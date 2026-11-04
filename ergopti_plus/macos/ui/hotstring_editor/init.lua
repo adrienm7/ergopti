@@ -458,9 +458,9 @@ local function handle_message(msg, owner)
 		
 		if ok_write and written == true and type(committed_content) == "string" then
 			_source_snapshot = { status = "ok", content = committed_content }
-			local reload_ok, reloaded = xpcall(function()
+			local reload_ok, reloaded, reload_cause = xpcall(function()
 				if type(_keymap) ~= "table" or type(_keymap.reload_toml) ~= "function" then
-					return false
+					return false, "the keymap reload API is unavailable"
 				end
 				-- The registry owns disable + load as one transaction. If parsing or
 				-- indexing fails, the exact old mappings remain live instead of leaving
@@ -469,7 +469,10 @@ local function handle_message(msg, owner)
 			end, debug.traceback)
 			if not owner_is_current(owner) then return end
 			if not reload_ok or reloaded ~= true then
-				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back.")
+				local cause = reload_cause or "the registry refused; its own line names the step"
+				-- A raised error may quote personal mappings; only its kind is logged.
+				if not reload_ok then cause = "the reload raised (details withheld)" end
+				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back (%s).", cause)
 				pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
 				return
 			end

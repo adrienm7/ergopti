@@ -46,12 +46,20 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
+    WAYLAND_SELECT_REFUSED,
+    WAYLAND_SESSION_UNSUPPORTED,
     CleanupStatus,
     activate_layout,
     apply_x11_user_tree,
     compile_rmlvo,
     deactivate_layouts,
     keymap_has_type,
+    live_readback_refusal,
+    live_slots,
+    read_desktop_selection,
+    running_as_root,
+    select_live_slot,
+    wayland_live_desktop,
 )
 from layout_package import (  # noqa: E402
     ERGOPTI_TYPE_NAME,
@@ -370,17 +378,21 @@ def install(
     home: Path,
     environ: Optional[Dict[str, str]] = None,
     allow_xorg: bool = False,
+    source_id: Optional[str] = None,
 ) -> dict:
     """Installs one converted layout into the user tree.
 
     A pure Xorg session is refused unless the caller loads the layout itself
     with ``apply_x11`` (``allow_xorg``): the desktop settings cannot select a
-    layout from the user tree there."""
+    layout from the user tree there. ``source_id`` names the converted files
+    when they were converted under another id (a live slot, see
+    ``apply_wayland``)."""
     if not allow_xorg:
         refuse_xorg_session(environ)
-    symbols = (source_dir / (layout_id + ".xkb")).read_text(encoding="utf-8")
+    source_name = source_id or layout_id
+    symbols = (source_dir / (source_name + ".xkb")).read_text(encoding="utf-8")
     types = (source_dir / "xkb_types.txt").read_text(encoding="utf-8")
-    compose_source = source_dir / (layout_id + ".XCompose")
+    compose_source = source_dir / (source_name + ".XCompose")
     problems = validate_layout_files(symbols, types)
     if problems:
         raise InstallError(
@@ -416,6 +428,22 @@ def install(
             "verified": False,
             "detail": "the converted layout does not compile with its key types; the tree is unchanged",
         }
+    sibling = live_slots(layout_id)[1]
+    if source_id is None and sibling in installed:
+        # An update reaches the live copy too (apply_wayland keeps both alike).
+        mirrored = install(
+            sibling,
+            display_name,
+            source_dir,
+            languages,
+            root,
+            home,
+            environ,
+            allow_xorg,
+            source_id=layout_id,
+        )
+        if not mirrored["ok"]:
+            return mirrored
     return {"ok": True, "verified": verified, "detail": "installed in %s" % root}
 
 
@@ -443,23 +471,25 @@ def restore_layout(
 
 
 def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -> dict:
-    """Removes one layout this module installed."""
+    """Removes one layout this module installed, with its live slot when it has one."""
     installed = read_manifest(root)
     if layout_id not in installed:
         raise InstallError(
             EXIT_VALIDATION, "the layout %s was not installed by ErgoptiPlus" % layout_id
         )
+    owned = [slot for slot in live_slots(layout_id) if slot in installed]
     try:
-        for path in layout_paths(root, layout_id).values():
-            if path.exists():
-                path.unlink()
-        remaining = {key: value for key, value in installed.items() if key != layout_id}
+        for slot in owned:
+            for path in layout_paths(root, slot).values():
+                if path.exists():
+                    path.unlink()
+        remaining = {key: value for key, value in installed.items() if key not in owned}
         publish_shared_files(root, home, remaining)
     except OSError as error:
         raise InstallError(EXIT_INSTALL_ABORTED, "cannot update the user XKB tree: %s" % error)
     status = CleanupStatus.ABSENT
     if deactivate:
-        status = deactivate_layouts(lambda spec: spec.layout == layout_id)
+        status = deactivate_layouts(lambda spec: spec.layout in owned)
     return {
         "ok": True,
         "verified": None,
@@ -468,11 +498,20 @@ def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -
 
 
 def activate(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
-    """Makes one installed layout the first input source of the session."""
+    """Makes one installed layout the first input source of the session.
+
+    Its live slot (``apply_wayland``) leaves the desktop's list: the two hold
+    the same build, and listing both would show the layout twice."""
     refuse_xorg_session(environ)
-    if layout_id not in read_manifest(root):
+    installed = read_manifest(root)
+    if layout_id not in installed:
         raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
     applied = activate_layout([LayoutSpec(layout_id)])
+    sibling = live_slots(layout_id)[1]
+    if applied and sibling in installed:
+        applied = (
+            deactivate_layouts(lambda spec: spec.layout == sibling) is not CleanupStatus.FAILED
+        )
     return {
         "ok": bool(applied),
         "verified": None,
@@ -495,6 +534,73 @@ def apply_x11(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = No
     return report
 
 
+def apply_wayland(
+    layout_id: str,
+    display_name: str,
+    source_dir: Path,
+    languages: List[str],
+    root: Path,
+    home: Path,
+    environ: Optional[Dict[str, str]] = None,
+) -> dict:
+    """Replaces a layout live on a GNOME or KDE Wayland session.
+
+    The converted files are installed under the live slot the desktop does not
+    use (``live_slots``), the desktop setting moves to it, and the report is a
+    success only once XWayland, which receives the compositor's keymap, holds
+    that slot with the installed cells. On a refusal the setting is put back
+    and the session keeps the layout it had."""
+    desktop = wayland_live_desktop(environ)
+    if desktop is None:
+        return _live_refusal(WAYLAND_SESSION_UNSUPPORTED, "no live layout path in this session")
+    refusal = live_readback_refusal(environ)
+    if refusal is not None:
+        # Without a read-back nothing could acknowledge the layout: write nothing.
+        return _live_refusal(refusal, "the loaded layout cannot be read back: " + refusal)
+    if running_as_root():
+        # dconf and the session bus belong to the desktop user (issue #84).
+        return _live_refusal(
+            WAYLAND_SELECT_REFUSED, "the desktop setting cannot be written as root"
+        )
+    slots = live_slots(layout_id)
+    selection = read_desktop_selection(desktop, slots)
+    if selection is None:
+        return _live_refusal(
+            WAYLAND_SELECT_REFUSED, "the %s layout setting is unreadable" % desktop
+        )
+    slot = slots[1] if selection.slot_in_use == slots[0] else slots[0]
+    report = install(
+        slot,
+        display_name,
+        source_dir,
+        languages,
+        root,
+        home,
+        environ,
+        source_id=layout_id,
+    )
+    if not report["ok"]:
+        return report
+    applied, code = select_live_slot(slot, slots, selection, root, environ)
+    if not applied:
+        return _live_refusal(code, "not loaded: " + code)
+    # The other slot is no longer selected, so rewriting it is invisible to the
+    # compositor: both copies now hold this build, and a later activation of
+    # either one types it.
+    other = slots[0] if slot == slots[1] else slots[1]
+    mirrored = install(
+        other, display_name, source_dir, languages, root, home, environ, source_id=layout_id
+    )
+    detail = "loaded by the %s desktop" % desktop
+    if not mirrored["ok"]:
+        detail += "; the unused copy %s keeps the previous build" % other
+    return {"ok": True, "verified": True, "slot": slot, "detail": detail}
+
+
+def _live_refusal(code: str, detail: str) -> dict:
+    return {"ok": False, "verified": False, "code": code, "detail": detail}
+
+
 def parse_arguments(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install registry layouts in the user XKB tree.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -506,6 +612,11 @@ def parse_arguments(argv: List[str]) -> argparse.Namespace:
     install_parser.add_argument(
         "--allow-xorg", action="store_true", help="install in a pure Xorg session (see apply-x11)"
     )
+    wayland_parser = commands.add_parser("apply-wayland")
+    wayland_parser.add_argument("--layout-id", required=True)
+    wayland_parser.add_argument("--display-name", required=True)
+    wayland_parser.add_argument("--source-dir", required=True, type=Path)
+    wayland_parser.add_argument("--language", action="append", default=[])
     for name in ("uninstall", "activate", "apply-x11"):
         command = commands.add_parser(name)
         command.add_argument("--layout-id", required=True)
@@ -533,6 +644,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             report = uninstall(args.layout_id, root, home)
         elif args.command == "apply-x11":
             report = apply_x11(args.layout_id, root)
+        elif args.command == "apply-wayland":
+            report = apply_wayland(
+                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+            )
         else:
             report = activate(args.layout_id, root)
     except InstallError as error:

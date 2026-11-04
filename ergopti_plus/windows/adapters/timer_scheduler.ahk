@@ -37,7 +37,54 @@
 global _TIMER_ADAPTER_REGISTRY := Map()
 global _TIMER_ADAPTER_NEXT_ID  := 0
 global TIMER_ADAPTER_MAX_INTERVAL_MS := 0xFFFFFFFF
+; Longest relative delay any driver arms, as _shared/lua/number_policy.lua
+; MAX_TIMER_DELAY_MS; _shared/tests/corpus/timer/delay_ceiling_vectors.json pins it.
+global TIMER_MAX_DELAY_MS := 2 ** 53
 
+; Whether a relative delay in milliseconds may reach a native timer: a finite
+; number not above the shared ceiling. Each caller keeps its own lower bound.
+; SetTimer never refuses a period: it truncates it to 32 bits, so 2^32, 2^53,
+; 1e300, infinity and NaN all fired at once (measured on v2.0.26).
+; @param Ms {Any} Candidate delay in milliseconds.
+; @return {Boolean}
+TimerDelayWithinCeiling(Ms) {
+	global TIMER_MAX_DELAY_MS
+	if !(Ms is Number)
+		return false
+	; Infinity and NaN are the numbers whose difference with themselves is not 0.
+	return (Ms - Ms == 0) && Ms <= TIMER_MAX_DELAY_MS
+}
+
+; Converts a relative delay in seconds to admitted milliseconds, in floating
+; point so that a huge integer count cannot wrap around.
+; @param Seconds {Any} Candidate delay in seconds.
+; @return {Number|String} Unrounded milliseconds, or "" when refused.
+TimerDelayMsFromSeconds(Seconds) {
+	if !(Seconds is Number) || !(Seconds - Seconds == 0)
+		return ""
+	Ms := Seconds * 1000.0
+	return TimerDelayWithinCeiling(Ms) ? Ms : ""
+}
+
+; SetTimer keeps 32 bits of its period, a narrower range than the shared ceiling:
+; a delay between the two is refused here, never truncated into another delay.
+; Compared on both sides because Abs of the lowest Integer stays negative.
+_TimerAdapterFitsNative(Ms) {
+	global TIMER_ADAPTER_MAX_INTERVAL_MS
+	return TimerDelayWithinCeiling(Ms)
+		&& Ms <= TIMER_ADAPTER_MAX_INTERVAL_MS && Ms >= -TIMER_ADAPTER_MAX_INTERVAL_MS
+}
+
+; Refuses, before the native timer, a delay it cannot honor.
+; @param DelayMs {Number} Delay in milliseconds, either sign.
+; @param Owner {String} Who asks, for the error.
+; @return {Number} DelayMs.
+TimerRequireDelayMs(DelayMs, Owner) {
+	if !_TimerAdapterFitsNative(DelayMs)
+		throw ValueError(Owner . " refuses a timer delay that is not finite or exceeds the native timer range.",
+			-1, String(DelayMs))
+	return DelayMs
+}
 
 ; Allocates a new unique handle ID.
 _TimerAdapterNextId() {
@@ -56,11 +103,10 @@ _TimerAdapterCancelNative(BoundFn) {
 
 /** Schedules or cancels an owned native callback without replacing its identity. */
 TimerSetCallback(Callback, PeriodMs) {
-	global TIMER_ADAPTER_MAX_INTERVAL_MS
 	if !HasMethod(Callback, "Call")
 		throw TypeError("TimerSetCallback requires a callable callback")
 	if !IsNumber(PeriodMs) || PeriodMs != Round(PeriodMs)
-		|| Abs(PeriodMs) > TIMER_ADAPTER_MAX_INTERVAL_MS
+		|| !_TimerAdapterFitsNative(PeriodMs + 0)
 		throw ValueError("TimerSetCallback requires an integer native timer period")
 	_TimerAdapterSetNative(Callback, PeriodMs)
 	return true
@@ -105,6 +151,8 @@ _TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
 _TimerAdapterDurationMs(DurationSec, ParamName) {
 	if !IsNumber(DurationSec)
 		throw TypeError(ParamName . " must be numeric.")
+	if !(TimerDelayMsFromSeconds(DurationSec + 0) is Number)
+		throw ValueError(ParamName . " is not finite or exceeds the timer ceiling.")
 	if (DurationSec <= 0)
 		throw ValueError(ParamName . " must be greater than zero.")
 	if (DurationSec > TIMER_ADAPTER_MAX_INTERVAL_MS / 1000)
@@ -315,8 +363,8 @@ TimerArmOneShotMs(Callback, DelayMs) {
 		throw TypeError("TimerArmOneShotMs requires a callable callback")
 	if !IsNumber(DelayMs)
 		throw TypeError("TimerArmOneShotMs requires a numeric delay")
-	Delay := Max(1, Round(Abs(DelayMs)))
 	try {
+		Delay := Max(1, Round(Abs(TimerRequireDelayMs(DelayMs + 0, "TimerArmOneShotMs"))))
 		_TimerAdapterSetNative(Callback, -Delay)
 		return true
 	} catch as Err {
@@ -465,6 +513,7 @@ class _LocalServerModelsTimerNativeAdapter {
 		; opaque positive interval must never become an idle repeating poller.
 		if !(Period is Integer) || Period > 0
 			throw TypeError("Models timers require cancellation or a negative one-shot period.")
+		TimerRequireDelayMs(Period, "Models timers")
 		if Period == 0
 			SetTimer(Callback, 0)
 		else
@@ -478,6 +527,7 @@ class _LocalServersTimerNativeAdapter {
 		; Logical queue observation only rearms an exact job's one-shot.
 		if !(Period is Integer) || Period > 0
 			throw TypeError("Local server queue timers require cancellation or a negative one-shot period.")
+		TimerRequireDelayMs(Period, "Local server queue timers")
 		if Period == 0
 			SetTimer(Callback, 0)
 		else

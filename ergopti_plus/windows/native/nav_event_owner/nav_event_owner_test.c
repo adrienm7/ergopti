@@ -6187,6 +6187,239 @@ static bool TestHookTraceDoesNotQualifyTestDispatch(void)
  *
  * @return Zero when every test passes or one after the first failure set.
  */
+/** Reads one key of the press ledger. */
+static bool TestLedgerRead(
+	const char *name, uint16_t sc, uint32_t *out_flags, uint64_t *out_sequence)
+{
+	ErgoptiNav_KeyPress press;
+	memset(&press, 0, sizeof(press));
+	press.struct_size = ERGOPTI_NAV_KEY_PRESS_SIZE;
+	TEST_ASSERT(name, ErgoptiNav_QueryKeyPress(sc, &press) == ERGOPTI_NAV_STATUS_OK);
+	*out_flags = press.flags;
+	*out_sequence = press.press_sequence;
+	return true;
+}
+
+
+
+/** A captured press is held for AutoHotkey's consumers until its replayed release. */
+static bool TestKeyLedgerHoldsCapturedPressUntilReplayedUp(void)
+{
+	const char *name = "press ledger keeps a captured press held until its replayed up (todo91-ledger-replay)";
+	const uint16_t shift = 0x2A;
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TestEvent replayed[4];
+	uint64_t generation = 0, sequence = 0;
+	uint32_t flags = 0, replayed_count = 0;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	ErgoptiNav_TestResetKeyLedger();
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, passed == 0);
+	TEST_ASSERT(name, TestLedgerRead(name, shift, &flags, &sequence));
+	TEST_ASSERT(name, flags == (ERGOPTI_NAV_KEY_REAL_DOWN | ERGOPTI_NAV_KEY_HIDDEN));
+	TEST_ASSERT(name, sequence != 0);
+	/* The physical release is captured too: the replay still owes the key. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, shift, &flags, &sequence));
+	TEST_ASSERT(name, (flags & ERGOPTI_NAV_KEY_HIDDEN) != 0);
+	/* AutoHotkey's own output presses no physical key. */
+	TEST_ASSERT(name, TestHookFlow(name, (uint16_t)'X', 0x2D, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_AHK_SEND_LEVEL_BASE,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, 0x2D, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0 && sequence == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(
+		TEST_OWNER_B, ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT, UINT32_MAX,
+		replayed, 4, &replayed_count) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, replayed_count == 2);
+	/* The two replayed edges come back marked: the second one ends the hold. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, shift, &flags, &sequence));
+	TEST_ASSERT(name, (flags & ERGOPTI_NAV_KEY_HIDDEN) != 0);
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, shift, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0 && sequence == 0);
+	/* A replay is a hidden press on its own, whatever the ledger saw before it. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, shift, &flags, &sequence));
+	TEST_ASSERT(name, flags == (ERGOPTI_NAV_KEY_REAL_DOWN | ERGOPTI_NAV_KEY_HIDDEN));
+	TEST_ASSERT(name, TestHookFlow(name, VK_LSHIFT, shift, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	return true;
+}
+
+
+
+/** Order, the AltGr alias and the refused provenances, read from raw tuples. */
+static bool TestKeyLedgerOrderAndAltGrProvenance(void)
+{
+	const char *name = "press ledger orders presses and tells the fake LCtrl from the real one (todo91-ledger-provenance)";
+	const uint16_t lctrl = 0x1D, ralt = 0x138, capslock = 0x3A, tab = 0x0F;
+	ErgoptiNav_DispatchResult result;
+	uint64_t first = 0, second = 0, again = 0, sequence = 0;
+	uint32_t flags = 0;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+	ErgoptiNav_KeyPress wrong;
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	uint64_t generation = 0;
+
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	ErgoptiNav_TestResetKeyLedger();
+	/* Held alone, then joined: the numbers follow the presses, not the catalogue. */
+	TEST_ASSERT(name, TestHookFlow(name, 0x09, tab, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_CAPITAL, capslock, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, tab, &flags, &first));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN);
+	TEST_ASSERT(name, TestLedgerRead(name, capslock, &flags, &second));
+	TEST_ASSERT(name, first != 0 && first < second);
+	/* An auto-repeat is not a new press. */
+	TEST_ASSERT(name, TestHookFlow(name, 0x09, tab, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, tab, &flags, &again));
+	TEST_ASSERT(name, again == first);
+	TEST_ASSERT(name, TestHookFlow(name, 0x09, tab, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, tab, &flags, &again));
+	TEST_ASSERT(name, flags == 0 && again == 0);
+	TEST_ASSERT(name, TestHookFlow(name, VK_CAPITAL, capslock, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+
+	/* Standard AltGr: the fake LCtrl (raw 0x21D) is the alias, never the real key. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, 0x21D, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_RMENU, ralt, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_SYSTEM_DOWN && sequence == 0);
+	TEST_ASSERT(name, TestLedgerRead(name, ralt, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN);
+	/* A real LCtrl joining it, then the fake release: the real hold survives. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, lctrl, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, 0x21D, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN && sequence != 0);
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, lctrl, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	/* Kana AltGr: SC138 alone, the same key identity, no alias at all. */
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0);
+	TEST_ASSERT(name, TestHookFlow(name, VK_RMENU, ralt, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, 0x15, ralt, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, ralt, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN);
+	TEST_ASSERT(name, TestHookFlow(name, 0x15, ralt, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+
+	/* A lower-integrity injector cannot claim the replay marker. */
+	TEST_ASSERT(name, TestHookFlow(name, (uint16_t)'Q', 0x10, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, 0x10, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0);
+
+	memset(&wrong, 0xA5, sizeof(wrong));
+	wrong.struct_size = ERGOPTI_NAV_KEY_PRESS_SIZE - 1u;
+	TEST_ASSERT(name, ErgoptiNav_QueryKeyPress(0x1D, &wrong) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, wrong.flags == 0xA5A5A5A5u);
+	wrong.struct_size = ERGOPTI_NAV_KEY_PRESS_SIZE;
+	TEST_ASSERT(name, ErgoptiNav_QueryKeyPress(0x200, &wrong) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	ErgoptiNav_TestResetKeyLedger();
+	return true;
+}
+
+
+
+/** A release no hook sees leaves no key held: the fake LCtrl stays AltGr's. */
+static bool TestKeyLedgerForgetsReleasesItCannotSee(void)
+{
+	const char *name = "press ledger lets go of keys whose release it cannot see (item3-missed-release)";
+	const uint16_t lctrl = 0x1D, lalt = 0x38, ralt = 0x138, del = 0x53, a = 0x1E;
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	uint64_t generation = 0, sequence = 0, before = 0, resets = 0;
+	uint32_t flags = 0, watch = 7;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	ErgoptiNav_TestResetKeyLedger();
+	/* Ctrl+Alt+Del: its Delete lets everything go, itself included. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, lctrl, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_LMENU, lalt, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &before));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN && before != 0);
+	TEST_ASSERT(name, TestHookFlow(name, VK_DELETE, del, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0 && sequence == 0);
+	TEST_ASSERT(name, TestLedgerRead(name, lalt, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0);
+	TEST_ASSERT(name, TestLedgerRead(name, del, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0);
+	/* AltGr alone afterwards is the alias, never the user's LCtrl. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, 0x21D, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_RMENU, ralt, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_SYSTEM_DOWN && sequence == 0);
+	/* Numbers keep rising, and a release of a forgotten key changes nothing. */
+	TEST_ASSERT(name, TestLedgerRead(name, ralt, &flags, &sequence));
+	TEST_ASSERT(name, sequence > before);
+	TEST_ASSERT(name, TestHookFlow(name, VK_LMENU, lalt, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, ralt, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN);
+	ErgoptiNav_TestResetKeyLedger();
+	/* Delete without the whole chord is a Delete. */
+	TEST_ASSERT(name, TestHookFlow(name, VK_LCONTROL, lctrl, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(name, VK_DELETE, del, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == ERGOPTI_NAV_KEY_REAL_DOWN);
+	/* The desktop switch (UAC, lock): the watch's own handler. */
+	TEST_ASSERT(name, TestHookFlow(name, (uint16_t)'A', a, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_GetKeyLedgerHealth(&watch, &before) == ERGOPTI_NAV_STATUS_OK);
+	ErgoptiNav_TestDesktopSwitch();
+	TEST_ASSERT(name, TestLedgerRead(name, a, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0 && sequence == 0);
+	TEST_ASSERT(name, TestLedgerRead(name, lctrl, &flags, &sequence));
+	TEST_ASSERT(name, flags == 0);
+	TEST_ASSERT(name, ErgoptiNav_GetKeyLedgerHealth(&watch, &resets) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, resets == before + 1u);
+	TEST_ASSERT(name, watch == 0u);
+	TEST_ASSERT(name, ErgoptiNav_GetKeyLedgerHealth(NULL, &resets) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	ErgoptiNav_TestResetKeyLedger();
+	return true;
+}
+
+
+
 /** Pins the rule deciding which events show that AutoHotkey rehooked. */
 static bool TestHookReassertRuleMatchesAutoHotkeyOutput(void)
 {
@@ -6268,6 +6501,12 @@ int main(int argc, char **argv)
 			TestStopDrainBalancesConsumedHolds},
 		{"terminal capture replays exact physical edges",
 			TestTerminalCaptureReplaysExactPhysicalEdges},
+		{"press ledger keeps a captured press held until its replayed up (todo91-ledger-replay)",
+			TestKeyLedgerHoldsCapturedPressUntilReplayedUp},
+		{"press ledger orders presses and tells the fake LCtrl from the real one (todo91-ledger-provenance)",
+			TestKeyLedgerOrderAndAltGrProvenance},
+		{"press ledger lets go of keys whose release it cannot see (item3-missed-release)",
+			TestKeyLedgerForgetsReleasesItCannotSee},
 		{"terminal route snapshots retain exact suffix (todo49-route-fifo)",
 			TestTerminalRouteSnapshotsRetainExactSuffix},
 		{"terminal output preview is authenticated and guarded (todo49-output-preview)",

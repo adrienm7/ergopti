@@ -38,7 +38,7 @@ _TUCM_CallbackAnswersInTheWindow() {
 		Count += 1
 		Position += 10
 	}
-	AssertEqual(4, Count, "no connection, no release, unreadable release and up to date answer in the window")
+	AssertEqual(5, Count, "no connection, no release, unreadable release, up to date and a check-only release answer in the window")
 	for Phase in ['"state", "error"', '"state", "no_release"', '"state", "up_to_date"']
 		Assert(InStr(Body, Phase) > 0, "the callback answers " . Phase)
 	Assert(InStr(Body, '"reason", "no_connection"') > 0 and InStr(Body, '"reason", "parse_failed"') > 0,

@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local table_unpack = table.unpack or unpack
 
 --- The submenu of the top-level row whose title contains the translation of `key`.
 --- @param items table
@@ -58,7 +59,7 @@ end
 --- @param changed table|nil Receives a `count` of on_menu_changed calls.
 --- @return table items
 local function build(llm, changed)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = llm,
@@ -114,9 +115,58 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 			helpers.assert_true(row.title ~= clear, "row " .. index .. " of the AI submenu is a clear row")
 		end
 	end)
+
+	-- ai-generation-groups: Linux draws the generation rows inline, in the same two
+	-- groups with one separator as the submenu of the other drivers.
+	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
+		helpers.it("draws the generation groups with the AI " .. state, function()
+			local i18n = require("infra.i18n")
+			local rows = submenu_of(build(fake_llm(enabled)), "menu.llm.title")
+			local head = function(key) return i18n.get(key):match("^[^%%]*") end
+			local first, last
+			for index, row in ipairs(rows) do
+				if row.title:find(head("menu.llm.num_predictions_label"), 1, true) then first = index end
+				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
+			end
+			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
+			require("test.ai_menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
+				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
+				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
+				clear_context = head("menu.llm.reset_on_nav"),
+			}, state)
+			require("test.ai_menu_layout_contract").assert_clean_separators(helpers, rows, state)
+		end)
+	end
+
+	-- ai-test-prediction-row: model, profile and test are one block in every AI
+	-- state, closed by one separator; none lands next to another one.
+	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
+		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = false }) do
+			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
+				local i18n = require("infra.i18n")
+				local llm = fake_llm(enabled)
+				llm.get_current_model = function() return model or nil end
+				llm.get_prediction_model = llm.get_current_model
+				local rows = submenu_of(build(llm), "menu.llm.title")
+				require("test.ai_menu_layout_contract").assert_block(helpers, rows, {
+					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
+					test = i18n.get("menu.llm.test_prediction"),
+					trigger = i18n.get("menu.llm.trigger_menu_title"),
+					settings = i18n.section("menu.llm.header_settings"),
+				}, state .. "/" .. model_state)
+			end)
+		end
+	end
 end)
 
 helpers.describe("tray (linux): keyboard slot groups need a key catalogue", function()
+	--- The real Shortcuts owner, read on by the menu: an off category greys every
+	--- row of its submenu (category-off rule), slot groups included.
+	local function shortcuts_on()
+		return setmetatable({ is_enabled = function() return true end },
+			{ __index = require("modules.shortcuts.manager") })
+	end
+
 	--- Menu inventory stays editable when its native source is unavailable.
 	--- This fixture owns that dependency rather than inheriting another test's
 	--- initialized physical-source owner or its expired private config path.
@@ -140,15 +190,14 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 		with_unavailable_source(function()
 			local kbd = helpers.load_module("modules.shortcuts.keyboard_shortcuts")
 			kbd._reset()
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			local rows = submenu_of(mb.build({
 				_version = "0.0.0-dev.12",
-				shortcuts = require("modules.shortcuts.manager"),
+				shortcuts = shortcuts_on(),
 				on_quit = function() end,
 			}), "menu.shortcuts.title")
-			local i18n = require("infra.i18n")
 			for _, group in ipairs(kbd.SLOT_GROUPS) do
-				local label, found = i18n.get(group.group_key), nil
+				local label, found = kbd.get_group_label(group), nil
 				for _, row in ipairs(rows or {}) do
 					if row.title == label then found = row end
 				end
@@ -172,17 +221,16 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 				helpers.assert_true(ok_kbd, tostring(kbd))
 				kbd._reset()
 				helpers.assert_eq(#kbd.available_slots("primary_"), 0, "the blind catalogue offers no slot")
-				local mb = helpers.load_module("ui.menu.menu_builder")
+				local mb = helpers.load_module("ui.menu.builder")
 				local items = mb.build({
 					_version = "0.0.0-dev.12",
-					shortcuts = require("modules.shortcuts.manager"),
+					shortcuts = shortcuts_on(),
 					on_quit = function() end,
 				})
 				local rows = submenu_of(items, "menu.shortcuts.title")
 				helpers.assert_true(rows ~= nil, "the shortcuts submenu must be drawn")
-				local i18n = require("infra.i18n")
 				for _, group in ipairs(kbd.SLOT_GROUPS) do
-					local label, found = i18n.get(group.group_key), nil
+					local label, found = kbd.get_group_label(group), nil
 					for _, row in ipairs(rows) do
 						if group.prefix == "contextual" and row.title == label then found = row
 						else helpers.assert_true(row.title ~= label,
@@ -267,7 +315,7 @@ local function with_slot_frame(locale, mutation, body)
 				return true
 			end,
 		}
-		local module = helpers.load_module_with_dependency("ui.menu.menu_builder", "infra.manifest_menu", renderer)
+		local module = helpers.load_module_with_dependency("ui.menu.builder", "infra.manifest_menu", renderer)
 		local build_rows = slot_builder_from(module)
 		function state.assign(option, picked)
 			state.assigned[#state.assigned + 1] = { option = option, picked = picked }

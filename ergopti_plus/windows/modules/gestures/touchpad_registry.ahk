@@ -6,9 +6,9 @@
 ; The one owner of Ergopti's writes to the Windows Precision Touchpad registry
 ; key. Before the first write it backs up the prior value of every name it is
 ; about to write; it applies the generated value table; it gives the first-run
-; wizard's elevated PowerShell script the same table; and it restores the
-; backup on request (Configuration > « Restaurer les gestes du pavé tactile
-; Windows »).
+; wizard's elevated PowerShell script the same table; and the Gestures and
+; global « Tout effacer » restore the backup, or the Windows factory defaults
+; when there is none.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One source: _generated/touchpad_registry.ahk, generated from
@@ -21,6 +21,8 @@
 ; 3. Exact restore: a value that was absent is deleted, a DWORD rewritten. The
 ;    backup is removed only once every value was restored, so a failed restore
 ;    can be retried and the next configuration backs up the values then current.
+;    Without a backup the generated factory_defaults are written instead, and
+;    every other name Ergopti writes is deleted; the log says which path ran.
 ; 4. Functions only, no top-level state: the first-run wizard calls this owner
 ;    before modules/gestures/init.ahk runs, when a top-level global of this
 ;    file would still be unset. Every I/O boundary is injectable so the unit
@@ -264,12 +266,30 @@ _TouchpadRegistryParseBackup(Text, Data) {
 	return Ordered
 }
 
-; Restores the values backed up before Ergopti's first write, removes the
-; backup, then restarts the touchpad so its driver reloads them.
+; The values a fresh Windows profile holds, in the shape of a parsed backup:
+; each family enable gets its shipped value, every other name is absent.
+; @param Data {Map} TouchpadRegistryData().
+; @return {Array} Maps ("name", "absent", "value") in write order.
+_TouchpadRegistryFactoryEntries(Data) {
+	Factory := Data["factory_defaults"]
+	Entries := []
+	for _, Value in Data["values"] {
+		Name := Value["name"]
+		Entries.Push(Factory.Has(Name)
+			? Map("name", Name, "absent", false, "value", Factory[Name])
+			: Map("name", Name, "absent", true, "value", 0))
+	}
+	return Entries
+}
+
+; Puts the touchpad back to its system state, then restarts it so its driver
+; reloads the values: the values backed up before Ergopti's first write when
+; that backup exists (it is removed afterwards), the Windows factory defaults
+; otherwise.
 ; @param OnDone {Func|0} Touchpad-restart completion, fn(Ok).
 ; @param Io {Map|0} Test seams, each optional: exists, read, write,
 ;   delete_value, delete_file, restart, backup_path.
-; @return {String} "restored", "no_backup" or "failed".
+; @return {String} "restored" (from the backup), "factory_defaults" or "failed".
 TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 	Tag := TouchpadRegistryLogTag()
 	Seams := Io is Map ? Io : Map()
@@ -282,12 +302,15 @@ TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 	Restart := Seams.Get("restart", GestureRestartTouchpadDevice)
 	LoggerStart(Tag, "Restoring the Windows touchpad gestures…")
 	try {
-		if !Exists.Call(Path) {
-			LoggerSuccess(Tag, "No touchpad backup: Ergopti never changed these settings.")
-			return "no_backup"
-		}
 		Data := TouchpadRegistryData()
-		Entries := _TouchpadRegistryParseBackup(Read.Call(Path), Data)
+		FromBackup := Exists.Call(Path)
+		if FromBackup {
+			Entries := _TouchpadRegistryParseBackup(Read.Call(Path), Data)
+			LoggerInfo(Tag, "Restoring the touchpad values backed up in '{1}'.", Path)
+		} else {
+			Entries := _TouchpadRegistryFactoryEntries(Data)
+			LoggerInfo(Tag, "No touchpad backup: restoring the Windows factory defaults.")
+		}
 	} catch as Err {
 		LoggerError(Tag, "The touchpad backup could not be read: {1}. Nothing was changed.", Err.Message)
 		return "failed"
@@ -301,11 +324,13 @@ TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 			Failed += 1
 	}
 	if Failed {
-		LoggerError(Tag, "{1} of {2} touchpad value(s) could not be restored; the backup is kept for a retry.",
+		LoggerError(Tag, FromBackup
+			? "{1} of {2} touchpad value(s) could not be restored; the backup is kept for a retry."
+			: "{1} of {2} touchpad value(s) could not be reset to the Windows factory defaults.",
 			Failed, Entries.Length)
 		return "failed"
 	}
-	if !DeleteFile.Call(Path) {
+	if FromBackup && !DeleteFile.Call(Path) {
 		LoggerError(Tag, "The touchpad values were restored but the backup '{1}' could not be removed.", Path)
 		return "failed"
 	}
@@ -313,27 +338,42 @@ TouchpadRegistryRestore(OnDone := 0, Io := 0) {
 	; values only take effect at the next sign-in.
 	if !Restart.Call(OnDone)
 		LoggerError(Tag, "The touchpad values were restored but the touchpad could not be restarted; they apply at the next sign-in.")
-	LoggerSuccess(Tag, "{1} touchpad value(s) restored.", Entries.Length)
-	return "restored"
+	LoggerSuccess(Tag, FromBackup ? "{1} touchpad value(s) restored from the backup."
+		: "{1} touchpad value(s) reset to the Windows factory defaults.", Entries.Length)
+	return FromBackup ? "restored" : "factory_defaults"
 }
 
-; Configuration > « Restaurer les gestes du pavé tactile Windows ». A failure
-; is already an ERROR, which the shared error UI surfaces.
-; @return {Boolean} True when the values were restored.
-TouchpadRegistryRestoreFromMenu(*) {
-	if A_IsSuspended {
-		LoggerWarn(TouchpadRegistryLogTag(), "Ignoring the touchpad restore while suspended.")
-		return false
-	}
-	Result := TouchpadRegistryRestore()
-	if (Result == "no_backup") {
-		NotifierSend(t("notify.touchpad.no_backup"), Map("level", "info"))
-		return false
-	}
-	if (Result != "restored")
-		return false
-	NotifierSend(t("notify.touchpad.restored"), Map("level", "success"))
-	; The Ergopti slots are no longer configured: refresh the gesture status rows
-	GestureSystemRequestRefresh()
-	return true
+; The system half of the Gestures and global « Tout effacer » on Windows: the
+; touchpad goes back to the values from before Ergopti, or to the Windows
+; factory defaults without a backup, and the user is told which. A failure is
+; already an ERROR, which the shared error UI surfaces.
+; @param RestoreFn {Func} The restore, fn() returning TouchpadRegistryRestore's result.
+; @param NotifyFn {Func|0} Notifier, fn(Message, Opts) (NotifierSend).
+; @return {String} The restore's result.
+TouchpadRegistryClearToSystem(RestoreFn, NotifyFn := 0) {
+	if !HasMethod(RestoreFn, "Call")
+		throw TypeError("The touchpad clear requires its restore owner.")
+	Notify := HasMethod(NotifyFn, "Call") ? NotifyFn : NotifierSend
+	Result := RestoreFn.Call()
+	if (Result == "restored")
+		Notify.Call(t("notify.touchpad.restored"), Map("level", "success"))
+	else if (Result == "factory_defaults")
+		Notify.Call(t("notify.touchpad.factory_defaults"), Map("level", "success"))
+	else if (Result != "failed")
+		throw ValueError("Unknown touchpad restore result: " . String(Result))
+	; No status refresh here: the clear reloads the driver, and a refused clear
+	; leaves the open-time check (GestureSystemOnInitPopup) to see the change.
+	return Result
+}
+
+; The touchpad clear a scope option map carries. The tray passes
+; TouchpadRegistryRestore; tests pass a fake, so a scope test can never reach
+; the real registry, and a caller that forgot it fails instead of skipping it.
+; @param Options {Map} Scope options with "touchpad_restore" (and an optional
+;   "touchpad_notify").
+; @return {String} The restore's result.
+TouchpadRegistryClearFromScope(Options) {
+	if !(Options is Map) || !Options.Has("touchpad_restore")
+		throw ValueError("A clear to the system behaviour requires its touchpad_restore port.")
+	return TouchpadRegistryClearToSystem(Options["touchpad_restore"], Options.Get("touchpad_notify", 0))
 }

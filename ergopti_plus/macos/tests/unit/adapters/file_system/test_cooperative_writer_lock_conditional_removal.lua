@@ -27,7 +27,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 			os.remove = original_remove
 			io.open = original_open
 			original_remove(path)
-			original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(fixture.write_lock_path(path))
 			if not call_ok then error(detail, 0) end
 		end)
 	end
@@ -58,7 +58,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 			helpers.assert_eq(locks, 1); helpers.assert_eq(unlocks, 1)
 			helpers.assert_eq(unlinks, 1); helpers.assert_eq(held, false)
 			helpers.assert_eq(adapter.read_with_status(path), nil)
-			local lock_file = assert(io.open(path .. fixture.WRITE_LOCK_SUFFIX, "r"))
+			local lock_file = assert(io.open(fixture.write_lock_path(path), "r"))
 			assert(lock_file:close())
 		end)
 	end)
@@ -162,7 +162,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 				end)
 				local original_open, original_remove = io.open, os.remove
 				io.open = function(target, mode)
-					if target == path .. fixture.WRITE_LOCK_SUFFIX and mode == "a+" then
+					if target == fixture.write_lock_path(path) and mode == "a+" then
 						return { close = function() return not blocked end }
 					end
 					return original_open(target, mode)
@@ -198,7 +198,7 @@ helpers.describe("adapters.file_system: conditional removal ownership", function
 			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not blocked end)
 			local original_open, original_remove = io.open, os.remove
 			io.open = function(target, mode)
-				if target == path .. fixture.WRITE_LOCK_SUFFIX and mode == "a+" then
+				if target == fixture.write_lock_path(path) and mode == "a+" then
 					return { close = function() return not blocked end }
 				end
 				return original_open(target, mode)
@@ -230,7 +230,7 @@ helpers.describe("conditional removal composed scope", function()
 			local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not blocked end)
 			local original_open, original_remove = io.open, os.remove
 			io.open = function(target, mode)
-				if target == path .. fixture.WRITE_LOCK_SUFFIX and mode == "a+" then
+				if target == fixture.write_lock_path(path) and mode == "a+" then
 					return { close = function() return not blocked end }
 				end
 				return original_open(target, mode)
@@ -266,8 +266,8 @@ helpers.describe("conditional removal composed scope", function()
 			end, debug.traceback)
 			io.open, os.remove = original_open, original_remove
 			original_remove(path); original_remove(backup)
-			original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
-			original_remove(backup .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(fixture.write_lock_path(path))
+			original_remove(fixture.write_lock_path(backup))
 			if not call_ok then error(detail, 0) end
 		end)
 	end)
@@ -284,7 +284,7 @@ helpers.describe("navigation-layer cohort native release debt", function()
 					local adapter = fixture.make_adapter(nil, nil, nil, nil, nil, function() return not blocked end)
 					local original_open, original_remove = io.open, os.remove
 					io.open = function(target, mode)
-						if target == path .. fixture.WRITE_LOCK_SUFFIX and mode == "a+" then
+						if target == fixture.write_lock_path(path) and mode == "a+" then
 							return { close = function() return not blocked end }
 						end
 						return original_open(target, mode)
@@ -326,7 +326,7 @@ helpers.describe("navigation-layer cohort native release debt", function()
 						helpers.assert_eq(unlinks, 1)
 					end, debug.traceback)
 					io.open, os.remove = original_open, original_remove
-					original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+					original_remove(path); original_remove(fixture.write_lock_path(path))
 					if not call_ok then error(detail, 0) end
 				end)
 			end)
@@ -356,7 +356,7 @@ helpers.describe("conditional removal classified read refusal", function()
 				path, adapter, { status = "ok", content = "owned preset" })
 			io.open, os.remove = original_open, original_remove
 			local observed = assert(original_open(path, "r")); local source = observed:read("*a"); assert(observed:close())
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			helpers.assert_eq(call_ok, true)
 			helpers.assert_eq(removed, false)
 			helpers.assert_contains(detail, "controlled read refusal")

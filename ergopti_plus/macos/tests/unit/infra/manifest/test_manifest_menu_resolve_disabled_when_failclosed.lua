@@ -27,7 +27,7 @@ local fixture = require("tests.support.manifest_menu_fixture")
 local MANIFEST = [[
 {
 	"test_menu": [
-		{ "type": "dynamic", "id": "known_item", "disabled_when": ["some_flag"] }
+		{ "type": "action", "id": "known_item", "disabled_when": ["some_flag"] }
 	]
 }
 ]]

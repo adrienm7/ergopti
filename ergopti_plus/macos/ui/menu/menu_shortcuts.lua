@@ -22,6 +22,7 @@ local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local text_acts     = require("modules.shortcuts.actions.text")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local MenuUtils     = require("ui.menu.menu_utils")
 local ManifestMenu  = require("infra.manifest_menu")
 local WrapMutation  = require("menu.wrap_mutation")
@@ -204,7 +205,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	-- materialises `items` the same way a `list` row's provider rows are, so a
 	-- group builder no longer has to assemble the driver's own tree.
 	return {
-		label    = pk .. (desc ~= "" and (" : " .. desc) or ""),
+		label    = desc ~= "" and LabelValue.compose(i18n.get, pk, desc) or pk,
 		checked  = is_on or nil,
 		disabled = not state.shortcuts or paused or nil,
 		action   = (state.shortcuts and not paused) and (function(id)
@@ -382,7 +383,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			if type(cs) == "table" and type(cs.left) == "string" and cs.left ~= "" then
 				local right   = (type(cs.right) == "string" and cs.right ~= "") and cs.right or cs.left
 				local cs_lbl  = (cs.left == right) and cs.left or (cs.left .. " … " .. right)
-				cs_lbl = cs_lbl .. " : " .. i18n.get("menu.shortcuts.wrap_symbols_custom_label")
+				cs_lbl = LabelValue.compose(i18n.get, cs_lbl, i18n.get("menu.shortcuts.wrap_symbols_custom_label"))
 				local del_sub = ManifestMenu.template_rows("wrap_symbols_custom_controls", {
 					[require("config_keys").COMMAND.WRAP_SYMBOLS_DELETE_CUSTOM] = (function(i) return function()
 						return mutate_wrap(function(candidate)
@@ -562,34 +563,6 @@ function M.build(ctx)
 					local mi = make_shortcut_item(s, shortcuts, ctx)
 					if s.id == require("config_keys").LEAF.WRAP_TEXT_IF_SELECTED then
 						wrap_item = mi
-					elseif s.id:sub(1, 5) == "ctrl_" then
-						table.insert(ctrl_items, mi)
-						-- Inject ChatGPT URL editor inline below ctrl_g
-						if s.id == "ctrl_g" then
-							local chatgpt_action = not paused and function()
-									local ok_p, clicked, url = pcall(dialog.text_prompt,
-										i18n.get("dialog.shortcuts.chatgpt_title"),
-										i18n.get("dialog.shortcuts.chatgpt_prompt"),
-										state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
-									if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
-										state.chatgpt_url = url
-										if type(shortcuts.set_chatgpt_url) == "function" then
-											pcall(shortcuts.set_chatgpt_url, url)
-										end
-										if ctx.save_prefs() ~= true then return false end
-										ctx.updateMenu()
-									end
-								end or nil
-							local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
-								[require("config_keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
-									if type(chatgpt_action) ~= "function" then return false end
-									return chatgpt_action(...)
-								end,
-							}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
-							if not editor_rows then return nil end
-							if paused then editor_rows[1].action = nil end
-							for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
-						end
 					elseif s.id:sub(1, 4) == "cmd_" then
 						table.insert(cmd_items, mi)
 					end
@@ -597,6 +570,32 @@ function M.build(ctx)
 			end
 		end
 	end
+
+	-- The ChatGPT URL editor heads the Ctrl group: the URL belongs to the
+	-- open_chatgpt action, which the Ctrl+G slot runs by default (schema v20).
+	local chatgpt_action = not paused and function()
+			local ok_p, clicked, url = pcall(dialog.text_prompt,
+				i18n.get("dialog.shortcuts.chatgpt_title"),
+				i18n.get("dialog.shortcuts.chatgpt_prompt"),
+				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
+			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
+				state.chatgpt_url = url
+				if type(shortcuts.set_chatgpt_url) == "function" then
+					pcall(shortcuts.set_chatgpt_url, url)
+				end
+				if ctx.save_prefs() ~= true then return false end
+				ctx.updateMenu()
+			end
+		end or nil
+	local editor_rows = ManifestMenu.template_rows("shortcut_chatgpt_editor_frame", {
+		[require("config_keys").COMMAND.SHORTCUT_CHATGPT_EDITOR] = function(...)
+			if type(chatgpt_action) ~= "function" then return false end
+			return chatgpt_action(...)
+		end,
+	}, { shortcut_chatgpt_editor_ready = function() return not paused end }, {})
+	if not editor_rows then return nil end
+	if paused then editor_rows[1].action = nil end
+	for _, row in ipairs(editor_rows) do ctrl_items[#ctrl_items + 1] = row end
 
 
 	-- =====================================================

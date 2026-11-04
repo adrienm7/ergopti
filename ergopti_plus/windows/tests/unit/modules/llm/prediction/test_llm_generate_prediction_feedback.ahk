@@ -208,7 +208,7 @@ _LMPF_ActionRunsTheManualTrigger() {
 	_LMPF_Run(_LMPF_Menu(false), "hello world", _Body)
 	_Body(Lines) {
 		; Dispatched the way a binding dispatches it: with its binding id.
-		GESTURE_ACTIONS["llm_generate_prediction"].Fn.Call("keyboard__win_space")
+		GESTURE_ACTIONS["llm_generate_prediction"].Fn.Call("keyboard__meta_space")
 		AssertEqual(1, _LMPF_InfoLinesFor(Lines, "disabled"),
 			"a bound gesture or keyboard slot must reach the manual trigger and its feedback")
 		AssertEqual(t("llm.manual_prediction.disabled"), _LMPF_PendingTooltipText(),

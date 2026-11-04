@@ -18,6 +18,8 @@
 ;    SSN / IBAN prefix triggers that auto-expand the full number.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -65,7 +67,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	; ===== 4.2) Personal information shortcuts with @ =====
 	; ======================================================
 
-	if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
+	if Features["hotstrings"]["dynamic"][ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION]["enabled"] {
 		; The single-field @-tags (@bic, @cb, @cc, @iban, @rib, @ss, @tel, @tél).
 		; Both the tag set and the field each one names come from
 		; PERSONAL_INFO_TAGS (infra/personal_info_preview.ahk), which the
@@ -107,7 +109,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 		GeneratePersonalInformationHotstrings(
 			PersonalInformationHotstrings,
 			PersonalInformationLetters,
-			Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["pattern_max_length"]
+			Features["hotstrings"]["dynamic"][ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION][ConfigLeaf.PATTERN_MAX_LENGTH]
 		)
 
 		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
@@ -252,8 +254,8 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 
 	; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 	; That means a letter will only be repeated if no hotstring defined above matches
-	if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
-		LoadHotstringsSection("magickey", "repeat_corrections", Features["hotstrings"]["magic_key"]["repeat_corrections"])
+	if Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["repeat_corrections"]["enabled"] {
+		LoadHotstringsSection("magickey", "repeat_corrections", Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["repeat_corrections"])
 	}
 	try BootProfile_Mark("HS sub: dynamic + repeat-key registered")
 }

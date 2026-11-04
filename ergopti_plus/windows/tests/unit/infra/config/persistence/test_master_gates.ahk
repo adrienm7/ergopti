@@ -120,7 +120,7 @@ Test("master gates: explicit category-gate callback contract fails fast", TestMa
 ; ask the KeyCombinations gate alone (infra/key_combinations.ahk).
 _MGKC_Candidate() {
 	return Map("shortcuts", Map(
-		"gpt", Map("enabled", true, "link", "https://example.test"),
+		"a_grave", Map("enabled", true, "letter", "q"),
 		"key_combination_taps", Map("alt_gr_then_left_alt", "ctrl_backspace")))
 }
 
@@ -137,8 +137,8 @@ TestMasterGates_KeyCombinationsSubGate() {
 		ApplyMasterGatesToFeatures(Candidate, Map(), _MGKC_Gates(Gates[1], Gates[2]))
 		AssertEqual("ctrl_backspace", Candidate["shortcuts"]["key_combination_taps"]["alt_gr_then_left_alt"],
 			"a master gate never rewrites a pair's action")
-		AssertEqual(Gates[1], Candidate["shortcuts"]["gpt"]["enabled"], "the Shortcuts master still gates the other shortcuts")
-		AssertEqual("https://example.test", Candidate["shortcuts"]["gpt"]["link"], "and keeps their parameters")
+		AssertEqual(Gates[1], Candidate["shortcuts"]["a_grave"]["enabled"], "the Shortcuts master still gates the other shortcuts")
+		AssertEqual("q", Candidate["shortcuts"]["a_grave"]["letter"], "and keeps their parameters")
 	}
 	Saved := CategoryEnabled.Clone()
 	try {
@@ -255,6 +255,24 @@ TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests() {
 Test("master gates: the decode memo never hides an invalid, changed or removed manifest (master-gates-decode-memo)",
 	TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests)
 
+; The same bytes the menu loader decoded are not decoded again. The seeded text is
+; invalid JSON, so reaching the decoder would throw; other text still decodes.
+TestMasterGates_SharesTheMenuLoadersDecode() {
+	Root := _MM_GetManifestRoot()
+	AssertTrue(Root is Map, "the real manifest is the subject")
+	RealText := FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8")
+	Seeded := Map("seeded", true), SeededText := "{ decoded text that is not json " . A_TickCount
+	try {
+		JsonKnownRoot(SeededText, Seeded)
+		AssertTrue(_MG_ParseManifestContent(SeededText) == Seeded, "identical text reuses the recorded root")
+		Other := _MG_ParseManifestContent('{"hotstring_category_keys": {"share_a": "ShareA"}}')
+		AssertTrue(Other != Seeded && Other.Has("hotstring_category_keys"), "any other text is decoded")
+		AssertFalse(JsonKnownRoot("different"), "the record answers only for its exact text")
+	} finally JsonKnownRoot(RealText, Root)
+}
+Test("master gates: identical manifest text shares the menu loader's decode (master-gates-shared-decode)",
+	TestMasterGates_SharesTheMenuLoadersDecode)
+
 TestMasterGates_TargetNamesRemainExplicit() {
 	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
 	Assert(Body != "", "ApplyMasterGatesToFeatures must exist")
@@ -279,7 +297,7 @@ _A1_WithDesiredFixture(Body) {
 	try {
 		Owner["initialized"] := false
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", false),
-			"shortcuts", Map("gpt", Map("enabled", true, "link", "https://example.test")),
+			"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "chatgpt_url", "https://old.test"),
 			"hotstrings", Map("repeat_key_enabled", true, "trigger_char", "*",
 				"rolls", Map("hc", Map("enabled", true))))
 		TapHold := Map("keys", Map("caps_lock", Map("tap_action", "enter", "hold_modifier", "ctrl")))
@@ -334,13 +352,13 @@ Test("master intent: child edits preserve disabled runtime and sibling intent (a
 
 _A1_GatesKeepParameters() {
 	Candidate := Map("layout", Map("ergopti_base", true, "parameter", "retained"),
-		"shortcuts", Map("gpt", Map("enabled", true, "letter", "q"), "delay_ms", 42))
+		"shortcuts", Map("a_grave", Map("enabled", true, "letter", "q"), "delay_ms", 42))
 	ApplyMasterGatesToFeatures(Candidate, Map(), (*) => false)
 	AssertEqual("retained", Candidate["layout"]["parameter"], "gates preserve string parameters")
 	AssertEqual(42, Candidate["shortcuts"]["delay_ms"], "gates preserve numeric parameters")
-	AssertEqual("q", Candidate["shortcuts"]["gpt"]["letter"], "disabled alpha features retain their parameter")
+	AssertEqual("q", Candidate["shortcuts"]["a_grave"]["letter"], "disabled alpha features retain their parameter")
 	AssertFalse(Candidate["layout"]["ergopti_base"])
-	AssertFalse(Candidate["shortcuts"]["gpt"]["enabled"])
+	AssertFalse(Candidate["shortcuts"]["a_grave"]["enabled"])
 }
 Test("master intent: runtime projection preserves pure parameters (a1-desired)", _A1_GatesKeepParameters)
 
@@ -397,8 +415,8 @@ _A1_ReenableDesiredOnly() {
 	AssertTrue(Features["layout"]["ergopti_base"], "reenabling restores the desired true child")
 	AssertFalse(Features["layout"]["ergopti_alt_gr"], "reenabling does not enable the undesired sibling")
 	AssertTrue(ToggleCategoryAllFeatures("Shortcuts", true, (*) => true, (*) => 0, (*) => true))
-	AssertTrue(Features["shortcuts"]["gpt"]["enabled"])
-	AssertEqual("https://example.test", Features["shortcuts"]["gpt"]["link"], "parameters survive OFF and ON")
+	AssertTrue(Features["shortcuts"]["a_grave"]["enabled"])
+	AssertEqual("q", Features["shortcuts"]["a_grave"]["letter"], "parameters survive OFF and ON")
 }
 Test("master intent: reenable restores only desired children (a1-desired)",
 	_A1_WithDesiredFixture.Bind(_A1_ReenableDesiredOnly))
@@ -453,8 +471,8 @@ _A1_EditorsUseDesiredIntent() {
 		AssertEqual("#", MasterGateDesiredFeatures(Features)["hotstrings"]["trigger_char"],
 			"the magic-key parameter publishes into retained intent")
 		AssertTrue(ModifyLink(0, "https://changed.test", (*) => true, (*) => 0, (*) => true))
-		AssertEqual("https://changed.test", ReadFeatureStateV2("shortcuts.gpt")["link"])
-		AssertFalse(Features["shortcuts"]["gpt"]["enabled"], "parameter edits do not activate shortcuts")
+		AssertEqual("https://changed.test", MasterGateDesiredFeatures(Features)["shortcuts"]["chatgpt_url"],
+			"the link parameter publishes into retained intent")
 	} finally {
 		HSE_RepeatEnabled := SavedRepeat
 		ScriptInformation["MagicKey"] := SavedMagic

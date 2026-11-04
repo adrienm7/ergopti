@@ -67,6 +67,7 @@ global _FTI_MIN_REPEATING_SITES := 30
 _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
+		"_KeyCombinationChordTimerFn",  "5",     ; only armed while a key waits for its chord or a chord holds its keys; one key-state read per key
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
 		"_UserHotstringsPoll",          "25",    ; only while exact worker/Job/stage debt is owned; stale source/focus/input cancellation
 		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
@@ -80,6 +81,7 @@ _FTI_Inventory() {
 		"this.CollectionTimer",          "100",   ; bounded diagnostic progress/guided transitions; disarmed on worker retirement
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
+		"this.PollTimer",                "?",     ; field run request watch, only while a field report folder is declared; timings [ui] field_run_poll_ms
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
 		'Callbacks["motion"]',          "?",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing

@@ -3,76 +3,64 @@
 --- ==============================================================================
 --- MODULE: streaming_handler — Backend-Agnostic Failure Warning Regression Test
 --- DESCRIPTION:
---- Static source-scan guard for M-14: asserts that the consecutive-failure
---- Logger.warn in streaming_handler.lua fires for ALL backends, not just MLX.
+--- Guard for M-14: the consecutive-failure warning of the streaming handler
+--- fires for ALL backends, not just MLX.
 ---
---- Before the fix, the Logger.warn and hs.notify calls were nested inside an
---- `if backend == "mlx"` guard, so Ollama and remote backends silently absorbed
---- repeated failures with no developer-visible warning. This test scans the
---- source text and asserts that Logger.warn appears BEFORE (outside) the mlx
---- guard block — a structural invariant that makes a regression immediately
---- visible without requiring an async HTTP integration test.
+--- Before the fix, the Logger.warn and the desktop notification were nested
+--- inside an `if backend == "mlx"` guard, so Ollama and remote backends silently
+--- absorbed repeated failures with no developer-visible warning. The test used to
+--- find both calls in the source text and compare their positions; it now fails
+--- real requests through the real engine and streaming handler and reads the log
+--- and the notifier, so any spelling of the guard is judged by what it does.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local load_pipeline = require("tests.support.prediction_pipeline").load
 
 
 
 
 -- ===========================================================================
 -- ===========================================================================
--- ======= 1/ Source-Scan Helpers ============================================
+-- ======= 1/ Failure Driver =================================================
 -- ===========================================================================
 -- ===========================================================================
 
---- Reads the streaming_handler.lua source relative to this test file.
---- @return string Raw file content.
-local function read_source()
-	local src = debug.getinfo(1, "S").source
-	if src:sub(1, 1) == "@" then src = src:sub(2) end
-	-- This file is under tests/unit/modules/llm/; the module is at modules/llm/
-	local test_dir = src:match("^(.*)[/\\]tests[/\\]") or "."
-	local path = test_dir .. "/modules/llm/streaming_handler.lua"
-	local fh = io.open(path, "r")
-	if not fh then
-		-- Fallback: search relative to the driver root
-		fh = io.open(helpers.driver_root() .. "modules/llm/streaming_handler.lua", "r")
-	end
-	if not fh then error("Cannot read streaming_handler.lua for source scan") end
-	local content = fh:read("*a")
-	fh:close()
-	return content
-end
+-- Enough failed requests to cross the handler's warning threshold, which is a
+-- private constant: the counter resets after warning, so one extra round must
+-- still produce exactly one warning.
+local FAILED_REQUESTS = 5
 
---- Extracts the body of the local on_fail function from the source.
---- @param src string Full file content.
---- @return string Function body text, or empty string if not found.
-local function extract_on_fail_body(src)
-	-- Find the `local on_fail` declaration and collect until the closing `end`
-	local start_idx = src:find("function on_fail")
-	if not start_idx then return "" end
-	-- Walk from there to find the matching `end` at the same nesting depth
-	local pos = start_idx
-	local depth = 0
-	local started = false
-	while pos <= #src do
-		local token, token_end = src:match("([%w_]+)()", pos)
-		if not token then break end
-		-- Count all Lua block openers that require a closing `end`; without
-		-- this, an inline `if … then return end` on the first line of on_fail
-		-- would drop depth back to 0 immediately, cutting off the rest of the body.
-		if token == "function" or token == "if" or token == "for" or token == "while" then
-			depth = depth + 1
-			started = true
-		elseif token == "end" and started then
-			depth = depth - 1
-			if depth == 0 then
-				return src:sub(start_idx, token_end - 1)
+--- Fails consecutive requests on one backend and records what surfaced.
+--- @param backend string Backend name the core reports.
+--- @return table outcome { warnings, notifications }
+local function fail_requests(backend)
+	local notifications = 0
+	local saved_notifier = package.loaded["adapters.application_notifier"]
+	package.loaded["adapters.application_notifier"] = {
+		new = function()
+			return { send = function() notifications = notifications + 1; return true end }
+		end,
+	}
+	local ok, outcome = xpcall(function()
+		local fixture = load_pipeline({ render_success = true })
+		package.loaded["modules.llm"].get_backend = function() return backend end
+		for attempt = 1, FAILED_REQUESTS do
+			fixture.engine.perform_check(true)
+			helpers.assert_eq(fixture.fetches, attempt, "attempt " .. attempt .. " must reach the backend")
+			fixture.on_fail()
+		end
+		local warnings = {}
+		for _, record in ipairs(fixture.logs) do
+			if record.level == "warn" and record.message:find("Repeated LLM failures", 1, true) then
+				warnings[#warnings + 1] = record.message
 			end
 		end
-		pos = token_end
-	end
-	return src:sub(start_idx)
+		return { warnings = warnings, notifications = notifications }
+	end, debug.traceback)
+	package.loaded["adapters.application_notifier"] = saved_notifier
+	if not ok then error(outcome, 0) end
+	return outcome
 end
 
 
@@ -80,44 +68,27 @@ end
 
 -- ===========================================================================
 -- ===========================================================================
--- ======= 2/ Structural Assertions ==========================================
+-- ======= 2/ Behaviour Assertions ===========================================
 -- ===========================================================================
 -- ===========================================================================
 
 helpers.describe("streaming_handler — consecutive-failure warning is backend-agnostic", function()
 
-	local src = read_source()
-	local body = extract_on_fail_body(src)
-
-	helpers.it("on_fail body exists and is non-empty", function()
-		helpers.assert_true(#body > 50,
-			"on_fail function body must be extractable from the source for subsequent checks")
-	end)
-
-
-	helpers.it("Logger.warn fires before the 'if … == mlx' guard (M-14)", function()
-		-- The warn must appear before the MLX-specific notification guard so that
-		-- Ollama / remote backends also receive the consecutive-failure warning.
-		local warn_pos = body:find("Logger%.warn")
-		local mlx_guard_pos = body:find('== "mlx"') or body:find("== 'mlx'")
-		helpers.assert_true(warn_pos ~= nil,
-			"Logger.warn must be present in on_fail (consecutive-failure warning)")
-		if mlx_guard_pos then
-			helpers.assert_true(warn_pos < mlx_guard_pos,
-				"Logger.warn must appear BEFORE the 'if backend == mlx' guard so it fires for all backends (M-14 regression)")
-		end
-	end)
+	for _, backend in ipairs({ "ollama", "remote", "mlx" }) do
+		helpers.it("warns once about repeated failures on " .. backend .. " (M-14)", function()
+			local outcome = fail_requests(backend)
+			helpers.assert_eq(#outcome.warnings, 1,
+				"repeated failures on " .. backend .. " must produce one warning")
+			helpers.assert_true(outcome.warnings[1]:find("'" .. backend .. "'", 1, true) ~= nil,
+				"the warning must name the failing backend: " .. outcome.warnings[1])
+		end)
+	end
 
 
-	helpers.it("hs.notify remains inside the MLX-specific guard", function()
-		-- The MLX desktop notification is intentionally backend-specific (the
-		-- i18n key says 'MLX'). It must stay inside the mlx guard.
-		local notify_pos = body:find("hs%.notify")
-		local mlx_guard_pos = body:find('== "mlx"') or body:find("== 'mlx'")
-		if notify_pos and mlx_guard_pos then
-			helpers.assert_true(notify_pos > mlx_guard_pos,
-				"hs.notify must remain inside the MLX guard — it references MLX-specific notification text")
-		end
+	helpers.it("keeps the desktop notification for MLX only", function()
+		-- The notification text names MLX, so another backend must not show it.
+		helpers.assert_eq(fail_requests("mlx").notifications, 1, "MLX failures must notify the user once")
+		helpers.assert_eq(fail_requests("ollama").notifications, 0, "an Ollama failure must not claim to be MLX")
 	end)
 
 end)

@@ -30,10 +30,8 @@
 ; ====================================================
 ; ====================================================
 
-_KSFS_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KSFS_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _KSFS_ReadSource(RelPath) {
 ; ====================================================
 
 _KSFS_ShutdownFlagDeclared() {
-	Src := _KSFS_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KSFS_ReadSource("keystats.ahk")
 	Assert(InStr(Src, "_shutting_down") > 0,
 		"Keystats._shutting_down must be declared in keystats.ahk (kl-stop-flush-defeated-by-suspend)")
 	Assert(InStr(Src, "_shutting_down   := false") > 0,
@@ -55,7 +53,7 @@ _KSFS_ShutdownFlagDeclared() {
 Test("keystats: _shutting_down flag declared and initialised false (kl-stop-flush-defeated-by-suspend)", _KSFS_ShutdownFlagDeclared)
 
 _KSFS_KLStopSetsFlag() {
-	Src := _KSFS_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KSFS_ReadSource("keystats.ahk")
 	Body := _DriverFuncBody("KL_Stop")
 	Assert(Body != "", "KL_Stop() must exist in keystats.ahk")
 	; The shutdown lease must be published BEFORE KL_FlushBuffer so its suspend
@@ -78,7 +76,7 @@ _KSFS_KLStopSetsFlag() {
 Test("keystats: KL_Stop() publishes shutdown lease before KL_FlushBuffer (kl-stop-flush-defeated-by-suspend)", _KSFS_KLStopSetsFlag)
 
 _KSFS_AppendLogGuardBypasses() {
-	Src := _KSFS_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KSFS_ReadSource("keystats.ahk")
 	Body := _DriverFuncBody("KL_AppendLog")
 	Assert(Body != "", "KL_AppendLog() must exist in keystats.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
@@ -89,7 +87,7 @@ _KSFS_AppendLogGuardBypasses() {
 Test("keystats: KL_AppendLog suspend guard includes _shutting_down bypass (kl-stop-flush-defeated-by-suspend)", _KSFS_AppendLogGuardBypasses)
 
 _KSFS_IngestOnceGuardBypasses() {
-	Src := _KSFS_ReadSource("modules/keystats/keystats.ahk")
+	Src := _KSFS_ReadSource("keystats.ahk")
 	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(Body != "", "KL_IngestOnce() must exist in keystats.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,

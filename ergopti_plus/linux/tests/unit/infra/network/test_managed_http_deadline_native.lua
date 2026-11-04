@@ -9,7 +9,6 @@
 
 --- One registered envelope contains the complete original four native controls.
 local helpers = require("tests.helpers")
-local driver = helpers.driver_root()
 helpers.it("managed_http: actual luv complete four-control inventory", function()
     local cleanup_logger = require("logger.shim")
     local saved_error = cleanup_logger.error
@@ -19,7 +18,7 @@ local Clock = require("infra.monotonic")
 local Logger = require("logger.shim")
 local logs = {}
 Logger.error = function(_, message) logs[#logs + 1] = message end
-local Deadline = dofile(driver .. "/infra/managed_http_deadline.lua")
+local Deadline = helpers.fresh_module("infra.managed_http_deadline")
 local function handles()
 	local count = 0
 	uv.walk(function() count = count + 1 end)

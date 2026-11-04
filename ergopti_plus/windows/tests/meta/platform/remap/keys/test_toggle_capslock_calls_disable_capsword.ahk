@@ -32,10 +32,8 @@
 ; =================================================
 ; =================================================
 
-_TCDCW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_TCDCW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _TCDCW_ReadSource(RelPath) {
 ; ===================================================
 
 _TCDCW_CheckCallsDisableCapsWord() {
-	Src := _TCDCW_ReadSource("platform/remap/one_shot_shift.ahk")
+	Src := _TCDCW_ReadSource("one_shot_shift.ahk")
 	Assert(Src != "", "platform/remap/one_shot_shift.ahk must be readable")
 
 	Body := _DriverFuncBody("ToggleCapsLock")
@@ -57,7 +55,7 @@ _TCDCW_CheckCallsDisableCapsWord() {
 }
 
 _TCDCW_CheckNoDirectFalseAssign() {
-	Src := _TCDCW_ReadSource("platform/remap/one_shot_shift.ahk")
+	Src := _TCDCW_ReadSource("one_shot_shift.ahk")
 	Assert(Src != "", "platform/remap/one_shot_shift.ahk must be readable")
 
 	Body := _DriverFuncBody("ToggleCapsLock")

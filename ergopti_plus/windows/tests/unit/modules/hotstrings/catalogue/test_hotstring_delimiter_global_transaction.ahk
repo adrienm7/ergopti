@@ -280,6 +280,68 @@ _HSDT_ToggleWritesOnceThenPublishes() {
 		AssertEqual(_HSDT_DefaultWord(), HSE_WORD_TERMINATORS)
 	} finally _HSDT_Restore(Saved)
 }
+_HSDT_ConsumeToggleWritesItsLeaf() {
+	global _HSDT_WriteCalls, _HSDT_WrittenUpdates, _HotstringsTerminatorRecords
+	Saved := _HSDT_SaveState()
+	try {
+		_HSDT_Seed("consume_row")
+		Sent := []
+		Send := (Text, Opts) => (Sent.Push([Text, Opts["level"]]), true)
+		Before := _HotstringsTerminatorRecords.Builtin["comma"].Consume
+		Enabled := _HotstringsTerminatorRecords.Builtin["comma"].Enabled
+		AssertTrue(_HS_DelimToggleConsume("comma", "Comma", _HSDT_AcceptWriter, Send))
+		AssertEqual(1, _HSDT_WriteCalls, "one click is one write")
+		AssertEqual("hotstrings.terminator_consume", _HSDT_WrittenUpdates[1][1].Section, "its own leaf")
+		AssertEqual(!Before, !!_HotstringsTerminatorRecords.Builtin["comma"].Consume, "the choice flips")
+		AssertEqual(Enabled, _HotstringsTerminatorRecords.Builtin["comma"].Enabled, "the row's switch stays")
+		AssertEqual(1, Sent.Length, "the switch is announced")
+		AssertContains(Sent[1][1], "Comma " . t("menu.hotstrings.consumed_suffix"))
+		AssertFalse(_HS_DelimToggleConsume("no_such_key", "X", _HSDT_AcceptWriter, Send), "an unknown entry is refused")
+		AssertEqual(1, _HSDT_WriteCalls)
+	} finally _HSDT_Restore(Saved)
+	Rows := _DriverFuncBody("_HS_WordExpanderRows")
+	Assert(InStr(Rows, '"parameter_consume_children", ConsumeRows') > 0, "the frame draws the rows")
+}
+Test("hotstring-delimiter-consume: a row of the submenu flips the consumption alone (PAR-8)",
+	_HSDT_ConsumeToggleWritesItsLeaf)
+
+; G.Show pumps messages: a dialog answered before the thread resumes is destroyed,
+; and reading G.Hwnd afterwards threw "Gui has no window" out of the menu click.
+_HSDT_AddDialogWaitsOnAHandleReadBeforeShow() {
+	Body := _DriverFuncBody("_HS_DelimAddCustom")
+	Read := InStr(Body, "DialogHwnd := G.Hwnd")
+	Shown := InStr(Body, "G.Show(")
+	Assert(Read > 0 && Read < Shown, "the handle is read before the dialog is shown")
+	Assert(InStr(Body, 'WinWaitClose("ahk_id " . DialogHwnd)') > 0, "and the wait uses it")
+	AssertEqual(0, InStr(Body, 'WinWaitClose("ahk_id " . G.Hwnd)'), "the Gui is never asked after Show")
+}
+Test("hotstring-delimiter-add-dialog: the wait survives a dialog answered at once (delimiter-add-destroyed-gui)",
+	_HSDT_AddDialogWaitsOnAHandleReadBeforeShow)
+
+; The write reloads nothing, so only a rebuild moves the row's tick and suffix.
+_HSDT_CommitRedrawsTheTrayOnlyAfterADurableWrite() {
+	Silent(*) => 0
+	Redraws := 0
+	Redraw(*) {
+		Redraws += 1
+		return true
+	}
+	Broken(*) {
+		throw Error("no tray")
+	}
+	AssertTrue(_HS_DelimCommit(() => 1, Silent, 0, Redraw))
+	AssertEqual(1, Redraws, "a durable write redraws the tray once")
+	AssertTrue(_HS_DelimCommit(() => 1, Silent, Silent, Redraw))
+	AssertEqual(2, Redraws, "a row's own notice does not skip the redraw")
+	AssertFalse(_HS_DelimCommit(() => 0, Silent, 0, Redraw))
+	AssertEqual(2, Redraws, "a refused write shows no state it did not store")
+	AssertTrue(_HS_DelimCommit(() => 1, Silent, 0, Broken), "a failed redraw does not undo a durable write")
+	Rows := _DriverFuncBody("_HS_DelimCommit")
+	Assert(InStr(Rows, "RebuildTrayMenu()") > 0, "the real path redraws the real tray")
+}
+Test("hotstring-delimiter-menu: a saved row redraws the tray (delimiter-row-tick-stale)",
+	_HSDT_CommitRedrawsTheTrayOnlyAfterADurableWrite)
+
 Test("hotstring-delimiter-global-transaction-20260813: a toggle writes one leaf "
 	. "and publishes the strings after the writer",
 	_HSDT_ToggleWritesOnceThenPublishes)

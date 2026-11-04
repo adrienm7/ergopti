@@ -46,16 +46,6 @@ local function fill(template, values)
 	return (template:gsub("{(%d+)}", function(index) return tostring(values[tonumber(index)] or "") end))
 end
 
---- Appends provider row data rendered by the shared renderer.
---- @param target table The native rows the renderer is building.
---- @param row table Row data { label, items?, action?, disabled? }.
---- @param id string Diagnostic id.
-local function append(target, row, id)
-	for _, rendered in ipairs(require("infra.manifest_menu").render_rows({ row }, id)) do
-		target[#target + 1] = rendered
-	end
-end
-
 
 
 
@@ -251,11 +241,13 @@ function M.build(ctx, dialogs)
 	local function changed()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
-	local handlers = {}
+	local providers = {}
+	-- The three rows are declared `list` rows: each provider returns the row
+	-- DATA of its declared frame and the shared renderer draws it in place.
 	for _, system in ipairs({ "system1", "system2" }) do
-		handlers["agent_" .. system] = function(target)
+		providers["agent_" .. system] = function()
 			local current, rows = system_rows(system, dialogs, changed)
-			if not rows then return end
+			if not rows then return {} end
 			local frame
 			if system == "system1" then
 				frame = ManifestMenu.template_rows("agent_linux_system1_frame", {}, {
@@ -270,20 +262,18 @@ function M.build(ctx, dialogs)
 					[require("config_keys").LEAF.AGENT_SYSTEM2] = function() return rows end,
 				})
 			end
-			if not frame then return end
-			for _, row in ipairs(frame) do append(target, row, "agent_" .. system) end
+			return frame or {}
 		end
 	end
-	handlers[require("config_keys").COMMAND.AGENT_DISABLED_APPS] = function(target)
+	providers[require("config_keys").COMMAND.AGENT_DISABLED_APPS] = function()
 		local count, rows = disabled_app_rows(llm, dialogs, changed)
-		if not rows then return end
+		if not rows then return {} end
 		local frame = ManifestMenu.template_rows("agent_linux_disabled_apps_frame", {}, {
 			agent_disabled_apps_count = function() return tostring(count) end,
 		}, {
 			[require("config_keys").LEAF.AGENT_DISABLED_APPS] = function() return rows end,
 		})
-		if not frame then return end
-		for _, row in ipairs(frame) do append(target, row, require("config_keys").LEAF.AGENT_DISABLED_APPS) end
+		return frame or {}
 	end
 	local menu_ctx = {
 		commands = {
@@ -299,7 +289,7 @@ function M.build(ctx, dialogs)
 			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
 		},
 	}
-	local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})
+	local children = ManifestMenu.build("agent_menu", "Agent", nil, nil, menu_ctx, providers)
 	return NativeParent.finish(parent, children)
 end
 

@@ -305,7 +305,7 @@ function M.new(ports, policy)
 			entry.promoted=true
 			budget_owner:finish()
 			request.result={ok=true, installed=entry.installed==true, origin=entry.origin,
-				model_installed=false}
+				model_installed=false, direct_fallback=entry.direct_fallback, relay_refusal=entry.relay_refusal}
 			entry.stage='done'; complete(); announce_result()
 		end
 		local function start_probe()
@@ -323,7 +323,7 @@ function M.new(ports, policy)
 			service=acquire('service', function(done)
 				return P.start_service(executable, {'serve'}, {origin=entry.origin,
 					host=entry.host, timeout_ms=false, authorized=service_authorized,
-					environment=entry.service_environment or {},
+					environment=entry.service_environment or {}, relay=entry.relay,
 					owner='ollama-runtime-' .. tostring(sequence)}, done)
 			end)
 			if not service_live() then fail('runtime_service_unavailable'); return end
@@ -382,6 +382,15 @@ function M.new(ports, policy)
 						if held.delivered and type(answer)=='table' and answer.ok==true
 							and type(answer.environment)=='table' then
 							entry.service_environment=answer.environment
+							-- The lookup stage that sent an origin direct: a later pull
+							-- that fails names both causes (PAC unusable, direct failed).
+							entry.direct_fallback=type(answer.direct_fallback)=='string' and answer.direct_fallback or nil
+							-- A proxy that demands a sign-in the daemon cannot give: the
+							-- daemon starts under the local relay (proxy-auth-relay.md).
+							entry.relay=type(answer.relay)=='table' and answer.relay or nil
+							-- A refused sign-in: the daemon starts without the proxy for the
+							-- models on disk, and this closed reason refuses only the pull.
+							entry.relay_refusal=type(answer.relay_refusal)=='string' and answer.relay_refusal or nil
 							begin_service()
 						else
 							fail('runtime_proxy_unavailable')

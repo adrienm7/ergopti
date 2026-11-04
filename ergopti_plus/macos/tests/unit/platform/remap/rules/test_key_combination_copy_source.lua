@@ -43,7 +43,7 @@ local function scoped(run, lock)
     return run(Config, adapter, path)
    end)
   end, debug.traceback))
-  os.remove(path); os.remove(path .. fixture.WRITE_LOCK_SUFFIX)
+  os.remove(path); os.remove(fixture.write_lock_path(path))
   if not result[1] then error(result[2], 0) end
   return table.unpack(result, 2, result.n)
  end)

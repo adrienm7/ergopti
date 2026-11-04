@@ -14,7 +14,9 @@
 ---    a backend without one needs the model in the binding, never a guess.
 --- 2. Each API dialect carries an image differently; build_request() writes
 ---    the request body for all four (openai, anthropic, gemini, ollama), so the
----    drivers only add the address and the credentials.
+---    drivers only add the address and the credentials. The ollama body
+---    turns thinking off; the API dialects get it from the provider's
+---    thinking_off rules (llm/thinking_off.lua), applied by the drivers.
 --- 3. Prompts, tags, token budgets and defaults live in vision.json, read by
 ---    every driver.
 ---
@@ -40,8 +42,10 @@ M.LOCAL_BACKEND = "local"
 -- Longest model name a binding may carry
 M.MAX_MODEL_LENGTH = 200
 
+local Formats = require("llm.remote_formats")
+
 -- Request formats build_request() writes
-M.FORMATS = { openai = true, anthropic = true, gemini = true, ollama = true }
+M.FORMATS = { openai = true, anthropic = true, gemini = true, ollama = true, [Formats.AGENT_FORMAT] = true }
 
 -- The user turn that goes with the screenshot of the reading request
 M.READ_USER_TEXT = "Transcribe this screenshot."
@@ -72,6 +76,21 @@ function M.parse(value)
 	return { backend = backend, model = model }, nil
 end
 
+--- Builds the binding value a native editor collected: a backend picked from a
+--- list, then a model typed (an empty one keeps the backend's default). A backend
+--- with no default and no model yields "<backend>|", which parse() refuses, so the
+--- editor's validation tells the user a model is required.
+--- @param backend string The picked backend id.
+--- @param typed string The typed model, trimmed here.
+--- @param default_model string|nil The backend's default model ("" or nil for none).
+--- @return string value
+function M.compose_parameter(backend, typed, default_model)
+	local model = TextUtils.trim(tostring(typed or ""))
+	if model ~= "" then return backend .. "|" .. model end
+	if type(default_model) == "string" and default_model ~= "" then return backend end
+	return backend .. "|"
+end
+
 --- Tells whether a binding value is syntactically valid.
 --- @param value string The stored parameter.
 --- @return boolean ok
@@ -99,14 +118,24 @@ end
 -- =====================================
 
 --- Builds the request body of one vision or text call.
---- @param format string "openai", "anthropic", "gemini" or "ollama".
---- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens }.
+--- @param format string "openai", "anthropic", "gemini", "perplexity_agent" (text only) or "ollama".
+--- @param spec table { model, system, text, image (base64 or nil), mime, max_tokens, think }:
+---     think is required for ollama, false or a level (thinking_off.lua ollama_think).
 --- @return table body The JSON body, without address or credentials.
 function M.build_request(format, spec)
 	if not M.FORMATS[format] then error("vision.build_request: unknown format " .. tostring(format)) end
+	local think = spec.think
+	if format == "ollama" and think ~= false and (type(think) ~= "string" or think == "") then
+		error("vision.build_request: an ollama request needs its think value (false or a level)")
+	end
 	local image, mime = spec.image, spec.mime
 	if image ~= nil and (type(image) ~= "string" or image == "" or type(mime) ~= "string") then
 		error("vision.build_request: an image needs base64 data and a mime type")
+	end
+	if format == Formats.AGENT_FORMAT then
+		-- The Agent API takes an image by URL only: a screenshot has none
+		if image then error("vision.build_request: a perplexity_agent request carries no image") end
+		return Formats.agent_body(spec)
 	end
 	if format == "openai" then
 		local content = spec.text
@@ -145,9 +174,11 @@ function M.build_request(format, spec)
 	end
 	local user = { role = "user", content = spec.text }
 	if image then user.images = { image } end
+	-- A thinking model would spend the whole budget reasoning before it answers
 	return {
 		model = spec.model,
 		stream = false,
+		think = think,
 		messages = { { role = "system", content = spec.system }, user },
 		options = { num_predict = spec.max_tokens },
 	}

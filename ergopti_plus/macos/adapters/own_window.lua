@@ -138,4 +138,21 @@ function M.is_webview_focused(view)
 	return focused ~= nil and focused:id() == number
 end
 
+--- The id of this process's focused window, read only while this process is
+--- the frontmost application. The frontmost check comes from NSWorkspace, so
+--- no other application is ever asked anything; Accessibility is asked only
+--- for this process's own focused window. Called from the keymap's eventtap
+--- for field-run selftest keys only (modules/keymap/selftest_gate.lua).
+--- @return number|nil window_id Nil when another application is in front or
+---         this process has no focused window.
+function M.focused_window_id()
+	local app = RunningApplication.current()
+	if app == nil then error("own_window: the running Hammerspoon process is unavailable", 0) end
+	local front = hs.application.frontmostApplication()
+	if front == nil or front:pid() ~= app:pid() then return nil end
+	local window = app:focusedWindow()
+	if window == nil then return nil end
+	return window:id()
+end
+
 return M

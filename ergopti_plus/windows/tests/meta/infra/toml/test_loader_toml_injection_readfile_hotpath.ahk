@@ -39,10 +39,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_LTI_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_LTI_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Returns the full function body — from its declaration to the first closing
@@ -68,7 +66,7 @@ _LTI_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _LTI_WriteTapHoldTomlIsAtomic() {
-	Src := _LTI_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Seg != "", "_TH_WriteTapHoldToml declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
@@ -81,7 +79,7 @@ _LTI_WriteTapHoldTomlIsAtomic() {
 Test("tap_hold_writer: _TH_WriteTapHoldToml uses durable atomic replacement (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldTomlIsAtomic)
 
 _LTI_WriteTapHoldDisabledIsAtomic() {
-	Src := _LTI_ReadSource("platform/remap/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldDisabled")
 	CommitSeg := _DriverFuncBody("_TH_CommitTapHoldMutation")
 	Assert(Seg != "", "_TH_WriteTapHoldDisabled declaration must exist in tap_hold_writer.ahk")
@@ -104,7 +102,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses durable atomic replacement 
 ; ==================================================
 
 _LTI_LoaderWarnsOnTruncatedConfig() {
-	Src := _LTI_ReadSource("platform/remap/tap_hold_loader.ahk")
+	Src := _LTI_ReadSource("tap_hold_loader.ahk")
 	Seg := _LTI_FuncBody(Src, "LoadTapHoldToml(FilePath, DefaultsFilePath := " . Chr(34) . Chr(34) . ") {")
 	Assert(Seg != "", "LoadTapHoldToml declaration must exist in tap_hold_loader.ahk")
 	; The sentinel fires only when the parsed config has 0 keys and the user did

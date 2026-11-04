@@ -31,13 +31,12 @@
 ; ===============================================================
 ; ===============================================================
 
-_HCA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_HCA_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _HCA_UsesAtomicWrite() {
-	Src := _HCA_ReadSource("infra/hotstrings/hotstrings_cache.ahk")
+	Src := _HCA_ReadSource("hotstrings_cache.ahk")
 	Body := _DriverFuncBody("_HotstringsCacheWriteTsv")
 
 	Assert(Body != "", "_HotstringsCacheWriteTsv must exist in hotstrings_cache.ahk")

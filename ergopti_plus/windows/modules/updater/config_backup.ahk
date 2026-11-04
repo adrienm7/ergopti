@@ -20,7 +20,8 @@
 ;    folder without one is an interrupted backup that is never restored.
 ; 3. Restore backs up first: the configuration it replaces becomes a
 ;    pre-restore backup, then every copy is checked present before the first
-;    file is written back, each through an atomic replace.
+;    file is written back, each through FSCopyReplaceAtomic, which holds the
+;    folders and the stage by handle so a same-user process cannot swap them.
 ; 4. Paths are relative to the configuration folder, never absolute, and a
 ;    manifest path that climbs out of it is refused.
 ; ==============================================================================
@@ -372,17 +373,9 @@ ConfigBackup_Restore(ConfigDir, Id, Rules := 0, ClockFn := 0) {
 		return Map("ok", false, "reason", "backup", "pre", 0)
 	}
 	for _, Relative in Record["files"] {
-		Target := _ConfigBackup_Join(ConfigDir, Relative)
-		SplitPath(Target, , &TargetDir)
-		try FSEnsureDirectoryStrict(TargetDir)
-		catch as Err {
-			try LoggerError("ConfigBackup", "Restore failed creating '{1}': {2}; the replaced configuration is in {3}.",
-				TargetDir, Err.Message, Pre["path"])
-			return Map("ok", false, "reason", "write", "pre", Pre)
-		}
-		if !FSCopyReplaceAtomic(_ConfigBackup_Join(Record["path"], "config/" . Relative), Target) {
-			try LoggerError("ConfigBackup", "Restore failed writing '{1}'; the replaced configuration is in {2}.",
-				Target, Pre["path"])
+		if !FSCopyReplaceAtomic(_ConfigBackup_Join(Record["path"], "config/" . Relative), ConfigDir, Relative, &Detail) {
+			try LoggerError("ConfigBackup", "Restore failed writing '{1}': {2}; the replaced configuration is in {3}.",
+				Relative, Detail, Pre["path"])
 			return Map("ok", false, "reason", "write", "pre", Pre)
 		}
 	}

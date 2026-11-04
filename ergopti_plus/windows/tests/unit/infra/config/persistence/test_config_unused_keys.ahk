@@ -626,7 +626,7 @@ Test("config cleanup webview: close during native creation releases the late con
 
 _CUK_ActionParameterOwnership() {
 	Target := ManifestBuildFeaturesMap()
-	for Binding in ["gesture__tap_4", "keyboard__ctrl_k", "script__pause", "tap_hold__caps_lock", "tap_key__number_row_left"] {
+	for Binding in ["gesture__tap_4", "keyboard__primary_k", "script__pause", "tap_hold__caps_lock", "tap_key__number_row_left"] {
 		Owner := ""
 		AssertEqual("", TomlConfigUnknownKind(Target, "action_parameters", Binding . "__open_url", &Owner),
 			"parameterized bindings must remain owned: " . Binding)
@@ -1005,20 +1005,20 @@ _CUK_UnlistedTableArrayKeepsItsSection() {
 Test("config unused keys: an unlisted table array keeps its unknown parent section "
 	. "(config-unused-keys-root-and-arrays)", _CUK_UnlistedTableArrayKeepsItsSection)
 
-; A live physical keyboard slot keeps a scan-code spelling (win_SC03A). Its
+; A live physical keyboard slot keeps a scan-code spelling (meta_SC03A). Its
 ; action parameter failed the lowercase grammar of the parameter owner, so the
 ; cleanup offered a live parameter for deletion (keyboard-slot-publication).
 _CUK_PhysicalKeyboardSlotParameterIsOwned() {
-	Live := "keyboard__win_SC03A__open_url"
+	Live := "keyboard__meta_SC03A__open_url"
 	AssertEqual("current", TomlConfigActionParameterBindingStatus(Live), "control: the slot is published")
 	AssertTrue(TomlConfigActionParameterIsOwned(Live))
 	AssertEqual("keyboard", ConfigScopeActionParameterDomain("action_parameters." . Live))
 	Tree := ManifestBuildFeaturesMap()
 	AssertEqual("", TomlConfigUnknownKind(Tree, "action_parameters", Live, &Owner))
 	AssertEqual("Gestures", Owner)
-	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC0FF__open_url"), "an unpublished scan stays retired")
-	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC03A__no_such_action"))
-	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC03A__Open_url"), "the action keeps its exact spelling")
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__meta_SC0FF__open_url"), "an unpublished scan stays retired")
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__meta_SC03A__no_such_action"))
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__meta_SC03A__Open_url"), "the action keeps its exact spelling")
 	AssertFalse(TomlConfigActionParameterIsOwned("gesture__Swipe_up__open_url"),
 		"an unpublished domain keeps the lowercase grammar")
 	Dir := _CUK_NewDir()

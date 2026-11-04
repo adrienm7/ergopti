@@ -69,11 +69,12 @@ global LAYOUT_CATALOGUE_INSTALLED_SCHEMA := 1
 ; The platform name registry entries list when Windows can emulate them.
 global LAYOUT_CATALOGUE_PLATFORM := "windows"
 
-; The index-entry fields the installed record keeps: what verifies the local
-; copy (file, size, sha256), what the emulation reads (keycode_convention) and
-; what the layout manager shows.
-global LAYOUT_CATALOGUE_RECORD_FIELDS := ["id", "name", "family", "keyboard_name", "version", "file",
-	"sha256", "size", "keycode_convention", "licence", "author", "homepage"]
+; The fields an update owns (INSTALLED_ENTRY_FIELDS of _shared/lua/layouts/catalogue.lua):
+; the entry it installs replaces them as one, so one it omits is gone. Every other
+; member of a recorded row has no owner in this build and stays source data.
+global LAYOUT_CATALOGUE_OWNED_FIELDS := ["id", "name", "family", "keyboard_name", "version", "file",
+	"sha256", "size", "licence", "homepage", "author", "languages", "variants", "platforms",
+	"keycode_convention", "source_url", "extension", "source_sha256", "licence_file", "xkb"]
 
 
 
@@ -251,8 +252,8 @@ _LayoutCatalogueWriteText(Path, Text) {
 		throw Error("Cannot publish " . Path)
 }
 
-; Minimal JSON writer for the installed record: Maps, Arrays, strings and
-; integers, the only shapes the record holds.
+; Minimal JSON writer for the installed record, which holds a verified index
+; entry whole: Maps, Arrays, strings, numbers and typed booleans.
 _LayoutCatalogueJson(Value) {
 	if (Value is Map) {
 		Out := ""
@@ -266,10 +267,12 @@ _LayoutCatalogueJson(Value) {
 			Out .= (A_Index > 1 ? "," : "") . _LayoutCatalogueJson(Item)
 		return "[" . Out . "]"
 	}
-	if (Value is Integer)
+	if (Value is Integer) || (Value is Float)
 		return String(Value)
 	if (Value is String)
 		return JsonStringLiteral(Value)
+	if (Value is TOML_Bool)
+		return Value.Value ? "true" : "false"
 	throw TypeError("The installed-layouts record holds an unsupported value.", -1, Type(Value))
 }
 
@@ -370,9 +373,15 @@ _LayoutCatalogueInstalledEntryProblem(Id, Entry) {
 		return "the entry is not an object"
 	if !Entry.Has("id") || Entry["id"] !== Id
 		return "its id field does not name this entry"
+	; A row needs no size: the checksum vouches for its copy (LayoutRegistry_Verify).
 	if !Entry.Has("sha256") || !(Entry["sha256"] is String)
-			|| !Entry.Has("version") || !(Entry["version"] is String) || !Entry.Has("size")
-		return "it has no verified checksum, version or size"
+			|| !Entry.Has("version") || !(Entry["version"] is String)
+		return "it has no verified sha256 and version"
+	if Entry.Has("extension") {
+		Problem := LayoutExtension_Problem(Entry)
+		if Problem != ""
+			return "its extension is unusable: " . Problem
+	}
 	return ""
 }
 
@@ -402,10 +411,11 @@ _LayoutCatalogueSameValue(Left, Right) {
 
 ; A catalogue update owns the current index fields; future members remain raw.
 _LayoutCatalogueOverlayEntry(Entry, Original, OriginalText) {
-	global LAYOUT_CATALOGUE_RECORD_FIELDS
+	global LAYOUT_CATALOGUE_OWNED_FIELDS
 	Members := JsonObjectMemberSpans(OriginalText)
-	Owned := Map("extension", true)
-	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
+	Owned := Map()
+	Owned.CaseSense := "On"
+	for Field in LAYOUT_CATALOGUE_OWNED_FIELDS
 		Owned[Field] := true
 	Text := ""
 	for Field, Span in Members {
@@ -425,16 +435,21 @@ _LayoutCatalogueOverlayEntry(Entry, Original, OriginalText) {
 	return "{" . Text . "}"
 }
 
-; The record keeps the fields LAYOUT_CATALOGUE_RECORD_FIELDS names.
+; The record keeps the verified entry whole, detached from the index it came from.
 _LayoutCatalogueRecordEntry(Entry) {
-	global LAYOUT_CATALOGUE_RECORD_FIELDS
-	Kept := Map()
-	for Field in LAYOUT_CATALOGUE_RECORD_FIELDS
-		if Entry.Has(Field) && ((Entry[Field] is String) || (Entry[Field] is Integer))
-			Kept[Field] := Entry[Field]
-	if Entry.Has("extension")
-		Kept["extension"] := JsonParse(_LayoutCatalogueJson(Entry["extension"]))
-	return Kept
+	if Entry is Array {
+		Copy := []
+		for Item in Entry
+			Copy.Push(_LayoutCatalogueRecordEntry(Item))
+		return Copy
+	}
+	if !(Entry is Map)
+		return Entry
+	Copy := Map()
+	Copy.CaseSense := Entry.CaseSense
+	for Field, Item in Entry
+		Copy[Field] := _LayoutCatalogueRecordEntry(Item)
+	return Copy
 }
 
 /**

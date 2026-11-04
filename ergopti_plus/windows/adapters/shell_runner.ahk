@@ -36,6 +36,8 @@
 ; no counterpart in _shared/core/ports/ — it wraps Windows-only process spawning.
 ; ==============================================================================
 
+#Include ../infra/phase_stats.ahk
+
 #Include ../infra/tick_count.ahk
 
 
@@ -183,6 +185,17 @@ _SR_ProgramName(Cmd) {
 	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
 }
 
+; Names the program of a spawned executable, never its arguments: unlike a composed
+; command, the executable is a whole path, spaces included.
+; @param Executable {String}
+; @returns {String}
+_SR_ExecutableName(Executable) {
+	if !(Executable is String)
+		return "unknown"
+	SplitPath(Executable, &Name)
+	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
+}
+
 ; Reports a process exit with its status and duration. The first exit of each
 ; program is logged, then at most one line per program per window (carrying the
 ; number of runs it summarises), unless a run is slow — a slow child is exactly
@@ -198,6 +211,7 @@ _SR_RecordExit(Program, Status, DurationMs) {
 	static LastLogged := Map()
 	static Suppressed := Map()
 	Now := A_TickCount
+	PhaseStats_AddMs("process." . Program, DurationMs)
 	if (LastLogged.Has(Program) && (Now - LastLogged[Program]) < WINDOW_MS && DurationMs < SLOW_MS) {
 		Suppressed[Program] := Suppressed.Get(Program, 0) + 1
 		return false
@@ -325,6 +339,60 @@ ShellRunner_WinPsPath() {
 }
 
 /**
+ * The module folder of that executable. A driver started from PowerShell 7 inherits
+ * its PSModulePath, whose folders hold modules built for another engine.
+ * @returns {String} Absolute path under the Windows directory.
+ */
+ShellRunner_WinPsModulePath() {
+	SplitPath(ShellRunner_WinPsPath(), , &Directory)
+	return Directory . "\Modules"
+}
+
+; The version the workers' script text is written for.
+global SHELL_RUNNER_MIN_WIN_PS_VERSION := "5.1"
+
+; The program's name, from its one spelling: the compiled script's antivirus
+; surface counts every other copy.
+_ShellRunner_WinPsStem() {
+	SplitPath(ShellRunner_WinPsPath(), , , , &Stem)
+	return Stem
+}
+
+/**
+ * The installed version, from the registry, whose names ignore case: starting
+ * the program would cost a process at every start of the driver.
+ * @returns {String} "" when it is not installed.
+ */
+ShellRunner_WinPsVersion() {
+	Stem := _ShellRunner_WinPsStem()
+	return RegRead("HKLM\SOFTWARE\Microsoft\" . Stem . "\3\" . Stem . "Engine", Stem . "Version", "")
+}
+
+/**
+ * Says at start, in words, that the workers cannot run. Scheduled after the boot
+ * is ready, since a modal dialog freezes the auto-execute thread under it.
+ * @param {Func} VersionFn Test seam, ShellRunner_WinPsVersion by default.
+ * @param {Func} NoticeFn Test seam taking the text, a dialog by default.
+ * @returns {Boolean} True when the version is supported.
+ */
+ShellRunner_CheckWinPsAtStart(VersionFn := 0, NoticeFn := 0) {
+	global SHELL_RUNNER_MIN_WIN_PS_VERSION
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : ShellRunner_WinPsVersion()
+	if (Version != "" && VerCompare(Version, SHELL_RUNNER_MIN_WIN_PS_VERSION) >= 0)
+		return true
+	Name := "Windows " . StrReplace(StrTitle(_ShellRunner_WinPsStem()), "shell", "Shell")
+	LoggerError("ShellRunner", "{1} {2} is required, found '{3}'.", Name, SHELL_RUNNER_MIN_WIN_PS_VERSION, Version)
+	Text := StrReplace(t(Version == "" ? "startup.winps_missing" : "startup.winps_too_old"),
+		"{1}", SHELL_RUNNER_MIN_WIN_PS_VERSION)
+	Text := StrReplace(StrReplace(Text, "{2}", Version), "{3}", Name)
+	if HasMethod(NoticeFn, "Call")
+		NoticeFn.Call(Text)
+	else
+		Ui_MsgBox(Text, Name, "Icon!")
+	return false
+}
+
+/**
  * The arguments a PowerShell stage starts with: no profile, no prompt, and
  * the execution policy its scripts and modules need, followed by Args.
  * @param {String} Args The stage's own arguments (-File or -Command first).
@@ -379,6 +447,8 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 
 	local state := _SR_LegacyNewState(task_id, "",
 		IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0)
+	state["PhaseProgram"] := _SR_ExecutableName(Executable)
+	state["PhaseStartedTick"] := A_TickCount
 	local handle := {}
 
 	; AHK v2 fat-arrow bodies must be a single expression — a multi-statement
@@ -583,7 +653,9 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"UseDirectFallback", false,
 		"TreeKillFn", 0,
 		"DirectKillFn", 0,
-		"CleanupDiagnostics", Map())
+		"CleanupDiagnostics", Map(),
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0))
 	_SR_CompletionInitClaim(claim, callback_token)
 	State["Native"] := 0
 	State["TerminalClaim"] := claim
@@ -851,6 +923,9 @@ _SR_CompletionBegin(Claim) {
 			return false
 		Claim["Finished"] := true
 		Claim["CompletionBusy"] := true
+		; One claim per process, one-shot: the phase is counted exactly once.
+		if (Claim.Get("PhaseProgram", "") != "")
+			PhaseStats_AddMs("process." . Claim["PhaseProgram"], A_TickCount - Claim["PhaseStartedTick"])
 		return true
 	} finally {
 		Critical(previous_critical)
@@ -1293,6 +1368,13 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		MaxOutputBytes, CaptureOutput, PrivateDiagnostics)
 }
 
+; The absolute path of an executable on the search path, "" when there is none.
+ShellRunner_FindOnPath(Name) {
+	Found := Buffer(2 * 32768)
+	return DllCall("Kernel32\SearchPathW", "Ptr", 0, "Str", Name, "Ptr", 0, "UInt", 32768, "Ptr", Found, "Ptr", 0, "UInt")
+		? StrGet(Found, "UTF-16") : ""
+}
+
 /**
  * Owns a trusted complete command line with a private Unicode environment.
  * Unlike the argv entry, this preserves shell syntax already composed by its
@@ -1308,14 +1390,97 @@ ShellRunner_SpawnTreeOwnedCommand(ApplicationPath, CommandLine, Environment, Wor
 			if NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort") == 0
 				throw ValueError("Raw tree launch strings cannot contain NUL.")
 	}
+	Launch := Map("command", CommandLine, "environment", _SR_CaptureEnvironment(Environment), "directory", WorkingDir)
+	return _SR_NewTreeOwnedTask(ApplicationPath, [], OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+}
+
+/**
+ * The argv entry of ShellRunner_SpawnTreeOwned with a private Unicode environment:
+ * what the child alone must see stays out of this process's own environment, so
+ * nothing else this driver starts can inherit it.
+ */
+ShellRunner_SpawnTreeOwnedPrivate(Environment, Executable, Args, OnDone?, OnChunk?,
+		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	Launch := Map("environment", _SR_CaptureEnvironment(Environment), "directory", "")
+	return _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+}
+
+_SR_CaptureEnvironment(Environment) {
 	if !(Environment is Buffer) || Environment.Size < 4 || Mod(Environment.Size, 2)
 			|| NumGet(Environment, Environment.Size - 4, "UInt") != 0
 		throw TypeError("A raw tree launch requires a terminated Unicode environment block.")
 	Captured := Buffer(Environment.Size, 0)
 	DllCall("RtlMoveMemory", "Ptr", Captured, "Ptr", Environment, "UPtr", Environment.Size)
-	Launch := Map("command", CommandLine, "environment", Captured, "directory", WorkingDir)
-	return _SR_NewTreeOwnedTask(ApplicationPath, [], OnDone?, OnChunk?, BeforeNativeAdoptFn?,
-		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+	return Captured
+}
+
+/**
+ * A copy of this process's environment with some variables replaced, for a child.
+ * @param {Map} Overrides Names and string values, added or replacing what is there.
+ * @returns {Buffer} A sorted, doubly terminated Unicode environment block.
+ */
+ShellRunner_BuildEnvironment(Overrides) {
+	if !(Overrides is Map)
+		throw TypeError("Environment overrides must be a Map.")
+	Values := Map()
+	Values.CaseSense := "Off"
+	EnvironmentPtr := DllCall("Kernel32\GetEnvironmentStringsW", "Ptr")
+	if !EnvironmentPtr
+		throw OSError(A_LastError)
+	try {
+		Cursor := EnvironmentPtr
+		while NumGet(Cursor, 0, "UShort") {
+			Entry := StrGet(Cursor, "UTF-16")
+			Cursor += (StrLen(Entry) + 1) * 2
+			; Hidden drive-current-directory entries start with '=' and must survive.
+			Separator := InStr(Entry, "=", true, 2)
+			if !Separator
+				throw Error("The inherited environment contains an invalid entry.")
+			Name := SubStr(Entry, 1, Separator - 1)
+			; An inherited ERRORLEVEL masks cmd's dynamic process status.
+			if StrLower(Name) != "errorlevel"
+				Values[Name] := SubStr(Entry, Separator + 1)
+		}
+	} finally DllCall("Kernel32\FreeEnvironmentStringsW", "Ptr", EnvironmentPtr)
+	for Name, Value in Overrides {
+		if !(Name is String) or Name == "" or InStr(Name, "=") or !(Value is String)
+			throw TypeError("Environment entries require valid names and string values.")
+		if StrLower(Name) == "errorlevel"
+			throw ValueError("Environment overrides must not shadow the process exit status.")
+		Values[Name] := Value
+	}
+	; Native environment blocks use case-insensitive ordinal ordering. Sort keys
+	; without a text delimiter, since inherited names and values may contain one.
+	Names := []
+	CharacterCount := 1
+	for Name, Value in Values {
+		Low := 1
+		High := Names.Length
+		while Low <= High {
+			Middle := (Low + High) // 2
+			Comparison := DllCall("Kernel32\CompareStringOrdinal", "Str", Name, "Int", -1,
+				"Str", Names[Middle], "Int", -1, "Int", true, "Int")
+			if !Comparison
+				throw OSError(A_LastError)
+			if Comparison == 1
+				High := Middle - 1
+			else
+				Low := Middle + 1
+		}
+		Names.InsertAt(Low, Name)
+		CharacterCount += StrLen(Name) + StrLen(Value) + 2
+	}
+	; Each entry includes its own NUL; the zero-filled tail supplies the second.
+	Result := Buffer(Max(2, CharacterCount) * 2, 0)
+	Offset := 0
+	for Name in Names {
+		Entry := Name . "=" . Values[Name]
+		StrPut(Entry, Result.Ptr + Offset, StrLen(Entry) + 1, "UTF-16")
+		Offset += (StrLen(Entry) + 1) * 2
+	}
+	return Result
 }
 
 _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
@@ -1334,11 +1499,13 @@ _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
 	; The argv entry quotes once; the trusted command entry keeps its exact
 	; caller-composed shell text. Both attach stdout/stderr natively below.
 	; A refused vector is never quoted: start() reports its validation error.
-	local cmd := NativeLaunch is Map ? NativeLaunch["command"]
+	local cmd := NativeLaunch is Map && NativeLaunch.Has("command") ? NativeLaunch["command"]
 		: validation_error == "" ? _SR_BuildDirectCommandLine(Executable, Args) : ""
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
+		"PhaseProgram", _SR_ExecutableName(Executable),
+		"PhaseStartedTick", A_TickCount,
 		"Command", cmd,
 		"NativeLaunch", NativeLaunch,
 		"TmpFile", "",
@@ -2274,6 +2441,8 @@ _SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
 		"NativeExitObserved", State["RootReaped"],
 		"TaskId", task_id,
 		"Executable", State["Executable"],
+		"PhaseProgram", State.Get("PhaseProgram", ""),
+		"PhaseStartedTick", State.Get("PhaseStartedTick", 0),
 		"TmpFile", State["TmpFile"],
 		"CaptureDir", State.Get("CaptureDir", ""),
 		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
@@ -2931,8 +3100,12 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 			local capture := Map("TmpFile", A_LoopFileFullPath . "\output.tmp",
 				"CaptureDir", A_LoopFileFullPath . "\")
 			local refusal := 0, diagnostic := ""
-			try refusal := _SR_CaptureRemove(capture)
-			catch as Err
+			try {
+				; A folder reached through a link is not this adapter's to empty.
+				if !InStr(A_LoopFileAttrib, "L")
+					_SR_CaptureSweepMembers(A_LoopFileFullPath)
+				refusal := _SR_CaptureRemove(capture)
+			} catch as Err
 				diagnostic := Err.Message
 			if !refusal && diagnostic = "" {
 				removed += 1
@@ -2954,4 +3127,15 @@ _SR_CaptureSweepStale(Directory, CurrentPid) {
 		_SR_LogAt("Warn", "{1} stale capture folder(s) could not be removed ({2}); the next start retries.",
 			kept, first_refusal)
 	return Map("removed", removed, "kept", kept)
+}
+
+; Deletes the files an exited owner left in its capture folder. A managed HTTP
+; request stages more than the capture file there, and its transport.json holds
+; the request's headers and body in clear: left alone, they outlive the crash and
+; the folder refuses removal at every later start. A file another process still
+; holds stays; the folder's own removal then reports the refusal.
+; @param Folder {String} The capture folder of an exited owner.
+_SR_CaptureSweepMembers(Folder) {
+	Loop Files Folder . "\*", "F"
+		DllCall("Kernel32\DeleteFileW", "WStr", A_LoopFileFullPath, "Int")
 }

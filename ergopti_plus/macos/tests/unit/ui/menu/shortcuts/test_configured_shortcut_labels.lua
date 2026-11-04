@@ -43,6 +43,8 @@ helpers.describe("configured shortcut row labels", function()
 					get_keyboard_slot_groups = function() return { { prefix = "secondary_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" } } end,
 					assigned_keyboard_slots = function() return { { id = "secondary_a", action = "open_url" } } end,
 					get_keyboard_slot_label = function() return "Ctrl+A" end,
+					get_keyboard_group_label = function(group) return group.group_key end,
+					get_keyboard_group_modifiers_label = function() return "Ctrl" end,
 					keyboard_binding_id = keyboard_binding,
 				}
 				package.loaded["modules.shortcuts"] = shortcuts
@@ -54,7 +56,10 @@ helpers.describe("configured shortcut row labels", function()
 				package.loaded["modules.shortcuts.bindings"] = {}
 				package.loaded["modules.shortcuts.actions.text"] = {}
 				package.loaded["infra.i18n"] = {
-					get = function(key) return key:find("right_opt", 1, true) and "%s" or key end,
+					get = function(key)
+						return key:find("right_opt", 1, true) and "%s"
+							or helpers.I18N_PLACEHOLDER_FORMATS[key] or key
+					end,
 					section = function(key) return key end,
 					decorate_section = function(label) return label end,
 				}
@@ -133,7 +138,7 @@ helpers.describe("real script-action catalogue projection", function()
 			local actions = require("modules.gestures.actions")
 			local script = require("modules.shortcuts.script_control")
 			helpers.assert_eq(script.ACTIONS, actions.SG_NAMES)
-			helpers.assert_eq(#script.ACTIONS, 832)
+			helpers.assert_eq(#script.ACTIONS, 840)
 			for index, row in ipairs(expected) do
 				helpers.assert_eq(script.ACTIONS[index], row[1], "genuine catalogue order " .. index)
 				helpers.assert_true(row[1] ~= "-" and row[1] ~= "--", "original catalogue has no retired token")

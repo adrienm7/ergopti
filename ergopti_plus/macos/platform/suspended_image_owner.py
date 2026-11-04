@@ -65,7 +65,8 @@ class EmptySession:
                 not stat.S_ISDIR(directory_identity.st_mode)
                 or directory_identity.st_uid != os.geteuid()
                 or stat.S_IMODE(directory_identity.st_mode) != 0o700
-                or vnode(value.directory.stat(follow_symlinks=False)) != vnode(directory_identity)
+                or vnode(os.stat(value.directory, follow_symlinks=False))
+                != vnode(directory_identity)
             ):
                 raise ImageRefusal("session")
             value._file_fd = os.open(
@@ -137,7 +138,7 @@ class EmptySession:
         if self._close_debt is not None or self._file_fd is None or self._directory_fd is None:
             raise ImageRefusal("cleanup")
         directory = os.fstat(self._directory_fd)
-        named_directory = self.directory.stat(follow_symlinks=False)
+        named_directory = os.stat(self.directory, follow_symlinks=False)
         file = os.fstat(self._file_fd)
         named_file = os.stat(self.name, dir_fd=self._directory_fd, follow_symlinks=False)
         if (

@@ -81,3 +81,67 @@ helpers.describe("network check route plan port", function()
 		helpers.assert_eq(#calls, 0)
 	end)
 end)
+
+-- docs/design/proxy-auth-relay.md: the relay beside the launcher answers the probe.
+helpers.describe("network check relay probe port", function()
+	local function probe(script, launcher, present)
+		local calls, answers = {}, {}
+		helpers.with_stub_scope({ "infra.logger", "adapters.field_check_ports", "adapters.shell_runner",
+			"adapters.timer_scheduler", "platform.remap.lease_helper", "adapters.file_system" }, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() return { stopped = false } end, cancel = function() return true end,
+			}
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(executable, args, callback)
+					calls[#calls + 1] = { executable = executable, args = args }
+					return { isSettled = function() return false end,
+						start = function() callback(script(args)); return true end, terminate = function() end }
+				end,
+			}
+			package.loaded["platform.remap.lease_helper"] = {
+				resolve = function() return launcher, nil, {} end,
+			}
+			local FileSystem = require("adapters.file_system")
+			local real_exists = FileSystem.exists
+			package.loaded["adapters.file_system"] = setmetatable({
+				exists = function(path)
+					if path:find("ergopti-proxy-relay", 1, true) then return present end
+					return real_exists(path)
+				end,
+			}, { __index = FileSystem })
+			package.loaded["adapters.field_check_ports"] = nil
+			require("adapters.field_check_ports").new().relay_probe("http://proxy.corp.example:3128",
+				function(answer, reason) answers[#answers + 1] = { answer = answer, reason = reason } end)
+		end)
+		return answers, calls
+	end
+
+	helpers.it("(proxy-auth-relay) runs the bundled relay's probe for the registry", function()
+		local answers, calls = probe(function()
+			return 0, '{"schema":1,"status":"required","scheme":"negotiate"}\n'
+		end, "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus", true)
+		helpers.assert_eq(#calls, 1)
+		helpers.assert_eq(calls[1].executable, "/Applications/ErgoptiPlus.app/Contents/MacOS/ergopti-proxy-relay")
+		helpers.assert_eq(calls[1].args[1], "probe")
+		helpers.assert_eq(calls[1].args[3], "http://proxy.corp.example:3128")
+		helpers.assert_eq(calls[1].args[5], "registry.ollama.ai:443")
+		helpers.assert_eq(answers[1].answer.scheme, "negotiate")
+	end)
+
+	helpers.it("(proxy-auth-relay) a relay that is not bundled answers not_installed without a child", function()
+		local answers, calls = probe(function() error("must not run") end, "/Applications/X.app/Contents/MacOS/ErgoptiPlus", false)
+		helpers.assert_eq(#calls, 0)
+		helpers.assert_eq(answers[1].answer.status, "not_installed")
+		local none = probe(function() error("must not run") end, nil, true)
+		helpers.assert_eq(none[1].answer.status, "not_installed")
+	end)
+
+	helpers.it("(proxy-auth-relay) a relay that answers off contract is relay_unavailable", function()
+		local answers = probe(function() return 1, "panic: boom\n" end,
+			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus", true)
+		helpers.assert_eq(answers[1].reason, "relay_unavailable")
+		local timeout = probe(function() return nil, "" end, "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus", true)
+		helpers.assert_eq(timeout[1].reason, "relay_unavailable")
+	end)
+end)

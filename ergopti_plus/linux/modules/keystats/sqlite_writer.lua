@@ -46,6 +46,7 @@ local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
 local Queries = require("keystats.queries")
+local TokenEncoding = require("keystats.token_encoding")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
@@ -95,14 +96,12 @@ local unpack_values = table.unpack or unpack
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	-- command -v, the shell's own lookup: `which` is a separate package that
-	-- Arch's base image and other minimal systems do not ship, and there the
-	-- probe reported sqlite3 missing and switched metrics to the JSON fallback.
-	local ok = os.execute("command -v sqlite3 >/dev/null 2>&1")
-	_available = (ok == true or ok == 0)
+	-- The private runtime's sqlite3 (infra/owned_programs.lua): every package
+	-- carries it, so its absence is a broken install, not a missing host package.
+	local Owned = require("infra.owned_programs")
+	_available = Owned.available("sqlite3")
 	if not _available then
-		Logger.warn(LOG, "sqlite3 CLI not found — SQLite persistence disabled.")
-		Logger.warn(LOG, "  Install: sudo apt-get install sqlite3")
+		Logger.error(LOG, "sqlite3 (%s) is not available — SQLite persistence disabled.", Owned.path("sqlite3"))
 	end
 	return _available
 end
@@ -363,6 +362,51 @@ function M.flush_transport_available()
 	return require("infra.sqlite_batch_process").is_available() == true
 end
 
+--- Moves a store to the current n-gram token encoding, once. This database is
+--- the only copy of its derived keys: unlike Windows and macOS there is no ledger
+--- replay, so the keys are rewritten in place. VACUUM INTO first leaves a
+--- consistent backup beside it, the update is one transaction that also records
+--- the version. The caller stops using a store this refuses: writing new keys
+--- beside old ones would make a later retry escape them twice.
+--- @return boolean True once the store holds the current encoding.
+function M.ensure_token_encoding()
+	local recorded = _query_scalar("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	if recorded == tostring(TokenEncoding.VERSION) then return true end
+	local keys = {}
+	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
+		local output = _query_output("SELECT DISTINCT hex(token) FROM " .. table_name .. " WHERE instr(token,'[')>0;")
+		if output == nil then
+			Logger.error(LOG, "Cannot read the n-gram keys of %s for their migration.", table_name)
+			return false
+		end
+		local family = {}
+		for hex in output:gmatch("[^\n]+") do
+			family[#family + 1] = (hex:gsub("%x%x", function(pair) return string.char(tonumber(pair, 16)) end))
+		end
+		keys[table_name] = family
+	end
+	local statements = TokenEncoding.migration_statements(keys)
+	if #statements > 0 then
+		local backup = _db_path .. TokenEncoding.BACKUP_SUFFIX
+		local fh = io.open(backup, "rb")
+		if fh then
+			fh:close()
+		elseif not _exec("VACUUM INTO '" .. backup:gsub("'", "''") .. "';") then
+			Logger.error(LOG, "Cannot back the metrics store up before migrating its n-gram keys.")
+			return false
+		end
+	end
+	statements[#statements + 1] = string.format(
+		"INSERT OR REPLACE INTO meta (key, value) VALUES ('ngram_token_encoding','%d');", TokenEncoding.VERSION)
+	if not _exec_raw_batch(table.concat(statements, "\n")) then
+		Logger.error(LOG, "The n-gram key migration was refused; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store moved to n-gram token encoding %d (%d statement(s)).",
+		TokenEncoding.VERSION, #statements - 1)
+	return true
+end
+
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
@@ -520,6 +564,13 @@ function M.register_device(device_id, device_name, os_name, os_version, host_sig
 	return accepted
 end
 
+--- Whether semantic media entries can be stored now: an open database whose media
+--- schema and five-key catalogue were admitted, with no unresolved media terminal.
+--- @return boolean available
+function M.media_available()
+	return M.is_available() and _media_policy ~= nil and _media_terminal_debt == nil
+end
+
 --- Stores already admitted semantic media entries in one native transaction.
 --- This port grants no native capture authority and never mutates pending input.
 --- @param device_id string Persisted collector partition, not a fabricated source device.
@@ -577,6 +628,23 @@ function M.rebuild_media(device_id, threshold_ms)
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.
+--- Renders one raw batch through its builder, refusing a batch the statement
+--- catalogue cannot render. A slot the catalogue refuses (a non-finite rate, a
+--- value of the wrong type) raises there by design; uncontained, that raise
+--- escaped insert_* as a Lua error where callers expect a false receipt and the
+--- pending source to stay unacknowledged for a retry.
+--- @param family string Key of _raw_sql.
+--- @return string|false sql
+local function _compose_raw(family, ...)
+	local composed, sql = pcall(_raw_sql[family], ...)
+	if not composed then
+		Logger.error(LOG, "Raw %s batch refused: a row cannot be rendered as its statement (%s).",
+			family, ErrorDescription.describe(sql))
+		return false
+	end
+	return sql
+end
+
 --- Each event is a single keystroke row.
 ---
 --- NOTE: the full keystats-walker processes individual keystrokes into
@@ -589,7 +657,7 @@ end
 --- @param derived table|nil Optional { ngrams, daily } rows committed with their raw source.
 _raw_sql.typing = function(device_id, events, first_id, derived)
 
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		local event_id = first_id + i - 1
 
@@ -609,35 +677,22 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 			return false
 		end
 
-		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
-		local date    = _sql_escape(ev.date    or os.date("%Y-%m-%d"))
-		local app     = _sql_escape(ev.app     or "unknown")
-		local text    = _sql_escape(enc_text)
-		local title   = _sql_escape(ev.title   or "")
-		-- WPM is a fractional rate in a REAL column, not an integer counter.
-		local wpm     = tonumber(ev.wpm) or 0
-		local layout  = _sql_escape(ev.layout  or "")
-		local events_json = _sql_escape(enc_json)
-		-- The pointer activity since the application's previous row (pointer_metrics).
-		local mouse_clicks = math.floor(tonumber(ev.mouse_clicks) or 0)
-		local mouse_scrolls = math.floor(tonumber(ev.mouse_scrolls) or 0)
-		local mouse_distance = math.floor(tonumber(ev.mouse_distance_px) or 0)
-
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,%d,%d,%d,0,0,0.0,%.17g,'%s','','%s')",
-			_sql_escape(device_id), event_id, ts, date, app, title,
-			layout, mouse_clicks, mouse_scrolls, mouse_distance, wpm, text, events_json
-		)
+		-- WPM is a fractional rate in a REAL column, not an integer counter. The
+		-- pointer activity is since the application's previous row (pointer_metrics).
+		statements[i] = Queries.render("events.typing", "cli_json", {
+			device_id = device_id, id = event_id,
+			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
+			app = ev.app or "unknown", title = ev.title or "", url = "", field_role = "",
+			layout = ev.layout or "", document_path = "",
+			is_fullscreen = 0, in_meeting = 0,
+			mouse_clicks = tonumber(ev.mouse_clicks) or 0, mouse_scrolls = tonumber(ev.mouse_scrolls) or 0,
+			mouse_distance_px = tonumber(ev.mouse_distance_px) or 0,
+			pause_before_ms = 0, battery_level = 0, audio_volume = 0,
+			wpm = tonumber(ev.wpm) or 0, text = enc_text, rich_text = "", events_json = enc_json,
+		})
 	end
 
-	local sql = string.format(
-		"INSERT OR IGNORE INTO events_typing "
-		.. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
-		.. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
-		.. "pause_before_ms,battery_level,audio_volume,wpm,text,rich_text,events_json) "
-		.. "VALUES %s;",
-		table.concat(parts, ",")
-	)
+	local sql = table.concat(statements, "\n")
 	if derived ~= nil then
 		local composed, statements = pcall(function()
 			assert(type(derived) == "table" and type(derived.ngrams) == "table" and type(derived.daily) == "table")
@@ -671,7 +726,7 @@ function M.insert_typing_events(device_id, events, derived)
 	if type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.typing(device_id, events, first_id, derived)
+	local sql = _compose_raw("typing", device_id, events, first_id, derived)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -702,27 +757,26 @@ function M.insert_hotstring_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.hotstrings(device_id, events, first_id)
+	local sql = _compose_raw("hotstrings", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
 
---- The nullable text and number literals of an events_llm row. A column the event does
+--- The nullable text, number and list values of an events_llm row. A column the event does
 --- not carry is NULL, exactly as the other two drivers write it: the dashboard tells a
 --- generation that reported no token count from one that reported zero.
 local function _llm_text(value)
-	if type(value) ~= "string" then return "NULL" end
-	return "'" .. _sql_escape(value) .. "'"
+	if type(value) == "string" then return value end
 end
 
 local function _llm_number(value)
-	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return "NULL" end
-	return string.format("%.17g", value)
+	if type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge then
+		return value
+	end
 end
 
 local function _llm_list(value)
-	if type(value) ~= "table" then return "NULL" end
-	return "'" .. _sql_escape(Json.encode(Json.array(value))) .. "'"
+	if type(value) == "table" then return Json.encode(Json.array(value)) end
 end
 
 --- Inserts LLM prediction events in the canonical events_llm shape macOS and Windows write.
@@ -734,30 +788,27 @@ end
 ---   all_predictions?, chosen_index?, deletes?, deleted_text?, net_saved_chars?,
 ---   prompt_tokens?, completion_tokens?, total_tokens?, est_cost_usd? }.
 _raw_sql.llm = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		local kind = ev.kind
 		if kind ~= "generation" and kind ~= "suggested" and kind ~= "dismissed" and kind ~= "accepted" then
 			Logger.error(LOG, "LLM event batch refused: '%s' is not an events_llm kind.", tostring(kind))
 			return nil
 		end
-		parts[#parts + 1] = string.format("('%s',%d,'%s','%s','%s','%s',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("%Y-%m-%d")),
-			_sql_escape(ev.app or "unknown"),
-			kind,
-			_llm_text(ev.context), _llm_list(ev.predictions), _llm_text(ev.prediction),
-			_llm_list(ev.all_predictions), _llm_number(ev.chosen_index), _llm_number(ev.deletes),
-			_llm_text(ev.deleted_text), _llm_number(ev.net_saved_chars), _llm_number(ev.count),
-			_llm_number(ev.prompt_tokens), _llm_number(ev.completion_tokens),
-			_llm_number(ev.total_tokens), _llm_number(ev.est_cost_usd))
+		statements[i] = Queries.render("events.llm", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
+			app = ev.app or "unknown", kind = kind,
+			context = _llm_text(ev.context), predictions_json = _llm_list(ev.predictions),
+			prediction = _llm_text(ev.prediction), all_predictions_json = _llm_list(ev.all_predictions),
+			chosen_index = _llm_number(ev.chosen_index), deletes = _llm_number(ev.deletes),
+			deleted_text = _llm_text(ev.deleted_text), net_saved_chars = _llm_number(ev.net_saved_chars),
+			count = _llm_number(ev.count), prompt_tokens = _llm_number(ev.prompt_tokens),
+			completion_tokens = _llm_number(ev.completion_tokens), total_tokens = _llm_number(ev.total_tokens),
+			est_cost_usd = _llm_number(ev.est_cost_usd),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_llm "
-		.. "(device_id,id,ts,date,app,kind,context,predictions_json,prediction,all_predictions_json,"
-		.. "chosen_index,deletes,deleted_text,net_saved_chars,count,prompt_tokens,completion_tokens,"
-		.. "total_tokens,est_cost_usd) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical raw LLM batch and returns its native receipt.
@@ -765,7 +816,7 @@ function M.insert_llm_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.llm(device_id, events, first_id)
+	local sql = _compose_raw("llm", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -802,7 +853,7 @@ function M.insert_shortcut_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.shortcuts(device_id, events, first_id)
+	local sql = _compose_raw("shortcuts", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -879,12 +930,32 @@ _raw_sql.system = function(device_id, events, first_id)
 	return table.concat(statements, "\n")
 end
 
+--- Plans admitted semantic media entries as raw events_system rows and their
+--- derived press and hold rows, so the flush that owns the raw source commits
+--- its projections in the same transaction (media never reaches the numeric
+--- heatmap tables).
+--- @param device_id string Persisted collector partition.
+--- @param events table Ordered physical_media_press/release entries.
+--- @param first_id integer First reserved raw-event identifier.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+_raw_sql.media = function(device_id, events, first_id, threshold_ms)
+	assert(_media_policy ~= nil, "Semantic media policy is not admitted")
+	local statements, batch = {}, { media_ngram = {}, media_hold = {} }
+	MediaStore.replay(_media_policy, batch, events, threshold_ms)
+	for index, event in ipairs(events) do
+		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
+	end
+	for _, row in pairs(batch.media_ngram) do statements[#statements + 1] = MediaStore.press_sql(device_id, row) end
+	for _, row in pairs(batch.media_hold) do statements[#statements + 1] = MediaStore.hold_sql(device_id, row) end
+	return table.concat(statements, "\n")
+end
+
 --- Commits one canonical raw system-event batch and returns its native receipt.
 function M.insert_system_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.system(device_id, events, first_id)
+	local sql = _compose_raw("system", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -894,7 +965,7 @@ function M.insert_session_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.sessions(device_id, events, first_id)
+	local sql = _compose_raw("sessions", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -904,7 +975,7 @@ function M.insert_window_switch_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.windows(device_id, events, first_id)
+	local sql = _compose_raw("windows", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -914,7 +985,7 @@ function M.insert_app_switch_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
-	local sql = _raw_sql.switches(device_id, events, first_id)
+	local sql = _compose_raw("switches", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -1478,19 +1549,16 @@ end
 --- @param scancodes table { [evdev_code] = count }.
 _derived_sql.scancodes = function(device_id, date, app, scancodes)
 	if type(scancodes) ~= "table" then return end
-	local parts = {}
+	local statements = {}
 	for scancode, count in pairs(scancodes) do
 		local code = tonumber(scancode)
 		if code and code > 0 and type(count) == "number" and count > 0 then
-			parts[#parts + 1] = string.format("('%s','%s','%s',%d,%d)",
-				_sql_escape(device_id), _sql_escape(date), _sql_escape(app),
-				math.floor(code), math.floor(count))
+			statements[#statements + 1] = Queries.render("agg.ngram_scancode", "cli_json", {
+				device_id = device_id, date = date, app = app, scancode = code, c = count,
+			})
 		end
 	end
-	if #parts == 0 then return "" end
-	return "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
-		.. table.concat(parts, ",")
-		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical scancodes upsert and returns its native receipt.
@@ -1571,8 +1639,14 @@ function M.start_flush(device_id, payload)
 	payload.raw.windows = payload.raw.windows or {}
 	payload.raw.sessions = payload.raw.sessions or {}
 	payload.raw.system = payload.raw.system or {}
+	payload.raw.media = payload.raw.media or {}
+	-- Media rows need the admitted policy and the tap threshold their holds are split by.
+	if #payload.raw.media > 0 and (not M.media_available() or type(payload.media_threshold_ms) ~= "number") then
+		return nil
+	end
+	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
@@ -1603,7 +1677,8 @@ function M.start_flush(device_id, payload)
 		for _, name in ipairs(families) do
 			local rows = payload.raw[name]
 			if #rows > 0 then
-				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor))
+				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor,
+					name == "media" and media_threshold_ms or nil))
 				cursor = cursor + #rows
 			end
 		end

@@ -102,7 +102,11 @@ helpers.describe("field check report", function()
 			local report = Engine.new_report("lease")
 			report.step("a", "pass", 3)
 			report.step("b", "fail")
-			local text = Engine.format_text(report.result(), function(key) return "<" .. key .. ">" end)
+			-- The join is read from the locale (common.label_value), never spelled here.
+			local text = Engine.format_text(report.result(), function(key)
+				if key == "common.label_value" then return "{1} : {2}" end
+				return "<" .. key .. ">"
+			end)
 			helpers.assert_eq(text,
 				"<field_check.verdict_fail>\n\n✅ <field_check.step.a> : 3\n❌ <field_check.step.b>")
 		end)

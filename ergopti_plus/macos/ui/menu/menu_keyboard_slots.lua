@@ -30,6 +30,7 @@ local ParameterLabel = require("action_parameter_label")
 
 local hs           = hs
 local i18n         = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
@@ -260,6 +261,8 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
 		keyboard_group_add_cmd = add_for("primary_"),
 		keyboard_group_add_cmd_shift = add_for("primary_shift_"),
+		-- The {1} of the Add row's template: the group's modifiers by name.
+		keyboard_group_add_caption = function() return KbShortcuts.get_keyboard_group_modifiers_label(group) end,
 	}
 	local function add_action()
 		if not getters.keyboard_group_ready() then return false end
@@ -302,7 +305,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 				gestures, KbShortcuts.keyboard_binding_id(slot.id), slot.action)
 		end
 		assigned[#assigned + 1] = {
-			label    = KbShortcuts.get_keyboard_slot_label(slot.id) .. " : " .. action_label,
+			label    = LabelValue.compose(i18n.get, KbShortcuts.get_keyboard_slot_label(slot.id), action_label),
 			disabled = disabled or nil,
 			action   = function() choose_action_for(slot.id, ctx) end,
 		}
@@ -341,7 +344,7 @@ function M.provide_rows(ctx, disabled, fixed_by_prefix)
 		local items = build_group_rows(group, ctx, disabled, fixed)
 		if not items then return {} end
 		rows[#rows + 1] = {
-			label    = i18n.get(group.group_key),
+			label    = KbShortcuts.get_keyboard_group_label(group),
 			disabled = disabled or nil,
 			items    = items,
 		}

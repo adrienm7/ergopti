@@ -59,6 +59,8 @@ local function split_tuple(text)
 			position = stop
 		end
 		if text:sub(position, position) == "," then position = position + 1 end
+		-- The catalogue spells its tuples with a space after each comma.
+		while text:sub(position, position) == " " do position = position + 1 end
 	end
 	return values
 end
@@ -167,6 +169,7 @@ helpers.describe("keystats llm events: the recorder buffers and flushes them onc
 	helpers.it("llm-events: record_llm_event reaches the writer in one flush and is not replayed", function()
 		local fake_writer = setmetatable({
 			open_db = function() return true end,
+			ensure_token_encoding = function() return true end,
 			register_device = function() return true end,
 			read_open_walk = function() return nil, true end,
 			upsert_open_walk = function() return true end,

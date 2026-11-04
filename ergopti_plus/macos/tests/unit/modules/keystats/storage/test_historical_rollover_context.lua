@@ -257,6 +257,11 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(manager.is_recovering(), true, "a large recovery must yield before init returns")
 			helpers.assert_true(walked < 300, "the first slice must not walk the whole cache")
 			helpers.assert_eq(manager.ingest_once(), false, "ingest waits while the recovery owns the aggregator")
+			value(value(manager.day_rollover, "_require_state"), "_state", {})
+			local rolled_over, reason = manager.day_rollover()
+			helpers.assert_eq(rolled_over, false, "the rollover waits with the ingest, and touches nothing")
+			helpers.assert_eq(reason, manager.ROLLOVER_WAITS_FOR_RECOVERY,
+				"a known wait names itself instead of reporting a stalled drain (rotation-waits-recovery)")
 			local slices = 1
 			while manager.is_recovering() do
 				local handle = table.remove(pending, 1)
@@ -278,6 +283,150 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(value(cancel, "_cancel_aggregate_recovery")(), true)
 			helpers.assert_eq(manager.is_recovering(), false)
 			helpers.assert_eq(cancelled, 1, "the pending slice timer is cancelled")
+		end)
+	end)
+
+	--- Wires a recovery whose clock spends one slice per read, returning its timers.
+	local function recovery_harness(rebuild, manager, on_battery)
+		local start = value(value(manager.init, "_init"), "_start_aggregate_recovery")
+		local slice = value(start, "_run_recovery_slice")
+		value(value(start, "_recover_aggregate_cache"), "_sync_foreign_data_sql", function() return {} end)
+		local clock = 0
+		value(slice, "timer", { absoluteTime = function() clock = clock + 8 * 1000 * 1000; return clock end })
+		local pending = {}
+		value(slice, "TimerScheduler", {
+			after = function(delay, fn)
+				local handle = { timer = {}, fn = fn, delay = delay }
+				pending[#pending + 1] = handle
+				return handle, true
+			end,
+			cancel = function(handle) handle.timer = nil; return true end,
+		})
+		value(value(slice, "_recovery_pause_sec"), "PowerSource", { on_battery = function() return on_battery end })
+		local walked = {}
+		value(rebuild, "Aggregator", { get_ngram_ctx = function() return { walked = #walked } end,
+			set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+			set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+			walk_typing = function(row) walked[#walked + 1] = row end })
+		return start, pending, walked
+	end
+
+	-- The 45 % idle CPU of the 2026-11-01 field run: on battery, 1554 slices ran
+	-- in 30 s at the same 10 ms pause as on the mains.
+	helpers.it("keeps a recovery under its CPU share on battery and at speed on the mains (recovery-battery-share)", function()
+		for _, on_battery in ipairs({ true, false }) do
+			with_rebuild(function(_, rebuild, _, db, state, _, manager)
+				local start, pending = recovery_harness(rebuild, manager, on_battery)
+				local ids, sql = {}, {}
+				for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
+				state.raw.device = ids
+				state.ledgers["owned/device/data.sql"] = batch(table.concat(sql)) .. marker
+				start(db)
+				helpers.assert_eq(manager.is_recovering(), true)
+				local delay = pending[#pending].delay
+				if on_battery then
+					helpers.assert_true(delay >= 1.6, "at most 0.5 % of a core on battery, got a pause of " .. delay)
+					helpers.assert_true(delay <= 30, "one long slice must not silence the recovery")
+				else
+					helpers.assert_eq(delay, 0.01, "the mains keep the fast pause")
+				end
+				value(value(value(manager.init, "_rollback_failed_init"), "_release_failed_init_resources"),
+					"_cancel_aggregate_recovery")()
+			end)
+		end
+	end)
+
+	-- Field run 2026-11-01: 10315 slices, then a reload threw them away and the
+	-- next start scanned the 300 MB ledger and cleared the rows all over again.
+	helpers.it("resumes an interrupted rebuild after its last committed row (recovery-resume-point)", function()
+		with_rebuild(function(_, rebuild, _, db, state, _, manager)
+			local start, pending, walked = recovery_harness(rebuild, manager, false)
+			local stored = nil
+			local exec, nrows = db.exec, db.nrows
+			function db:exec(sql)
+				local body = sql:match("VALUES%('aggregate_recovery_progress', '(.*)'%);$")
+				if body then stored = body end
+				if sql:find("DELETE FROM meta WHERE key='aggregate_recovery_progress'", 1, true) then stored = nil end
+				return exec(self, sql)
+			end
+			function db:nrows(sql)
+				if sql:find("WHERE key='aggregate_recovery_progress'", 1, true) then
+					local served = stored == nil
+					return function()
+						if served then return nil end
+						served = true
+						return { value = stored }
+					end
+				end
+				return nrows(self, sql)
+			end
+			local ids, sql = {}, {}
+			for id = 1, 1200 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
+			state.raw.device = ids
+			state.ledgers["owned/device/data.sql"] = batch(table.concat(sql)) .. marker
+			local function step()
+				local handle = table.remove(pending, 1)
+				assert(handle, "a yielded recovery owns its next slice timer")
+				handle.timer = nil
+				handle.fn()
+			end
+
+			start(db)
+			local guard = 0
+			while #walked < 650 do
+				step()
+				guard = guard + 1
+				assert(guard < 10000, "the walk never reached its first flush")
+			end
+			local first_run = #walked
+			local cancel = value(value(manager.init, "_rollback_failed_init"), "_release_failed_init_resources")
+			helpers.assert_eq(value(cancel, "_cancel_aggregate_recovery")(), true)
+			helpers.assert_true(stored ~= nil, "the first flush committed a resume point")
+			helpers.assert_true(stored:find('"id":500', 1, true) ~= nil, "it names the last flushed row: " .. stored)
+
+			local deletes_before, scans = db.deletes, 0
+			state.ledgers["owned/device/data.sql"] = nil
+			value(value(rebuild, "_typing_replay_cutoffs"), "FileSystem", { read = function() scans = scans + 1 end })
+			for index = 1, first_run do walked[index] = nil end
+			start(db)
+			guard = 0
+			while manager.is_recovering() do
+				step()
+				guard = guard + 1
+				assert(guard < 10000, "the resumed recovery never ended")
+			end
+			helpers.assert_eq(#walked, 700, "only the rows after the resume point are walked again")
+			helpers.assert_eq(scans, 0, "a resumed rebuild does not read the ledger again")
+			helpers.assert_eq(db.deletes - deletes_before, 1, "it clears nothing; only the mark retires its row")
+			helpers.assert_eq(stored, nil, "the finished rebuild retires its resume point")
+		end)
+	end)
+
+	-- The 101 "issues" of the same run: a lock-free reader needs a still file.
+	helpers.it("holds its slices for a lock-free reader, then goes on (recovery-hold)", function()
+		with_rebuild(function(_, rebuild, _, db, state, _, manager)
+			local start, pending, walked = recovery_harness(rebuild, manager, false)
+			helpers.assert_eq(manager.hold_recovery(5), false, "nothing to hold before a recovery runs")
+			local ids, sql = {}, {}
+			for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
+			state.raw.device = ids
+			state.ledgers["owned/device/data.sql"] = batch(table.concat(sql)) .. marker
+			start(db)
+			helpers.assert_eq(manager.hold_recovery(5), true)
+			local count, statements = #walked, #db.statements
+			local handle = table.remove(pending, 1)
+			handle.timer = nil
+			handle.fn()
+			helpers.assert_eq(#walked, count, "a held slice walks nothing")
+			helpers.assert_eq(#db.statements, statements, "a held slice writes nothing")
+			helpers.assert_eq(pending[1].delay, 0.25, "it asks again soon")
+			helpers.assert_eq(manager.hold_recovery(0), true)
+			while manager.is_recovering() do
+				handle = table.remove(pending, 1)
+				handle.timer = nil
+				handle.fn()
+			end
+			helpers.assert_eq(#walked, 300, "every row is walked once the hold ends")
 		end)
 	end)
 
@@ -491,7 +640,7 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(rebuild(db), true, "the old revision still permits a complete migration retry")
 			helpers.assert_eq(current, { Editor = { cur_word = "repaired-local" } })
 			helpers.assert_eq(mark(db), true)
-			helpers.assert_eq(db.revision, "2")
+			helpers.assert_eq(db.revision, "3")
 			helpers.assert_eq(json.decode(db.context), current)
 			helpers.assert_eq(db.view_revision, 2)
 
@@ -499,7 +648,7 @@ helpers.describe("historical rebuild ownership", function()
 			manager.ingest_once()
 			helpers.assert_eq(applied, 2)
 			helpers.assert_eq(state.reads, 2)
-			helpers.assert_eq(db.revision, "2", "current foreign-only refresh keeps its compatibility mark")
+			helpers.assert_eq(db.revision, "3", "current foreign-only refresh keeps its compatibility mark")
 			helpers.assert_eq(json.decode(db.context), current, "current local context keeps normal persistence")
 			helpers.assert_eq(db.view_revision, 3)
 		end)

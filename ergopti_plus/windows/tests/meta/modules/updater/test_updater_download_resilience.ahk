@@ -15,14 +15,12 @@
 
 #Requires AutoHotkey v2.0
 
-_G5UD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_G5UD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _G5UD_CheckDownloadPollGuards() {
-	Src := _G5UD_ReadSource("modules/updater.ahk")
+	Src := _G5UD_ReadSource("updater.ahk")
 	Seg := _DriverFuncBody("_Updater_MonitorStagingWorker")
 	
 	Assert(Seg != "", "_Updater_MonitorStagingWorker must exist in updater.ahk")
@@ -44,7 +42,7 @@ _G5UD_CheckDownloadPollGuards() {
 		"Pause must cancel synchronously and confirm exact native cleanup")
 	StartBody := _DriverFuncBody("_Updater_StartStagingWorker")
 	Assert(StartBody != "", "_Updater_StartStagingWorker must exist in updater.ahk")
-	Assert(InStr(StartBody, "ShellRunner_SpawnTreeOwned") > 0
+	Assert(InStr(StartBody, "ProxyOverride_SpawnWorker") > 0
 		&& !RegExMatch(StartBody, "\bShellRunner_Spawn\("),
 		"updater staging must use the Job-owned process-tree runner; PID-only cancellation can leave PowerShell alive after Suspend (Garantie G5)")
 }

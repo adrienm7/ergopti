@@ -13,9 +13,13 @@
 ; Included by modules/gestures/init.ahk after the constants block.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
 		"run_program", { Fn: (BindingId := "") => ProgramActions_Run(BindingId) },
+		"run_command", { Fn: (BindingId := "") => UserActions_RunCommand(BindingId) },
+		"open_path", { Fn: (BindingId := "") => UserActions_OpenPath(BindingId) },
 		"none", {
 				Fn: (*) => 0,
 		},
@@ -113,6 +117,10 @@ global GESTURE_ACTIONS := Map(
 		"lock_screen", {
 				Fn: (*) => DllCall("LockWorkStation"),
 		},
+		; Deferred: Windows blanks the screens for a moment while it applies this.
+		"display_mirror_toggle", {
+				Fn: (*) => _GestureMakeSystemRunner("display_mirror_toggle", GestureDisplayMirrorToggle).Call(),
+		},
 		; --- UI windows ---
 		; Each UI action toggles its window (actions.toml, group "UI"): closed or
 		; hidden opens it, open but in the background raises it, open and focused
@@ -166,10 +174,10 @@ global GESTURE_ACTIONS := Map(
 		"open_logs_folder", {
 				Fn: (*) => OpenLogsFolder(),
 		},
-		"open_today_log", {
+		MenuCommand.OPEN_TODAY_LOG, {
 				Fn: (*) => OpenTodayLog(),
 		},
-		"open_error_log", {
+		MenuCommand.OPEN_ERROR_LOG, {
 				Fn: (*) => OpenErrorLog(),
 		},
 		; --- Script management ---
@@ -183,17 +191,17 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => GestureSaveAndReload(),
 		},
 		"script_quit", {
-				Fn: (*) => ExitApp(),
+				Fn: (*) => ActivateExitApp(),
 		},
 		; --- Debug (AHK only — Hammerspoon Console covers the three) ---
 		"open_window_spy", {
 				Fn: (*) => WindowSpy(),
 		},
 		"open_list_vars", {
-				Fn: (*) => ConsoleWindow_Open("list_vars"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.LIST_VARS),
 		},
 		"open_key_history", {
-				Fn: (*) => ConsoleWindow_Open("key_history"),
+				Fn: (*) => ConsoleWindow_Open(MenuCommand.KEY_HISTORY),
 		},
 		; --- Advanced system actions ---
 		"screen_capture_instant", {
@@ -202,11 +210,14 @@ global GESTURE_ACTIONS := Map(
 		"open_url", {
 				Fn: (BindingId := "") => GestureOpenConfiguredURL(BindingId),
 		},
+		"open_chatgpt", {
+				Fn: (*) => GestureOpenChatGpt(),
+		},
 		"pick_color", {
 				Fn: (*) => GesturePickColor(),
 		},
 		"take_note", {
-				Fn: (*) => GestureTakeNote(),
+				Fn: (BindingId := "") => GestureTakeNote(BindingId),
 		},
 		"activity_simulation", {
 				Fn: (*) => (
@@ -321,10 +332,14 @@ global GESTURE_ACTIONS := Map(
 ; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init: a
 ; handler built by anything deferred off the boot path would open a window in
 ; which a gesture fires and finds nothing registered.
+; A synthetic Home or End is invisible to the prefix watcher's InputHook, so the
+; hotstring buffers must be told the caret moved: otherwise the next expansion
+; backspaces over the selected line instead of its own trigger.
+global GESTURE_CARET_MOVING_EMITS := Map("select_line", true, "surround_parens", true)
 for _EmitId, _Emit in GestureEmitActionsData() {
 		if _Emit.HasOwnProp("Seq") {
 				; Raw send sequence — no portable key/modifier form exists for it.
-				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq, GESTURE_CARET_MOVING_EMITS.Has(_EmitId)) }
 		} else {
 				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods, _EmitId == "paste"),
 						Key: _Emit.Key, Mods: _Emit.Mods }
@@ -393,8 +408,8 @@ _GestureWithPasteAdmission(EmitFn) {
 		finally CB_EndOwnedTransaction(OwnerToken)
 }
 
-_GestureMakeSeqEmitter(Seq) {
-		return (*) => SendFinalResult(Seq)
+_GestureMakeSeqEmitter(Seq, MovesCaret := false) {
+		return MovesCaret ? (*) => SendFinalResult(Seq, false, true) : (*) => SendFinalResult(Seq)
 }
 
 ; Same reason: the profile id arrives as a parameter, so each preset keeps its own.
@@ -419,19 +434,37 @@ _GestureMakeVisionRunner(ActionId) {
 ; single source of truth, and test-action-catalogue-codegen.cjs fails on a
 ; catalogue label key missing from any locale.
 _GestureActionLabel(Name) {
-	global GESTURE_MODIFIER_ACTION_LABELS, GESTURE_ACTION_CATALOGUE
-	if GESTURE_MODIFIER_ACTION_LABELS.Has(Name)
-		return GESTURE_MODIFIER_ACTION_LABELS[Name]
+	global GESTURE_MODIFIER_ACTION_PARTS, GESTURE_ACTION_CATALOGUE
+	if GESTURE_MODIFIER_ACTION_PARTS.Has(Name) {
+		Parts := GESTURE_MODIFIER_ACTION_PARTS[Name]
+		return KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef)
+	}
 	Key := (IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(Name))
 		? GESTURE_ACTION_CATALOGUE.Actions[Name].LabelKey
 		: "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
-	if (Translated != Key)
-		return Translated
-	return Name
+	if (Translated == Key)
+		return Name
+	; A sticky label is a template its modifiers fill from the key name table
+	; (« 📌 {1} rémanents »), Cmd being Win and Option Alt. It used to spell
+	; macOS's English names and swap two of them. sticky_hyper is named by its
+	; own word. Port of _shared/lua/actions/sticky_label.lua.
+	if (InStr(Name, "sticky_") == 1) && (Name != "sticky_hyper")
+		return KeyNameFill(Key, KeyNameModifiersLabel(StickyModifierNames(Name)))
+	return Translated
 }
 
+
+for _StickyId in ["sticky_ctrl", "sticky_cmd", "sticky_option", "sticky_cmd_shift", "sticky_cmd_option",
+		"sticky_cmd_ctrl", "sticky_option_shift", "sticky_option_ctrl", "sticky_ctrl_shift", "sticky_cmd_option_shift",
+		"sticky_cmd_option_ctrl", "sticky_cmd_shift_ctrl", "sticky_option_shift_ctrl", "sticky_hyper"]
+	GESTURE_ACTIONS[_StickyId] := { Fn: _GestureMakeStickyRunner(_StickyId) }
+
+; The remap layer that owns the capture loads after this module.
+_GestureMakeStickyRunner(ActionId) {
+	return (*) => StickyModifier(ActionId)
+}
 
 ; --- Advanced system action implementations ---
 
@@ -475,7 +508,7 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 				return false
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
-				Parsed.Get("num_predictions", 0), FireFn, Parsed.Get("translation_target", ""))
+				Parsed.Get(ConfigLeaf.NUM_PREDICTIONS, 0), FireFn, Parsed.Get("translation_target", ""))
 }
 
 ; Runs the llm_live_prompt_toggle action of one binding. While live mode is on,
@@ -493,7 +526,7 @@ GestureLivePromptToggle(BindingId := "") {
 				LoggerWarn("gestures", "llm_live_prompt_toggle ignored for binding '{1}': {2}.", BindingId, Reason)
 				return false
 		}
-		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0),
+		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get(ConfigLeaf.NUM_PREDICTIONS, 0),
 				Parsed.Get("translation_target", ""))
 }
 
@@ -540,6 +573,23 @@ GestureOpenConfiguredURL(BindingId := "") {
 		}
 }
 
+; Opens the configured ChatGPT link (shortcuts.chatgpt_url), which the manifest
+; declares for every driver. A configured URL is external input and Run() can
+; throw: this is a hook callback, so the failure stays here with visible,
+; nonblocking feedback.
+GestureOpenChatGpt() {
+		global Features
+		try {
+				Link := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
+				if (Type(Link) != "String" or Trim(Link) = "")
+						throw Error("the configured ChatGPT link is empty or invalid")
+				Run(Link)
+		} catch as Err {
+				LoggerError("gestures", "open_chatgpt failed: {1}", Err.Message)
+				try TrayTip(t("notify.open_gpt_failed"), "ErgoptiPlus", "Iconx Mute")
+		}
+}
+
 ; Opens a shell target (an executable or a URI such as ms-settings:). A refusal
 ; stays inside the gesture callback and is logged, never escalated to the
 ; driver's global error handler.
@@ -566,10 +616,12 @@ GesturePickColor() {
 		}
 }
 
-GestureTakeNote() {
-		; Preserve the gesture's historical no-newline behaviour while delegating
-		; every blocking/OS step to the same job used by the Win+N shortcut.
-		return _TakeNoteQueueFromFeatures(false)
+; A keyboard binding starts the note on a fresh line, as the Win+N shortcut always
+; did; a gesture keeps its historical no-newline behaviour. Every blocking or OS
+; step belongs to the same job.
+; @param {String} BindingId The binding that fired.
+GestureTakeNote(BindingId := "") {
+		return _TakeNoteQueueFromFeatures(SubStr(BindingId, 1, 10) == "keyboard__")
 }
 
 
@@ -623,6 +675,45 @@ GestureTeleportMouse() {
 		SpotlightMouseAt(TargetX, TargetY, 3000)
 }
 
+; DISPLAYCONFIG_TOPOLOGY_ID (wingdi.h), the same bits as the SDC_TOPOLOGY_* flags.
+global GESTURE_DISPLAY_TOPOLOGY_INTERNAL := 0x1
+global GESTURE_DISPLAY_TOPOLOGY_CLONE := 0x2
+global GESTURE_DISPLAY_TOPOLOGY_EXTEND := 0x4
+global GESTURE_DISPLAY_TOPOLOGY_EXTERNAL := 0x8
+; What the toggle left, restored on the way back; 0 when it mirrored nothing.
+global _GestureMirrorPriorTopology := 0
+
+; Mirrors the displays, or goes back to what they did before. A mirror this run
+; did not start (Win+P, or a driver restarted since) has no remembered topology
+; and leaves for Extend, the arrangement mirroring is normally left for.
+; @param {Object} Sys The SystemControl it acts through (a double in tests).
+; @returns {Boolean} Whether a topology was applied.
+; @throws {OSError} When Windows refuses to read or apply a topology.
+GestureDisplayMirrorToggle(Sys := 0) {
+		global _GestureMirrorPriorTopology, GESTURE_DISPLAY_TOPOLOGY_INTERNAL, GESTURE_DISPLAY_TOPOLOGY_CLONE
+		global GESTURE_DISPLAY_TOPOLOGY_EXTEND, GESTURE_DISPLAY_TOPOLOGY_EXTERNAL
+		Sys := _GestureSys(Sys)
+		if (Sys.ConnectedDisplayCount() < 2) {
+				LoggerInfo("gestures", "display_mirror_toggle: one display is connected, nothing to mirror.")
+				Sys.Notify(t("shortcuts.no_other_monitor"))
+				return false
+		}
+		Current := Sys.DisplayTopology()
+		if (Current = GESTURE_DISPLAY_TOPOLOGY_CLONE)
+				Target := _GestureMirrorPriorTopology ? _GestureMirrorPriorTopology : GESTURE_DISPLAY_TOPOLOGY_EXTEND
+		else if (Current = GESTURE_DISPLAY_TOPOLOGY_INTERNAL || Current = GESTURE_DISPLAY_TOPOLOGY_EXTEND
+				|| Current = GESTURE_DISPLAY_TOPOLOGY_EXTERNAL)
+				Target := GESTURE_DISPLAY_TOPOLOGY_CLONE
+		else
+				throw ValueError("Windows reports an unknown display topology.", -1, Current)
+		Status := Sys.ApplyDisplayTopology(Target)
+		if (Status != 0)
+				throw OSError(Status, "SetDisplayConfig")
+		_GestureMirrorPriorTopology := (Target = GESTURE_DISPLAY_TOPOLOGY_CLONE) ? Current : 0
+		LoggerInfo("gestures", "display_mirror_toggle: topology {1} replaced {2}.", Target, Current)
+		return true
+}
+
 ; Case action id -> the pure transform it applies to the selection
 ; (infra/text_case.ahk). The registry below and the shared-corpus replay
 ; (tests/unit/modules/shortcuts/test_text_case_vectors.ahk) both read this map, so an id cannot be
@@ -631,10 +722,10 @@ GestureTeleportMouse() {
 GestureCaseTransforms() {
 		static Transforms := Map(
 				"selection_uppercase", TextCaseUpper,
-				"selection_lowercase", TextCaseLower,
+				MenuCommand.SELECTION_LOWERCASE, TextCaseLower,
 				"selection_titlecase", TextCaseTitle,
-				"uppercase_selection", TextCaseToggleUpper,
-				"titlecase_selection", TextCaseToggleTitle,
+				MenuCommand.UPPERCASE_SELECTION, TextCaseToggleUpper,
+				MenuCommand.TITLECASE_SELECTION, TextCaseToggleTitle,
 		)
 		return Transforms
 }
@@ -655,7 +746,7 @@ _GestureSendTransformedSelection(Text, Transform) {
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
 				SendInstant(Transform.Call(Text))
-				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("gestures", "synthetic_clear_ms"))
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
 				throw
@@ -795,8 +886,11 @@ GesturePastePlain() {
 
 ; Modifier + key actions are generated from the cross-driver catalogue. This
 ; replaces the former partial, AHK-only Ctrl/Alt/Win tables with every non-empty
-; combination of Ctrl, Shift, Alt and Win for every catalogue key.
-global GESTURE_MODIFIER_ACTION_LABELS := Map()
+; combination of Ctrl, Shift, Alt and Win for every catalogue key. Each action
+; keeps the modifier ids and the catalogue key its label is named from at each
+; read, in the active language (« Ctrl + Maj + Entrée »): the labels used to
+; keep the catalogue's English names in every locale.
+global GESTURE_MODIFIER_ACTION_PARTS := Map()
 global GESTURE_MODIFIER_ACTION_GROUPS := []
 
 _GestureJoin(Values, Separator) {
@@ -807,7 +901,7 @@ _GestureJoin(Values, Separator) {
 }
 
 _GestureRegisterModifierChords() {
-		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_LABELS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
+		global GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_PARTS, GESTURE_MODIFIER_ACTION_GROUPS, _SharedDir
 
 		Path := _SharedDir . "\modules\actions\modifier_chords.json"
 		Raw := FSRead(Path)
@@ -832,7 +926,6 @@ _GestureRegisterModifierChords() {
 		loop MaxMask {
 				Mask      := A_Index
 				IdParts   := []
-				LabelParts := []
 				Prefixes  := []
 				loop Modifiers.Length {
 						Bit := A_Index - 1
@@ -840,13 +933,11 @@ _GestureRegisterModifierChords() {
 								continue
 						Modifier := Modifiers[A_Index]
 						IdParts.Push(Modifier["id"])
-						LabelParts.Push(Modifier["label"])
 						Prefixes.Push(Modifier["ahk_prefix"])
 				}
 				IdPrefix := _GestureJoin(IdParts, "_")
-				LabelPrefix := _GestureJoin(LabelParts, " + ")
 				SendPrefix := _GestureJoin(Prefixes, "")
-				Group := { Label: LabelPrefix, Actions: [] }
+				Group := { Modifiers: IdParts, Actions: [] }
 				for _, KeyDef in Keys {
 						KeyId   := KeyDef["id"]
 						KeyCode := KeyDef.Has("windows_key") ? KeyDef["windows_key"] : KeyId
@@ -854,7 +945,7 @@ _GestureRegisterModifierChords() {
 						; types is the bare name, which the hotkey form always is.
 						BareKey := KeyDef.Has("windows_hotkey_key") ? KeyDef["windows_hotkey_key"] : KeyCode
 						ActionId := IdPrefix . "_" . KeyId
-						GESTURE_MODIFIER_ACTION_LABELS[ActionId] := LabelPrefix . " + " . KeyDef["label"]
+						GESTURE_MODIFIER_ACTION_PARTS[ActionId] := { Modifiers: IdParts, KeyDef: KeyDef }
 						Group.Actions.Push(ActionId)
 						GESTURE_ACTIONS[ActionId] := {
 								Fn: ((_keys) => (*) => GestureSendShortcut(_keys))(SendPrefix . KeyCode),
@@ -1028,7 +1119,7 @@ _GestureIsTerminalForeground() {
 GestureSaveAndReload() {
 		if !_GestureIsTerminalForeground() {
 				TextPressKey("s", ["Ctrl"])
-				Sleep(300)
+				Sleep(TimingsGet("gestures", "action_settle_ms"))
 		}
 		ReloadPreservingSuspend()
 }
@@ -1099,23 +1190,55 @@ GestureActionPickerItems() {
 								Items.Push({ Type: "heading", Level: Item.Level, Text: _GestureHeadingText(Item.Key) })
 						case "action":
 								if (Item.Id != "none")
-										Items.Push({ Type: "action", Id: Item.Id, Label: _GestureActionLabel(Item.Id) })
+										Items.Push(_GesturePickerActionItem(Item.Id))
 						case "modifier_chords":
-								; One sub-heading per modifier combination. The combination label
-								; ("Ctrl + Shift") is language-neutral; the words around it are not,
-								; which is why this used to read "Raccourcis Ctrl" in every locale.
+								; One sub-heading per modifier combination, its names from the key
+								; name table (« Raccourcis Ctrl + Maj »). The template used to be
+								; French in every locale, then the names English.
 								Template := t(Item.GroupKey)
 								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS {
 										Items.Push({ Type: "heading", Level: Item.Level,
-												Text: StrReplace(Template, "{1}", Group.Label) })
+												Text: StrReplace(Template, "{1}", KeyNameModifiersLabel(Group.Modifiers)) })
 										for _, ActionId in Group.Actions
-												Items.Push({ Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) })
+												Items.Push(_GesturePickerActionItem(ActionId))
 								}
 						default:
 								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
 				}
 		}
 		return Items
+}
+
+; One picker row: an action whose catalogue requirement is proven absent stays
+; visible and greyed, with the reason. Read at each open, so switching the AI on
+; offers it again without a reload.
+; @param {String} ActionId A catalogue action id.
+; @returns {Object} { Type: "action", Id, Label[, Disabled, Hint] }
+_GesturePickerActionItem(ActionId) {
+		Item := { Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) }
+		Hint := _GestureActionRequirementHint(ActionId)
+		if (Hint != "") {
+				Item.Disabled := true
+				Item.Hint := Hint
+		}
+		return Item
+}
+
+; Why a catalogue requirement of this action does not hold right now.
+; @param {String} ActionId A catalogue action id.
+; @returns {String} The translated reason, "" when every requirement holds.
+_GestureActionRequirementHint(ActionId) {
+		global GESTURE_ACTION_CATALOGUE
+		Actions := GESTURE_ACTION_CATALOGUE.Actions
+		if !Actions.Has(ActionId) || !Actions[ActionId].HasOwnProp("Requires")
+				return ""
+		for _, Token in Actions[ActionId].Requires {
+				if (Token != "ai:on")
+						throw ValueError("Unknown action requirement token '" . Token . "'.")
+				if !LLM_Menu_AiEnabled()
+						return t("dialog.action_picker.requires_ai")
+		}
+		return ""
 }
 
 ; The translated text of one picker heading. Older header values carry a

@@ -4,7 +4,7 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported: one AHK consumer must call the Windows writer's inline hint step and prepare step on (source, rows) and decode the candidate for the decoded checks."
+		"windows": "windows/tests/meta/corpus/test_corpus_toml_inline_scalar.ahk replays the vectors with an ok verdict through the prepare step; it has no hint step, so the 12 hint-only vectors have no Windows entry. Divergences are pinned with their reason."
 	},
 	"vectors": [
 		{

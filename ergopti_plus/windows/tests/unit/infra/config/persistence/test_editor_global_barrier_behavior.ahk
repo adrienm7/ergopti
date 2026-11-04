@@ -76,7 +76,7 @@ _EGB20260813_Writer(Path, Updates) {
 		key: Update.Key,
 		magic: ScriptInformation["MagicKey"],
 		trigger: Features["hotstrings"].Get("trigger_char", ""),
-		link: Features["shortcuts"]["gpt"]["link"],
+		link: Features["shortcuts"]["chatgpt_url"],
 		repeat: HSE_RepeatEnabled,
 		repeat_feature: Features["hotstrings"].Get("repeat_key_enabled", false),
 		reloads: _EGB20260813_ReloadCalls,
@@ -140,7 +140,7 @@ _EGB20260813_SaveState() {
 		magic: ScriptInformation["MagicKey"],
 		trigger_had: Hotstrings.Has("trigger_char"),
 		trigger: Hotstrings.Get("trigger_char", ""),
-		link: Features["shortcuts"]["gpt"]["link"],
+		link: Features["shortcuts"]["chatgpt_url"],
 		repeat: HSE_RepeatEnabled,
 		repeat_had: Hotstrings.Has("repeat_key_enabled"),
 		repeat_feature: Hotstrings.Get("repeat_key_enabled", false),
@@ -156,7 +156,7 @@ _EGB20260813_RestoreState(Saved) {
 		Hotstrings["trigger_char"] := Saved.trigger
 	else if Hotstrings.Has("trigger_char")
 		Hotstrings.Delete("trigger_char")
-	Features["shortcuts"]["gpt"]["link"] := Saved.link
+	Features["shortcuts"]["chatgpt_url"] := Saved.link
 	HSE_RepeatEnabled := Saved.repeat
 	if Saved.repeat_had
 		Hotstrings["repeat_key_enabled"] := Saved.repeat_feature
@@ -175,7 +175,7 @@ _EGB20260813_SeedFixture(Saved) {
 	ConfigurationFile := Saved.fixture.path
 	ScriptInformation["MagicKey"] := "★"
 	Features["hotstrings"]["trigger_char"] := "★"
-	Features["shortcuts"]["gpt"]["link"] := "https://old.example/"
+	Features["shortcuts"]["chatgpt_url"] := "https://old.example/"
 	HSE_RepeatEnabled := false
 	Features["hotstrings"]["repeat_key_enabled"] := false
 }
@@ -186,7 +186,7 @@ _EGB20260813_AssertFixtureUnchanged() {
 	global _EGB20260813_MagicGui, _EGB20260813_LinkGui
 	AssertEqual("★", ScriptInformation["MagicKey"])
 	AssertEqual("★", Features["hotstrings"]["trigger_char"])
-	AssertEqual("https://old.example/", Features["shortcuts"]["gpt"]["link"])
+	AssertEqual("https://old.example/", Features["shortcuts"]["chatgpt_url"])
 	AssertFalse(HSE_RepeatEnabled)
 	AssertFalse(Features["hotstrings"]["repeat_key_enabled"])
 	AssertEqual(0, _EGB20260813_ReloadCalls)
@@ -282,7 +282,7 @@ _EGB20260813_ReloadFailuresStayContainedAndKeepEditorsOpen() {
 		AssertEqual(2, _EGB20260813_ReloadCalls)
 		AssertEqual("#", ScriptInformation["MagicKey"],
 			"post-commit refusal cannot erase the already-durable publication")
-		AssertEqual("https://new.example/", Features["shortcuts"]["gpt"]["link"])
+		AssertEqual("https://new.example/", Features["shortcuts"]["chatgpt_url"])
 	} finally _EGB20260813_RestoreState(Saved)
 }
 Test("editor-global-barrier-20260813: reload false and throw stay contained with editor open",
@@ -370,7 +370,7 @@ _EGB20260813_DurableSuccessPublishesAfterWriter() {
 		AssertEqual(0, _EGB20260813_Observed[3].rebuilds)
 		AssertEqual("#", ScriptInformation["MagicKey"])
 		AssertEqual("#", Features["hotstrings"]["trigger_char"])
-		AssertEqual("https://new.example/", Features["shortcuts"]["gpt"]["link"])
+		AssertEqual("https://new.example/", Features["shortcuts"]["chatgpt_url"])
 		AssertTrue(HSE_RepeatEnabled)
 		AssertTrue(Features["hotstrings"]["repeat_key_enabled"])
 		AssertEqual(2, _EGB20260813_ReloadCalls)

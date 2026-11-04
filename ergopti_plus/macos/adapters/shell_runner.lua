@@ -65,7 +65,9 @@ local function _record_exit(program, status, duration_ms)
 	PhaseStats.add_ms("process." .. tostring(program), duration_ms)
 	return _log_exit(program, status, duration_ms)
 end
-local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
+-- Read through the registry's generated table, as the logger transport does,
+-- so this early boot module takes no infra.timings dependency.
+local CAPTURED_OUTPUT_MAX_BYTES = require("_generated.registry_limits").count("limits", "shell_captured_output_bytes")
 local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
 local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
 
@@ -382,6 +384,11 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	if refusal ~= "" then
 		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
 			tostring(executable), refusal)
+		return refused_handle(private)
+	end
+	-- The system curl is checked at its point of use; the gate logs and tells.
+	local SystemCurl = require("adapters.system_curl")
+	if executable == SystemCurl.PATH and not SystemCurl.check("a spawned transfer") then
 		return refused_handle(private)
 	end
 	local handle = {}

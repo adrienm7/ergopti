@@ -23,7 +23,7 @@ local DRIVERS = { windows = true, macos = true, linux = true }
 
 -- The vector count, pinned so a truncated corpus fails instead of shrinking
 -- the contract.
-M.VECTOR_COUNT = 23
+M.VECTOR_COUNT = 30
 
 
 

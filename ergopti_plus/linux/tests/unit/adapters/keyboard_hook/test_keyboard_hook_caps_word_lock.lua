@@ -477,9 +477,8 @@ helpers.describe("keyboard_hook: the CapsLock a CapsWord session holds", functio
 	end)
 
 	helpers.it("(linux-caps-word-lock) ends the session before a dialog takes the keyboard", function()
-		local source = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "rb"))
-		local text = source:read("*a")
-		source:close()
+		-- adapters/keyboard_hook, selected by a declaration unique to it.
+		local text = assert(helpers.read_driver_unit("local function hold_owner("))
 		local body = assert(text:match("function M%.while_released%(fn, opts%)(.-)\nend\n"), "while_released is missing")
 		local ending = body:find('_locks.end_word(true, "keyboard handed to a dialog")', 1, true)
 		local ungrab = body:find("EvdevReader.ungrab", 1, true)

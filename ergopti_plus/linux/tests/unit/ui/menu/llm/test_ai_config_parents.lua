@@ -56,7 +56,7 @@ helpers.describe("Linux AI configuration guard (ai-submenus-newer-config-2026-10
 				--- Finds the profile parent inside the built AI tray row, and the AI rows.
 				local function profile_parent()
 					local title = I18n.get("menu.llm.title")
-					for _, top in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+					for _, top in ipairs(require("ui.menu.builder").build(ctx)) do
 						if type(top.title) == "string" and top.title:sub(1, #title) == title then
 							for _, child in ipairs(top.menu or {}) do
 								if type(child.title) == "string" and child.menu

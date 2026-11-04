@@ -56,6 +56,18 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
    Confirmed by the maintainer on 2026-10-27 under the owned-runtimes rule
    (`docs/design/owned-runtimes.md`): Tap-Hold on quits the user's Karabiner;
    Tap-Hold off never activates the owned runtime beside theirs.
+   **Revised by the maintainer on 2026-10-31**, superseding the Tap-Hold
+   trigger and the option: the rule follows Ergopti running. While Ergopti runs
+   and is not paused it always uses its own runtime and closes a running user
+   Karabiner-Elements, and tells the user so; paused or quit, it stops its
+   runtime and restarts the user's Karabiner if, and only if, it closed it. A
+   persisted marker records the close, so a crash or a forced quit still gives
+   it back. No feature switch (Tap-Hold or another) takes part; the consent
+   row « close other Karabiner apps while Ergopti is running (restored when
+   paused or quit) » stays, on by default (`[karabiner] close_other_instances`),
+   and unticked it keeps ours from running beside theirs. Because one Lua VM cannot start a
+   second capture (decision 8), a resume after a pause reloads the driver.
+   The owner is `platform/remap/runtime_activation.lua`.
 4. **Branding and signing (question 2).** The pqrs branding of the
    VirtualHIDDevice (hidden manager application, notification, Driver
    Extensions entry) is acceptable. Ergopti does not get an Apple Developer ID:
@@ -129,9 +141,13 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   build ever wrote, so shared-mode generator output and boot stay identical.
 - An incompatible VirtualHIDDevice (only one version can be active system-wide)
   blocks owned mode in an explicit named unavailable state with an explanation.
-  The decided policy offers a driver-only update requiring explicit confirmation.
-  Detection, product wiring and authenticated signed DriverKit payload suppliers
-  remain unfinished, as do native validation and real-Mac acceptance.
+  The decided policy offers a driver-only update requiring explicit confirmation:
+  detection is `platform/remap/runtime_vhid.lua`, the Tap-Holds row and its
+  confirmation are wired, and the payload is the manifest's pinned pqrs package,
+  whose digest and Developer ID Installer team are checked again by the
+  administrator shell before `/usr/sbin/installer`
+  (`platform/remap/runtime_vhid_update.lua`). Native validation and real-Mac
+  acceptance remain unfinished.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.
@@ -167,8 +183,8 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   Ergopti labels only, and `test_owned_runtime_uninstall_scope.lua` pins them).
 - The artifact pin is `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`,
   judged by `platform/remap/runtime_manifest.lua` and gated by
-  `tools/test/test-remap-runtime-manifest.cjs` (`--require-pinned` refuses the
-  unbuilt runtime fields until the hosted build fills them).
+  `tools/test/test-remap-runtime-manifest.cjs`, which refuses any unpinned
+  field since the hosted build's `16.3.0-ergopti.2` artifact was pinned.
 - The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
   runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
   producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the

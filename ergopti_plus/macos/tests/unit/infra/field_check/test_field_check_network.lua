@@ -23,7 +23,7 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 local PAC_URL = "http://pac.intranet.example/proxy.pac"
 local SCUTIL_PAC = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : " .. PAC_URL .. "\n}\n"
 local GOOD_PAC = "function FindProxyForURL(url, host) { return 'DIRECT'; }"
-local HELPER_OK = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n"
+local HELPER_OK = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest pass sha256\n"
 
 --- Runs the network check over scripted answers.
 --- @param world table { scutil, pac_status, pac_body, helper_code, helper_output }
@@ -43,6 +43,12 @@ local function run(world)
 				{ origin = "https://blob.ollama.example", route = "direct" },
 			} })
 		end,
+		relay_probe = function(upstream, callback)
+			seen[#seen + 1] = upstream
+			local answer = world.relay_answer or { { status = "not_needed" } }
+			callback(answer[1], answer[2])
+		end,
+		relay_policy = function() return require("modules.llm.network_env").proxy_auth_relay() end,
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
@@ -67,7 +73,7 @@ helpers.describe("network check", function()
 		helpers.assert_eq(steps.pac_script.value, "valid")
 		helpers.assert_eq(steps.route_lookup.value, "selected")
 		helpers.assert_eq(steps.transfer.value, "http_200")
-		helpers.assert_eq(steps.digest.state, "skip")
+		helpers.assert_eq(steps.digest.state, "pass")
 		helpers.assert_eq(seen[1], PAC_URL)
 	end)
 
@@ -99,7 +105,7 @@ helpers.describe("network check", function()
 
 	helpers.it("names the native stage that made the download go direct, and passes when direct works", function()
 		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 200, pac_body = GOOD_PAC, helper_code = 0,
-			helper_output = "step route_lookup info direct_pac_evaluation\nstep tls pass trusted\nstep transfer pass http_200\nstep digest skip head_only\n" })
+			helper_output = "step route_lookup info direct_pac_evaluation\nstep tls pass trusted\nstep transfer pass http_200\nstep digest pass sha256\n" })
 		helpers.assert_true(result.passed)
 		helpers.assert_eq(steps.route_lookup.state, "info")
 		helpers.assert_eq(steps.route_lookup.value, "direct_pac_evaluation")
@@ -108,11 +114,21 @@ helpers.describe("network check", function()
 
 	helpers.it("fails the transfer when the direct attempt after an unusable PAC fails too", function()
 		local steps, result = run({ scutil = SCUTIL_PAC, pac_status = 0, pac_body = nil, helper_code = 0,
-			helper_output = "step route_lookup info direct_pac_download\nstep tls skip not_reached\nstep transfer fail connect\nstep digest skip head_only\n" })
+			helper_output = "step route_lookup info direct_pac_download\nstep tls skip not_reached\nstep transfer fail connect\nstep digest skip not_reached\n" })
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.pac_download.state, "info")
 		helpers.assert_eq(steps.route_lookup.value, "direct_pac_download")
 		helpers.assert_eq(steps.transfer.value, "connect")
+	end)
+
+	-- Issue #101 follow-up (6): a HEAD that answers proves nothing about the bytes
+	helpers.it("fails the check when the downloaded input does not match its pin", function()
+		local steps, result = run({ scutil = "", helper_code = 0,
+			helper_output = "step route_lookup pass selected\nstep tls pass trusted\nstep transfer pass http_200\nstep digest fail mismatch\n" })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.transfer.state, "pass")
+		helpers.assert_eq(steps.digest.state, "fail")
+		helpers.assert_eq(steps.digest.value, "mismatch")
 	end)
 
 	helpers.it("reports a route plan lookup at a fallback stage as direct, any other as failed", function()
@@ -162,6 +178,34 @@ helpers.describe("network check", function()
 		helpers.assert_true(result.passed)
 		local all_direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
 		helpers.assert_eq(all_direct.route_plan.value, "registry:direct+blob:direct")
+	end)
+
+	-- docs/design/proxy-auth-relay.md: the step names what the daemon's start does.
+	helpers.it("(proxy-auth-relay) names the sign-in the selected relay demands", function()
+		local relay = "http://proxy.corp.example:3128"
+		local plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = relay },
+			{ origin = "https://blob.ollama.example", route = relay },
+		} }
+		local steps, result, seen = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { { status = "required", scheme = "negotiate" } } })
+		helpers.assert_eq(steps.proxy_relay.state, "pass")
+		helpers.assert_eq(steps.proxy_relay.value, "required_negotiate")
+		helpers.assert_eq(seen[#seen], relay)
+		helpers.assert_true(result.passed)
+		local refused, refused_result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { nil, "sign_in_unavailable" } })
+		helpers.assert_eq(refused.proxy_relay.state, "fail")
+		helpers.assert_eq(refused.proxy_relay.value, "sign_in_unavailable")
+		helpers.assert_true(not refused_result.passed)
+		local missing, missing_result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = plan,
+			relay_answer = { { status = "not_installed" } } })
+		helpers.assert_eq(missing.proxy_relay.state, "skip")
+		helpers.assert_eq(missing.proxy_relay.value, "relay_not_installed")
+		helpers.assert_true(missing_result.passed, "a build without the relay does not fail the check")
+		local direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_eq(direct.proxy_relay.state, "skip")
+		helpers.assert_eq(direct.proxy_relay.value, "direct")
 	end)
 
 	helpers.it("fails the route plan with the reason that would stop the daemon", function()

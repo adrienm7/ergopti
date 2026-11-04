@@ -145,7 +145,7 @@ helpers.describe("Linux gesture scope transaction", function()
 	-- act at once, with no question, because the owner's backup is the way back.
 	helpers.it("gesture-scope: the real menu opens with switch, restore and clear, each applied at once", function()
 		with_scope(function(_, gestures, controls, path)
-			local menu_name = "ui.menu.menu_builder"
+			local menu_name = "ui.menu.builder"
 			local previous_menu = package.loaded[menu_name]
 			local previous_execute = os.execute
 			local ok, err = pcall(function()
@@ -180,7 +180,7 @@ helpers.describe("Linux gesture scope transaction", function()
 				local restore, clear = submenu[2], submenu[3]
 				helpers.assert_true(type(restore.fn) == "function" and type(clear.fn) == "function")
 				os.execute = function(command)
-					if command:find("zenity", 1, true) then questions = questions + 1 end
+					if command:find("dialog_host.lua", 1, true) then questions = questions + 1 end
 					return 0
 				end
 				-- A pause refuses the owner's publication; the file stays whole.

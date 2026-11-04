@@ -104,7 +104,7 @@ _TooltipHideSurfaceObjects(Surface) {
 _TooltipCreateDetachedSurface(Row, Generation, Pos := 0) {
 		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos, Anchor: 0,
 			ContentHwnds: [], BorderHwnds: [], Generation: Generation,
-			LlmPresented: 0 }
+			LlmPresented: 0, DecisionItems: [] }
 		try Surface.ContentHwnds.Push(Row.Gui.Hwnd)
 		return Surface
 }
@@ -555,6 +555,10 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 						_TooltipHideSurfaceObjects(RetiredSurface)
 						HotPath_BreakdownMark("retire", _hpRetire, Breakdown)
 
+						; The decision rows the surface shows travel with it: a prediction
+						; drawn under them (llm.trigger.while_hotstring_tooltip = "both")
+						; reads them back from the surface it replaces.
+						PreparedSurface.DecisionItems := PublishItems
 						; One assignment publishes content, border, trackers, position and
 						; owner generation together. No callback can observe a half-swap.
 						_TooltipActiveSurface := PreparedSurface
@@ -779,6 +783,41 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 			return false
 		}
 		return true
+}
+
+; Draws hotstring rows heading a prediction Gui (llm.trigger.while_hotstring_tooltip
+; = "both") the way _TooltipBuildGui draws the hotstring stack: same tint bands,
+; text colours and rules, at the geometry _LLM_TooltipHeaderLayout chose.
+_TooltipDrawSharedHotstringRows(G, Items, Header, TotalW) {
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE
+	global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_DIM_COLOR_HEX
+	global _TOOLTIP_LABEL_COLOR_HEX, _TOOLTIP_SEP_COLOR_HEX
+	for Idx, Item in Items {
+		RowY := Header.RowY[Idx]
+		RowH := Header.RowH[Idx]
+		ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TooltipMixTintHex(ColorHex), RowY, TotalW, RowH), "")
+		IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+		if IsDimmed
+			G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		else
+			G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}", _TOOLTIP_PADDING_X,
+			RowY + _TOOLTIP_PADDING_Y, Header.TextW, Header.Sizes[Idx].H), Item.Text)
+		Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+		if (Label != "" && Header.LabelW > 0) {
+			LabelSize := Header.LabelSizes[Idx]
+			G.SetFont("norm c" . (IsDimmed ? _TOOLTIP_DIM_COLOR_HEX : _TOOLTIP_LABEL_COLOR_HEX)
+				. " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+				TotalW - _TOOLTIP_PADDING_X - Header.LabelW,
+				RowY + _TOOLTIP_PADDING_Y + Max(0, (Header.Sizes[Idx].H - LabelSize.H) // 2),
+				Header.LabelW, LabelSize.H), Label)
+		}
+		G.SetFont("s1", _TOOLTIP_FONT_NAME)
+		G.Add("Text", Format("Background{1} x0 y{2} w{3} h1", _TOOLTIP_SEP_COLOR_HEX, RowY + RowH, TotalW), "")
+	}
 }
 
 ; Does a row need its own full-width background band?

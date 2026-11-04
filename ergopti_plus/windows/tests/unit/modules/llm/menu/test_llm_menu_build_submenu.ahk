@@ -18,14 +18,14 @@ _LBMS_Fixture() {
 	Saved := _LLM_Menu
 	_LLM_Menu := Map("enabled", true, "backend", "api", "model", "stale-tag",
 		"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
-		"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500,
+		"min_words", 3, "max_words", 15, "language", "fr", "debounce_ms", 500, "min_request_interval_ms", 300,
 		"ctx_chars", 500, "temperature", "0.10", "instant_on_word_end", true,
 		"after_hotstring", true, "reset_on_nav", true, "disable_url_bars", true,
 		"disable_password_fields", true, "disabled_apps", [], "show_info_bar", true,
 		"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 		"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 		"inline_autotype", false,
-		"ollama_port", 11434, "user_profiles", [], "api_entry_id", "e1",
+		"ollama_port", 11435, "user_profiles", [], "api_entry_id", "e1",
 		"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 			"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",
 			"Token", "sekret", "Model", "qwen-3.8-27b")])
@@ -83,6 +83,147 @@ _LBMS_Labels(TargetMenu) {
 	}
 	return Labels
 }
+
+; Refuses a separator that leads, trails or follows another one. A separator
+; reads as an empty label.
+_LBMS_AssertCleanSeparators(Labels, State) {
+	AssertTrue(Labels[1] != "", State . ": no leading separator")
+	AssertTrue(Labels[Labels.Length] != "", State . ": no trailing separator")
+	for Position, Label in Labels
+		AssertFalse(Position > 1 && Label == "" && Labels[Position - 1] == "", State . ": two separators in a row at " . Position)
+}
+
+; ai-test-prediction-row: model, profile and test are one block in every AI
+; state, closed by one separator, then the settings header over the trigger
+; group.
+_LBMS_AiBlock(State, Prepare) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	_LLM_Menu_Handle := Menu()
+	try {
+		Prepare.Call()
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Labels := _LBMS_Labels(Built)
+			_LBMS_AssertCleanSeparators(Labels, State)
+			; With the AI off every row but its switch is greyed with the category-off
+			; reason, and a greyed group opens nothing (category-off rule).
+			Off := State == "off"
+			TestRow := _LBMS_RowPosition(Labels, t("menu.llm.test_prediction"), Off)
+			Trigger := _LBMS_RowPosition(Labels, t("menu.llm.trigger_menu_title"), Off)
+			AssertTrue(TestRow > 0, State . ": the test row is drawn")
+			if Off {
+				MF_BYPOSITION := 0x400, MF_GRAYED := 0x1
+				AssertTrue(DllCall("GetMenuState", "ptr", Built.Handle, "uint", TestRow, "uint", MF_BYPOSITION, "uint") & MF_GRAYED,
+					State . ": the test row is greyed")
+			} else
+				AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", TestRow - 1, "ptr") != 0,
+					State . ": the test row follows the profile parent")
+			AssertEqual("", Labels[TestRow + 2], State . ": one separator closes the block")
+			; The settings header, already greyed, keeps its exact title when the AI is off.
+			AssertEqual(MenuSectionTitle(t("menu.llm.header_settings")), Labels[TestRow + 3],
+				State . ": the settings header follows that separator")
+			MF_BYPOSITION := 0x400, MF_GRAYED := 0x1
+			AssertTrue(DllCall("GetMenuState", "ptr", Built.Handle, "uint", TestRow + 2, "uint", MF_BYPOSITION, "uint") & MF_GRAYED,
+				State . ": the settings header is inert")
+			AssertEqual(TestRow + 3, Trigger, State . ": the trigger group follows the settings header")
+			AssertTrue(Labels[TestRow - 1] != "", State . ": no separator splits the block")
+		} finally Built.Delete()
+	} finally {
+		_LBMS_LeaveBackend()
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
+	}
+}
+_LBMS_AiOff() {
+	global _LLM_Menu
+	_LLM_Menu["enabled"] := false
+}
+_LBMS_NoModel() {
+	global _LLM_Menu
+	_LLM_Menu["api_entry_id"] := ""
+	_LLM_Menu["api_entries"] := []
+}
+_LBMS_NoLocalModel() {
+	global _LLM_Menu
+	_LLM_Menu["backend"] := "ollama"
+	_LLM_Menu["model"] := ""
+}
+; Drawing the menu on the Ollama backend fires the real health and tags probes.
+; Restoring the fixture's backend without the driver's own transition boundary
+; left both in flight, and their completion rebuilt the menu, launching two
+; more, inside a later test that forbids every launch.
+_LBMS_LeaveBackend() {
+	LLM_AuxInvalidate("test fixture leaves its backend")
+}
+Test("ai-test-prediction-row: the block stands with the AI on", _LBMS_AiBlock.Bind("on", (*) => 0))
+Test("ai-test-prediction-row: the block stands with the AI off", _LBMS_AiBlock.Bind("off", _LBMS_AiOff))
+Test("ai-test-prediction-row: the block stands with no API entry", _LBMS_AiBlock.Bind("no entry", _LBMS_NoModel))
+Test("ai-test-prediction-row: the block stands with no local model", _LBMS_AiBlock.Bind("no local model", _LBMS_NoLocalModel))
+
+; The position of the first label starting like a translated caption.
+_LBMS_CaptionPosition(Labels, Key) {
+	Caption := t(Key)
+	Marker := InStr(Caption, "%")
+	Head := Marker ? SubStr(Caption, 1, Marker - 1) : Caption
+	for Position, Label in Labels
+		if InStr(Label, Head, true) == 1
+			return Position
+	return 0
+}
+
+; ai-generation-groups: the count and the words, one separator, then everything
+; about the context down to the last row, in every state.
+_LBMS_GenerationGroups(State, Prepare) {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	_LLM_Menu_Handle := Menu()
+	try {
+		Prepare.Call()
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Parent := _LBMS_CaptionPosition(_LBMS_Labels(Built), "menu.llm.generation_menu_title")
+			AssertTrue(Parent > 0, State . ": the generation parent is drawn")
+			Child := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Parent - 1, "ptr")
+			AssertTrue(Child != 0, State . ": it opens a submenu")
+			Labels := _LBMS_Labels({Handle: Child})
+			_LBMS_AssertCleanSeparators(Labels, State)
+			Separators := []
+			for Position, Label in Labels
+				if Label == ""
+					Separators.Push(Position)
+			AssertEqual(1, Separators.Length, State . ": exactly one separator")
+			Count := _LBMS_CaptionPosition(Labels, "menu.llm.num_predictions_label")
+			MinWords := _LBMS_CaptionPosition(Labels, "menu.llm.min_words_label")
+			MaxWords := _LBMS_CaptionPosition(Labels, "menu.llm.max_words_label")
+			Context := _LBMS_CaptionPosition(Labels, "menu.llm.context_length_label")
+			Clear := _LBMS_CaptionPosition(Labels, "menu.llm.reset_on_nav")
+			AssertEqual(1, Count, State . ": the count comes first")
+			AssertTrue(Count < MinWords && MinWords < MaxWords && MaxWords < Separators[1],
+				State . ": the words follow, above the separator")
+			AssertTrue(Separators[1] < Context && Context < Clear, State . ": the context rows follow the separator")
+			AssertEqual(Labels.Length, Clear, State . ": clearing the context closes the submenu")
+		} finally Built.Delete()
+	} finally {
+		_LBMS_LeaveBackend()
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
+	}
+}
+_LBMS_ChangedSettings() {
+	global _LLM_Menu
+	_LLM_Menu["n_predictions"] := 7
+	_LLM_Menu["ctx_chars"] := 321
+	_LLM_Menu["min_words"] := 2
+	_LLM_Menu["max_words"] := 9
+	_LLM_Menu["temperature"] := "0.70"
+}
+Test("ai-generation-groups: one separator with the AI on", _LBMS_GenerationGroups.Bind("on", (*) => 0))
+Test("ai-generation-groups: one separator with the AI off", _LBMS_GenerationGroups.Bind("off", _LBMS_AiOff))
+Test("ai-generation-groups: one separator with every reset row drawn", _LBMS_GenerationGroups.Bind("resets", _LBMS_ChangedSettings))
+Test("ai-generation-groups: one separator with no local model", _LBMS_GenerationGroups.Bind("no local model", _LBMS_NoLocalModel))
 
 ; Runs Body with a fresh private configuration the session may write, so the
 ; persistence rows draw ready; Ready false keeps the harness's unwritable
@@ -224,6 +365,14 @@ _LBMS_GroupDeclaration(Rows, Id) {
 		if Row is Map && _MR_Get(Row, "id") == Id
 			return Row
 	throw Error("A genuine group declaration is missing: " . Id)
+}
+; Zero-based position of a row. With Suffixed, the row may carry the category-off
+; reason; one already greyed for its own cause keeps its plain caption.
+_LBMS_RowPosition(Labels, Label, Suffixed) {
+	for Position, Present in Labels
+		if Present == Label || (Suffixed && InStr(Present, Label . " — ") == 1)
+			return Position - 1
+	return -1
 }
 _LBMS_ParentPosition(Labels, Label) {
 	for Position, Present in Labels

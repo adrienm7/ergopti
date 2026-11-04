@@ -431,12 +431,13 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 				? "," . _ActPickWeb_Kv("parameter", Kind) . "," . _ActPickWeb_Kv("parameterValue",
 					(BindingId = "") ? "" : GestureGetActionParameter(BindingId, It.Id))
 				: ""
+			Hint := DisabledProgram ? t("platform_reason.program_runner_unavailable") : (It.HasOwnProp("Hint") ? It.Hint : "")
 			ItemsJson .= "{"
 				. _ActPickWeb_Kv("type", "action") . ","
 				. _ActPickWeb_Kv("id", It.Id) . ","
 				. _ActPickWeb_Kv("label", It.Label)
 				. Parameter
-				. (DisabledProgram ? ',"disabled":true,"hint":' . JsonStringLiteral(t("platform_reason.program_runner_unavailable")) : "")
+				. (Hint != "" ? ',"disabled":true,"hint":' . JsonStringLiteral(Hint) : "")
 				. "}"
 		}
 	}
@@ -453,7 +454,7 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("cancelLabel", t("button.cancel")) . ","
 		. _ActPickWeb_Kv("executableSyntax", "windows") . ","
 		. '"commandIsPrimary":false,'
-		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
+		. '"sendVocabulary":' . SendKeysVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"programProviders":' . _ActPickWeb_ProgramPacketJson() . ","
 		. '"programProviderStrings":{'
@@ -615,7 +616,7 @@ _ActPickWeb_OnResize(GuiObj, MinMax, Width, Height) {
 	if (MinMax == -1)
 		return
 	if IsSet(_ActPickWeb_Controller)
-		try _ActPickWeb_Controller.Fill()
+		try WebView_FitToWindow(_ActPickWeb_Controller)
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.

@@ -63,7 +63,7 @@ local function with_notice(tool, body)
 end
 
 helpers.describe("AI refusal notice", function()
-	for _, tool in ipairs({ "zenity", "kdialog" }) do
+	do local tool = "owned dialog"
 		helpers.it("requires an explicit restored replacement choice in " .. tool .. " (ai-enable-admission)", function()
 			with_notice(tool, function(world)
 				local opaque = {}
@@ -75,7 +75,7 @@ helpers.describe("AI refusal notice", function()
 				helpers.assert_eq(chosen, opaque)
 				helpers.assert_eq(world.order, { "release", "dialog", "restore" })
 				helpers.assert_eq(world.captions, { "Ollama is not answering" })
-				local title_flag = tool == "zenity" and "--title=" or "--title "
+				local title_flag = "--title="
 				helpers.assert_true(world.commands[1]:find(title_flag .. Shell.quote(world.composed_title), 1, true) ~= nil)
 				helpers.assert_true(world.commands[1]:find(Shell.quote(label), 1, true) ~= nil)
 				world.restore_ok = false
@@ -86,7 +86,7 @@ helpers.describe("AI refusal notice", function()
 	end
 
 	helpers.it("does not infer replacement consent from retry or malformed native output (ai-enable-admission)", function()
-		with_notice("zenity", function(world)
+		with_notice("owned dialog", function(world)
 			local replacements = { { label = "Use LM Studio", value = {} } }
 			for _, answer in ipairs({ "retry\n", "replacement_9\n", "replacement_1\nforeign", "" }) do
 				world.answer = answer
@@ -97,7 +97,7 @@ helpers.describe("AI refusal notice", function()
 			end
 		end)
 	end)
-	for _, tool in ipairs({ "zenity", "kdialog" }) do
+	do local tool = "owned dialog"
 		helpers.it("names and quotes the configured origin in " .. tool .. " (ai-enable-admission)", function()
 			with_notice(tool, function(world)
 				local origin = "http://127.0.0.1:11434/?label=50%' quoted"
@@ -107,7 +107,7 @@ helpers.describe("AI refusal notice", function()
 				helpers.assert_eq(world.order, { "release", "dialog", "restore" })
 				helpers.assert_eq(#world.commands, 1)
 				helpers.assert_eq(world.captions, { "Ollama is not answering" })
-				local title_flag = tool == "zenity" and "--title=" or "--title "
+				local title_flag = "--title="
 				helpers.assert_true(world.commands[1]:find(title_flag .. Shell.quote(world.composed_title), 1, true) ~= nil)
 				local expected = "The AI stays off: Ollama is not answering at " .. origin
 					.. ". Start the server, then try enabling the AI again."
@@ -120,7 +120,7 @@ helpers.describe("AI refusal notice", function()
 	end
 
 	helpers.it("does not launch a dialog after native keyboard release refusal (ai-enable-admission)", function()
-		with_notice("zenity", function(world)
+		with_notice("owned dialog", function(world)
 			world.release_ok = false
 			local shown, retry = world.notice.show("http://127.0.0.1:11434")
 			helpers.assert_eq(shown, false)
@@ -132,7 +132,7 @@ helpers.describe("AI refusal notice", function()
 	end)
 
 	helpers.it("reports refused restoration instead of claiming the acknowledgement settled (ai-enable-admission)", function()
-		with_notice("zenity", function(world)
+		with_notice("owned dialog", function(world)
 			world.restore_ok = false
 			local shown, retry = world.notice.show("http://127.0.0.1:11434")
 			helpers.assert_eq(shown, false)
@@ -143,7 +143,7 @@ helpers.describe("AI refusal notice", function()
 	end)
 
 
-	for _, tool in ipairs({ "zenity", "kdialog" }) do
+	do local tool = "owned dialog"
 		helpers.it("keeps the AI off when the user declines " .. tool .. " retry (ai-enable-admission)", function()
 			with_notice(tool, function(world)
 				world.command_ok = false
@@ -156,15 +156,15 @@ helpers.describe("AI refusal notice", function()
 		end)
 	end
 
-	helpers.it("keeps a visible address explanation without a native dialog package (ai-enable-admission)", function()
+	helpers.it("asks through the owned dialog, never a host tool (ai-enable-admission)", function()
 		with_notice(nil, function(world)
-			local origin = "http://127.0.0.1:21434"
-			local shown, retry = world.notice.show(origin)
+			local shown, retry = world.notice.show("http://127.0.0.1:21434")
 			helpers.assert_true(shown)
-			helpers.assert_eq(retry, false)
-			helpers.assert_eq(#world.commands, 0)
-			helpers.assert_eq(#world.notifications, 1)
-			helpers.assert_true(world.notifications[1][1]:find(origin, 1, true) ~= nil)
+			helpers.assert_true(retry)
+			helpers.assert_eq(#world.commands, 1)
+			local dialog = require("ui.native_dialog").command() .. " --question "
+			helpers.assert_eq(world.commands[1]:sub(1, #dialog), dialog)
+			helpers.assert_eq(#world.notifications, 0)
 		end)
 	end)
 end)

@@ -158,7 +158,7 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 				return true
 			end,
 		}
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local hooks = {
 			on_menu_changed = function() end,
 			on_update_finished = function() end,

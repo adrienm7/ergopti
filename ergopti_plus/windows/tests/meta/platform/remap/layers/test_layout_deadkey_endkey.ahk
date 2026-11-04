@@ -31,9 +31,8 @@
 ; ===================================================
 ; ===================================================
 
-_LDEK_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
+_LDEK_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _LDEK_StripComments(Src) {
@@ -46,7 +45,7 @@ _LDEK_StripComments(Src) {
 }
 
 _LDEK_DeadKeyResendEndKey() {
-	Raw := _LDEK_ReadSource("modules/keymap/layout.ahk")
+	Raw := _LDEK_ReadSource("layout.ahk")
 	Src := _LDEK_StripComments(Raw)
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")

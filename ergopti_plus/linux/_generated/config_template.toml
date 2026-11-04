@@ -442,7 +442,7 @@ agent_disabled_apps = []
 
 
 [llm.display]
-pred_indent = 0
+pred_indent = -3
 show_info_bar = true
 streaming = true
 streaming_multi = true
@@ -479,6 +479,7 @@ debounce_ms = 500
 min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
+while_hotstring_tooltip = "wait"
 secure_filter_enabled = true
 url_bar_filter_enabled = false
 
@@ -500,8 +501,8 @@ system_auth_filter_enabled = true
 encrypt = false
 disabled_apps = []
 wpm_widget_visible = false
-wpm_widget_colors = false
-wpm_widget_graph = false
+wpm_widget_colors = true
+wpm_widget_graph = true
 wpm_menubar_visible = false
 wpm_menubar_colors = true
 
@@ -636,3 +637,4 @@ key_combinations = true
 
 [tap_holds]
 enabled = false
+lone_modifier_tap_max_ms = 1000

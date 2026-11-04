@@ -149,8 +149,15 @@ local function with_offer(scenario)
 		"infra.i18n",
 	}, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
-		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
+		-- The four servers these cases drive run; every other catalogue server is
+		-- stopped, so a longer catalogue changes no case.
+		local stopped = {}
+		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, stopped)
 		local LocalServers = require("modules.llm.local_servers")
+		local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
+		for _, id in ipairs(LocalServers.ORDER) do
+			if not driven[id] then stopped[id] = { running = false, pids = {}, detail = "no running process" } end
+		end
 		local world = { probes = {}, dialogs = {}, actions = {}, installed = false }
 		local probe_clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
@@ -225,7 +232,8 @@ local function with_offer(scenario)
 			local latest = {}
 			for _, probe in ipairs(world.probes) do latest[probe.id] = probe end
 			for _, id in ipairs(LocalServers.ORDER) do
-				latest[id].callback(answers[id] or { ok = false, status = 0, error = "connection refused" })
+				-- A stopped server has no probe to answer
+				if latest[id] then latest[id].callback(answers[id] or { ok = false, status = 0, error = "connection refused" }) end
 			end
 		end
 		world.request = {
@@ -312,7 +320,7 @@ helpers.describe("Unreachable offer exact native predecessor (unreachable-backen
 			helpers.assert_eq(#world.probes, 4, "refused native cancellation cannot acquire successor requests")
 			helpers.assert_eq(#world.dialogs, 0)
 			helpers.assert_eq(menu_sweeps, 0)
-			for _, id in ipairs(LocalServers.ORDER) do
+			for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
 				helpers.assert_eq(world.native_clients[id].isSettled(), false)
 				helpers.assert_true(world.native_clients[id].settle_cancelled())
 			end

@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -21,7 +23,7 @@
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
 	"keystats_enabled",       () => MetricsShortcuts.enabled,
-	"wpm_widget_visible",      () => WPMWidget.visible,
+	ConfigLeaf.WPM_WIDGET_VISIBLE,      () => WPMWidget.visible,
 	"metrics_widget_colors",   () => WPMWidget.use_colors,
 	"metrics_widget_graph",    () => WPMWidget.show_graph,
 	; Read by the manifest's checked_when predicates, so the checkmark state is
@@ -55,19 +57,19 @@ BuildMetricsMenu() {
 	DynHandlers := Map()
 	Commands := _MET_ScopeCommands()
 	for Id, Handler in Map(
-		"metrics_toggle",  (*) => ToggleMetricsEnabled(),
-		"wpm_widget",      (*) => _ToggleWpmWidget(),
-		"widget_colors",   (*) => _ToggleWpmWidgetColors(),
-		"include_realtime", (*) => _ToggleWpmWidgetGraph(),
-		"filter_private",  ToggleFilterPrivate,
-		"filter_secure",   ToggleFilterSecureField,
-		"filter_sysauth",  ToggleFilterSystemAuth,
+		MenuCommand.METRICS_TOGGLE,  (*) => ToggleMetricsEnabled(),
+		MenuCommand.WPM_WIDGET,      (*) => _ToggleWpmWidget(),
+		MenuCommand.WIDGET_COLORS,   (*) => _ToggleWpmWidgetColors(),
+		MenuCommand.INCLUDE_REALTIME, (*) => _ToggleWpmWidgetGraph(),
+		MenuCommand.FILTER_PRIVATE,  ToggleFilterPrivate,
+		MenuCommand.FILTER_SECURE,   ToggleFilterSecureField,
+		MenuCommand.FILTER_SYSAUTH,  ToggleFilterSystemAuth,
 		"encryption",         ToggleAtRestEncryption,
-		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
-		"show_typing",     KLUI_ToggleTyping,
-		"show_apps",       KLUI_ToggleApps,
-		"metrics_suspend", (*) => ToggleMetricsCollectionPause(),
-		"metrics_reset_session", (*) => ResetMetricsSession(),
+		MenuCommand.RESET_WPM_POSITION, (*) => WPMWidget_ResetPosition(),
+		MenuCommand.SHOW_TYPING,     KLUI_ToggleTyping,
+		MenuCommand.SHOW_APPS,       KLUI_ToggleApps,
+		MenuCommand.METRICS_SUSPEND, (*) => ToggleMetricsCollectionPause(),
+		MenuCommand.METRICS_RESET_SESSION, (*) => ResetMetricsSession(),
 	)
 		Commands[Id] := Handler
 
@@ -124,6 +126,6 @@ _MET_ExcludeAppsRows(Getters) {
 ; The Configuration clear still composes the metrics settings.
 _MET_ScopeCommands(Options := unset) {
 	Commands := ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
-	Commands.Delete("scope_clear")
+	Commands.Delete(MenuCommand.SCOPE_CLEAR)
 	return Commands
 }

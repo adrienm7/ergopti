@@ -142,6 +142,35 @@ helpers.describe("api_entries: a private, durable store", function()
 		os.execute("rm -rf '" .. DIR .. "'")
 	end)
 
+	helpers.it("never replaces an earlier set-aside, nor one made at the same instant (api-entries-corrupt-no-replace)", function()
+		fresh()
+		os.execute("mkdir -p '" .. DIR .. "' && printf 'not json' > '" .. PATH .. "'"
+			.. " && printf 'older set-aside' > '" .. PATH .. ".corrupt'")
+		-- A second process sets its own malformed copy aside at .corrupt.1 between
+		-- this process's choice of that name and its move.
+		local Mover = require("infra.no_replace_move")
+		local move = Mover.move
+		Mover.move = function(from, to)
+			if to == PATH .. ".corrupt.1" and not io.open(to, "rb") then
+				local other = assert(io.open(to, "wb")); other:write("concurrent set-aside"); other:close()
+			end
+			return move(from, to)
+		end
+		local entries = fresh(true)
+		local listed = #entries.list()
+		Mover.move = move
+		local function bytes(path)
+			local fh = io.open(path, "rb")
+			if not fh then return nil end
+			local text = fh:read("*a"); fh:close(); return text
+		end
+		helpers.assert_eq(listed, 0)
+		helpers.assert_eq(bytes(PATH .. ".corrupt"), "older set-aside", "the earlier set-aside is kept")
+		helpers.assert_eq(bytes(PATH .. ".corrupt.1"), "concurrent set-aside", "the concurrent one is kept")
+		helpers.assert_eq(bytes(PATH .. ".corrupt.2"), "not json", "this source moves to the next free name")
+		os.execute("rm -rf '" .. DIR .. "'")
+	end)
+
 	--- Writes api_keys.json as another build left it and captures the ERRORs.
 	--- @param document table Decoded file.
 	--- @param body function body(entries, errors, bytes)
@@ -577,11 +606,12 @@ helpers.describe("malformed API source quarantine acknowledgement", function()
 		local malformed = '{"future": [ incomplete private source'
 		external_api_source(malformed)
 		local entries = fresh(true)
-		local rename, rename_calls, stages = os.rename, 0, 0
-		os.rename = function(from, to)
+		local Mover = require("infra.no_replace_move")
+		local rename, rename_calls, stages = Mover.move, 0, 0
+		Mover.move = function(from, to)
 			if from == PATH and to == PATH .. ".corrupt" then
 				rename_calls = rename_calls + 1
-				return false, "owned quarantine refusal"
+				return false, "EACCES"
 			end
 			return rename(from, to)
 		end
@@ -590,7 +620,7 @@ helpers.describe("malformed API source quarantine acknowledgement", function()
 			return create_without_mode(path, text)
 		end)
 		local called, added = pcall(entries.add, { provider = "lmstudio", token = "", label = "Local", model = "model" })
-		os.rename = rename
+		Mover.move = rename
 		-- The actual failed quarantine is observed before any private publication,
 		-- and assertions follow the owner's return and exact wrapper restoration.
 		helpers.assert_eq(called, true)
@@ -605,7 +635,7 @@ helpers.describe("malformed API source quarantine acknowledgement", function()
 		local staging_exists = staged ~= nil
 		if staged then staged:close() end
 		helpers.assert_eq(staging_exists, false)
-		helpers.assert_eq(os.rename, rename)
+		helpers.assert_eq(Mover.move, rename)
 	end)
 end)
 
@@ -657,5 +687,47 @@ helpers.describe("API entry identity after restart (api-entry-id-restart)", func
 		helpers.assert_eq(observations.count, 2)
 		helpers.assert_eq(observations.first_token, "inert-first")
 		helpers.assert_eq(observations.active, observations.second)
+	end)
+end)
+
+-- Selecting an entry starts its access-token exchange, so the first request
+-- after a key change finds the token (access-token-lease)
+helpers.describe("API entry selection prewarms the access token (access-token-lease)", function()
+	--- Records every prewarm the store asks of the real remote backend.
+	--- @param body function body(entries, prewarmed)
+	local function with_prewarm_recorder(body)
+		local entries = fresh()
+		local remote = require("modules.llm.api_remote")
+		local original = remote.prewarm_access
+		local prewarmed = {}
+		remote.prewarm_access = function(entry)
+			prewarmed[#prewarmed + 1] = entry and entry.id or false
+			return false
+		end
+		local ok, failure = pcall(body, entries, prewarmed)
+		remote.prewarm_access = original
+		if not ok then error(failure, 0) end
+	end
+
+	helpers.it("adding a selected entry prewarms it, an unselected one does not (access-token-lease)", function()
+		with_prewarm_recorder(function(entries, prewarmed)
+			local first = assert(entries.add({ provider = "cerebras", label = "first", token = "inert-first" }))
+			helpers.assert_eq(prewarmed[1], first.id)
+			assert(entries.add({ provider = "cerebras", label = "second", token = "inert-second" }, false))
+			helpers.assert_eq(#prewarmed, 1, "a kept selection is not prewarmed again")
+		end)
+	end)
+
+	helpers.it("selecting an entry or giving it a model prewarms that entry (access-token-lease)", function()
+		with_prewarm_recorder(function(entries, prewarmed)
+			local first = assert(entries.add({ provider = "cerebras", label = "first", token = "inert-first" }))
+			local second = assert(entries.add({ provider = "cerebras", label = "second", token = "inert-second" }))
+			for index = #prewarmed, 1, -1 do prewarmed[index] = nil end
+			helpers.assert_true(entries.set_active(first.id))
+			helpers.assert_eq(prewarmed[1], first.id)
+			helpers.assert_true(entries.set_model(second.id, "llama-4-scout"))
+			helpers.assert_eq(prewarmed[2], second.id, "set_model selects the entry it changes")
+			helpers.assert_eq(#prewarmed, 2)
+		end)
 	end)
 end)

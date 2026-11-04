@@ -45,7 +45,7 @@ _UCNO_ChildSource(Fixture) {
 		"The consent child must load the real terminal-failure registry class")
 	Source .= StateClass[0] . "`n"
 	for Spec in [["Gui_HarmoniseButtonWidths", ["UI_BTN_MIN_W"]],
-		["_Updater_NewRequestContext", ["UPDATER_CHANNEL", "UPDATER_REQUEST_ORIGIN_BACKGROUND", "UPDATER_REQUEST_ORIGIN_MANUAL",
+		["_Updater_NewRequestContext", ["UPDATER_GH_OWNER", "UPDATER_GH_REPO", "UPDATER_CHANNEL", "UPDATER_REQUEST_ORIGIN_BACKGROUND", "UPDATER_REQUEST_ORIGIN_MANUAL",
 			"_UpdaterPauseGeneration", "_UpdaterBackgroundGeneration", "_UpdaterChannelEpoch", "_UpdaterRequestCounter"]]] {
 		Owner := _DriverProductionFileForSymbol(Spec[1], _DriverDir)
 		AssertTrue(Owner != "", "Every native request policy declaration needs its genuine owner")

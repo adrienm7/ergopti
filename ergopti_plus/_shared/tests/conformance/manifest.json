@@ -24,6 +24,14 @@
 			"tracked": "none"
 		},
 		{
+			"id": "CONF-LINUX-SECRET-TOOL",
+			"driver": "linux",
+			"subject": "modules/llm/api_token_store.lua — the API key handed to secret-tool",
+			"status": "environment",
+			"reason": "The tests run a stand-in secret-tool written as a POSIX shell script. A Windows checkout has neither secret-tool nor sh: only there are they deferred, while every other token store test runs on the in-memory service. On Linux, CI included, a failing stand-in fails the test.",
+			"tracked": "none"
+		},
+		{
 			"id": "CONF-LINUX-SETSID-RELAY",
 			"driver": "linux",
 			"subject": "modules/updater/restarter.lua — the detached relay that restarts the daemon",

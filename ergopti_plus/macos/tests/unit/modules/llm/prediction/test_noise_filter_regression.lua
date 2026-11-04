@@ -133,29 +133,49 @@ end)
 
 -- ========================================================
 -- ========================================================
--- ======= 3/ Source Guard — Fix Permanence ===============
+-- ======= 3/ Real Pipeline — Fix Permanence ==============
 -- ========================================================
 -- ========================================================
 
-helpers.describe("is_noise_pred: production source contains the fixed formula", function()
-	helpers.it("prediction_engine.lua has the nil-safe ends_sent expression", function()
-		local driver_root = helpers.driver_root()
-		local src_path    = driver_root .. "modules/llm/prediction_engine.lua"
-		local fh          = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil,
-			"could not open prediction_engine.lua at " .. tostring(src_path))
-		local src = fh:read("*a")
-		fh:close()
+-- The formulas above only document the bug. This section runs the real engine
+-- and streaming handler, so the noise gate they share is the one judged: an
+-- uppercase completion must reach the tooltip at document start and after a
+-- sentence end, and only mid-sentence is it dropped as noise.
+local load_pipeline = require("tests.support.prediction_pipeline").load
 
-		-- Fixed pattern must be present
-		helpers.assert_true(
-			src:find("%(prev_char == nil%)", 1, false) ~= nil,
-			"source must contain the '(prev_char == nil)' doc-start guard")
+--- Dispatches one request over a buffer and answers it with one completion.
+--- @param buffer string Typed context the engine reads.
+--- @param completion string Text the backend returns.
+--- @return table fixture Pipeline fixture after the final callback.
+local function answer(buffer, completion)
+	local fixture = load_pipeline({ render_success = true, buffer = buffer })
+	fixture.engine.perform_check(true)
+	helpers.assert_eq(fixture.fetches, 1,
+		"the engine must dispatch a request over " .. string.format("%q", buffer))
+	fixture.on_success({ {
+		to_type = completion, deletes = 0,
+		chunks = { { type = "insert", text = completion } }, nw = "",
+	} }, 25, true, false)
+	return fixture
+end
 
-		-- Buggy pattern must be absent
-		helpers.assert_eq(
-			src:find("prev_char and prev_char:match", 1, true),
-			nil,
-			"source must NOT contain the old 'prev_char and prev_char:match' pattern")
+helpers.describe("is_noise_pred: the real pipeline keeps a capitalised completion where one belongs", function()
+	for _, case in ipairs({
+		{ name = "a whitespace-only buffer", buffer = "   " },
+		{ name = "a finished sentence", buffer = "Il pleut." },
+	}) do
+		helpers.it("shows an uppercase completion after " .. case.name, function()
+			local fixture = answer(case.buffer, "Demain il fera beau")
+			helpers.assert_eq(fixture.prediction_renders, 1,
+				"an uppercase completion after " .. case.name .. " is not noise")
+			helpers.assert_true(fixture.engine.is_visible(), "the completion must stay on screen")
+		end)
+	end
+
+	helpers.it("drops an uppercase completion in the middle of a sentence", function()
+		local fixture = answer("il pleut et", "Demain il fera beau")
+		helpers.assert_eq(fixture.prediction_renders, 0,
+			"a capital in the middle of a sentence is the noise the gate exists for")
+		helpers.assert_true(not fixture.engine.is_visible(), "no noise completion may stay on screen")
 	end)
 end)

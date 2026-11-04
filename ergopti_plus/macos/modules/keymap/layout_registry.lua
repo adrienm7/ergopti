@@ -44,6 +44,10 @@ local LOG = "layout_registry"
 -- Folder macOS reads the current user's keyboard layouts from.
 local USER_LAYOUTS_DIR = "~/Library/Keyboard Layouts"
 
+-- The git a clone run asks for its registry changes. /usr/bin/git is on every
+-- macOS (the Xcode command line tools shim); a clone was made with a git.
+local GIT = "/usr/bin/git"
+
 -- Stable failure codes the layout manager translates.
 M.FAILURE_BUSY = "busy"
 M.FAILURE_UNKNOWN_LAYOUT = "unknown_layout"
@@ -101,6 +105,11 @@ local read_installed, write_installed = Store.read_installed, Store.write_instal
 -- ================================
 -- ================================
 
+-- The last decode of each shared JSON file, with the exact text it came from:
+-- the settings are resolved for every registry call (twice per keyboard-layout
+-- menu rebuild), and identical bytes decode to the identical, read-only value.
+local _shared_json = {}
+
 --- Reads and decodes one shared JSON file.
 --- @param rel string Path under _shared/.
 --- @return table|nil value
@@ -109,9 +118,12 @@ local function read_shared_json(rel)
 	local path = Paths.shared(rel)
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
+	local known = _shared_json[path]
+	if known ~= nil and known.raw == raw then return known.decoded, nil end
 	-- The shared json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
+	_shared_json[path] = { raw = raw, decoded = decoded }
 	return decoded, nil
 end
 
@@ -147,6 +159,18 @@ local function default_deps(settings)
 	return {
 		settings = settings,
 		local_source = require("modules.updater").is_local_source(),
+		-- An asynchronous task (ShellRunner.run), never a blocking shell call: the refresh
+		-- runs on the main thread that also delivers the keys.
+		registry_changes = function(dir, callback)
+			require("adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
+				if ok then
+					callback(out or "", nil)
+				else
+					local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
+					callback(nil, detail ~= "" and detail or "git did not run")
+				end
+			end)
+		end,
 		transport = {
 			get = function(url, headers, _timeout_ms, callback)
 				client.get(url, headers, function(result)
@@ -858,6 +882,26 @@ function M.composer_remove(on_done, deps)
 	end
 	operations.remove(on_done)
 	return true
+end
+
+--- The text and index entry of a layout the app ships (the field run's source of
+--- the number-row build), read from the shipped registry the offline install uses.
+--- @param id string Registry id.
+--- @param deps table|nil
+--- @return table|nil shipped { entry, text }
+--- @return string|nil error
+function M.shipped_layout(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local index = bundled_index(resolved)
+	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+		if entry.id == id then
+			local text = type(resolved.bundled_dir) == "string" and resolved.read(resolved.bundled_dir .. entry.file) or nil
+			if type(text) ~= "string" then return nil, "the shipped " .. id .. " layout is unreadable" end
+			return { entry = entry, text = text }, nil
+		end
+	end
+	return nil, "the app ships no " .. tostring(id) .. " layout"
 end
 
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.

@@ -24,7 +24,12 @@ function Set-CrashField {
 		[Parameter(Mandatory = $true)][string]$Name,
 		[AllowNull()]$Value
 	)
-	$Snapshot | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+	# Assigned in place: the document keeps the order the driver serialized.
+	if ($Snapshot.PSObject.Properties[$Name]) {
+		$Snapshot.PSObject.Properties[$Name].Value = $Value
+	} else {
+		$Snapshot | Add-Member -NotePropertyName $Name -NotePropertyValue $Value
+	}
 }
 
 function Test-CrashFault {
@@ -39,6 +44,47 @@ function Remove-CrashTransportFields {
 	param([Parameter(Mandatory = $true)]$Snapshot)
 	$Snapshot.PSObject.Properties.Remove("_transport_script_dir")
 	$Snapshot.PSObject.Properties.Remove("_transport_reports_dir")
+}
+
+# The shared crash document (_shared/lua/crash_report.lua): the fields in the order
+# the driver serialized them, two spaces deep, one line per field.
+function ConvertTo-CrashDocument {
+	param([Parameter(Mandatory = $true)]$Snapshot)
+	$lines = foreach ($field in $Snapshot.PSObject.Properties) {
+		"  " + (ConvertTo-Json -InputObject $field.Name -Compress) + ": " +
+			(ConvertTo-Json -InputObject $field.Value -Compress -Depth 8)
+	}
+	return "{`n" + ($lines -join ",`n") + "`n}"
+}
+
+# Writes the document under the shared name, <timestamp>.json then <timestamp>-2.json
+# for a second report within the same second. CreateNew refuses an existing file, so
+# a concurrent writer can never be replaced.
+function Write-CrashDocument {
+	param(
+		[Parameter(Mandatory = $true)][string]$Directory,
+		[Parameter(Mandatory = $true)][string]$Timestamp,
+		[Parameter(Mandatory = $true)][string]$Document
+	)
+	if ($Timestamp -notmatch '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$') {
+		throw "A crash report timestamp is YYYY-MM-DDTHH:MM:SSZ, got '$Timestamp'"
+	}
+	$stem = $Timestamp.Replace(":", "-")
+	$bytes = [Text.UTF8Encoding]::new($false).GetBytes($Document)
+	$attempt = 1
+	while ($true) {
+		$name = if ($attempt -eq 1) { "$stem.json" } else { "$stem-$attempt.json" }
+		$path = Join-Path $Directory $name
+		try {
+			$stream = [IO.File]::Open($path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+		} catch [IO.IOException] {
+			if (-not [IO.File]::Exists($path)) { throw }
+			$attempt += 1
+			continue
+		}
+		try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+		return $path
+	}
 }
 
 $mapping = [IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting(
@@ -79,7 +125,7 @@ if ($DelayMs -gt 0) {
 
 try {
 	if (Test-CrashFault "environment") { throw "Injected environment fault" }
-	Set-CrashField $snapshot "os_name" ([Environment]::OSVersion.VersionString)
+	Set-CrashField $snapshot "os_version" ([Environment]::OSVersion.VersionString)
 } catch { $enrichmentErrors.Add("environment: " + $_.Exception.Message) }
 
 try {
@@ -119,6 +165,7 @@ if ([string]::IsNullOrWhiteSpace([string]$snapshot.git_hash)) {
 			throw "Git enrichment exited with code $LASTEXITCODE."
 		}
 		Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
+		Set-CrashField $snapshot "commit_source" "git"
 	} catch {
 		$enrichmentErrors.Add("git: " + $_.Exception.Message)
 		Set-CrashField $snapshot "git_hash" "unknown"
@@ -129,12 +176,6 @@ Set-CrashField $snapshot "enrichment_errors" $enrichmentErrors.ToArray()
 
 $reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
-$reportName = "{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"), [guid]::NewGuid().ToString("N")
-$reportPath = Join-Path $reportDir $reportName
 Remove-CrashTransportFields $snapshot
-[IO.File]::WriteAllText(
-	$reportPath,
-	($snapshot | ConvertTo-Json -Depth 8),
-	[Text.UTF8Encoding]::new($false)
-)
+$reportPath = Write-CrashDocument $reportDir ([string]$snapshot.timestamp) (ConvertTo-CrashDocument $snapshot)
 Write-Output ("OK:" + $reportPath)

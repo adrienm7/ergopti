@@ -44,6 +44,7 @@ local PublicationRecovery = require("hotstrings.publication_recovery")
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.delay_resolver")
+local Languages = require("hotstrings.languages")
 local HotstringPriority = require("hotstring_priority")
 local TextUtils = require("text_utils")
 local TableUtil = require("table_util")
@@ -834,6 +835,17 @@ function M.get_global_default_delay_ms()
 	return math.floor(base_delay() * 1000 + 0.5)
 end
 
+--- The delay a built-in section declares, rung 3 of the shared cascade: its
+--- manifest default (the maintainer's decision of 3 November 2026). This
+--- driver's config.toml stores a section as a boolean under hotstrings.modules,
+--- so the user's own delay for it lives in the override file, rungs 1 and 2.
+--- @param category string Canonical bundled category.
+--- @param section string|nil Section name.
+--- @return number|nil seconds
+local function declared_delay(category, section)
+	return Languages.section_default_delay(require("infra.manifest_reader").features(), category, section)
+end
+
 --- A user override rung as the cascade reads it: its stored delay turned into
 --- effective seconds, every other field as `sanitized_resolution_entry` leaves it.
 --- @param entry table|nil Stored rung.
@@ -871,9 +883,11 @@ delay_projection = function(overrides, base)
 		elseif type(meta_section) ~= "table" and meta.section_delays then
 			meta_section = { delay = meta.section_delays[section] }
 		end
+		local bundled = not extension_id and not PersonalFiles.components(category)
 		return DelayResolver.resolve({
 			user_category = user_resolution_entry(user, base),
 			user_section = user_resolution_entry(user_section, base),
+			declared_delay = bundled and declared_delay(category, section) or nil,
 			meta_category = sanitized_resolution_entry(meta),
 			meta_section = sanitized_resolution_entry(meta_section),
 			default_delay = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
@@ -945,6 +959,7 @@ function M.resolve(category, section)
 	local resolved = DelayResolver.resolve({
 		user_category  = user_resolution_entry(user),
 		user_section   = user_resolution_entry(user_sec),
+		declared_delay = not personal and declared_delay(category, section) or nil,
 		meta_category  = sanitized_resolution_entry(meta),
 		meta_section   = sanitized_resolution_entry(meta_sec),
 		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or base_delay(),

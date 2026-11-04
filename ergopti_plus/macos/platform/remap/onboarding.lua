@@ -41,6 +41,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local NativePath = require("native_path")
 local i18n   = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
@@ -815,7 +816,8 @@ local function verify_sha256_async(owner, path, expected_sha, callback)
 				callback(false, "shasum exit code " .. tostring(rc))
 				return
 			end
-			local actual = stdout:match("^([%x]+)")
+			-- shasum prefixes the digest with a backslash when the path holds one.
+			local actual = stdout:match("^\\?([%x]+)")
 			if not actual then
 				callback(false, "Could not parse shasum output: " .. stdout)
 				return
@@ -1139,7 +1141,7 @@ function M.install_karabiner_elements(callback)
 				settle_install_artifacts(owner, "package discovery failure")
 				Logger.error(LOG, "No .pkg found in mounted volume.")
 				finish_install_owner(owner, callback, false,
-					i18n.get("karabiner.pkg_not_found") .. ": " .. tostring(pkg_err))
+					LabelValue.compose(i18n.get, i18n.get("karabiner.pkg_not_found"), tostring(pkg_err)))
 				return
 			end
 			if not install_owner_is_current(owner) then

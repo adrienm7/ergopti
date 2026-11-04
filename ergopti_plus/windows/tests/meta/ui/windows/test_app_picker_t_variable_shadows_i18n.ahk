@@ -31,10 +31,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir
 ; (tests/); its parent is the windows/ driver root.
-_APTV_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_APTV_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -47,7 +45,7 @@ _APTV_ReadSource(RelPath) {
 ; ==================================================
 
 _APTV_NoSingleLetterTAssignment() {
-	Src := _APTV_ReadSource("infra/app_picker.ahk")
+	Src := _APTV_ReadSource("app_picker.ahk")
 	Assert(Src != "", "infra/app_picker.ahk must be readable")
 	; The single-letter i18n identifier must never appear as an lvalue.
 	; A match means the window-title shadow (or a new one) was reintroduced.

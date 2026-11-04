@@ -49,8 +49,21 @@
 --- debounced tasks that still cancel on the next key-down and at key-up; the
 --- console user server client is now a peer; power or eject with command and
 --- option, and Escape at the login window, are posted 500 ms late; a manipulated
---- event's time stamp is rounded instead of truncated. The comparison did not
---- cover src/share/core_configuration or the event queue.
+--- event's time stamp is rounded instead of truncated. src/share/event_queue
+--- changed only mechanically. In src/share/core_configuration the complex
+--- modification parameters (their defaults and bounds) did not change; a rule's
+--- `enabled` is read from the unresolved JSON (only `eval_js` rules differ),
+--- `description_notes` must be an array of strings and `available_since` is no
+--- longer type-checked; a device's `ignore` and `manipulate_caps_lock_led`
+--- defaults are resolved from its identifiers before loading, with the same
+--- values for a keyboard, and the new profile key
+--- `ignore_pointing_device_events_by_default` defaults to true, as pointing
+--- devices were ignored before; devices gained
+--- `swap_grave_accent_and_non_us_backslash` (false by default); the global
+--- section renamed `check_for_updates_on_startup` and dropped
+--- `ask_for_confirmation_before_quitting`. The generated document uses none of
+--- the changed keys: test_generator_shipped_graph_deploys.lua
+--- (owned-revision-config-keys) pins the keys it may carry.
 --- ==============================================================================
 
 local M = {}

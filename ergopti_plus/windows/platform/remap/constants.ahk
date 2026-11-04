@@ -8,6 +8,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -56,6 +57,17 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 ; pins this loader to it.
 global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0
 
+; How long (ms) a key whose hold is a modifier, pressed alone, still types its
+; tap (tap_holds.lone_modifier_tap_max_ms; 0 = the strict tap-hold). The
+; manifest default until the configuration sets it (TapHoldSetLoneTapMaxMs);
+; "" means not set yet. Same rule as _shared/lua/tap_hold/lone_tap.lua on
+; macOS and Linux.
+global TAP_HOLD_LONE_TAP_MAX_MS := ""
+
+; Wait (ms) before a tap-hold copy reads the clipboard's sequence number, for
+; the copy and again for its one retry (section 2.1).
+global TAP_COPY_VERIFY_MS := 0
+
 ; Failsafe ceiling (s) on any KeyWait that holds a SYNTHETIC modifier Down while
 ; waiting for the physical tap-hold key to be released. The arm/release pair is
 ; guarded by try/finally, but an unbounded wait could still latch the modifier
@@ -70,12 +82,82 @@ global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := 5
 ; still absorbing a transient injection failure before lifecycle cleanup runs.
 global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
 
+; Refuses a lone tap window that is neither 0 nor a positive whole number.
+; @param Ms {Number} Milliseconds.
+; @returns {Integer}
+TapHoldValidLoneTapMaxMs(Ms) {
+	if !(Ms is Integer) || Ms < 0
+		throw ValueError("tap_holds.lone_modifier_tap_max_ms must be 0 or a positive whole number of milliseconds.", -1, String(Ms))
+	return Ms
+}
+
+; Sets the lone tap window from the configuration.
+; @param Ms {Integer} 0 (strict) or a positive whole number of milliseconds.
+TapHoldSetLoneTapMaxMs(Ms) {
+	global TAP_HOLD_LONE_TAP_MAX_MS
+	TAP_HOLD_LONE_TAP_MAX_MS := TapHoldValidLoneTapMaxMs(Ms)
+}
+
+; Reads the lone tap window from config.toml at boot. Absent, the manifest
+; default applies; a value that is neither 0 nor a positive whole number is
+; reported and the manifest default applies, as for [mod_combos].
+; @param Cache {Map} The parsed config (IniCacheGet's source).
+TapHoldLoneTapReadConfig(Cache) {
+	global TAP_HOLD_LONE_TAP_MAX_MS
+	TAP_HOLD_LONE_TAP_MAX_MS := ""
+	Stored := (Cache is Map) && Cache.Has(ConfigLeaf.TAP_HOLDS) && (Cache[ConfigLeaf.TAP_HOLDS] is Map)
+		? Cache[ConfigLeaf.TAP_HOLDS] : Map()
+	if !Stored.Has(ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS) {
+		LoggerInfo("TapHold", "Lone modifier tap window not set: the default {1} ms applies.", TapHoldLoneTapMaxMs())
+		return
+	}
+	Value := Stored[ConfigLeaf.LONE_MODIFIER_TAP_MAX_MS]
+	try TapHoldSetLoneTapMaxMs(IsInteger(Value) ? Integer(Value) : Value)
+	catch as Err {
+		LoggerWarn("TapHold", "[tap_holds] lone_modifier_tap_max_ms = '{1}' is refused ({2}): the default {3} ms applies.",
+			(Value is Object) ? Type(Value) : Value, Err.Message, TapHoldLoneTapMaxMs())
+		return
+	}
+	LoggerInfo("TapHold", "Lone modifier tap window read: {1} ms.", TapHoldLoneTapMaxMs())
+}
+
+; The longest press (ms) that still types KeyId's tap: its threshold, or the
+; lone tap window when KeyId's hold is a modifier taken at key-down and the
+; window is longer. The typing keys ([tap_hold.rollover]) and a one-shot
+; Shift tap never take the window: a one-shot armed by a long press would
+; shift the next letter of a Shift held and let go unused. Alone (no other
+; key, click or wheel) is the prior-key guard and the activity tracker of the
+; caller, as for any tap.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param ThresholdSec {Number} The key's tap / hold threshold.
+; @returns {Number}
+TapHoldTapMaxMs(KeyId, ThresholdSec) {
+	global TAP_HOLD_LONE_TAP_MAX_MS, TAPHOLD_ROLL_KEYS, TapHold
+	ThresholdMs := ThresholdSec * 1000
+	if IsSet(TAPHOLD_ROLL_KEYS) && TAPHOLD_ROLL_KEYS.Has(KeyId)
+		return ThresholdMs
+	if IsSet(TapHold) && TapHoldTapAction(TapHold, KeyId) == "one_shot_shift"
+		return ThresholdMs
+	return Max(ThresholdMs, TapHoldLoneTapMaxMs())
+}
+
+; The lone tap window in force (ms, 0 = strict).
+; @returns {Integer}
+TapHoldLoneTapMaxMs() {
+	global TAP_HOLD_LONE_TAP_MAX_MS
+	if (TAP_HOLD_LONE_TAP_MAX_MS == "")
+		TAP_HOLD_LONE_TAP_MAX_MS := TapHoldValidLoneTapMaxMs(ManifestDefaultFor(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
+	return TAP_HOLD_LONE_TAP_MAX_MS
+}
+
 ; Reassign the tap-hold timing constants from the shared registry. Called once
 ; from the auto-execute body at boot (after TimingsLoadShared(), before any
 ; tap-hold hotkey arms). Fail-fast: a missing key throws via TimingsGet.
 TapHoldsLoadTimings() {
 	global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
 	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	global TAP_COPY_VERIFY_MS
+	TAP_COPY_VERIFY_MS          := TimingsGet("tap_hold", "copy_verify_ms")
 	TAP_MIN_DURATION_MS         := TimingsGet("tap_hold", "tap_min_duration_ms")
 	KEY_REPEAT_INITIAL_DELAY_MS := TimingsGet("tap_hold", "key_repeat_initial_delay_ms")
 	KEY_REPEAT_INTERVAL_MS      := TimingsGet("tap_hold", "key_repeat_interval_ms")
@@ -371,7 +453,7 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 }
 
 _TapHoldModifierWaitRelease(KeyName, TimeoutSec) {
-	return KeyWait(KeyName, "U T" . TimeoutSec)
+	return KS_WaitReleased(KeyName, TimeoutSec)
 }
 
 _TapHoldModifierKeyIsDown(KeyName) {
@@ -534,15 +616,20 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		}
 
 		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
-		GuardMs := TapThresholdSec * 1100
+		; Pressed alone, a modifier key still taps up to the lone tap window.
+		TapMaxMs := TapHoldTapMaxMs(KeyId, TapThresholdSec)
+		GuardMs := TapMaxMs * 1.1
 		if (GuardMs < 250)
 			GuardMs := 250
 		Suspended := IsSuspendedFn.Call()
 		CancelReason := ""
 		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
 			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
+		; A release sooner than the shared tap minimum is a key bounce: CapsLock held
+		; as Ctrl typed its tap on a 20 ms brush (tap_hold/decision_vectors.json).
+		; Owned here so no hold-modifier hotkey can miss it, as Linux does in its engine.
 		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
-			and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+			and ElapsedMs >= TapMinDurationMs() and ElapsedMs <= TapMaxMs and CancelReason == ""
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
 				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
@@ -1221,7 +1308,13 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
-			HS_ApplyEventWordReset("tap_hold_resets_word", "tap of " . KeyId)
+			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
+		; A tap that types Enter or Tab goes out through the driver's own send, which
+		; the watcher never sees: it completes a hotstring here, as Space does.
+		EndChar := HotstringEndCharOfTap(KeyId)
+		if (EndChar != "" and HotstringCompleteEndKey(EndChar,
+				TapHoldRollTapIsRunning(KeyId) ? TapHoldRollTapDownTick() : 0))
+			return true
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()
@@ -1334,6 +1427,8 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 		; the catalogue paste's admission before any temporary payload is read.
 		if ActionId == "paste"
 			return _GestureWithPasteAdmission(TapHoldEmitKeyTap.Bind(Action.Key, Action.Mods))
+		if ActionId == "copy"
+			return TapCopySend(KeyId, TapHoldEmitKeyTap.Bind(Action.Key, Action.Mods))
 		TapHoldEmitKeyTap(Action.Key, Action.Mods)
 		return
 	}
@@ -1343,6 +1438,143 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 ; Fire the configured generic tap action through the shared gate.
 _TapHoldFireAction(KeyId) {
 	return TapHoldDispatchTap(KeyId, _TapHoldInvokeConfiguredAction.Bind(KeyId))
+}
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 2.1) Copy check =============
+; =====================================
+; =====================================
+
+; A tap's copy (Ctrl+C) is proved by the clipboard's sequence number
+; (GetClipboardSequenceNumber), never by its content: copying the same text
+; again moves the number and leaves the content as it was. The number is read
+; before Ctrl+C is sent, read again by a one-shot timer (never a Sleep on the
+; hook thread), Ctrl+C is sent once more when it did not move, and the user is
+; warned when it still did not. The states and outcomes are those of
+; _shared/lua/tap_hold/copy_check.lua, which the macOS and Linux drivers run.
+
+; How many times a copy is sent again when the clipboard did not move.
+global TAP_COPY_RETRIES := 1
+; The pending check (a Map), or 0. A newer copy supersedes it.
+global _TapCopyPending := 0
+global _TapCopyGeneration := 0
+; Seams for the test suite: the counter, the timer and the notice.
+global _TapCopyCounterFn := () => CB_GetSequenceNumber()
+global _TapCopyTimerFn := (Callback, DelayMs) => TimerAfter(DelayMs / 1000, Callback)
+global _TapCopyWarnFn := () => NotifierSend(t("notify.tap_hold.copy_failed"), Map("level", "warning"))
+
+; Sends one tap-hold copy and starts its check.
+; @param KeyId {String} The tap-hold key that tapped, for the log.
+; @param SendFn {Func} Sends the copy keystroke; returns the sender's verdict.
+;   The retry calls it again.
+TapCopySend(KeyId, SendFn) {
+	global _TapCopyCounterFn
+	Baseline := _TapCopyCounterFn.Call()
+	Sent := SendFn.Call()
+	TapCopyCheckStart(Baseline, KeyId, SendFn)
+	return Sent
+}
+
+; Starts checking one copy keystroke.
+; @param Baseline {Integer} The sequence number read before the keystroke.
+; @param Source {String} What sent the copy, for the log.
+; @param SendFn {Func} Sends the copy keystroke again for the retry.
+; @return {Boolean} Whether a check is now pending.
+TapCopyCheckStart(Baseline, Source, SendFn) {
+	global _TapCopyPending, _TapCopyGeneration, _TapCopyTimerFn, TAP_COPY_VERIFY_MS
+	if IsObject(_TapCopyPending)
+		try LoggerDebug("TapHoldCopy", "Tap-hold copy check from {1} superseded by a newer copy.", _TapCopyPending["source"])
+	_TapCopyGeneration += 1
+	_TapCopyPending := 0
+	; GetClipboardSequenceNumber returns 0 when the session gives no access to
+	; the clipboard (a locked or another window station): nothing can be checked.
+	if !(Baseline is Integer) or Baseline == 0 {
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Source)
+		return false
+	}
+	_TapCopyPending := Map("baseline", Baseline, "attempts", 1, "source", Source,
+		"generation", _TapCopyGeneration, "send", SendFn)
+	Generation := _TapCopyGeneration
+	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
+	return true
+}
+
+; Abandons the pending check without a report (pause, reload).
+TapCopyCheckStop() {
+	global _TapCopyPending, _TapCopyGeneration
+	_TapCopyPending := 0
+	_TapCopyGeneration += 1
+}
+
+; Reads the counter once an attempt has had its time.
+; @param Generation {Integer} The check this timer belongs to.
+_TapCopyCheckTick(Generation) {
+	global _TapCopyPending, _TapCopyCounterFn, _TapCopySendFn, _TapCopyTimerFn, _TapCopyWarnFn
+	global TAP_COPY_RETRIES, TAP_COPY_VERIFY_MS
+	Pending := _TapCopyPending
+	if !IsObject(Pending) or Pending["generation"] != Generation
+		return
+	; A paused driver sends nothing: the check ends with the pause.
+	if A_IsSuspended {
+		_TapCopyPending := 0
+		return
+	}
+	Counter := _TapCopyCounterFn.Call()
+	WaitedMs := Pending["attempts"] * TAP_COPY_VERIFY_MS
+	if !(Counter is Integer) or Counter == 0 {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be checked (counter_unreadable).", Pending["source"])
+		return
+	}
+	if Counter != Pending["baseline"] {
+		_TapCopyPending := 0
+		if (Pending["attempts"] > 1) {
+			try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} reached the clipboard only when sent again ({2} ms).", Pending["source"], WaitedMs)
+		} else {
+			try LoggerDebug("TapHoldCopy", "Tap-hold copy from {1} verified: the clipboard changed within {2} ms.", Pending["source"], WaitedMs)
+		}
+		return
+	}
+	if Pending["attempts"] > TAP_COPY_RETRIES {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (not_copied after {2} ms); the user is warned.", Pending["source"], WaitedMs)
+		_TapCopyWarnUser()
+		return
+	}
+	Pending["attempts"] += 1
+	Pending["baseline"] := Counter
+	Refusal := ""
+	try {
+		if !Pending["send"].Call()
+			Refusal := "the sender refused the keystroke"
+	} catch as Err {
+		Refusal := Err.Message
+	}
+	if (Refusal != "") {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (retry_refused after {2} ms: {3}); the user is warned.", Pending["source"], WaitedMs, Refusal)
+		_TapCopyWarnUser()
+		return
+	}
+	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
+}
+
+; Shows the localized notice; a refused notice is logged, never fatal.
+_TapCopyWarnUser() {
+	global _TapCopyWarnFn
+	try {
+		Shown := _TapCopyWarnFn.Call()
+	} catch as Err {
+		try LoggerError("TapHoldCopy", "Copy failure notice was not delivered: {1}.", Err.Message)
+		return
+	}
+	if !Shown
+		try LoggerError("TapHoldCopy", "Copy failure notice was not delivered.")
 }
 
 ; Whether modifier Name is logically down. A global holding a function, as
@@ -1430,15 +1662,24 @@ TapHoldKanaAltGrHeld() {
 ; AltGr's. Only there: QWERTY's right Alt is a plain Alt and a Kana AltGr is no
 ; RAlt, neither adds a fake LCtrl (KS_AltGrAddsFakeLCtrl), so a physical LCtrl
 ; is always the user's and LCtrl+RAlt then LAlt tapped as Backspace is the
-; Ctrl+Backspace special.
+; Ctrl+Backspace special. The native ledger does tell them apart (raw 0x21D is the
+; alias), so a real LCtrl held with AltGr is the user's whenever an owner runs;
+; with none running, the LCtrl under AltGr stays AltGr's, as AltGr alone needs. The
+; ledger forgets a release missed on the secure desktop, so a stale LCtrl cannot
+; turn a later AltGr alone into the user's Ctrl.
 ; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown by default.
+; @param RealPressFn {Func} Test seam taking a key name, KS_RealPressState by default.
 ; @return {Boolean}
-TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
+TapHoldUserLCtrlHeld(KeyIsDownFn := 0, RealPressFn := 0) {
 	if !IsObject(KeyIsDownFn)
 		KeyIsDownFn := KS_IsDown
 	if !KeyIsDownFn.Call("SC01D")
 		return false
-	return !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
+	if !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
+		return true
+	if !IsObject(RealPressFn)
+		RealPressFn := KS_RealPressState
+	return RealPressFn.Call("SC01D") == 1
 }
 
 ; Hand back the synthetic hold the owner of KeyId took for this press, now.

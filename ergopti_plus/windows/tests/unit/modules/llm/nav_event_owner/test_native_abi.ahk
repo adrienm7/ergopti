@@ -202,6 +202,54 @@ _LNEO_HookOrderStatsCrossTheAbiExactly() {
 Test("LLM nav event owner: hook-order stats cross the ABI exactly (todo49-hook-order)",
 	_LNEO_HookOrderStatsCrossTheAbiExactly)
 
+; The press ledger crosses the ABI as one 24-byte struct, and the driver reads it
+; from #HotIf criteria (todo91-ledger-abi). No owner runs here: it holds nothing.
+_LNEO_KeyPressCrossesTheAbiExactly() {
+	for _, Sc in [0x138, 0x02A, 0x01D] {
+		Press := LLM_NavEventOwner_KeyPress(Sc)
+		AssertEqual(0, Press.flags, "a stopped owner holds no key")
+		AssertEqual(0, Press.sequence, "a stopped owner numbers no press")
+	}
+	Wrong := Buffer(24, 0xA5)
+	NumPut("UInt", 16, Wrong, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", 0x138, "Ptr", Wrong, "Int")
+	AssertEqual(1, Status, "a mismatched struct size must be refused as invalid")
+	AssertEqual(0xA5A5A5A5, NumGet(Wrong, 4, "UInt"), "a refused call must not write the key")
+	NumPut("UInt", 24, Wrong, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", 0x200, "Ptr", Wrong, "Int")
+	AssertEqual(1, Status, "a scan code beyond the extended range must be refused")
+	Health := LLM_NavEventOwner_KeyLedgerHealth()
+	AssertEqual(0, Health["desktop_watch"], "a stopped owner watches no desktop")
+	AssertTrue(Health["resets"] >= 0, "the reset count crosses the ABI")
+}
+
+Test("LLM nav event owner: the press ledger crosses the ABI exactly (todo91-ledger-abi)",
+	_LNEO_KeyPressCrossesTheAbiExactly)
+
+; The session record is written once the owner stopped and unhooked its watch: it
+; must not read that as a watch that failed to arm, a warning on every healthy exit.
+_LNEO_StoppedOwnerDoesNotBlameTheDesktopWatch() {
+	Logged := []
+	LoggerSetTestSink((Line) => Logged.Push(Line))
+	try _LLM_NavEventOwnerLogHookOrder()
+	finally LoggerClearTestSink()
+	for Line in Logged
+		AssertFalse(InStr(Line, "desktop_watch=0"), "a stopped owner warns of no desktop watch: " . Line)
+	Logged := []
+	LoggerSetTestSink((Line) => Logged.Push(Line))
+	try _LLM_NavEventOwnerLogDesktopWatch()
+	finally LoggerClearTestSink()
+	Joined := ""
+	for Line in Logged
+		Joined .= Line . "`n"
+	AssertContains(Joined, "desktop_watch=0", "a running owner without its watch does warn")
+}
+
+Test("LLM nav event owner: a stopped owner reports no missing desktop watch (ledger-desktop-watch)",
+	_LNEO_StoppedOwnerDoesNotBlameTheDesktopWatch)
+
 ; Empty val_modifiers is the shared default: a bare digit N while a prediction
 ; owner is committed must be suppressed (never typed) and target slot N, while
 ; a modified digit or a digit beyond the shown slots stays application input.

@@ -3,11 +3,11 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported: one AHK consumer calls the Windows manifest reader's scope inventory and plan with an owner built from the generated action catalogue."
+		"windows": "windows/tests/meta/corpus/test_corpus_config_scope_plan.ahk replays every vector but the 6 declaration ones: the Windows reader plans the generated manifest and takes no declaration."
 	},
 	"stored_paths": [
 		"action_parameters.gesture__tap_4__open_url",
-		"action_parameters.keyboard__ctrl_k__open_url",
+		"action_parameters.keyboard__primary_k__open_url",
 		"action_parameters.script__reload__open_url",
 		"action_parameters.tap_key__digit_1__open_url",
 		"action_parameters.tap_hold__caps_lock__open_url"

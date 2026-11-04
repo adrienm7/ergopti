@@ -110,8 +110,9 @@ _TIC_SectionHeaderDropsItsComment() {
 ; as a class so a fix to one parser cannot quietly skip the others.
 _TIC_AllHeaderParsersStripComments() {
 	Checked := 0
-	Names := ["ApplyConfigToml", "ParseTomlGroupConfig",
-		"ReadTomlSectionsOrder", "LoadHotstringsSection"]
+	; ParseTomlGroupConfig and ReadTomlSectionsOrder are driven just below. These two
+	; need a live configuration and a live engine.
+	Names := ["ApplyConfigToml", "LoadHotstringsSection"]
 	for Name in Names {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist for the header-parser class guard")
@@ -150,6 +151,37 @@ Test("meta toml: a hash inside quotes is kept as data", _TIC_HashInsideQuotesIsK
 Test("meta toml: an escaped quote does not end the string", _TIC_EscapedQuoteDoesNotEndTheString)
 Test("meta toml: a comment after a section header is stripped", _TIC_SectionHeaderDropsItsComment)
 Test("meta toml: every header parser strips comments first", _TIC_AllHeaderParsersStripComments)
+
+; A commented header left the section pointer on the previous section.
+_TIC_GroupConfigHeaderDropsItsComment() {
+	Path := A_Temp . "\ergopti_test_inline_comment_group.toml"
+	try FileDelete(Path)
+	FileAppend('[other]`ndelay = 9`n[_meta] # notes`ndelay = 0.25`n[_meta.sections.fast] # notes`ndelay = 0.5`nsections_order = ["a"]`n', Path, "UTF-8-RAW")
+	try {
+		Config := ParseTomlGroupConfig("comment_probe", Path)
+		AssertEqual(0.25, Config.Delay, "the keys under a commented [_meta] header belong to it")
+		AssertEqual(0.5, Config.Sections["fast"].Delay, "the keys under a commented section header belong to it")
+	} finally {
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		FileDelete(Path)
+	}
+}
+Test("meta toml: ParseTomlGroupConfig reads below a commented header", _TIC_GroupConfigHeaderDropsItsComment)
+
+_TIC_SectionsOrderHeaderDropsItsComment() {
+	Path := A_Temp . "\ergopti_test_inline_comment_order.toml"
+	try FileDelete(Path)
+	FileAppend('[_meta] # notes`nsections_order = ["a", "b"] # order`n', Path, "UTF-8-RAW")
+	try {
+		Order := ReadTomlSectionsOrder("comment_probe", Path)
+		AssertEqual(2, Order.Length, "the order below a commented [_meta] header is read")
+		AssertEqual("b", Order[2], "the trailing comment is not part of the order")
+	} finally {
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		FileDelete(Path)
+	}
+}
+Test("meta toml: ReadTomlSectionsOrder reads below a commented header", _TIC_SectionsOrderHeaderDropsItsComment)
 Test("meta toml: an array element comment is not an element", _TIC_ArrayElementCommentIsNotAnElement)
 
 ; The migration registry is a large multiline array. Rescanning its complete

@@ -7,6 +7,7 @@
 --- transport is owned by this view policy.
 local M = {}
 local Discovery = require("llm.local_server_discovery")
+local Labels = require("menu.labels")
 
 --- Matches the actual captured entry when supplied by a native source owner.
 --- @param options table
@@ -27,6 +28,19 @@ end
 --- @return string
 function M.host_of(base_url)
 	return tostring(base_url):match("^%a[%w+.-]*://([^/]+)") or tostring(base_url)
+end
+
+--- The name of the server a verdict answered for: the row's own label, or the
+--- label of the row of the same address its response fingerprinted
+--- (llm.local_server_fingerprint), so vLLM on oMLX's port is named vLLM.
+--- @param servers table View id -> { label }.
+--- @param id string The row.
+--- @param verdict table|nil Its published verdict.
+--- @return string
+function M.label_of(servers, id, verdict)
+	local named = type(verdict) == "table" and verdict.server or nil
+	if type(named) == "string" and type(servers[named]) == "table" then return servers[named].label end
+	return servers[id].label
 end
 
 --- Builds one catalogue server's model and configuration choices.
@@ -62,7 +76,8 @@ end
 --- backend, active, tr, format, actions = { select, address, key, rescan } }.
 --- @return table
 function M.rows(options)
-	local rows = { { separator = true }, { label = options.tr("menu.llm.local_servers.header"), disabled = true } }
+	local rows = { { separator = true },
+		{ label = Labels.decorate_section(options.tr("menu.llm.local_servers.header")), disabled = true } }
 	local unavailable = false
 	for _, id in ipairs(options.order) do
 		local result = options.result(id)
@@ -71,7 +86,7 @@ function M.rows(options)
 	if unavailable then rows[#rows + 1] = { label = options.tr("healthcheck.status.failed"), disabled = true } end
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
-		local label = options.servers[id].label .. " 🖥️ — " .. M.host_of(verdict.base_url)
+		local label = M.label_of(options.servers, id, verdict) .. " 🖥️ — " .. M.host_of(verdict.base_url)
 		if verdict.status == Discovery.STATUS_NEEDS_KEY then
 			label = options.format("menu.llm.local_servers.needs_key", label)
 		end
@@ -80,10 +95,16 @@ function M.rows(options)
 			items = server_items(options, id, verdict) }
 	end
 	if #options.detected == 0 and not unavailable then
-		local labels = {}
-		for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
-		local key = options.sweeping and "menu.llm.local_servers.searching" or "menu.llm.local_servers.none"
-		rows[#rows + 1] = { label = options.format(key, table.concat(labels, ", ")), disabled = true }
+		-- A finished sweep says one sentence: the catalogue's server names stay in the
+		-- local servers panel and the "other address" submenu, not in this row.
+		if options.sweeping then
+			local labels = {}
+			for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
+			rows[#rows + 1] = { label = options.format("menu.llm.local_servers.searching",
+				table.concat(labels, ", ")), disabled = true }
+		else
+			rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.none_detected"), disabled = true }
+		end
 	end
 	rows[#rows + 1] = { label = options.tr("menu.llm.local_servers.rescan"), disabled = options.paused or nil,
 		action = not options.paused and options.actions.rescan or nil }
@@ -109,7 +130,7 @@ function M.page_rows(options)
 	local live = not options.paused
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
-		local label = options.servers[id].label
+		local label = M.label_of(options.servers, id, verdict)
 		local actions = {}
 		if live then
 			actions[#actions + 1] = { id = "set_key", text = options.tr("menu.llm.local_servers.api_key"),

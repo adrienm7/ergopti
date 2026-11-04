@@ -661,7 +661,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
 		} }, function(world)
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local rebuilt = 0
 			local ctx = { llm = world.engine, on_menu_changed = function() rebuilt = rebuilt + 1 end }
 			local i18n = require("infra.i18n")
@@ -744,7 +744,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local i18n = require("infra.i18n")
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
 			local spec = Json.decode(file:read("*a")); file:close()
@@ -791,7 +791,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("retains the real shortcut stop notice in all locales while the second chooser stays absent", function()
 		scenario({}, function(world)
-			local builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.builder")
 			local i18n = require("infra.i18n")
 			local saved_get = i18n.get
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))

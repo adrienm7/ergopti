@@ -21,7 +21,13 @@ local with_fixture = Fixture.with_fixture
 
 helpers.describe("Complete LLM fixed controls: real transaction owners", function()
 	helpers.it("the modifier frame owns translated choices and retains every physical-key callback", function()
-		with_fixture({}, function(f)
+		-- The choices name their modifiers from the shared key name table in the
+		-- user's language: French reads « Maj », never the English « Shift ».
+		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+		local french = require("adapters.json_codec").decode(file:read("*a"))
+		file:close()
+		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
+		with_fixture({ translate = translate }, function(f)
 			local menu = package.loaded["infra.manifest_menu"]
 			local root, frame = menu.get_root(), menu.get_array("llm_modifier_picker_frame")
 			local original = frame[1].i18n
@@ -30,12 +36,12 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 				helpers.assert_eq(#before, 8)
 				helpers.assert_eq(before[1].title, "menu.settings.disabled")
 				helpers.assert_eq(before[2].title, "menu.settings.no_modifier")
-				helpers.assert_eq(before[3].title, "⇧ Shift")
+				helpers.assert_eq(before[3].title, "⇧ Maj")
 				helpers.assert_eq(before[4].title, "⌘ Cmd")
 				helpers.assert_eq(before[5].title, "⌥ Option")
 				helpers.assert_eq(before[6].title, "⌃ Ctrl")
-				helpers.assert_eq(before[7].title, "⇧⌘ Shift + Cmd")
-				helpers.assert_eq(before[8].title, "⇧⌥ Shift + Option")
+				helpers.assert_eq(before[7].title, "⇧⌘ Maj + Cmd")
+				helpers.assert_eq(before[8].title, "⇧⌥ Maj + Option")
 				helpers.assert_eq(before[6].checked, true)
 				for _, row in ipairs(before) do helpers.assert_type(row.fn, "function") end
 				frame[1].i18n = "button.cancel"
@@ -55,7 +61,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 		end)
 	end)
 
-	for _, section in ipairs({ "llm_generation_native_controls", "llm_after_profile_boundary" }) do
+	for _, section in ipairs({ "llm_generation_word_controls", "llm_generation_context_controls" }) do
 		helpers.it("refuses the actual missing " .. section .. " before native action delivery and repairs it", function()
 			with_fixture({ parent_only = true }, function(f)
 				local rebuild = f.top_level_callbacks().rebuild
@@ -176,9 +182,12 @@ helpers.describe("Complete LLM generation: independent native images", function(
 					end
 					for _, index in ipairs(expected.callback_positions) do helpers.assert_type(parent.menu[index].fn, "function") end
 					helpers.assert_nil(parent.menu[1].fn)
-					helpers.assert_nil(parent.menu[3].fn)
-					helpers.assert_eq(parent.menu[6].checked, true)
-					helpers.assert_eq(parent.menu[13].checked, false)
+					-- ai-generation-groups: the count, the words and the temperature, one
+					-- separator, then the context ending with its clearing.
+					helpers.assert_eq(parent.menu[10].title, "-")
+					helpers.assert_nil(parent.menu[10].fn)
+					helpers.assert_eq(parent.menu[13].checked, true)
+					helpers.assert_eq(parent.menu[9].checked, false)
 					helpers.assert_eq(f.calls.save, 0); helpers.assert_eq(f.calls.runtime, 0)
 					helpers.assert_eq(parent.menu[2].fn(), true)
 					helpers.assert_eq(f.state.llm_num_predictions, 1)
@@ -210,31 +219,25 @@ end)
 
 
 helpers.describe("Complete LLM outer boundary context", function()
-	helpers.it("joins the model and profile rows and keeps the after-profile boundary", function()
-		with_fixture({parent_only = true}, function(fixture)
-			local callbacks = fixture.top_level_callbacks()
-			local rows = callbacks.rebuild()
-			-- The model button: the backend's emoji, then the model (or none).
-			local emoji = require("ui.menu.menu_llm.backend_labels").emoji(fixture.state.llm_backend)
-			local model
-			for index, row in ipairs(rows) do
-				if type(row.title) == "string" and row.title:find(emoji .. " ", 1, true) then model = index end
-			end
-			helpers.assert_type(model, "number")
-			helpers.assert_true(rows[model + 1].title ~= "-", "no separator between the model and the profile rows")
-			helpers.assert_eq(rows[model + 2].title, "-", "the original after-profile boundary remains")
-			local renderer = package.loaded["infra.manifest_menu"]
-			local fragment = renderer.get_array("llm_after_profile_boundary")
-			local original = fragment[1]
-			local ok, err = xpcall(function()
-				fragment[1] = {type = "command", id = "unbound_actual_profile_boundary", i18n = "button.cancel"}
-				helpers.assert_nil(callbacks.rebuild(), "unbound complete-parent boundary refuses construction")
-			end, debug.traceback)
-			fragment[1] = original
-			if not ok then error(err, 0) end
-			helpers.assert_eq(callbacks.rebuild()[model + 2].title, "-", "exact original repairs the same whole context")
-		end)
-	end)
+	-- ai-test-prediction-row: model, profile and test are one block in every AI
+	-- state, closed by one declared separator; none lands next to another one.
+	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
+		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = "" }) do
+			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
+				with_fixture({parent_only = true}, function(fixture)
+					fixture.state.llm_enabled, fixture.state.llm_model = enabled, model
+					local i18n = require("infra.i18n")
+					local head = function(key) return (i18n.get(key):match("^[^%%{]*")) end
+					require("test.ai_menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
+						profile = head("menu.profiles.profile_label_prefix"),
+						test = head("menu.llm.test_prediction"),
+						trigger = head("menu.llm.trigger_menu_title"),
+						settings = i18n.section("menu.llm.header_settings"),
+					}, state .. "/" .. model_state)
+				end)
+			end)
+		end
+	end
 end)
 
 

@@ -58,7 +58,7 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"the relocated replacement control must have no second Layout owner")
 		local physical_picker = false
 		for title in pairs(seen) do
-			if title:sub(1, #"menu.layout.magic_key_source : ") == "menu.layout.magic_key_source : " then
+			if title:sub(1, #"menu.layout.magic_key_source: ") == "menu.layout.magic_key_source: " then
 				physical_picker = true
 			end
 		end

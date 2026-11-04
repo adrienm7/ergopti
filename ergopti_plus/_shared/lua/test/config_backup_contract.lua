@@ -246,6 +246,22 @@ function M.register(helpers, env)
 				"the replaced configuration is kept")
 		end)
 
+		helpers.it("refuses to report a substituted staging file as restored", function()
+			local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" } })
+			local record = assert(owner.create("pre_install", {}))
+			fs.files["/cfg/config.toml"] = "[changed]\n"
+			-- A same-user process swaps the stage between its check and the rename.
+			fs.io.replace = function(path)
+				fs.files[path] = "foreign bytes\n"
+				return true
+			end
+			local restored, reason, pre = owner.restore(record.id)
+			helpers.assert_eq(restored, false, "foreign bytes never read as a success")
+			helpers.assert_eq(reason, "write")
+			helpers.assert_eq(fs.files[pre.path .. "/config/config.toml"], "[changed]\n",
+				"the failure still names the backup of what was replaced")
+		end)
+
 		helpers.it("writes nothing back when a copy is missing", function()
 			local owner, fs = fixture()
 			local record = assert(owner.create("pre_install", {}))

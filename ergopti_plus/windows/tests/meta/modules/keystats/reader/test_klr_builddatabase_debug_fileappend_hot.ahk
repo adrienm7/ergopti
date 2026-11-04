@@ -36,10 +36,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_KLRDBG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KLRDBG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -52,7 +50,7 @@ _KLRDBG_ReadSource(RelPath) {
 ; ==================================================
 
 _KLRDBG_BuildHasNoRawFileAppend() {
-	Src := _KLRDBG_ReadSource("modules/keystats/keystats_reader.ahk")
+	Src := _KLRDBG_ReadSource("keystats_reader.ahk")
 	Seg := _DriverFuncBody("KLR_BuildDatabase")
 	Assert(Seg != "", "KLR_BuildDatabase(metrics_dir) declaration must exist in keystats_reader.ahk")
 	Assert(!InStr(Seg, "FileAppend"),
@@ -61,7 +59,7 @@ _KLRDBG_BuildHasNoRawFileAppend() {
 Test("keystats_reader: KLR_BuildDatabase has no ungated FileAppend (klr-builddatabase-debug-fileappend-hot)", _KLRDBG_BuildHasNoRawFileAppend)
 
 _KLRDBG_IncrementalHasNoRawFileAppend() {
-	Src := _KLRDBG_ReadSource("modules/keystats/keystats_reader.ahk")
+	Src := _KLRDBG_ReadSource("keystats_reader.ahk")
 	Seg := _DriverFuncBody("KLR_ApplyIncremental")
 	Assert(Seg != "", "KLR_ApplyIncremental(db, md, logPath) declaration must exist in keystats_reader.ahk")
 	Assert(!InStr(Seg, "FileAppend"),

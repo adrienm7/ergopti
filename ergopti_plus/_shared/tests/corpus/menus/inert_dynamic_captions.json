@@ -15,8 +15,8 @@
 	],
 	"value": "50% / $1 / %s",
 	"expected": {
-		"en": ["Backend: 50% / $1 / %s", "REQUIREMENTS (50% / $1 / %s)"],
-		"fr": ["Backend : 50% / $1 / %s", "CONFIGURATION REQUISE (50% / $1 / %s)"]
+		"en": ["Backend: 50% / $1 / %s", "Requirements (50% / $1 / %s)"],
+		"fr": ["Backend : 50% / $1 / %s", "Configuration requise (50% / $1 / %s)"]
 	},
 	"format_cases": [
 		{

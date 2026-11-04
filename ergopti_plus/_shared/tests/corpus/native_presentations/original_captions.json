@@ -344,7 +344,7 @@
 		"magic_key_source_notice": {
 			"kind": "notification",
 			"platform": "linux",
-			"source": "static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"source": "static/ergopti_plus/linux/ui/menu/builder.lua",
 			"title_key": "dialog.magic_key_source.title"
 		},
 		"profile_shortcut_dialog": {

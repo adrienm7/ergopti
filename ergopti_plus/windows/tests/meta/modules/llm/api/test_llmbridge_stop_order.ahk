@@ -20,10 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TLBSO_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TLBSO_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TLBSO_StripLineComments(Src) {
@@ -43,7 +41,7 @@ _TLBSO_StripLineComments(Src) {
 ; ====================================================================
 
 _TLBSO_StopBeforeDisable() {
-	Src := _TLBSO_StripLineComments(_TLBSO_ReadSource("modules/keymap/llm_bridge.ahk"))
+	Src := _TLBSO_StripLineComments(_TLBSO_ReadSource("llm_bridge.ahk"))
 	Assert(Src != "", "modules/keymap/llm_bridge.ahk must be readable")
 
 	Body := _DriverFuncBody("LLM_Bridge_Stop")

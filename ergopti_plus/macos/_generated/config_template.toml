@@ -442,7 +442,7 @@ agent_disabled_apps = []
 
 
 [llm.display]
-pred_indent = 0
+pred_indent = -3
 show_info_bar = true
 streaming = true
 streaming_multi = true
@@ -480,6 +480,7 @@ debounce_ms = 500
 min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
+while_hotstring_tooltip = "wait"
 secure_filter_enabled = true
 url_bar_filter_enabled = false
 
@@ -502,8 +503,8 @@ system_auth_filter_enabled = true
 encrypt = false
 disabled_apps = []
 wpm_widget_visible = false
-wpm_widget_colors = false
-wpm_widget_graph = false
+wpm_widget_colors = true
+wpm_widget_graph = true
 wpm_menubar_visible = false
 wpm_menubar_colors = true
 
@@ -619,8 +620,8 @@ swipe_2_right_down = "x1"
 swipe_2_right_up = "x1"
 swipe_3_left = "incremental"
 swipe_3_right = "incremental"
-swipe_3_up = "incremental"
-swipe_3_down = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
 swipe_3_left_down = "incremental"
 swipe_3_left_up = "incremental"
 swipe_3_right_down = "incremental"
@@ -709,10 +710,10 @@ menubar_icon = "v1"
 
 [tap_holds]
 enabled = false
+lone_modifier_tap_max_ms = 1000
 
 
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-ctrl_g = false
 cmd_star = false

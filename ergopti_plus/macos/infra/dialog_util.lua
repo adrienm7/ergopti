@@ -303,14 +303,88 @@ function M.choose_application(message, title)
 	return type(path) == "string" and path ~= "" and path or nil
 end
 
+--- The folder the file-or-folder chooser opens on: the user's home.
+local HOME_DIR = os.getenv("HOME") or "/"
+
+--- Builds the native file-or-folder panel of the open_path editor through the
+--- in-process AppleScript port: any file or folder may be chosen, and an alias
+--- resolves to the item it names.
+--- @param message string The panel's unchanged message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string script The escaped native panel source.
+function M.path_picker_script(message, title)
+	return text_utils.applescript_format([[
+use framework "AppKit"
+use scripting additions
+set panel to current application's NSOpenPanel's openPanel()
+panel's setTitle:"%s"
+panel's setMessage:"%s"
+panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:"%s")
+panel's setCanChooseFiles:true
+panel's setCanChooseDirectories:true
+panel's setAllowsMultipleSelection:false
+panel's setTreatsFilePackagesAsDirectories:false
+panel's setResolvesAliases:true
+set response to panel's runModal()
+if response is not (current application's NSModalResponseOK) then return missing value
+set chosenURLs to panel's |URLs|()
+if (chosenURLs's |count|()) is 0 then return missing value
+set chosenURL to chosenURLs's firstObject()
+return (chosenURL's |path|()) as text
+]], WindowTitles.compose(title), message, HOME_DIR)
+end
+
+--- Focus-aware file-or-folder chooser for the open_path editor. Modal, like
+--- choose_application, and opened from a menu, never from the keyboard tap.
+--- @param message string The panel's message.
+--- @param title string|nil The translated, brandless parameter title.
+--- @return string|nil path The chosen path, nil when cancelled.
+function M.choose_path(message, title)
+	focus_hammerspoon()
+	local ok, path = Logger.run_modal(hs.osascript.applescript, M.path_picker_script(message, title))
+	if ok ~= true then
+		error("dialog_util.choose_path: the native file-or-folder picker failed", 2)
+	end
+	return type(path) == "string" and path ~= "" and path or nil
+end
+
+-- hs.dialog.alert(x, y, callback, message, informativeText, buttonOne,
+-- buttonTwo, style): at most eight arguments, the optional ones strings.
+local ALERT_MAX_ARGS = 8
+
+--- Refuses a call that does not have hs.dialog.alert's shape, before anything
+--- is focused or shown. A caller once passed hs.alert.show's (message,
+--- duration): the native call raised deep inside and took its caller down.
+--- @param args table table.pack of the call's arguments.
+local function assert_alert_shape(args)
+	local x, y, callback, message = args[1], args[2], args[3], args[4]
+	if type(x) ~= "number" or type(y) ~= "number" or type(callback) ~= "function"
+		or type(message) ~= "string" then
+		error(string.format("dialog_util.alert(x, y, callback, message, ...) called with (%s, %s, %s, %s)",
+			type(x), type(y), type(callback), type(message)), 3)
+	end
+	if args.n > ALERT_MAX_ARGS then
+		error(string.format("dialog_util.alert takes at most %d arguments, got %d", ALERT_MAX_ARGS, args.n), 3)
+	end
+	for index = 5, args.n do
+		if args[index] ~= nil and type(args[index]) ~= "string" then
+			error(string.format("dialog_util.alert argument %d must be a string or nil, got %s",
+				index, type(args[index])), 3)
+		end
+	end
+end
+
 --- Focus-aware wrapper around hs.dialog.alert (the non-blocking variant).
 --- Focusing is still useful so the alert renders on top of the user's current
 --- app and its auto-dismiss / button-click behaviour is predictable.
+--- @param ... any hs.dialog.alert's arguments: x, y, callback, message,
+---        then the optional informativeText, buttonOne, buttonTwo and style.
 function M.alert(...)
+	local args = table.pack(...)
+	assert_alert_shape(args)
 	-- The only wrapper whose dialog does not park the runloop, so the only one
 	-- the deferred raise can reach in time to do what it is for.
 	local _, focus_timer = focus_hammerspoon(true)
-	local args = table.pack(...)
 	local callback = args[3]
 	local function retire_focus_timer()
 		local handle = focus_timer

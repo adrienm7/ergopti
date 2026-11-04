@@ -2,75 +2,98 @@
 	"en": {
 		"parent": "⚠ Debug",
 		"quit": "⏹ Quit",
+		"tests": "Tests",
 		"hs": [
 			"Console",
 			"-",
-			"Log level : ℹ️ INFO",
+			"— Diagnostics —",
+			"System diagnostics",
+			"Show a window for every error",
+			"Report a bug",
+			"Suggest a feature",
+			"-",
+			"— Logs —",
+			"Log level: ℹ️ INFO",
 			"Open logs folder",
 			"Open today's log file",
 			"Open today's errors file",
 			"-",
-			"System diagnostics",
-			"Show a window for every error",
-			"Test Karabiner lease",
-			"Test owned Karabiner runtime (dormant check)",
+			"Tests"
+		],
+		"hs_tests": [
 			"Test network (PAC, proxy, download)",
 			"Test the composed layout",
 			"Test key accounting (30 s)",
+			"Test Karabiner lease",
+			"Test owned Karabiner runtime (dormant check)",
 			"Test third-party tools (Shortcuts, Homebrew, timer)",
-			"Show what starts Ergopti at login",
-			"Report a bug",
-			"Suggest a feature"
+			"Show what starts Ergopti at login"
 		],
 		"linux": [
-			"Log level : ℹ️ INFO",
+			"— Diagnostics —",
+			"System diagnostics",
+			"Show a window for every error",
+			"Report a bug",
+			"Suggest a feature",
+			"-",
+			"— Logs —",
+			"Log level: ℹ️ INFO",
 			"Open logs folder",
 			"Open today's log file",
 			"Open today's errors file",
 			"-",
-			"System diagnostics",
-			"Show a window for every error",
-			"Test network (PAC, proxy, download)",
-			"Test the composed layout",
-			"Report a bug",
-			"Suggest a feature"
-		]
+			"Tests"
+		],
+		"linux_tests": ["Test network (PAC, proxy, download)", "Test the composed layout"]
 	},
 	"fr": {
 		"parent": "⚠ Débogage",
 		"quit": "⏹ Quitter",
+		"tests": "Tests",
 		"hs": [
 			"Console",
 			"-",
+			"— Diagnostic —",
+			"Diagnostic système",
+			"Afficher une fenêtre à chaque erreur",
+			"Signaler un bug",
+			"Proposer une fonctionnalité",
+			"-",
+			"— Logs —",
 			"Niveau de log : ℹ️ INFO",
 			"Ouvrir le dossier de logs",
 			"Ouvrir le fichier de log du jour",
 			"Ouvrir le fichier des erreurs du jour",
 			"-",
-			"Diagnostic système",
-			"Afficher une fenêtre à chaque erreur",
-			"Tester le bail Karabiner",
-			"Tester le runtime Karabiner propre (contrôle dormant)",
+			"Tests"
+		],
+		"hs_tests": [
 			"Tester le réseau (PAC, proxy, téléchargement)",
 			"Tester la disposition composée",
 			"Tester le comptage des touches (30 s)",
+			"Tester le bail Karabiner",
+			"Tester le runtime Karabiner propre (contrôle dormant)",
 			"Tester les outils tiers (Raccourcis, Homebrew, minuterie)",
-			"Afficher ce qui lance Ergopti à l’ouverture de session",
-			"Signaler un bug",
-			"Proposer une fonctionnalité"
+			"Afficher ce qui lance Ergopti à l’ouverture de session"
 		],
 		"linux": [
+			"— Diagnostic —",
+			"Diagnostic système",
+			"Afficher une fenêtre à chaque erreur",
+			"Signaler un bug",
+			"Proposer une fonctionnalité",
+			"-",
+			"— Logs —",
 			"Niveau de log : ℹ️ INFO",
 			"Ouvrir le dossier de logs",
 			"Ouvrir le fichier de log du jour",
 			"Ouvrir le fichier des erreurs du jour",
 			"-",
-			"Diagnostic système",
-			"Afficher une fenêtre à chaque erreur",
+			"Tests"
+		],
+		"linux_tests": [
 			"Tester le réseau (PAC, proxy, téléchargement)",
-			"Tester la disposition composée",
-			"Signaler un bug",
-			"Proposer une fonctionnalité"
+			"Tester la disposition composée"
 		]
 	}
 }

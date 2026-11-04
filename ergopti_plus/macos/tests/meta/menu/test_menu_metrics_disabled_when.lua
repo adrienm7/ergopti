@@ -18,10 +18,9 @@ local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 
 -- id -> canonical disabled_when key array (order matches the manifest).
+-- The two windows are `readable_when_off` instead: they read stored history only.
 local CANON = {
-	{ id = "show_typing",        keys = { MetricsState.ENABLED } },
-	{ id = "show_apps",          keys = { MetricsState.ENABLED } },
-	{ id = "wpm_menubar",        keys = { MetricsState.ENABLED } },
+	{ id = "wpm_menubar",       keys = { MetricsState.ENABLED } },
 	{ id = "menubar_colors",     keys = { MetricsState.ENABLED, "wpm_menubar_visible" } },
 	{ id = "wpm_widget",         keys = { MetricsState.ENABLED } },
 	{ id = "widget_colors",      keys = { MetricsState.ENABLED, "wpm_widget_visible" } },

@@ -38,6 +38,25 @@ end
 
 local valid_tag = HttpBridge.valid_ollama_tag
 
+-- An answer the registry itself gave: the route reached it.
+local REGISTRY_ANSWERS = { "file does not exist" }
+
+--- The failure the window shows. A pull the managed daemon fetched direct,
+--- because its PAC route was unusable, names both causes as macOS does.
+--- @param request table
+--- @return string message
+local function failure_message(request)
+	local remote = request.remote_error
+	local stage = require("modules.llm.ollama_install_state").direct_fallback(request.base_url)
+	if stage == nil or type(remote) ~= "string" then return translated("menu.llm.download_failed") end
+	for _, answer in ipairs(REGISTRY_ANSWERS) do
+		if remote:find(answer, 1, true) then return translated("menu.llm.download_failed") end
+	end
+	Logger.error(LOG, "The automatic network configuration was unusable (%s) and the direct connection failed: %s.",
+		stage, remote)
+	return translated("network.failure.pac_unreachable_direct_failed")
+end
+
 --- Tells the percentage observer a new whole percentage of one pull, or nil
 --- once the pull ended.
 --- @param request table
@@ -142,6 +161,17 @@ local function dispatch(request)
 	local attempt = _attempt_serial
 	request.attempt = attempt
 	_active, _retained = request, request
+	-- The daemon started without its proxy after a refused sign-in: it serves the
+	-- models on disk, and a pull is refused here with the relay's own message.
+	local InstallState = require("modules.llm.ollama_install_state")
+	local refusal_key = InstallState.pull_refusal_key(request.base_url)
+	if refusal_key then
+		Logger.error(LOG, "Ollama model pull refused: the proxy sign-in relay refused (%s).",
+			tostring(InstallState.relay_refusal(request.base_url)))
+		request.acquiring = false
+		finish(request, attempt, false, translated(refusal_key))
+		return false
+	end
 	local url = HttpBridge.ollama_endpoint(request.base_url, "pull")
 	local ok_body, body = pcall(Json.encode, { name = request.tag, stream = true })
 	if not url or not ok_body or type(body) ~= "string" then
@@ -170,7 +200,7 @@ local function dispatch(request)
 			local succeeded = type(result) == "table" and result.ok == true
 				and request.saw_success == true and request.remote_error == nil
 			finish(request, attempt, succeeded, succeeded and translated("download_window.done_success")
-				or translated("menu.llm.download_failed"),
+				or failure_message(request),
 				type(result) == "table" and result.ok ~= true and result.failure_receipt or nil)
 		end)
 	request.acquiring = false

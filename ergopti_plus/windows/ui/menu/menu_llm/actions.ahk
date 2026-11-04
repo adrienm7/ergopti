@@ -28,6 +28,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -134,11 +135,15 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 		LLM_Menu_ScheduleBackendLifecycle(ShowUi)
 		; A boot with the AI off left its hotkeys inactive until now.
 		LLM_Menu_ScheduleHotkeysAwaitingEnable()
+		; A boot with the AI off did not check the curl its requests need.
+		HTTP_ScheduleCurlCheck(true)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
+		LLM_Agent_OnAiSwitchedOff()
 	}
+	KeyboardShortcutsFollowAiSwitch()
 	; Runtime admission/retirement precedes a potentially slow or refused repaint.
 	LLM_Menu_RequestBuild("toggle_committed")
 	return true
@@ -218,7 +223,7 @@ _LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration, *) {
 LLM_Menu_OnInstantToggle(*) {
 	return LLM_Menu_CommitMutation("the instant-on-word-end setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate,
-			"instant_on_word_end"), _LLM_Menu_ApplyStandardCommitted)
+			ConfigLeaf.INSTANT_ON_WORD_END), _LLM_Menu_ApplyStandardCommitted)
 }
 
 /**
@@ -245,6 +250,25 @@ LLM_Menu_ToggleBool(key) {
 ; ==================================
 ; ==================================
 
+/**
+ * Stores what an automatic prediction does while a hotstring tooltip shows.
+ * @param {String} Value "wait" or "both" (the manifest's enum values).
+ * @returns {Boolean} True when the choice is durable and live; false when it
+ *     is already the current one or the transaction refused it.
+ */
+LLM_Menu_SetWhileHotstringTooltip(Value) {
+	if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP, Value, &Normalized)
+		throw ValueError("LLM_Menu_SetWhileHotstringTooltip: unknown value " . String(Value) . ".")
+	if (LLM_Menu_WhileHotstringTooltip() == Normalized)
+		return false
+	if LLM_Menu_CommitMutation("the AI prediction while a hotstring tooltip shows",
+			_LLM_Menu_SetCandidateWhileHotstringTooltip.Bind(Normalized),
+			_LLM_Menu_ApplyStandardCommitted) != true
+		return false
+	LoggerInfo("LLM", "AI prediction while a hotstring tooltip shows set to '{1}'.", Normalized)
+	return true
+}
+
 /** Changes one privacy leaf through the retained configuration lease owner. */
 LLM_Menu_SetPrivacy(Key, Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM privacy filter",
@@ -259,10 +283,10 @@ _LLM_Menu_PrivacyWrite(Expected, Key, Path, Updates, WriterFn := 0) {
 	if !Decision["admitted"]
 			|| !_LLM_Menu_EnableSourceMatches(Expected["source"], Current["source"])
 		return false
-	NativeKey := Key == "disable_url_bars" ? "url_bar_filter_enabled" : "secure_filter_enabled"
+	NativeKey := Key == "disable_url_bars" ? ConfigLeaf.URL_BAR_FILTER_ENABLED : ConfigLeaf.SECURE_FILTER_ENABLED
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.trigger" && Update.Key == NativeKey
+		if Update.Section == ConfigKey.LLM_TRIGGER && Update.Key == NativeKey
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -469,9 +493,9 @@ _LLM_Menu_SetProfileCandidate(Candidate, Id) {
 	; for the current model is still computed live by the auto-detect
 	; helper, so flipping the toggle back on later re-applies it.
 	recommended := LLM_RecommendProfileForModel(Candidate["model"])
-	if (Candidate["auto_profile_for_model"] and recommended != ""
+	if (Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] and recommended != ""
 			and Id != recommended) {
-		Candidate["auto_profile_for_model"] := false
+		Candidate[ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := false
 	}
 	Candidate["profile_id"] := Id
 	return true
@@ -486,7 +510,7 @@ LLM_Menu_SetN(n) {
 /** Publishes one Info Bar value through the existing leased transaction. */
 LLM_Menu_SetInfoBar(Value, Expected) {
 	return LLM_Menu_CommitMutation("the LLM Info Bar setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "show_info_bar", Value),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.SHOW_INFO_BAR, Value),
 		_LLM_Menu_ApplyStandardCommitted, _LLM_Menu_InfoBarWrite.Bind(Expected))
 }
 
@@ -498,7 +522,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "show_info_bar"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.SHOW_INFO_BAR
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -516,7 +540,7 @@ _LLM_Menu_InfoBarWrite(Expected, Path, Updates, WriterFn := 0) {
 LLM_Menu_SetIndent(lvl, Expected := 0) {
 	Writer := Expected is Map ? _LLM_Menu_IndentWrite.Bind(Expected) : 0
 	return LLM_Menu_CommitMutation("the LLM indentation setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "pred_indent", lvl),
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, ConfigLeaf.PRED_INDENT, lvl),
 		_LLM_Menu_ApplyStandardCommitted, Writer)
 }
 
@@ -528,7 +552,7 @@ _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	Owned := []
 	for Update in Updates {
-		if Update.Section == "llm.display" && Update.Key == "pred_indent"
+		if Update.Section == ConfigKey.LLM_DISPLAY && Update.Key == ConfigLeaf.PRED_INDENT
 			Owned.Push(Update)
 	}
 	if Owned.Length != 1
@@ -562,7 +586,7 @@ LLM_Menu_OpenAppPicker() {
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
-		"initial",  _LLM_Menu["disabled_apps"],
+		"initial",  _LLM_Menu[ConfigLeaf.DISABLED_APPS],
 		"on_save",  LLM_Menu_OnAppPickerSave
 	))
 }

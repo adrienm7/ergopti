@@ -2,6 +2,7 @@
 ; Pure validators for option values crossing config, menu, and engine boundaries.
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 ; Generous but finite admission budgets. These protect boot/config inputs from
 ; turning canonical signature construction into an unbounded per-request walk.
@@ -36,10 +37,13 @@ global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
 global LLM_PROFILE_LIVE_TRANSLATIONS := ["translate_en", "translate_ja"]
 ; The AI agent's settings (llm.agent_* of the features manifest): the AI menu's
 ; state carries and persists them like its own options.
-global LLM_AGENT_SETTING_KEYS := ["agent_system1", "agent_system2", "agent_mode", "agent_disabled_apps"]
+global LLM_AGENT_SETTING_KEYS := [ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE, ConfigLeaf.AGENT_DISABLED_APPS]
 ; The agent's modes, in menu order: every agent action refuses, the actions
 ; only, the actions and the detection while typing.
 global LLM_AGENT_MODES := ["off", "action", "auto"]
+; The llm.trigger.while_hotstring_tooltip value that shows the hotstring rows
+; and the prediction together; the manifest owns the full value list.
+global LLM_HOTSTRING_TOOLTIP_SHOW_BOTH := "both"
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
 	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS
@@ -263,6 +267,19 @@ LLM_Option_NormalizeApiEntries(Value) {
 	return Out
 }
 
+/**
+ * The key an application is stored and looked up under, the twin of
+ * _shared/lua/llm/app_identity.lua `normalize`.
+ * @param {Any} App The identifier a driver reports, or a user typed.
+ * @returns {String} Lower-cased, trimmed, without ".exe"; "" when unusable.
+ */
+LLM_AppIdentity_Normalize(App) {
+	if !(App is String)
+		return ""
+	Key := RegExReplace(StrLower(Trim(App, " `t`r`n")), "\.exe$", "")
+	return (Key == "" || StrLen(Key) > 256 || RegExMatch(Key, "[\x00-\x1F\x7F]")) ? "" : Key
+}
+
 /** Returns a detached app -> profile-id map or false for any invalid pair. */
 LLM_Option_NormalizeAppProfileOverrides(Value) {
 	global LLM_OPTION_MAX_COLLECTION_ITEMS
@@ -286,7 +303,21 @@ LLM_Option_NormalizeAppProfileOverrides(Value) {
 global LLM_OLLAMA_PORT_MIN := 1024
 global LLM_OLLAMA_PORT_MAX := 65535
 
-/** Normalizes the one Ollama port domain shared by menu, engine and client. */
+/**
+ * Tells whether a port is the stock one (llm_ollama_port) a user's own Ollama keeps.
+ * False while the shared defaults are not loaded, since they name that port.
+ */
+LLM_Option_IsStockOllamaPort(Value) {
+	global LLM_Defaults
+	return IsSet(LLM_Defaults) && LLM_Defaults is Map && LLM_Defaults.Has("llm_ollama_port")
+		&& Value == LLM_Defaults["llm_ollama_port"]
+}
+
+/**
+ * Normalizes the one Ollama port domain shared by menu, engine and client. The
+ * stock port (llm_ollama_port) is refused: a user's own Ollama keeps it, and
+ * Ergopti's daemon must never meet that Ollama.
+ */
 LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
 	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX
 	Normalized := false
@@ -296,6 +327,8 @@ LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
 	catch
 		return false
 	if Candidate < LLM_OLLAMA_PORT_MIN || Candidate > LLM_OLLAMA_PORT_MAX
+		return false
+	if LLM_Option_IsStockOllamaPort(Candidate)
 		return false
 	Normalized := Candidate
 	return true
@@ -339,25 +372,26 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
 		"backend", true, "api_entry_id", true,
-		"agent_system1", true, "agent_system2", true)
+		ConfigLeaf.AGENT_SYSTEM1, true, ConfigLeaf.AGENT_SYSTEM2, true)
 	; These are semantic consumer bounds, not merely storage types. Keep every
 	; public integer in this one table so boot restore, menu persistence, runtime
 	; publication and interactive setters cannot disagree. max_words=0 is the
 	; documented unlimited sentinel; the finite ceiling bounds token arithmetic.
 	static IntegerRanges := Map(
 		"n_predictions", [1, 10],
-		"min_words", [1, 20],
-		"max_words", [0, 10000],
-		"debounce_ms", [50, 10000],
+		ConfigLeaf.MIN_WORDS, [1, 20],
+		ConfigLeaf.MAX_WORDS, [0, 10000],
+		ConfigLeaf.DEBOUNCE_MS, [50, 10000],
+		ConfigLeaf.MIN_REQUEST_INTERVAL_MS, [0, 10000],
 		"ctx_chars", [50, 10000])
 	static BooleanKeys := Map(
-		"enabled", true, "auto_profile_for_model", true,
-		"instant_on_word_end", true, "after_hotstring", true,
-		"reset_on_nav", true, "disable_url_bars", true,
-		"disable_password_fields", true, "show_info_bar", true,
+		"enabled", true, ConfigLeaf.AUTO_PROFILE_FOR_MODEL, true,
+		ConfigLeaf.INSTANT_ON_WORD_END, true, ConfigLeaf.AFTER_HOTSTRING, true,
+		ConfigLeaf.RESET_ON_NAV, true, "disable_url_bars", true,
+		"disable_password_fields", true, ConfigLeaf.SHOW_INFO_BAR, true,
 		"streaming", true, "show_all_at_once", true,
-		"auto_raise_temp", true, "onboarding_seen", true,
-		"inline_autotype", true)
+		ConfigLeaf.AUTO_RAISE_TEMP, true, ConfigLeaf.ONBOARDING_SEEN, true,
+		ConfigLeaf.INLINE_AUTOTYPE, true)
 	Normalized := false
 	if StringKeys.Has(Key) {
 		AggregateChars := 0
@@ -368,16 +402,16 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	}
 	if (Key == "temperature")
 		return LLM_Option_TryNormalizeTemperature(Value, &Normalized)
-	if (Key == "nav_modifiers" || Key == "val_modifiers") {
+	if (Key == ConfigLeaf.NAV_MODIFIERS || Key == ConfigLeaf.VAL_MODIFIERS) {
 		Normalized := LLM_Option_NormalizeModifierString(Value)
 		return Normalized is String
 	}
 	if (Key == "ollama_port")
 		return LLM_Option_TryNormalizeOllamaPort(Value, &Normalized)
-	if (Key == "pred_indent") {
+	if (Key == ConfigLeaf.PRED_INDENT) {
 		if !(Value is Integer) && !(Value is Float)
 			return false
-		for Accepted in LLM_DisplayIndentValues(ManifestFindEntryByPath("llm.display.pred_indent")) {
+		for Accepted in LLM_DisplayIndentValues(ManifestFindEntryByPath(ConfigKey.LLM_DISPLAY_PRED_INDENT)) {
 			if Value == Accepted {
 				Normalized := Accepted
 				return true
@@ -393,6 +427,11 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 			return false
 		if (Candidate != Value)
 			return false
+		; The stored "never" of the debounce: the one value outside its range.
+		if (Key == ConfigLeaf.DEBOUNCE_MS && Candidate == LLM_REQUEST_PLAN_NEVER_MS) {
+			Normalized := Candidate
+			return true
+		}
 		Range := IntegerRanges[Key]
 		if (Candidate < Range[1] || Candidate > Range[2])
 			return false
@@ -405,11 +444,11 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := Value == 1
 		return true
 	}
-	if (Key == "disabled_apps" || Key == "agent_disabled_apps") {
+	if (Key == ConfigLeaf.DISABLED_APPS || Key == ConfigLeaf.AGENT_DISABLED_APPS) {
 		Normalized := LLM_Option_NormalizeStringArray(Value, true)
 		return Normalized is Array
 	}
-	if (Key == "agent_mode") {
+	if (Key == ConfigLeaf.AGENT_MODE) {
 		for Mode in LLM_AGENT_MODES {
 			if (Value is String) && Value == Mode {
 				Normalized := Value
@@ -418,7 +457,20 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		}
 		return false
 	}
-	if (Key == "user_profiles") {
+	; The features manifest owns the accepted values of this enum.
+	if (Key == ConfigLeaf.WHILE_HOTSTRING_TOOLTIP) {
+		Entry := ManifestFindEntryByPath(ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+		if !(Entry is Map) || !Entry.Has("enum_values")
+			return false
+		for Mode in Entry["enum_values"] {
+			if (Value is String) && Value == Mode {
+				Normalized := Value
+				return true
+			}
+		}
+		return false
+	}
+	if (Key == ConfigLeaf.USER_PROFILES) {
 		Normalized := LLM_Option_NormalizeUserProfiles(Value)
 		return Normalized is Array
 	}
@@ -426,7 +478,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := LLM_Option_NormalizeApiEntries(Value)
 		return Normalized is Array
 	}
-	if (Key == "app_profile_overrides") {
+	if (Key == ConfigLeaf.APP_PROFILE_OVERRIDES) {
 		Normalized := LLM_Option_NormalizeAppProfileOverrides(Value)
 		return Normalized is Map
 	}
@@ -439,7 +491,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
  * timer; reject any value outside the same public option boundary first.
  */
 LLM_Option_DebounceTimerPeriod(Value) {
-	if !LLM_Option_TryNormalize("debounce_ms", Value, &Normalized)
+	if !LLM_Option_TryNormalize(ConfigLeaf.DEBOUNCE_MS, Value, &Normalized) || Normalized < 0
 		throw ValueError("Invalid LLM debounce delay.")
 	return -Normalized
 }

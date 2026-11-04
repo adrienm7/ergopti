@@ -72,6 +72,20 @@ WebView_ClearDocumentCache(WebView) {
 	LoggerDone("WebView", "Retained browser document cache invalidated.")
 }
 
+/**
+ * Resizes a controller's host control to its window's client area, then fills it.
+ *
+ * Controller.Fill() only copies the client rect of the controller's parent
+ * window. Hosts parent the controller to a placeholder Text control created at
+ * the default size, which no layout ever grows, so filling it alone kept the
+ * page at its opening size however far the window was widened.
+ * @param Controller {WebView2.Controller} The controller to fit.
+ */
+WebView_FitToWindow(Controller) {
+	WMFitChildToParentClient(Controller.ParentWindow)
+	Controller.Fill()
+}
+
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
 ; exactly one and it is reused forever), so it is leak-free by construction.
@@ -187,15 +201,60 @@ WebView_AvailRamMb() {
 	return NumGet(MemStatus, 16, "UInt64") / 1048576   ; ullAvailPhys
 }
 
-; True when free RAM is too low to comfortably boot Chromium, so a WebView window
-; should use its native fallback. An unknown reading never gates (returns false),
-; leaving the WebView path to be attempted as before.
-WebView_ShouldUseNativeFallback(AvailRamFn := 0) {
+; The oldest Evergreen runtime the pages run on: the first with
+; SetVirtualHostNameToFolderMapping (ICoreWebView2_3), which every page needs.
+global WEBVIEW_MIN_RUNTIME_VERSION := "87.0.664.8"
+; The runtime's EdgeUpdate client, where Microsoft documents its version.
+global WEBVIEW_RUNTIME_CLIENT := "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+global _WebView_RuntimeRefusalShown := false
+
+; The installed Evergreen runtime's version, per machine then per user.
+; @returns {String} "" when none is installed.
+WebView_RuntimeVersion() {
+	global WEBVIEW_RUNTIME_CLIENT
+	for Root in ["HKLM\SOFTWARE\WOW6432Node\", "HKLM\SOFTWARE\", "HKCU\Software\"] {
+		Version := RegRead(Root . WEBVIEW_RUNTIME_CLIENT, "pv", "")
+		if (Version != "" && Version != "0.0.0.0")
+			return Version
+	}
+	return ""
+}
+
+; Refuses a runtime below the minimum, saying so once per run: the pages would
+; break on a missing interface. No runtime at all is not a refusal: creating the
+; web view fails as before and each window falls back on its own.
+; @param VersionFn {Func} Test seam, WebView_RuntimeVersion by default.
+; @param NoticeFn {Func} Test seam taking the text, a tooltip by default.
+; @returns {Boolean} True when the runtime is too old.
+WebView_RuntimeIsRefused(VersionFn := 0, NoticeFn := 0) {
+	global WEBVIEW_MIN_RUNTIME_VERSION, _WebView_RuntimeRefusalShown
+	Version := HasMethod(VersionFn, "Call") ? VersionFn.Call() : WebView_RuntimeVersion()
+	if (Version == "" || VerCompare(Version, WEBVIEW_MIN_RUNTIME_VERSION) >= 0)
+		return false
+	if !_WebView_RuntimeRefusalShown {
+		_WebView_RuntimeRefusalShown := true
+		LoggerError("WebView", "The WebView2 Runtime {1} is below the minimum {2}: native windows only.",
+			Version, WEBVIEW_MIN_RUNTIME_VERSION)
+		Text := StrReplace(StrReplace(t("webview.runtime_too_old"), "{1}", WEBVIEW_MIN_RUNTIME_VERSION), "{2}", Version)
+		if HasMethod(NoticeFn, "Call")
+			NoticeFn.Call(Text)
+		else
+			TooltipShow({ Text: Text, DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
+	}
+	return true
+}
+
+; True when a WebView window should use its native fallback: the runtime is too
+; old, or free RAM is too low to comfortably boot Chromium. An unknown reading
+; never gates (returns false), leaving the WebView path to be attempted as before.
+WebView_ShouldUseNativeFallback(AvailRamFn := 0, RefusedFn := 0) {
 	global WEBVIEW_MIN_AVAIL_RAM_MB, _WebView_SharedEnv
 	; A warm environment already owns the browser process; this open needs only
 	; a controller, so the cold-start RAM heuristic must not suppress it.
 	if _WebView_SharedEnv
 		return false
+	if (HasMethod(RefusedFn, "Call") ? RefusedFn.Call() : WebView_RuntimeIsRefused())
+		return true
 	Avail := HasMethod(AvailRamFn, "Call") ? AvailRamFn.Call() : WebView_AvailRamMb()
 	if Avail < 0
 		return false
@@ -557,7 +616,7 @@ class WebViewHost {
 				; and the teardown below silently called SetTimer("", 0) inside a bare
 				; try. SetTimer keys on the callback object, so that is what to hold.
 				this.SafetyTimer := this._SafetyFlush.Bind(this)
-				SetTimer(this.SafetyTimer, -2500)
+				SetTimer(this.SafetyTimer, -TimingsGet("ui", "webview_host_safety_flush_ms"))
 
 				try LoggerSuccess("WebViewHost", "{1} shown via WebView2.", this.AppId)
 				return true
@@ -734,7 +793,7 @@ class WebViewHost {
 				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
-						try this.Controller.Fill()
+						try WebView_FitToWindow(this.Controller)
 		}
 
 		_OnClose(*) {

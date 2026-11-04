@@ -229,19 +229,20 @@ _SBE_ActionLayerUsesAtomicSender() {
 		"ActionLayer must not restore the former raw declaration/send pair")
 }
 
-; The two Win-shortcut siblings named in the same finding. They reach the caret
+; The two caret-moving actions named in the same finding. They reach the caret
 ; through SendFinalResult rather than ActionLayer, so the ActionLayer wiring
-; above does not cover them.
+; above does not cover them: their invisible Home and End must reach the buffers.
 _SBE_WinCaretShortcutsUseAtomicSender() {
-	for FuncName in ["SelectLine", "SurroundLineWithParentheses"] {
-		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . "() must exist in the driver source")
-		Assert(InStr(Body, "{Home}") > 0,
-			FuncName . " must still be the caret-moving shortcut this guard was written for")
-		Assert(RegExMatch(Body, "SendFinalResult\([^\r\n]+,\s*false,\s*true\)") > 0,
-			FuncName . " must request SendFinalResult's atomic buffer-effect transaction for its invisible Home/End payload")
-		Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0,
-			FuncName . " must not restore a separate declaration which can become interruptible before SendFinalResult")
+	global GESTURE_CARET_MOVING_EMITS
+	Body := _DriverFuncBody("_GestureMakeSeqEmitter")
+	Assert(RegExMatch(Body, "SendFinalResult\(Seq,\s*false,\s*true\)") > 0,
+		"a caret-moving action must request SendFinalResult's atomic buffer-effect transaction")
+	Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0,
+		"it must not restore a separate declaration which can become interruptible before SendFinalResult")
+	Emits := GestureEmitActionsData()
+	for ActionId in ["select_line", "surround_parens"] {
+		Assert(GESTURE_CARET_MOVING_EMITS.Has(ActionId), ActionId . " is declared caret-moving")
+		Assert(InStr(Emits[ActionId].Seq, "{Home}") > 0, ActionId . " is the caret-moving action this guard was written for")
 	}
 }
 

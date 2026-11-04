@@ -72,7 +72,7 @@ local function with_action(route, mode, action, body)
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function() return true end, quote = quote,
 				exec_checked = function(command)
-					if command:find("zenity", 1, true) then return true, "" end
+					if command:find("dialog_host.lua", 1, true) then return true, "" end
 					world.reads = world.reads + 1; return true, clipboard
 				end,
 				with_exact_stdin = function(command, text) pending = text; return command end,

@@ -584,7 +584,8 @@ _CurlCaptureProductionJoinControls() {
 	AssertContains(Start, "_Updater_BindCurlCaptureTransport(Transport, Capture)")
 	AssertContains(Start, "Staged := _Updater_AcquireStagingArtifacts(StagingEpoch)")
 	AssertContains(Start, "_Updater_BindStagedArtifactTransport(Transport, Staged)")
-	AssertTrue(InStr(Start, "_Updater_AcquireStagingArtifacts(StagingEpoch)") < InStr(Start, "ShellRunner_SpawnTreeOwned("),
+	AssertTrue(InStr(Start, "ProxyOverride_SpawnWorker(") > 0
+		&& InStr(Start, "_Updater_AcquireStagingArtifacts(StagingEpoch)") < InStr(Start, "ProxyOverride_SpawnWorker("),
 		"exclusive staged custody exists before any child process")
 	AssertContains(Start, "Capture.Attach(Worker)")
 	AssertTrue(InStr(Start, "Capture.Attach(Worker)") < InStr(Start, "Worker.start()"),

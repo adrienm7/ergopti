@@ -26,7 +26,7 @@ _MKS_RowsCase() {
 		Rows := MagicKeySourceMenuRows()
 		AssertEqual(1, Rows.Length, "one row names the key in effect")
 		Label := Rows[1]["label"]
-		AssertEqual(1, InStr(Label, t("menu.layout.magic_key_source") . " : "))
+		AssertEqual(1, InStr(Label, LabelValue(t("menu.layout.magic_key_source"), "")))
 		Assert(InStr(Label, "(KeyJ)") > 0 || SubStr(Label, -4) == "KeyJ", "the row names the chosen key")
 		Items := Rows[1]["items"]
 		AssertEqual(t("menu.layout.magic_key_source.capture"), Items[1]["label"])
@@ -48,7 +48,7 @@ _MKS_RowsCase() {
 		ScriptInformation["MagicKeySource"] := "auto"
 		Rows := MagicKeySourceMenuRows()
 		AssertTrue(Rows[1]["items"][3]["checked"], "the automatic key is ticked when nothing is chosen")
-		AssertEqual(t("menu.layout.magic_key_source") . " : " . t("menu.layout.magic_key_source.auto"),
+		AssertEqual(LabelValue(t("menu.layout.magic_key_source"), t("menu.layout.magic_key_source.auto")),
 			Rows[1]["label"])
 	} finally {
 		ScriptInformation["MagicKeySource"] := Saved

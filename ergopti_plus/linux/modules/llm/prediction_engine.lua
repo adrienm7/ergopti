@@ -509,6 +509,29 @@ function _debounce.input(event)
 	return _debounce.plan:on_input(event)
 end
 
+--- Whether suggestions are drawn together with the hotstring rows: the
+--- llm.trigger.while_hotstring_tooltip value "both" (the manifest owns the list).
+--- @return boolean
+function M.shows_with_hotstring_rows()
+	return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP) == "both"
+end
+
+--- Whether an automatic or live suggestion must leave the window to the
+--- hotstring preview shown now. Covering it would hide a hotstring that can
+--- still expand, so every such request waits unless the user chose to see
+--- both; a live one always waits, its tooltip following every keystroke.
+--- @param live boolean
+--- @return boolean
+function _debounce.preview_holds(live)
+	-- Injected by init(): whether a hotstring preview that can still expand holds
+	-- the shared tooltip window (ui/tooltip/preview.lua is_showing).
+	local provider = _debounce.preview_showing
+	if type(provider) ~= "function" then return false end
+	local ok, showing = pcall(provider)
+	if not ok or showing ~= true then return false end
+	return live == true or not M.shows_with_hotstring_rows()
+end
+
 local function schedule(context, output_context, event, live)
 	if type(context) ~= "string" or context == "" then return false end
 	local decisions = _debounce.input(event)
@@ -534,6 +557,12 @@ local function schedule(context, output_context, event, live)
 		-- A timer a newer keystroke or a cancel already superseded sends nothing.
 		if _debounce.plan:on_timer(arm.token)[1].action ~= "fire" then return end
 		_pending_trigger = nil
+		-- A preview drawn since the timer was armed keeps the window; its
+		-- expiry asks again (on_hotstring_expired).
+		if (captured.automatic or live) and _debounce.preview_holds(live) then
+			Logger.debug(LOG, "%s prediction deferred: a hotstring tooltip is shown.", live and "Live" or "Automatic")
+			return
+		end
 		if not live then
 			M.predict(context, captured)
 			return
@@ -606,6 +635,8 @@ function M.init(opts)
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
 	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
+	_debounce.preview_showing = type(options.hotstring_preview_showing) == "function"
+		and options.hotstring_preview_showing or nil
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_cancel_selection = type(options.cancel_selection) == "function" and options.cancel_selection or nil
@@ -650,7 +681,7 @@ function M.init(opts)
 
 	local profiles = get_profiles()
 	if profiles then
-		if profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT, on_models_changed = on_models_changed }) == false then return false end
+		if profiles.init({ port = HttpBridge.OLLAMA_OWNED_PORT, on_models_changed = on_models_changed }) == false then return false end
 		Collision.inventory.profiles, Collision.inventory.cancel, Collision.inventory.pending =
 			profiles, profiles.cancel_model_inventory, profiles.model_inventory_pending
 		if _runtime_closed or _scope_owner then return false end
@@ -701,9 +732,11 @@ function M.on_char(ch, buffer, output_context)
 	end
 	-- While a hotstring preview is on screen, the AI tooltip waits for it to go:
 	-- always in live mode, whose tooltip would otherwise cover it at every
-	-- keystroke; with the "after a hotstring" setting otherwise.
+	-- keystroke; unless the suggestions are shown together with it otherwise
+	-- (llm.trigger.while_hotstring_tooltip). The preview's expiry asks again
+	-- when llm.trigger.after_hotstring is on.
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
-		and (_live or TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) == true) then return end
+		and (_live or not M.shows_with_hotstring_rows()) then return end
 	if _live then
 		-- The live prompt, count and debounce replace the menu's; a new keystroke
 		-- has already withdrawn the request in flight above.
@@ -726,6 +759,8 @@ function M.on_hotstring_expired(context, output_context)
 	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
 	if not _live and TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
+	-- Shown together, the keystroke's own request already ran beside the preview.
+	if not _live and M.shows_with_hotstring_rows() then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _live then return schedule(context, output_context, { cause = "expiry" }, true) end
 	return schedule(context, output_context, { cause = "expiry" })
@@ -916,6 +951,13 @@ function M.predict(context, output_context, override)
 		for index, candidate in ipairs(candidates) do visible[index] = candidate end
 		if partial then append_unique(visible, partial, 0) end
 		meta.loading = _predicting
+		-- A preview shown meanwhile keeps the window: nothing is offered, and its
+		-- expiry asks again.
+		local ctx = _suggestion_context
+		if type(ctx) == "table" and (ctx.automatic or ctx.live) and _debounce.preview_holds(ctx.live) then
+			Logger.debug(LOG, "Prediction not shown: a hotstring tooltip is shown.")
+			return
+		end
 		if #visible > 0 or meta.loading then show_candidates(visible, meta) end
 	end
 
@@ -1860,6 +1902,7 @@ local function finish_capture(flow, spec, outcome)
 		image = Base64.encode(image),
 		mime = config.image_mime,
 		max_tokens = config.read_max_tokens,
+		think = spec.target.format == "ollama" and require("modules.llm.api_remote").ollama_think(spec.model),
 	})
 	flow.reading = true
 	-- The tooltip says something is coming: reading a screen takes seconds.
@@ -1911,46 +1954,83 @@ function M.read_screen(action, value)
 		show_notice(VISION_NO_MODEL_KEY, "no_model")
 		return false
 	end
-	local target, target_err = VisionRequest.resolve_target(parsed.backend, model)
-	if not target then
-		Logger.warn(LOG, "Screen reading refused: %s.", tostring(target_err))
-		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
-		return false
-	end
 	if not _capture_screen then
 		Logger.error(LOG, "Screen reading refused: no capture surface was injected.")
 		return false
 	end
+	--- Starts the capture once the target is resolved.
+	--- @param target table|nil VisionRequest.resolve_target() output.
+	--- @param target_err string|nil Why there is no target.
+	--- @param flow table|nil The flow that waited for the target; nil when resolved at once.
+	--- @return boolean started
+	local function begin_screen_read(target, target_err, flow)
+		if not target then
+			if flow and _vision_flow == flow then _vision_flow = nil end
+			Logger.warn(LOG, "Screen reading refused: %s.", tostring(target_err))
+			show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+			return false
+		end
+		if not flow then
+			M.drop_vision("superseded")
+			_debounce.cancel()
+			if _predicting or #_suggestions > 0 then M.dismiss() end
+			flow = { generation = _vision_generation }
+			_vision_flow = flow
+		end
+		flow.waiting = nil
+		local spec = {
+			action = action,
+			label = i18n.get("sg_actions." .. action),
+			backend = parsed.backend,
+			model = model,
+			target = target,
+			config = config,
+			answers = config[screen_action.answers],
+		}
+		Logger.info(LOG, "Screen reading requested (action=%s, mode=%s, backend=%s, model=%s).",
+			action, mode, parsed.backend, model)
+		local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
+			-- A capture that finished before the handle came back is taken up below.
+			if not flow.capture then flow.early = outcome; return end
+			finish_capture(flow, spec, outcome)
+		end)
+		if not started or type(handle) ~= "table" then
+			if _vision_flow == flow then _vision_flow = nil end
+			Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
+			show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
+			return false
+		end
+		flow.capture = handle
+		if flow.early then finish_capture(flow, spec, flow.early) end
+		return true
+	end
+
+	-- A provider exchanging its key (watsonx, Vertex AI) has no endpoint until
+	-- its access token arrives: the request waits for it through the access
+	-- lease, and the capture starts once the address is known, so nothing is
+	-- captured for a request that is then refused
+	local settled_now, accepted = false, false
+	local waiting = nil
+	VisionRequest.prepare_target(parsed.backend, model, function(target, target_err)
+		if waiting == nil then
+			settled_now = true
+			accepted = begin_screen_read(target, target_err, nil)
+			return
+		end
+		if _runtime_closed or _scope_owner or not vision_current(waiting) then
+			if _vision_flow == waiting then _vision_flow = nil end
+			Logger.info(LOG, "Screen reading's access token arrived after the action was dropped.")
+			return
+		end
+		begin_screen_read(target, target_err, waiting)
+	end)
+	if settled_now then return accepted end
 	M.drop_vision("superseded")
 	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-
-	local spec = {
-		action = action,
-		label = i18n.get("sg_actions." .. action),
-		backend = parsed.backend,
-		model = model,
-		target = target,
-		config = config,
-		answers = config[screen_action.answers],
-	}
-	local flow = { generation = _vision_generation }
-	_vision_flow = flow
-	Logger.info(LOG, "Screen reading requested (action=%s, mode=%s, backend=%s, model=%s).",
-		action, mode, parsed.backend, model)
-	local started, handle, capture_err = pcall(_capture_screen, mode, config.max_image_edge, function(outcome)
-		-- A capture that finished before the handle came back is taken up below.
-		if not flow.capture then flow.early = outcome; return end
-		finish_capture(flow, spec, outcome)
-	end)
-	if not started or type(handle) ~= "table" then
-		if _vision_flow == flow then _vision_flow = nil end
-		Logger.error(LOG, "Screen capture could not start: %s", tostring(started and capture_err or handle))
-		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
-		return false
-	end
-	flow.capture = handle
-	if flow.early then finish_capture(flow, spec, flow.early) end
+	waiting = { generation = _vision_generation, waiting = true }
+	_vision_flow = waiting
+	Logger.info(LOG, "Screen reading waits for the access token of '%s'.", parsed.backend)
 	return true
 end
 
@@ -2110,6 +2190,74 @@ function M.translate_selection(value)
 	end
 	local accepted = _read_selection(focus, authorized, function(...) completed = captured(...) end)
 	return accepted == true and completed ~= false
+end
+
+--- Sends the test sample straight to the active backend, with the active prompt
+--- and the test's own high temperature: the same sample at the low generation
+--- temperature repeats one answer, which proves nothing. Nothing here reads a
+--- cache. A candidate offer would be a text the user could accept into the focused
+--- document, so none is opened and no engine state changes.
+--- @param sample string
+--- @param on_text function Receives the answer.
+--- @param on_fail function Receives the failure.
+function M._send_test_prediction(sample, on_text, on_fail)
+	local backend, target, model, runtime_response = M.resolve_backend()
+	if not backend then error("the backend is not ready", 0) end
+	local profile = ProfileSettings.resolve(model)
+	if not profile then error("the prediction profile catalogue is unavailable", 0) end
+	local params = PromptBuilder.build_params(sample, {
+		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
+		min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
+		num_predictions = 1,
+		temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE,
+		auto_raise_temp = false,
+		language = prompt_language(),
+		context_window_chars = max_context_chars(),
+	})
+	local system_prompt = resolve_system_prompt(profile, params, 1)
+	if type(system_prompt) ~= "string" then error("the active prompt has no usable system prompt", 0) end
+	local request = offer_request_opts(params.max_tokens, nil, runtime_response)
+	request.temperature = HttpBridge.TEST_PREDICTION_TEMPERATURE
+	backend.chat(target, model, PromptBuilder.build_messages(system_prompt, params.context, params.context_tail),
+		request, nil,
+		function(full_text, err)
+			if err then return on_fail(err) end
+			on_text(Parser.strip_thinking(full_text or ""))
+		end)
+end
+
+--- The AI menu's « Test a prediction »: one prediction on a sample context, showing
+--- the answer or why it could not run (llm/test_prediction.lua).
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	-- A field, not a local: this chunk is at Lua's limit of 200 locals.
+	if not M._test_prediction then
+		M._test_prediction = require("llm.test_prediction").new({
+			text = function(key) return i18n.get(key) end,
+			refusal = function()
+				-- A sample is sent, so an empty typing buffer refuses nothing.
+				local reason = manual_refusal()
+				if reason == "empty_context" then reason = nil end
+				if not reason and not M.resolve_backend() then reason = "backend_not_ready" end
+				return reason and MANUAL_REFUSAL_KEYS[reason] or nil
+			end,
+			may_publish = function()
+				return not _runtime_closed and not _scope_owner and _enabled == true and not _is_paused()
+			end,
+			send = M._send_test_prediction,
+			now_ms = function() return _clock_ms() end,
+			show = function(text)
+				if not _notify then
+					Logger.error(LOG, "No notice surface injected: the test prediction is only logged.")
+				elseif _notify(text) ~= true then
+					Logger.warn(LOG, "A test prediction notice was not shown.")
+				end
+			end,
+			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+		})
+	end
+	return M._test_prediction.run()
 end
 
 --- Fills the {1}, {2}… of a translated template with plain values: a value is

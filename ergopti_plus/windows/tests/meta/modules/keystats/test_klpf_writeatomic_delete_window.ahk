@@ -36,10 +36,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_KWDW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_KWDW_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -53,7 +51,7 @@ _KWDW_ReadSource(RelPath) {
 
 ; The function must no longer delete the destination before moving onto it.
 _KWDW_NoDeleteThenMove() {
-	Src := _KWDW_ReadSource("modules/keystats/keystats_prefetch.ahk")
+	Src := _KWDW_ReadSource("keystats_prefetch.ahk")
 	Seg := _DriverFuncBody("KLPF_WriteAtomic")
 	Assert(Seg != "", "KLPF_WriteAtomic(path, content) declaration must exist in keystats_prefetch.ahk")
 	; The destination publish must be a true atomic swap, never FileDelete(path)

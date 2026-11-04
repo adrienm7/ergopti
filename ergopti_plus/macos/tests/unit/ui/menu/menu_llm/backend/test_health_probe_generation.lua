@@ -235,7 +235,6 @@ local function build_fixture(callback, options)
 			end,
 		}
 		package.loaded["ui.menu.menu_llm.menu_layout"] = {
-			row_ids = function() return { "llm_backend", "llm_model" } end,
 			row_disabled = function() return false end,
 			title_health_dot = function(status)
 				return ({ ready = "🟢", warming = "🟡", unreachable = "🔴" })[status]
@@ -265,18 +264,16 @@ local function build_fixture(callback, options)
 				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 				return rows
 			end,
-			build = function(key, _, handlers, _, render_ctx, providers)
-				-- Only the health-bearing top-level handlers are observed here.
+			build = function(key, _, _, _, render_ctx, providers)
+				-- Only the health-bearing top-level model row is observed here.
 				-- Generation's declared child retains the old pass-through numeric
 				-- provider; its real check is covered by test_settings_transaction.
 				if key == "llm_generation_menu" then
 					return providers.llm_generation_values()
 				end
 				last_render_ctx = render_ctx
-				local items = {}
-				handlers.llm_backend(items)
-				handlers.llm_model(items)
-				return items
+				-- The model row is list DATA: the shared renderer materialises it.
+				return native_renderer.render_rows(providers.llm_model(), "llm_model")
 			end,
 		}
 		local core = package.loaded["modules.llm"]
@@ -508,6 +505,32 @@ helpers.describe("LLM health probe ownership", function()
 			helpers.assert_type(refreshed_model, "table")
 			assert_title_dot(refreshed, refreshed_model, "🟡",
 				"a committed current MLX response must render the reachable state")
+		end)
+	end)
+
+	helpers.it("repaints only when a probe changes the health status (probe loop, 2026-06-19)", function()
+		-- Each build fires a probe. When the probe's completion repainted the menu
+		-- unconditionally, the repaint built the menu, which probed again: about
+		-- ten to twenty rebuilds a second with live HTTP. A completion that leaves
+		-- the status as it was must therefore repaint nothing.
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 1, "opening the menu must probe once")
+			local updates_before = fixture.updates()
+			fixture.probes[1].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that turns the status from unknown to reachable must repaint once")
+
+			fixture.handler.build_item()
+			helpers.assert_eq(#fixture.probes, 2, "the repainted menu probes again")
+			fixture.probes[2].completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before + 1,
+				"a probe that confirms the same status must not repaint, or build and probe loop")
+
+			fixture.handler.build_item()
+			fixture.probes[3].completion(0)
+			helpers.assert_eq(fixture.updates(), updates_before + 2,
+				"a probe that finds the server gone must repaint")
 		end)
 	end)
 

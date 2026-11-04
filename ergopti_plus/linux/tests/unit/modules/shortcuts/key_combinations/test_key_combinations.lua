@@ -16,7 +16,7 @@ local function make(text, keys, changed)
 		is_paused = function() return state.paused end, changed = changed or function() return true end,
 		actions = { is_assignable = function(action) return action == "run_program" or action == "copy" or action == "llm_generate_prediction" end } })
 	local base = Engine.new({ keys = keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
-		tap_min_ms = 0, one_shot_timeout_ms = 1000 })
+		tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
 	local thresholds = {}; for _, row in ipairs(catalog) do thresholds[row.id] = 300 end
 	state.base, state.native = base, Native.new(base, state.owner.engine_options(thresholds))
 	return state
@@ -181,7 +181,7 @@ helpers.describe("configured Linux ordered pair ownership", function()
 		local _,action,_,frame = process(state,15,1,10); helpers.assert_eq(action,nil); helpers.assert_eq(frame,nil)
 	end)
 	helpers.it("preserves the original three-value binding on native roll replay", function()
-		local base = Engine.new({ keys={space={tap_action="",hold_modifier="ctrl",time_activation_seconds=.3},win={tap_action="run_program",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,one_shot_timeout_ms=1000 })
+		local base = Engine.new({ keys={space={tap_action="",hold_modifier="ctrl",time_activation_seconds=.3},win={tap_action="run_program",time_activation_seconds=.3}},roll_keys={"space"},tap_min_ms=0,lone_tap_max_ms=0,one_shot_timeout_ms=1000 })
 		base:process(57,1,0); base:process(125,1,10)
 		local due = base:tick(301); local found = false
 		for _, row in ipairs(due) do if row.tap == "run_program" then found = row.binding == "tap_hold__win" end end
@@ -482,7 +482,7 @@ local function terminal_owner(port)
 		changed = function() return true end,
 		actions = { is_assignable = function(action) return action == "run_program" end } })
 	state.base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
-		tap_min_ms = 0, one_shot_timeout_ms = 1000 })
+		tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
 	local thresholds = {}; for _, row in ipairs(catalog) do thresholds[row.id] = 300 end
 	state.native = Native.new(state.base, state.owner.engine_options(thresholds))
 	return state
@@ -1005,7 +1005,7 @@ helpers.describe("original output observer constructor provenance (controlled po
 					helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open())
 					s.output = assert(capture()); s.writer.capture_output = function() return s.output, factory end
 				else
-					local other = assert(loadfile("adapters/uinput_writer.lua"))()
+					local other = helpers.fresh_module("adapters.uinput_writer")
 					s.writer.capture_output_observer = other.capture_output_observer
 				end
 				s.restore_factory = function() s.writer.capture_output, s.writer.capture_output_observer = capture, factory end
@@ -1367,7 +1367,9 @@ helpers.describe("same-device third slot through original production consumers (
 			helpers.assert_eq(native_rows(s), "", "equality remains inside the positive delay")
 			s.pump_at(1101)
 			helpers.assert_eq(native_rows(s), "29:1", "the genuine idle pump expires after the deadline")
-			s.edge("a", 58, 0, 1401)
+			-- Released past the lone modifier tap window (1000 ms by default in the
+			-- manager's tap_hold.toml), so CapsLock stays the hold and types no Enter.
+			s.edge("a", 58, 0, 2101)
 			helpers.assert_eq(native_rows(s), "29:1 29:0")
 			helpers.assert_eq(s.actions, {})
 		end)
@@ -1519,7 +1521,7 @@ helpers.describe("same-device third slot through original production consumers (
 				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
 				capture_chord=function()return function()return true end end}
 			helpers.assert_eq(require("modules.shortcuts.key_combinations").buffered_settings_current(config),false)
-			local base=Engine.new({keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,one_shot_timeout_ms=1000})
+			local base=Engine.new({keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,lone_tap_max_ms=0,one_shot_timeout_ms=1000})
 			local extra=Pair.new(base,config,{capture_buffered_input=s.hook.capture_buffered_input,
 				buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view})
 			helpers.assert_true(s.hook.set_remapper(extra,function(action)s.actions[#s.actions+1]={action}end))
@@ -1727,7 +1729,7 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
   local Base=require("platform.remap.tap_hold_engine")
   local Pair=require("platform.remap.key_combination_engine")
   local base=Base.new({keys={tab={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
-   tap_min_ms=0,one_shot_timeout_ms=1000})
+   tap_min_ms=0,lone_tap_max_ms=0,one_shot_timeout_ms=1000})
   local received={}
   local pair=Pair.new(base,configured,{capture_buffered_input=s.hook.capture_buffered_input,
    buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view,

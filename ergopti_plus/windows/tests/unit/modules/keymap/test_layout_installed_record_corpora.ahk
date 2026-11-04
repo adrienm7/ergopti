@@ -9,35 +9,10 @@
 ; way LayoutCatalogue_Install records it or deletes one the way
 ; LayoutCatalogue_Uninstall does, and writes the record back. The written JSON
 ; is compared with the corpus model member by member, keeping null, Boolean,
-; number and array identities. Every case agrees, or is pinned in _LIR_PENDING
-; with the reason, so a fix forces the inventory to shrink.
+; number and array identities. Every case agrees with the shared Lua law.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-
-; Cases where the Windows record path disagrees with the shared Lua law. Both
-; reasons await a maintainer decision (which rule the drivers should share).
-global _LIR_SIZE := "Windows admits an installed row only with a size, because LayoutRegistry_Verify checks"
-	. " the local copy's byte count; the shared rule needs id, sha256 and version, so a size-less row"
-	. " stays outdated here and cannot be updated in place or uninstalled"
-global _LIR_OWNED := "a Windows update owns and records only LAYOUT_CATALOGUE_RECORD_FIELDS; the shared law"
-	. " also owns languages, variants, platforms, source_url, source_sha256, licence_file and xkb, so their"
-	. " stale values survive an update here"
-global _LIR_PENDING := Map(
-	"installed_record_preservation:remove-preserves-complete-unowned-model", _LIR_SIZE,
-	"installed_record_preservation:chained-builders-retain-source-only-values", _LIR_SIZE,
-	"installed_record_preservation:verified-replacement-does-not-resurrect-obsolete-row", _LIR_SIZE,
-	"installed_record_preservation:source-outdated-member-is-not-runtime-classification", _LIR_SIZE,
-	"installed_record_updates:update-keeps-omitted-future-models", _LIR_SIZE,
-	"installed_record_updates:supplied-values-win-with-detached-future-neighbors", _LIR_SIZE . "; " . _LIR_OWNED,
-	"installed_record_updates:owned-extension-to-base-removes-only-owned-container", _LIR_SIZE,
-	"installed_record_updates:known-optional-index-fields-do-not-resurrect", _LIR_OWNED,
-	"installed_record_updates:chained-update-remove-preserves-neighbors-not-owned-id", _LIR_SIZE)
-; Each extension case's removal targets the size-less entry its install wrote.
-for _LIR_Id in ["null", "false", "number", "string", "array", "object", "bad-checksum", "empty-name",
-		"invalid-pack-id", "null-files", "object-files", "empty-files", "scalar-file", "array-file", "unsafe-path",
-		"negative-size", "fractional-size", "bad-file-checksum", "duplicate-file", "missing-manifest"]
-	_LIR_PENDING["installed_record_extensions:" . _LIR_Id . " remove"] := _LIR_SIZE
 
 ; Cases that model in-memory builders. Windows rereads the file for every
 ; operation, so there is no builder record to mutate between them.
@@ -47,7 +22,8 @@ global _LIR_NOT_APPLICABLE := Map(
 
 _LIR_Corpus(Name) {
 	global _SharedDir
-	return JsonParse(FileRead(_SharedDir . "\tests\corpus\layouts\" . Name . ".json", "UTF-8"))
+	; An entry's Boolean stays typed, so the record writes it as the corpus spells it.
+	return _TCV_Revive(_TCV_ParseTyped(FileRead(_SharedDir . "\tests\corpus\layouts\" . Name . ".json", "UTF-8")))
 }
 
 _LIR_TempDir() {
@@ -122,15 +98,9 @@ _LIR_Replay(Source, Operations) {
 		DirDelete(Dir, true)
 }
 
-; Runs one case and holds a pending case to its recorded disagreement.
+; Runs one case.
 _LIR_Check(Corpus, Id, Source, Operations, Expected) {
-	global _LIR_PENDING
-	Key := Corpus . ":" . Id
-	Difference := _LIR_ModelDifference(Expected, _LIR_Replay(Source, Operations), Id)
-	if _LIR_PENDING.Has(Key)
-		AssertTrue(Difference != "", Key . " now agrees: remove it from _LIR_PENDING")
-	else
-		AssertEqual("", Difference, Key)
+	AssertEqual("", _LIR_ModelDifference(Expected, _LIR_Replay(Source, Operations), Id), Corpus . ":" . Id)
 }
 
 _LIR_RegisterRecordCases(Name) {
@@ -157,26 +127,33 @@ _LIR_RegisterRecordCases("installed_record_preservation")
 _LIR_RegisterRecordCases("installed_record_updates")
 _LIR_RegisterExtensionCases()
 
-Test("installed-record corpora: every pending case names a corpus case (installed-record-corpora)", () => (
-	_LIR_AssertPendingNamesCases()
+Test("installed-record corpora: every exclusion names a corpus case (installed-record-corpora)", () => (
+	_LIR_AssertExclusionsNameCases()
 ))
 
-_LIR_AssertPendingNamesCases() {
-	global _LIR_PENDING, _LIR_NOT_APPLICABLE
+_LIR_AssertExclusionsNameCases() {
+	global _LIR_NOT_APPLICABLE
 	Known := Map()
 	for Name in ["installed_record_preservation", "installed_record_updates"]
 		for Vector in _LIR_Corpus(Name)["cases"]
 			Known[Name . ":" . Vector["id"]] := true
-	for Vector in _LIR_Corpus("installed_record_extensions")["cases"] {
-		Known["installed_record_extensions:" . Vector["id"]] := true
-		Known["installed_record_extensions:" . Vector["id"] . " remove"] := true
-	}
-	for Key, Reason in _LIR_PENDING {
-		AssertTrue(Known.Has(Key), "stale pending entry: " . Key)
-		AssertTrue(Reason is String && Reason != "", "a pending entry states its reason: " . Key)
-	}
-	for Key, Reason in _LIR_NOT_APPLICABLE {
+	for Key, Reason in _LIR_NOT_APPLICABLE
 		AssertTrue(Known.Has(Key), "stale exclusion: " . Key)
-		AssertFalse(_LIR_PENDING.Has(Key), "a case is either excluded or pending: " . Key)
-	}
 }
+
+; A size-less row is a real installed layout: its copy is verified by checksum.
+_LIR_SizelessRowIsInstalled() {
+	Dir := _LIR_TempDir()
+	Text := "<keyboard/>"
+	try {
+		_LIR_Write(Dir . LayoutRegistry_Settings()["installed_file"], '{"schema_version":1,"layouts":{"sample":{"id":"sample","sha256":"'
+			. CryptoSha256(Text) . '","version":"1"}}}')
+		_LIR_Write(Dir . "sample.keylayout", Text)
+		AssertEqual(Text, LayoutRegistry_ReadLocal("sample", Dir)["Text"], "the checksum alone vouches for the copy")
+		_LIR_Write(Dir . "sample.keylayout", "<tampered/>")
+		AssertThrows(LayoutRegistry_ReadLocal.Bind("sample", Dir), "a copy the checksum refuses stays refused")
+	} finally
+		DirDelete(Dir, true)
+}
+Test("installed-record corpora: a row without a size is verified by its checksum (installed-record-sizeless)",
+	_LIR_SizelessRowIsInstalled)

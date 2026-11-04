@@ -200,6 +200,7 @@ local function load_coordinator(options)
 			return { stop = function() calls.deadline_stopped = true; return true end }
 		end,
 		user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+		reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
 		mark_reload = function() return true end,
 		clear_reload = function() return true end,
 	}))

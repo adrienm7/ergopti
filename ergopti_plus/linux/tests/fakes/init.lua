@@ -67,9 +67,15 @@ function M.uinput_writer(opts)
 			if #bytes ~= 24 then return false end
 			local kind, code, value = uint(bytes, 17, 2), uint(bytes, 19, 2), uint(bytes, 21, 4)
 			if kind == 1 then pending = { code = code, value = value }; return true end
+			-- A relative report: the value is a signed 32-bit delta.
+			if kind == 2 then
+				if value >= 0x80000000 then value = value - 0x100000000 end
+				pending = { code = code, value = value, relative = true }
+				return true
+			end
 			if kind ~= 0 or code ~= 0 or not pending then return false end
 			local row = pending; pending = nil
-			if opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
+			if not row.relative and opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
 			fake.events[#fake.events + 1] = row
 			return true
 		end,
@@ -95,7 +101,7 @@ function M.uinput_writer(opts)
 	function fake.test.pressed()
 		local out = {}
 		for _, e in ipairs(fake.events) do
-			if e.value == 1 then out[#out + 1] = e.code end
+			if e.value == 1 and not e.relative then out[#out + 1] = e.code end
 		end
 		return out
 	end
@@ -150,6 +156,14 @@ function M.evdev_reader(opts)
 	end
 	function fake.is_open(slot) return fake.open_slots[slot or fake.KEYBOARD] ~= nil end
 	function fake.device_path(slot) return fake.open_slots[slot or fake.KEYBOARD] end
+	-- A scripted descriptor names no device unless the test gives it a number.
+	function fake.device_identity(slot)
+		local path = fake.open_slots[slot or fake.KEYBOARD]
+		if path == nil then return nil, "device is not open" end
+		local numbers = opts.device_numbers or {}
+		if numbers[path] == nil then return nil, "no device-number port" end
+		return numbers[path]
+	end
 	function fake.event_capabilities(slot)
 		slot = slot or fake.KEYBOARD
 		local path, owner = fake.open_slots[slot], opens[slot]
@@ -502,7 +516,14 @@ function M.clipboard(opts)
 		if opts.available == false then return false, "", "clipboard unavailable" end
 		return true, fake.contents, nil
 	end
-	function fake.write(text) fake.contents = tostring(text) ; return true end
+	-- The change counter moves on every write, even of the same text, as the X11
+	-- owner's TIMESTAMP does; unavailable is the Wayland answer.
+	fake.counter = 0
+	function fake.write(text) fake.contents = tostring(text) ; fake.counter = fake.counter + 1 ; return true end
+	function fake.change_counter()
+		if opts.available == false then return nil, "unsupported" end
+		return fake.counter
+	end
 	-- The PRIMARY selection: what the application published, never written here.
 	function fake.read_primary()
 		if opts.available == false then return false, "", "clipboard unavailable" end
@@ -687,6 +708,7 @@ function M.sqlite_writer(opts)
 	function fake.flush_transport_available() return available end
 	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; return available end
+	function fake.ensure_token_encoding() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end
@@ -836,6 +858,7 @@ function M.sqlite_writer(opts)
 		fake.media_projections[path][device_id] = copy(batch)
 		fake.revision = fake.revision + 1
 	end
+	function fake.media_available() return media_ready() end
 	function fake.insert_media_events(device_id, events, threshold_ms)
 		if not media_ready() then return false end
 		local previous = media_history[fake.path] and media_history[fake.path][device_id]

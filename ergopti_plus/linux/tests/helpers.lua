@@ -75,6 +75,92 @@ function M.driver_root()
 	return (tests_dir:match("^(.*)[/\\\\]tests$") or tests_dir):gsub("\\\\", "/")
 end
 
+-- Production sources, read once per process: the tree is never mutated by a test.
+local _production_sources = nil
+
+--- Loads (once) every production Lua file under the driver root, tests/ excluded.
+--- @return table bodies
+local function production_sources()
+	if _production_sources then return _production_sources end
+	local paths, detail = require("test.runner_discovery").files(M.driver_root(), function(name)
+		return name:match("%.lua$") ~= nil
+	end, { tests = true })
+	assert(paths, detail)
+	local bodies = {}
+	for _, path in ipairs(paths) do
+		local handle = assert(io.open(path, "rb"))
+		bodies[#bodies + 1] = assert(handle:read("*a"))
+		assert(handle:close())
+	end
+	-- An empty inventory is no evidence: left uncached, the caller's floor refuses it.
+	if #bodies > 0 then _production_sources = bodies end
+	return bodies
+end
+
+--- The ONE production file containing `symbol` (the Linux twin of the macOS
+--- helper of the same name). A source invariant names a declaration unique to
+--- its file, never the file's path, so the module can move or split without
+--- turning the invariant into a path error.
+--- @param symbol string A string unique to the file being asked for.
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_driver_unit(symbol)
+	if type(symbol) ~= "string" or symbol == "" then
+		return nil, "read_driver_unit() needs a symbol to look for"
+	end
+	local matches = {}
+	for _, body in ipairs(production_sources()) do
+		if body:find(symbol, 1, true) then matches[#matches + 1] = body end
+	end
+	if #matches == 0 then return nil, string.format("no production file contains %q", symbol) end
+	if #matches > 1 then
+		return nil, string.format("%d production files contain %q; name a symbol unique to one file",
+			#matches, symbol)
+	end
+	return matches[1]
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it, so a test listing
+--- several modules names them as the code does, never by a driver path.
+--- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	local handle, open_error = io.open(path, "rb")
+	if not handle then return nil, open_error end
+	local body = handle:read("*a")
+	handle:close()
+	return body
+end
+
+--- Returns the tray root's source followed by every section module it binds.
+--- ui/menu/builder.lua binds each section builder from its own
+--- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
+--- finds it in whichever of these files now holds it.
+--- @return string The root's text, then each module it or a part binds, in binding order.
+function M.read_menu_source()
+	local directory = M.driver_root() .. "/ui/menu/"
+	local function read(name)
+		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
+		local text = assert(handle:read("*a"))
+		assert(handle:close())
+		return text
+	end
+	-- A part may bind another part (the dialogs), which the root no longer names.
+	local texts, seen, index = { read("builder") }, {}, 1
+	while texts[index] do
+		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
+			if not seen[name] then
+				seen[name] = true
+				texts[#texts + 1] = read(name)
+			end
+		end
+		index = index + 1
+	end
+	return table.concat(texts, "\n")
+end
+
 
 -- =====================================
 -- =====================================
@@ -88,6 +174,20 @@ end
 function M.load_module(module_name)
 	package.loaded[module_name] = nil
 	return require(module_name)
+end
+
+--- Loads a fresh instance of a module by name and leaves the package cache as
+--- it found it, as dofile on its path would, so a test can run private copies
+--- without naming the file a move would break.
+--- @param module_name string Dotted Lua module name to load.
+--- @return any The module's return value.
+function M.fresh_module(module_name)
+	local cached = package.loaded[module_name]
+	package.loaded[module_name] = nil
+	local ok, result = pcall(require, module_name)
+	package.loaded[module_name] = cached
+	if not ok then error(result, 0) end
+	return result
 end
 
 --- Loads a fresh module with one dependency explicitly present or unavailable.

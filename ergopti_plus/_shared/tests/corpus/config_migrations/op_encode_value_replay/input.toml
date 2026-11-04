@@ -1,0 +1,4 @@
+# _shared/tests/corpus/config_migrations/op_encode_value_replay/input.toml
+
+[llm]
+user_profiles = "v1:W3siaWQiOiJ1c2VyX2ZpcnN0IiwibGFiZWwiOiJGaXJzdCBQcm9maWxlIiwic3lzdGVtX3NpbmdsZSI6ImZpcnN0In1d"

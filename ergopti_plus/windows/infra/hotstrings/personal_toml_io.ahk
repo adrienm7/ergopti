@@ -264,9 +264,15 @@ _PersonalTomlOpeningAuthority(Source, FilePath, OwnerToken) {
 	SourcePath := Source.Get("path", "")
 	if !(SourcePath is String) || SourcePath == ""
 		return false
-	return _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) && !A_IsSuspended
+	return _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) && !_PersonalWritesPaused()
 		&& _ConfigWriteLeaseKey(SourcePath) == _ConfigWriteLeaseKey(FilePath)
 		&& _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+}
+
+; A user's pause holds back writes. A quarantined smoke is paused only to stay off
+; the session's input, and its first boot still creates its private files.
+_PersonalWritesPaused() {
+	return A_IsSuspended && !(IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined)
 }
 
 _PersonalTomlOpeningImageMatches(Source, FilePath, OwnerToken) {
@@ -711,7 +717,6 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
 		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0) {
-	static STALE_TEMP_MS := 60000
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -731,7 +736,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 	}
 	LocalSeq := ++WriteSeq
 	StagePath := FilePath . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
-	_TOML_ReapStaleTemps(FilePath, STALE_TEMP_MS)
+	_TOML_ReapStaleTemps(FilePath, StaleTempAgeMs())
 	_PersonalTomlCleanupStage(StagePath, DeleteFn)
 
 	Written := false
@@ -802,7 +807,7 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 			&& (Observed["content"] == PreservationSource["content"])
 		PreviousCritical := Critical("On")
 		try SourceMatches := SourceMatches && _PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
-			&& !A_IsSuspended && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
+			&& !_PersonalWritesPaused() && _ConfigWriteLeaseKey(PersonalTomlPath()) == _ConfigWriteLeaseKey(FilePath)
 		finally Critical(PreviousCritical)
 		if !SourceMatches {
 			_PersonalTomlCleanupStage(StagePath, DeleteFn)
@@ -1587,7 +1592,7 @@ _PersonalInfoEditorSourcesEqual(Expected, Observed) {
 ; usable without making its target the configured path, while a relocation of
 ; the configured identity invalidates the attempt that started before it.
 _PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
-	if !Source["admitted"] || A_IsSuspended
+	if !Source["admitted"] || _PersonalWritesPaused()
 			|| !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
 		return false
 	if Source.Has("editor_owner") && !_PersonalInfoEditorSourceCurrent(Source["editor_owner"], FilePath)

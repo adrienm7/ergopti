@@ -35,6 +35,7 @@ local function fake_config(gates_on, sections_on)
 		language_packs = function()
 			return { { id = "en", locale = "en", categories = { "typos" } } }
 		end,
+		any_enabled = function() return gates_on end,
 		is_group_enabled = function() return gates_on end,
 		is_section_enabled = function() return gates_on and sections_on end,
 		is_section_checked = function() return sections_on end,
@@ -90,7 +91,7 @@ end
 --- @param dyn table|nil Dynamic-hotstrings manager double.
 --- @return table|nil
 local function hotstrings_menu(config, dyn, paused, snapshot_paused)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local i18n = require("infra.i18n")
 	local title = i18n.get("menu.hotstrings.title")
 	local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = dyn or fake_dyn(true, true),
@@ -184,7 +185,9 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 			for _, paused in ipairs({ true, false }) do
 				helpers.it("dynamic bulk menu: explicit " .. tostring(enabled) .. " from " .. tostring(posture)
 					.. " paused " .. tostring(paused), function()
-					local config = fake_config(false, true)
+					-- The other categories read on, so the Hotstrings switch does while
+					-- the dynamic category is off: an off switch greys the whole submenu.
+					local config = fake_config(true, true)
 					local dyn, log = fake_dyn(posture, not posture)
 					local menu = hotstrings_menu(config, dyn, paused)
 					local category = row_for(menu, "category.dynamic_hotstrings")
@@ -248,16 +251,16 @@ local function with_bulk_error_receipts(body)
 		return first, second, third
 	end
 	os.execute = function(command)
-		if type(command) == "string" and command:match("^zenity %-%-error") then
+		if type(command) == "string" and command:match("dialog_host%.lua' %-%-error") then
 			notices[#notices + 1] = { command = command, keyboard_released = inside }
 			return 0
 		end
 		return execute(command)
 	end
-	local before_builder = package.loaded["ui.menu.menu_builder"]
+	local before_builder = package.loaded["ui.menu.builder"]
 	local ok, err = pcall(body, notices, function() return releases end)
 	Modal.run, os.execute = modal_run, execute
-	package.loaded["ui.menu.menu_builder"] = before_builder
+	package.loaded["ui.menu.builder"] = before_builder
 	if not ok then error(err, 0) end
 end
 
@@ -423,7 +426,7 @@ local function dynamic_family_row(dynamic, section)
 	local context = { config = config, _version = "9.9.9", dyn_hotstrings = dynamic,
 		paused = false, is_paused = function() return false end,
 		on_menu_changed = function() seen.refreshes = seen.refreshes + 1 end }
-	local builder = helpers.load_module("ui.menu.menu_builder")
+	local builder = helpers.load_module("ui.menu.builder")
 	local title = require("infra.i18n").get("category.dynamic_hotstrings")
 	local label
 	for _, family in ipairs(dynamic.rule_families()) do
@@ -600,7 +603,7 @@ end)
 --- Retains the actual engine and installs a fresh genuine renderer cohort.
 local function with_dynamic_section_frame(body)
 	with_dynamic_family_owners(function(owner)
-		local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+		local names = { "infra.manifest_menu", "ui.menu.builder" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local called, detail = xpcall(function()
 			local translator = require("infra.i18n")
@@ -664,12 +667,12 @@ local function with_personal_info_leaf(body)
 		local translator = require("infra.i18n")
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = assert(require("infra.manifest_menu"))
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		-- Receive the real Hotstrings parent only: a withdrawn template must not
 		-- dispatch unrelated full-tray producers before the leaf assertions.
 		local get_upvalue = assert(debug.getupvalue)
 		local source = debug.getinfo(builder.build, "S").source
-		assert(source:match("/ui/menu/menu_builder%.lua$"), "actual native builder file required")
+		assert(source:match("/ui/menu/builder%.lua$"), "actual native builder file required")
 		local build_hotstrings, matches = nil, 0
 		for index = 1, math.huge do
 			local name, value = get_upvalue(builder.build, index)
@@ -677,7 +680,11 @@ local function with_personal_info_leaf(body)
 			if name == "_build_hotstrings" then build_hotstrings, matches = value, matches + 1 end
 		end
 		assert(matches == 1 and type(build_hotstrings) == "function", "unique original native Hotstrings constructor required")
-		assert(debug.getinfo(build_hotstrings, "S").source == source, "constructor must belong to the actual builder file")
+		-- The root binds the constructor from its own module (ui/menu/menu_hotstrings.lua).
+		assert(rawequal(build_hotstrings, require("ui.menu.menu_hotstrings").build),
+			"constructor must be the one the actual builder binds")
+		assert(debug.getinfo(build_hotstrings, "S").source:match("/ui/menu/menu_hotstrings%.lua$"),
+			"constructor must belong to the actual Hotstrings module")
 		local opened = {}
 		local config, changes = fake_config(false, false)
 		local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = owner.dynamic,

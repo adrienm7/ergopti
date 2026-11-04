@@ -92,6 +92,19 @@ helpers.describe("keymap expander: repeat uses an explicit replacement transacti
 		fixture.cleanup()
 	end)
 
+	helpers.it("a delimiter the user added ends a word, as on Windows (PAR-8)", function()
+		local Terminators = require("modules.keymap.terminators")
+		helpers.assert_eq(Terminators.add_custom_terminator("custom_1", "1", "1", false), true)
+		local fixture = load_fixture({ buffer = "ab1★" })
+		local refused = fixture.expander.try_repeat_feature("★", true)
+		fixture.state.buffer = "1a★"
+		local resting = fixture.expander.try_repeat_feature("★", true)
+		fixture.cleanup()
+		helpers.assert_eq(Terminators.remove_custom_terminator("custom_1"), true)
+		helpers.assert_eq(refused, false, "the delimiter itself is not repeated")
+		helpers.assert_eq(resting, false, "and the letter after it starts a word")
+	end)
+
 	helpers.it("allocates a new generation for an immediate consecutive repeat", function()
 		local fixture = load_fixture()
 		local first_events = fire_repeat(fixture)

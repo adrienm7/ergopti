@@ -37,10 +37,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_ULEM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_ULEM_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _ULEM_ReadSource(RelPath) {
 ; ==================================================
 
 _ULEM_OpenLogsControllerFailure() {
-	Src := _ULEM_ReadSource("modules/keystats/keystats_webview.ahk")
+	Src := _ULEM_ReadSource("keystats_webview.ahk")
 	Body := _DriverFuncBody("KLWV_Open")
 	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keystats_webview.ahk")
 	Assert(InStr(Body, "LoggerError") > 0,
@@ -60,7 +58,7 @@ _ULEM_OpenLogsControllerFailure() {
 Test("keystats_webview: KLWV_Open logs controller-create failure via LoggerError (ui-launch-error-msgbox-on-timer-thread)", _ULEM_OpenLogsControllerFailure)
 
 _ULEM_OpenLogsNavigateFailure() {
-	Src := _ULEM_ReadSource("modules/keystats/keystats_webview.ahk")
+	Src := _ULEM_ReadSource("keystats_webview.ahk")
 	Body := _DriverFuncBody("KLWV_Open")
 	Assert(Body != "", "KLWV_Open(which, metrics_dir) declaration must exist in keystats_webview.ahk")
 	Assert(InStr(Body, "LoggerWarn") > 0,

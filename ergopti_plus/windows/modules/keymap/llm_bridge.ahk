@@ -25,6 +25,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -1330,7 +1331,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
  * @param {Object} SurfaceToken - Optional immutable owner from the pixel commit.
  */
 LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine
+	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine, LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
 	global _LLM_HOTSTRING_CHAIN_OFFSET_SEC, _LLM_INFINITE_TOOLTIP_SEC
 	global _LLM_MIN_TOOLTIP_DURATION_SEC
 
@@ -1339,8 +1340,13 @@ LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 	; Live mode waits for the hotstring tooltip to close whatever after_hotstring
 	; says: its tooltip follows every keystroke, so it must come back after it.
 	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"]
-			&& (_LLM_Engine["after_hotstring"] || LLM_Engine_LiveIsActive()))
+			&& (_LLM_Engine[ConfigLeaf.AFTER_HOTSTRING] || LLM_Engine_LiveIsActive()))
 		return
+	; Shown together, the prediction keeps the keystroke's own debounce: pushing
+	; it past the tooltip would show the two one after the other.
+	if !LLM_Engine_LiveIsActive()
+			&& LLM_Engine_WhileHotstringTooltip() == LLM_HOTSTRING_TOOLTIP_SHOW_BOTH
+		return false
 	if !(IsObject(items) && items.Length > 0)
 		return false
 	if (IsObject(SurfaceToken)
@@ -1387,7 +1393,7 @@ _LLM_Bridge_IsBoundaryChar(c) {
 ; appended) is a word character. Mirrors macOS engine.start_timer_word_end gating.
 _LLM_Bridge_IsWordEndTrigger(ch) {
 	global _LLM_Engine, _LLM_Bridge_Buffer
-	if !(_LLM_Engine.Has("instant_on_word_end") and _LLM_Engine["instant_on_word_end"])
+	if !(_LLM_Engine.Has(ConfigLeaf.INSTANT_ON_WORD_END) and _LLM_Engine[ConfigLeaf.INSTANT_ON_WORD_END])
 		return false
 	if !_LLM_Bridge_IsBoundaryChar(ch)
 		return false
@@ -1457,8 +1463,9 @@ _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
-	; the overlay closes, mirroring HS update_preview().
-	if TooltipIsVisible()
+	; the overlay closes, mirroring HS update_preview(). With
+	; llm.trigger.while_hotstring_tooltip = "both" the keystroke arms as usual.
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	; Only hide OUR tooltip — never dismiss a hotstring overlay. The canonical
 	; lifecycle emits dismissal for the exact offer this keystroke supersedes.
@@ -1536,7 +1543,7 @@ LLM_Bridge_OnBackspace() {
 		LLM_Agent_OnTyping(_LLM_Bridge_Buffer)
 
 	; Same hotstring-priority guard as OnChar.
-	if TooltipIsVisible()
+	if _LLM_Engine_HotstringTooltipHolds(LLM_Engine_LiveOverride())
 		return
 	if LLM_Tooltip_IsVisible()
 		LLM_Bridge_DeferTooltipHide()
@@ -1592,7 +1599,7 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 }
 
 ; Tells whether the inactive bridge feeds the AI agent: its automatic mode
-; watches the typing (LLM_Agent_WatchesTyping: mode "auto", not paused). The
+; watches the typing (LLM_Agent_WatchesTyping: mode "auto", AI on, not paused). The
 ; answer is read on every keystroke from the agent's own settings, so a mode
 ; change, a pause or a restored config starts or stops the feed at the next
 ; keystroke with no second copy of that state; the transitions are logged.
@@ -1684,7 +1691,7 @@ LLM_Bridge_ResetPredictions() {
 		return
 	; Context retention applies even between requests, while work cancellation
 	; and visual disposal remain conditional on actual active work.
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has(ConfigLeaf.RESET_ON_NAV) and _LLM_Engine[ConfigLeaf.RESET_ON_NAV])
 		_LLM_Bridge_ClearBuffer()
 	if !LLM_Bridge_HasActivePredictionWork()
 		return

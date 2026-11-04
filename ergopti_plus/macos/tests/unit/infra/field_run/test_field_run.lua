@@ -9,8 +9,10 @@
 ---    init.lua starts it only behind infra/dev_source.lua;
 --- 2. request parsing: every step, a subset in declaration order, and the
 ---    refusals (unknown step, unknown key, bad deadline, oversized);
---- 3. a run writes one result per step with the declared shape, reports the
----    typing step as needs_typing without running it, and ends with done;
+--- 3. a run writes one result per step with the declared shape, runs every
+---    declared step (the maintainer's field run needs no person, the key
+---    accounting included), reports a step declared for a person with its
+---    reason without running it, and ends with done;
 --- 4. deadlines: a step that never answers times out and its late answer is
 ---    dropped; past the request's deadline the remaining steps are skipped;
 --- 5. the configuration guard restores and names what a step changed, and a
@@ -135,6 +137,13 @@ local function world(runners)
 end
 
 --- Starts a session over a world.
+--- The shipped declaration with every step enabled, for tests of the whole run's mechanics.
+local function enabled_spec_of(FieldRun)
+	local declaration = Json.decode(SPEC_TEXT)
+	for _, step in ipairs(declaration.steps) do step.disabled = nil end
+	return FieldRun.validate(declaration)
+end
+
 local function started(FieldRun, state)
 	local session = FieldRun.new({ spec = spec_of(FieldRun), folder = FOLDER, pid = 4242, ports = state.ports })
 	session:start()
@@ -167,6 +176,7 @@ local function pending_coordinator(kind)
 		schedule = forbidden,
 		fatal_exit_code = 70,
 		user_exit_deadline_seconds = 12,
+		reload_deadline_seconds = 12,
 	}))
 	local requested = kind == "reload" and coordinator.request_reload("field-admission-reload")
 		or kind == "exit" and coordinator.request_exit("field-admission-exit")
@@ -280,8 +290,14 @@ helpers.describe("field run: declaration and requests", function()
 			for _, step in ipairs(spec.steps) do
 				if step.kind == "field_check" then declared[step.check] = true end
 			end
-			for check in pairs(require("infra.field_check_checks").checks) do
-				helpers.assert_true(declared[check], "no field run step runs the check " .. check)
+			local Checks = require("infra.field_check_checks")
+			for check in pairs(Checks.checks) do
+				local substitute = Checks.FIELD_RUN_SUBSTITUTES[check]
+				helpers.assert_true(declared[check] or (substitute and declared[substitute]),
+					"no field run step runs the check " .. check)
+				if substitute then
+					helpers.assert_nil(declared[check], check .. " waits for a person; the field run runs " .. substitute)
+				end
 			end
 		end)
 	end)
@@ -363,14 +379,167 @@ helpers.describe("field run: declaration and requests", function()
 	end)
 end)
 
+helpers.describe("field run: a disabled step", function()
+	-- The reload that lost the app (2026-10-30 21:06, both 2026-10-31 runs) was
+	-- the owned Ollama daemon refusing the teardown; the shipped step runs again.
+	helpers.it("ships driver_reload enabled (reload-teardown-failed)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local spec = FieldRun.validate(Json.decode(SPEC_TEXT))
+			helpers.assert_true(spec.step_by_id.driver_reload ~= nil)
+			helpers.assert_nil(spec.step_by_id.driver_reload.disabled)
+		end)
+	end)
+
+	helpers.it("skips a disabled step by name and never asks for a reload", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local declaration = Json.decode(SPEC_TEXT)
+			for _, step in ipairs(declaration.steps) do
+				if step.id == "driver_reload" then step.disabled = "reload_lost_the_app" end
+			end
+			local spec = FieldRun.validate(declaration)
+			helpers.assert_eq(spec.step_by_id.driver_reload.disabled, "reload_lost_the_app")
+			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			session:start()
+			state.request({ schema = 1, request_id = "r39", steps = Json.array({ "driver_reload" }) })
+			state.advance(0)
+			local result = state.json(result_path("r39", 1, "driver_reload"))
+			helpers.assert_eq(result.verdict, "skip")
+			helpers.assert_eq(result.codes[1], "reload_lost_the_app")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"], "no reload was prepared")
+		end)
+	end)
+end)
+
+helpers.describe("field run: the timed reload", function()
+	--- Declares a two-step run: one check, then the reload, then a check.
+	local function reload_spec(FieldRun)
+		local declaration = Json.decode(SPEC_TEXT)
+		local check, reload, last
+		for _, step in ipairs(declaration.steps) do
+			if step.kind == "reload" then reload = step end
+			if step.id == "field_lease" then check = step end
+			if step.id == "field_network" then last = step end
+		end
+		-- The mechanism stays proven while the shipped step is disabled.
+		reload.disabled = nil
+		declaration.steps = { check, reload, last }
+		declaration.deadline_seconds.default = 600
+		return FieldRun.validate(declaration), reload
+	end
+
+	helpers.it("resumes at the next step with the reload's duration and a fresh snapshot", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec, reload = reload_spec(FieldRun)
+			local first = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			first:start()
+			state.request({ schema = 1, request_id = "r40", steps = Json.array({ "all" }) })
+			state.advance(0)
+			helpers.assert_eq(table.concat(state.calls, ","), "field_lease", "nothing runs past the reload")
+			helpers.assert_eq(state.restored.tag, "snapshot", "the configuration is put back before the reload")
+			local resume = state.json(FOLDER .. "/resume.json")
+			helpers.assert_eq(resume.request_id, "r40")
+			helpers.assert_eq(resume.index, 2)
+			first:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
+			helpers.assert_nil(state.files[FOLDER .. "/results/r40/done.json"])
+			state.now = state.now + 3500
+			state.restored = nil
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4343, ports = state.ports }):start()
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"], "the resume file is consumed once")
+			state.advance(0)
+			local result = state.json(result_path("r40", 2, reload.id))
+			helpers.assert_eq(result.verdict, "pass")
+			helpers.assert_eq(result.elapsed_ms, 3500)
+			helpers.assert_eq(result.report.reload_ms, 3500)
+			helpers.assert_eq(table.concat(state.calls, ","), "field_lease,field_network")
+			local done = state.json(FOLDER .. "/results/r40/done.json")
+			helpers.assert_eq(done.interrupted, false)
+			helpers.assert_eq(table.concat(done.order, ","), "field_lease," .. reload.id .. ",field_network,config_guard")
+			helpers.assert_eq(state.restored.tag, "snapshot", "the guard compares against the fresh snapshot")
+		end)
+	end)
+
+	helpers.it("fails a refused reload and one that never tears the state down, and runs on", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec, reload = reload_spec(FieldRun)
+			state.reload_accepted = false
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.request({ schema = 1, request_id = "r41", steps = Json.array({ "all" }) })
+			state.advance(0)
+			helpers.assert_eq(state.json(result_path("r41", 2, reload.id)).codes[1], "reload_refused")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_not_nil(state.json(FOLDER .. "/results/r41/done.json"))
+			state.reload_accepted = true
+			state.request({ schema = 1, request_id = "r42", steps = Json.array({ "all" }) })
+			state.advance(reload.deadline_seconds * 1000)
+			local result = state.json(result_path("r42", 2, reload.id))
+			helpers.assert_eq(result.verdict, "timeout")
+			helpers.assert_eq(result.codes[1], "reload_not_started")
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_not_nil(state.json(FOLDER .. "/results/r42/done.json"))
+		end)
+	end)
+
+	helpers.it("closes the run as interrupted when the resume file is unusable", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local spec = reload_spec(FieldRun)
+			state.files[FOLDER .. "/running.json"] = Json.encode({ schema = 1, request_id = "r43" })
+			state.files[FOLDER .. "/resume.json"] = Json.encode({ schema = 1, request_id = "other", index = 2,
+				steps = Json.array({}) })
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.advance(0)
+			helpers.assert_eq(state.json(FOLDER .. "/results/r43/done.json").interrupted, true)
+			helpers.assert_nil(state.files[FOLDER .. "/resume.json"])
+			helpers.assert_eq(#state.calls, 0)
+		end)
+	end)
+end)
+
 helpers.describe("field run: a run", function()
+	helpers.it("reports a step declared for a person with its reason and does not run it", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			local declaration = Json.decode(SPEC_TEXT)
+			declaration.steps[1].person = "needs_typing"
+			declaration.steps[1].reason = "synthetic_input_unsafe"
+			local spec = FieldRun.validate(declaration)
+			FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports }):start()
+			state.request({ schema = 1, request_id = "r10", steps = Json.array({ spec.steps[1].id }) })
+			state.advance(0)
+			local result = state.json(result_path("r10", 1, spec.steps[1].id))
+			helpers.assert_eq(result.verdict, "needs_typing")
+			helpers.assert_eq(result.codes[1], "synthetic_input_unsafe")
+			helpers.assert_eq(#state.calls, 0, "a step that needs a person must not run")
+		end)
+	end)
+
 	helpers.it("writes one result per step, the guard and done", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world()
-			local spec = spec_of(FieldRun)
-			started(FieldRun, state)
+			-- A disabled shipped step is a skip, proven apart; the whole run keeps the reload
+			local spec = enabled_spec_of(FieldRun)
+			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
+			session:start()
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
+			state.advance(0)
+			-- The timed reload: this state is torn down, the reloaded one carries on
+			helpers.assert_eq(#state.reloads, 1, "the reload step asks for one reload")
+			helpers.assert_eq(state.reloads[1].reason, FieldRun.TIMED_RELOAD_REASON)
+			helpers.assert_nil(state.files[FOLDER .. "/results/r11/done.json"], "a suspended run writes no done")
+			session:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
+			helpers.assert_not_nil(state.files[FOLDER .. "/running.json"], "the running marker survives the reload")
+			state.now = state.now + 4200
+			FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343, ports = state.ports }):start()
 			state.advance(0)
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))
@@ -385,11 +554,18 @@ helpers.describe("field run: a run", function()
 				helpers.assert_type(result.log_window.lines, "table")
 				helpers.assert_true(spec.verdict_set[result.verdict], "undeclared verdict " .. tostring(result.verdict))
 			end
-			local typing = state.json(result_path("r11", 7, "key_accounting"))
-			helpers.assert_eq(typing.verdict, "needs_typing")
-			helpers.assert_eq(typing.codes[1], "synthetic_input_unsafe")
-			for _, id in ipairs(state.calls) do
-				helpers.assert_true(id ~= "key_accounting", "a step that needs a person must not run")
+			-- Found by its id: the field run's own probes are declared before it
+			local typing_index
+			for index, step in ipairs(spec.steps) do
+				if step.id == "key_accounting" then typing_index = index end
+			end
+			local typing = state.json(result_path("r11", typing_index, "key_accounting"))
+			helpers.assert_eq(typing.verdict, "pass", "the key accounting runs without a person")
+			local ran = {}
+			for _, id in ipairs(state.calls) do ran[id] = true end
+			for _, step in ipairs(spec.steps) do
+				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
+				if step.kind ~= "reload" then helpers.assert_true(ran[step.id], step.id .. " did not run") end
 			end
 			local lease = state.json(result_path("r11", 1, "field_lease"))
 			helpers.assert_eq(lease.verdict, "pass")
@@ -400,10 +576,31 @@ helpers.describe("field run: a run", function()
 			helpers.assert_eq(state.restored.tag, "snapshot", "the guard compares against the run's snapshot")
 			local done = state.json(FOLDER .. "/results/r11/done.json")
 			helpers.assert_eq(done.interrupted, false)
-			helpers.assert_eq(done.verdicts.key_accounting, "needs_typing")
+			helpers.assert_eq(done.verdicts.key_accounting, "pass")
 			helpers.assert_eq(#done.order, #spec.steps + 1)
 			helpers.assert_nil(state.files[FOLDER .. "/running.json"], "done clears the running marker")
 			helpers.assert_not_nil(state.json(FOLDER .. "/results/r11/accepted.json"))
+		end)
+	end)
+
+	helpers.it("runs work a step queued for after the run only once done is written", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local session
+			local seen = {}
+			local state = world({
+				field_owned_pause = function(_, finish, current)
+					helpers.assert_true(session:after_run(function()
+						seen[#seen + 1] = current.files[FOLDER .. "/results/r21/done.json"] ~= nil
+					end))
+					finish("pass", { "ok" }, {})
+				end,
+			})
+			session = started(FieldRun, state)
+			helpers.assert_eq(session:after_run(function() end), false, "no run, nothing to queue")
+			state.request({ schema = 1, request_id = "r21", steps = Json.array({ "field_owned_pause" }) })
+			state.advance(0)
+			helpers.assert_eq(seen, { true }, "the queued work runs once, after the done marker")
 		end)
 	end)
 
@@ -511,7 +708,7 @@ helpers.describe("field run: a run", function()
 		end)
 	end)
 
-	helpers.it("times a stalled download out after one silent window, and any download at its bound", function()
+	helpers.it("times a stalled download out after one silent window, and a moving one only at the request's spare time", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world({ ollama_model = function() end, mlx_model = function() end })
@@ -528,18 +725,50 @@ helpers.describe("field run: a run", function()
 			helpers.assert_eq(stalled.verdict, "timeout")
 			helpers.assert_eq(stalled.codes[1], "stalled_" .. step.deadline_seconds .. "s")
 
+			-- Still moving at its bound, a download goes on into the request time no
+			-- later step needs (the 19:17 Mac run cut the MLX model at 90 %).
 			local bound = spec.step_by_id.mlx_model
-			state.request({ schema = 1, request_id = "r32", steps = Json.array({ "mlx_model" }) })
+			local request_seconds = bound.progress_max_seconds + 600
+			local function moving_until_settled(id, steps)
+				state.request({ schema = 1, request_id = id, steps = Json.array(steps),
+					deadline_seconds = request_seconds })
+				state.advance(0)
+				local waited = 0
+				while state.files[result_path(id, 1, "mlx_model")] == nil and waited <= request_seconds do
+					state.mark = state.mark + 1
+					state.advance(10000)
+					waited = waited + 10
+				end
+				return state.json(result_path(id, 1, "mlx_model")), waited
+			end
+			local alone, waited_alone = moving_until_settled("r32", { "mlx_model" })
+			helpers.assert_eq(alone.codes[1], "bound_" .. request_seconds .. "s")
+			helpers.assert_eq(waited_alone, request_seconds, "a moving download may use the whole request")
+		end)
+	end)
+
+	helpers.it("keeps the later steps' budget when a moving download runs past its bound", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world({ ollama_model = function() end, mlx_model = function() end })
+			local spec = spec_of(FieldRun)
+			local bound = spec.step_by_id.ollama_model
+			local reserve = spec.step_by_id.mlx_model.progress_max_seconds
+			local request_seconds = bound.progress_max_seconds + reserve + 600
+			started(FieldRun, state)
+			-- Steps run in declaration order: the Ollama download comes before the MLX one.
+			state.request({ schema = 1, request_id = "r33", steps = Json.array({ "ollama_model", "mlx_model" }),
+				deadline_seconds = request_seconds })
 			state.advance(0)
 			local waited = 0
-			while state.files[result_path("r32", 1, "mlx_model")] == nil and waited <= bound.progress_max_seconds do
+			while state.files[result_path("r33", 1, "ollama_model")] == nil and waited <= request_seconds do
 				state.mark = state.mark + 1
 				state.advance(10000)
 				waited = waited + 10
 			end
-			local bounded = state.json(result_path("r32", 1, "mlx_model"))
-			helpers.assert_eq(bounded.codes[1], "bound_" .. bound.progress_max_seconds .. "s")
-			helpers.assert_eq(waited, bound.progress_max_seconds, "the bound ends the step exactly")
+			local expected = request_seconds - reserve
+			helpers.assert_eq(state.json(result_path("r33", 1, "ollama_model")).codes[1], "bound_" .. expected .. "s")
+			helpers.assert_eq(waited, expected, "the later steps keep their own budget")
 		end)
 	end)
 
@@ -759,6 +988,34 @@ helpers.describe("field run: pure helpers", function()
 			helpers.assert_true(ollama.runtime_name ~= ollama.name, "an Ollama pull takes the library tag")
 		end)
 	end)
+
+	helpers.it("prefers an installed model over a smaller one it would have to download", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local smallest = FieldRun.smallest_model(catalogue, "mlx")
+			local installed_name = nil
+			local largest = 0
+			for _, provider in ipairs(catalogue) do
+				for _, family in ipairs(provider.families) do
+					for _, model in ipairs(family.models) do
+						local size = model.hardware_requirements and model.hardware_requirements.mlx
+							and model.hardware_requirements.mlx.download_gb
+						if size and size > largest and model.urls and model.urls.mlx then
+							largest, installed_name = size, model.name
+						end
+					end
+				end
+			end
+			helpers.assert_true(installed_name ~= smallest.name, "the fixture needs a model larger than the smallest")
+			local chosen = FieldRun.smallest_model(catalogue, "mlx", function(model)
+				return model.name == installed_name
+			end)
+			helpers.assert_eq(chosen.name, installed_name, "the installed model is used, nothing is downloaded")
+			local none = FieldRun.smallest_model(catalogue, "mlx", function() return false end)
+			helpers.assert_eq(none.name, smallest.name, "with nothing installed the smallest is downloaded")
+		end)
+	end)
 end)
 
 helpers.describe("field run ports: configuration guard", function()
@@ -910,7 +1167,7 @@ helpers.describe("field run ports: the MLX model step", function()
 					on_success()
 					return true
 				end,
-				delete_mlx_model = function() return true end,
+				delete_mlx_model = function() error("the step must keep the downloaded model", 0) end,
 			}
 			package.loaded["ui.menu.menu_llm"] = {
 				active_models_manager = function() return manager end,
@@ -931,7 +1188,7 @@ helpers.describe("field run ports: the MLX model step", function()
 		helpers.assert_eq(outcome.active, "/home/models/Qwen3.5-4B\n", "the user's model stays the active one")
 		helpers.assert_eq(outcome.verdict, "pass")
 		helpers.assert_eq(outcome.codes,
-			"model_absent,downloaded_and_served,server_stopped,removal_started,active_model_restored")
+			"model_absent,downloaded_and_served,server_stopped,model_kept,active_model_restored")
 	end)
 
 	helpers.it("removes the active-model file the step created", function()
@@ -945,5 +1202,78 @@ helpers.describe("field run ports: the MLX model step", function()
 		helpers.assert_eq(outcome.verdict, "fail")
 		helpers.assert_true(outcome.codes:find("active_model_restore_failed", 1, true) ~= nil,
 			"the step names the file it could not put back")
+	end)
+end)
+
+helpers.describe("field run ports: Ollama model step", function()
+	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.shell_runner",
+			"adapters.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
+			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
+		helpers.with_stub_scope(stubbed, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["adapters.file_system"] = { read = function() return "{}" end }
+			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
+			local timers = 0
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function(_, callback) timers = timers + 1; callback() end,
+				cancel = function() end,
+			}
+			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["infra.field_run"] = {
+				smallest_model = function() return { name = "Granite", runtime_name = "granite4:350m-h", download_gb = 0.36 } end,
+			}
+			-- The 19:17 Mac run: the install had just rewritten the runtime files,
+			-- so the hint was pending twice before it named the executable.
+			local looks = 0
+			package.loaded["modules.llm.ollama_binary"] = {
+				native_candidate = function()
+					looks = looks + 1
+					if looks <= 2 then return nil, nil, "pending" end
+					return "/owned/ollama", {}
+				end,
+				resolve = function()
+					if looks <= 2 then return nil, "managed runtime metadata is pending", nil end
+					return "/owned/ollama", nil, "native_managed"
+				end,
+			}
+			-- What the step read before: the pending hint answers "absent".
+			package.loaded["modules.llm.ollama_deps_checker"] = {
+				runtime_available = function() return package.loaded["modules.llm.ollama_binary"].resolve() ~= nil end,
+			}
+			package.loaded["modules.llm.api_ollama"] = {
+				forget_local_models = function() end,
+				verify_local_model = function(_, callback) callback(true) end,
+				ensure_running = function() end,
+			}
+			local pulled = false
+			local manager = { pull_ollama_model = function(_, on_success) pulled = true; on_success(); return true end }
+			package.loaded["ui.menu.menu_llm"] = { active_models_manager = function() return manager end }
+			package.loaded["adapters.field_run_ports"] = nil
+			local ports = require("adapters.field_run_ports").new("/repo")
+			local verdict, codes
+			ports.run_step({ id = "ollama_model", kind = "ai" }, function(v, c) verdict, codes = v, table.concat(c, ",") end)
+			helpers.assert_eq(verdict, "pass", "the step must not read a pending hint as an absent runtime")
+			helpers.assert_true(pulled, "the model step ran its pull")
+			helpers.assert_eq(timers, 2, "it looked again once per pending answer")
+			helpers.assert_eq(codes, "model_preexisting,pulled,model_kept")
+		end)
+	end)
+end)
+
+helpers.describe("field run: model download bounds", function()
+	helpers.it("lets a model download over a slow shared connection finish", function()
+		local spec = Json.decode(SPEC_TEXT)
+		local total = 0
+		for _, step in ipairs(spec.steps) do
+			total = total + (step.progress_max_seconds or step.deadline_seconds)
+			if step.id == "ollama_model" or step.id == "mlx_model" then
+				-- The Mac run of 2026-10-30 19:17 stopped the 0.38 GB MLX model at 90 %
+				-- after 1 200 s while it still progressed; 40 minutes covers 0.4 GB at 0.2 MB/s.
+				helpers.assert_true(step.progress_max_seconds >= 2400,
+					step.id .. " stops a progressing download too early")
+			end
+		end
+		helpers.assert_true(spec.deadline_seconds.default >= total, "the default request covers every bound")
 	end)
 end)

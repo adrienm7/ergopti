@@ -72,7 +72,7 @@ global BUNDLE_RELEASE_URL := "__BUNDLE_RELEASE_URL__"
 ; Asset name pattern for the self-updater download. Frozen at build time to
 ; keep the runtime decoupled from the release-workflow naming convention —
 ; if a future rename happens, only this placeholder needs to track it.
-global BUNDLE_RELEASE_ASSET := "ErgoptiPlus.exe"
+global BUNDLE_RELEASE_ASSET := Identifiers.App.EXE
 
 ; Update channel this exe was BUILT from: the release workflow rewrites the
 ; placeholder to the registry id of the channel it publishes
@@ -90,6 +90,7 @@ global _BundleDir := ""
 
 ; CNG constants must be initialized before the first compiled asset check.
 ; Bootstrap errors use OutputDebug because the central logger is not ready yet.
+#Include %A_LineFile%\..\..\_generated\identifiers.ahk
 #Include ../adapters/crypto.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/process_lifecycle.ahk

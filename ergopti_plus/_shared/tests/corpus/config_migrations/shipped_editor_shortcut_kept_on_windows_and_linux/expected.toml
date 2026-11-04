@@ -1,8 +1,0 @@
-[_meta]
-schema_version = 16
-
-[hotstrings.editor]
-shortcut = { mods = ["ctrl"], key = "d" }
-
-[hotstrings.dynamic]
-enabled = true

@@ -21,6 +21,12 @@
 ---    vendor/remap-runtime/manifest.json pins completely; an unpinned manifest is a
 ---    named refusal, never a guessed driver version.
 --- 5. One Command Runner: bounded commands reuse the field check's runner.
+--- 6. Fetched Into Ergopti's Folder: the first admission downloads and verifies
+---    the pinned artifact through platform/remap/runtime_artifact_fetch.lua,
+---    then every later one reuses that copy without the network.
+--- 7. Driver-Only Update On Request: the pinned VirtualHIDDevice replaces an
+---    incompatible one only through platform/remap/runtime_vhid_update.lua,
+---    which the Tap-Holds row starts after the user's confirmation.
 --- ==============================================================================
 
 local M = {}
@@ -37,25 +43,128 @@ local UNKNOWN_SERVICE_STATUS = 113
 -- The runtime manifest, relative to this module's directory.
 local MANIFEST_RELATIVE = "../vendor/remap-runtime/manifest.lua"
 
+--- Reads the shipped runtime manifest.
+--- @return table|nil manifest Nil when it cannot be read.
+local function load_manifest()
+	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
+	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
+	if not loaded or type(manifest) ~= "table" then return nil end
+	return manifest
+end
+
 --- Reads and judges the shipped runtime manifest.
 --- @return table|nil pinned The owner's pinned facts.
 --- @return string|nil reason Why there are none.
 local function pinned_artifact()
-	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
-	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
-	if not loaded or type(manifest) ~= "table" then
-		return nil, "the runtime manifest could not be read"
-	end
+	local manifest = load_manifest()
+	if not manifest then return nil, "the runtime manifest could not be read" end
 	return require("platform.remap.runtime_manifest").pinned(manifest)
 end
 
 --- How many pin fields of the shipped runtime manifest are still unpinned.
 --- @return integer|nil count Nil when the manifest cannot be read.
 function M.unpinned_count()
-	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
-	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
-	if not loaded or type(manifest) ~= "table" then return nil end
+	local manifest = load_manifest()
+	if not manifest then return nil end
 	return #require("platform.remap.runtime_manifest").unpinned(manifest)
+end
+
+--- The VirtualHIDDevice version the shipped manifest pins.
+--- @return string|nil version Nil when unreadable or not pinned.
+function M.virtual_hid_version()
+	local manifest = load_manifest()
+	if not manifest then return nil end
+	return require("platform.remap.runtime_manifest").virtual_hid_version(manifest)
+end
+
+local fetcher
+
+--- Downloads and verifies the pinned artifact the first time, then reuses it.
+--- One fetcher serves admission and the field run, so they share one fetch.
+--- @param callback function fn(ok, payload|reason, explanation).
+function M.fetch_artifact(callback)
+	local manifest = load_manifest()
+	if not manifest then
+		return callback(false, "artifact_unpinned", "the runtime manifest could not be read")
+	end
+	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
+		exec = FieldCheckPorts.exec,
+		exists = FileSystem.exists,
+		read = FileSystem.read,
+		write = function(path, content) return FileSystem.write(path, content) == true end,
+		expand = FileSystem.expand_path,
+	})
+	fetcher.ensure(manifest.runtime, callback)
+end
+
+local vhid_updater
+
+--- Replaces the installed VirtualHIDDevice with the pinned driver, once the
+--- user confirmed it (platform/remap/runtime_vhid_update.lua).
+--- @param callback function fn(ok, reason|nil, explanation|nil).
+function M.update_virtual_hid(callback)
+	local Update = require("platform.remap.runtime_vhid_update")
+	local manifest = load_manifest()
+	if not manifest then
+		return callback(false, Update.REASON.UNPINNED, "the runtime manifest could not be read")
+	end
+	vhid_updater = vhid_updater or Update.new({
+		exec = FieldCheckPorts.exec,
+		expand = FileSystem.expand_path,
+	})
+	vhid_updater.update(manifest.virtual_hid_device, callback)
+end
+
+--- The persisted record that Ergopti closed the user's own Karabiner.
+--- @return table marker { get, set, clear }.
+function M.marker()
+	local path = FileSystem.expand_path(require("platform.remap.ke_paths").OWNED.CLOSED_OTHER_MARKER)
+	return {
+		get = function() return FileSystem.exists(path) == true end,
+		set = function()
+			return FileSystem.prepare_parent_for_create(path) == true and FileSystem.write(path, "closed\n") == true
+		end,
+		clear = function() return FileSystem.delete(path) == true end,
+	}
+end
+
+--- Tells the user that Ergopti closed their Karabiner and when it comes back.
+local function announce_closed()
+	local i18n = require("infra.i18n")
+	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
+end
+
+--- Builds the owner's state observer: the first block of a launch the user can
+--- act on (runtime_owner.lua USER_BLOCKS) raises one notice; the Tap-Holds menu
+--- says which one. Without it an owned boot with the runtime missing
+--- or a user Karabiner left running had the tap-holds off silently, since the
+--- official-application wizard no longer runs and the explanation sits in a submenu.
+--- @param notify function fn(text) showing a notice.
+--- @return function observer fn(state, reason).
+function M.block_notice(notify)
+	assert(type(notify) == "function", "Missing notifier")
+	local shown = false
+	local blocks = require("platform.remap.runtime_owner").USER_BLOCKS
+	return function(state, reason)
+		if shown or (state ~= "unavailable" and state ~= "failed") or not blocks[reason] then return end
+		shown = true
+		notify(require("infra.i18n").get("notify.karabiner.owned_blocked"))
+	end
+end
+
+--- The ports of the activation rule (platform/remap/runtime_activation.lua).
+--- @param owner table The bound runtime owner module.
+--- @param close_other_instances function fn() -> boolean, the user's consent.
+--- @param reload function fn() asking for a driver reload.
+--- @return table ports
+function M.activation(owner, close_other_instances, reload)
+	return {
+		owner = owner,
+		close_other_instances = close_other_instances,
+		restore = require("adapters.karabiner_coexistence").new().restore,
+		marker = M.marker(),
+		reload = reload,
+	}
 end
 
 --- The ports of the real Mac.
@@ -86,13 +195,18 @@ function M.new()
 		},
 		coexistence = {
 			detect = Coexistence.detect,
-			close = Coexistence.close,
+			close = require("platform.remap.runtime_activation").remembering_close(Coexistence.close, M.marker(),
+				announce_closed),
 		},
 		artifact = {
 			pinned = pinned_artifact,
+			fetch = M.fetch_artifact,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
 		timer = require("adapters.timer_scheduler"),
+		observer = M.block_notice(function(text)
+			require("infra.notifications").notify(text, nil, "warning")
+		end),
 	}
 end
 

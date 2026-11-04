@@ -282,10 +282,8 @@ helpers.describe("keyboard hook: the daemon refreshes the active XKB keymap", fu
 		helpers.assert_true(handler:find("keyboard_layout.refresh", 1, true) ~= nil,
 			"the active server dump must refresh both capture and injection")
 
-		local layout_handle = assert(io.open(
-			helpers.driver_root() .. "/adapters/keyboard_layout.lua", "r"))
-		local layout_source = layout_handle:read("*a")
-		layout_handle:close()
+		-- adapters/keyboard_layout, selected by a declaration unique to it.
+		local layout_source = assert(helpers.read_driver_unit("local function copy_step("))
 		helpers.assert_true(layout_source:find("XkbCapture.load(text)", 1, true) ~= nil,
 			"refresh must load capture from the exact text used to build injection")
 	end)

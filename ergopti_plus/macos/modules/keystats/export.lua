@@ -30,6 +30,9 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Queries = require("keystats.queries")
+-- One owner of SQL text values: db:exec ends a statement at a NUL, so doubling
+-- apostrophes alone let one cut a literal (sql-literal-nul-2026-10-21).
+local Literal = require("sqlite.literal")
 local i18n   = require("infra.i18n")
 local FsDir  = require("infra.fs_dir")
 local RunningApplication = require("adapters.running_application")
@@ -241,10 +244,11 @@ end
 function M.get_db_rev()
 	local db = _get_db and _get_db()
 	if not db then return 0 end
+	local rev = 0
 	for r in db:nrows(Queries.render("meta.rev", "native")) do
-		return tonumber(r.value) or 0
+		rev = tonumber(r.value) or 0
 	end
-	return 0
+	return rev
 end
 
 
@@ -421,11 +425,45 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover, pace)
 end
 
 --- Return the legacy last complete LF-terminated COMMIT byte offset.
+--- Same lexical rules as `_scan_ledger` without a device, but it jumps between
+--- the only bytes that change state (`-`, `'`, LF) with a native find: the
+--- unjournaled-ledger admission scans the whole local data.sql on the main
+--- thread, and the byte-by-byte loop held it 17 s on a 290 MB ledger in the
+--- 2026-10-30 field report.
 ---@param chunk string
 ---@return integer
 function M._last_complete_batch_offset(chunk)
-	local offset = _scan_ledger(chunk)
-	return offset
+	chunk = chunk or ""
+	local find, sub = string.find, string.sub
+	local last_commit, i = 0, 1
+	while true do
+		local at = find(chunk, "[-'\n]", i)
+		if not at then return last_commit end
+		local ch = sub(chunk, at, at)
+		if ch == "-" then
+			if sub(chunk, at + 1, at + 1) == "-" then
+				-- The comment's LF is consumed without a COMMIT check, as in the full scan.
+				local ending = find(chunk, "\n", at + 2, true)
+				if not ending then return last_commit end
+				i = ending + 1
+			else
+				i = at + 1
+			end
+		elseif ch == "'" then
+			local close = at
+			repeat
+				close = find(chunk, "'", close + 1, true)
+				if not close then return last_commit end
+				local doubled = sub(chunk, close + 1, close + 1) == "'"
+				if doubled then close = close + 1 end
+			until not doubled
+			i = close + 1
+		elseif sub(chunk, at + 1, at + 8) == "COMMIT;\n" then
+			last_commit, i = at + 8, at + 9
+		else
+			i = at + 1
+		end
+	end
 end
 
 --- Read authoritative per-device typing cutoffs from uncompacted producer SQL.
@@ -581,7 +619,7 @@ function M.sync_foreign_data_sql(on_applied)
 				local watermark, digest, has_device_row = 0, nil, false
 				for r in db:nrows(string.format(
 					"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
-					entry:gsub("'", "''"))) do
+					Literal.escape(entry))) do
 					has_device_row = true
 					watermark = tonumber(r.imported_data_sql_size)
 					digest = r.imported_data_sql_sha256
@@ -637,7 +675,7 @@ function M.sync_foreign_data_sql(on_applied)
 							if derived_ok then
 								local watermark_rc = db:exec(string.format(
 									"UPDATE devices SET imported_data_sql_size=%d, imported_data_sql_sha256='%s', updated_at='%s' WHERE device_id='%s'",
-									applied_to, receipt.digest, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
+									applied_to, Literal.escape(receipt.digest), Literal.escape(_now_ts()), Literal.escape(entry)))
 								if watermark_rc == sqlite3.OK then
 									table.insert(synced_devices, entry)
 									Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)

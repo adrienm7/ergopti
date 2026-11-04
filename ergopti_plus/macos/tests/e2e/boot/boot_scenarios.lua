@@ -42,6 +42,14 @@
 ---    active developer folder's python3, and that copy was x86_64 only. The
 ---    migrated Mac keeps those Intel Pythons (and an Intel Homebrew in
 ---    /usr/local); a Python helper started after the boot must pick the arm64 one.
+--- 7. init-boot-logger: a boot WARNING used {1} and {2} as placeholders, which
+---    string.format never replaces, so the paths it named never reached the
+---    log. No boot line may keep a {N} placeholder.
+--- 8. init-boot-mlx: the boot ran its MLX port cleanup (lsof, a curl probe of up
+---    to 1 s, ps) on every boot, the AI off included; it only serves the AI
+---    warmup. An AI-off boot runs no such shell, and a boot whose AI is on,
+---    from config.toml or this Mac's preferences, runs it once. Only the AI-off boot
+---    skips the LLM backend bootstrap, and logs that it did.
 --- ==============================================================================
 
 local M = {}
@@ -52,6 +60,8 @@ local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 -- a configured boot.
 local WIZARD_MARKER = "Onboarding wizard opened."
 local BOOTED_MARKER = "Hammerspoon boot SUCCESSFUL."
+-- The INFO line init.lua logs when an AI-off boot skips the LLM backend bootstrap.
+local LLM_SKIPPED_MARKER = "LLM boot disabled at startup"
 
 
 
@@ -163,9 +173,33 @@ end
 --- Karabiner-Elements is set up.
 --- @param ctx table Scenario context.
 local function neutral_defaults(ctx)
+	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
+	local registry = assert(read(ctx.repo .. "/static/ergopti_plus/_shared/core/config_schema/migrations.toml"),
+		"migration registry missing")
+	local version = assert(registry:match("\noldest_version = (%d+)"), "registry has no oldest version")
 	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml",
-		assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
+		"[_meta]\nschema_version = " .. version .. "\n\n"
+		.. assert(read(ctx.driver .. "/_generated/config_template.toml"), "config template missing"))
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
+end
+
+--- The neutral defaults with the AI turned on in config.toml only: no value in
+--- this Mac's preferences, as after a copied or restored configuration.
+--- @param ctx table Scenario context.
+local function ai_on_in_config(ctx)
+	neutral_defaults(ctx)
+	local path = ctx.home .. "/.config/ergopti_plus/hammerspoon/config.toml"
+	local toml, replaced = assert(read(path), "config.toml missing"):gsub("\n%[llm%]\nenabled = false\n",
+		"\n[llm]\nenabled = true\n", 1)
+	assert(replaced == 1, "the config template no longer opens [llm] with enabled = false")
+	write_home(ctx.home, ".config/ergopti_plus/hammerspoon/config.toml", toml)
+end
+
+--- The AI turned on in config.toml and in this Mac's preferences.
+--- @param ctx table Scenario context.
+local function ai_consented(ctx)
+	ai_on_in_config(ctx)
+	ctx.settings = { ["ergopti.llm.enabled"] = true }
 end
 
 --- A saved widget position whose X coordinate survived but whose Y did not.
@@ -177,10 +211,12 @@ local function partial_wpm_position(ctx)
 	local config = assert(read(ctx.home .. "/" .. relative))
 	local enabled, enabled_count = config:gsub("%[metrics%]\nenabled = false", "[metrics]\nenabled = true")
 	assert(enabled_count == 1, "the metrics configuration section must be present exactly once")
-	-- The shipped widget is hidden and compact: the scenario shows it, keeping the compact pill.
-	local compact, shown_count = enabled:gsub("wpm_widget_visible = false", "wpm_widget_visible = true")
+	-- The shipped widget is hidden and shows its graph (decision of 2026-11-03): the
+	-- scenario shows it and turns the graph off, so the child finds the compact pill.
+	local shown, shown_count = enabled:gsub("wpm_widget_visible = false", "wpm_widget_visible = true")
 	assert(shown_count == 1, "the widget visibility configuration must be present exactly once")
-	assert(compact:find("wpm_widget_graph = false", 1, true), "the shipped widget must be compact")
+	local compact, graph_count = shown:gsub("wpm_widget_graph = true", "wpm_widget_graph = false")
+	assert(graph_count == 1, "the shipped widget must show its graph exactly once in the configuration")
 	write_home(ctx.home, relative, compact)
 	ctx.settings = { ["ergopti.wpm_widget.pos_x"] = 120 }
 	-- An existing Metrics user already owns its device identity and folders.
@@ -313,7 +349,14 @@ end
 local function scenarios(repo)
 	local list = {
 		{ name = "a fresh install opens the first-run wizard", steps = { "boot" }, marker = WIZARD_MARKER },
-		{ name = "the neutral defaults boot", setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER },
+		{ name = "the neutral defaults boot", setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER,
+			ai_enabled = false },
+		{ name = "the AI turned on and consented boots its MLX port cleanup (init-boot-mlx)", setup = ai_consented,
+			steps = { "boot" }, marker = BOOTED_MARKER, ai_enabled = true },
+		-- The cleanup gate read the preferences alone while the AI bootstrap fell
+		-- back to config.toml: this boot started the AI with no cleanup.
+		{ name = "the AI turned on in config.toml alone boots its MLX port cleanup (init-boot-mlx-config)",
+			setup = ai_on_in_config, steps = { "boot" }, marker = BOOTED_MARKER, ai_enabled = true },
 		{ name = "the layout menu selects French through its native fallback (native-layout-selection)",
 			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
 			machine = "native_layout_selection", facts = { layout_set_attempts = "1", layout_native_selections = "1",
@@ -371,6 +414,7 @@ local function scenarios(repo)
 			-- The legacy preference keys of an unstamped release turn the AI off
 			ai_runtime = case.stamped and function(arch) return missing_ai_runtime(case, arch) end or nil,
 		}
+		list[#list].ai_enabled = case.stamped and case.enables_ai
 	end
 	if #list < 6 then error("boot scenarios: the migration corpus holds fewer than three macOS releases") end
 	local turns_ai_on = false
@@ -448,6 +492,10 @@ local function judge(output, action, marker)
 	for line in output:gmatch("[^\n]+") do
 		if line:find("%[ERROR%]") or line:find("%[FATAL%]") then
 			problems[#problems + 1] = "logged " .. line:gsub("^%S+ %S+ ", "")
+		elseif line:find("^%d%d%d%d%-") and line:find("{%d+}") then
+			-- init-boot-logger: the logger formats with string.format, so a {1}
+			-- placeholder reaches the file as is and hides its value.
+			problems[#problems + 1] = "logged an unformatted placeholder: " .. line:gsub("^%S+ %S+ ", "")
 		else
 			local kind = line:match("^E2E_([%u_]+) ")
 			if kind == "DIALOG" or kind == "EXIT" or kind == "BUNDLE_WRITE" or kind == "BUNDLE_READ_MISSING"
@@ -552,6 +600,32 @@ local function started_pythons(output)
 	return boot, action
 end
 
+--- Whether a child's boot, before its action, logged a line holding `marker`.
+--- @param output string Child output.
+--- @param marker string Plain text.
+--- @return boolean logged
+local function boot_logged(output, marker)
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_PHASE ") then return false end
+		if line:find(marker, 1, true) then return true end
+	end
+	return false
+end
+
+--- How many MLX port cleanup shells a child started during its boot: the
+--- world records each task start, and the cleanup is the one that lists the
+--- port's listeners (modules/llm/boot_cleanup.lua).
+--- @param output string Child output.
+--- @return integer count E2E_TASK lines before E2E_PHASE that run lsof on a port.
+local function boot_port_cleanups(output)
+	local count = 0
+	for line in output:gmatch("[^\n]+") do
+		if line:match("^E2E_PHASE ") then break end
+		if line:match("^E2E_TASK ") and line:find("lsof -nP -iTCP:", 1, true) then count = count + 1 end
+	end
+	return count
+end
+
 --- Whether a boot told the user that the AI runtime it needs is missing: a
 --- notification naming that runtime (a product name, never translated).
 --- @param output string Child output.
@@ -622,6 +696,23 @@ function M.run(check, options)
 				end
 				if action == "python_helper" and #action_pythons == 0 then
 					ctx.problems[#ctx.problems + 1] = action .. ": the Python helper started no Python"
+				end
+				-- init-boot-mlx: the port cleanup belongs to an AI-on boot only.
+				if action == "boot" and scenario.ai_enabled ~= nil then
+					local cleanups = boot_port_cleanups(output)
+					if scenario.ai_enabled and cleanups ~= 1 then
+						ctx.problems[#ctx.problems + 1] = action .. ": the AI-on boot ran " .. cleanups
+							.. " MLX port cleanup(s), expected 1"
+					elseif not scenario.ai_enabled and cleanups ~= 0 then
+						ctx.problems[#ctx.problems + 1] = action .. ": the AI-off boot ran the MLX port cleanup"
+					end
+					-- The LLM backend bootstrap is skipped, and said so, on an AI-off boot only.
+					local skipped = boot_logged(output, LLM_SKIPPED_MARKER)
+					if skipped == scenario.ai_enabled then
+						ctx.problems[#ctx.problems + 1] = action .. (scenario.ai_enabled
+							and ": the AI-on boot skipped the LLM backend bootstrap"
+							or ": the AI-off boot never skipped the LLM backend bootstrap")
+					end
 				end
 				local runtime = action == "boot" and scenario.ai_runtime and scenario.ai_runtime(ctx.arch) or nil
 				if runtime and not notified_missing_runtime(output, runtime) then

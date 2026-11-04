@@ -45,4 +45,35 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 		package.loaded["modules.shortcuts.actions.system"] = saved
 		helpers.assert_true(ok, tostring(err))
 	end)
+
+	it("opens the Ctrl+G page under the dispatching parent (action-parity-open-chatgpt)", function(fresh_actions)
+		-- open_chatgpt existed on Windows and Linux only; macOS had just its
+		-- Ctrl+G shortcut, whose URL owner the action must share.
+		-- fresh_actions() installs the fixture's owners; these replace two of
+		-- them for this case and are put back before the fixture restores its own.
+		local actions = fresh_actions()
+		local saved_bindings = package.loaded["modules.shortcuts.bindings"]
+		local saved_apps = package.loaded["modules.shortcuts.actions.apps"]
+		local opened = {}
+		package.loaded["modules.shortcuts.bindings"] = {
+			get_chatgpt_url = function() return "https://chat.example.test/" end,
+		}
+		package.loaded["modules.shortcuts.actions.apps"] = {
+			open_chatgpt = function(url, parent)
+				opened[#opened + 1] = { url = url, parent = parent }
+				return true
+			end,
+		}
+		local ok, err = pcall(function()
+			helpers.assert_eq(actions.execute_single("open_chatgpt"), true, "open_chatgpt must be registered")
+			helpers.assert_eq(actions.execute_single("open_chatgpt", "keyboard__primary_1"), true)
+			helpers.assert_eq(opened, {
+				{ url = "https://chat.example.test/", parent = "gestures" },
+				{ url = "https://chat.example.test/", parent = "shortcut_bindings" },
+			})
+		end)
+		package.loaded["modules.shortcuts.bindings"] = saved_bindings
+		package.loaded["modules.shortcuts.actions.apps"] = saved_apps
+		helpers.assert_true(ok, tostring(err))
+	end)
 end)

@@ -97,9 +97,12 @@ _KLMig_WriteLedger(texts, foreignText := "") {
     if (foreignText != "") {
         ; A row that arrived from another machine. Built with the same builder
         ; under a different device id, then restored.
+        localId := Keystats.device_id
         localLit := Keystats._device_id_lit
+        Keystats.device_id := "other-device"
         Keystats._device_id_lit := KL_SqlStr("other-device")
         body .= _KLMig_TypingSql(foreignText) . "`n"
+        Keystats.device_id := localId
         Keystats._device_id_lit := localLit
     }
     body .= "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) "

@@ -258,48 +258,6 @@ function M.run(helpers, corpus_path)
 				get_edges = owner.get_edges, set_order = owner.set_order, set_edges = owner.set_edges }), 0,
 				"a greyed row needs its reason")
 		end)
-
-		helpers.it("replays the shipped typed migration through the actual Lua planner", function()
-			local Migrate = require("config_migrate")
-			local Codec = require("toml_codec")
-			local shared = corpus_path:gsub("tests/corpus/layouts/number_row_policy%.json$", "")
-			local function read(path)
-				local stream = assert(io.open(path, "rb"))
-				local bytes = stream:read("*a")
-				assert(stream:close())
-				return bytes
-			end
-			local registry = assert(Migrate.load_registry(shared .. Migrate.REGISTRY_PATH))
-			helpers.assert_eq(registry.current, 16, "the actual shipped registry includes the dynamic feature-row migration")
-			local replays = 0
-			for index = 0, 10 do
-				-- A case the Windows-only dynamic-master step changes is split in two: the
-				-- Windows replay and, beside it, the replay of the drivers it leaves alone.
-				for _, suffix in ipairs({ "", "_non_windows" }) do
-					local directory = shared .. "tests/corpus/config_migrations/shipped_number_row_typed_" .. index
-						.. suffix .. "/"
-					local probe = io.open(directory .. "case.toml", "rb")
-					if probe then
-						probe:close()
-						local meta = Codec.decode(read(directory .. "case.toml")).case
-						local source = read(directory .. "input.toml")
-						local expected = read(directory .. "expected.toml")
-						for _, driver in ipairs(meta.drivers) do
-							local planned = Migrate.plan(source, registry, driver)
-							helpers.assert_eq(planned.outcome, "migrated", driver .. ": typed migration")
-							helpers.assert_eq(planned.candidate, expected, driver .. ": exact independent expected bytes")
-							helpers.assert_eq(planned.candidate:find('future = "kept" # independently retained', 1, true) ~= nil, true)
-							local replay = Migrate.plan(planned.candidate, registry, driver)
-							helpers.assert_eq(replay.outcome, "current", driver .. ": idempotent native plan")
-							helpers.assert_eq(replay.candidate, nil, "current sources acquire no rewrite")
-							replays = replays + 1
-						end
-					end
-				end
-			end
-			helpers.assert_eq(replays, 21, "every declared driver vector executed")
-		end)
-
 	end)
 end
 

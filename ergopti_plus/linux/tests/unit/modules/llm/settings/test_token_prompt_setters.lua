@@ -34,10 +34,8 @@ local Engine = helpers.load_module("modules.llm.prediction_engine")
 --- Every `state.llm.<name>` the token-prompt bridge calls.
 --- @return table Sorted array of names.
 local function called_by_bridge()
-	local handle = assert(io.open(
-		helpers.driver_root() .. "/ui/token_prompt/bridge.lua", "r"))
-	local source = handle:read("*a")
-	handle:close()
+	-- ui/token_prompt/bridge, selected by a declaration unique to it.
+	local source = assert(helpers.read_driver_unit('local LOG = "bridge.token"'))
 	local seen = {}
 	for name in source:gmatch("state%.llm%.([%a_]+)") do seen[name] = true end
 	local out = {}

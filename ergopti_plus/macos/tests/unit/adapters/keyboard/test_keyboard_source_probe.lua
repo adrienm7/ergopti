@@ -258,6 +258,30 @@ helpers.describe("native keyboard source proof ownership", function()
 		end)
 	end)
 
+	helpers.it("trusts a fresh process's identity over this process's lagging view (rows-probe-fresh-identity)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local context = fixture()
+			-- A subprocess just selected SOURCE; this process still answers the previous one.
+			context.source = "com.apple.keyboardlayout.ergopti.plus"
+			local operation = context.request({ source_id = SOURCE, codes = { 41 }, identity = "fresh_process" })
+			helpers.assert_eq(context.calls.spawned, 1, "the launcher reads the selected source itself")
+			context.finish(context.receipt())
+			helpers.assert_true(operation.is_settled())
+			helpers.assert_eq(context.results[1].reason, nil)
+			helpers.assert_eq(context.results[1].receipt.levels[1].text, ";")
+
+			local stale = fixture()
+			stale.source = "com.apple.keyboardlayout.ergopti.plus"
+			stale.request({ source_id = SOURCE, codes = { 41 } })
+			helpers.assert_eq(stale.calls.spawned, nil, "this process's own identity is still compared")
+			helpers.assert_eq(stale.results[1].reason, "source_changed")
+
+			local unknown = fixture()
+			unknown.request({ source_id = SOURCE, codes = { 41 }, identity = "guessed" })
+			helpers.assert_eq(unknown.results[1].reason, "invalid_request")
+		end)
+	end)
+
 	helpers.it("retains pending SIGTERM and fences a late successful result", function()
 		helpers.with_stub_scope(MODULES, function()
 			local context = fixture()
@@ -274,6 +298,25 @@ helpers.describe("native keyboard source proof ownership", function()
 			helpers.assert_eq(context.results[1].reason, "cancelled")
 			helpers.assert_eq(settled, 1)
 			helpers.assert_true(operation.cancel())
+		end)
+	end)
+
+	helpers.it("logs its caller's cancellation as a warning and a refusal as an error", function()
+		-- A newer proof replacing this one logged « refused: cancelled » as an ERROR.
+		helpers.with_stub_scope(MODULES, function()
+			local context = fixture()
+			local logged = { error = {}, warn = {} }
+			local logger = package.loaded["infra.logger"]
+			logger.error = function(_, fmt, ...) logged.error[#logged.error + 1] = string.format(fmt, ...) end
+			logger.warn = function(_, fmt, ...) logged.warn[#logged.warn + 1] = string.format(fmt, ...) end
+			local operation = context.request()
+			helpers.assert_true(operation.cancel())
+			helpers.assert_eq(context.results[1].reason, "cancelled")
+			helpers.assert_eq(#logged.error, 0)
+			helpers.assert_eq(#logged.warn, 1)
+			local invalid = context.request({ source_id = SOURCE, codes = { 41 }, identity = "guessed" })
+			helpers.assert_true(invalid ~= nil)
+			helpers.assert_eq(#logged.error, 1, "a real refusal stays an error")
 		end)
 	end)
 

@@ -40,6 +40,7 @@ local AuthPolicy     = require("llm.local_server_auth")
 local Json           = require("json")
 local Discovery      = require("llm.local_server_discovery")
 local PortPolicy     = require("llm.local_server_ports")
+local Fingerprint    = require("llm.local_server_fingerprint")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -83,6 +84,9 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- @return boolean published Complete same-source local inventory.
 --- @return table discovery Server id -> validated discovery descriptor.
 --- @return table request_fields Body fields of every request to a local server.
+--- @return table dialect The reasoning controls of every request to a local server.
+--- @return table identities Server id -> the address group and fingerprint of a
+---         row whose default address another row shares (llm.local_server_fingerprint).
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -90,12 +94,12 @@ local function load_catalogue()
 	if status ~= "ok" or type(raw) ~= "string" then
 		Logger.error(LOG, "local_servers.json is unreadable at %s (%s): no local server is detected.",
 			tostring(path), tostring(status))
-		return {}, {}, false, {}, {}
+		return {}, {}, false, {}, {}, {}, {}
 	end
 	local ok, root = pcall(JsonCodec.decode, raw)
 	if not ok or type(root) ~= "table" or type(root.server_order) ~= "table" or type(root.servers) ~= "table" then
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
-		return {}, {}, false, {}, {}
+		return {}, {}, false, {}, {}, {}, {}
 	end
 	local source = Json.decode_lossless(raw)
 	local shaped = type(source) == "table" and not Json.is_array(source) and not Json.is_null(source)
@@ -113,11 +117,23 @@ local function load_catalogue()
 		if descriptor then discovery[id] = descriptor
 		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
 	end
-	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root)
+	-- The family controls a local server carries, on top of request_fields
+	local dialect, dialect_reason = require("llm.thinking_off").parse_dialect(root.thinking_dialect)
+	if not dialect then
+		Logger.error(LOG, "local_servers.json thinking_dialect is invalid (%s); only request_fields apply.", tostring(dialect_reason))
+		dialect = {}
+	end
+	-- A refused fingerprint leaves its row to its address's default row
+	local identities, refused = Fingerprint.parse(root, order)
+	for _, reason in ipairs(refused) do
+		Logger.error(LOG, "local_servers.json: %s; that row is not fingerprinted.", reason)
+	end
+	return order, servers, shaped and #order == #source.server_order, discovery, AuthPolicy.request_fields(root), dialect,
+		identities
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY, M.REQUEST_FIELDS, M.THINKING_DIALECT, M.IDENTITIES = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.
@@ -190,6 +206,7 @@ end
 -- This controller only owns logical generations, snapshots and publication.
 local controller = Discovery.new({
 	order = M.ORDER,
+	identities = M.IDENTITIES,
 	clock = function() return TimerScheduler.now() end,
 	max_age = function() return require("infra.timings").sec("llm", "local_server_detection_max_age_ms") end,
 	on_publish = function(results)
@@ -199,8 +216,11 @@ local controller = Discovery.new({
 			if result and result.status == M.STATUS_UP then M.report_success(id) end
 			if result and result.status ~= M.STATUS_DOWN then
 				local scan = M.port_scan(id)
-				found[#found + 1] = string.format("%s=%s at %s%s", id, result.status, tostring(result.base_url),
-					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "")
+				found[#found + 1] = string.format("%s=%s at %s%s%s", id, result.status, tostring(result.base_url),
+					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "",
+					result.server and (" (answers as " .. result.server .. ")") or "")
+			elseif result and result.shadowed_by then
+				found[#found + 1] = string.format("%s at %s answers as %s", id, tostring(result.base_url), result.shadowed_by)
 			end
 		end
 		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")

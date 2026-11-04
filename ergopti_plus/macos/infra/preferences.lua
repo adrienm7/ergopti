@@ -66,7 +66,6 @@ local FileSystem = require("adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
 local LEAF = require("config_keys").LEAF
-local KEY = require("config_keys").KEY
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
 local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
@@ -163,6 +162,7 @@ local KEY_MAP = {
 	llm_min_request_interval             = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
+	llm_while_hotstring_tooltip          = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.WHILE_HOTSTRING_TOOLTIP },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },
 	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED },
 	llm_context_length                   = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.CONTEXT_LENGTH },
@@ -330,28 +330,6 @@ local function delay_fits(key, value)
 	return true
 end
 
---- The user profiles an older macOS build kept as an array at [llm.profiles]
---- user_profiles, importable only while the shared llm.user_profiles key is
---- absent: the shared envelope wins once it exists. The migration registry cannot
---- carry them (its closed ops cannot re-encode a value, and the Windows engine
---- validates the same registry), so this reader is their one migration; the save
---- deletes the old array in the same write that stores the envelope.
---- @param llm table|nil Decoded [llm] table.
---- @return table|nil profiles Detached dense array, nil when there is nothing to import.
-local function legacy_user_profiles(llm)
-	if type(llm) ~= "table" or llm.user_profiles ~= nil then return nil end
-	local profiles = type(llm.profiles) == "table" and llm.profiles.user_profiles or nil
-	if type(profiles) ~= "table" or #profiles == 0 then return nil end
-	local encodable, envelope = pcall(ProfileRegistry.encode, profiles)
-	if not encodable then
-		-- Not imported means not deleted: the array stays on disk for a later build.
-		Logger.error(LOG, "Older [llm.profiles] user_profiles cannot be imported; keeping it untouched: %s",
-			tostring(envelope))
-		return nil
-	end
-	return ProfileRegistry.decode(envelope)
-end
-
 --- The prompt profile ids a document can name: the shipped built-ins and the
 --- document's own llm.user_profiles, plus the legacy ids the active
 --- profile's owner still migrates silently. nil when the shipped list cannot
@@ -375,7 +353,7 @@ local function known_profile_ids(grouped)
 	if type(stored) == "string" and not ProfileRegistry.is_outdated(stored) then
 		readable, user_profiles = pcall(ProfileRegistry.decode, stored)
 	end
-	for _, profile in ipairs(readable and user_profiles or legacy_user_profiles(llm) or {}) do
+	for _, profile in ipairs(readable and user_profiles or {}) do
 		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
 	end
 	return ids, legacy
@@ -663,6 +641,14 @@ local SCALAR_VALUE_RULES = {
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
+	end,
+	-- The manifest owns the values of this enum.
+	llm_while_hotstring_tooltip = function(value)
+		local entry = Manifest.find_entry_by_path(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+		for _, accepted in ipairs(type(entry) == "table" and entry.enum_values or {}) do
+			if accepted == value then return true end
+		end
+		return false, "'" .. tostring(value) .. "' is not a choice for the AI prediction while a hotstring tooltip shows"
 	end,
 	llm_app_profile_overrides = function(value)
 		local overrides, reason = AppProfileOverrides.decode(value)
@@ -1133,11 +1119,6 @@ local function flatten_from_disk(grouped, mark, shapes)
 			end
 		end
 	end
-	local imported = legacy_user_profiles(grouped.llm)
-	if imported then
-		flat.llm_user_profiles = ProfileRegistry.encode(imported)
-		take(KEY.LLM, LEAF.PROFILES, LEAF.USER_PROFILES)
-	end
 	for key, value in pairs(flat) do flat[key] = scalar_units(KEY_MAP[key], value, true) end
 	return flat
 end
@@ -1371,7 +1352,8 @@ end
 --- @param prefs_file string Canonical configuration path.
 --- @param tolerate_outdated boolean|nil True for a read-only consumer: an entry this build
 ---   no longer knows is then left out of the view (already warned once) instead of refusing it.
----   A transaction that writes the file back keeps the strict view, which would drop that entry.
+---   A transaction that writes this view back keeps the strict one, which would drop that
+---   entry; a save of the loaded state keeps it (see _load_outdated) and may read tolerantly.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
 --- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
@@ -2207,11 +2189,6 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		local proposed = sparse_updates(existing)
 		stage("sparse")
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
-		if document and legacy_user_profiles(document.llm) then
-			-- Imported at load: the envelope replaces the array in this very write,
-			-- or an emptied registry would import the array again at the next boot.
-			proposed[#proposed + 1] = { section = KEY.LLM_PROFILES, key = LEAF.USER_PROFILES, delete = true }
-		end
 		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
 			proposed[#proposed + 1] = row
 		end

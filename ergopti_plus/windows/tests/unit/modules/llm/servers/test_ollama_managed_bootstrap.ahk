@@ -9,6 +9,7 @@ Test("managed bootstrap: declined start keeps installation without daemon (group
 Test("managed bootstrap: held install consent rejects withdrawn source (groups247-managed)", _G4B_Withdraw)
 Test("managed bootstrap: model pull needs separate consent and fresh tags (groups247-managed)", _G4B_Model)
 Test("managed bootstrap: missing model after pull fails closed (groups247-managed)", _G4B_MissingAfterPull)
+Test("managed bootstrap: a Windows-login relay refuses the pull with its reason (owned-ollama-proxy)", _G4B_PullProxyLogin)
 Test("managed bootstrap: unknown tags cannot enable AI (groups247-managed)", _G4B_UnknownTags)
 Test("managed bootstrap: configured version mismatch cannot enable AI (groups247-managed)", _G4B_Version)
 Test("managed bootstrap: foreign epoch cannot publish readiness (groups247-managed)", _G4B_Epoch)
@@ -144,10 +145,13 @@ class _G4B_Fixture {
 		this.Now := 1000
 		this.UnknownTags := false
 		this.MissingAfterPull := false
+		this.PullExit := 0
+		; Each pull's [exit code, output], in order; 0 keeps PullExit for every pull.
+		this.PullScript := 0
 		this.Files := _G4B_Files(this)
 		this.Runtime := _G4B_Runtime(this)
 	}
-	Start() {
+	Start(Silent := false) {
 		Plan := Map("ManagedRoot", "C:\managed", "CataloguePath", "C:\catalogue.json",
 			"CatalogueSha256", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			"AssetId", "windows-amd64", "port", 23456, "version", "0.24.0", "deadline_ms", 9000,
@@ -157,7 +161,7 @@ class _G4B_Fixture {
 			"consent", ObjBindMethod(this, "Consent"), "models", ObjBindMethod(this, "Models"),
 			"version", ObjBindMethod(this, "VersionReceipt"), "pull", ObjBindMethod(this, "Pull"))
 		this.Flow := OllamaManagedBootstrap(this.Model, 9101,
-			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port)
+			(*) => this.ReadyCalls += 1, (*) => this.FailedCalls += 1, Port, Silent)
 		this.Flow.Begin()
 	}
 	Consent(Kind, Model) {
@@ -184,7 +188,12 @@ class _G4B_Fixture {
 		this.Pulls += 1
 		AssertEqual(Target["origin"], "http://127.0.0.1:23456", "Pull keeps the captured managed origin.")
 		AssertEqual(Model, this.Model, "Pull keeps the consented model.")
-		Done.Call(0)
+		if this.PullScript is Array {
+			Row := this.PullScript[this.Pulls]
+			Done.Call(Row[1], Row[2])
+			return true
+		}
+		Done.Call(this.PullExit)
 		return true
 	}
 	Close() {
@@ -359,6 +368,232 @@ _G4B_MissingAfterPull() {
 		AssertEqual(F.FailedCalls, 1, "A successful pull exit alone cannot claim an installed model.")
 	} finally F.Close()
 }
+
+; A relay that demands a Windows login was kept from the owned daemon: the
+; pull refuses with its own exit code, and the user reads why, not a generic
+; repair failure.
+_G4B_PullProxyLogin() {
+	global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullExit := LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(F.Pulls, 1)
+		AssertEqual(F.ReadyCalls, 0)
+		AssertEqual(F.FailedCalls, 1, "a refused pull fails the bootstrap")
+		AssertEqual(t("network.failure.proxy_windows_login"), _LLM_Deps_FailureMessage,
+			"the failure names the Windows-login relay")
+		AssertTrue(t("network.failure.proxy_windows_login") != t("ollama.runtime_repair_failed"),
+			"the named reason is not the generic one")
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+}
+
+; A sign-in relay refusal reaches the user as the relay's own message, the login
+; message only when no relay could answer.
+_G4B_PullRelayRefusalNamesItself() {
+	global LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[LLM_OLLAMA_PULL_PROXY_LOGIN_EXIT, "Managed model pull refused: proxy_relay sign_in_rejected`n"]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(t("network.relay.sign_in_rejected"), _LLM_Deps_FailureMessage)
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+	AssertEqual("network.failure.proxy_windows_login", LLM_OllamaPullRefusalKey("Managed model pull refused: proxy_windows_login"))
+	AssertEqual("network.relay.failed", LLM_OllamaPullRefusalKey("Managed model pull refused: proxy_relay not_a_reason"),
+		"an unknown reason is the relay that did not answer by contract")
+}
+Test("managed bootstrap: a relay refusal names its own message (proxy-auth-relay)", _G4B_PullRelayRefusalNamesItself)
+
+; The launcher compares the relay's image with what this returns, so a value read
+; from the file itself would admit any binary placed at the path.
+_G4B_RelayDigestComesFromItsManifest() {
+	Path := A_Temp . "\ergopti-g4-relay-" . A_TickCount . ".json"
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	try {
+		FileAppend('{"schema_version":1,"exe_sha256":"' . Digest . '"}', Path, "UTF-8-RAW")
+		AssertEqual(Digest, LLM_OllamaProxyRelayDigest(Path))
+		FileDelete(Path)
+		FileAppend('{"schema_version":1,"exe_sha256":"not a digest"}', Path, "UTF-8-RAW")
+		AssertThrows(() => LLM_OllamaProxyRelayDigest(Path), "a manifest naming no digest is refused")
+		FileDelete(Path)
+		AssertThrows(() => LLM_OllamaProxyRelayDigest(Path), "a binary without its manifest is refused")
+		; The bundled pair agrees: this is what a real launch compares.
+		Published := LLM_OllamaProxyRelayDigest(_VendorDir . "\" . LLM_OLLAMA_PROXY_RELAY_MANIFEST)
+		AssertEqual(Published, CryptoSha256Bytes(FSReadBytesStrict(_VendorDir . "\" . LLM_OLLAMA_PROXY_RELAY_EXECUTABLE)))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("managed bootstrap: the relay digest is its manifest's, never the file's own (proxy-relay-e2e)", _G4B_RelayDigestComesFromItsManifest)
+
+; The closing line of a pull whose fresh layer failed its sha256 check, after the
+; progress frames that always say "pulling manifest".
+_G4B_DigestOutput() {
+	return "pulling manifest`rpulling 6a07: 100%`nError: digest mismatch, file must be downloaded again: want sha256:a, got sha256:b`n"
+}
+
+_G4B_DigestRetrySucceeds() {
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, _G4B_DigestOutput()], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(2, F.Pulls, "a digest mismatch is pulled once more")
+		AssertEqual(1, F.ReadyCalls, "the second pull completes the bootstrap")
+		AssertEqual(0, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: a digest mismatch is pulled once more (ollama-digest-mismatch)", _G4B_DigestRetrySucceeds)
+
+_G4B_DigestRetryFails() {
+	global _LLM_Deps_FailureMessage
+	SavedMessage := _LLM_Deps_FailureMessage
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, _G4B_DigestOutput()], [1, _G4B_DigestOutput()], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(2, F.Pulls, "only one automatic retry")
+		AssertEqual(1, F.FailedCalls)
+		AssertEqual(StrReplace(t("ollama.digest_mismatch"), "%s", F.Model), _LLM_Deps_FailureMessage,
+			"the failure names the mismatch and the model")
+	} finally {
+		F.Close()
+		_LLM_Deps_FailureMessage := SavedMessage
+	}
+}
+Test("managed bootstrap: a second digest mismatch names itself (ollama-digest-mismatch)", _G4B_DigestRetryFails)
+
+_G4B_OtherPullErrorNotRetried() {
+	F := _G4B_Fixture()
+	try {
+		F.Model := "qwen3:0.6b"
+		F.PullScript := [[1, "pulling manifest`nError: pull model manifest: file does not exist`n"], [0, ""]]
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertEqual(1, F.Pulls, "only a digest mismatch removed the layer it would download again")
+		AssertEqual(1, F.FailedCalls)
+	} finally F.Close()
+}
+Test("managed bootstrap: another pull error is not retried (ollama-digest-mismatch)", _G4B_OtherPullErrorNotRetried)
+
+_G4B_MenuDigestRetry(Script, ExpectedPulls, ExpectedPublished) {
+	F := _G4B_Fixture()
+	Published := 0
+	try {
+		F.Start()
+		F.Runtime.PublishReady()
+		AssertTrue(F.Flow.Ready)
+		F.Model := "qwen3:0.6b"
+		F.PullScript := Script
+		F.Flow.PullModel(F.Model, (*) => Published += 1)
+		AssertEqual(ExpectedPulls, F.Pulls)
+		AssertEqual(ExpectedPublished, Published)
+		AssertEqual(ExpectedPublished == 1, F.Flow.Ready, "only the completed retry keeps the runtime")
+	} finally F.Close()
+}
+_G4B_MenuDigestRetrySucceeds() {
+	_G4B_MenuDigestRetry([[1, _G4B_DigestOutput()], [0, ""]], 2, 1)
+}
+Test("managed bootstrap: a menu pull retries a digest mismatch once (ollama-digest-mismatch)", _G4B_MenuDigestRetrySucceeds)
+_G4B_MenuDigestRetryFails() {
+	_G4B_MenuDigestRetry([[1, _G4B_DigestOutput()], [1, _G4B_DigestOutput()], [0, ""]], 2, 0)
+}
+Test("managed bootstrap: a menu pull stops at the second digest mismatch (ollama-digest-mismatch)", _G4B_MenuDigestRetryFails)
+
+_G4B_PullErrorClasses() {
+	for Row in [["Error: digest mismatch, file must be downloaded again", "digest_mismatch"],
+			["Error: write: no space left on device", "no_space"], ["Error: open: permission denied", "permission_denied"],
+			["Error: context canceled", "cancelled"], ["Error: max retries exceeded", "max_retries"],
+			["Error: pull model manifest: file does not exist", "manifest"], ["Error: something new", "other"],
+			["Error: pull model manifest: Get: context deadline exceeded", "timeout"],
+			["Error: pull model manifest: tls: handshake failure", "certificate"],
+			["Error: pull model manifest: dial tcp: lookup host: no such host", "dns"],
+			["Error: pull model manifest: read: connection reset by peer", "connection"],
+			["Error: pull model manifest: 429: too many requests", "rate_limited"],
+			["Error: open blob: file does not exist", "not_found"],
+			["pulling manifest`npulling 6a07: 100%`nsuccess", ""], ["", ""]]
+		AssertEqual(Row[2], LLM_OllamaPullErrorClass(Row[1]), Row[1])
+	; The vocabulary is the macOS worker's; a drift shows here, marker and class alike.
+	global _SharedDir, LLM_OLLAMA_PULL_ERROR_CLASSES
+	Source := FileRead(_SharedDir . "\..\macos\modules\llm\managed_ollama_pull.py", "UTF-8")
+	AssertTrue(RegExMatch(Source, "s)ERROR_CLASSES = \((.*?)\n\)", &Block), "the macOS worker must declare its classes")
+	Position := 1, Index := 0
+	while RegExMatch(Block[1], '\("([^"]+)", "([^"]+)"\)', &Found, Position) {
+		Index += 1
+		AssertEqual(Found[1], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][1])
+		AssertEqual(Found[2], LLM_OLLAMA_PULL_ERROR_CLASSES[Index][2])
+		Position := Found.Pos + Found.Len
+	}
+	AssertEqual(LLM_OLLAMA_PULL_ERROR_CLASSES.Length, Index, "every class of the macOS worker")
+}
+Test("managed bootstrap: the pull output classes are the macOS vocabulary (ollama-digest-mismatch)", _G4B_PullErrorClasses)
+
+; The CLI writes its closing Error line to stderr: the real tree-owned capture must
+; hold it, or the classifier above reads nothing on a real pull.
+_G4B_RealCaptureHoldsStderr() {
+	Done := false, Code := -1, Output := ""
+	OnDone(ExitCode, Stdout, Stderr := "") {
+		Code := ExitCode, Output := Stdout, Done := true
+	}
+	Task := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+		["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+			"[Console]::Error.WriteLine('Error: digest mismatch, file must be downloaded again'); exit 7"],
+		OnDone, , , LLM_OLLAMA_PULL_CAPTURE_BYTES, true, true)
+	AssertTrue(Task.start(), "the real child must start")
+	Deadline := A_TickCount + 20000
+	while !Done && A_TickCount < Deadline
+		Sleep(20)
+	AssertTrue(Done, "the real child must finish")
+	AssertEqual(7, Code)
+	AssertEqual("digest_mismatch", LLM_OllamaPullErrorClass(Output), "the capture holds stderr: " . Output)
+}
+Test("managed bootstrap: the real pull capture holds the CLI's stderr (ollama-digest-mismatch)", _G4B_RealCaptureHoldsStderr)
+
+; Past its ceiling the shell runner reads no body and reports exit 63, so a pull
+; of a few minutes would fail after it succeeded.
+_G4B_PullCaptureHoldsHoursOfFrames() {
+	global LLM_OLLAMA_PULL_CAPTURE_BYTES
+	FramesPerHour := 36000, FrameBytes := 200
+	AssertTrue(LLM_OLLAMA_PULL_CAPTURE_BYTES >= 8 * FramesPerHour * FrameBytes, "eight hours of frames fit")
+	F := _G4B_Fixture()
+	Captured := 0
+	Spawn(Executable, Arguments, Done, Chunk := 0, Adopt := 0, MaxOutputBytes := 0, *) {
+		Captured := MaxOutputBytes
+		throw Error("Synthetic spawn refusal after reading its ceiling")
+	}
+	try {
+		F.Start()
+		F.Flow.Plan["directory"] := "C:\managed-workers"
+		F.Flow.Plan["helper"] := "C:\managed-workers\ollama_managed_files.ps1"
+		F.Flow.Plan["helper_sha256"] := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		F.Flow.Plan["environment"] := "C:\captured\managed_ollama_environment.json"
+		F.Flow.Plan["environment_sha256"] := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		F.Flow.Sources["C:\managed-workers\ollama-runtime-launch.ps1"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Runtime.PublishReady()
+		F.Flow.Target["ready_file_identity"] := "34567890:3456789012345678"
+		F.Flow.Target["ready_image_sha256"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		F.Flow._NativePull("qwen3:0.6b", (*) => 0, Spawn)
+		AssertEqual(LLM_OLLAMA_PULL_CAPTURE_BYTES, Captured, "the native pull spawns with the pull's own ceiling")
+	} finally F.Close()
+}
+Test("managed bootstrap: a pull's capture holds hours of progress frames (ollama-digest-mismatch)", _G4B_PullCaptureHoldsHoursOfFrames)
 
 _G4B_UnknownTags() {
 	F := _G4B_Fixture()

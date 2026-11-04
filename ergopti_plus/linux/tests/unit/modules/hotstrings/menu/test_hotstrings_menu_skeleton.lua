@@ -68,7 +68,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows, table|nil parent
 local function hotstrings_rows(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -147,8 +147,8 @@ helpers.describe("hotstrings submenu: the personal-hotstring editor", function()
 	---
 	--- Rows are matched by their translated LABEL and only the matched row's `fn`
 	--- is run. Walking the tree and firing every callback to see what each does
-	--- would also fire the magic-key prompt, which shells out to zenity — on a
-	--- machine that has zenity and a display, the suite would stop at a dialog.
+	--- would also fire the magic-key prompt, which opens the owned dialog — on a
+	--- machine that has GTK 3 and a display, the suite would stop at a dialog.
 	--- @return table Set of app names, and the label lookup used.
 	local function apps_opened_by_labels(labels)
 		local asked = {}
@@ -209,7 +209,8 @@ helpers.describe("shared personal editor command", function()
 		local calls, found = 0, nil
 		local ok, err = pcall(function()
 			declaration[1].i18n = "menu.hotstrings.shortcut_none"
-			local rows = hotstrings_rows(fake_config({ all_enabled = false }), {
+			-- Master on: an off category greys every row of its submenu (category-off rule).
+			local rows = hotstrings_rows(fake_config({ all_enabled = true }), {
 				is_paused = function() return false end,
 				webview = { show = function() calls = calls + 1 end },
 			})
@@ -238,7 +239,8 @@ helpers.describe("shared personal editor command", function()
 	for _, vector in ipairs(vectors) do
 		helpers.it("shared-personal-editor: " .. vector.name, function()
 			local current, calls = vector.initial_paused, 0
-			local config = fake_config({ all_enabled = false })
+			-- Master on: an off category greys every row of its submenu (category-off rule).
+			local config = fake_config({ all_enabled = true })
 			local ctx = { paused = false, webview = {} }
 			if vector.opener then ctx.webview.show = function(name)
 				calls = calls + 1

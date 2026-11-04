@@ -19,7 +19,10 @@
 		"tap_holds": {
 			"type": "object",
 			"additionalProperties": false,
-			"properties": { "enabled": { "type": "boolean" } }
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"lone_modifier_tap_max_ms": { "type": "integer", "minimum": 0 }
+			}
 		},
 		"mod_combos": {
 			"description": "Linux simultaneous settings and known pair combo leaves; native source/output admission remains separately owned.",
@@ -38,6 +41,12 @@
 					}
 				}
 			}
+		},
+		"network": {
+			"description": "The proxy override of modules/network/proxy_override.json: empty, direct, or one relay URL. Its value grammar is validated by the driver.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": { "proxy_override": { "type": "string" } }
 		},
 		"category_enabled": { "$ref": "#/$defs/category_enabled" },
 		"ui": { "$ref": "#/$defs/ui" }
@@ -242,6 +251,7 @@
 						"min_request_interval_ms": { "type": "integer", "minimum": 0 },
 						"instant_on_word_end": { "type": "boolean" },
 						"after_hotstring": { "type": "boolean" },
+						"while_hotstring_tooltip": { "type": "string", "enum": ["wait", "both"] },
 						"inline_autotype": { "type": "boolean" },
 						"secure_filter_enabled": { "type": "boolean" },
 						"url_bar_filter_enabled": { "type": "boolean" },

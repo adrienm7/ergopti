@@ -149,7 +149,7 @@ end
 --- Where a vision request for a backend goes.
 --- @param backend string The binding's backend id.
 --- @param model string The resolved vision model.
---- @return table|nil target { url, headers, format }, string|nil reason
+--- @return table|nil target { url, headers, format, provider?, model? }, string|nil reason
 function M.resolve_target(backend, model)
 	if backend == Vision.LOCAL_BACKEND then
 		local profiles = require("modules.llm.profiles")
@@ -164,7 +164,27 @@ function M.resolve_target(backend, model)
 	if not Remote.serves(backend, "vision") then return nil, "the provider " .. backend .. " reads no image" end
 	local entry = M.entry_for(backend)
 	if not entry then return nil, "no API key is stored for " .. backend end
+	-- The endpoint names its provider and model, which send() completes the
+	-- body for (thinking off).
 	return Remote.endpoint(entry, model)
+end
+
+--- Resolves a vision target once its key's access token is usable: at once
+--- for a local backend, a provider sending its key as is or a fresh token,
+--- else when the exchange of the access lease (api_remote.prepare_access)
+--- settles, so the first vision request to watsonx or Vertex AI waits for
+--- its token instead of being refused while it is fetched.
+--- @param backend string The binding's backend id.
+--- @param model string The resolved vision model.
+--- @param on_target function on_target(target|nil, reason|nil), called exactly once.
+function M.prepare_target(backend, model, on_target)
+	if type(on_target) ~= "function" then error("vision_request.prepare_target requires a callback", 2) end
+	local entry = backend ~= Vision.LOCAL_BACKEND and M.entry_for(backend) or nil
+	if not entry then return on_target(M.resolve_target(backend, model)) end
+	require("modules.llm.api_remote").prepare_access(entry, function(ok, reason)
+		if not ok then return on_target(nil, reason or "the access token could not be fetched") end
+		on_target(M.resolve_target(backend, model))
+	end)
 end
 
 
@@ -194,6 +214,12 @@ end
 --- @param on_done function
 --- @return boolean dispatched
 function M.send(target, body, on_done)
+	local added = {}
+	if target.format ~= LOCAL_FORMAT then
+		local _
+		_, added = require("modules.llm.api_remote").complete_body(target.provider, target.model, body)
+	end
+	local retried = false
 	local encoded = Json.encode(body)
 	if type(encoded) ~= "string" then
 		Logger.error(LOG, "Vision request could not be encoded.")
@@ -220,9 +246,19 @@ function M.send(target, body, on_done)
 		require("modules.llm.api_remote").redact_url(target.url), target.format, #encoded)
 	local function dispatch()
 		if not current() then return false end
-		return HttpClient.post(target.url, target.headers, encoded, function(result)
+		local function on_result(result)
 			if not current() then return end
 			if type(result) ~= "table" or result.ok ~= true then
+				-- A refused thinking field: the same request once more without it
+				if not retried and target.format ~= LOCAL_FORMAT and require("modules.llm.api_remote")
+					.thinking_refusal(target.provider, target.model, result, added, body) then
+					retried = true
+					local again = Json.encode(body)
+					if type(again) == "string" and HttpClient.post(target.url, target.headers, again, on_result,
+						{ owner = OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms") }) == true then
+						return
+					end
+				end
 				local missing = target.format == LOCAL_FORMAT
 					and LocalModelPolicy.response_failure(result, target.base_url) or nil
 				if missing then finish(nil, missing) return end
@@ -236,7 +272,9 @@ function M.send(target, body, on_done)
 			local text = extract_text(target.format, result.body)
 			if not text or text == "" then finish(nil, "the response holds no answer text") return end
 			finish(text, nil)
-		end, { owner = OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms") }) == true
+		end
+		return HttpClient.post(target.url, target.headers, encoded, on_result,
+			{ owner = OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms") }) == true
 	end
 	if target.format == LOCAL_FORMAT then
 		return require("modules.llm.local_model_probe").verify(target.base_url, body.model, OWNER,

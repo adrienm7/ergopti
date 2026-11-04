@@ -27,10 +27,8 @@
 ; ===================================================
 ; ===================================================
 
-_HLTSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_HLTSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -41,7 +39,7 @@ _HLTSG_ReadSource(RelPath) {
 ; ===================================================
 
 _HLTSG_HalflifeTickHasSuspendGuard() {
-	Src := _HLTSG_ReadSource("modules/keystats/keystats_trigger_roi.ahk")
+	Src := _HLTSG_ReadSource("keystats_trigger_roi.ahk")
 	Seg := _DriverFuncBody("KL_Roi_HalflifeTick")
 	Assert(Seg != "", "KL_Roi_HalflifeTick must exist in keystats_trigger_roi.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

@@ -279,7 +279,7 @@ OllamaWV_Create(kind, subtitle) {
 	; -DPIScale: tell AHK to treat all coordinates as logical pixels (no auto-scaling).
 	; Without this, AHK v2 in PerMonitorV2 mode interprets Gui dimensions as physical
 	; pixels, making the window larger than intended on scaled displays.
-	g := Gui_Create("+Caption +MinimizeBox +Resize -DPIScale", "IA")
+	g := Gui_Create("+Caption +MinimizeBox +Resize -DPIScale", t("ui_typing.dataset_ai"))
 	g.MarginX := 0
 	g.MarginY := 0
 	g.OnEvent("Close", OllamaWV_CloseIfEpoch.Bind(captured_epoch))
@@ -366,7 +366,7 @@ OllamaWV_Create(kind, subtitle) {
 	; The "ready" message from JS triggers OllamaWV_OnWebMessage which
 	; flushes the queue. As a safety net, also flush after 2 s in case
 	; the message bridge misfires.
-	SetTimer(OllamaWV_FlushQueue.Bind(captured_epoch), -2000)
+	SetTimer(OllamaWV_FlushQueue.Bind(captured_epoch), -TimingsGet("ui", "webview_page_safety_flush_ms"))
 
 	; Queue the initial setKind so it fires once the page is ready
 	OllamaWV_EvalJS("setKind(" OllamaWV_JSStr(kind) "," OllamaWV_JSStr("") "," OllamaWV_JSStr(subtitle) ")")

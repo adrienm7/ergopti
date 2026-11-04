@@ -33,6 +33,8 @@
 	"source_fingerprint_paths": [
 		"tools/build/build-macos-managed-ollama.py",
 		"static/ergopti_plus/_shared/go/native_http/transport.go",
+		"static/ergopti_plus/_shared/go/native_http/range_response.go",
+		"static/ergopti_plus/_shared/go/native_http/range_response_test.go",
 		"static/ergopti_plus/_shared/go/native_http/worker_darwin.go",
 		"static/ergopti_plus/_shared/go/native_http/worker_other.go",
 		"static/ergopti_plus/_shared/go/native_http/admission.go",
@@ -157,7 +159,16 @@
 			"TestRedirectPolicyStopsAfterTenHops",
 			"TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
 			"TestServeEnvironmentDisablesOllamaCloud",
-			"TestServeEnvironmentRefusesInvalidDeclarations"
+			"TestServeEnvironmentRefusesInvalidDeclarations",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_budget",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_candidates",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_download",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_pac_evaluation",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_proxy_routes",
+			"TestAllowedFailureStagesPreserveReasonAndPhysicalRetirement/native_wpad_discovery",
+			"TestAlignRangeSkipsAFullResponseToThePartOffset",
+			"TestAlignRangeKeepsTheBodyOfTheAskedRange",
+			"TestAlignRangeRefusesWhatWouldCorruptTheFile"
 		]
 	}
 }

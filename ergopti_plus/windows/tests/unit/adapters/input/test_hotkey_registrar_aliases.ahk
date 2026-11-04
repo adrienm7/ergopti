@@ -19,7 +19,7 @@ _HKRT_OwnersCannotBeClobbered() {
 	global _HKRT_NativeBindings, _HKRT_ProbeThrows
 	global _HKRT_FirstCalls, _HKRT_SecondCalls
 	_HKRT_Reset()
-	FirstHandle := _HKRT_Bind("Ctrl+B", _HKRT_First, "keyboard:ctrl_b")
+	FirstHandle := _HKRT_Bind("Ctrl+B", _HKRT_First, "keyboard:primary_b")
 	AssertTrue(FirstHandle != "")
 	AssertEqual("", _HKRT_Bind("Ctrl+B", _HKRT_Second, "llm:trigger"),
 		"a second registrar owner must be refused")

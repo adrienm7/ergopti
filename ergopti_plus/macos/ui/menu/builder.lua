@@ -718,6 +718,8 @@ function M.generate(ctx, menu_mods, actions)
 				[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
 				[require("config_keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
 				[require("config_keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
+				-- Self-contained: the shared edit flow reads and writes its own setting.
+				[require("config_keys").COMMAND.PROXY_OVERRIDE]      = function() require("ui.proxy_override").run() end,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
@@ -838,7 +840,16 @@ function M.generate(ctx, menu_mods, actions)
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end
-			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, nil, dbg_ctx, {})
+			-- The checks and probes hang in the « Tests » group, from the same
+			-- context; no Tests row is drawn when none of them is for macOS.
+			local debug_groups = {
+				debug_tests = function(context)
+					local tests = ManifestMenu.build("debug_tests_menu", "Debug", nil, nil, context, {})
+					if type(tests) ~= "table" or #tests == 0 then return nil end
+					return tests
+				end,
+			}
+			local debug_items = ManifestMenu.build("debug_menu", "Debug", nil, debug_groups, dbg_ctx, {})
 			if not debug_dense(debug_items, true) then return {} end
 			local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "hs")
 			if not rawequal(root, current_root) or not rawequal(top, current_top)

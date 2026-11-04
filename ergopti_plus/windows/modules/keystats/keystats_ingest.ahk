@@ -35,6 +35,8 @@ KL_LoadState() {
 			&& (Members["today_log_offset"]["kind"] != "number"
 				|| !(State["today_log_offset"] is Integer) || State["today_log_offset"] < 0)
 			return false
+		if State.Has("data_sql_receipt") && !_KL_DataSqlReceiptValid(State["data_sql_receipt"])
+			return false
 		if State.Has("today_log_date") && !_KL_JournalDateValid(State["today_log_date"], true)
 			return false
 		if State.Has("rollover_pending")
@@ -44,6 +46,7 @@ KL_LoadState() {
 		Keystats.next_event_id := State["next_event_id"]
 		if State.Has("today_log_offset")
 			Keystats.today_log_offset := State["today_log_offset"]
+		Keystats.data_sql_receipt := State.Get("data_sql_receipt", 0)
 		if State.Has("today_log_date")
 			Keystats.today_log_date := State["today_log_date"]
 		Keystats.rollover_pending := State.Get("rollover_pending", 0)
@@ -64,6 +67,8 @@ KL_SaveState() {
         "today_log_date",   Keystats.today_log_date,
         "ngram_ctx",        ngram_ctx
     )
+    if Keystats.data_sql_receipt
+        s["data_sql_receipt"] := Keystats.data_sql_receipt
     ; Best-effort: a transient antivirus / indexer lock on state.json must
     ; not propagate up the timer stack and kill the ingest tick. The next
     ; KL_SaveState a few seconds later will retry on a fresh write.
@@ -369,9 +374,12 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 	        return Map("ok", false, "eof", false, "reason", "sql_failed")
 	    }
 	    old_offset := Keystats.today_log_offset
+	    old_receipt := Keystats.data_sql_receipt
 	    Keystats.today_log_offset := new_offset
+	    Keystats.data_sql_receipt := KL_DataSqlAckReceipt(Keystats.data_sql_path)
 	    if !KL_SaveState() {
 	        Keystats.today_log_offset := old_offset
+	        Keystats.data_sql_receipt := old_receipt
 	        return Map("ok", false, "eof", false, "reason", "state_failed")
 	    }
 

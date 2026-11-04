@@ -196,7 +196,7 @@ Test("dynamic hotstrings: the registration call keeps its position in the boot o
 
 ; Synthetic personal values and a cached configuration receipt keep registration
 ; on its real in-memory path. Matching never invokes a keyboard/output owner.
-_DynHSTest_WithWordRegistry(Body, DisabledNames := []) {
+_DynHSTest_WithWordRegistry(Body, DisabledNames := [], Personal := 0) {
 	global Features, ScriptInformation, PersonalInformation, _HotstringRegistrar
 	global _HSResolveCache, _HSResolveGen
 	Saved := [IsSet(Features) ? Features : unset,
@@ -240,7 +240,7 @@ _DynHSTest_WithWordRegistry(Body, DisabledNames := []) {
 		for Name in ["date_fr", "date_long_fr", "date", "phone_prefixes", "ssn_prefixes", "iban_prefixes"]
 			Features["hotstrings"]["dynamic"][Name] := Map("enabled", !DisabledSet.Has(Name))
 		ScriptInformation := Map("MagicKey", Chr(0x2605))
-		PersonalInformation := Map("phone_number", "0612345678", "phone_number_clean", "06 12 34 56 78",
+		PersonalInformation := Personal ? Personal : Map("phone_number", "0612345678", "phone_number_clean", "06 12 34 56 78",
 			"social_security_number", "1 99 99 99 999 999 99", "iban", "FR76 1234 5678 9012 3456 789")
 		_HotstringRegistrar := 0
 		_HSResolveCache := Map("dynamichotstrings|", { gen: _HSResolveGen,
@@ -455,9 +455,84 @@ _DynHSTest_GateAdmitsBody(Triggers) {
 
 
 
+
+
+; ==================================================
+; ==================================================
+; ======= 6/ The corpus through registration =======
+; ==================================================
+; ==================================================
+
+; The corpus consumer proves CountDynamicSection, the menu's hand-written count.
+; This proves the registrations themselves: the menu must announce as many
+; triggers as actually fire (PAR-63). Each family registers alone, so the registry
+; size is its count. An SSN or IBAN is given one decorative space, as it is stored:
+; without one the spaced trigger IS the raw trigger and is rightly not registered
+; twice, which the corpus counts as two.
+_DynHSTest_Decorate(Raw) {
+	return StrLen(Raw) < 2 ? Raw : SubStr(Raw, 1, 1) . " " . SubStr(Raw, 2)
+}
+
+_DynHSTest_CorpusFamilyCount(Vector, Family, Key) {
+	global HSE_StarSpecs
+	AllFamilies := ["date_fr", "date_long_fr", "date", "phone_prefixes", "ssn_prefixes", "iban_prefixes"]
+	Disabled := []
+	for Name in AllFamilies
+		if Name != Family
+			Disabled.Push(Name)
+	Personal := Map("phone_number", Vector["phone"], "phone_number_clean", Vector["fphone"],
+		"social_security_number", _DynHSTest_Decorate(Vector["ssn_raw"]),
+		"iban", _DynHSTest_Decorate(Vector["iban_raw"]))
+	Count := -1
+	Read() {
+		Count := HSE_StarSpecs.Length
+	}
+	_DynHSTest_WithWordRegistry(Read, Disabled, Personal)
+	AssertEqual(Vector["expected"][Key], Count, Vector["id"] . ": registered " . Key)
+}
+
+_DynHSTest_CorpusMatchesRegistration() {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\prefix_vectors.json", "UTF-8"))
+	Assert(Corpus["prefix_count_vectors"].Length >= 15, "the corpus must hold its vectors")
+	for Vector in Corpus["prefix_count_vectors"] {
+		_DynHSTest_CorpusFamilyCount(Vector, "phone_prefixes", "phoneprefixes")
+		_DynHSTest_CorpusFamilyCount(Vector, "ssn_prefixes", "ssnprefixes")
+		_DynHSTest_CorpusFamilyCount(Vector, "iban_prefixes", "ibanprefixes")
+	}
+}
+Test("dynamic hotstrings: every prefix vector registers exactly the triggers it counts (PAR-63)",
+	_DynHSTest_CorpusMatchesRegistration)
+
+_DynHSTest_CorpusSpacedPrefixFires() {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\prefix_vectors.json", "UTF-8"))
+	for Vector in Corpus["spaced_prefix_vectors"]
+		AssertEqual(Vector["expected"], SpacedPrefix(Vector["spaced"], Vector["raw_count"]), Vector["id"])
+}
+Test("dynamic hotstrings: every spaced_prefix vector replays on the trigger builder (PAR-63)",
+	_DynHSTest_CorpusSpacedPrefixFires)
+
+_DynHSTest_LongDateNamesEveryMonthAndDay() {
+	; Each month's first day, on a calendar checked by hand: the weekday arithmetic
+	; and both name tables, which the shape test above cannot see.
+	Vectors := Map("20260101", "jeudi 1 janvier 2026", "20260201", "dimanche 1 février 2026",
+		"20260301", "dimanche 1 mars 2026", "20260401", "mercredi 1 avril 2026",
+		"20260501", "vendredi 1 mai 2026", "20260601", "lundi 1 juin 2026",
+		"20260701", "mercredi 1 juillet 2026", "20260801", "samedi 1 août 2026",
+		"20260901", "mardi 1 septembre 2026", "20261001", "jeudi 1 octobre 2026",
+		"20261101", "dimanche 1 novembre 2026", "20261201", "mardi 1 décembre 2026")
+	for Instant, Expected in Vectors
+		AssertEqual(Expected, _DateLongFrWithClock(_DynHSTest_ClockSequence([Instant . "120000"])))
+}
+Test("dynamic hotstrings: the long French date names every month and weekday (PAR-63)",
+	_DynHSTest_LongDateNamesEveryMonthAndDay)
+
+
+
+
+
 ; ======================================
 ; ======================================
-; ======= 6/ Activation delay ==========
+; ======= 7/ Activation delay ==========
 ; ======================================
 ; ======================================
 

@@ -49,12 +49,15 @@ local Manifest = require("infra.manifest_reader")
 local ParameterLabel = require("action_parameter_label")
 local ProgramParameter = require("program_parameter")
 local ProgramOwner = require("modules.gestures.program_owner")
+local UserActions = require("modules.gestures.user_actions")
+local UserActionParameter = require("user_action_parameter")
 local WindowSwitch = require("adapters.window_switch")
 local PromptAction = require("llm.prompt_action")
 local Vision = require("llm.vision")
 local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
+local KeyNames = require("keycodes.key_names")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
@@ -296,15 +299,14 @@ end
 -- =========================================
 -- =========================================
 
---- Labels COMPUTED at registration time for the modifier-chord actions
---- ("Ctrl + Shift + A"). They are language-neutral by construction — modifier
---- and key names are the same in every locale — so they are stored as labels
---- rather than as catalogue keys.
-local ACTION_COMPUTED_LABELS = {}
+--- The parts each modifier-chord action is named from at every read: its
+--- modifier ids and its catalogue key, which the shared key name table turns
+--- into « Ctrl + Maj + Entrée » in the active language. They used to be English
+--- labels computed once, the same in every locale.
+local MODIFIER_ACTION_PARTS = {}
 
 -- Dynamic modifier-key actions use the same shared catalogue as Windows and
--- macOS. Their labels are intentionally language-neutral (for example
--- "Ctrl + A") and therefore bypass the locale layer entirely.
+-- macOS.
 local MODIFIER_ACTION_COMMANDS = {}
 
 -- The chord matrix in picker order: one { label, actions } group per modifier
@@ -345,21 +347,19 @@ local function register_modifier_chords(catalogue)
 
 	local max_mask = (2 ^ #modifiers) - 1
 	for mask = 1, max_mask do
-		local ids, labels, native_modifiers = {}, {}, {}
+		local ids, native_modifiers = {}, {}
 		for index, modifier in ipairs(modifiers) do
 			if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
 				ids[#ids + 1] = modifier.id
-				labels[#labels + 1] = modifier.label
 				native_modifiers[#native_modifiers + 1] = modifier.xdotool
 			end
 		end
 		local id_prefix = table.concat(ids, "_")
-		local label_prefix = table.concat(labels, " + ")
-		local group = { label = label_prefix, actions = {} }
+		local group = { modifiers = ids, actions = {} }
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
 			local key = key_def.linux_key or key_def.id
-			ACTION_COMPUTED_LABELS[action_id] = label_prefix .. " + " .. key_def.label
+			MODIFIER_ACTION_PARTS[action_id] = { modifiers = ids, key = key_def }
 			MODIFIER_ACTION_COMMANDS[action_id] = table.concat(native_modifiers, "+") .. "+" .. key
 			group.actions[#group.actions + 1] = action_id
 		end
@@ -495,6 +495,22 @@ local SCREENSHOT_COMMANDS = {
 	["screenshot_window_save"] =
 		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
 }
+-- The frontmost window saved at once, with no selection: what macOS and
+-- Windows name screen_capture_instant is this driver's window capture.
+SCREENSHOT_COMMANDS["screen_capture_instant"] = SCREENSHOT_COMMANDS["screenshot_window_save"]
+
+--- ocr_screenshot: the region the user draws, captured by the region cascade
+--- into a private temporary file, read by tesseract in every language it has
+--- installed (its own "osd" script detector is not a language), and the text
+--- left on the clipboard, Wayland first as for the captures. The capture is
+--- removed whatever happens; a cancelled selection leaves the clipboard alone.
+local OCR_COMMAND = "{ f=$(mktemp --suffix=.png) || exit 1; { "
+	.. SCREENSHOT_COMMANDS["screenshot_region_save"]:gsub("%%s", '"$f"')
+	.. "; } && [ -s \"$f\" ]"
+	.. " && langs=$(tesseract --list-langs 2>/dev/null | tail -n +2 | grep -vx osd | tr '\\n' '+')"
+	.. " && text=$(tesseract \"$f\" - ${langs:+-l \"${langs%+}\"} 2>/dev/null)"
+	.. " && { printf '%s' \"$text\" | wl-copy 2>/dev/null || printf '%s' \"$text\" | xclip -selection clipboard; };"
+	.. " rm -f \"$f\"; }"
 
 --- Where a saved screenshot lands, and under what name.
 ---
@@ -518,6 +534,7 @@ local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",
 	["screenshot_region_save"]     = "reg",
 	["screenshot_window_save"]     = "win",
+	["screen_capture_instant"]     = "win",
 }
 
 --- Actions this driver performs as one fixed shell command, by action id.
@@ -532,6 +549,7 @@ local DIRECT_COMMANDS = {
 	-- guessed ~/Downloads.
 	["open_downloads"]    = 'xdg-open "$(xdg-user-dir DOWNLOAD)"',
 	["open_file_manager"] = 'xdg-open "$HOME"',
+	["ocr_screenshot"]    = OCR_COMMAND,
 }
 
 --- The settings applications open_system_settings tries, in order: GNOME, KDE,
@@ -545,6 +563,26 @@ local SETTINGS_APPLICATIONS = {
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
 	["run_program"] = function(binding) return M.run_program(binding) end,
+	-- The user's own command line and file or folder: each value is decoded by
+	-- _shared/lua/user_action_parameter and never logged.
+	["run_command"] = function(binding)
+		local fields = UserActionParameter.parse("command", M.get_action_parameter(binding, "run_command"))
+		if not fields then
+			Logger.warn(LOG, "run_command ignored for binding '%s': no valid command is stored.", tostring(binding))
+			return false
+		end
+		-- The shortcuts manager owns the send-input vocabulary (read here, not
+		-- through send_vocabulary(), which is declared below this table)
+		return UserActions.run_command(fields, require("modules.shortcuts.manager").send_vocabulary().text_max_code_points)
+	end,
+	["open_path"] = function(binding)
+		local fields = UserActionParameter.parse("path", M.get_action_parameter(binding, "open_path"))
+		if not fields then
+			Logger.warn(LOG, "open_path ignored for binding '%s': no valid path is stored.", tostring(binding))
+			return false
+		end
+		return UserActions.open_path(fields)
+	end,
 	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
 		local Shell = require("adapters.shell_runner")
@@ -816,13 +854,23 @@ local function _execute_action(action_name, go_next, binding)
 	Logger.warn(LOG, "Unknown action: %s", action_name)
 end
 
+--- The name of one gesture slot in the user's language, the same
+--- gesture.slots.* text the Windows and macOS menus show. The menu rows used
+--- to read a French sentence built there (« Balayage 3 doigts vers haut ») in
+--- every locale.
+--- @param slot string A slot of the shared gesture catalogue.
+--- @return string
+function M.slot_label(slot)
+	return i18n.get("gesture.slots." .. tostring(slot))
+end
+
 --- Returns a human-readable label for an action.
 --- @param action_name string
 --- @return string
 function M.get_action_label(action_name)
 	if not action_name or action_name == "" then return "∅" end
-	local computed = ACTION_COMPUTED_LABELS[action_name]
-	if computed then return computed end
+	local chord = MODIFIER_ACTION_PARTS[action_name]
+	if chord then return KeyNames.chord_label(chord.modifiers, chord.key, "linux", i18n.get) end
 	local meta = Catalogue.actions[action_name]
 	if not meta then return action_name end
 	return i18n.get(meta.label_key)
@@ -1011,9 +1059,10 @@ function M.get_picker_items()
 		elseif item.kind == "modifier_chords" then
 			local template = i18n.get(item.group_key)
 			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				local names = KeyNames.modifiers_label(group.modifiers, "linux", i18n.get)
 				items[#items + 1] = {
 					type = "heading", level = item.level,
-					text = (template:gsub("{1}", function() return group.label end)),
+					text = (template:gsub("{1}", function() return names end)),
 				}
 				for _, action_name in ipairs(group.actions) do push_action(action_name) end
 			end
@@ -1278,6 +1327,8 @@ function M.validate_action_parameter(action_name, value)
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
 	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
+	-- Syntax only: whether the path still exists is checked when it opens.
+	if UserActionParameter.KINDS[spec] then return UserActionParameter.parse(spec, value) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1298,6 +1349,7 @@ function M.get_action_parameter_prompt(action_name)
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_program") end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		local WrapPair = require("wrap_pair")
@@ -1346,6 +1398,11 @@ function M.get_action_parameter_error(action_name)
 	if spec == "llm_language" then return i18n.get("dialog.gestures.param_err_llm_language") end
 	if spec == "app" then return i18n.get("dialog.gestures.param_err_app") end
 	if spec == "program" then return i18n.get("dialog.gestures.param_err_program") end
+	if spec == "command" then
+		return fill_placeholder(i18n.get(UserActionParameter.ERROR_KEYS.command),
+			tostring(UserActionParameter.MAX_COMMAND_BYTES))
+	end
+	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.ERROR_KEYS[spec]) end
 	if SEND_INPUT_KINDS[spec] then
 		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
 			tostring(send_vocabulary().text_max_code_points))
@@ -1452,13 +1509,16 @@ function M.run_program(binding)
 end
 
 function M.set_program_paused(paused)
-	if _program_owner == nil then return type(paused) == "boolean" end
-	return _program_owner.set_paused(paused)
+	-- The hidden run_command children follow the same pause as user programs
+	local commands_settled = UserActions.set_paused(paused)
+	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
+	return _program_owner.set_paused(paused) and commands_settled
 end
 
 function M.stop_programs()
-	if _program_owner == nil then return true end
-	return _program_owner.stop()
+	local commands_settled = UserActions.stop()
+	if _program_owner == nil then return commands_settled end
+	return _program_owner.stop() and commands_settled
 end
 
 function M.when_programs_settled(callback)
@@ -1689,7 +1749,7 @@ function M.get_action_display_label(slot)
 	local label = M.get_action_label(action)
 	local value = M.get_action_parameter(slot, action)
 	if M.get_action_parameter_spec(action) == "program" then return label end
-	return ParameterLabel.format(label, value)
+	return ParameterLabel.for_spec(label, M.get_action_parameter_spec(action), value)
 end
 
 --- Returns all gesture actions.
@@ -1926,6 +1986,32 @@ function M.dispatch_gesture(gesture)
 	return true
 end
 
+--- Names, once per reading start, the slots this touchpad can never fire and
+--- the bound slots the desktop also acts on. The menu greys the first kind, but
+--- a binding written by hand or carried over from another machine is only seen
+--- here: without this line a bound swipe_4_up on a three-finger pad is silent.
+--- @param touchpad table The selected touchpad.
+local function report_slots(touchpad)
+	local slots, bound = {}, {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		slots[#slots + 1] = slot
+		local action = M.get_action(slot)
+		if action ~= nil and action ~= "none" then bound[slot] = true end
+	end
+	local report = require("modules.gestures.slot_report").report(slots, bound, touchpad.max_fingers)
+	if #report.unreachable > 0 then
+		Logger.info(LOG, "This touchpad counts up to %d finger(s): %d of %d gesture slot(s) can never fire: %s.",
+			touchpad.max_fingers, #report.unreachable, #slots, table.concat(report.unreachable, ", "))
+	end
+	for _, slot in ipairs(report.bound_unreachable) do
+		Logger.warn(LOG, "Gesture %s is bound, but this touchpad cannot count that many fingers: it will never fire.", slot)
+	end
+	if #report.bound_two_finger > 0 then
+		Logger.warn(LOG, "Two-finger gesture(s) bound: %s. The desktop reads the same touches as scrolling or a "
+			.. "secondary click, so it acts on them too.", table.concat(report.bound_two_finger, ", "))
+	end
+end
+
 --- Starts reading the touchpad.
 ---
 --- Reads the device's evdev node directly, WITHOUT a grab, and decodes the
@@ -1972,6 +2058,7 @@ function M.start_reading()
 	Logger.success(LOG, "Reading %s (%s), up to %d finger(s)%s.",
 		touchpad.path, touchpad.name, touchpad.max_fingers,
 		touchpad.semi_mt and ", semi-MT" or "")
+	report_slots(touchpad)
 	return true
 end
 

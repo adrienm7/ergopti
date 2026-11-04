@@ -490,7 +490,7 @@ _UpdaterTest_DownloadHasTimeout() {
 		"Updater_DownloadAndInstall must dispatch the binary transaction to the isolated worker")
 	AssertEqual(true, InStr(Worker, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS") > 0,
 		"Updater staging worker must receive the finite download timeout")
-	AssertEqual(true, InStr(Worker, "ShellRunner_SpawnTreeOwned") > 0,
+	AssertEqual(true, InStr(Worker, "ProxyOverride_SpawnWorker") > 0,
 		"Updater staging worker must use the asynchronous tree-owned runner so pause or exit cannot orphan PowerShell")
 }
 Test("Updater: DownloadAndInstall has timeout guard (regression: unbounded binary download)", _UpdaterTest_DownloadHasTimeout)

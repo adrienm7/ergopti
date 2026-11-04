@@ -39,6 +39,15 @@ _MBSW_Withdraw(Boundary) {
 		throw Error("Unqualified: boundary must pump genuine native Close")
 }
 
+; The real browser reads this one delay from the registry; nothing else may ask.
+TimingsGet(Section, Key) {
+	if Section != "ui" || Key != "webview_page_safety_flush_ms"
+		throw Error("The startup child binds only the page safety flush.")
+	if !RegExMatch(FileRead(A_Args[3] . "\modules\timings\constants.toml", "UTF-8"), "m)^\s*" . Key . "\s*=\s*(\d+)", &Value)
+		throw Error("The shared registry must declare the page safety flush.")
+	return Integer(Value[1])
+}
+
 Gui_Create(Options := "", Title := "") {
 	global _MBSW
 	local Window := Gui(Options, Title)

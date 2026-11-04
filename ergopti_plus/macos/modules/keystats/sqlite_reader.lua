@@ -744,14 +744,22 @@ end
 
 --- Adds every entry of `from` into `into`, using the same additive fields as
 --- the row handlers. Used to extend a cached historical dict by new days.
+--- An all-time history holds every distinct token, so the merge pauses at each
+--- one when given a pacer: unpaced, one extension held the main thread 458 ms
+--- (field report 2026-11-03 01:04).
 --- @param into table Dict from read_ngrams, mutated.
 --- @param from table Dict from read_ngrams.
+--- @param pacer table|nil Pacer from `infra.paced_job`.
 --- @return table into
-function M.merge_ngrams(into, from)
+function M.merge_ngrams(into, from, pacer)
+	if pacer ~= nil and (type(pacer) ~= "table" or type(pacer.pause) ~= "function") then
+		error("sqlite_reader.merge_ngrams: the pacer must come from infra.paced_job", 2)
+	end
 	for code, tokens in pairs(from) do
 		local bucket = into[code]
 		if not bucket then bucket = {}; into[code] = bucket end
 		for token, item in pairs(tokens) do
+			if pacer then pacer.pause() end
 			local target = bucket[token]
 			if not target then
 				target = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }

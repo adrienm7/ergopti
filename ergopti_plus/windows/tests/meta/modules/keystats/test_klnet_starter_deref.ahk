@@ -27,9 +27,8 @@
 ; ============================================
 ; ============================================
 
-_KSD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "\", "/") . "/" . RelPath)
+_KSD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -43,7 +42,7 @@ _KSD_ReadSource(RelPath) {
 ; ===================================================
 
 _KSD_WifiStarterDerefsBeforeCall() {
-	Src  := _KSD_ReadSource("modules/keystats/keystats_network.ahk")
+	Src  := _KSD_ReadSource("keystats_network.ahk")
 	Body := _DriverFuncBody("KL_Net_WifiStarter")
 	Assert(Body != "", "KL_Net_WifiStarter must exist in keystats_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.wifi_fn") > 0,
@@ -54,7 +53,7 @@ _KSD_WifiStarterDerefsBeforeCall() {
 Test("keystats_network: KL_Net_WifiStarter dereferences BoundFunc before call (klnet-starter-deref)", _KSD_WifiStarterDerefsBeforeCall)
 
 _KSD_ReachStarterDerefsBeforeCall() {
-	Src  := _KSD_ReadSource("modules/keystats/keystats_network.ahk")
+	Src  := _KSD_ReadSource("keystats_network.ahk")
 	Body := _DriverFuncBody("KL_Net_ReachStarter")
 	Assert(Body != "", "KL_Net_ReachStarter must exist in keystats_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.reach_fn") > 0,
@@ -65,7 +64,7 @@ _KSD_ReachStarterDerefsBeforeCall() {
 Test("keystats_network: KL_Net_ReachStarter dereferences BoundFunc before call (klnet-starter-deref)", _KSD_ReachStarterDerefsBeforeCall)
 
 _KSD_VpnStarterDerefsBeforeCall() {
-	Src  := _KSD_ReadSource("modules/keystats/keystats_network.ahk")
+	Src  := _KSD_ReadSource("keystats_network.ahk")
 	Body := _DriverFuncBody("KL_Net_VpnStarter")
 	Assert(Body != "", "KL_Net_VpnStarter must exist in keystats_network.ahk")
 	Assert(InStr(Body, "fn := KLNet.vpn_fn") > 0,

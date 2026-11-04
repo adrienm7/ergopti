@@ -121,9 +121,14 @@ _ScopeOwnerFixture(InitialSource := unset) {
 	AssertEqual("current", Boot["status"], "the actual source must complete its genuine default constructor")
 	AssertEqual(0, Boot["read_only"])
 	AssertTrue(FSUtf8ExactMatches(Path, Source), "ordinary current startup preserves the independently authored source")
+	; A clear restores the touchpad through this fake, never the real registry:
+	; each call is recorded for the clears that assert it.
+	Touchpad := []
 	Options := Map("path", Path, "locator", Directory . "\paths.toml", "stamp", "scope-test",
-		"settle", (*) => 1, "notify", (*) => 0)
-	return { directory: Directory, path: Path, source: Source, options: Options }
+		"settle", (*) => 1, "notify", (*) => 0,
+		"touchpad_restore", () => (Touchpad.Push("restore"), "factory_defaults"),
+		"touchpad_notify", (Message, *) => (Touchpad.Push(Message), true))
+	return { directory: Directory, path: Path, source: Source, options: Options, touchpad: Touchpad }
 }
 
 _ScopeOwnerCleanup(Fixture) {
@@ -250,14 +255,21 @@ _SGM_LabelAt(TargetMenu, Position) {
 ; conseillées », « Tout effacer », then a separator (menu-first-group), and a
 ; click on either scope row runs the gesture scope owner over the fixture.
 _ScopeGestureMenuOwnsParameters() {
-	global GestureActionParameters, _MenuDispatchCallbacks
+	global GestureActionParameters, _MenuDispatchCallbacks, Features
 	SavedParameters := GestureActionParameters
-	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__win_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
+	; The menu reads Gestures on, as the fixture's file says: an off category
+	; greys its restore and clear (category-off rule).
+	HadGestures := Features.Has("gestures")
+	SavedGestures := HadGestures ? Features["gestures"] : 0
+	ShownGestures := HadGestures ? SavedGestures.Clone() : Map()
+	ShownGestures["enabled"] := true
+	Features["gestures"] := ShownGestures
+	Source := '[gestures]`nenabled = true`ntap_4 = "open_url"`n[action_parameters]`ngesture__tap_4__open_url = "https://example.com/old"`nkeyboard__meta_a__open_url = "https://example.com/keep"`nunknown_user_key = "keep"`n[llm]`nenabled = true`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	GestureActionParameters := Map("gesture__tap_4__open_url", "https://example.com/old",
-		"keyboard__win_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
+		"keyboard__meta_a__open_url", "https://example.com/keep", "unknown_user_key", "keep")
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed
@@ -289,7 +301,7 @@ _ScopeGestureMenuOwnsParameters() {
 			AssertEqual(Receipt["status"], "pending")
 			Parsed := TOML_ParseFreshFile(Fixture.path)
 			Assert(!Parsed["action_parameters"].Has("gesture__tap_4__open_url"), "old binding parameters leave with their scope")
-			AssertEqual(Parsed["action_parameters"]["keyboard__win_a__open_url"], "https://example.com/keep")
+			AssertEqual(Parsed["action_parameters"]["keyboard__meta_a__open_url"], "https://example.com/keep")
 			AssertEqual(Parsed["action_parameters"]["unknown_user_key"], "keep")
 			AssertEqual(Parsed["llm"]["enabled"], true)
 			if Mode == "clear" {
@@ -297,8 +309,19 @@ _ScopeGestureMenuOwnsParameters() {
 				; (gestures-clear-keeps-switch).
 				AssertEqual(true, Parsed["gestures"]["enabled"], "clear removes the assignments and keeps the switch")
 				Assert(!Parsed["gestures"].Has("tap_4"), "clear removes the assignment")
-			} else
+				; The Configuration menu's touchpad restore was merged into this
+				; clear (gestures-clear-restores-touchpad).
+				AssertEqual("factory_defaults", Receipt.Get("touchpad", ""),
+					"the Gestures clear also puts the touchpad back to its system state")
+				AssertEqual("restore", Fixture.touchpad[1], "the touchpad restore runs once")
+				AssertEqual(t("notify.touchpad.factory_defaults"), Fixture.touchpad[2],
+					"and says the factory defaults were written")
+				AssertEqual(2, Fixture.touchpad.Length)
+			} else {
 				AssertEqual(Parsed["gestures"]["enabled"], ManifestRecommendedFor("gestures.enabled"))
+				AssertEqual(0, Fixture.touchpad.Length, "a restore of the recommendations leaves the touchpad alone")
+				AssertFalse(Receipt.Has("touchpad"))
+			}
 			AssertEqual(GestureActionParameters["gesture__tap_4__open_url"], "https://example.com/old",
 				"pending reload preserves current runtime authority")
 			Refusal.Call("refused")
@@ -307,13 +330,17 @@ _ScopeGestureMenuOwnsParameters() {
 		}
 	} finally {
 		GestureActionParameters := SavedParameters
+		if HadGestures
+			Features["gestures"] := SavedGestures
+		else
+			Features.Delete("gestures")
 		if Bundle is Object
 			_ConfigWriteTerminalRelease(Bundle)
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
 Test("config-scope: the gesture menu's restore owns the master, its clear keeps it, and both own only its action parameters",
-	_ScopeGestureMenuOwnsParameters)
+	_RRNC_NoDialog.Bind("Gestures", _ScopeGestureMenuOwnsParameters))
 
 _ScopeOwnerRetainsRollbackDebt() {
 	global _ConfigTransitionRetainedBarrier
@@ -435,8 +462,9 @@ _ScopeObsoleteSource(Literal, Parent := false) {
 }
 
 ; The four preview switches are active by default, so a hotstrings clear writes
-; their off value (the manifest's cleared value) after the user's own rows
-; instead of deleting them. Keys follow the manifest order.
+; their off value (the manifest's cleared value) instead of deleting them. A new
+; key opens its section, as the shared batch-write corpus pins (the vector
+; header-scalar-new-key-gets-the-precise-numeric-literal); keys follow the manifest order.
 _ScopePreviewOffRows() {
 	return "preview_ai_enabled = false`npreview_autocorrect_enabled = false`n"
 		. "preview_colored_tooltips = false`npreview_star_enabled = false`n"
@@ -548,7 +576,7 @@ _ScopeObsoleteParentClear(Literal) {
 		Assert(Outdated.Has("hotstrings`nautocorrection"))
 		Receipt := ConfigScopeApply("hotstrings", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		AssertEqual(StrReplace(Source, "[layout]`n", _ScopePreviewOffRows() . "[layout]`n"), FSReadUtf8Exact(Fixture.path),
+		AssertEqual(StrReplace(Source, "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows()), FSReadUtf8Exact(Fixture.path),
 			"neutral descendants cannot replace an obsolete table parent")
 		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
 		Refusal.Call("native refusal")
@@ -690,7 +718,7 @@ _ScopeObsoleteGlobal(Mode) {
 			AssertEqual("pending", Receipt["status"])
 			Assert(Backups >= 4, "the genuine global file cohort crosses its coordinated backup boundary")
 			AssertEqual(1, Launches)
-			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[layout]`n", _ScopePreviewOffRows() . "[layout]`n")
+			Expected := StrReplace(StrReplace(Source, "ergopti_alt_gr = true`n", ""), "[hotstrings]`n", "[hotstrings]`n" . _ScopePreviewOffRows())
 				. '[shortcuts.keyboard]`nmagic_editor = "none"`n'
 				. '[shortcuts.script_control]`nscript_altgr_backspace = "none"`n'
 				. 'script_altgr_delete = "none"`nscript_altgr_enter = "none"`nscript_altgr_escape = "none"`n'

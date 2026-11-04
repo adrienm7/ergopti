@@ -450,6 +450,12 @@ end
 --- @return boolean dispatched True only when one exact dispatcher accepted.
 local function triggerAction(action, sign, slot)
 	if not action or action == "none" then return false end
+	-- macOS runs its own gesture on this slot while it is on in the Trackpad
+	-- settings: firing Ergopti's too would be a double action.
+	if slot and type(_state.system_held) == "function" and _state.system_held(slot) then
+		Logger.debug(LOG, "Gesture %s -> %s held back: macOS uses this gesture.", tostring(slot), action)
+		return false
+	end
 	-- An AI action is unarmed while the AI is off, as for the keys.
 	if require("modules.shortcuts.ai_actions").blocked(action) then
 		Logger.debug(LOG, "Gesture %s -> %s held back: the AI is off.", tostring(slot), action)

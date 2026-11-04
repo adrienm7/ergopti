@@ -294,10 +294,10 @@ local ROUTES = {
 		return indentation_item(f.streaming_menu()).menu[10].fn()
 	end},
 	{name = "set navigation modifiers", key = "llm_nav_modifiers", invoke = function(f)
-		return find_item(f.manager.build_nav_modifier_menu(), "⇧ Shift").fn()
+		return find_item(f.manager.build_nav_modifier_menu(), "⇧ key_name.shift").fn()
 	end},
 	{name = "set validation modifiers", key = "llm_val_modifiers", invoke = function(f)
-		return find_item(f.manager.build_val_modifier_menu(), "⌘ Cmd").fn()
+		return find_item(f.manager.build_val_modifier_menu(), "⌘ key_name.cmd").fn()
 	end},
 	{name = "toggle instant word end", key = "llm_instant_on_word_end", invoke = function(f)
 		return find_item(f.trigger_menu(), "menu.llm.instant_on_word_end").fn()
@@ -437,10 +437,10 @@ helpers.describe("HS-026 missed LLM setting callbacks share the owner", function
 			local navigation = find_item(submenu, "menu.llm.nav_menu_title")
 			helpers.assert_true(navigation ~= nil, "the real navigation row must rebuild")
 			helpers.assert_true(find_item(navigation.menu,
-				"menu.llm.nav_label : ⌃ menu.llm.arrows") ~= nil,
+				"menu.llm.nav_label: ⌃ key_name.ctrl + menu.llm.arrows") ~= nil,
 				"navigation title must display the canonical state value")
 			helpers.assert_true(find_item(navigation.menu,
-				"menu.llm.val_label : ⇧ menu.llm.digits") ~= nil,
+				"menu.llm.val_label: ⇧ key_name.shift + menu.llm.digits") ~= nil,
 				"validation title must display the canonical state value")
 			helpers.assert_eq(fixture.calls.runtime, 0,
 				"a render-only rebuild must not invoke either runtime setter")

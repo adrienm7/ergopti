@@ -34,7 +34,7 @@ local helpers, fake_config =
 
 helpers.describe("extension category gates: one acknowledged batch", function()
 	local function gate_action(config, enabled, changed)
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local label = require("infra.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
 		local extension = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
@@ -54,7 +54,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 			return execute(command)
 		end
 		local called, result = pcall(action)
@@ -269,10 +269,10 @@ end)
 
 helpers.describe("hotstring delay rows: durable owner acknowledgement", function()
 	local function delay_action(config, kind, changed)
-		local builder = helpers.load_module("ui.menu.menu_builder")
+		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
-		local title = require("infra.i18n").get(key) .. " : "
+		local title = require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -295,7 +295,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		end
 		modal.run = function(callback) releases = releases + 1;return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command;return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command;return 0 end
 			return execute(command)
 		end
 		local called, result = pcall(action)
@@ -379,7 +379,9 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		-- The base expansion delay (0.4 s) is the canonical config.toml leaf; the category
 		-- delay (0.3 s) is stored as its offset, -0.1 s.
 		local original = '# hand-written delay preferences\n[magickey]\ndelay_offset = -0.1\n' .. foreign
-		local config_original = '[future]\nuser = "kept"\n[hotstrings]\nexpansion_delay = 0.4\n'
+		-- The magic key category reads on, so does the Hotstrings switch: an off
+		-- category greys every row of its submenu (category-off rule).
+		local config_original = '[future]\nuser = "kept"\n[hotstrings]\nexpansion_delay = 0.4\ngroups = { magickey = true }\n'
 		write(path, original);write(config_path, config_original)
 		local loaded = {};for name, value in pairs(package.loaded) do loaded[name] = value end
 		local preferences = require("infra.hotstring_preferences")

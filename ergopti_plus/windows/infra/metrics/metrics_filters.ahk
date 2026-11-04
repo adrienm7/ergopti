@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Persists and evaluates the privacy filters that gate the keystats hot
 ; path: private browsing detection, system-auth dialogs, and a per-app
-; exclusion list. Mirrors the « FILTRES DE CONFIDENTIALITÉ » section of
+; exclusion list. Mirrors the « Filtres de confidentialité » section of
 ; the Hammerspoon menu_metrics.lua.
 ;
 ; FEATURES & RATIONALE:
@@ -29,6 +29,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
 
 
@@ -78,10 +79,10 @@ class MetricsFilters {
 ; the failure this function exists to make impossible to have unnoticed.
 MetricsFiltersApplyManifestDefaults() {
 		Pairs := Map(
-			"private_browsing", "metrics.private_filter_enabled",
-			"secure_field",     "metrics.secure_filter_enabled",
-			"system_auth",      "metrics.system_auth_filter_enabled",
-			"encrypt",          "metrics.encrypt"
+			"private_browsing", ConfigKey.METRICS_PRIVATE_FILTER_ENABLED,
+			"secure_field",     ConfigKey.METRICS_SECURE_FILTER_ENABLED,
+			"system_auth",      ConfigKey.METRICS_SYSTEM_AUTH_FILTER_ENABLED,
+			"encrypt",          ConfigKey.METRICS_ENCRYPT
 		)
 		for Prop, Path in Pairs {
 				Entry := ManifestFindEntryByPath(Path)
@@ -129,9 +130,9 @@ MF_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MF_FilterConfigKey(Prop) {
 	static Keys := Map(
-		"private_browsing", "private_filter_enabled",
-		"secure_field",     "secure_filter_enabled",
-		"system_auth",      "system_auth_filter_enabled"
+		"private_browsing", ConfigLeaf.PRIVATE_FILTER_ENABLED,
+		"secure_field",     ConfigLeaf.SECURE_FILTER_ENABLED,
+		"system_auth",      ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED
 	)
 	return Keys.Get(Prop, "")
 }
@@ -243,7 +244,7 @@ _MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
 		Persisted.Push(Key)
 	}
 	return {
-		updates: [{ Section: "metrics", Key: "disabled_apps",
+		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}
@@ -977,7 +978,7 @@ _MF_BuildDisabledAppTogglePlan(ProcessName, Outcome) {
 	for Name, _ in Candidate
 		Persisted.Push(Name)
 	return {
-		updates: [{ Section: "metrics", Key: "disabled_apps",
+		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}

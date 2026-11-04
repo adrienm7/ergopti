@@ -892,6 +892,13 @@ X11_NO_DISPLAY = "no_display"
 X11_TOOL_MISSING = "tool_missing"
 X11_COMPILE_FAILED = "compile_failed"
 X11_NOT_LOADED = "not_loaded"
+X11_STALE_KEYMAP = "stale_keymap"
+
+# The keys whose cells the number-row options move. A loaded keymap is the
+# installed layout only when these keys hold what the installed files declare:
+# a desktop that puts back an older layout of the same name (a system copy, a
+# settings daemon) keeps the name and changes the cells.
+ROW_PROBE_KEYS = ("<TLDE>",) + tuple("<AE%02d>" % number for number in range(1, 13))
 
 _TYPES_SECTION = re.compile(r'(xkb_types\s*\{\s*include\s+)"[^"]*"')
 _SYMBOLS_NAME = re.compile(r'xkb_symbols\s+"([^"]*)"')
@@ -914,11 +921,68 @@ def x11_keymap_text(spec: LayoutSpec, tree_root: Path, display: str) -> str | No
     return printed
 
 
-def x11_loaded_symbols(display: str) -> str | None:
-    """The name of the symbols section the running server holds, or ``None``."""
-    dumped = run_capture(["xkbcomp", "-xkb", display, "-"], timeout=X11_TOOL_TIMEOUT_SECONDS)
-    match = _SYMBOLS_NAME.search(dumped or "")
-    return match.group(1) if match else None
+def x11_loaded_keymap(display: str) -> str | None:
+    """The keymap the running server holds, as ``xkbcomp`` prints it, or ``None``."""
+    return run_capture(["xkbcomp", "-xkb", display, "-"], timeout=X11_TOOL_TIMEOUT_SECONDS)
+
+
+def compile_keymap_text(keymap: str, tree_root: Path) -> str | None:
+    """Compiles a keymap description offline, printed the way the server prints it."""
+    try:
+        result = subprocess.run(
+            ["xkbcomp", "-I" + str(tree_root), "-xkb", "-", "-"],
+            input=keymap,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=X11_TOOL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 and result.stdout else None
+
+
+def keymap_layout_group(keymap: str, layout: str) -> int | None:
+    """The 1-based group that holds ``layout`` in a compiled keymap, or ``None``.
+
+    The symbols section is named from the layouts it was built from
+    (``pc+us+ergopti:2+inet(evdev)``); a layout without an index is group 1."""
+    match = _SYMBOLS_NAME.search(keymap or "")
+    if not match:
+        return None
+    for part in match.group(1).split("+"):
+        name, _, index = part.partition(":")
+        if name.split("(", 1)[0] == layout:
+            return int(index) if index.isdigit() else 1
+    return None
+
+
+def keymap_group_symbols(keymap: str, key: str, group: int) -> list[str]:
+    """The keysym names of ``key`` in ``group``; a single-group key may be printed bare."""
+    held = keymap_key_symbols(keymap, key, group)
+    if held or group != 1:
+        return held
+    block = keymap_key_block(keymap, key) or ""
+    bare = re.findall(r"\[([^\]]*)\]", block)
+    return [part.strip() for part in bare[-1].split(",") if part.strip()] if bare else []
+
+
+def keymap_carries_layout(held: str, expected: str, layout: str) -> bool:
+    """Whether the keymap ``held`` by a server types ``layout`` as compiled in ``expected``.
+
+    Both are printed by ``xkbcomp``, so keysym names are spelled the same way;
+    the layout may sit in another group of ``held`` (a desktop with several
+    input sources)."""
+    held_group = keymap_layout_group(held, layout)
+    expected_group = keymap_layout_group(expected, layout)
+    if held_group is None or expected_group is None:
+        return False
+    for key in ROW_PROBE_KEYS:
+        wanted = keymap_group_symbols(expected, key, expected_group)
+        if keymap_group_symbols(held, key, held_group) != wanted:
+            return False
+    return True
 
 
 def apply_x11_user_tree(
@@ -927,9 +991,12 @@ def apply_x11_user_tree(
     """Replaces the running X11 keymap with a layout of the user XKB tree.
 
     Returns ``(applied, code)`` with a closed code: ``applied``, ``not_x11``,
-    ``no_display``, ``tool_missing``, ``compile_failed`` or ``not_loaded`` (the
+    ``no_display``, ``tool_missing``, ``compile_failed``, ``not_loaded`` (the
     server compiled the upload but still holds another layout, which is what a
-    desktop that re-applies its own settings looks like)."""
+    desktop that re-applies its own settings looks like) or ``stale_keymap``
+    (the server holds a layout of that name whose number row is not the
+    installed one). Only a server keymap read back after the upload proves the
+    layout is in use."""
     env = os.environ if environ is None else environ
     if session_type(environ) != "x11":
         return False, X11_NOT_X11
@@ -939,7 +1006,8 @@ def apply_x11_user_tree(
     if not (shutil.which("setxkbmap") and shutil.which("xkbcomp")):
         return False, X11_TOOL_MISSING
     keymap = x11_keymap_text(spec, tree_root, display)
-    if keymap is None:
+    expected = compile_keymap_text(keymap, tree_root) if keymap is not None else None
+    if expected is None:
         return False, X11_COMPILE_FAILED
     try:
         result = subprocess.run(
@@ -955,10 +1023,220 @@ def apply_x11_user_tree(
         return False, X11_COMPILE_FAILED
     if result.returncode != 0:
         return False, X11_COMPILE_FAILED
-    held = x11_loaded_symbols(display)
-    if held is None or ("+" + spec.layout) not in held:
+    held = x11_loaded_keymap(display)
+    if keymap_layout_group(held or "", spec.layout) is None:
         return False, X11_NOT_LOADED
+    if not keymap_carries_layout(held or "", expected, spec.layout):
+        return False, X11_STALE_KEYMAP
     return True, X11_APPLIED
+
+
+# ---------------------------------------------------------------------------
+# Wayland live replacement (GNOME, KDE)
+# ---------------------------------------------------------------------------
+
+# A compositor compiles a keymap again when the selected layout id changes;
+# rewriting the files of the selected id and writing the same setting back
+# changes nothing it can see. Each build therefore alternates between two ids,
+# the layout's own and the same id with LIVE_SLOT_SUFFIX, and the desktop
+# setting moves from the one in use to the other. Both stay installed, so at
+# most two copies of a layout ever exist.
+LIVE_SLOT_SUFFIX = "_live"
+
+WAYLAND_APPLIED = "applied"
+WAYLAND_SESSION_UNSUPPORTED = "session_unsupported"
+WAYLAND_NO_DISPLAY = "no_display"
+WAYLAND_TOOL_MISSING = "tool_missing"
+WAYLAND_COMPILE_FAILED = "compile_failed"
+WAYLAND_SELECT_REFUSED = "select_refused"
+WAYLAND_NOT_LOADED = "not_loaded"
+WAYLAND_STALE_KEYMAP = "stale_keymap"
+
+# The compositor compiles the new keymap in its own time after the setting
+# changes; XWayland then receives it. A bounded poll, never a fixed sleep.
+WAYLAND_READBACK_SECONDS = 10.0
+WAYLAND_READBACK_INTERVAL_SECONDS = 0.2
+
+
+def live_slots(layout_id: str) -> tuple[str, str]:
+    """The two ids a layout alternates between on a Wayland desktop."""
+    return layout_id, layout_id + LIVE_SLOT_SUFFIX
+
+
+def wayland_live_desktop(environ: dict[str, str] | None = None) -> str | None:
+    """``gnome`` or ``kde`` when this Wayland session selects layouts through a
+    setting this module can write and read back; ``None`` for every other session."""
+    if session_type(environ) != "wayland":
+        return None
+    owner = owning_desktop(desktop_tokens(environ))
+    return owner if owner in ("gnome", "kde") else None
+
+
+@dataclass
+class DesktopSelection:
+    """The desktop setting before a live selection, to put back on a refusal."""
+
+    desktop: str
+    values: dict[str, str]
+    slot_in_use: str | None
+
+
+def _read_gnome_selection(slots: tuple[str, str]) -> DesktopSelection | None:
+    values = {}
+    for key in (GNOME_KEY, GNOME_MRU_KEY):
+        raw = run_capture(["gsettings", "get", GNOME_SCHEMA, key])
+        if raw is None or parse_gsettings_sources(raw) is None:
+            return None
+        values[key] = raw.strip()
+    sources = parse_gsettings_sources(values[GNOME_KEY]) or []
+    in_use = next((ident for kind, ident in sources if kind == "xkb" and ident in slots), None)
+    return DesktopSelection("gnome", values, in_use)
+
+
+def _read_kde_selection(slots: tuple[str, str]) -> DesktopSelection | None:
+    reader = _kde_reader()
+    if reader is None or _kde_writer() is None:
+        return None
+    values = {}
+    for key in (KDE_LAYOUTS_KEY, KDE_VARIANTS_KEY, KDE_NAMES_KEY, KDE_USE_KEY):
+        status, value = _kde_read(reader, key)
+        if status is CommandCaptureStatus.FAILED:
+            return None
+        values[key] = value
+    layouts = parse_kde_layouts(values[KDE_LAYOUTS_KEY], values[KDE_VARIANTS_KEY])
+    in_use = next(
+        (spec.layout for spec in layouts if spec.layout in slots and not spec.variant), None
+    )
+    return DesktopSelection("kde", values, in_use)
+
+
+def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelection | None:
+    """The current setting, or ``None`` when it cannot be read (never overwritten then)."""
+    if desktop == "gnome":
+        return _read_gnome_selection(slots)
+    return _read_kde_selection(slots)
+
+
+def _gnome_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+    for key in (GNOME_KEY, GNOME_MRU_KEY):
+        current = parse_gsettings_sources(selection.values[key]) or []
+        wanted = [("xkb", slot)] + [
+            pair for pair in current if not (pair[0] == "xkb" and pair[1] in slots)
+        ]
+        if not _gnome_set(key, wanted, "GNOME : disposition " + slot):
+            return False
+        readback = parse_gsettings_sources(
+            run_capture(["gsettings", "get", GNOME_SCHEMA, key]) or ""
+        )
+        if readback != wanted:
+            return False
+    return True
+
+
+def _kde_select(slot: str, slots: tuple[str, str], selection: DesktopSelection) -> bool:
+    writer, reader = _kde_writer(), _kde_reader()
+    if writer is None or reader is None:
+        return False
+    current = parse_kde_layouts(
+        selection.values[KDE_LAYOUTS_KEY], selection.values[KDE_VARIANTS_KEY]
+    )
+    kept, _ = remove_layout_specs(current, lambda spec: spec.layout in slots and not spec.variant)
+    merged = [LayoutSpec(slot)] + kept
+    layout_list, variant_list = format_kde_layouts(merged)
+    written = _kde_write(writer, KDE_LAYOUTS_KEY, layout_list, "KDE : dispositions")
+    written = written and _kde_write(writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes")
+    names = _kde_display_names(current, selection.values[KDE_NAMES_KEY], merged)
+    if names is not None:
+        written = written and _kde_write(writer, KDE_NAMES_KEY, names, "KDE : noms affichés")
+    if selection.values[KDE_USE_KEY].lower() != "true":
+        written = written and _kde_write(writer, KDE_USE_KEY, "true", "KDE : liste activée")
+    if not written:
+        return False
+    _, readback = _kde_read(reader, KDE_LAYOUTS_KEY)
+    if readback != layout_list:
+        return False
+    _kde_reload()
+    return True
+
+
+def restore_desktop_selection(selection: DesktopSelection) -> bool:
+    """Writes back the setting read before a refused live selection."""
+    if selection.desktop == "gnome":
+        restored = True
+        for key in (GNOME_KEY, GNOME_MRU_KEY):
+            pairs = parse_gsettings_sources(selection.values[key]) or []
+            restored = _gnome_set(key, pairs, "GNOME : réglage précédent rétabli") and restored
+        return restored
+    writer = _kde_writer()
+    if writer is None:
+        return False
+    restored = True
+    for key in (KDE_LAYOUTS_KEY, KDE_VARIANTS_KEY, KDE_NAMES_KEY, KDE_USE_KEY):
+        restored = (
+            _kde_write(writer, key, selection.values[key], "KDE : réglage précédent rétabli")
+            and restored
+        )
+    if restored:
+        _kde_reload()
+    return restored
+
+
+def wait_for_xwayland_keymap(spec: LayoutSpec, tree_root: Path, display: str) -> str:
+    """Polls XWayland, which receives the compositor's keymap, until it holds
+    ``spec`` as compiled from the user tree. Returns a closed code."""
+    keymap = x11_keymap_text(spec, tree_root, display)
+    expected = compile_keymap_text(keymap, tree_root) if keymap is not None else None
+    if expected is None:
+        return WAYLAND_COMPILE_FAILED
+    code = WAYLAND_NOT_LOADED
+    deadline = time.monotonic() + WAYLAND_READBACK_SECONDS
+    while True:
+        held = x11_loaded_keymap(display) or ""
+        if keymap_layout_group(held, spec.layout) is None:
+            code = WAYLAND_NOT_LOADED
+        elif keymap_carries_layout(held, expected, spec.layout):
+            return WAYLAND_APPLIED
+        else:
+            code = WAYLAND_STALE_KEYMAP
+        if time.monotonic() >= deadline:
+            return code
+        time.sleep(WAYLAND_READBACK_INTERVAL_SECONDS)
+
+
+def live_readback_refusal(environ: dict[str, str] | None = None) -> str | None:
+    """Why the loaded keymap cannot be read back through XWayland, or ``None``."""
+    env = os.environ if environ is None else environ
+    if not env.get("DISPLAY", ""):
+        return WAYLAND_NO_DISPLAY
+    if not (shutil.which("setxkbmap") and shutil.which("xkbcomp")):
+        return WAYLAND_TOOL_MISSING
+    return None
+
+
+def select_live_slot(
+    slot: str,
+    slots: tuple[str, str],
+    selection: DesktopSelection,
+    tree_root: Path,
+    environ: dict[str, str] | None = None,
+) -> tuple[bool, str]:
+    """Selects ``slot`` through the desktop setting and proves it through XWayland.
+
+    The setting read before (``selection``) is written back whenever the
+    selection or its proof fails, so the session keeps the layout it had."""
+    refusal = live_readback_refusal(environ)
+    if refusal is not None:
+        return False, refusal
+    display = (os.environ if environ is None else environ)["DISPLAY"]
+    select = _gnome_select if selection.desktop == "gnome" else _kde_select
+    if not select(slot, slots, selection):
+        restore_desktop_selection(selection)
+        return False, WAYLAND_SELECT_REFUSED
+    code = wait_for_xwayland_keymap(LayoutSpec(slot), tree_root, display)
+    if code != WAYLAND_APPLIED:
+        restore_desktop_selection(selection)
+        return False, code
+    return True, WAYLAND_APPLIED
 
 
 # ---------------------------------------------------------------------------

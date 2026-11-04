@@ -11,6 +11,8 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -47,14 +49,16 @@
 ; modifiers, their combinations and the nav layer; its « none » row clears it).
 ; Both pickers persist immediately via WriteTapHoldTap / TapHoldSetHold and
 ; reload the script to refresh the menu; a refused hold keeps its picker open.
-_BuildTapHoldsSubmenu() {
+_BuildTapHoldsSubmenu(TargetMenu := unset) {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
 		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
+		"tap_hold_lone_tap", (*) => _TH_LoneTapRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters,
+		IsSet(TargetMenu) ? TargetMenu : unset)
 }
 
 ; The GLOBAL delay row: the delay of every key that has none of its own. The label
@@ -64,6 +68,74 @@ _TH_GlobalDelayRows() {
 	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
 	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
 	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
+}
+
+; The lone tap window's choices in milliseconds, in menu order; 0 is off (the
+; strict tap-hold). They are the feature's preset_values in the manifest, the
+; one list the macOS and Linux menus read too.
+; @returns {Array}
+_TH_LoneTapChoicesMs() {
+	Feature := ManifestFindEntryByPath(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	Choices := (Feature is Map) ? Feature.Get("preset_values", 0) : 0
+	if !(Choices is Array) || Choices.Length < 2
+		throw ValueError("tap_holds.lone_modifier_tap_max_ms declares no preset_values in the manifest.")
+	for _, Ms in Choices
+		TapHoldValidLoneTapMaxMs(Ms)
+	return Choices
+}
+
+; How the lone tap window reads in the menu: « off (strict tap-hold) » for 0,
+; « up to 1000 ms » otherwise.
+; @param Ms {Integer} The window in milliseconds.
+; @returns {String}
+_TH_LoneTapCaption(Ms) {
+	return Ms == 0 ? t("menu.tapholds.lone_tap_off")
+		: StrReplace(t("menu.tapholds.lone_tap_up_to"), "%s", Ms . " ms")
+}
+
+; The lone tap window row (tap_holds.lone_modifier_tap_max_ms): its caption
+; carries the window in force and it opens the choices, the current one checked.
+; A window set by hand outside the choices is shown in the caption, unchecked.
+; @param CurrentMs {Integer} The window shown; the one in force by default.
+; @returns {Array} One row.
+_TH_LoneTapRows(CurrentMs := unset) {
+	Current := IsSet(CurrentMs) ? CurrentMs : TapHoldLoneTapMaxMs()
+	Choices := []
+	for _, Ms in _TH_LoneTapChoicesMs() {
+		Choices.Push(Map(
+			"label", Ms == 0 ? t("menu.tapholds.lone_tap_off") : Ms . " ms",
+			"checked", Ms == Current,
+			; The fat arrow drops the native menu arguments, which would otherwise
+			; fill the commit's Path and ReloadFn seams.
+			"action", ((Value, *) => _TH_CommitLoneTapMaxMs(Value)).Bind(Ms)))
+	}
+	Label := StrReplace(t("menu.tapholds.lone_tap_title"), "%s", _TH_LoneTapCaption(Current))
+	return [Map("label", Label, "items", Choices)]
+}
+
+; Persists the lone tap window chosen in the menu, then reloads.
+; @param Ms {Integer} 0 (strict) or a positive whole number of milliseconds.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Boolean} False when nothing was committed.
+_TH_CommitLoneTapMaxMs(Ms, Path := "", ReloadFn := 0) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_CommitLoneTapMaxMs(Ms, Path, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	try TapHoldValidLoneTapMaxMs(Ms)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The lone modifier tap window is refused: {1}.", Err.Message)
+		return false
+	}
+	Rows := [ManifestSparseOperation(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, Ms)]
+	if !ConfigCommitUpdates(Path != "" ? Path : ConfigurationFile, Rows, "the lone modifier tap window")
+		return false
+	try LoggerInfo("TapHoldMenu", "Lone modifier tap window set to {1} ms (pid={2}).", Ms, DriverPid)
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend()
 }
 
 ; List provider: one row per configurable key of one hand.
@@ -100,10 +172,10 @@ _TH_KeyRows(Hand) {
 			? Round(TapHoldDuration(Desired, KeyId) * 1000) . " ms"
 			: StrReplace(t("menu.tapholds.key_tap_delay_inherited"), "%s", GlobalCaption)
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
-			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
-				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
-				"tap_hold_key_hold_action", _TH_MakeHoldPickerFn(KeyId, KeyLabel),
-				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId),
+			Map(MenuCommand.TAP_HOLD_KEY_NATIVE, _TH_MakeDisableFn(KeyId),
+				MenuCommand.TAP_HOLD_KEY_TAP, _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
+				MenuCommand.TAP_HOLD_KEY_HOLD_ACTION, _TH_MakeHoldPickerFn(KeyId, KeyLabel),
+				MenuCommand.TAP_HOLD_KEY_DELAY, _TH_MakeDelayPickerFn(KeyId),
 				MenuCommand.TAP_HOLD_KEY_DELAY_USE_GLOBAL, _TH_MakeDelayResetFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
@@ -307,7 +379,7 @@ class _TH_TapPickerFnObj {
 		global TapHold
 		; Current tap action at call time (not at menu-build time).
 		; "" means native (unconfigured) — pass as-is; ShowNative:=true adds the entry.
-		Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, this.KeyId) : ""
+		Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, this.KeyId) : ""
 		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
@@ -640,7 +712,7 @@ _TH_ApplyTap(KeyId, ActionId) {
 		try return _TH_ApplyTap(KeyId, ActionId)
 		finally Critical(InheritedCritical)
 	}
-	Current := IsSet(TapHold) ? TapHoldTapAction(TapHold, KeyId) : "<not_ready>"
+	Current := IsSet(TapHold) ? TapHoldConfiguredTapAction(TapHold, KeyId) : "<not_ready>"
 	try LoggerInfo("TapHoldMenu", "ApplyTap key='{1}' current='{2}' -> '{3}' (pid={4}).", KeyId,
 		(Current == "" ? "<native>" : Current), (ActionId == "" ? "<native>" : ActionId), DriverPid)
 	if !GestureEnsureActionParameter(GestureBindingId("tap_hold", KeyId), ActionId)
@@ -691,8 +763,8 @@ _TH_ScopeCommands(Options := unset) {
 	global _ConfigDir
 	OwnedOptions := IsSet(Options) ? Options : Map("layers_config_dir", _ConfigDir)
 	return Map(
-		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
-		"scope_restore", (*) => TapHoldScopeApply("recommended", OwnedOptions),
-		"scope_clear", (*) => TapHoldScopeApply("clear", OwnedOptions),
-		"edit_nav_layer", LayerEditor_Open)
+		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
+		MenuCommand.SCOPE_RESTORE, (*) => TapHoldScopeApply("recommended", OwnedOptions),
+		MenuCommand.SCOPE_CLEAR, (*) => TapHoldScopeApply("clear", OwnedOptions),
+		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
 }

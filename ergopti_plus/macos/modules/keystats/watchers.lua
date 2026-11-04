@@ -75,6 +75,8 @@ local _context_refresh_timers = {}
 
 -- Day boundary tracker for the midnight rotation
 local _current_day          = os.date("%Y-%m-%d")
+local _rotation_announced     = false
+local _rotation_wait_reported = false
 
 -- Throttle for the expensive system-load poll
 local _last_system_load_poll_ms = 0
@@ -280,7 +282,11 @@ function M.perform_maintenance()
 	if _is_paused() then return end
 	local today = os.date("%Y-%m-%d")
 	if _current_day ~= today then
-		Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
+		-- One START per rotation: a recovery can hold it for many ticks.
+		if not _rotation_announced then
+			_rotation_announced = true
+			Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
+		end
 		-- Credit the part of the current foreground interval that belongs to the
 		-- previous calendar day before the log is rotated. Without this split, a
 		-- user who stays in one app over midnight has all of that time assigned to
@@ -294,12 +300,18 @@ function M.perform_maintenance()
 		-- resumption bookmark (today_idx, ngram_context, _current_day) must
 		-- stay untouched so the very next maintenance tick retries the same
 		-- rollover instead of silently skipping straight to "today" (G1, G2).
-		local rolled_over = LogManager.day_rollover()
+		local rolled_over, reason = LogManager.day_rollover()
 		if rolled_over then
 			_state.today_idx     = {}
 			_state.ngram_context = nil
 			_current_day = today
+			_rotation_announced, _rotation_wait_reported = false, false
 			Logger.success(LOG, "Midnight rotation complete — now tracking %s.", today)
+		elseif reason == LogManager.ROLLOVER_WAITS_FOR_RECOVERY then
+			if not _rotation_wait_reported then
+				_rotation_wait_reported = true
+				Logger.info(LOG, "Midnight rotation waits for the aggregate cache recovery; today.log keeps every event.")
+			end
 		else
 			Logger.warn(LOG, "Midnight rotation stalled — will retry on next maintenance tick.")
 		end

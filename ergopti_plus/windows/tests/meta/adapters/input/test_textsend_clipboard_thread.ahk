@@ -45,10 +45,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_TSCT_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TSCT_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Returns the function body from its declaration to the first flush-left closing
@@ -83,7 +81,7 @@ _TSCT_FuncBodyStripped(Src, FuncDef) {
 ; The keyboard-thread TextSend body must NOT call ClipWait / ^v inline; it must
 ; hand the round-trip to a one-shot timer so the hook thread returns immediately.
 _TSCT_TextSendDefersClipboardWork() {
-	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCT_ReadSource("text_sender.ahk")
 	Body := _TSCT_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
 	Assert(Body != "", "TextSend must exist in adapters/text_sender.ahk")
 	Assert(!InStr(Body, "ClipWait"),
@@ -107,7 +105,7 @@ Test("text_sender: TextSend defers clipboard work off the keyboard thread (texts
 
 ; The blocking ClipWait must use a small finite timeout constant, never the old 1 s.
 _TSCT_ClipWaitTimeoutIsSmall() {
-	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCT_ReadSource("text_sender.ahk")
 	Assert(InStr(Src, "TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC := 0.2") > 0,
 		"A small finite ClipWait timeout constant (0.2 s) must be defined so the wait never stalls perceptibly")
 	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {")
@@ -131,7 +129,7 @@ Test("text_sender: clipboard ClipWait uses a small finite timeout (textsend-clip
 
 ; ClipWait's boolean must gate the paste: on timeout, no ^v and a loud LoggerError.
 _TSCT_ClipWaitReturnChecked() {
-	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCT_ReadSource("text_sender.ahk")
 	Body := _TSCT_FuncBodyStripped(Src, "_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {")
 	Assert(Body != "", "_TextSendClipboard helper must exist")
 	Assert(InStr(Body, "if !ClipWait(") > 0,
@@ -154,7 +152,7 @@ Test("text_sender: clipboard branch checks ClipWait return and bails loudly (tex
 ; The deferred restore must be serialised by a generation counter so a stale
 ; restore can never clobber a clipboard a later injection just populated.
 _TSCT_RestoreGuardedByGeneration() {
-	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCT_ReadSource("text_sender.ahk")
 	Assert(InStr(Src, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"A module generation counter (_TEXT_CLIPBOARD_GENERATION) must exist to serialise overlapping clipboard restores")
 
@@ -175,7 +173,7 @@ Test("text_sender: deferred clipboard restore is generation-guarded (textsend-re
 ; older requested output when two writes overlap. Clipboard sends therefore need
 ; a FIFO whose per-request snapshot is taken only after the request owns the head.
 _TSCT_ClipboardRequestsAreFifoSerialized() {
-	Src := _TSCT_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCT_ReadSource("text_sender.ahk")
 	TextBody := _TSCT_FuncBodyStripped(Src, "TextSend(Text, Opts, Callback) {")
 	StartBody := _TSCT_FuncBodyStripped(Src, "_TextSenderStartClipboard() {")
 	FinishBody := _TSCT_FuncBodyStripped(Src, "_TextSenderFinishClipboard() {")

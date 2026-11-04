@@ -92,7 +92,7 @@ _OllamaNativeEnable_Body(Status, Counter, CancelDuringDebt, State) {
 		_LLM_ManagedBootstrap := 0
 		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:" . Port
 		Before := FileRead(ConfigurationFile, "UTF-8")
-		State["port"].Delete("probe")
+		State["port"]["probe"] := _LLM_Menu_EnableOwnedProbe
 		AssertFalse(HadRunCall, "the native launch observer must start from the genuine production boundary")
 		RunFn.DefineProp("Call", {Call: _OllamaNativeEnable_ObserveRun.Bind(NativeState)})
 		ObservedRun := true

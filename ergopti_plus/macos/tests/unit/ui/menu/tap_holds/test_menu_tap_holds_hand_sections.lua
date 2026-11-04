@@ -61,6 +61,7 @@ local function remap_double()
 		get_combo_hold_action = function() return "none" end,
 		get_tap_hold_timeout = function() return 200 end,
 		get_sticky_timeout = function() return 1000 end,
+		get_lone_modifier_tap_max_ms = function() return 1000 end,
 		get_simultaneous_threshold = function() return 50 end,
 	}
 end
@@ -114,8 +115,8 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		helpers.assert_not_nil(right, "the « Main droite (tap / hold) » header")
 		helpers.assert_true(left < right, "the left hand comes first")
 
-		local fn = key_index(rows, "tap_hold.group.fn")
-		local space = key_index(rows, "tap_hold.group.space")
+		local fn = key_index(rows, "key_name.fn")
+		local space = key_index(rows, "key_name.space")
 		helpers.assert_not_nil(fn, "Fn has a row")
 		helpers.assert_true(fn > left and fn < right, "Fn is a left-hand key")
 		helpers.assert_not_nil(space, "Space has a row")
@@ -125,10 +126,10 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		-- and the first right-hand key.
 		helpers.assert_eq(space, right - 2, "Space is the last left-hand row")
 		helpers.assert_eq(rows[space + 1].title, "-", "a separator follows the last left-hand key")
-		local first_right = key_index(rows, "tap_hold.group.right_command")
+		local first_right = key_index(rows, "key_name.right_command")
 		helpers.assert_eq(first_right, right + 1, "Right Cmd is the first right-hand key")
-		helpers.assert_not_nil(key_index(rows, "tap_hold.group.backspace"), "Backspace is listed")
-		helpers.assert_true(key_index(rows, "tap_hold.group.backspace") > right,
+		helpers.assert_not_nil(key_index(rows, "key_name.backspace"), "Backspace is listed")
+		helpers.assert_true(key_index(rows, "key_name.backspace") > right,
 			"Backspace is a right-hand key")
 	end)
 
@@ -136,7 +137,7 @@ helpers.describe("the macOS Tap-Holds submenu lists its keys by hand", function(
 		local rows = render()
 		local keyed = 0
 		for _, row in ipairs(rows) do
-			if type(row.title) == "string" and row.title:match("^tap_hold%.group%.") then
+			if type(row.title) == "string" and row.title:match("^key_name%.") then
 				keyed = keyed + 1
 			end
 		end
@@ -172,7 +173,7 @@ local function with_native_key_menu(configured, body)
 				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
 		end
 		local function first()
-			local prefix = require("infra.i18n").get("tap_hold.group.left_shift") .. "  :"
+			local prefix = require("infra.i18n").get("key_name.left_shift") .. "  :"
 			for _, row in ipairs(rows()) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then
 					return row.menu[1], row.menu
@@ -352,7 +353,7 @@ local function with_slot_picker(body)
 		native.regenerate = function() observed.regenerations = observed.regenerations + 1; return true end
 		local built = menu.build({ karabiner = native,
 			updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
-		local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
+		local key = assert(built[key_index(built, "key_name.left_shift")])
 		body(key.menu, observed, built)
 	end)
 end
@@ -365,7 +366,7 @@ helpers.describe("the macOS key slots open the shared action picker", function()
 			helpers.assert_eq(#observed.opened, 1)
 			local opts = observed.opened[1].opts
 			helpers.assert_eq(opts.presentation_id, "tap_hold_action", "the tap slot's shared title")
-			helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift", "the title names the key")
+			helpers.assert_eq(opts.presentation_suffix, "key_name.left_shift", "the title names the key")
 			helpers.assert_eq(opts.current, "escape", "the current tap is the picker's marked choice")
 			helpers.assert_eq(opts.items, {
 				{ type = "heading", level = 1, text = "Navigation" },
@@ -381,7 +382,7 @@ helpers.describe("the macOS key slots open the shared action picker", function()
 			helpers.assert_true(rows[4].fn())
 			local opts = observed.opened[1].opts
 			helpers.assert_eq(opts.presentation_id, "tap_hold_hold_action", "the hold slot's shared title")
-			helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift")
+			helpers.assert_eq(opts.presentation_suffix, "key_name.left_shift")
 			helpers.assert_eq(opts.current, "shift")
 			helpers.assert_eq(opts.items, {
 				{ type = "heading", level = 1, text = "Modifiers" },
@@ -455,7 +456,7 @@ helpers.describe("the macOS key slots open the shared action picker", function()
 			end
 			local keys = 0
 			for _, row in ipairs(built) do
-				if type(row.title) == "string" and row.title:match("^tap_hold%.group%.") then
+				if type(row.title) == "string" and row.title:match("^key_name%.") then
 					keys = keys + 1
 					walk(row.menu)
 				end
@@ -490,7 +491,7 @@ local function with_delay_native(body)
 		local function rows()
 			local built = menu.build({ karabiner = native,
 				updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
-			local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
+			local key = assert(built[key_index(built, "key_name.left_shift")])
 			return key.menu
 		end
 		local ok, err = pcall(body, rows, observed, require("infra.manifest_menu"), native)
@@ -698,7 +699,7 @@ local function with_pair_picker(body)
 			updateMenu = function() observed.refreshes = observed.refreshes + 1 end })
 		local function find(list)
 			for _, row in ipairs(list or {}) do
-				if type(row.title) == "string" and row.title:find("tap_hold.group.left_shift", 1, true) == 1 then
+				if type(row.title) == "string" and row.title:find("key_name.left_shift", 1, true) == 1 then
 					return row
 				end
 				local nested = find(row.menu)
@@ -752,7 +753,7 @@ helpers.describe("the macOS key-combination slots open the shared action picker"
 				helpers.assert_true(slots[case.slot].fn())
 				local opts = observed.opened[1].opts
 				helpers.assert_eq(opts.presentation_id, case.presentation)
-				helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift + tap_hold.group.right_shift",
+				helpers.assert_eq(opts.presentation_suffix, "key_name.left_shift + key_name.right_shift",
 					"the title names the pair")
 				helpers.assert_eq(opts.current, case.current, "the current action is the marked choice")
 				helpers.assert_eq(opts.items, case.items)

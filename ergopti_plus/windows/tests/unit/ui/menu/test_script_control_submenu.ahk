@@ -77,7 +77,7 @@ _SCSM_AssertOrder(ChordsOn) {
 		AssertEqual(t("common.clear_to_system"), _SCSM_LabelAt(Rendered, 2), "the clear comes third")
 		Assert((_SCSM_StateAt(Rendered, 3) & MF_SEPARATOR) != 0, "a separator closes the first group")
 		for Index, Slot in _SCSM_SLOTS {
-			AssertEqual(1, InStr(_SCSM_LabelAt(Rendered, 3 + Index), t("sg_labels." . Slot) . " : "),
+			AssertEqual(1, InStr(_SCSM_LabelAt(Rendered, 3 + Index), LabelValue(t("sg_labels." . Slot), "")),
 				Slot . " keeps its row, in order")
 		}
 	} finally Rendered.Delete()
@@ -152,7 +152,7 @@ _SCSM_ScopeCase(Mode) {
 	global GestureActionParameters, _SCSM_SLOTS
 	Source := '[shortcuts.script_control]`nchords_enabled = false`nscript_altgr_enter = "none"`nscript_altgr_delete = "open_url"`n'
 		. '[action_parameters]`nscript__script_altgr_delete__open_url = "https://script.test"`n'
-		. 'keyboard__win_b__open_url = "https://keyboard.test"`n'
+		. 'keyboard__meta_b__open_url = "https://keyboard.test"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
@@ -189,7 +189,7 @@ _SCSM_ScopeCase(Mode) {
 			AssertFalse(Section.Has("chords_enabled"), "the restore switches the chords back on")
 		AssertFalse(Parsed["action_parameters"].Has("script__script_altgr_delete__open_url"),
 			"a script binding's parameter goes with its slot")
-		AssertEqual("https://keyboard.test", Parsed["action_parameters"]["keyboard__win_b__open_url"],
+		AssertEqual("https://keyboard.test", Parsed["action_parameters"]["keyboard__meta_b__open_url"],
 			"other bindings keep their parameters")
 		Refusal.Call("native close refused")
 		AssertEqual("refused", Receipt["status"])

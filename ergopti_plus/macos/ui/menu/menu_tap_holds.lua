@@ -35,6 +35,8 @@ local ManifestMenu = require("infra.manifest_menu")
 local Paths       = require("infra.paths")
 local KeyCatalog  = require("tap_hold.key_catalog")
 local CombinationLabels = require("tap_hold.combination_labels")
+local LoneTap     = require("tap_hold.lone_tap")
+local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
@@ -816,6 +818,43 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	}
 end
 
+--- Captions one lone modifier tap window.
+--- @param ms number 0 for the strict tap-hold, else milliseconds.
+--- @return string caption
+local function lone_tap_caption(ms)
+	if ms == 0 then return i18n.get("menu.tapholds.lone_tap_off") end
+	return string.format(i18n.get("menu.tapholds.lone_tap_up_to"), string.format("%d ms", ms))
+end
+
+--- Builds the lone modifier tap window row and its choices: how long a
+--- modifier key pressed alone still types its tap.
+--- @param karabiner   table    The karabiner module.
+--- @param update_menu function Callback to refresh the menu bar.
+--- @return table Provider row carrying the choice rows.
+local function build_lone_tap_item(karabiner, update_menu)
+	local current_ms = karabiner.get_lone_modifier_tap_max_ms()
+	-- The windows offered are the feature's preset_values, the one list the
+	-- three drivers read; 0 is the strict tap-hold.
+	local offered = LoneTap.choices(Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
+	local choices = {}
+	for _, ms in ipairs(offered) do
+		choices[#choices + 1] = {
+			label   = ms == 0 and i18n.get("menu.tapholds.lone_tap_off") or string.format("%d ms", ms),
+			checked = ms == current_ms or nil,
+			action  = function()
+				return commit_menu_setting(karabiner, "Lone modifier tap window", function()
+					return karabiner.set_lone_modifier_tap_max_ms(ms)
+				end, update_menu)
+			end,
+		}
+	end
+	return {
+		label = string.format(i18n.get("menu.tapholds.lone_tap_title"),
+			current_ms ~= nil and lone_tap_caption(current_ms) or "?"),
+		items = choices,
+	}
+end
+
 --- Builds the combo activation window item. Clicking opens a free-text input dialog.
 --- Controls `basic.simultaneous_threshold_milliseconds` — the maximum delay
 --- between the two keys of a shortcut for KE to fire the combo (chord) slot.
@@ -1046,6 +1085,107 @@ local function legacy_rules_rows(karabiner)
 	})
 end
 
+--- The row that tells the user Ergopti closed their own Karabiner-Elements
+--- while it runs and gives it back on pause or quit (ADR 011, the maintainer's
+--- rule of 2026-10-31). Windows and Linux have no Karabiner, as the provider
+--- row's `platform_reason.remap_engine_is_per_driver` says.
+--- @param karabiner table Remap facade.
+--- @return table rows Empty unless Ergopti holds the user's Karabiner closed.
+local function user_karabiner_closed_rows(karabiner)
+	if type(karabiner.user_karabiner_closed) ~= "function" then return {} end
+	local ok, closed = pcall(karabiner.user_karabiner_closed)
+	if not ok or closed ~= true then return {} end
+	return ManifestMenu.template_rows("tap_hold_user_karabiner_closed_rows", {}) or {}
+end
+
+--- The consent row of Ergopti's own Karabiner runtime (ADR 011): while it is
+--- ticked, Ergopti closes the user's own Karabiner-Elements while it runs and
+--- gives it back when paused or quit. It exists only on a boot that runs the
+--- owned runtime.
+--- @param karabiner table Remap facade.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return table rows Empty unless the owned runtime runs.
+local function close_other_karabiner_rows(karabiner, update_menu)
+	if type(karabiner.owned_runtime_selected) ~= "function" or karabiner.owned_runtime_selected() ~= true
+		or type(karabiner.get_close_other_instances) ~= "function" then return {} end
+	local consent = karabiner.get_close_other_instances() == true
+	return ManifestMenu.template_rows("tap_hold_close_other_karabiner_rows", {
+		[ConfigKeys.COMMAND.TAP_HOLD_CLOSE_OTHER_KARABINER] = function()
+			Logger.info(LOG, "Close other Karabiner instances toggled to %s from the Tap-Holds menu.", tostring(not consent))
+			return commit_menu_setting(karabiner, "Close other Karabiner instances", function()
+				return karabiner.set_close_other_instances(not consent)
+			end, update_menu)
+		end,
+	}, { close_other_karabiner = function() return consent end }) or {}
+end
+
+--- Why Ergopti's own runtime cannot run, for the blocks the user can act on.
+--- Only one VirtualHIDDevice version can be active on a Mac, so a user
+--- Karabiner with another driver version blocks it (ADR 011), and a driver
+--- macOS has not approved blocks it until it is allowed in System Settings.
+--- The others, keyed by the owner's stable reasons (runtime_owner.lua REASON):
+--- the runtime is not installed or its jobs are not loaded, a user Karabiner
+--- runs while the consent row below is unticked, Karabiner's own quit was
+--- refused, or the pinned artifact could not be downloaded. Without these rows
+--- the tap-holds were simply off, with nothing saying why.
+-- Literal template names, so the menu parity gate sees each publication.
+local NOT_INSTALLED = function() return ManifestMenu.template_rows("tap_hold_owned_not_installed_rows", {}) end
+local CLOSE_FAILED = function() return ManifestMenu.template_rows("tap_hold_owned_close_failed_rows", {}) end
+local BLOCK_ROWS = {
+	virtual_hid_incompatible = function() return ManifestMenu.template_rows("tap_hold_vhid_incompatible_rows", {}) end,
+	virtual_hid_not_active = function() return ManifestMenu.template_rows("tap_hold_vhid_not_active_rows", {}) end,
+	runtime_not_installed = NOT_INSTALLED,
+	runtime_job_not_loaded = NOT_INSTALLED,
+	virtual_hid_absent = NOT_INSTALLED,
+	other_karabiner_running = function() return ManifestMenu.template_rows("tap_hold_owned_other_running_rows", {}) end,
+	close_other_unsupported = CLOSE_FAILED,
+	close_other_failed = CLOSE_FAILED,
+	other_karabiner_still_running = CLOSE_FAILED,
+	artifact_fetch_failed = function() return ManifestMenu.template_rows("tap_hold_owned_fetch_failed_rows", {}) end,
+}
+
+--- The reasons this menu explains, so a test can hold them to the owner's
+--- USER_BLOCKS, which the boot notice reads.
+--- @return table reasons Set of stable reasons.
+function M._explained_owned_reasons()
+	local reasons = {}
+	for reason in pairs(BLOCK_ROWS) do reasons[reason] = true end
+	return reasons
+end
+
+--- The disabled row that explains why the owned runtime does not run.
+--- @param karabiner table Remap facade.
+--- @return table rows Empty unless the owner reports a block the user can act on.
+local function owned_runtime_block_rows(karabiner)
+	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
+	local ok, status = pcall(karabiner.owned_runtime_status)
+	-- A refused quit of the user's Karabiner settles as failed, the other blocks as unavailable.
+	if not ok or type(status) ~= "table" or (status.state ~= "unavailable" and status.state ~= "failed") then
+		return {}
+	end
+	local rows = BLOCK_ROWS[status.reason]
+	if not rows then return {} end
+	rows = rows() or {}
+	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
+		and type(karabiner.update_virtual_hid_driver) == "function" then
+		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_vhid_update_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_VHID_UPDATE] = function()
+				Logger.info(LOG, "Showing the VirtualHIDDevice driver update from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.virtual_hid_update").open(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The VirtualHIDDevice driver update could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	return rows
+end
+
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -1084,9 +1224,15 @@ function M.build(ctx)
 		["tap_hold_timings"] = function()
 			local rows = legacy_rules_rows(karabiner)
 			for _, row in ipairs(guardian_status_rows(karabiner, tap_holds_on)) do rows[#rows + 1] = row end
+			for _, row in ipairs(owned_runtime_block_rows(karabiner)) do rows[#rows + 1] = row end
+			for _, row in ipairs(close_other_karabiner_rows(karabiner, update_menu)) do rows[#rows + 1] = row end
+			for _, row in ipairs(user_karabiner_closed_rows(karabiner)) do rows[#rows + 1] = row end
 			rows[#rows + 1] = build_delay_item(karabiner, update_menu)
 			rows[#rows + 1] = build_sticky_delay_item(karabiner, update_menu)
 			return rows
+		end,
+		["tap_hold_lone_tap"] = function()
+			return { build_lone_tap_item(karabiner, update_menu) }
 		end,
 		-- With « Ergopti uses Karabiner » off the key rows are greyed: nothing
 		-- can deploy them. Say why right above the first of them, at the top of

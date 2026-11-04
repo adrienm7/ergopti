@@ -29,10 +29,8 @@
 ; =================================================
 ; =================================================
 
-_APEL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_APEL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -43,7 +41,7 @@ _APEL_ReadSource(RelPath) {
 ; ===================================================
 
 _APEL_CheckCatchBlockExists() {
-	Src := _APEL_ReadSource("ui/menu/menu_llm/menu_api_entries.ahk")
+	Src := _APEL_ReadSource("menu_api_entries.ahk")
 	Assert(Src != "", "ui/menu/menu_llm/menu_api_entries.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntriesNonCritical")
@@ -57,7 +55,7 @@ _APEL_CheckCatchBlockExists() {
 }
 
 _APEL_CheckCatchLogsError() {
-	Src := _APEL_ReadSource("ui/menu/menu_llm/menu_api_entries.ahk")
+	Src := _APEL_ReadSource("menu_api_entries.ahk")
 	Assert(Src != "", "ui/menu/menu_llm/menu_api_entries.ahk must be readable")
 
 	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntriesNonCritical")

@@ -47,7 +47,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 	Assets := Release["assets"]
 	if !(Assets is Array)
 		return 0
-	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+	ExpectedUrl := UPDATER_GITHUB_WEB_ROOT . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
@@ -628,7 +628,11 @@ Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
 ; LAST_NOTIFIED_TAG, and on a genuinely new release caches it, rebuilds the tray
 ; menu, and surfaces a TrayTip. Any failure is logged and the loop just waits
 ; for the next interval — a network blip must not silently kill the updater.
-_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
+; @param CheckOnly {Boolean} The answer comes from the public Atom feed: a release
+;   it names is announced, never cached for the tray's install row.
+; @param FeedFn {Func|Integer} Replaces _Updater_FetchFeedJsonAsync (tests only).
+; @param ShowFn {Func|Integer} Replaces the check-only balloon (tests only).
+_Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0, CheckOnly := false, FeedFn := 0, ShowFn := 0) {
 	; Background work may publish only in the exact pause generation where it
 	; was born. This also closes the register-vs-suspend race in the shared owner.
 	if !_Updater_RequestMayPublish(Request)
@@ -640,6 +644,15 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	; Every outcome is INFO: a check runs a few times a day, and "did it check,
 	; and what did it find" is the first question when an update never arrives.
+	if !CheckOnly && _Updater_JsonPayloadIsFailure(Json) {
+		; api.github.com gave no list (blocked, throttled, rate-limited), as on
+		; Linux: a user behind such a proxy would otherwise never hear of a release.
+		try LoggerInfo("Updater", "Background check: the GitHub API gave no list; reading the public Atom feed.")
+		OnFeed := (FeedJson, CompletedRequest, FeedTerminal := 0) => _Updater_HandleBackgroundResult(
+			FeedJson, Current, CompletedRequest, FeedTerminal, true, 0, ShowFn)
+		(IsObject(FeedFn) ? FeedFn : _Updater_FetchFeedJsonAsync).Call(Request.Channel, Request, OnFeed)
+		return
+	}
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
 		_Updater_RecordBackgroundCheck(false, Request)
@@ -663,6 +676,10 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
 			Current, Latest, Request.Channel)
+		return
+	}
+	if CheckOnly {
+		_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn)
 		return
 	}
 	Release := {
@@ -694,13 +711,48 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	try {
 		_Updater_ClaimBalloon()
-		TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
+		_Updater_ShowReleaseBalloon(Format(t("updater.tray_new_version_body"), Latest))
 		if _Updater_CommitReleaseNotification(Reservation, Request)
 			_Updater_RecordNotifiedTag(Latest)
 	} catch as Err {
 		_Updater_ReleaseNotificationReservation(Reservation)
 		try LoggerError("Updater", "Could not surface background update notification: {1}.", Err.Message)
 	}
+}
+
+; Tells once that the public feed names a newer release. The tray's row installs
+; from the cached release, which needs the API's asset list and digests, so
+; nothing is cached and the balloon stays unclaimed: its click offers nothing the
+; blocked API could not honour. Its text says why it cannot be installed yet.
+_Updater_AnnounceCheckOnlyRelease(Latest, Current, Request, ShowFn := 0) {
+	Reservation := _Updater_TryReserveReleaseNotification(Request, Latest)
+	if !IsObject(Reservation) {
+		try LoggerInfo("Updater", "Background check result: {1} available, already notified.", Latest)
+		return
+	}
+	try LoggerInfo("Updater", "New release available (public feed, check only): {1} (current: {2}).", Latest, Current)
+	if !_Updater_RequestMayPublish(Request) {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		return
+	}
+	try {
+		_Updater_ReleaseBalloon()
+		Text := Format(t("updater.tray_new_version_body"), Latest) . " " . t("update_check.check_only")
+		if IsObject(ShowFn)
+			ShowFn.Call(Text)
+		else
+			_Updater_ShowReleaseBalloon(Text)
+		if _Updater_CommitReleaseNotification(Reservation, Request)
+			_Updater_RecordNotifiedTag(Latest)
+	} catch as Err {
+		_Updater_ReleaseNotificationReservation(Reservation)
+		try LoggerError("Updater", "Could not surface the check-only update notification: {1}.", Err.Message)
+	}
+}
+
+; The one balloon both release announcements show, under the same title.
+_Updater_ShowReleaseBalloon(Text) {
+	TrayTip(Text, t("updater.tray_new_version_title"))
 }
 
 ; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray
@@ -1173,6 +1225,7 @@ _Updater_RequestRecoveryHandoffExit(*) {
 		_UpdaterRecoveryExitInvocation := true
 		TimerArmOneShotMs(_Updater_RequestRecoveryHandoffExit,
 			UPDATER_RECOVERY_HANDOFF_RETRY_MS)
+		LifecycleNoteExitRequester("the updater's recovery handoff")
 		ExitApp(0)
 	} finally {
 		_UpdaterRecoveryExitInvocation := false
@@ -2103,7 +2156,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
-		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
+		? BUNDLE_RELEASE_ASSET : Identifiers.App.EXE
 	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
@@ -2134,6 +2187,20 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 			return false
 		}
 		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi", 0, InstallObserver)
+		return false
+	}
+
+	; Before the transaction and the download: every install path, the release
+	; installer's included, ends here. The fetch can pump messages.
+	SignatureAllows := AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	if !SignatureAllows {
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
 		return false
 	}
 
@@ -2376,7 +2443,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
-			Worker := ShellRunner_SpawnTreeOwned(
+			Worker := ProxyOverride_SpawnWorker(
 				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
 			if IsObject(Capture)
 				Capture.Attach(Worker)
@@ -3639,8 +3706,10 @@ _Updater_RequestExitForIntent(TransactionId) {
 	InvocationPublished := false
 	try {
 		InvocationPublished := _Updater_PublishExitInvocation(TransactionId, Owner)
-		if InvocationPublished
+		if InvocationPublished {
+			LifecycleNoteExitRequester("the updater's swap")
 			ExitApp(0)
+		}
 	} finally {
 		_Updater_ClearExitInvocation(TransactionId, Owner)
 		Critical(PreviousCritical)
@@ -3800,7 +3869,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	try {
 		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingRetirement")
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		try SetTimer((*) => _Updater_RebuildMenu(), -TimingsGet("adapters", "updater_callback_defer_ms"))
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true
 }

@@ -17,10 +17,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TTSMG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TTSMG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TTSMG_StripLineComments(Src) {
@@ -40,7 +38,7 @@ _TTSMG_StripLineComments(Src) {
 ; ==============================================================
 
 _TTSMG_MsZeroGuard() {
-	Src := _TTSMG_StripLineComments(_TTSMG_ReadSource("adapters/timer_scheduler.ahk"))
+	Src := _TTSMG_StripLineComments(_TTSMG_ReadSource("timer_scheduler.ahk"))
 	Assert(Src != "", "adapters/timer_scheduler.ahk must be readable")
 
 	Body := _DriverFuncBody("TimerEvery")

@@ -19,6 +19,7 @@
 
 local M = {}
 
+local SaveFailure = require("config_save_failure")
 local llm_mod       = require("modules.llm")
 local i18n          = require("infra.i18n")
 local Logger        = require("infra.logger")
@@ -29,6 +30,7 @@ local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
 local EntryIdentity  = require("llm.api_entry_identity")
 local LocalAuth      = require("llm.local_server_auth")
+local UrlTemplate    = require("llm.api_url_template")
 local TextUtils = require("text_utils")
 
 local LOG = "api_panel"
@@ -103,8 +105,9 @@ end
 
 local function notify_persistence_failure(label)
 	Logger.error(LOG, "%s was rejected; runtime state was restored.", tostring(label))
-	pcall_log("notify(api persistence failure)", notifications.notify,
-		i18n.get("common.error_title"), i18n.get("dialog.bulk_toggle.save_failed"), "error")
+	pcall_log("notify(api persistence failure)", SaveFailure.present, i18n.get, function(message)
+		notifications.notify(i18n.get("common.error_title"), message, "error")
+	end)
 end
 
 --- The automatic name of every entry, by id: <provider>/<model>, with the
@@ -523,11 +526,53 @@ function M.build(ctx)
 
 					-- Use existing i18n keys for prompt hints so non-French users
 					-- see localized text. Provider name mixed with field tag.
-					local base_url_ok, base_url = prompt_field(
-						string.format("API %s — URL", p.label),
-						p.base_url,
-						i18n.get("menu.llm.api_prompt_url"))
-					if not base_url_ok then return false end
+					local base_url
+					local fields = UrlTemplate.fields(p.base_url)
+					if #fields > 0 then
+						-- A per-account address: one value per placeholder, filled into the entry's own URL
+						local values = {}
+						for _, name in ipairs(fields) do
+							local field_label = i18n.get("menu.llm.api_prompt_field." .. name)
+							local value_ok, value = prompt_field(
+								string.format("API %s — %s", p.label, field_label), "", field_label)
+							if not value_ok then return false end
+							if not UrlTemplate.valid_value(value) then
+								Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", name)
+								pcall_log("notify(api account field refusal)", notifications.notify,
+									i18n.get("common.error_title"),
+									i18n.get("menu.llm.api_prompt_field_invalid"),
+									"error")
+								return false
+							end
+							values[name] = value
+						end
+						base_url = assert(UrlTemplate.expand(p.base_url, values))
+						Logger.info(LOG, "API entry address filled for provider '%s' (%d account field(s)).", pid, #fields)
+					elseif p.optional_address then
+						-- The catalogue's address works; one optional value replaces it
+						local optional = p.optional_address
+						local field_label = i18n.get("menu.llm.api_prompt_field." .. optional.field)
+						local value_ok, value = prompt_field(
+							string.format("API %s — %s", p.label, field_label), "", field_label)
+						if not value_ok then return false end
+						local filled = UrlTemplate.optional_url(optional, value)
+						if not filled then
+							Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
+							pcall_log("notify(api account field refusal)", notifications.notify,
+								i18n.get("common.error_title"),
+								i18n.get("menu.llm.api_prompt_field_invalid." .. optional.field),
+								"error")
+							return false
+						end
+						base_url = filled ~= "" and filled or p.base_url
+					else
+						local base_url_ok
+						base_url_ok, base_url = prompt_field(
+							string.format("API %s — URL", p.label),
+							p.base_url,
+							i18n.get("menu.llm.api_prompt_url"))
+						if not base_url_ok then return false end
+					end
 					local token_ok, token = prompt_field(
 						string.format("API %s — Token", p.label),
 						"",
@@ -545,6 +590,13 @@ function M.build(ctx)
 						p.default_model,
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
+					if model == "" and p.default_model == "" then
+						-- No catalogue default (a per-account provider): the model is the user's deployment
+						Logger.error(LOG, "API entry creation requires a model for provider '%s'.", pid)
+						pcall_log("notify(api model refusal)", notifications.notify,
+							i18n.get("common.error_title"), i18n.get("menu.llm.api_prompt_model"), "error")
+						return false
+					end
 
 					local list = api_remote.get_entries() or {}
 					local id

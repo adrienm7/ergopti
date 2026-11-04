@@ -30,10 +30,8 @@
 ; ==================================================
 ; ==================================================
 
-_CPMB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_CPMB_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -46,7 +44,7 @@ _CPMB_ReadSource(RelPath) {
 ; ==================================================
 
 _CPMB_NoBlockingMsgBox() {
-	Src := _CPMB_ReadSource("modules/diagnostics/crash_reporter.ahk")
+	Src := _CPMB_ReadSource("crash_reporter.ahk")
 	Body := _DriverFuncBody("CrashReport_PromptUser")
 	Assert(Body != "", "CrashReport_PromptUser(Report) must exist in modules/diagnostics/crash_reporter.ahk")
 	Assert(InStr(Body, "MsgBox(") = 0,

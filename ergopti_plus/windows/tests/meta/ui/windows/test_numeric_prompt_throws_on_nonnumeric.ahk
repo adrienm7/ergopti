@@ -35,10 +35,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_NPNN_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_NPNN_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -51,7 +49,7 @@ _NPNN_ReadSource(RelPath) {
 ; ==================================================
 
 _NPNN_PromptNumericGuardsInteger() {
-	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
+	Src := _NPNN_ReadSource("menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptNumeric")
 	Assert(Seg != "", "LLM_Menu_PromptNumeric declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeIntegerPrompt") > 0,
@@ -60,7 +58,7 @@ _NPNN_PromptNumericGuardsInteger() {
 Test("menu_settings: LLM_Menu_PromptNumeric guards Integer() with IsInteger (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptNumericGuardsInteger)
 
 _NPNN_PromptMaxWordsGuardsInteger() {
-	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
+	Src := _NPNN_ReadSource("menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptMaxWords")
 	Assert(Seg != "", "LLM_Menu_PromptMaxWords declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeIntegerPrompt") > 0,
@@ -69,7 +67,7 @@ _NPNN_PromptMaxWordsGuardsInteger() {
 Test("menu_settings: LLM_Menu_PromptMaxWords guards Integer() with IsInteger (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptMaxWordsGuardsInteger)
 
 _NPNN_PromptTemperatureGuardsFloat() {
-	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
+	Src := _NPNN_ReadSource("menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptTemperature")
 	Assert(Seg != "", "LLM_Menu_PromptTemperature declaration must exist in menu_settings.ahk")
 	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeTemperaturePrompt") > 0,

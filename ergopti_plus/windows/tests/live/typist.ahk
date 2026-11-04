@@ -15,7 +15,8 @@
 ; text (literal text), wait (milliseconds), gap (default milliseconds after each
 ; key or character), level (the SendLevel of what follows), mode ("input" or
 ; "event", the Send primitive) and mouse (left, right, middle, x1, x2, wheel or
-; move, over the focused window). The process exits when the script ends.
+; move, over the focused window; a right click's native menu is cancelled). The
+; process exits when the script ends.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,6 +47,8 @@ TypistMouse(Kind) {
 	switch Kind {
 		case "left", "right", "middle", "x1", "x2":
 			Click(Kind)
+			if Kind == "right"
+				TypistCloseMenu()
 		case "wheel":
 			Click("WheelDown")
 		case "move":
@@ -53,6 +56,24 @@ TypistMouse(Kind) {
 		default:
 			FileAppend("typist: unknown pointer action '" . Kind . "'`n", "**", "UTF-8-RAW")
 			ExitApp(3)
+	}
+}
+
+/**
+ * Cancels the native menu a right click opened, without a key: the driver under
+ * test would see a key. The menu runs its own message loop on the driver's only
+ * thread, so while it is open no live command can be answered, and on a quiet
+ * desktop nothing else ever closes it.
+ */
+TypistCloseMenu() {
+	if !WinWait("ahk_class #32768", , 2)
+		return
+	Owner := ControlGetFocus("A")
+	; WM_CANCELMODE is what the system itself sends a window to end a menu.
+	PostMessage(0x1F, 0, 0, Owner ? Owner : WinGetID("A"))
+	if !WinWaitClose("ahk_class #32768", , 2) {
+		FileAppend("typist: the menu did not close`n", "**", "UTF-8-RAW")
+		ExitApp(4)
 	}
 }
 

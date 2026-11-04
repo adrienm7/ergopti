@@ -117,7 +117,7 @@ _HSE_IsCascadeLink(Spec) {
 ; @param Prepared {Object} The first spec's decision (_HSE_PrepareDispatchDecision).
 ; @param EndChar {String} The end character that completed the match, "" for a star trigger.
 ; @param GateTick {Integer} The tick the expansion-delay gate is measured at.
-; @returns {Object|String} ``{Replacement, ExtraUnits, ExtraCodepoints, Steps}``
+; @returns {Object|String} ``{Replacement, ExtraUnits, ExtraCodepoints, Steps, FinalResult}``
 ;   where Replacement replaces the first trigger plus ExtraUnits more code units
 ;   of typed text, or "" when nothing chains.
 _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick) {
@@ -135,7 +135,7 @@ _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick) {
 	try {
 		Original := HSE_Buffer
 		OriginalLength := StrLen(Original)
-		StripLength := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+		StripLength := _HSE_ExpansionStripUnits(Spec.Length, EndChar, HSE_TypoNbspStripped)
 		Stable := OriginalLength >= StripLength ? OriginalLength - StripLength : 0
 		; Carried through the chain even when its delimiter is consumed: the
 		; consumption is applied once, by the caller, after the last link.
@@ -170,7 +170,7 @@ _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick) {
 			Decision := _HSE_PrepareDispatchDecision(GateSpec, Virtual, LinkEndChar, LinkTypo, , GateTick)
 			if !IsObject(Decision) or !Decision.OnlyText
 				break
-			LinkStrip := Link.Length + StrLen(LinkEndChar) + (LinkTypo ? 1 : 0)
+			LinkStrip := _HSE_ExpansionStripUnits(Link.Length, LinkEndChar, LinkTypo)
 			if (StrLen(Virtual) < LinkStrip)
 				break
 			Kept := StrLen(Virtual) - LinkStrip
@@ -190,7 +190,8 @@ _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick) {
 			Replacement: SubStr(Virtual, Stable + 1, StrLen(Virtual) - Stable - StrLen(Emitted)),
 			ExtraUnits: ExtraUnits,
 			ExtraCodepoints: _TextCodepointLength(ExtraText),
-			Steps: Steps
+			Steps: Steps,
+			FinalResult: Last.HasOwnProp("FinalResult") and Last.FinalResult
 		}
 	} finally {
 		HSE_Buffer := SavedBuffer

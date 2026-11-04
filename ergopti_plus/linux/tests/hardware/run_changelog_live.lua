@@ -39,13 +39,27 @@ local Gtk = lgi.require("Gtk", "3.0")
 -- refused with HTTP 403 on a release run. The shell expands the variable.
 local auth = os.getenv("GITHUB_TOKEN") and " -H \"Authorization: Bearer $GITHUB_TOKEN\"" or ""
 local pipe = io.popen("curl -fsS --max-time 20" .. auth
-	.. " 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=1'")
-local latest_json = pipe and pipe:read("*a") or ""
+	.. " 'https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100'")
+local releases_json = pipe and pipe:read("*a") or ""
 if pipe then pipe:close() end
-local latest = latest_json:match('"tag_name"%s*:%s*"([^"]+)"')
-if not latest then abort("GitHub's release API is unreachable.") end
-local latest_is_prerelease = latest_json:match('"prerelease"%s*:%s*true') ~= nil
-print("  newest published release: " .. latest .. (latest_is_prerelease and " (prerelease)" or ""))
+-- The repository also publishes releases that are not Ergopti versions (the
+-- Linux remap runtime, remap-runtime-v…), which the page rightly never lists.
+-- The page keeps GitHub's order, newest published first: the head is the first
+-- Ergopti release the channel shows (the dev view also shows stable releases).
+local ergopti_tags = {}
+for tag in releases_json:gmatch('"tag_name"%s*:%s*"([^"]+)"') do
+	if tag:match("^v%d+%.%d+%.%d+") then ergopti_tags[#ergopti_tags + 1] = tag end
+end
+if #ergopti_tags == 0 then abort("GitHub's release API is unreachable or lists no Ergopti release.") end
+--- The first release the channel's view lists, in GitHub's order.
+--- @param channel string "dev" or "main".
+--- @return string|nil tag
+local function head_for(channel)
+	for _, tag in ipairs(ergopti_tags) do
+		if channel == "dev" or tag:match("^v%d+%.%d+%.%d+$") then return tag end
+	end
+end
+print("  newest published Ergopti release: " .. ergopti_tags[1])
 
 local Manager = require("ui.webview_manager")
 local Updater = require("modules.updater.manager")
@@ -119,8 +133,9 @@ local state = wait_for(webview, STATE, function(value) return value:find('"tags"
 print("  page: " .. state:sub(1, 300))
 expect(state ~= "", "the page state probe returned a value")
 expect(not state:find('"error":true', 1, true), "no error is shown")
+local latest = head_for(expected_channel) or "?"
 expect(state:find('"tags":["' .. latest .. '"', 1, true) ~= nil,
-	"the newest release (" .. latest .. ") heads the list")
+	"the newest release of the " .. expected_channel .. " view (" .. latest .. ") heads the list")
 expect(state:find('"dev":' .. tostring(expected_channel == "dev"), 1, true) ~= nil,
 	"the list opens on the channel the installation follows (" .. expected_channel .. ")")
 

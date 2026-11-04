@@ -1133,6 +1133,75 @@ local function confirm_enabled_async(keyboard_name, options, on_done)
 	}, settle)
 end
 
+-- Reads, from a FRESH process, the selected keyboard input source and the exact
+-- enabled-sources preference, so a caller that changes them (the field run's
+-- layout rows check) can put back exactly what it found. argv: the timeout of
+-- the defaults child in seconds. Prints {"selected": id|null, "enabled": [...]|null}.
+local SOURCES_STATE_SCRIPT = [[
+import ctypes, json, plistlib, subprocess, sys
+
+TIMEOUT = float(sys.argv[1])
+UTF8 = 0x08000100
+enabled = None
+try:
+    exported = subprocess.run(["/usr/bin/defaults", "export", "com.apple.HIToolbox", "-"],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT, check=True).stdout
+    enabled = plistlib.loads(exported).get("AppleEnabledInputSources", [])
+except Exception:
+    enabled = None
+
+cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
+tis = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+P = ctypes.c_void_p
+cf.CFStringGetCString.argtypes = [P, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
+cf.CFStringGetCString.restype = ctypes.c_bool
+cf.CFRelease.argtypes = [P]
+cf.CFRelease.restype = None
+tis.TISCopyCurrentKeyboardInputSource.argtypes = []
+tis.TISCopyCurrentKeyboardInputSource.restype = P
+tis.TISGetInputSourceProperty.argtypes = [P, P]
+tis.TISGetInputSourceProperty.restype = P
+selected = None
+source = tis.TISCopyCurrentKeyboardInputSource()
+if source:
+    ref = tis.TISGetInputSourceProperty(source, P.in_dll(tis, "kTISPropertyInputSourceID").value)
+    buffer = ctypes.create_string_buffer(1024)
+    if ref and cf.CFStringGetCString(ref, buffer, 1024, UTF8):
+        selected = buffer.value.decode("utf-8")
+    cf.CFRelease(source)
+print(json.dumps({"selected": selected, "enabled": enabled}, sort_keys=True, default=str))
+]]
+
+--- Reads the selected source and the enabled-sources preference from a fresh process.
+--- @param on_done function fn(ok, state, reason): state { selected, enabled, enabled_json }.
+--- @return boolean accepted True only when the child start commits.
+local function read_sources_state_async(on_done)
+	local python_bin, python_state = PythonInterpreter.resolve()
+	if not python_bin then
+		require("ui.python_runtime_offer").offer(python_state)
+		invoke_mutation_done("sources_state.done", on_done, false, nil, "python_unavailable")
+		return false
+	end
+	local child_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
+	return run_bounded_process("Read keyboard input sources", python_bin,
+		{ "-c", SOURCES_STATE_SCRIPT, tostring(child_timeout) },
+		function(process_ok, out, reason)
+			local Json = require("json")
+			local decoded_ok, state = pcall(Json.decode, tostring(out or ""))
+			if process_ok ~= true or not decoded_ok or type(state) ~= "table" then
+				Logger.warn(LOG, "The input sources could not be read from a fresh process (reason=%s).",
+					tostring(reason or "invalid_output"))
+				invoke_mutation_done("sources_state.done", on_done, false, nil, reason or "invalid_output")
+				return
+			end
+			-- Compared as the child encoded it (sorted keys): an exact restore is equal text.
+			state.enabled_json = type(state.enabled) == "table" and Json.encode(state.enabled) or nil
+			Logger.info(LOG, "Input sources seen by a fresh process: selected=%s, %s enabled.",
+				tostring(state.selected), type(state.enabled) == "table" and tostring(#state.enabled) or "unreadable")
+			invoke_mutation_done("sources_state.done", on_done, true, state, nil)
+		end)
+end
+
 --- Adds an installed .keylayout to the user's enabled input sources. Its
 --- KeyboardLayout ID and Name are read from the file, so any layout works,
 --- whether it sits in a bundle or on its own in ~/Library/Keyboard Layouts.
@@ -1359,6 +1428,7 @@ return {
 	is_live_enabled               = is_live_enabled,
 	confirm_source_async          = confirm_source_async,
 	confirm_enabled_async         = confirm_enabled_async,
+	read_sources_state_async      = read_sources_state_async,
 	disable_keylayout_source_async = disable_keylayout_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,

@@ -53,3 +53,16 @@ for _HCPDU_Mode in ["le-high", "le-low", "be-high", "be-low", "utf8-nul", "utf16
 	"utf8-bom-only", "le-bom-only", "be-bom-only", "utf8-bom-valid"]
 	Test("PAC decoder: " . _HCPDU_Mode . " preserves strict source text (diagnostics-pac-native-decode)",
 		_HCPDU_Case.Bind(_HCPDU_Mode))
+
+; The diagnostic judges a PAC by the managed download's own limit, read from
+; proxy_policy.json: a hand-typed byte count drifted from it silently.
+_HCPND_LimitFromPolicy() {
+	Body := _DriverFuncBody("_HC_PacReadSource")
+	AssertTrue(InStr(Body, "NetworkCheck_PacMaxBytes()") > 0,
+		"the PAC diagnostic must read native_pac.max_script_bytes")
+	AssertFalse(RegExMatch(Body, "\b\d{6,}\b"), "no byte limit is spelled by hand")
+	Over := Buffer(NetworkCheck_PacMaxBytes() + 1, 0x20)
+	AssertTrue(InStr(_HC_PacDecodeSource(Over, NetworkCheck_PacMaxBytes()).Get("error", ""), "byte limit") > 0,
+		"one byte over the policy limit is refused")
+}
+Test("PAC diagnostics: the byte limit is the proxy policy's (PAR-71)", _HCPND_LimitFromPolicy)

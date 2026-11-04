@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater_SetChannel Download-Block Meta Test
 ; DESCRIPTION:
-; Static source guard for finding updater-channel-switch-download-race (F27).
+; Behaviour guard for finding updater-channel-switch-download-race (F27).
 ;
 ; Updater_SetChannel persists the new channel and begins a deferred Reload.
 ; The self-update download's WinHttp Req and poll-timer chain are tracked only
@@ -13,32 +13,31 @@
 ; and abandoned the download with zero log trace.
 ;
 ; The fix blocks the channel switch while _UpdaterDownloadInProgress is true,
-; reusing the same flag F10's reentrancy guard also reads. This is a
-; meta-static test (calling Updater_SetChannel for real would execute Reload
-; and restart the headless runner), mirroring the sibling
-; test_updater_setchannel_cancels_async.ahk's approach.
+; reusing the same flag F10's reentrancy guard also reads. The real function runs
+; over its write and reload ports, so a broken guard writes or reloads here and
+; never restarts the headless runner. The action lease below stays a source scan:
+; a span across a worker handoff has no observable answer in this process.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 
 _USBD_AssertBlocksDuringDownload() {
-	Body := _DriverFuncBody("Updater_SetChannel")
-	Assert(Body != "", "Updater_SetChannel(Channel) declaration must exist")
-
-	ReadIdx := InStr(Body, "DownloadActive := _UpdaterDownloadInProgress")
-	BranchIdx := InStr(Body, "if DownloadActive", , ReadIdx)
-	ReturnIdx := InStr(Body, "return false", , BranchIdx)
-	PersistIdx := InStr(Body, "ConfigCommitBorrowedUpdates(", , ReturnIdx)
-	Assert(ReadIdx > 0 and BranchIdx > ReadIdx and ReturnIdx > BranchIdx
-		and PersistIdx > ReturnIdx,
-		"Updater_SetChannel must branch and return on the real download flag before persistence")
-
-	ReloadIdx := InStr(Body, "_Updater_BeginDeferredChannelReload(")
-	Assert(ReloadIdx > 0,
-		"Updater_SetChannel must still hand off to deferred Reload after the guard")
-	Assert(ReturnIdx < ReloadIdx,
-		"The _UpdaterDownloadInProgress guard must be checked BEFORE Reload -- checking after the restart already began would be too late (updater-channel-switch-download-race)")
+	global _UpdaterDownloadInProgress, UPDATER_CHANNEL
+	Saved := _UpdaterDownloadInProgress
+	Target := UPDATER_CHANNEL == "dev" ? "main" : "dev"
+	Writes := 0, Reloads := 0
+	WriteFn := (*) => (Writes += 1, true)
+	ReloadFn := (*) => (Reloads += 1, true)
+	_UpdaterDownloadInProgress := true
+	try
+		Answer := Updater_SetChannel(Target, unset, false, (*) => 0, WriteFn, ReloadFn, (*) => 0, (*) => 0, (*) => 0)
+	finally
+		_UpdaterDownloadInProgress := Saved
+	AssertEqual(false, Answer, "a channel switch is refused while a download runs")
+	AssertEqual(0, Writes, "the refused channel is not persisted")
+	AssertEqual(0, Reloads, "no restart begins under a running download (updater-channel-switch-download-race)")
+	Assert(UPDATER_CHANNEL != Target, "the channel in force is unchanged")
 }
 Test("updater: Updater_SetChannel blocks the channel switch while a download is in progress (updater-channel-switch-download-race)", _USBD_AssertBlocksDuringDownload)
 

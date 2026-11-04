@@ -29,6 +29,8 @@
 ;    changed unrepresentable namespaces refuse before any staging write.
 ; ==============================================================================
 
+#Include ../phase_stats.ahk
+
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
@@ -168,7 +170,9 @@ global _ConfigBootOutdatedEntries := Map()
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
-		return _ParseTomlFileImpl(Path, true, true)
+		Started := PhaseStats_Now()
+		try return _ParseTomlFileImpl(Path, true, true)
+		finally PhaseStats_Stop("toml.parse", Started)
 }
 
 ; Transactional candidate rendering must observe bytes only after its terminal
@@ -176,7 +180,9 @@ ParseTomlFile(Path) {
 ; does not replace that cache object; a refused Reload continues on the exact
 ; pre-transition in-memory state.
 TOML_ParseFreshFile(Path) {
-		return _ParseTomlFileImpl(Path, false, false)
+		Started := PhaseStats_Now()
+		try return _ParseTomlFileImpl(Path, false, false)
+		finally PhaseStats_Stop("toml.parse", Started)
 }
 
 ; Fresh, uncached parse that keeps ``true``/``false`` literals as TOML_Bool so
@@ -188,12 +194,14 @@ TOML_ParseFreshFileTyped(Path, &DiscardedArrays := 0) {
 }
 
 _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
-		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
+		PreserveBooleanLiterals := false, &DiscardedArrays := 0, SectionFilter := 0) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
 		; Writers request this local diagnostic on fresh, uncached parses.
 		DiscardedArrays := 0
 		if PreserveBooleanLiterals && (UseCache || StoreCache)
 				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
+		if IsObject(SectionFilter) && (UseCache || StoreCache)
+				throw ValueError("A section-filtered parse cannot use the reader cache")
 		Key := _TOML_WriteRefusalKey(Path)
 		Owners := _TOML_ParseCacheOwners()
 		PreviousCritical := Critical("On")
@@ -263,6 +271,13 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		PendingDepth := 0
 		PendingQuote := ""
 		PendingEscaped := false
+		; A caller that reads only some sections (personal-file metadata reads the
+		; [_meta] tables of a file holding hundreds of hotstrings) skips decoding
+		; every other section's values; the line state that finds headers and
+		; multi-line arrays runs exactly as in a full parse.
+		SectionKept := true
+		; Values decoded by this parse, published per parse for the boot budget.
+		Decoded := 0
 
 		loop parse, Content, "`n", "`r" {
 				Line := Trim(A_LoopField)
@@ -290,6 +305,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 								HasPendingValue := false
 								PendingVal := ""
 								Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
+								SectionKept := !IsObject(SectionFilter) || SectionFilter.Call(Section)
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
 								continue
@@ -301,8 +317,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						if (PendingDepth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
-								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
-										PreserveBooleanLiterals)
+								if SectionKept {
+										Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
+												PreserveBooleanLiterals)
+										Decoded += 1
+								}
 								PendingKey := ""
 								HasPendingValue := false
 								PendingVal := ""
@@ -322,6 +341,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						Header := TOML_StripInlineComment(Line)
 						inner := RegExReplace(Header, "^\[+|\]+$", "")
 						Section := Trim(inner)
+						SectionKept := !IsObject(SectionFilter) || SectionFilter.Call(Section)
 						if !Sections.Has(Section)
 								Sections[Section] := Map()
 						continue
@@ -329,6 +349,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 				eq := _TOML_AssignmentDelimiter(Line)
 				if !eq
+						continue
+				; In a skipped section only an opening array changes the line state.
+				if !SectionKept && SubStr(LTrim(SubStr(Line, eq + 1), " `t"), 1, 1) != "["
 						continue
 				key := TOML_DecodeKey(Trim(SubStr(Line, 1, eq - 1)))
 				val := Trim(SubStr(Line, eq + 1))
@@ -353,8 +376,14 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 				; Whole-file writers must retain source Boolean intent before AHK
 				; erases it into integer 0/1. Ordinary readers keep native values.
-				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
+				if SectionKept {
+						Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
+						Decoded += 1
+				}
 		}
+		; Detached compositions (workers, child fixtures) load this parser without the profiler.
+		if IsSet(PerfCount)
+				PerfCount("toml.flat_values", Decoded)
 		if HasPendingValue {
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
@@ -797,6 +826,14 @@ TOML_WriteRefusal(Path) {
 	return Refusals.Has(Key) ? Refusals[Key] : ""
 }
 
+; Minimum age of an abandoned atomic-write stage: one minute tells it from a live
+; writer, and the reapers also check producer ownership. Writers can run before the
+; timing registry loads, so this copy is pinned to [adapters] stale_temp_age_ms by
+; tools/test/test-keystats-timings-single-source.cjs.
+StaleTempAgeMs() {
+	return 60000
+}
+
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
 ; Renders explicitly owned rows canonically and retains foreign physical records
 ; and comments before the one atomic replace. A wholly owned, uncommented source
@@ -867,6 +904,21 @@ _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes) {
 		return Result
 	}
 	return Map("status", "error", "kind", "render_failed", "content", "")
+}
+
+; The setting a case twin refused in the latest write, "" otherwise. The writers
+; answer a boolean, so the failure report reads the cause here, once.
+global _TomlCaseTwinRefusal := ""
+
+/**
+ * Answers the setting a case twin refused in the latest write, and forgets it.
+ * @returns {String} The setting's dotted name, or "" for any other outcome.
+ */
+TOML_TakeCaseTwinRefusal() {
+	global _TomlCaseTwinRefusal
+	Setting := _TomlCaseTwinRefusal
+	_TomlCaseTwinRefusal := ""
+	return Setting
 }
 
 TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := [], AdmissionFn := 0) {
@@ -948,6 +1000,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
+		global _TomlCaseTwinRefusal
+		_TomlCaseTwinRefusal := ""
 		Refusal := TOML_WriteRefusal(Path)
 		if (Refusal != "") {
 				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': writes to it are refused for this session ({3}). No file was changed.",
@@ -1003,6 +1057,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 			}
 			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, CandidateUpdates, ExactSectionPrefixes)
 			catch as Err {
+				_TomlCaseTwinRefusal := Err.HasOwnProp("CaseTwinSetting") ? Err.CaseTwinSetting : ""
 				try LoggerError("TomlWrite", "Refusing semantic configuration {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
 				return false
 			}
@@ -1143,17 +1198,17 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if BuildOnly {
 				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
 					Updates.Length . " update(s)")
-				; Ordinary write mode opens its stage as UTF-8 (with BOM). Return the
-				; identical byte image so the transition does not silently change the
-				; repository's canonical encoding policy.
+				; Return the byte image ordinary write mode would stage, so a transition
+				; publishes exactly what a direct save would.
 				return Map("status", "ok", "kind", "rendered",
 					"content", Admitted["content"], "preserve_source", Admitted["preserve_source"])
 		}
 
 		; Admission may retain foreign physical records around canonical owned rows.
 		; Both detached and ordinary modes publish this one qualified image.
-		body := SubStr(Admitted["content"], 2)
 		FinalCandidate := Admitted["content"]
+		HasByteOrderMark := SubStr(FinalCandidate, 1, 1) == Chr(0xFEFF)
+		body := HasByteOrderMark ? SubStr(FinalCandidate, 2) : FinalCandidate
 		NativeNoop := Admitted["preserve_source"]
 		SchemaAdmission := DocumentMode ? (NativeNoop ? ConfigMigrateBoot(Path, "capture_noop")
 			: ConfigMigrateBoot(Path, "capture_write", FinalCandidate)) : 0
@@ -1182,7 +1237,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
-		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
+		if FileExist(Path) && FSUtf8ExactMatches(Path, FinalCandidate) {
 				if !FSNativeAcknowledge(FinalAdmission) {
 					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
@@ -1201,17 +1256,16 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
 		; rather than a GetCurrentProcessId DllCall: unique per process all the
 		; same, and it keeps the OS-call purity ratchet at its baseline.
-		static STALE_TEMP_MS := 60000  ; Minimum age; the reaper also checks producer ownership
 		static WriteSeq := 0
 		WriteSeq += 1
 		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
-		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
+		_TOML_ReapStaleTemps(Path, StaleTempAgeMs())
 		try FileDelete(tmp)
 		f := 0
 		StageOwned := false
 		StageWritten := false
 		try {
-				f := FileOpen(tmp, "w", "UTF-8")
+				f := FileOpen(tmp, "w", HasByteOrderMark ? "UTF-8" : "UTF-8-RAW")
 				if !f {
 						_TOML_InvalidateParseCache(Path)
 						; Logged, not merely returned. This branch fails without throwing, and

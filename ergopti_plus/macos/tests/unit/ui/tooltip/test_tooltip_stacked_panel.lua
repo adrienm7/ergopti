@@ -199,7 +199,8 @@ end
 
 --- Builds a canvas double that tallies every minimumTextSize call by measured text.
 --- @return table canvas, table measurements Map of text -> call count.
-local function make_counting_canvas()
+--- @param element_count integer How many canvas elements the real renderer builds.
+local function make_counting_canvas(element_count)
 	local measurements = {}
 	local canvas = {
 		minimumTextSize = function(_self, _index, styled_text)
@@ -210,8 +211,9 @@ local function make_counting_canvas()
 		frame = function() end,
 		show  = function() end,
 	}
-	-- render() writes into elements 1..6 by index.
-	for i = 1, 7 do canvas[i] = {} end
+	-- render() writes into every element of the real canvas by index, the
+	-- shortcut column (ELEM_LABELS) last.
+	for i = 1, element_count do canvas[i] = {} end
 	return canvas, measurements
 end
 
@@ -233,7 +235,7 @@ end
 --- @return table Array of drawn strings.
 local function drawn_texts(canvas)
 	local out = {}
-	for i = 1, 7 do
+	for i = 1, #canvas do
 		local element = canvas[i]
 		if type(element) == "table" then
 			for _, value in pairs(element) do
@@ -255,7 +257,7 @@ helpers.describe("tooltip render: the combined footer is measured exactly once",
 		local styledtext_stub, styled = make_styledtext_stub()
 		local R = helpers.load_with_stubs("ui.tooltip.renderer", { styledtext = styledtext_stub })
 
-		local canvas, measurements = make_counting_canvas()
+		local canvas, measurements = make_counting_canvas(R.ELEM_LABELS)
 		R.canvas = canvas
 
 		R.render(

@@ -261,7 +261,11 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- guarded publisher in menu_caps_word: one call more.
 	-- The Karabiner virtual keyboard choice in menu_keyboard_layout restores the
 	-- previous type when its save is refused: one call more.
-	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1,
+	-- Each delimiter's « consumed » row in menu_hotstrings_management stops on a
+	-- refused save before it notifies: one call more.
+	-- The number-row rows in menu_keyboard_layout restore the previous choice
+	-- when the save is refused, before the layout is rebuilt: one call more.
+	helpers.assert_eq(calls, 59 + 3 - 1 + 1 + 1 + 1 + 1,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

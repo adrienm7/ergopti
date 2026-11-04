@@ -60,11 +60,11 @@ _SLL_SuccessFollowsTheTeardown() {
 	Enter := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(Enter != "", "Ergopti_OnSuspendEnter() must exist")
 
-	; TooltipHide is one of the first teardown steps; the LLM deps timer is the
+	; TooltipHide is one of the first teardown steps; the pause layout is the
 	; last. The closing line must sit beyond both.
-	LastWorkPos := InStr(Enter, "_LLM_Deps_PollTimer")
+	LastWorkPos := InStr(Enter, "PauseLayoutSwitch_Apply")
 	SuccessPos := InStr(Enter, "LoggerSuccess(")
-	Assert(LastWorkPos > 0, "prerequisite: the LLM deps poll timer is still stopped on suspend")
+	Assert(LastWorkPos > 0, "prerequisite: the pause layout is still applied on suspend")
 	Assert(SuccessPos > LastWorkPos,
 		"the suspend SUCCESS must be emitted after the teardown completes, otherwise it vouches for work that has not happened yet")
 }

@@ -54,6 +54,16 @@ local PLATFORM = "linux"
 -- the caller, and carries no label this test could look for.
 local RENDERED_TYPES = { action = true, group = true, section_header = true }
 
+-- Sections the tray draws only for state the whole-tray fixture does not hold.
+-- Each is certified by its own test, which builds the tray with that state.
+local STATE_GATED_SECTIONS = {
+	-- Drawn only when the user registry holds a profile (llm_profile_custom_present),
+	-- a section header since 2026-11; the profile-headings cases of
+	-- tests/unit/modules/llm/settings/test_profile_preferences_canonical_prompt_profiles.lua
+	-- draw it, and prove it absent with an empty registry.
+	llm_profile_custom_heading = true,
+}
+
 --- Whether the manifest declares a row for this platform.
 --- @param row table
 --- @return boolean
@@ -108,7 +118,7 @@ end
 -- Fresh backend and builder modules must capture this exact private owner, not
 -- a prior module whose source path or cached entries belong to another test.
 local API_SOURCE_MODULES = {
-	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.menu_builder",
+	"modules.llm.api_entries", "ui.menu.llm_backend_rows", "ui.menu.builder",
 }
 
 --- Builds with a genuine private API source and restores the complete module cohort.
@@ -127,7 +137,7 @@ local function with_api_source(scenario)
 		local entries = require("modules.llm.api_entries")
 		entries._set_path_for_test(path)
 		require("ui.menu.llm_backend_rows")
-		local builder = require("ui.menu.menu_builder")
+		local builder = require("ui.menu.builder")
 		return scenario(builder, entries, path)
 	end, debug.traceback)
 	local closed = true
@@ -157,6 +167,10 @@ local LIVE_SOURCE_MODULES = {
 	"modules.llm.agent_settings", "ui.menu.agent_rows",
 }
 
+-- The agent reads on: an off category greys every row of its submenu and drops
+-- its frames (category-off rule), and this certification walks every row.
+local AGENT_ON_SOURCE = '[llm]\nagent_mode = "auto"\n'
+
 local function with_live_source(context, scenario)
 	if type(context.llm) ~= "table" or context.llm.get_live ~= nil then return scenario() end
 	local prior = {}; for _, name in ipairs(LIVE_SOURCE_MODULES) do prior[name] = rawget(package.loaded, name) end
@@ -165,14 +179,14 @@ local function with_live_source(context, scenario)
 	local descriptor
 	local acquired, result = false, nil
 	local ok, detail = xpcall(function()
-		descriptor = assert(io.open(path, "wb")); assert(descriptor:write("")); assert(descriptor:close()); descriptor = nil
+		descriptor = assert(io.open(path, "wb")); assert(descriptor:write(AGENT_ON_SOURCE)); assert(descriptor:close()); descriptor = nil
 		for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
 		preferences = require("infra.llm_preferences")
 		local bytes, status = require("toml_codec.writer").read_classified(path)
-		assert(status == "ok" and bytes == "")
+		assert(status == "ok" and bytes == AGENT_ON_SOURCE)
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
-			-- Independent neutral physical input: both systems are Off, no model or excluded app.
+			-- Independent physical input: the agent on, both systems Off, no model or excluded app.
 			local settings = require("modules.llm.agent_settings")
 			for _, system in ipairs({ "system1", "system2" }) do
 				helpers.assert_eq(settings.get_spec(system), "")
@@ -181,7 +195,7 @@ local function with_live_source(context, scenario)
 				helpers.assert_eq(reason, "off")
 			end
 			helpers.assert_eq(#settings.get_disabled_apps(), 0)
-			helpers.assert_eq(settings.get_mode(), "off")
+			helpers.assert_eq(settings.get_mode(), "auto")
 			local engine = require("modules.llm.prediction_engine")
 			assert(engine.get_live() == nil)
 			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
@@ -365,6 +379,7 @@ local function full_context()
 			DEFAULT_GESTURES = require("modules.gestures.manager").DEFAULT_GESTURES,
 			is_reading     = function() return false end,
 			get_action_label = require("modules.gestures.manager").get_action_label,
+			slot_label     = require("modules.gestures.manager").slot_label,
 			is_enabled     = function() return true end,
 			toggle         = noop,
 			get_action     = function() return nil end,
@@ -570,7 +585,7 @@ helpers.describe("menu certification: published available component rows are ren
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
 			local rows = ManifestMenu.get_array(menu_key)
-			if type(rows) == "table" then
+			if type(rows) == "table" and not STATE_GATED_SECTIONS[menu_key] then
 				for _, row in ipairs(rows) do
 					local kind = row.type or ""
 					if RENDERED_TYPES[kind] and visible(row) and type(row.i18n) == "string" then
@@ -584,7 +599,7 @@ helpers.describe("menu certification: published available component rows are ren
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
 						if row.id == "magic_key_source_heading" then
-							label = label .. " : " .. i18n.get("menu.layout.magic_key_source.auto")
+							label = require("locale.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
 						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
@@ -784,7 +799,7 @@ helpers.describe("menu certification: private API source lifecycle", function()
 	helpers.it("restores the genuine previous cohort after builder construction refuses", function()
 		local previous = {}
 		for _, name in ipairs(API_SOURCE_MODULES) do previous[name] = rawget(package.loaded, name) end
-		local name = "ui.menu.menu_builder"
+		local name = "ui.menu.builder"
 		local preload = rawget(package.preload, name)
 		local private_path
 		rawset(package.preload, name, function()
@@ -963,7 +978,7 @@ helpers.describe("linux-absent-module templates: actual native branches", functi
 			-- The already constructed genuine backend retains its private source owner.
 			-- Only the new builder's optional renderer admission is withdrawn.
 			helpers.assert_eq(entries.path(), path)
-			local name, builder_name = "infra.manifest_menu", "ui.menu.menu_builder"
+			local name, builder_name = "infra.manifest_menu", "ui.menu.builder"
 			local prior, preload = rawget(package.loaded, name), rawget(package.preload, name)
 			local old_builder = rawget(package.loaded, builder_name)
 			local ok, detail = xpcall(function()
@@ -991,10 +1006,10 @@ local function control_boundary_corpus()
 end
 
 --- Reuses the existing physical-source sandbox with genuine native preference/settings owners.
-local function with_control_trigger_source(scenario)
+local function with_control_trigger_source(scenario, source)
 	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	Sandbox.with_config('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
-		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n', function(path)
+	Sandbox.with_config(source or ('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
+		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n'), function(path)
 		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
 		local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name); rawset(package.loaded, name, nil) end
 		local Paths = require("infra.config_paths")
@@ -1021,6 +1036,8 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				local root, original = ManifestMenu.get_root(), ManifestMenu.get_array(boundary.section)
 				local context, changes = full_context(), 0
 				context.on_menu_changed = function() changes = changes + 1 end
+				context.paused, context.is_paused = false, function() return false end
+				context.llm.streaming_revision = function() return 0 end
 				local function build()
 					return with_api_source(function(builder, entries, api_path)
 						local source = Sandbox.read_bytes(api_path)
@@ -1061,6 +1078,35 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				helpers.assert_eq(changes, 1)
 			end)
 		end)
+	end)
+
+	-- Only user changes are stored, so at their shipped values neither filter nor
+	-- the backend is in the file. The macOS rows greyed exactly there.
+	helpers.it("keeps both privacy rows enabled over a sparse source and persists a click (shared-privacy-triggers)", function()
+		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		for _, expected in ipairs(corpus.rows) do
+			with_absent_english(function()
+				with_control_trigger_source(function(settings, path, Sandbox)
+					local context = full_context()
+					context.paused = false
+					context.is_paused = function() return false end
+					context.llm.get_backend = function() return "ollama" end
+					context.llm.streaming_revision = function() return 0 end
+					local row = assert(with_api_source(function(builder)
+						return find_item(builder.build(context), i18n.get("menu.llm.trigger_menu_title"))
+					end))
+					local privacy = assert(find_item(row.menu, i18n.get(expected.i18n)))
+					helpers.assert_eq(privacy.disabled or false, false, "a filter at its shipped value stays changeable")
+					helpers.assert_eq(privacy.checked or false, expected.neutral)
+					helpers.assert_eq(privacy.fn(), true)
+					helpers.assert_eq(settings.get(expected.linux), not expected.neutral)
+					local leaf = expected.path:match("[^.]+$")
+					helpers.assert_true(Sandbox.read_bytes(path):find(leaf .. " = " .. tostring(not expected.neutral), 1, true) ~= nil,
+						"the click reaches config.toml")
+				end, '[llm]\nenabled = true\n')
+			end)
+		end
 	end)
 
 	helpers.it("projects independent platform boundaries using the actual initialized renderer (llm-control-boundaries)", function()
@@ -1239,7 +1285,7 @@ helpers.describe("Whole LLM tray genuine live owner scope", function()
 							helpers.assert_nil(context.llm.get_live())
 							helpers.assert_eq(context.llm.set_live(nil), true)
 							local values, source = require("infra.llm_preferences").get_many({ "llm.profiles.num_predictions" })
-							helpers.assert_eq(source.content, "")
+							helpers.assert_eq(source.content, AGENT_ON_SOURCE)
 							helpers.assert_type(values["llm.profiles.num_predictions"], "number")
 							if raises then error("actual live scope sentinel") end
 							return "actual live scope result"
@@ -1446,7 +1492,7 @@ end)
 require("test.menu_layout_caption_values_contract").register(helpers, "linux")
 
 require("test.menu_numbered_caption_contract").register(helpers, "linux")
-require("test.menu_row_order_contract").register(helpers, 9)
+require("test.menu_row_order_contract").register(helpers, 8)
 
 -- Component coverage above uses the recorded declaration only during its build.
 -- Current public policy is checked separately with the genuine prediction owner.
@@ -1458,7 +1504,7 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 				helpers.assert_eq(declaration.i18n, "menu.agent.title")
 				helpers.assert_eq(declaration.reason_key, "menu.agent.not_ready")
 				for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.agent_settings",
-					"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
+					"ui.menu.builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
 					package.loaded[name] = nil
 				end
 				require("tests.support.llm_preferences_fixture").with(function()
@@ -1480,7 +1526,7 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 					end
 					local caption = i18n.get("menu.agent.title")
 					local found
-					for _, row in ipairs(require("ui.menu.menu_builder").build(context)) do
+					for _, row in ipairs(require("ui.menu.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
 							helpers.assert_nil(found, "the actual public Agent row must be unique")
 							found = row
@@ -1577,8 +1623,8 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 						end
 						return feature_template(key, ...)
 					end
-					builder = helpers.load_module("ui.menu.menu_builder")
-					helpers.assert_true(rawequal(builder, require("ui.menu.menu_builder")), "the actual native builder captures the final genuine delegation spies")
+					builder = helpers.load_module("ui.menu.builder")
+					helpers.assert_true(rawequal(builder, require("ui.menu.builder")), "the actual native builder captures the final genuine delegation spies")
 					local source_file = assert(io.open(path, "rb")); local source = source_file:read("*a"); assert(source_file:close())
 					local function parent_at_tray()
 						return find_item(builder.build(absent_context()), i18n.get(contract.key))
@@ -1712,7 +1758,7 @@ helpers.describe("Gestures Infos row opens the explanation in a dialog", functio
 		rawset(_G, "i18n_safe", real_i18n_safe)
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(#commands, 1, "one click opens one dialog")
-		helpers.assert_true(commands[1]:find("zenity --info", 1, true) == 1, "the existing info dialog: " .. commands[1])
+		helpers.assert_true(commands[1]:find("dialog_host.lua' --info", 1, true) ~= nil, "the existing info dialog: " .. commands[1])
 		-- shell_quote closes and reopens the quotes around an apostrophe.
 		local unquoted = commands[1]:gsub("'\\''", "'")
 		for _, expected in ipairs({ note, reason, i18n.get("menu.gestures.notify_title") }) do

@@ -156,18 +156,34 @@ Test("Gestures: every action has Label and Fn properties", TestGestures_ActionsH
 
 ; The picker headings used to be the literal "#Raccourcis" and
 ; "##Raccourcis <mods>", French in every locale. They are now locale keys, and
-; the group heading places the language-neutral modifier label through {1}.
+; the group heading places the modifiers' names through {1}. The chord labels
+; read the catalogue's English names (« Ctrl + Shift + Enter ») in every locale
+; until 2026-11-03; they now name each key from the key name table.
 TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
+    global _SharedDir, GESTURE_MODIFIER_ACTION_PARTS
     for Name in ["ctrl_a", "ctrl_alt_a", "ctrl_shift_alt_win_enter"]
         AssertTrue(GESTURE_ACTIONS.Has(Name), "missing shared modifier action: " . Name)
-    AssertEqual("Ctrl + A", _GestureActionLabel("ctrl_a"), "Ctrl+A label must never expose the internal id")
-    AssertEqual("Ctrl + Alt + A", _GestureActionLabel("ctrl_alt_a"), "multi-modifier label must use the shared format")
-    AssertEqual("Ctrl + Shift + Alt + Win + Enter", _GestureActionLabel("ctrl_shift_alt_win_enter"), "full modifier matrix must include special keys")
+    AssertEqual(KeyNameLabel("ctrl") . " + A", _GestureActionLabel("ctrl_a"), "Ctrl+A label must never expose the internal id")
+    AssertEqual(KeyNameLabel("ctrl") . " + " . KeyNameLabel("alt") . " + A", _GestureActionLabel("ctrl_alt_a"),
+        "multi-modifier label must use the shared format")
+    AssertEqual(KeyNameLabel("ctrl") . " + " . KeyNameLabel("shift") . " + " . KeyNameLabel("alt") . " + "
+        . KeyNameLabel("win") . " + " . KeyNameLabel("enter"), _GestureActionLabel("ctrl_shift_alt_win_enter"),
+        "full modifier matrix must include special keys")
+    ; The real French catalogue: Shift, Enter and Space read in French.
+    French := JsonParse(FileRead(_SharedDir . "\data\locales\fr.json", "UTF-8"))
+    Fr := (Key) => French.Has(Key) ? French[Key] : Key
+    Parts := GESTURE_MODIFIER_ACTION_PARTS["ctrl_shift_alt_win_enter"]
+    AssertEqual("Ctrl + Maj + Alt + Win + Entrée", KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef, Fr),
+        "a chord names its modifiers and its key in the user's language")
+    Parts := GESTURE_MODIFIER_ACTION_PARTS["shift_space"]
+    AssertEqual("Maj + Espace", KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef, Fr), "Space is named too")
+    Parts := GESTURE_MODIFIER_ACTION_PARTS["ctrl_period"]
+    AssertEqual("Ctrl + .", KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef, Fr), "a legend prints as written")
     ChordsTitle := t("sg_actions.sg_order.header.modifier_chords")
     GroupTemplate := t("sg_actions.sg_order.header.modifier_chord_group")
     AssertTrue(ChordsTitle != "sg_actions.sg_order.header.modifier_chords", "the chord heading key must resolve")
     AssertTrue(InStr(GroupTemplate, "{1}") > 0, "the chord group heading must place the modifier label")
-    CtrlTitle := StrReplace(GroupTemplate, "{1}", "Ctrl")
+    CtrlTitle := StrReplace(GroupTemplate, "{1}", KeyNameLabel("ctrl"))
     HasShortcutsH1 := false
     HasCtrlH2 := false
     CtrlH2FollowedByCtrlA := false
@@ -432,9 +448,9 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
 
         ; Exercise a real search template too: % and & must survive TOML
         ; serialization verbatim rather than becoming a generic/global setting.
-        SearchKey := GestureActionParameterKey("keyboard__ctrl_k", "search_web")
+        SearchKey := GestureActionParameterKey("keyboard__primary_k", "search_web")
         SearchTemplate := "https://search.example/?q=%s&source=ergopti"
-        AssertTrue(GestureSetActionParameter("keyboard__ctrl_k", "search_web", SearchTemplate),
+        AssertTrue(GestureSetActionParameter("keyboard__primary_k", "search_web", SearchTemplate),
             "the second parameter write must acknowledge")
         Parsed := ParseTomlFile(TempConfig)
         AssertTrue(Parsed.Has("action_parameters"), "action parameter section must be persisted")
@@ -448,7 +464,7 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
         _IniCache := Parsed
         GesturesReadConfig()
         AssertEqual("https://saved.example/path", GestureGetActionParameter("gesture__tap_3", "open_url"), "saved parameter must reload from TOML")
-		AssertEqual(SearchTemplate, GestureGetActionParameter("keyboard__ctrl_k", "search_web"), "scoped search template must reload from TOML")
+		AssertEqual(SearchTemplate, GestureGetActionParameter("keyboard__primary_k", "search_web"), "scoped search template must reload from TOML")
         AssertFalse(GestureActionParameters.Has("stale__open_url"), "reload must not retain stale parameter values")
     } finally {
         ConfigurationFile := OriginalConfig

@@ -498,6 +498,75 @@ TestTL_LoadExtTomlFileUsesCurrentSection() {
 Test("LoadExtTomlFile: registers entries without undefined category/section locals",
 	TestTL_LoadExtTomlFileUsesCurrentSection)
 
+; The pack label and its file are names the user chose (item 139). The redactor
+; masks a path only under the configuration directory, so the emitter prints the
+; placeholder and the file, kept here outside that directory, must not reach a line.
+TestTL_LoadExtDoesNotLogThePackLabel() {
+	TmpPath := A_ScriptDir . "\test_ext_label_log.toml"
+	Placeholder := LoggerUserNamePlaceholder()
+	Lines := []
+	try {
+		try FileDelete(TmpPath)
+		FileAppend('[[custom]]`n"aa" = "alpha"`n', TmpPath, "UTF-8")
+		ResetHotstringRecorders()
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		LoadExtTomlFile(TmpPath, "PrivatePackLabel")
+	} finally {
+		LoggerClearTestSink()
+		try FileDelete(TmpPath)
+	}
+	Loaded := false
+	for Line in Lines {
+		AssertFalse(InStr(Line, "PrivatePackLabel"), "The pack label reached the log: " . Line)
+		AssertFalse(InStr(Line, "test_ext_label_log"), "The pack file reached the log: " . Line)
+		Loaded := Loaded || (InStr(Line, "1 entry(ies) loaded") && InStr(Line, Placeholder))
+	}
+	AssertTrue(Loaded, "The success line carries the placeholder and the count")
+}
+Test("LoadExtTomlFile: the pack label stays out of the log", TestTL_LoadExtDoesNotLogThePackLabel)
+
+; A category the driver does not ship is named by its user, whether it is an
+; extension under the configuration directory or a personal file's owner.
+TestTL_CategoryLogNameMasksUserCategories() {
+	global _HotstringExtensionPaths, _ConfigDir
+	SavedPaths := _HotstringExtensionPaths, SavedDir := _ConfigDir
+	Placeholder := LoggerUserNamePlaceholder()
+	try {
+		_ConfigDir := "D:\Private Folder\ergopti_plus\"
+		_HotstringExtensionPaths := Map("my_pack", _ConfigDir . "extensions\my_pack\my_pack.toml")
+		AssertEqual(Placeholder, HotstringCategoryLogName("my_pack"), "an extension under the configuration directory")
+		AssertEqual(Placeholder, HotstringCategoryLogName("a__b"), "a personal file's owner backs no shipped file")
+		; A real file outside the configuration directory is still the user's.
+		OutsidePath := A_ScriptDir . "\test_ext_outside_config.toml"
+		try FileDelete(OutsidePath)
+		FileAppend("", OutsidePath, "UTF-8")
+		_HotstringExtensionPaths["outside_pack"] := OutsidePath
+		try AssertEqual(Placeholder, HotstringCategoryLogName("outside_pack"), "an extension outside the configuration directory")
+		finally FileDelete(OutsidePath)
+		AssertEqual("magickey", HotstringCategoryLogName("magickey"), "a shipped category stays readable")
+		AssertEqual("", HotstringCategoryLogName(""), "no category has nothing to mask")
+		; The real consumer: the widget module is not loaded in this suite, the keystats log is
+		Lines := []
+		SavedInitialized := Keystats.initialized
+		Keystats.initialized := false
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		try KL_LogHotstring("trig", "out", "unknown", "", "my_pack", "section")
+		finally {
+			LoggerClearTestSink()
+			Keystats.initialized := SavedInitialized
+		}
+		Reached := false
+		for Line in Lines {
+			Reached := Reached || InStr(Line, "KL_LogHotstring")
+			AssertFalse(InStr(Line, "my_pack"), "The pack name reached the log: " . Line)
+		}
+		AssertTrue(Reached, "the keystats call must log, or this proves nothing")
+	} finally {
+		_HotstringExtensionPaths := SavedPaths, _ConfigDir := SavedDir
+	}
+}
+Test("HotstringCategoryLogName: only shipped categories are printed", TestTL_CategoryLogNameMasksUserCategories)
+
 TestTL_LoadExtSimpleEntriesUnescapeTomlStrings() {
 	global _Stub_HotstringRegistrations, _Stub_RecordedSends
 	TmpPath := A_ScriptDir . "\test_ext_simple_escapes.toml"

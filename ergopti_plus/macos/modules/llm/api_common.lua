@@ -114,6 +114,18 @@ end
 local DEFAULT_TEMPERATURE = load_default_temperature()
 M.DEFAULT_TEMPERATURE = DEFAULT_TEMPERATURE
 
+--- The temperature of the AI menu's « Test a prediction », from defaults.json. It
+--- has no mirror: a test sent at another temperature would prove nothing, so a
+--- missing value fails that test with its cause.
+--- @return number
+function M.test_prediction_temperature()
+	local raw = FileSystem.read(Paths.shared("modules/llm/defaults.json"))
+	local parsed = raw and JsonCodec.decode(raw)
+	local value = type(parsed) == "table" and tonumber(parsed.llm_test_prediction_temperature)
+	if not value then error("defaults.json has no llm_test_prediction_temperature", 0) end
+	return value
+end
+
 --- Loads the default Ollama keep-alive window from the shared defaults.json — the
 --- single source every payload builder reads so "30m" is never hardcoded at the
 --- call site. Mirrors "30m" only when the JSON is unreadable, matching the

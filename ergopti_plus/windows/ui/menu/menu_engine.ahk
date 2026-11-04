@@ -68,7 +68,7 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	State := ReadFeatureStateV2(V2Path)
 	Row := Map(
 		"label",   MenuTitle,
-		"action",  (*) => ToggleFeatureV2(V2Path),
+		"action",  (*) => ToggleFeatureV2(V2Path, MenuTitle),
 		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false,
 		"checked_fn", MenuFeatureRowChecked.Bind(V2Path))
@@ -126,7 +126,7 @@ MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 	State := ReadFeatureStateV2(V2Path)
 	Row := Map(
 		"label",   MenuTitle,
-		"action",  (*) => ToggleFeatureV2(V2Path),
+		"action",  (*) => ToggleFeatureV2(V2Path, MenuTitle),
 		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false,
 		"checked_fn", MenuFeatureRowChecked.Bind(V2Path))
@@ -345,11 +345,11 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 	; {date} substitution — only the three dynamic-date entries carry it.
 	if (InStr(Label, "{date}")) {
 		switch V2Path {
-			case "hotstrings.dynamic.date_fr":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE_FR:
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
-			case "hotstrings.dynamic.date_long_fr":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE_LONG_FR:
 				Label := StrReplace(Label, "{date}", _DateLongFr())
-			case "hotstrings.dynamic.date":
+			case ConfigKey.HOTSTRINGS_DYNAMIC_DATE:
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
 	}
@@ -361,7 +361,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 		V2Cat := Parts[2]
 		V2SecId := Parts[3]
 		switch V2Cat {
-			case "autocorrection", "distances_reduction", "magic_key", "rolls", "sfbs_reduction":
+			case "autocorrection", ConfigLeaf.DISTANCES_REDUCTION, ConfigLeaf.MAGIC_KEY, "rolls", ConfigLeaf.SFBS_REDUCTION:
 				N := CountTomlSection(StrReplace(V2Cat, "_", ""), V2SecId)
 				if (N > 0)
 					Label := Label . " (" . N . ")"
@@ -385,8 +385,13 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 ; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
 ; in-process (no Reload); everything else persists the flip and Reloads. Reads + writes go through infra/feature_io.ahk, so
 ; no v1 PascalCase path or rename table is consulted.
-ToggleFeatureV2(V2Path) {
+; @param V2Path {String} Canonical v2 path of the switch.
+; @param Label {String} The row's label for the notice; its manifest title when
+;   a caller holds none.
+ToggleFeatureV2(V2Path, Label := "") {
 	global Features
+	if (Label == "")
+		Label := GetMenuTitleByPath(V2Path)
 	; Fast path: live hotstring section toggle, no Reload (see _HS_TryLiveToggleV2).
 	LiveResult := _HS_TryLiveToggleV2(V2Path)
 	if LiveResult.handled {
@@ -394,8 +399,9 @@ ToggleFeatureV2(V2Path) {
 			return ConfigReportPersistenceFailure("the live feature toggle '" . V2Path . "'")
 		; Every menu toggle is logged with its id and outcome: until now the only
 		; trace of a click was a failure, so "I turned it off" could not be checked.
-		try LoggerInfo("Menu", "Feature '{1}' toggled live to {2}.", V2Path,
-			ReadFeatureStateV2(V2Path).Get("enabled", false) ? "enabled" : "disabled")
+		LiveEnabled := ReadFeatureStateV2(V2Path).Get("enabled", false)
+		try LoggerInfo("Menu", "Feature '{1}' toggled live to {2}.", V2Path, LiveEnabled ? "enabled" : "disabled")
+		NotifyFeature(Label, LiveEnabled ? true : false)
 		return true
 	}
 
@@ -408,6 +414,8 @@ ToggleFeatureV2(V2Path) {
 	Batch := [Map("path", V2Path, "value", NewValue)]
 	if (WriteFeatureBatchV2(Features, Batch) != Batch.Length)
 		return ConfigReportPersistenceFailure("the feature toggle '" . V2Path . "'")
+	; Before the reload: its tray icon goes with the process.
+	NotifyFeature(Label, NewValue)
 	return ReloadPreservingSuspend()
 }
 
@@ -419,7 +427,7 @@ ToggleFeatureV2(V2Path) {
 ; here (they keep the v1 MenuAddItemWithLabel path).
 _HS_TryLiveToggleV2(V2Path) {
 	global Features
-	if V2Path == "hotstrings.dynamic.user_code"
+	if V2Path == ConfigKey.HOTSTRINGS_DYNAMIC_USER_CODE
 		return _HS_ToggleProgrammableHotstrings(V2Path)
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {

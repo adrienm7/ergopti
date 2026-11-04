@@ -722,12 +722,14 @@ _LAO_OllamaPortIsLiveSemanticState() {
 	SavedBaseUrl := LLM_OLLAMA_BASE_URL
 	try {
 		_LAO_ResetOwners()
-		LLM_OLLAMA_PORT := 11434
-		LLM_OLLAMA_BASE_URL := "http://localhost:11434"
+		; An owned port, as in production: the stock 11434 is refused once any test
+		; has loaded LLM_Defaults, which made this test depend on the order.
+		LLM_OLLAMA_PORT := 11435
+		LLM_OLLAMA_BASE_URL := "http://localhost:11435"
 		OldPing := LLM_AuxBegin("ollama_ping", _LAO_Context())
 		_LLM_Engine := SavedEngine.Clone()
 		_I18nLocale := "en"
-		LLM_Engine_Init(Map("language", "en", "ollama_port", 11434))
+		LLM_Engine_Init(Map("language", "en", "ollama_port", 11435))
 		OldRequestId := _LLM_Engine["request_id"]
 		OldSignature := _LLM_Engine["semantic_config_signature"]
 		PrepareState := Map("steps", [])

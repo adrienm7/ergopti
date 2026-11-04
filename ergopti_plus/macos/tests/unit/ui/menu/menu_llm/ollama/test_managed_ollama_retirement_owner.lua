@@ -31,7 +31,9 @@ local function with_managed(options, callback)
 	package.loaded["adapters.managed_ollama_pull"] = nil
 	local raw, removed, handle, adapter, cleanup_hook, reentry_result = "", false, nil, nil, nil, nil
 	package.loaded["adapters.file_system"] = {
-		exists = function() return true end,
+		-- No refused proxy sign-in left its receipt: the pull these cases own
+		-- goes ahead (modules/llm/proxy_relay_receipt.lua).
+		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,
 		read_with_status = function(path)
 			if path:find("proxy_policy.json", 1, true) then return '{"max_proxy_bytes":4096}', "ok" end
 			if path:find("network-retry.sh", 1, true) then
@@ -110,10 +112,37 @@ helpers.describe("Managed Ollama exact daemon retirement owner", function()
 			task.running = false
 			task.on_done(78)
 			helpers.assert_eq(f.active_tasks.ollama_pull, task)
+			-- Field run of 2026-10-30 23:10: a slot was kept and no line named the check.
+			helpers.assert_true(table.concat(f.error_records, " | "):find(
+				"receipt_not_retired(state=pending, worker_status=78, callback=78, admitted=true, retired=false)",
+				1, true) ~= nil, "the retained slot must name the receipt's state: "
+				.. table.concat(f.error_records, " | "))
 			helpers.assert_eq(f.removed(), false)
 			helpers.assert_nil(f.http_callback())
 			helpers.assert_eq(start(f), false)
 			helpers.assert_eq(#f.pulls, 1)
+		end)
+	end)
+
+	helpers.it("names the helper's refusal when an exit leaves no receipt (ollama-pull-unsettled-cause)", function()
+		-- Field run of 2026-10-30 20:47: three pulls ended with code 78 and an
+		-- empty receipt; the log said only that the task "could not be settled".
+		with_managed({}, function(f)
+			helpers.assert_true(start(f))
+			local task = f.pulls[1]
+			task.running = false
+			task.on_done(78, "", "Managed Ollama pull admission refused: TimeoutError at pull.py:9 request.\n")
+			helpers.assert_eq(f.active_tasks.ollama_pull, task)
+			local named = false
+			for _, record in ipairs(f.error_records) do
+				if record:find("could not be settled; last output: Managed Ollama pull admission refused: TimeoutError", 1, true) then
+					named = true
+				end
+			end
+			helpers.assert_true(named, "the unsettled error must quote the helper's refusal: "
+				.. table.concat(f.error_records, " | "))
+			helpers.assert_true(table.concat(f.error_records, " | "):find("pending (receipt_empty)", 1, true) ~= nil,
+				"the retained slot must name the refused check: " .. table.concat(f.error_records, " | "))
 		end)
 	end)
 

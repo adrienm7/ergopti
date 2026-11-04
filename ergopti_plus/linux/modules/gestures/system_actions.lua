@@ -4,10 +4,11 @@
 --- MODULE: System Actions (Linux)
 --- DESCRIPTION:
 --- The system actions of the shared catalogue that run a desktop command:
---- show the desktop, sleep the displays, toggle dark mode and the microphone,
---- quit or kill the active window's process, empty the trash, clear the
---- notifications and the clipboard, and make the file manager's selection
---- executable. modules/gestures/manager.lua dispatches them.
+--- show the desktop, minimize every window, sleep the displays, toggle dark
+--- mode and the microphone, quit or kill the active window's process, empty
+--- the trash, eject the removable disks, clear the notifications and the
+--- clipboard, open an emoji chooser, pick a screen colour, and make the file
+--- manager's selection executable. modules/gestures/manager.lua dispatches them.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data first: COMMANDS maps each fixed action to its exact shell command,
@@ -16,9 +17,9 @@
 ---    runner. The daemon holds the grabbed keyboard, so a command that waits
 ---    for a window manager or a dialog must never be waited for here.
 --- 3. A catalogue action with `confirm = true` gets its question from
----    confirmed_command(): zenity or kdialog in the same background shell,
----    chained to the command with &&, so Cancel (or no dialog tool at all)
----    runs nothing. The window an action targets (TARGETS) is read before the
+---    confirmed_command(): Ergopti's own dialog (ui/native_dialog.lua) in the
+---    same background shell, chained to the command with &&, so Cancel (or a
+---    dialog that cannot open) runs nothing. The window an action targets (TARGETS) is read before the
 ---    question, so a confirmed force quit kills the application the user acted
 ---    from, never the one focused once the dialog is gone. Its process id is
 ---    read before the question too, and the signal goes only to a window that
@@ -32,6 +33,7 @@ local WindowTitles = require("window_titles")
 local Logger = require("logger.shim")
 local i18n = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
+local NativeDialog = require("ui.native_dialog")
 local FileSelection = require("file_selection")
 
 local LOG = "modules.gestures.system_actions"
@@ -71,6 +73,30 @@ end
 --- The GNOME interface setting dark mode lives in, and its two values.
 local COLOR_SCHEME = "org.gnome.desktop.interface color-scheme"
 
+--- minimize_all: EWMH has no "minimize every window" request, so each window
+--- the window manager lists (wmctrl -l) is minimized in turn. A window on
+--- desktop -1 is sticky (a panel, the desktop itself) and is left alone.
+M.MINIMIZE_ALL = 'wmctrl -l 2>/dev/null | while read -r win desk _; do'
+	.. ' [ "$desk" = "-1" ] || xdotool windowminimize "$win"; done'
+
+--- The mount points that make a disk the running system's own, which
+--- eject_all_disks never powers off even when it is hot-pluggable (a live or
+--- installed-to-USB system).
+local SYSTEM_MOUNTS = "^(/|/boot|/boot/efi|/usr|/var|/home|\\[SWAP\\])$"
+
+--- eject_all_disks: every removable or hot-plugged disk lsblk lists, its
+--- mounted partitions unmounted, then the drive powered off, as Finder's
+--- "Eject" does. udisksctl goes through udisks and polkit, the same path the
+--- file managers use, so no root is needed for a drive the session mounted.
+--- lsblk -r escapes the spaces of a mount point, so `read` splits it right.
+M.EJECT_ALL_DISKS = 'lsblk -nrpo NAME,TYPE,RM,HOTPLUG 2>/dev/null | while read -r dev kind rm hot; do'
+	.. ' [ "$kind" = disk ] || continue;'
+	.. ' [ "$rm" = 1 ] || [ "$hot" = 1 ] || continue;'
+	.. " lsblk -nrpo MOUNTPOINT \"$dev\" | grep -qE '" .. SYSTEM_MOUNTS .. "' && continue;"
+	.. ' lsblk -nrpo NAME,MOUNTPOINT "$dev" | while read -r part mnt; do'
+	.. ' [ -n "$mnt" ] && udisksctl unmount -b "$part" </dev/null; done;'
+	.. ' udisksctl power-off -b "$dev" </dev/null; done'
+
 --- Every action this module runs as one fixed shell command, by action id.
 M.COMMANDS = {
 	-- wmctrl -m reports the EWMH "showing the desktop" mode; -k sets it.
@@ -83,6 +109,8 @@ M.COMMANDS = {
 		.. " *) gsettings set " .. COLOR_SCHEME .. " prefer-dark;; esac",
 	mic_mute_toggle = "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
 	empty_trash = "gio trash --empty",
+	minimize_all = M.MINIMIZE_ALL,
+	eject_all_disks = M.EJECT_ALL_DISKS,
 	quit_frontmost_app = window_signal("TERM"),
 	force_quit_frontmost = window_signal("KILL"),
 }
@@ -107,28 +135,15 @@ M.CLEAR_NOTIFICATIONS = "dunstctl close-all 2>/dev/null || makoctl dismiss --all
 --- The command that asks the user first, then runs `command` on Continue.
 --- @param action_label string The action's localized label.
 --- @param command string The command to confirm.
---- @param has_command function|nil binary -> boolean; ShellRunner.has_command by default.
---- @return string|nil confirmed The chained command, nil when no dialog tool exists.
-function M.confirmed_command(action_label, command, has_command)
-	has_command = has_command or ShellRunner.has_command
+--- @return string confirmed The chained command.
+function M.confirmed_command(action_label, command)
 	local title = WindowTitles.compose(i18n.get("dialog.confirm_action.title"))
 	local message = i18n.get("dialog.confirm_action.message"):gsub("{1}", function() return action_label end)
 	local continue = i18n.get("dialog.confirm_action.confirm")
 	local cancel = i18n.get("button.cancel")
-	local ask
-	if has_command("zenity") then
-		ask = "zenity --question --no-markup --default-cancel --title=" .. quote(title)
-			.. " --text=" .. quote(message)
-			.. " --ok-label=" .. quote(continue) .. " --cancel-label=" .. quote(cancel)
-	elseif has_command("kdialog") then
-		-- kdialog has no "dangerous" option: Return always presses its first
-		-- (Yes) button. That button is therefore Cancel, and only No, labelled
-		-- Continue, confirms (exit 1); Escape and closing the window exit 2.
-		ask = "{ kdialog --title " .. quote(title) .. " --warningyesno " .. quote(message)
-			.. " --yes-label " .. quote(cancel) .. " --no-label " .. quote(continue) .. "; [ $? -eq 1 ]; }"
-	else
-		return nil
-	end
+	local ask = NativeDialog.command() .. " --question --no-markup --default-cancel --title=" .. quote(title)
+		.. " --text=" .. quote(message)
+		.. " --ok-label=" .. quote(continue) .. " --cancel-label=" .. quote(cancel)
 	return ask .. " && { " .. command .. "; }"
 end
 
@@ -137,20 +152,14 @@ end
 --- @param action_name string
 --- @param action_label string
 --- @param confirm boolean
---- @param has_command function|nil
---- @return string|nil command Nil when a confirmation cannot be asked.
-function M.command_for(action_name, action_label, confirm, has_command)
+--- @return string command
+function M.command_for(action_name, action_label, confirm)
 	local command = M.COMMANDS[action_name]
 	if not command then error("system_actions: no command for '" .. tostring(action_name) .. "'", 2) end
 	local target = M.TARGETS[action_name]
 	local read_target = target and (target .. " && ") or ""
 	if not confirm then return "{ " .. read_target .. command .. "; }" end
-	local confirmed = M.confirmed_command(action_label, command, has_command)
-	if not confirmed then
-		Logger.error(LOG, "'%s' needs a confirmation, and neither zenity nor kdialog is installed — not run.",
-			action_name)
-		return nil
-	end
+	local confirmed = M.confirmed_command(action_label, command)
 	if not target then return confirmed end
 	return "{ " .. read_target .. confirmed .. "; }"
 end
@@ -164,6 +173,56 @@ end
 -- ======= 2/ Handlers ==============
 -- ==================================
 -- ==================================
+
+--- The emoji choosers open_emoji_picker tries, in order. Linux desktops share
+--- none: KDE Plasma ships plasma-emojier, GNOME's IBus answers `ibus emoji`
+--- (the panel its text fields open on Ctrl+.), and Smile is the chooser the
+--- other desktops install. Each picks an emoji and copies it, so the user
+--- pastes it where they were typing.
+M.EMOJI_PICKERS = {
+	{ binary = "plasma-emojier", command = "plasma-emojier" },
+	{ binary = "ibus", command = "ibus emoji" },
+	{ binary = "smile", command = "smile" },
+}
+
+--- The colour pickers pick_color tries, by session, in order. Each lets the
+--- user click a pixel and leaves its #RRGGBB on the clipboard, as the macOS
+--- and Windows actions do. Under Wayland only a compositor-side picker can
+--- read the screen (hyprpicker, for wlroots compositors); X11 lets xcolor and
+--- gpick read it directly.
+M.COLOR_PICKERS = {
+	wayland = {
+		{ binary = "hyprpicker", command = "hyprpicker --autocopy --format=hex" },
+	},
+	x11 = {
+		{ binary = "xcolor", command = "xcolor --selection clipboard" },
+		{ binary = "gpick", command = "gpick --single --output --no-newline | xclip -selection clipboard" },
+	},
+}
+
+--- The installed candidates of `candidates`, chained with ||: a chooser that
+--- is installed but cannot start (IBus without its daemon) hands over to the
+--- next one instead of leaving the user with nothing.
+--- @param candidates table List of { binary, command }.
+--- @param has_command function binary -> boolean.
+--- @return string|nil command Nil when none is installed.
+function M.first_installed(candidates, has_command)
+	local commands = {}
+	for _, candidate in ipairs(candidates) do
+		if has_command(candidate.binary) then commands[#commands + 1] = candidate.command end
+	end
+	if #commands == 0 then return nil end
+	return "{ " .. table.concat(commands, " || ") .. "; }"
+end
+
+--- Lists the binaries of `candidates` for an error message.
+--- @param candidates table
+--- @return string
+local function binaries(candidates)
+	local names = {}
+	for index, candidate in ipairs(candidates) do names[index] = candidate.binary end
+	return table.concat(names, ", ")
+end
 
 --- Shows a short notice for an action that had nothing to act on.
 --- @param key string Locale key.
@@ -192,6 +251,28 @@ M.HANDLERS = {
 		end
 		Logger.error(LOG, "clear_notifications: none of %s is installed; this desktop's notifications"
 			.. " cannot be cleared by a command.", table.concat(M.NOTIFICATION_CLIENTS, ", "))
+	end,
+	open_emoji_picker = function(deps)
+		local command = M.first_installed(M.EMOJI_PICKERS, ShellRunner.has_command)
+		if not command then
+			Logger.error(LOG, "open_emoji_picker: none of %s is installed — no emoji chooser opened.",
+				binaries(M.EMOJI_PICKERS))
+			return
+		end
+		Logger.info(LOG, "Opening the emoji chooser.")
+		deps.run_background(command)
+	end,
+	pick_color = function(deps)
+		local session = (os.getenv("WAYLAND_DISPLAY") or "") ~= "" and "wayland" or "x11"
+		local candidates = M.COLOR_PICKERS[session]
+		local command = M.first_installed(candidates, ShellRunner.has_command)
+		if not command then
+			Logger.error(LOG, "pick_color: none of %s is installed for this %s session — no colour picked.",
+				binaries(candidates), session)
+			return
+		end
+		Logger.info(LOG, "Picking a screen colour (%s session).", session)
+		deps.run_background(command)
 	end,
 	clear_clipboard = function(deps)
 		if deps.clipboard.write("") then

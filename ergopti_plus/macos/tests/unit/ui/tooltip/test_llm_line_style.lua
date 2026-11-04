@@ -163,38 +163,32 @@ helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", funct
 		helpers.it("(llm-shortcut-column) label: " .. vector.id, function()
 			support.with_fixture(function(fixture)
 				local context = fixture.load_tooltip(support.CASES[1])
+				-- {id} stands for the key name table's glyph of that modifier.
+				local expected = vector.expected.hs:gsub("{(%a+)}", function(id)
+					return require("keycodes.key_names").macos_symbol(id)
+				end)
 				helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers,
-					context.config.llm_ui.shortcut_spec), vector.expected.hs, vector.id)
+					context.config.llm_ui.shortcut_spec), expected, vector.id)
 			end)
 		end)
 	end
 
-	helpers.it("(llm-shortcut-column) every row ends on a right tab stop with its muted chord", function()
+	helpers.it("(llm-shortcut-column) every row's muted chord sits in a right-aligned column of its own", function()
 		support.with_fixture(function(fixture)
 			local pieces, config = shortcut_pieces(fixture, "alt")
 			for _, label in ipairs({ "⌥1", "⌥2" }) do
-				local built_label = piece(pieces, label)
-				helpers.assert_true(built_label ~= nil, label .. " is drawn")
-				helpers.assert_eq(built_label.attributes.color, config.colors.cmd_dim, label .. " is muted")
-				helpers.assert_eq(built_label.attributes.font.size, config.sizes.hint, label .. " is at the hint size")
-			end
-			helpers.assert_true(piece(pieces, "\t") ~= nil, "the chord sits after a tab")
-			-- show_predictions assembles the lines once per sizing pass and once
-			-- to draw; each assembly builds one tab and gives both labelled lines
-			-- the stop, always at the same place.
-			local stopped, tabs, location = 0, 0, nil
-			for _, candidate in ipairs(pieces) do
-				if candidate.text == "\t" then tabs = tabs + 1 end
-				local paragraph = type(candidate.attributes) == "table" and candidate.attributes.paragraphStyle
-				if paragraph and paragraph.tabStops then
-					helpers.assert_eq(paragraph.tabStops[1].tabStopType, "right")
-					location = location or paragraph.tabStops[1].location
-					helpers.assert_eq(paragraph.tabStops[1].location, location, "the column never moves")
-					stopped = stopped + 1
+				local drawn = nil
+				for _, candidate in ipairs(pieces) do
+					local paragraph = candidate.text == label and candidate.attributes.paragraphStyle
+					if paragraph and paragraph.alignment == "right" then drawn = candidate end
 				end
+				helpers.assert_true(drawn ~= nil, label .. " is drawn right-aligned")
+				helpers.assert_eq(drawn.attributes.color, config.colors.cmd_dim, label .. " is muted")
+				helpers.assert_eq(drawn.attributes.font.size, config.sizes.hint, label .. " is at the hint size")
 			end
-			helpers.assert_true(tabs >= 2, "the lines are sized before they are drawn")
-			helpers.assert_eq(stopped, 2 * tabs, "each labelled line starts with the right tab stop")
+			-- The tab stop this replaces was placed from the widest line, so a
+			-- footer wider than the lines left the chord stuck to the text.
+			helpers.assert_eq(piece(pieces, "\t"), nil, "no line carries a tab")
 		end)
 	end)
 
@@ -203,7 +197,84 @@ helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", funct
 			local pieces = shortcut_pieces(fixture, "\226\128\139")
 			helpers.assert_true(piece(pieces, "1") ~= nil and piece(pieces, "2") ~= nil, "bare digits")
 			pieces = shortcut_pieces(fixture, "none")
-			helpers.assert_eq(piece(pieces, "\t"), nil, "no column without a validation shortcut")
+			helpers.assert_eq(piece(pieces, "1"), nil, "no column without a validation shortcut")
+		end)
+	end)
+end)
+
+--- Renders predictions on a canvas that measures n characters as n * 7 points
+--- and returns the blocks handed to the renderer.
+--- @param fixture table Tooltip watcher fixture.
+--- @param predictions table
+--- @param indent number The indentation setting.
+--- @param shortcut string Display-form validation shortcut.
+--- @return table blocks, table state, table config
+local function rendered_blocks(fixture, predictions, indent, shortcut)
+	local context = fixture.load_tooltip(support.CASES[1])
+	local renderer = context.renderer
+	renderer.canvas.minimumTextSize = function(_, _, styled)
+		local widest = 0
+		for line in (tostring(styled) .. "\n"):gmatch("(.-)\n") do widest = math.max(widest, #line * 7) end
+		return { w = widest, h = 20 }
+	end
+	local real_render = renderer.render
+	local blocks, state
+	renderer.render = function(content, render_state, on_shown)
+		blocks, state = content, render_state
+		return real_render(content, render_state, on_shown)
+	end
+	assert(context.tooltip.show_predictions(predictions, 1, true, nil, shortcut, indent) == true)
+	return blocks, state, context.config
+end
+
+helpers.describe("tooltip_llm: where the shortcut column goes (llm-shortcut-column)", function()
+	local fh = assert(io.open(helpers.shared("tests/corpus/tooltip/llm_column_vectors.json"), "r"))
+	local vectors = require("hs").json.decode(fh:read("*a")).vectors
+	fh:close()
+
+	for _, vector in ipairs(vectors) do
+		helpers.it("(llm-shortcut-column) corpus: " .. vector.id, function()
+			local column = LlmLine.shortcut_column(vector.widest_line, vector.widest_label, vector.gap, vector.max_width)
+			local placement = LlmLine.column_placement(vector.content_w, column.zone_w, vector.label_w, vector.line_w)
+			helpers.assert_eq(column.zone_w, vector.expected.zone_w, "zone_w")
+			helpers.assert_eq(column.preds_w, vector.expected.preds_w, "preds_w")
+			helpers.assert_eq(placement.label_x, vector.expected.label_x, "label_x")
+			helpers.assert_eq(placement.line_limit, vector.expected.line_limit, "line_limit")
+			helpers.assert_eq(placement.truncated, vector.expected.truncated, "truncated")
+		end)
+	end
+
+	for _, indent in ipairs({ -3, 0, 3 }) do
+		helpers.it("(llm-shortcut-column) the block reserves the column at indent " .. indent, function()
+			support.with_fixture(function(fixture)
+				local blocks, state, config = rendered_blocks(fixture, { CORRECTING, { chunks = {}, nw = "ok" } }, indent, "alt")
+				helpers.assert_true(blocks.labels_st ~= nil, "the column is handed to the renderer")
+				helpers.assert_true(blocks.preds_w >= config.layout.label_gap, "the width includes the column")
+				helpers.assert_eq(blocks.line_limit, nil, "short lines are left whole")
+				helpers.assert_true(state.fixed_width >= blocks.preds_w, "the panel holds the block")
+				helpers.assert_true(not tostring(blocks.preds):find("⌥", 1, true), "the chords left the lines")
+			end)
+		end)
+	end
+
+	helpers.it("(llm-shortcut-column) a long line is cut before the column at the cap", function()
+		support.with_fixture(function(fixture)
+			local long = { chunks = {}, nw = string.rep("mot ", 200) }
+			local blocks, state, config = rendered_blocks(fixture, { long, { chunks = {}, nw = "ok" } }, -3, "alt")
+			helpers.assert_eq(blocks.preds_w, config.layout.llm_max_content_width, "the block stops at the cap")
+			helpers.assert_true(blocks.line_limit ~= nil and blocks.line_limit < state.fixed_width,
+				"the lines get a frame that stops before the column")
+			helpers.assert_true(not tostring(blocks.labels_st):find("mot", 1, true),
+				"a cut line is not repeated: it would push the label out")
+		end)
+	end)
+
+	helpers.it("(llm-shortcut-column) a long line is capped without a column too", function()
+		support.with_fixture(function(fixture)
+			local long = { chunks = {}, nw = string.rep("mot ", 200) }
+			local blocks, _, config = rendered_blocks(fixture, { long }, 0, "none")
+			helpers.assert_eq(blocks.labels_st, nil, "no chord, no column")
+			helpers.assert_eq(blocks.preds_w, config.layout.llm_max_content_width)
 		end)
 	end)
 end)

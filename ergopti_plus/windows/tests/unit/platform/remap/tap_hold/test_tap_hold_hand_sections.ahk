@@ -58,8 +58,9 @@ _THHS_Render() {
 		"tap_hold_keys_right", (*) => _THHS_KeyIdRows("right", Inert))
 	Commands := Map("tapholds_toggle", Inert, "scope_restore", Inert,
 		"scope_clear", Inert, "edit_nav_layer", Inert)
+	; Tap-holds on: an off category suffixes and greys every key row (category-off rule).
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", Providers, Commands,
-		Map("tapholds_enabled", () => false))
+		Map("tapholds_enabled", () => true))
 }
 
 ; One row per key of a hand, labelled by its id.
@@ -88,7 +89,7 @@ _THHS_CatalogueSplitsTheHands() {
 	AssertEqual("space", LeftKeys[LeftKeys.Length]["id"], "Space ends the left hand")
 	AssertEqual("alt_gr", RightKeys[1]["id"], "AltGr opens the right hand")
 	for _, KeyDef in TapHoldKeyDefs()
-		Assert(InStr(KeyDef["i18n"], "tap_hold.group.") == 1, "key '" . KeyDef["id"] . "' is labelled from the catalogue")
+		AssertEqual(KeyNameI18n(KeyDef["id"]), KeyDef["i18n"], "key '" . KeyDef["id"] . "' is named by the shared key name table")
 }
 Test("tap-holds: the shared key catalogue gives every Windows key a hand (tap-hold-hand-sections)",
 	_THHS_CatalogueSplitsTheHands)
@@ -127,7 +128,7 @@ _THHS_WithNativeFixture(TestFn) {
 
 _THHS_NativeCommandRow(KeyId) {
 	for Row in _TH_KeyRows("left") {
-		if InStr(Row["label"], t("tap_hold.group." . KeyId) . "  :") == 1
+		if InStr(Row["label"], KeyNameLabel(KeyId) . "  :") == 1
 			return Row["items"][1]
 	}
 	throw Error("Missing actual key provider: " . KeyId)
@@ -182,7 +183,7 @@ Test("tap-holds: the actual native command preserves writer lease refusal (tap-h
 ; The complete child template owns row order, captions and platform projection.
 _THHS_KeyChildren(KeyId) {
 	for Row in _TH_KeyRows("left") {
-		if InStr(Row["label"], t("tap_hold.group." . KeyId) . "  :") == 1
+		if InStr(Row["label"], KeyNameLabel(KeyId) . "  :") == 1
 			return Row["items"]
 	}
 	throw Error("Missing actual key template: " . KeyId)
@@ -297,7 +298,7 @@ _THHS_HoldOpensSharedPicker(TargetPath) {
 		Reloads.Push(Reason . ":" . KeyId)
 		return 1
 	}
-	KeyLabel := t("tap_hold.group.caps_lock")
+	KeyLabel := t("key_name.caps_lock")
 	_TH_OpenHoldPicker("caps_lock", KeyLabel, Capture, Accept, Reload)
 	AssertEqual(1, Opened.Length, "the hold opens the shared picker once")
 	Picker := Opened[1]
@@ -312,7 +313,7 @@ _THHS_HoldOpensSharedPicker(TargetPath) {
 		Labels[Item.Id] := Item.Label
 	}
 	AssertEqual(t("tap_hold.hold.nav_layer"), Labels.Get("nav", ""), "the navigation layer is a holdable entry")
-	AssertEqual(t("tap_hold.hold.ctrl") . " + " . t("tap_hold.hold.shift"), Labels.Get("ctrl+shift", ""),
+	AssertEqual(t("key_name.ctrl") . " + " . t("key_name.shift"), Labels.Get("ctrl+shift", ""),
 		"a modifier combination is a holdable entry")
 	AssertFalse(Labels.Has("copy"), "no tap action is offered for a hold")
 	AssertFalse(Picker.OnConfirm.Call("copy"), "an action the hold does not offer is refused")

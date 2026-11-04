@@ -17,6 +17,7 @@ local Logger            = require("infra.logger")
 local dialog            = require("infra.dialog_util")
 local notifications     = require("infra.notifications")
 local i18n              = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
@@ -262,6 +263,42 @@ function M.build_management(ctx)
 		end
 	end
 
+	-- Whether an expansion swallows each built-in delimiter: a click on its catalogue
+	-- row above switches it on or off, so this half of its state has its own rows.
+	local consume_rows = {}
+	for _, def in ipairs(defs) do
+		if type(def) == "table" and not def.custom and def.type ~= "separator" and def.key then
+			local consumed = ctx.keymap and type(ctx.keymap.is_terminator_consume) == "function"
+				and ctx.keymap.is_terminator_consume(def.key) or false
+			local label = ctx.applyTriggerChar(i18n.get(def.label_key))
+			consume_rows[#consume_rows + 1] = {
+				label    = label,
+				checked  = consumed or nil,
+				disabled = paused or nil,
+				action   = not paused and function()
+					local next_consume = not consumed
+					local committed = KeymapLifecycle.commit_mutation(ctx, "toggle delimiter consumption", function()
+						if not ctx.keymap or type(ctx.keymap.set_terminators_consume) ~= "function" then return false end
+						return ctx.keymap.set_terminators_consume({ [def.key] = next_consume })
+					end)
+					if not committed then return false end
+					if type(state.terminator_consume) ~= "table" then state.terminator_consume = {} end
+					-- Back on the catalogue choice, the stored consume table holds no key.
+					if next_consume == (def.consume == true) then
+						state.terminator_consume[def.key] = nil
+					else
+						state.terminator_consume[def.key] = next_consume
+					end
+					if ctx.save_prefs() ~= true then return false end
+					ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"),
+						label .. " " .. i18n.get("menu.hotstrings.consumed_suffix")), next_consume)
+					ctx.updateMenu()
+					return true
+				end or nil,
+			}
+		end
+	end
+
 	-- Custom terminators + add button, grouped together at the bottom
 	local catalogue_rows = exp_sub
 	exp_sub = {}
@@ -270,7 +307,7 @@ function M.build_management(ctx)
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
 		local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(ct.key) or false
 		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
-		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
+		local ct_lbl = LabelValue.compose(i18n.get, ct.char, i18n.get("menu.hotstrings.custom_label")) .. consume_sfx
 
 		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
 			[require("config_keys").COMMAND.WORD_EXPANDER_DELETE] = (function(k) return function()
@@ -360,7 +397,7 @@ function M.build_management(ctx)
 				and consume_res ~= consume_yes_label then return false end
 			local consume = (consume_res == consume_yes_label)
 
-			local label = char .. " : " .. (consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
+			local label = LabelValue.compose(i18n.get, char, consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
 
 			-- 4. Register in the live engine
 			local committed = KeymapLifecycle.commit_mutation(ctx,
@@ -395,6 +432,7 @@ function M.build_management(ctx)
 	}
 	local entry_rows = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
 		["parameter_catalogue_entries"] = function() return catalogue_rows end,
+		["parameter_consume_children"] = consume_rows,
 		["parameter_custom_entries"] = function() return exp_sub end,
 	})
 	if not entry_rows then return nil end
@@ -412,7 +450,7 @@ function M.build_management(ctx)
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
-			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = LabelValue.compose(i18n.get, title, i18n.get("menu.hotstrings.missing_value")), disabled = true }
 		end
 		-- Coerce + fail closed to default_val: state.expansion_delay (and per-key
 		-- delays) come straight from config.toml and can be a string (hand edit /
@@ -427,7 +465,7 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") is the surviving shared
 			-- key — its value already carries the leading space, so we don't add one.
-			label    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
+			label    = LabelValue.compose(i18n.get, title, display_ms) .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
 			action       = not paused and function()
 				local ok_label = i18n.get("button.ok")
@@ -471,7 +509,7 @@ function M.build_management(ctx)
 		local cur_val  = (type(resolved) == "table" and type(resolved.delay) == "number") and resolved.delay or nil
 		if type(cur_val) ~= "number" then
 			Logger.error(LOG, "make_category_delay_item(): no resolvable delay for category '%s'.", category)
-			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = LabelValue.compose(i18n.get, title, i18n.get("menu.hotstrings.missing_value")), disabled = true }
 		end
 		local cur_ms     = math.floor(cur_val * 1000 + 0.5)
 		local has_over   = (type(resolved) == "table" and resolved.has_override) or false
@@ -480,7 +518,7 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") carries its own leading
 			-- space; show it while the user has set no override for this category.
-			label    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
+			label    = LabelValue.compose(i18n.get, title, display_ms) .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
 			action       = not paused and function()
 				local ok_label = i18n.get("button.ok")

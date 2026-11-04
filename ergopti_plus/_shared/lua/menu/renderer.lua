@@ -30,9 +30,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Single renderer: every submenu is built by the same loop — structure lives
 ---    in the manifest, not in per-submenu Lua code.
---- 2. Dynamic escape hatch: items whose ``type`` is ``"dynamic"`` are routed to a
----    caller-supplied table of handler functions so platform-specific UI stays in
----    the caller.
+--- 2. No escape hatch: the retired ``dynamic`` type handed a row back to the
+---    caller, and the menu compiler refuses it now. A row whose contents are
+---    runtime data is a ``list``, whose provider returns DATA drawn here; only the
+---    legacy ``action`` type still hands its id to a caller handler.
 --- 3. A FACTORY, not a singleton. Each driver builds one instance at require
 ---    time. An ``M.init``-style singleton would have to warn-and-ignore a second
 ---    call per the module-init convention, and the test harness legitimately
@@ -80,6 +81,7 @@ local function reasoned_group_current(receipt, seen)
 end
 
 local utf8_length = require("compat.utf8").len
+local LabelValue = require("locale.label_value")
 
 -- Literal command decoration does not interpret percent bytes or native data.
 local function command_literal_prefix(item)
@@ -491,6 +493,55 @@ function M.new(deps)
 			return nil
 		end
 		return { title = i18n.get(item.i18n) .. " — " .. reason_head(i18n.get(item.reason_key)), disabled = true }
+	end
+
+	--- Whether a menu's enable row reads off. An unanswered state is not "off":
+	--- the row reports its drift where it is drawn, and the menu stays as built.
+	--- @param manifest_key string Menu definition key.
+	--- @param item table The enable row: a `toggle`, or a `choice` with its off value.
+	--- @param getters table Native state readers.
+	--- @return boolean
+	local function enable_row_reads_off(manifest_key, item, getters)
+		if item.type == "toggle" then
+			for _, key in ipairs(item.checked_when or {}) do
+				if type(getters[key]) ~= "function" then return false end
+			end
+			return R.resolve_checked_when(manifest_key, item.id, getters) ~= true
+		end
+		return type(getters[item.path]) == "function" and getters[item.path]() == item.submenu_off_value
+	end
+
+	--- What the category-off rule does to the rows one manifest entry draws.
+	--- @param item table Manifest entry.
+	--- @return string role "live" stays clickable; "unreasoned" may already be
+	---   grey for another cause and still owes the reason; "plain" owes it unless
+	---   already grey, as a caption or a row naming its own reason is.
+	local function off_rule_role(item)
+		if item.submenu_off_reason_key ~= nil or item.readable_when_off == true then return "live" end
+		if item.disabled_when ~= nil and item.disabled_reason_key == nil and is_for_platform(item) then
+			return "unreasoned"
+		end
+		return "plain"
+	end
+
+	--- Greys a finished category submenu whose enable row reads off: one rule,
+	--- declared on that row in the manifest, so no driver restates it.
+	--- @param rows table Finished rows.
+	--- @param roles table Finished row -> off_rule_role.
+	--- @param reason_key string Locale key of the shared reason.
+	local function apply_category_off(rows, roles, reason_key)
+		local suffix = " — " .. reason_head(i18n.get(reason_key))
+		for _, row in ipairs(rows) do
+			local role = roles[row]
+			if row.title ~= "-" and role ~= "live" then
+				if (not row.disabled or role == "unreasoned") and type(row.title) == "string" then
+					row.title = row.title .. suffix
+				end
+				row.disabled = true
+				row.fn = nil
+				row.menu = nil
+			end
+		end
 	end
 
 
@@ -945,11 +996,16 @@ function M.new(deps)
 				end
 			end
 		end
-		local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
+		local title = i18n.get(i18n_key)
 		-- Caption interpolation is declared alongside the shared choice, so
 		-- native consumers provide no competing mode-label policy.
 		if item.show_current_choice == true then
-			title = title:gsub(item.current_choice_placeholder or "{1}", function() return current_label or tostring(current or "") end)
+			local shown = current_label or tostring(current or "")
+			if item.current_choice_label_value == true then
+				title = LabelValue.compose(i18n.get, title, shown)
+			else
+				title = title:gsub(item.current_choice_placeholder or "{1}", function() return shown end)
+			end
 		end
 		local disabled = R.resolve_disabled_when(manifest_key, row_id, getters)
 		-- A greyed choice that declares why (`disabled_reason_key`) opens nothing
@@ -1530,7 +1586,8 @@ function M.new(deps)
 		end
 		for _, item in ipairs(declaration) do
 			if type(item) ~= "table" then return nil end
-			local label = item.type == "label" and type(item.i18n) == "string" and item.i18n ~= ""
+			local label = (item.type == "label" or item.type == "section_header")
+				and type(item.i18n) == "string" and item.i18n ~= ""
 			if item.type ~= "---" and not label then return nil end
 			for field in pairs(item) do
 				if field ~= "type" and not (label and field == "i18n") then return nil end
@@ -1569,8 +1626,8 @@ function M.new(deps)
 	---
 	--- ``manifest_key``      — key in menu_manifest.json (e.g. ``"shortcuts_menu"``)
 	--- ``category``          — human-readable category name for debug logs
-	--- ``dynamic_handlers``  — table of id → function(items, ctx) for ``action`` and
-	---   ``dynamic`` entries. Each handler appends its items to the list in place.
+	--- ``action_handlers``   — table of id → function(items, ctx) for ``action``
+	---   entries. Each handler appends its items to the list in place.
 	--- ``group_builders``    — optional table of group_id → function(ctx) → table|nil
 	---   for ``group`` entries. Returns ``{title, menu}``, a raw items list, or nil.
 	--- ``list_providers``    — optional table of list_id → function(ctx) → rows for
@@ -1582,13 +1639,13 @@ function M.new(deps)
 	--- ``ctx``               — menu context passed through to handlers.
 	--- @param manifest_key string
 	--- @param category string
-	--- @param dynamic_handlers table
+	--- @param action_handlers table|nil
 	--- @param group_builders table|nil
 	--- @param ctx table
 	--- @param list_providers table|nil
 	--- @return table
-	function R.build(manifest_key, category, dynamic_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
-		dynamic_handlers = dynamic_handlers or {}
+	function R.build(manifest_key, category, action_handlers, group_builders, ctx, list_providers)  -- luacheck: ignore 212
+		action_handlers  = action_handlers or {}
 		group_builders   = group_builders or {}
 		list_providers   = list_providers or {}
 		local menu_def    = get_menu_def(manifest_key)
@@ -1610,7 +1667,24 @@ function M.new(deps)
 		local commands = (type(ctx) == "table" and type(ctx.commands) == "table") and ctx.commands or {}
 		local getters  = (type(ctx) == "table" and type(ctx.state_getters) == "table") and ctx.state_getters or {}
 
+		-- The rows each entry draws are read off `result` when the next entry
+		-- starts: the branches below leave through `goto continue`, whose label
+		-- must stay last in its block.
+		local roles, settled, previous, off_reason_key = {}, 0, nil, nil
+		local function settle_previous_item()
+			if previous == nil then return end
+			if #result > settled and previous.submenu_off_reason_key ~= nil
+				and enable_row_reads_off(manifest_key, previous, getters) then
+				off_reason_key = previous.submenu_off_reason_key
+			end
+			local role = off_rule_role(previous)
+			for index = settled + 1, #result do roles[result[index]] = role end
+			settled = #result
+		end
+
 		for _, item in ipairs(menu_def) do
+			settle_previous_item()
+			previous = item
 			local prefix = command_literal_prefix(item)
 			if prefix == nil then
 				Logger.error(LOG, "Invalid literal command prefix in '%s' — row refused.", manifest_key)
@@ -1715,9 +1789,9 @@ function M.new(deps)
 
 			elseif t == "action" then
 				local action_id = type(item.id) == "string" and item.id or ""
-				if action_id ~= "" and type(dynamic_handlers[action_id]) == "function" then
+				if action_id ~= "" and type(action_handlers[action_id]) == "function" then
 					flush_sep()
-					local ok = call_isolated(manifest_key, action_id, dynamic_handlers[action_id], result, ctx)
+					local ok = call_isolated(manifest_key, action_id, action_handlers[action_id], result, ctx)
 					if ok then item_count = item_count + 1 end
 				else
 					-- A manifest entry with an id but no matching handler renders one
@@ -1872,7 +1946,7 @@ function M.new(deps)
 			elseif t == "list" then
 				local list_id = type(item.id) == "string" and item.id or ""
 				if list_id == "" or type(list_providers[list_id]) ~= "function" then
-					-- Same class of bug as the "action" and "dynamic" branches: an entry
+					-- Same class of bug as the "action" branch: an entry
 					-- whose provider is missing either belongs on this platform (and the
 					-- caller's list_providers table has a hole) or needs a `platforms`
 					-- restriction. Silence here is a menu section that vanishes.
@@ -1897,9 +1971,9 @@ function M.new(deps)
 				-- The declarative row: everything about it is in the manifest, and
 				-- the driver supplies only a NAMED behaviour.
 				--
-				-- WHY THIS TYPE EXISTS. Every other type that carries behaviour —
-				-- "action", "dynamic" — hands the manifest key to a driver function
-				-- that builds the row itself. That is why 639 rows lived outside this
+				-- WHY THIS TYPE EXISTS. The other types that carried behaviour —
+				-- "action", and "dynamic" until it was retired — hand the manifest key
+				-- to a driver function that builds the row itself. That is why 639 rows lived outside this
 				-- file: the manifest described the SLOT and three drivers each wrote
 				-- the row. And they wrote it differently — Linux appended " ✓" to the
 				-- title while its own tray adapter has supported a native GTK check
@@ -1928,27 +2002,17 @@ function M.new(deps)
 					item_count = item_count + 1
 				end
 
-			elseif t == "dynamic" then
-				local dyn_id = type(item.id) == "string" and item.id or ""
-				if dyn_id ~= "" and type(dynamic_handlers[dyn_id]) == "function" then
-					flush_sep()
-					local ok = call_isolated(manifest_key, dyn_id, dynamic_handlers[dyn_id], result, ctx)
-					if ok then item_count = item_count + 1 end
-				else
-					-- Same class of bug as the "action" branch above: a misclassified or
-					-- drifted id-bearing entry with no handler must never fail silently.
-					Logger.warn(LOG, "No 'dynamic' handler registered for id '%s' in '%s' — item skipped.",
-						tostring(dyn_id), manifest_key)
-				end
-
 			else
 				Logger.warn(LOG, "Unknown item type '%s' in '%s' — skipped.", tostring(t), manifest_key)
 			end
 
 			::continue::
 		end
+		settle_previous_item()
 
-		return normalize_separators(result)
+		local finished = normalize_separators(result)
+		if off_reason_key ~= nil then apply_category_off(finished, roles, off_reason_key) end
+		return finished
 	end
 
 

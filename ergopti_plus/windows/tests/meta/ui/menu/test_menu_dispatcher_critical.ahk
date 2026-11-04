@@ -30,10 +30,8 @@
 ; ===================================================
 ; ===================================================
 
-_MDC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_MDC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -44,7 +42,7 @@ _MDC_ReadSource(RelPath) {
 ; ===================================================
 
 _MDC_CriticalReleasedBeforeCallback() {
-	Src := _MDC_ReadSource("infra/menu_dispatcher.ahk")
+	Src := _MDC_ReadSource("menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; Verify Critical Off appears in the function body (released before Call).

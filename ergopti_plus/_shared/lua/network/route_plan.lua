@@ -75,6 +75,14 @@ local function valid_route(route)
 	return host:find("[^%w%._%-]") == nil
 end
 
+--- Whether a route is "direct" or a relay an environment-driven client can
+--- export (the proxy override setting accepts the same relays).
+--- @param route any
+--- @return boolean
+function M.valid_route(route)
+	return valid_route(route)
+end
+
 --- Builds a plan from the ordered lookups of one client's origins.
 --- @param entries table Array of { origin = "https://host", route = "direct"|relay }.
 --- @return table|nil plan, string|nil reason

@@ -82,7 +82,7 @@ _LFO_Exercise(State) {
 	global _Stub_LlmTooltipLoading, _Stub_LlmTooltipText
 	AssertFalse(A_IsSuspended)
 	AssertFalse(A_IsCritical)
-	State.FloorMs := LLM_ApiCommon_GetRateLimitMs("api") + 1
+	State.FloorMs := _LLM_Engine["min_request_interval_ms"] + 1
 	AssertTrue(State.FloorMs is Integer && State.FloorMs > 1 && State.FloorMs < 3000)
 	State.Timer := _LFO_AdmitB.Bind(State)
 	LLM_Engine_FirePrediction("Le premier message")

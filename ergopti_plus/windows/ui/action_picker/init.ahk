@@ -18,21 +18,19 @@ _ActionPickerNativeClose(Window, *) {
 }
 
 ShowKeyboardSlotPicker(Prefix) {
-		global GESTURE_ACTIONS
 		Slots := []
 		; The keys come from the input owner's published slot domain, so a slot
 		; the picker creates is always one the owner binds and the loader keeps.
 		for Key in KeyboardSlotDeclaration()["keys"] {
-				SlotId := Prefix . Key
-				if GESTURE_ACTIONS.Has(SlotId)
-						Slots.Push(SlotId)
+				Slots.Push(Prefix . Key)
 		}
 		if (Slots.Length = 0)
 				return
 		SlotLabels := []
 		for SlotId in Slots
-				SlotLabels.Push(_GestureActionLabel(SlotId))
-		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+				SlotLabels.Push(_FormatSlotLabel(SlotId))
+		; The group's modifiers by name, never its slot prefix (`primary_shift_`).
+		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . _KeyboardSlotFamilyLabel(Prefix) . " + …")
 		W.OnEvent("Close", _ActionPickerNativeClose)
 		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")
@@ -90,9 +88,10 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 						&& (!IsSet(ProgramActions_Available) || !IsSet(ProgramActions_BindingSupported)
 				|| !ProgramActions_Available() || !ProgramActions_BindingSupported(BindingId))
 						continue
+				; A ListBox cannot grey a row, so this fallback leaves it out.
 				if (Item.Type = "heading")
 						CurrentCat := Item.Text
-				else
+				else if !Item.HasOwnProp("Disabled")
 						_PushItem(Item.Id, Item.Label, CurrentCat)
 		}
 		BuildListRows(Items) {

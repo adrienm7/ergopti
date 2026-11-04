@@ -189,7 +189,8 @@ local function with_write_receipts(channel, refusal, body)
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
 	local previous_paths = package.loaded["infra.config_paths"]
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end }
+	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end,
+		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function() return 0 end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
 		flush = function() return true end }
@@ -303,7 +304,8 @@ local function with_repoint_receipts(case, body)
 	local previous_paths = package.loaded["infra.config_paths"]
 	local logger = { set_sink = function(callback) state.emit = callback end,
 		enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end }
+	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end,
+		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function()
 		if state.phase ~= "initial" and case.mode == "mkdir" then return false end
 		return 0
@@ -640,7 +642,8 @@ end)
 
 helpers.describe("logger sink — date rollover", function()
 	helpers.it("both handles are repointed when the date changes", function()
-		local src = read_file(DRIVER_ROOT .. "/infra/logger_sink.lua")
+		-- infra/logger_sink, selected by a declaration unique to it.
+		local src = helpers.read_driver_unit("local function retention_days(")
 		helpers.assert_not_nil(src, "logger_sink.lua must be readable")
 
 		-- open_handles() must assign BOTH handles; a rollover that only repoints
@@ -719,6 +722,7 @@ local function with_private_log_sink(options, body)
 	}
 	package.loaded["infra.config_paths"] = {
 		get_logs_dir = function() return "/home/PrivateUser/logs" end,
+		get_config_dir = function() return "/home/PrivateUser/.config/ergopti" end,
 		account_home = function()
 			state.home_resolutions = state.home_resolutions + 1
 			return options.resolved_home or DirectoryResolver.account_home()
@@ -779,6 +783,20 @@ helpers.describe("linux-logger-privacy", function()
 			state.emit("PrivateUser failed /home/CanonicalAccount/cache; password=secret12345", "error")
 			helpers.assert_eq(state.console, { "<user> failed ~/cache; password=<secret>" })
 			helpers.assert_eq(state.home_resolutions, 1, "Identity is captured once, not resolved on emission")
+		end)
+	end)
+
+	-- Item 139: every rule the collector applies at export is applied as the line
+	-- is written, so a log on disk never holds them in clear text.
+	helpers.it("linux-logger-privacy: an email, a URL credential and another account's folder are masked at write time", function()
+		with_private_log_sink({ resolved_home = "/home/CanonicalAccount" }, function(Sink, state, logger)
+			helpers.assert_eq(Sink.install(logger), true)
+			state.emit("Sent to someone@example.org via https://bob:hunter2pass@proxy.example:8080 from /home/OtherPerson/x", "warn")
+			local line = state.console[1]
+			helpers.assert_true(not line:find("someone@example.org", 1, true), line)
+			helpers.assert_true(not line:find("hunter2pass", 1, true), line)
+			helpers.assert_true(not line:find("OtherPerson", 1, true), line)
+			helpers.assert_contains(line, "<email>")
 		end)
 	end)
 
@@ -978,7 +996,17 @@ helpers.describe("linux-logger-topical-fan-out", function()
 			Logger.info("modules.llm.inference", "marker-llm")
 			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
 			Logger.info("sink_test", "marker-unrouted")
-			local keystats = read_file(dir .. "/ErgoptiPlus_keystats.log")
+			-- The keystats file name comes from the routing table, not a spelling here.
+			local keystats_file
+			for _, entry in ipairs(require("_generated.logger_sub_files")) do
+				for _, pattern in ipairs(entry.patterns) do
+					if keystats_file == nil and ("[modules.keystats.keystats]"):find(pattern, 1, true) then
+						keystats_file = entry.name
+					end
+				end
+			end
+			helpers.assert_not_nil(keystats_file, "a sub-file must route the keystats module")
+			local keystats = read_file(dir .. "/" .. keystats_file)
 			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
 			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
 			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
@@ -1030,7 +1058,7 @@ helpers.describe("linux-logger-topical-fan-out", function()
 	helpers.it("linux-logger-topical-fan-out: a refused topic handle is retired without silencing the main log", function()
 		with_sink("refuse", function(_, Logger, dir)
 			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_menu.log'")
-			Logger.info("ui.menu.menu_builder", "marker-menu-refused")
+			Logger.info("ui.menu.builder", "marker-menu-refused")
 			Logger.info("modules.llm.inference", "marker-llm-after")
 			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
 			helpers.assert_contains(main, "marker-menu-refused")

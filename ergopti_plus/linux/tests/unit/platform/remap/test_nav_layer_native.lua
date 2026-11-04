@@ -16,7 +16,7 @@ local ALT, KEY_J, KEY_T = 56, 36, 20
 local function engine(layer)
 	local instance = Engine.new({
 		keys = { left_alt = { hold_layer = "nav", tap_action = "none", time_activation_seconds = 0.2 } },
-		tap_min_ms = 50, one_shot_timeout_ms = 2000, nav_layer = layer,
+		tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000, nav_layer = layer,
 	})
 	instance:process(ALT, DOWN, 0)
 	return instance
@@ -92,7 +92,18 @@ helpers.describe("native navigation source capabilities", function()
 			return text
 		end,
 	})
-	for _, code in ipairs({ "WheelUp", "MouseLeft" }) do
+	helpers.it("binds a wheel direction under its own code, above every key (layer-wheel-linux)", function()
+		local result = Layers.load('[_meta]\nschema_version = 1\n[layers.nav.linux]\n"WheelUp" = "vol_up"\n',
+			"linux", ctx, Toml.decode)
+		helpers.assert_eq(result.ok, true)
+		local native = require("platform.remap.nav_layer").compile(result.layers.nav, ctx.registry)
+		local code = require("infra.input_event").wheel_layer_code("vertical", 1)
+		helpers.assert_eq(native[code].chords[1].keys[1], 115, "WheelUp is KEY_VOLUMEUP")
+		-- engine() holds the layer key: one notch is one volume-up press and release.
+		helpers.assert_eq(trail(engine(native):wheel("vertical", 1)), "115:1 115:0")
+		helpers.assert_eq(engine(native):wheel("vertical", -1), nil, "an unbound direction still scrolls")
+	end)
+	for _, code in ipairs({ "MouseLeft", "MouseMiddle" }) do
 		helpers.it("refuses observed pointer input " .. code .. " with a localized reason", function()
 			local text = '[_meta]\nschema_version = 1\n[layers.nav.linux]\n"' .. code .. '" = "none"\n'
 			local result = Layers.load(text, "linux", ctx, Toml.decode)

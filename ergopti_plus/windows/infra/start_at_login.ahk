@@ -8,6 +8,8 @@
 ; shortcuts. Windows' separate Startup Apps approval stays under user control.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\identifiers.ahk
+
 ; Source launch requires the interpreter and exactly one quoted script argument.
 StartupLaunchCommand(LocalSource, ScriptPath, InterpreterPath) {
 	if !(LocalSource is Integer) || (LocalSource != 0 && LocalSource != 1)
@@ -192,7 +194,7 @@ _StartupOtherSourceIdentity(Script, ReadFn := FSReadBounded) {
 	if !_StartupIsAbsolutePath(Script) || !FileExist(Script)
 		return false
 	SplitPath(Script, &Name, &Directory)
-	if !(Name == "ErgoptiPlus.ahk")
+	if !(Name == Identifiers.App.AHK)
 		return false
 	; A fixed upper bound is a parser input limit, never an execution capability.
 	Limit := 1048576

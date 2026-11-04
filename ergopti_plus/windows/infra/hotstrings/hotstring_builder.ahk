@@ -96,6 +96,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 				and options["PreviewValues"] is Array) {
 			Meta.PreviewValues := options["PreviewValues"].Clone()
 		}
+		_HSE_WithPreviewOutput(Meta, IsSet(options) ? options.Get("PreviewOutput", "") : "")
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
@@ -175,6 +176,18 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				Meta.group := Group
 		if IsSet(PersonalSource)
 				Meta.PersonalSource := PersonalFileDescriptorCopy(PersonalSource)
+		return Meta
+}
+
+; Carries the text an output with keys types, for the preview: the Replacement of
+; such an output is a Send string the bubble cannot show. An output of keys alone
+; types nothing, so it keeps no row.
+; @param Meta {Object} The dispatch metadata.
+; @param PreviewOutput {String} The typed text, "" when there is none.
+; @returns {Object} Meta.
+_HSE_WithPreviewOutput(Meta, PreviewOutput) {
+		if PreviewOutput != ""
+				Meta.PreviewOutput := PreviewOutput
 		return Meta
 }
 
@@ -273,14 +286,14 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; clipboard path which is slower than the direct event injection.
 				if IsSet(PrefixWatcherSuppress) {
 						if Fired
-								SetTimer((*) => PrefixWatcherSuppress(false), -60)
+								SetTimer((*) => PrefixWatcherSuppress(false), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 						else
 								PrefixWatcherSuppress(false)
 				}
 				; Release the synthetic flag on the same flush window — clearing it
 				; inline would let trailing replacement keystrokes look manual.
 				if Fired
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -60)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("hotstrings", "synthetic_clear_ms"))
 				else
 						KL_ClearSynthetic(SyntheticOwner)
 		}
@@ -346,6 +359,21 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds, NowTick 
 ; the engine in both directions. Bundled categories always short-circuit into the
 ; cache registrar, so only the two least-covered paths were affected.
 HSE_RegisterFromTomlFlags(IsCaseSensitive, Flags, Trigger, Output, Options) {
+		; A TOML output is the grammar of send_input_parameter.ahk, which every loader
+		; reaches through here: with no answer from them the factories default to
+		; OnlyText = true, and {Text} typed {Left} and {U+27C3} as characters. A caller
+		; that names OnlyText has already decided what its output is.
+		if (!Options.Has("OnlyText") and RegExMatch(Output, "[{`r`n`t]")) {
+				Parsed := SendInputParseOutput(Output)
+				if Parsed["has_keys"] {
+						Options := Options.Clone()
+						Options["OnlyText"] := false
+						Options["PreviewOutput"] := Parsed["text"]
+						Output := SendInputOutputPayload(Parsed)
+				} else {
+						Output := Parsed["text"]
+				}
+		}
 		if IsCaseSensitive {
 				CreateHotstring(Flags, Trigger, Output, Options)
 				return
@@ -374,6 +402,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				: _HSE_ResolveRegistrationPriority(Category, Section)
 
 		Rec := _HotstringRegistrar
+		PreviewOutput := IsSet(options) ? options.Get("PreviewOutput", "") : ""
 
 		; Order matters: nbsp abbreviations must trigger before bare punctuation
 		; so the engine can delete the preceding non-breaking space correctly.
@@ -416,6 +445,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset, true)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
+				_HSE_WithPreviewOutput(ConformMeta, PreviewOutput)
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
@@ -442,35 +472,37 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		; ``_HotstringDispatch`` skips the StrLen + SubStr work on every firing.
 		; Must be a fat-arrow lambda so it closes over the outer locals; nested
 		; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
-		RegisterVariant := (Abbr, Repl) => _RegisterHotstringFast(
+		RegisterVariant := (Abbr, Repl, Preview) => _RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags "C"), Abbr,
 				Rec ? (FlagsPortion Abbr) : "",
 				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, InStr(Flags, "*") > 0) : 0,
-				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
+				_HSE_WithPreviewOutput(_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
-				InStr(Flags, "*") > 0)
+				InStr(Flags, "*") > 0), Preview)
 		)
+		PreviewTitleCase := _HSE_ReplTitle(PreviewOutput)
+		PreviewUpperCase := StrUpper(PreviewOutput)
 
-		RegisterVariant(AbbreviationLowerCase, Replacement)
+		RegisterVariant(AbbreviationLowerCase, Replacement, PreviewOutput)
 
 		; When an abbreviation is only one character, titlecase = uppercase
 		if StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1 {
-				RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
+				RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase, PreviewTitleCase)
 				return
 		}
 
 		if (StrLen(Abbreviation) >= 2) {
 				for _, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
-						RegisterVariant(variant, ReplacementUpperCase)
+						RegisterVariant(variant, ReplacementUpperCase, PreviewUpperCase)
 				}
 
 				; Titlecase: first letter uppercase, rest lowercase
 				if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
-						RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
+						RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase, PreviewTitleCase)
 				} else if UppercasedSymbols.Has(FirstChar) {
 						for _, UppercasedSymbol in UppercasedSymbols[FirstChar] {
-								RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase)
+								RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase, PreviewTitleCase)
 						}
 				}
 		}

@@ -46,18 +46,24 @@ _THKM_Capture(HeldNames, Fn) {
 }
 
 ; Fires KeyId's tap with ActionId configured, through the real dispatch gate.
+; A copy tap starts its clipboard check (constants.ahk 2.1); its timer is held
+; here, so no real Ctrl+C retry or notice reaches the desktop after the test.
 _THKM_FireTap(KeyId, ActionId, HeldNames) {
-	global TapHold, _TH_TapHoldTrackState
+	global TapHold, _TH_TapHoldTrackState, _TapCopyTimerFn
 	PreviousTapHold := TapHold
+	PreviousCopyTimer := _TapCopyTimerFn
 	TapHold := Map("keys", Map(KeyId, Map(
 		"tap_action", ActionId,
 		"time_activation_seconds", 0.2)), "layers", Map())
 	_TH_TapHoldTrackState := Map()
+	_TapCopyTimerFn := (*) => 0
 	try {
 		return _THKM_Capture(HeldNames, () => _TapHoldFireAction(KeyId))
 	} finally {
 		TapHold := PreviousTapHold
 		_TH_TapHoldTrackState := Map()
+		_TapCopyTimerFn := PreviousCopyTimer
+		TapCopyCheckStop()
 	}
 }
 

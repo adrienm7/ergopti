@@ -24,10 +24,12 @@ end
 --- Attaches the tracker, then delivers focus changes through its real callback.
 --- @param remove_error string|nil Error raised when removing the first element's watcher.
 --- @param add_error string|nil Error raised when watching the second element.
---- @return table result { rendered, removed }
+--- @return table result { rendered, removed, counts, second_askable }
 local function focus_through(remove_error, add_error)
 	package.loaded["modules.keystats.context_tracker"] = nil
+	package.loaded["adapters.accessibility_permission"] = nil
 	local first, second, third = element("first"), element("second"), element("third")
+	second.pid = function() return 449 end
 	local removed = {}
 	local handler = nil
 	local observer = {}
@@ -61,6 +63,7 @@ local function focus_through(remove_error, add_error)
 	}, function() return false end))
 	helpers.assert_eq(tracker.update_ax_observer(4242), true)
 	assert(handler, "the observer callback must be installed")
+	local permission = require("adapters.accessibility_permission")
 	local lines = {}
 	local Logger = require("infra.logger")
 	helpers.admit_logger_privacy(Logger)
@@ -72,7 +75,8 @@ local function focus_through(remove_error, add_error)
 	end)
 	Logger.set_sink(nil)
 	if not ok then error(err, 0) end
-	return { rendered = table.concat(lines, "\n"), removed = removed }
+	return { rendered = table.concat(lines, "\n"), removed = removed, counts = tracker.ax_value_watch_counts(),
+		second_askable = permission.is_askable(449) }
 end
 
 helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead-element)", function()
@@ -95,6 +99,16 @@ helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead
 		helpers.assert_eq(result.removed, { "first" }, "a refused watcher is not retained")
 	end)
 
+	-- Field run 2026-11-03: the watch of loginwindow's element waited the
+	-- timeout out, then the post-wake focused-window read of it held the main
+	-- thread 1005 ms because nothing had started its unanswered cooldown.
+	helpers.it("puts the application of an unanswered watch in the cooldown", function()
+		local unanswered = focus_through(nil, "context_tracker.lua:649: Messaging failed\nstack traceback:\n\t[C]: in method 'addWatcher'")
+		helpers.assert_eq(unanswered.second_askable, false, "the next readers must skip the application")
+		local unwatchable = focus_through(nil, "context_tracker.lua:631: Illegal argument\nstack traceback:\n\t[C]: in method 'addWatcher'")
+		helpers.assert_eq(unwatchable.second_askable, true, "an unwatchable element proves no unanswered application")
+	end)
+
 	helpers.it("releases a previous element whose application stopped answering (ax-messaging-failed-removal)", function()
 		local result = focus_through("context_tracker.lua:649: Messaging failed\nstack traceback:\n\t[C]: in method 'removeWatcher'")
 		helpers.assert_true(result.rendered:find("[ERROR]", 1, true) == nil, result.rendered)
@@ -102,9 +116,22 @@ helpers.describe("context tracker: dead or unwatchable focused elements (ax-dead
 			"the unanswered element is not retried on every later focus change")
 	end)
 
+	-- 2026-10-31 14:09: a watcher left on an element whose removal went
+	-- unanswered made the next focus on that element an ERROR with a traceback
+	-- (ax-already-registered).
+	helpers.it("commits the watch of an element this observer already watches (ax-already-registered)", function()
+		local result = focus_through(nil, "context_tracker.lua:655: Notification has already been registered\nstack traceback:\n\t[C]: in field '?'")
+		helpers.assert_true(result.rendered:find("[ERROR]", 1, true) == nil, result.rendered)
+		helpers.assert_eq(result.removed, { "first", "second" },
+			"the already-watched element is owned, so the next focus removes its watcher")
+		helpers.assert_eq(result.counts, { already_watched = 1, failed = 0 },
+			"the field run reads this boot's already-registered commits (ax-watch-since-boot)")
+	end)
+
 	helpers.it("keeps any other watcher failure an ERROR", function()
 		local result = focus_through(nil, "context_tracker.lua:631: observer refused the watcher")
 		helpers.assert_contains(result.rendered, "[ERROR]")
+		helpers.assert_eq(result.counts.failed, 1, "the field run fails this boot on it (ax-watch-since-boot)")
 		helpers.assert_contains(result.rendered, "Replacement AXValueChanged watcher setup failed")
 	end)
 end)

@@ -14,7 +14,8 @@
 ---   5. the remote-API backend and its "Test" probe, pointed at Ollama's own
 ---      OpenAI-compatible endpoint, which speaks the dialect Cerebras does.
 ---
---- Usage (from the driver root, with lua-luv installed and Ollama serving):
+--- Usage (from the driver root, with lua-luv installed and Ergopti's own Ollama
+--- serving on llm_ollama_owned_port; a user's Ollama on the stock port is never used):
 ---   luajit tests/hardware/run_ollama_live.lua <model-tag>
 --- Exit 0 = all five verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
@@ -205,7 +206,7 @@ print("=== 5/ the remote-API backend on Ollama's OpenAI endpoint ===")
 local Remote = require("modules.llm.api_remote")
 local entry = {
 	id = "ollama-openai", provider = "openai_compat", label = "Ollama (OpenAI)",
-	token = "ollama", model = MODEL, base_url = "http://127.0.0.1:11434/v1",
+	token = "ollama", model = MODEL, base_url = Profiles.get_base_url() .. "/v1",
 }
 local tested = nil
 Remote.test(entry, function(succeeded, detail, elapsed_ms)

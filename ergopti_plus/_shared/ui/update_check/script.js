@@ -27,7 +27,7 @@
  *    body, owner, repo), the changelog section shows in place through the pane
  *    renderer the Windows update prompt uses. A clicked repository link posts
  *    open_url with the URL only; the host checks it against the repository again.
- *    A host that seeds no notes (Windows today) shows no pane.
+ *    A state without notes shows no pane.
  * ==============================================================================
  */
 

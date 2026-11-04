@@ -3,8 +3,9 @@
 ; ==============================================================================
 ; MODULE: Gesture Menu Boundary and Availability
 ; DESCRIPTION:
-; The gestures menu materializes its shared tap boundary, consumes the
-; current declared order and refuses an effect-bearing boundary. Each slot row
+; The gestures menu groups its slots under one declared header per finger
+; count, consumes the current declared order and refuses an effect-bearing
+; boundary. Each slot row
 ; is greyed out, with its reason in the label, unless the Windows touchpad
 ; settings send Ergopti's shortcut for it (assigned / not assigned / key
 ; missing / unreadable). The retired status submenu stays absent, and the
@@ -37,7 +38,7 @@ _GSS_FullReader() {
 	return (Name) => Values.Get(Name, "")
 }
 
-; The independent three-slot vector crosses the original tap_4 boundary once.
+; The independent three-slot vector mixes the two finger counts out of order.
 _GTB_WithSlots(Callback) {
 	global GESTURE_SLOTS, GestureAssignments, Features
 	PreviousSlots := GESTURE_SLOTS, PreviousAssignments := GestureAssignments, PreviousFeatures := Features
@@ -57,43 +58,79 @@ _GTB_Owner() {
 	return Owner
 }
 
-_GTB_AssertSlotRows(Rows, ExpectedLength, TapPosition) {
+; The finger groups belong to macOS: a Windows handler for one is the drift the
+; renderer logs at every boot, for a row this driver can never draw.
+_GTB_NoHandlerForFilteredFingerGroups() {
+	Build := _DriverFuncBody("BuildGesturesMenu")
+	Assert(Build != "", "the gestures menu builder is found")
+	for Id in ["gesture_slots_2", "gesture_slots_3", "gesture_slots_4", "gesture_slots_5"]
+		AssertEqual(0, InStr(Build, Id), Id . " has no Windows handler")
+}
+Test("gestures menu: no handler for a row the platform filter drops (gesture-slots-drift)",
+	_GTB_NoHandlerForFilteredFingerGroups)
+
+; Each slot row at its position: the slot name leads, its picker is the action.
+_GTB_AssertSlotRows(Rows, ExpectedLength, Positions) {
 	Assert(Rows is Array)
 	AssertEqual(ExpectedLength, Rows.Length)
-	for Pair in [[1, "swipe_3_up"], [TapPosition, "tap_4"], [TapPosition + 1, "tap_3"]] {
+	for Pair in Positions {
 		Row := Rows[Pair[1]]
-		AssertTrue(InStr(Row["label"], t("gesture.slots." . Pair[2]) . " : ") == 1)
+		AssertTrue(InStr(Row["label"], LabelValue(t("gesture.slots." . Pair[2]), "")) == 1, Pair[2] . " at " . Pair[1])
 		Assert(Row["action"] is Func, "the existing slot action remains its native callback")
 		AssertFalse(Row["disabled"])
 	}
 }
 
-_GTB_DeclaredBoundary() {
-	_GTB_WithSlots(() => _GTB_DeclaredBoundaryInner())
+; A finger-count header row: the shared section frame around its title, inert.
+_GTB_AssertHeader(Row, Fingers) {
+	AssertEqual(MenuSectionTitle(t("menu.gestures.header_fingers_" . Fingers)), Row["label"])
+	AssertTrue(Row["disabled"])
+	AssertFalse(Row.Has("action"), "a section header has no click owner")
 }
-_GTB_DeclaredBoundaryInner() {
+
+; The declared templates of the Windows list: a bare boundary and one header
+; per finger count the Precision Touchpad reports (three and four).
+_GTB_ValidStatus() {
+	return Map("finger_group_boundary", [Map("type", "---")],
+		"fingers_3", [Map("type", "section_header", "i18n", "menu.gestures.header_fingers_3")],
+		"fingers_4", [Map("type", "section_header", "i18n", "menu.gestures.header_fingers_4")])
+}
+
+_GTB_DeclaredGroups() {
+	_GTB_WithSlots(() => _GTB_DeclaredGroupsInner())
+}
+_GTB_DeclaredGroupsInner() {
 	Owner := _GTB_Owner()
-	Assert(Owner.Get("status_rows", false) is Map)
-	Boundary := Owner["status_rows"]["tap_group_boundary"]
-	Assert(Boundary is Array)
-	AssertEqual(1, Boundary.Length)
-	AssertEqual(1, Boundary[1].Count)
-	AssertEqual("---", Boundary[1]["type"])
+	Status := Owner.Get("status_rows", false)
+	Assert(Status is Map)
+	for Name, Expected in _GTB_ValidStatus() {
+		Assert(Status.Has(Name), "the list declares " . Name)
+		AssertEqual(1, Status[Name].Length)
+		for Field, Value in Expected[1]
+			AssertEqual(Value, Status[Name][1][Field], Name . "." . Field)
+		AssertEqual(Expected[1].Count, Status[Name][1].Count, Name . " carries no other field")
+	}
+	; swipe_3_up, tap_4, tap_3 are grouped: three fingers first, in slot order.
 	Rows := _GES_SlotRows(_GSS_FullReader())
-	_GTB_AssertSlotRows(Rows, 4, 3)
-	AssertTrue(Rows[2]["separator"])
-	AssertFalse(Rows[2].Has("action"), "a fixed separator has no click owner")
+	_GTB_AssertSlotRows(Rows, 6, [[2, "swipe_3_up"], [3, "tap_3"], [6, "tap_4"]])
+	_GTB_AssertHeader(Rows[1], 3)
+	AssertTrue(Rows[4]["separator"])
+	AssertFalse(Rows[4].Has("action"), "a fixed separator has no click owner")
+	_GTB_AssertHeader(Rows[5], 4)
 	Native := Menu()
 	try {
-		AssertEqual(3, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
-		AssertEqual(4, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
-		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+		AssertEqual(5, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
+		AssertEqual(6, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 3, "UInt", 0x400, "UInt")
 		Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual separator position")
-		AssertTrue((Flags & 0x800) != 0, "the actual Win32 item between swipe and tap is a separator")
-		AssertEqual(Rows[3]["label"], _CTC_LabelAt(Native, 2), "tap_4 follows the actual separator")
+		AssertTrue((Flags & 0x800) != 0, "the actual Win32 item between the two groups is a separator")
+		AssertEqual(Rows[5]["label"], _CTC_LabelAt(Native, 4), "the four-finger header follows the separator")
+		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 0, "UInt", 0x400, "UInt")
+		AssertTrue((Flags & 3) != 0, "the three-finger header is actually disabled")
 	} finally _CTC_ReleaseMenu(Native)
 }
-Test("Gestures menu: the actual flat provider materializes its shared tap boundary", _GTB_DeclaredBoundary)
+Test("Gestures menu: the provider groups its slots under one header per finger count (gesture-finger-headers)",
+	_GTB_DeclaredGroups)
 
 _GTB_PublishedBoundary() {
 	_GTB_WithSlots(() => _GTB_PublishedBoundaryInner())
@@ -101,26 +138,27 @@ _GTB_PublishedBoundary() {
 _GTB_PublishedBoundaryInner() {
 	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
 	try {
-		Owner["status_rows"] := Map("tap_group_boundary", [
-			Map("type", "label", "i18n", "common.restore_recommended"), Map("type", "---")])
+		Status := _GTB_ValidStatus()
+		Status["finger_group_boundary"] := [Map("type", "label", "i18n", "common.restore_recommended"), Map("type", "---")]
+		Owner["status_rows"] := Status
 		Rows := _GES_SlotRows(_GSS_FullReader())
-		_GTB_AssertSlotRows(Rows, 5, 4)
-		AssertEqual(t("common.restore_recommended"), Rows[2]["label"])
-		AssertTrue(Rows[2]["disabled"])
-		AssertFalse(Rows[2].Has("action"))
-		AssertTrue(Rows[3]["separator"])
-		AssertFalse(Rows[3].Has("action"))
-		Owner["status_rows"]["tap_group_boundary"][1]["i18n"] := "common.clear_to_system"
-		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "held materialized data is detached from later source mutation")
-		AssertEqual(t("common.clear_to_system"), _GES_SlotRows(_GSS_FullReader())[2]["label"], "a fresh native provider consumes current shared source")
+		_GTB_AssertSlotRows(Rows, 7, [[2, "swipe_3_up"], [3, "tap_3"], [7, "tap_4"]])
+		AssertEqual(t("common.restore_recommended"), Rows[4]["label"])
+		AssertTrue(Rows[4]["disabled"])
+		AssertFalse(Rows[4].Has("action"))
+		AssertTrue(Rows[5]["separator"])
+		AssertFalse(Rows[5].Has("action"))
+		Owner["status_rows"]["finger_group_boundary"][1]["i18n"] := "common.clear_to_system"
+		AssertEqual(t("common.restore_recommended"), Rows[4]["label"], "held materialized data is detached from later source mutation")
+		AssertEqual(t("common.clear_to_system"), _GES_SlotRows(_GSS_FullReader())[4]["label"], "a fresh native provider consumes current shared source")
 		Owner.Delete("status_rows")
 		AssertEqual(0, _GES_SlotRows(_GSS_FullReader()).Length, "a missing required boundary refuses a rebuilt provider")
 		Native := Menu()
 		try {
-			AssertEqual(4, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts the inert label and slots")
-			AssertEqual(5, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
-			AssertEqual(t("common.restore_recommended"), _CTC_LabelAt(Native, 1))
-			Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+			AssertEqual(6, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts the headers, the inert label and slots")
+			AssertEqual(7, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+			AssertEqual(t("common.restore_recommended"), _CTC_LabelAt(Native, 3))
+			Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 3, "UInt", 0x400, "UInt")
 			Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual held-label position")
 			AssertTrue((Flags & 3) != 0, "the held inert label remains actually disabled")
 		} finally _CTC_ReleaseMenu(Native)
@@ -140,11 +178,23 @@ _GTB_RefusedBoundaryInner() {
 	global GESTURE_SLOTS, GestureAssignments, Features
 	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
 	Assignments := GestureAssignments, FeatureOwner := Features
+	Invalids := [false, Map()]
+	for Name, Bad in Map("finger_group_boundary", [], "fingers_4", false) {
+		Status := _GTB_ValidStatus()
+		if Bad is Array
+			Status[Name] := Bad
+		else
+			Status.Delete(Name)
+		Invalids.Push(Status)
+	}
+	for Bad in [[Map("type", "command", "id", "foreign_action")], [Map("type", "---", "action", (*) => true)],
+		[Map("type", "label", "i18n", "common.restore_recommended", "checked_when", ["foreign_state"])]] {
+		Status := _GTB_ValidStatus()
+		Status["finger_group_boundary"] := Bad
+		Invalids.Push(Status)
+	}
 	try {
-		for Invalid in [false, Map(), Map("tap_group_boundary", []),
-			Map("tap_group_boundary", [Map("type", "command", "id", "foreign_action")]),
-			Map("tap_group_boundary", [Map("type", "---", "action", (*) => true)]),
-			Map("tap_group_boundary", [Map("type", "label", "i18n", "common.restore_recommended", "checked_when", ["foreign_state"])])] {
+		for Invalid in Invalids {
 			Owner["status_rows"] := Invalid
 			AssertEqual(0, _GES_SlotRows(_GSS_FullReader()).Length, "missing, empty or effect-bearing status cannot publish a partial slot list")
 			AssertTrue(GestureAssignments == Assignments)
@@ -152,12 +202,13 @@ _GTB_RefusedBoundaryInner() {
 			AssertTrue(Features == FeatureOwner)
 			AssertTrue(Features["gestures"]["enabled"])
 		}
-		Owner.Delete("status_rows")
+		Owner["status_rows"] := _GTB_ValidStatus()
 		GESTURE_SLOTS := ["swipe_3_up", "tap_3"]
 		Rows := _GES_SlotRows(_GSS_FullReader())
-		AssertEqual(2, Rows.Length, "an absent tap_4 needs no boundary or invented separator")
-		AssertFalse(Rows[1].Get("separator", false))
-		AssertFalse(Rows[2].Get("separator", false))
+		AssertEqual(3, Rows.Length, "one group needs its header and no boundary or invented separator")
+		_GTB_AssertHeader(Rows[1], 3)
+		for Row in Rows
+			AssertFalse(Row.Get("separator", false))
 	} finally {
 		if HadStatus
 			Owner["status_rows"] := Previous
@@ -238,13 +289,14 @@ _GSS_RowsFollowAvailabilityInner() {
 	Lost := GESTURE_REG_ACTIONS["tap_4"]
 	Rows := _GES_SlotRows((Name) => Name == Lost ? "" : Full.Call(Name))
 	Reason := t("gestures.system.slot_unavailable")
-	AssertEqual(4, Rows.Length)
-	AssertFalse(Rows[1]["disabled"], "swipe_3_up is assigned")
-	AssertFalse(InStr(Rows[1]["label"], Reason), "an available row carries no reason")
-	AssertTrue(Rows[3]["disabled"], "tap_4 is not assigned")
-	AssertTrue(SubStr(Rows[3]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
-	AssertTrue(InStr(Rows[3]["label"], t("gesture.slots.tap_4") . " : ") == 1, "the slot name still leads")
-	AssertFalse(Rows[4]["disabled"], "tap_3 is assigned")
+	; Three-finger header, swipe_3_up, tap_3, separator, four-finger header, tap_4.
+	AssertEqual(6, Rows.Length)
+	AssertFalse(Rows[2]["disabled"], "swipe_3_up is assigned")
+	AssertFalse(InStr(Rows[2]["label"], Reason), "an available row carries no reason")
+	AssertTrue(Rows[6]["disabled"], "tap_4 is not assigned")
+	AssertTrue(SubStr(Rows[6]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
+	AssertTrue(InStr(Rows[6]["label"], LabelValue(t("gesture.slots.tap_4"), "")) == 1, "the slot name still leads")
+	AssertFalse(Rows[3]["disabled"], "tap_3 is assigned")
 	; Nothing assigned and an unreadable registry grey every row.
 	for Reader in [(Name) => "", TestGestures_RefuseSystemRead] {
 		Greyed := _GES_SlotRows(Reader)
@@ -253,7 +305,7 @@ _GSS_RowsFollowAvailabilityInner() {
 				AssertTrue(Row["disabled"], "no slot is usable without an assignment: " . Row["label"])
 		}
 	}
-	AssertTrue(InStr(_GES_SlotRows(TestGestures_RefuseSystemRead)[1]["label"], t("gestures.system.slot_unverified")),
+	AssertTrue(InStr(_GES_SlotRows(TestGestures_RefuseSystemRead)[2]["label"], t("gestures.system.slot_unverified")),
 		"an unreadable registry says so in the row")
 }
 Test("Gestures availability: slot rows are greyed with their reason and re-read at every build", _GSS_RowsFollowAvailability)
@@ -329,8 +381,10 @@ _GSS_InfoOpensTheWindowsReason() {
 	for Item in _MR_GetMenuDef("gestures_menu")
 		if _MR_IsForAhk(Item)
 			AssertTrue(Item.Get("type", "") != "label", "the Gestures menu shows no explanation row")
-	AssertContains(_DriverFuncBody("BuildGesturesMenu"),
-		'MenuCommand.GESTURE_RECOMMENDED_INFO, (*) => GestureShowRecommendedInfo()',
+	AssertContains(_DriverFuncBody("BuildGesturesMenu"), "_GES_MenuCommands(",
+		"the Gestures menu registers its commands from one table")
+	AssertContains(_DriverFuncBody("_GES_MenuCommands"),
+		"MenuStartupUiCommand((*) => GestureShowRecommendedInfo(), MenuStartupDiagnosticsReady)",
 		"the Infos row opens the explanation dialog")
 	InfoShown := []
 	try {
@@ -348,14 +402,77 @@ _GSS_InfoOpensTheWindowsReason() {
 }
 Test("Gestures menu: Infos opens the Windows reason in a message box", _GSS_InfoOpensTheWindowsReason)
 
+; « Infos… » took about five seconds after a reload: the click was retained
+; like a state-changing command until input initialization completed
+; ("Retained startup selection runs after 5265 ms" in the maintainer's log).
+; It is now a startup UI command, so it opens while input is still pending,
+; and its handler reads no registry and rebuilds nothing.
+_GSS_InfoOpensAtOnce(Owner, State) {
+	global _DriverUiCleanupReady, _DriverMenuReady
+	SavedCleanup := IsSet(_DriverUiCleanupReady) ? _DriverUiCleanupReady : unset
+	SavedMenu := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	Shown := []
+	try {
+		; The configured tray is published, input registration is not done yet.
+		_DriverUiCleanupReady := true, _DriverMenuReady := true
+		Command := _GES_MenuCommands(Map())["gesture_recommended_info"]
+		AssertTrue(Command is MenuStartupUiCommand, "Infos is a startup UI command")
+		TestMsgBoxResponder((Text, *) => (Shown.Push(Text), "OK"))
+		MenuCommandRun(Command, [])
+		AssertEqual(1, Shown.Length, "the dialog opens before input initialization completes")
+		AssertEqual(0, Owner.Pending.Length, "the click is not retained")
+		AssertEqual(t("menu.gestures.recommended_reason_windows"), Shown[1])
+	} finally {
+		TestMsgBoxResponder("")
+		_DriverUiCleanupReady := IsSet(SavedCleanup) ? SavedCleanup : unset
+		_DriverMenuReady := IsSet(SavedMenu) ? SavedMenu : unset
+	}
+	Body := _DriverFuncBody("GestureShowRecommendedInfo")
+	Assert(Body != "", "the Infos handler must exist")
+	for _, Slow in ["GestureSystemRefresh", "GestureSystemReadSnapshot", "RegRead", "RebuildTrayMenu",
+			"GestureSystemRequestRefresh", "MenuRenderer_Build"]
+		AssertEqual(0, InStr(Body, Slow), "Infos does no slow work before its dialog: " . Slow)
+}
+Test("Gestures menu: Infos opens at once, even right after a reload (gesture-info-instant)",
+	(*) => _MSC_WithOwner(_GSS_InfoOpensAtOnce))
+
 ; Whoever rewrites the registry asks for a re-read, so the greying follows it.
+; The touchpad restore is part of the Gestures and global clears, which reload
+; the driver: the successor's first build reads the registry again, and a
+; refused clear is caught by the open-time check below.
 _GSS_RegistryWritersRequestRefresh() {
-	for Name in ["GestureAutoConfigureRegistry", "TouchpadRegistryRestoreFromMenu"]
+	for Name in ["GestureAutoConfigureRegistry"]
 		AssertContains(_DriverFuncBody(Name), "GestureSystemRequestRefresh(",
 			Name . " must refresh the availability after changing the registry")
+	for Name in ["_GES_ApplyScope", "ConfigGlobalScopeApply"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist")
+		ClearAt := InStr(Body, "TouchpadRegistryClearFromScope(")
+		AssertTrue(ClearAt > 0 && ClearAt < InStr(Body, "Receipt :="),
+			Name . " restores the touchpad before the commit that reloads the driver")
+	}
 	AssertContains(_DriverFuncBody("GestureSystemWatchMenu"), "OnMessage(0x117",
 		"the Gestures submenu is re-checked when it opens")
 	AssertContains(_DriverFuncBody("BuildGesturesMenu"), "GestureSystemWatchMenu(",
 		"the built Gestures submenu is the one watched")
 }
 Test("Gestures availability: registry rewrites and the menu open both re-evaluate it", _GSS_RegistryWritersRequestRefresh)
+
+; The notice is gone: boot removes what it stored and nothing else in the store.
+_GSS_RetiresTheDismissedEntries() {
+	Records := []
+	for Name in ["gesture_conflict_dismissed.swipe_3", "theme", "gesture_conflict_dismissed.tap_2",
+			"gesture_conflict_dismissed"]
+		Records.Push({ name: Name })
+	Deleted := []
+	Removed := GestureSystemRetireDismissals((*) => Records, (Key) => (Deleted.Push(Key), true))
+	AssertEqual(2, Removed)
+	AssertEqual(2, Deleted.Length)
+	AssertEqual("gesture_conflict_dismissed.swipe_3", Deleted[1])
+	AssertEqual("gesture_conflict_dismissed.tap_2", Deleted[2])
+	AssertEqual(0, GestureSystemRetireDismissals((*) => Records, (*) => false),
+		"a refused deletion is not counted and raises nothing")
+	Assert(InStr(FSReadUtf8Exact(A_ScriptDir . "\..\ErgoptiPlus.ahk"), "`nGestureSystemRetireDismissals()`n"),
+		"the boot runs the sweep")
+}
+Test("Gestures availability: boot removes the retired notice entries and nothing else", _GSS_RetiresTheDismissedEntries)

@@ -132,3 +132,149 @@ _KLQCat_ReaderRendersByName() {
 }
 Test("Keystats query catalogue: the manifest reader renders by name (keystats-query-catalogue)",
 	_KLQCat_ReaderRendersByName)
+
+; The same corpus the JS reference and both Lua renderers replay: byte-exact SQL.
+; JSON null is how the corpus spells a missing slot, which here is an absent key.
+_KLQCat_WriteVectorsRenderExactly() {
+	global _SharedDir
+	Vectors := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\keystats\write_query_vectors.json"))["vectors"]
+	Native := 0
+	Seen := Map()
+	for Vector in Vectors {
+		if (Vector["dialect"] != "native")
+			continue
+		Values := Map()
+		for Key, Value in Vector["values"]
+			if (Value !== JSON_NULL)
+				Values[Key] := Value
+		AssertEqual(Vector["sql"], KeystatsQuery(Vector["name"], Values), Vector["name"] . " vector " . A_Index)
+		Native += 1
+		Seen[Vector["name"]] := true
+	}
+	AssertTrue(Native > 0, "the corpus must hold native vectors")
+	for Name in ["meta.set", "meta.seed", "devices.upsert", "agg.app_day", "agg.burst", "agg.ngram", "agg.title_prune",
+			"agg.ngram_keycode", "agg.ngram_scancode", "agg.ngram_shortcut", "agg.system_day",
+			"events.app_switch", "events.session", "events.typing", "events.llm"]
+		AssertTrue(Seen.Has(Name), "the replay must reach " . Name)
+}
+Test("Keystats query catalogue: the write vectors render to the exact SQL (keystats-query-catalogue)",
+	_KLQCat_WriteVectorsRenderExactly)
+
+_KLQCat_SlotRefusals() {
+	Good := Map("key", "k", "value", "v")
+	AssertEqual("INSERT OR REPLACE INTO meta (key, value) VALUES ('k', 'v');", KeystatsQuery("meta.set", Good))
+	for Misuse in [Map("key", "k"), Map("key", "k", "value", 1), Map("key", "k", "value", "v", "extra", "x")] {
+		Refused := false
+		try KeystatsQuery("meta.set", Misuse)
+		catch ValueError
+			Refused := true
+		AssertTrue(Refused, "meta.set must refuse text-slot misuse " . A_Index)
+	}
+	Values := Map("device_id", "d", "id", 7, "ts", "t", "date", "x", "app", "a", "kind", "k", "trigger", "g", "replacement", "r")
+	Sql := KeystatsQuery("events.hotstring", Values)
+	AssertContains(Sql, "'r', NULL, NULL);", "both absent nullable slots are NULL")
+	Values["id"] := "not a number"
+	AssertThrows(() => KeystatsQuery("events.hotstring", Values), "a non-number in an integer slot")
+	Values["id"] := 1e308 * 10
+	AssertThrows(() => KeystatsQuery("events.hotstring", Values), "an infinity in an integer slot")
+	Values["id"] := "7"
+	AssertContains(KeystatsQuery("events.hotstring", Values), "VALUES ('d', 7, ", "a numeric string is a number")
+	Values["id"] := 7.9
+	AssertContains(KeystatsQuery("events.hotstring", Values), "VALUES ('d', 7, ", "an integer slot floors")
+}
+Test("Keystats query catalogue: a slot refuses a missing or mistyped value (keystats-query-catalogue)",
+	_KLQCat_SlotRefusals)
+
+; The batch families the walker emits, through the real SQLite DLL. Two flushes
+; must add up, and the columns the SQL rebuild owns must keep their value.
+_KLQCat_WalkerFamiliesAccumulate() {
+	db := SQLite_Open(":memory:")
+	AssertTrue(db != 0, "the walker fixture must open an in-memory DB")
+	try {
+		AssertTrue(KLR_LoadSchema(db), "the fixture uses the canonical production schema")
+		AssertTrue(SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, sleep_ms) "
+			. "VALUES ('dev','2026-10-01',9,70);"), "the rebuild-owned columns are seeded")
+		Loop 2 {
+			KLW_ResetBatch()
+			KLW.batch["kc_ngram"]["k"] := Map("date", "2026-10-01", "app", "it's", "keycode", 38, "count", 2)
+			KLW.batch["sc_kb_ngram"]["s"] := Map("date", "2026-10-01", "app", "it's", "scancode", 30, "count", 3)
+			KLW.batch["sc_ngram"]["ngram_shortcut_bigrams"] := Map("t", Map("date", "2026-10-01", "app", "it's",
+				"token", "Ctrl+C'V", "count", 4))
+			KLW.batch["system_day"]["d"] := Map("date", "2026-10-01", "space_switches", 1,
+				"audio_muted_ms", 2, "passive_count", 3, "night_wake_count", 5)
+			Sql := KLW_BuildBatchSql("dev")
+			AssertTrue(SQLite_Exec(db, Sql), "flush " . A_Index . " must be accepted by the schema")
+		}
+		_KLQCat_AssertOneRow(db, "SELECT app, keycode, c FROM ngram_keycodes", Map("app", "it's", "keycode", 38, "c", 4))
+		_KLQCat_AssertOneRow(db, "SELECT app, scancode, c FROM ngram_scancodes", Map("app", "it's", "scancode", 30, "c", 6))
+		_KLQCat_AssertOneRow(db, "SELECT token, c FROM ngram_shortcut_bigrams", Map("token", "Ctrl+C'V", "c", 8))
+		_KLQCat_AssertOneRow(db, "SELECT wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, passive_count, night_wake_count FROM agg_system_day",
+			Map("wifi_changes", 9, "space_switches", 2, "audio_muted_ms", 4, "locked_ms", 0, "sleep_ms", 70,
+				"passive_count", 6, "night_wake_count", 10))
+	} finally {
+		KLW_ResetBatch()
+		SQLite_Close(db)
+	}
+}
+Test("Keystats query catalogue: the walker's key, shortcut and system families add up (keystats-write-catalogue)",
+	_KLQCat_WalkerFamiliesAccumulate)
+
+; A journal number the row cannot hold used to reach a NOT NULL column as NULL,
+; and INSERT OR IGNORE then dropped the whole typing event without a word.
+_KLQCat_TypingAndLlmRows() {
+	db := SQLite_Open(":memory:")
+	AssertTrue(db != 0, "the event fixture must open an in-memory DB")
+	try {
+		AssertTrue(KLR_LoadSchema(db), "the fixture uses the canonical production schema")
+		AssertTrue(SQLite_Exec(db, KL_BuildInsertTyping(Map("timestamp", "2026-10-01 10:00:00.000", "app", "Code",
+			"app_category", "editor", "text", "it's", "events", [], "mouse_clicks", "lost", "is_fullscreen", 1,
+			"wpm", 61.25, "layout", ""), 1)), "the typing row must be accepted")
+		_KLQCat_AssertOneRow(db, "SELECT app_category, is_fullscreen, in_meeting, mouse_clicks, pause_before_ms, "
+			. "battery_level IS NULL AS no_battery, wpm, layout IS NULL AS no_layout, text FROM events_typing",
+			Map("app_category", "editor", "is_fullscreen", 1, "in_meeting", 0, "mouse_clicks", 0, "pause_before_ms", 0,
+				"no_battery", 1, "wpm", 61.25, "no_layout", 1, "text", "it's"))
+		AssertTrue(SQLite_Exec(db, KL_BuildInsertLlm(Map("timestamp", "2026-10-01 10:00:00.000", "prediction", "x'y",
+			"count", 3, "est_cost_usd", 0.00125), 2, "suggested")), "the LLM row must be accepted")
+		_KLQCat_AssertOneRow(db, "SELECT app, kind, prediction, predictions_json IS NULL AS no_predictions, "
+			. "all_predictions_json IS NULL AS no_all_predictions, count, "
+			. "deletes IS NULL AS no_deletes, est_cost_usd FROM events_llm",
+			Map("app", "Unknown", "kind", "suggested", "prediction", "x'y", "no_predictions", 1,
+				"no_all_predictions", 1, "count", 3, "no_deletes", 1, "est_cost_usd", 0.00125))
+	} finally {
+		SQLite_Close(db)
+	}
+}
+Test("Keystats query catalogue: typing and LLM events store their rows (keystats-write-catalogue)",
+	_KLQCat_TypingAndLlmRows)
+
+; The hotstring unit declaration is the driver's metadata writer: first value kept.
+_KLQCat_UnitDeclarationSeedsMeta() {
+	db := SQLite_Open(":memory:")
+	AssertTrue(db != 0, "the declaration fixture must open an in-memory DB")
+	try {
+		AssertTrue(KLR_LoadSchema(db), "the fixture uses the canonical production schema")
+		Key := KLHotstringUnits.Prefix . "it's"
+		AssertTrue(SQLite_Exec(db, "INSERT INTO meta (key, value) VALUES (" . SQLite_Q(Key) . ", 'kept');"), "an earlier value")
+		AssertTrue(SQLite_Exec(db, KLHotstringUnits.DeclarationSql("it's")), "the seed must not conflict")
+		_KLQCat_AssertOneRow(db, "SELECT value FROM meta WHERE key=" . SQLite_Q(Key), Map("value", "kept"))
+		AssertTrue(SQLite_Exec(db, KLHotstringUnits.DeclarationSql("other")), "a second device declares its own key")
+		_KLQCat_AssertOneRow(db, "SELECT value FROM meta WHERE key=" . SQLite_Q(KLHotstringUnits.Prefix . "other"),
+			Map("value", KLHotstringUnits.WindowsUnit))
+	} finally {
+		SQLite_Close(db)
+	}
+}
+Test("Keystats query catalogue: the hotstring unit declaration seeds metadata (keystats-write-catalogue)",
+	_KLQCat_UnitDeclarationSeedsMeta)
+
+_KLQCat_AssertOneRow(db, Sql, Expected) {
+	Rows := SQLite_Query(db, Sql . ";")
+	AssertEqual(1, Rows.Length, "exactly one row: " . Sql)
+	for Column, Value in Expected {
+		Got := Rows[1][Column]
+		if IsNumber(Value)
+			AssertEqual(Format("{:.6f}", Value), Format("{:.6f}", Got), Column . " of " . Sql)
+		else
+			AssertEqual(Value, Got, Column . " of " . Sql)
+	}
+}

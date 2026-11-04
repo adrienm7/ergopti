@@ -49,7 +49,7 @@ MagicKeyEditor(*) {
 		try {
 				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
 				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
-				GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
+				GuiToShow.Add("Text", "w300", t("button.cancel") . " → " . t("layer_editor.key.escape"))
 				; Construct while hidden: native Close otherwise hides an unowned Gui
 				; before the later factory returns and starts an invisible capture.
 				IH := InputHook("L2 E C I", ScalarEndKeys)
@@ -207,12 +207,12 @@ _EditorDestroyAfterCommit(gui, Context) {
 _EditorBuildMagicKeyPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.trigger_char", NewValue, "")
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_TRIGGER_CHAR, NewValue, "")
 		Plan.publish := _EditorPublishDesiredMagicKey.Bind(Plan.publish, NewValue)
 		return Plan
 	}
 	return {
-		updates: [{ Section: "hotstrings", Key: "trigger_char", Value: NewValue }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.TRIGGER_CHAR, Value: NewValue }],
 		publish: _EditorPublishMagicKey.Bind(NewValue),
 	}
 }
@@ -227,7 +227,7 @@ _EditorPublishMagicKey(NewValue) {
 	global ScriptInformation, Features
 	ScriptInformation["MagicKey"] := NewValue
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["trigger_char"] := NewValue
+		Features["hotstrings"][ConfigLeaf.TRIGGER_CHAR] := NewValue
 }
 
 ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
@@ -355,7 +355,7 @@ MagicKeySourceCapture(*) {
 _MagicKeySourceCaptureState(IsDown := _MagicKeySourceIsDown) {
 		Scans := []
 		Keycodes := LayoutRegistry_Keycodes()
-		for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if MagicKeySourceIsCandidate(Code)
 						Scans.Push(LayoutRegistry_KeyScan(Code, Keycodes))
 		}
@@ -411,11 +411,11 @@ _MagicKeySourceCapturePoll(State, IH) {
 MagicKeySourceMenuRows() {
 	global ScriptInformation
 	Current := ScriptInformation["MagicKeySource"]
-	Automatic := ManifestDefaultFor("hotstrings.magic_key_source")
+	Automatic := ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	Keycodes := LayoutRegistry_Keycodes()
 	Hkl := KS_ResolveKeyboardLayout()
 	Items := []
-	for Code in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+	for Code in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 		if (Code == Automatic)
 			continue
 		Reason := MagicKeySourceChoiceReason(Code)
@@ -425,13 +425,13 @@ MagicKeySourceMenuRows() {
 		Items.Push(Map("label", Label, "checked", Current == Code, "disabled", Reason != "",
 			"action", ((Chosen) => (*) => ModifyMagicKeySource(Chosen))(Code)))
 	}
-	Commands := Map("magic_key_source_capture", MagicKeySourceCapture,
-		"magic_key_source_automatic", (*) => ModifyMagicKeySource(Automatic))
+	Commands := Map(MenuCommand.MAGIC_KEY_SOURCE_CAPTURE, MagicKeySourceCapture,
+		MenuCommand.MAGIC_KEY_SOURCE_AUTOMATIC, (*) => ModifyMagicKeySource(Automatic))
 	Getters := Map("magic_key_source_capture_ready", (*) => true,
 		"magic_key_source_is_automatic", (*) => Current == Automatic)
 	Children := MenuRenderer_TemplateRows("magic_key_source_children", Commands, Getters,
 		Map("magic_key_source_candidates", (*) => Items))
-	if !(Children is Array) || Children.Length != ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"].Length + 3
+	if !(Children is Array) || Children.Length != ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"].Length + 3
 		return []
 	Rows := MenuRenderer_TemplateRows("magic_key_source_menu", Commands, Getters,
 		Map("magic_key_source_heading", Children))
@@ -439,7 +439,7 @@ MagicKeySourceMenuRows() {
 		return []
 	Shown := (Current == Automatic) ? t("menu.layout.magic_key_source.auto")
 		: _MagicKeySourceLabel(Current, Keycodes, Hkl)
-	Rows[1]["label"] .= " : " . Shown
+	Rows[1]["label"] := LabelValue(Rows[1]["label"], Shown)
 	return Rows
 }
 
@@ -447,7 +447,7 @@ MagicKeySourceMenuRows() {
 ; @param {String} Value Candidate or automatic source.
 ; @returns {String} Locale reason key, or empty when there is no conflict.
 MagicKeySourceChoiceReason(Value) {
-	if Value == ManifestDefaultFor("hotstrings.magic_key_source")
+	if Value == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 		return ""
 	Scan := LayoutRegistry_KeyScan(Value, LayoutRegistry_Keycodes())
 	if TapKeyAssignedToScan(Integer("0x" . SubStr(Scan, 3))) != ""
@@ -492,9 +492,9 @@ _MagicKeySourceCaptureKeyDown(State, IH, VK, SC) {
 MagicKeySourceIsCandidate(Code) {
 		if !(Code is String) || Code == ""
 				return false
-		if (Code == ManifestDefaultFor("hotstrings.magic_key_source"))
+		if (Code == ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE))
 				return false
-		for Allowed in ManifestFindEntryByPath("hotstrings.magic_key_source")["enum_values"] {
+		for Allowed in ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)["enum_values"] {
 				if (Allowed == Code)
 						return true
 		}
@@ -504,12 +504,12 @@ MagicKeySourceIsCandidate(Code) {
 _EditorBuildMagicKeySourcePlan(Value) {
 	global Features
 	if _FeatureUsesDesiredState(Features) {
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.magic_key_source", Value, "")
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE, Value, "")
 		Plan.publish := _EditorPublishDesiredMagicKeySource.Bind(Plan.publish, Value)
 		return Plan
 	}
 	return {
-		updates: [{ Section: "hotstrings", Key: "magic_key_source", Value: Value }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.MAGIC_KEY_SOURCE, Value: Value }],
 		publish: _EditorPublishMagicKeySource.Bind(Value),
 	}
 }
@@ -522,9 +522,9 @@ _EditorPublishDesiredMagicKeySource(PublishFn, Value) {
 _EditorPublishMagicKeySource(Value) {
 	global ScriptInformation, Features
 	ScriptInformation["MagicKeySource"] := Value
-	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor("hotstrings.magic_key_source")
+	ScriptInformation["MagicKeySourceChosen"] := Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["magic_key_source"] := Value
+		Features["hotstrings"][ConfigLeaf.MAGIC_KEY_SOURCE] := Value
 }
 
 ; Persists the physical magic key ([hotstrings] magic_key_source) and reloads:
@@ -533,7 +533,7 @@ _EditorPublishMagicKeySource(Value) {
 ; @returns {Boolean} Whether the choice was written and the reload accepted.
 ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 	global ConfigurationFile
-	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor("hotstrings.magic_key_source") {
+	if !MagicKeySourceIsCandidate(Value) && Value !== ManifestDefaultFor(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE) {
 		LoggerWarn("Editors", "Refused physical magic key '{1}': no candidate key has that code.", String(Value))
 		return false
 	}
@@ -560,14 +560,14 @@ ModifyMagicKeySource(Value, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 _EditorBuildRepeatKeyPlan() {
 	global HSE_RepeatEnabled, Features
 	if _FeatureUsesDesiredState(Features) {
-		Candidate := !ReadFeatureStateV2("hotstrings.repeat_key_enabled")["enabled"]
-		Plan := _FeatureBuildSinglePlan(Features, "hotstrings.repeat_key_enabled", Candidate, "")
+		Candidate := !ReadFeatureStateV2(ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED)["enabled"]
+		Plan := _FeatureBuildSinglePlan(Features, ConfigKey.HOTSTRINGS_REPEAT_KEY_ENABLED, Candidate, "")
 		Plan.publish := _EditorPublishDesiredRepeatKey.Bind(Plan.publish)
 		return Plan
 	}
 	Candidate := !HSE_RepeatEnabled
 	return {
-		updates: [{ Section: "hotstrings", Key: "repeat_key_enabled", Value: Candidate }],
+		updates: [{ Section: "hotstrings", Key: ConfigLeaf.REPEAT_KEY_ENABLED, Value: Candidate }],
 		publish: _EditorPublishRepeatKey.Bind(Candidate),
 	}
 }
@@ -575,7 +575,7 @@ _EditorBuildRepeatKeyPlan() {
 _EditorPublishDesiredRepeatKey(PublishFn) {
 	global HSE_RepeatEnabled, Features
 	PublishFn.Call()
-	HSE_RepeatEnabled := Features["hotstrings"]["repeat_key_enabled"]
+	HSE_RepeatEnabled := Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED]
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 }
@@ -584,7 +584,7 @@ _EditorPublishRepeatKey(Candidate) {
 	global HSE_RepeatEnabled, Features
 	HSE_RepeatEnabled := Candidate
 	if IsSet(Features) && Features.Has("hotstrings")
-		Features["hotstrings"]["repeat_key_enabled"] := Candidate
+		Features["hotstrings"][ConfigLeaf.REPEAT_KEY_ENABLED] := Candidate
 	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 		HSE_AdvanceRuntimeDecisionGeneration()
 	return true
@@ -618,17 +618,17 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 _EditorWordResetGlobal(Key, Value) {
 	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
-	if (Key == "idle_reset_seconds")
+	if (Key == ConfigLeaf.IDLE_RESET_SECONDS)
 		HSE_IdleResetSeconds := Value
 	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
 		HSE_CascadeMaxArrows := Value
-	else if (Key == "click_resets_word")
+	else if (Key == ConfigLeaf.CLICK_RESETS_WORD)
 		HSE_ClickResetsWord := Value
-	else if (Key == "arrow_resets_word")
+	else if (Key == ConfigLeaf.ARROW_RESETS_WORD)
 		HSE_ArrowResetsWord := Value
-	else if (Key == "shortcut_resets_word")
+	else if (Key == ConfigLeaf.SHORTCUT_RESETS_WORD)
 		HSE_ShortcutResetsWord := Value
-	else if (Key == "tap_hold_resets_word")
+	else if (Key == ConfigLeaf.TAP_HOLD_RESETS_WORD)
 		HSE_TapHoldResetsWord := Value
 	else if HSE_PreviewSwitchIsKnown(Key)
 		HSE_PreviewSwitchPublish(Key, Value)
@@ -692,7 +692,7 @@ SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn :
 		try LoggerError("Editors", "Refused idle-reset delay: not a number of seconds, 0 or more.")
 		return false
 	}
-	return _EditorCommitWordReset("idle_reset_seconds", Seconds, "the idle-reset delay",
+	return _EditorCommitWordReset(ConfigLeaf.IDLE_RESET_SECONDS, Seconds, "the idle-reset delay",
 		WriterFn, NotifyFn, RebuildFn)
 }
 
@@ -766,7 +766,7 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
  * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
  */
 ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
-	return _EditorCommitWordReset("click_resets_word", !HSE_ClickResetsWordCurrent(),
+	return _EditorCommitWordReset(ConfigLeaf.CLICK_RESETS_WORD, !HSE_ClickResetsWordCurrent(),
 		"the click word-reset toggle", WriterFn, NotifyFn, RebuildFn)
 }
 
@@ -802,8 +802,14 @@ ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0)
 		return false
 	; Retire what the old value promised: a bubble on screen, a prediction timer.
 	TooltipHide("PreviewSwitch", true)
-	if (Key == "preview_ai_enabled" && !Candidate && IsSet(LLM_Engine_CancelTimer))
+	if (Key == ConfigLeaf.PREVIEW_AI_ENABLED && !Candidate && IsSet(LLM_Engine_CancelTimer))
 		LLM_Engine_CancelTimer()
+	static NoticeKeys := Map(ConfigLeaf.PREVIEW_STAR_ENABLED, "menu.hotstrings.notify_bubble_star",
+		ConfigLeaf.PREVIEW_AUTOCORRECT_ENABLED, "menu.hotstrings.notify_bubble_autocorrect",
+		ConfigLeaf.PREVIEW_AI_ENABLED, "menu.hotstrings.notify_bubble_ai",
+		ConfigLeaf.PREVIEW_COLORED_TOOLTIPS, "menu.hotstrings.notify_bubble_colored")
+	if NoticeKeys.Has(Key)
+		NotifyFeature(t(NoticeKeys[Key]), Candidate)
 	return true
 }
 
@@ -915,7 +921,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 
 	PersonalInformationSummary := ""
 	for Key, _ in Changed
-		PersonalInformationSummary .= Key . ": " . PersonalInformation[Key] . "`n"
+		PersonalInformationSummary .= LabelValue(Key, PersonalInformation[Key]) . "`n"
 	try {
 		if HasMethod(ConfirmFn, "Call")
 			ConfirmFn.Call(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
@@ -941,8 +947,8 @@ _GPTLinkEditorClose(Window, *) {
 GPTLinkEditor(*) {
 		global Features
 		CurrentLink := ""
-		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
-				CurrentLink := Features["shortcuts"]["gpt"]["link"]
+		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has(ConfigLeaf.CHATGPT_URL)
+				CurrentLink := Features["shortcuts"][ConfigLeaf.CHATGPT_URL]
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
 		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
 		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
@@ -954,17 +960,17 @@ GPTLinkEditor(*) {
 _EditorBuildLinkPlan(NewValue) {
 	global Features
 	if _FeatureUsesDesiredState(Features)
-		return _FeatureBuildSinglePlan(Features, "shortcuts.gpt", NewValue, "link")
+		return _FeatureBuildSinglePlan(Features, ConfigKey.SHORTCUTS_CHATGPT_URL, NewValue, "")
 	return {
-		updates: [{ Section: "shortcuts.gpt", Key: "link", Value: NewValue }],
+		updates: [{ Section: "shortcuts", Key: ConfigLeaf.CHATGPT_URL, Value: NewValue }],
 		publish: _EditorPublishLink.Bind(NewValue),
 	}
 }
 
 _EditorPublishLink(NewValue) {
 	global Features
-	if IsSet(Features) && Features.Has("shortcuts") && Features["shortcuts"].Has("gpt")
-		Features["shortcuts"]["gpt"]["link"] := NewValue
+	if IsSet(Features) && Features.Has("shortcuts")
+		Features["shortcuts"][ConfigLeaf.CHATGPT_URL] := NewValue
 }
 
 ModifyLink(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {

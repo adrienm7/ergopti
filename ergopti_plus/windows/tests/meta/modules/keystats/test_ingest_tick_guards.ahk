@@ -25,10 +25,8 @@
 ; ===================================================
 ; ===================================================
 
-_ITG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_ITG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -39,7 +37,7 @@ _ITG_ReadSource(RelPath) {
 ; ===================================================
 
 _ITG_IngestHasIdleGuards() {
-	Src := _ITG_ReadSource("modules/keystats/keystats.ahk")
+	Src := _ITG_ReadSource("keystats.ahk")
 	Body := _DriverFuncBody("KL_IngestOnce")
 	Assert(Body != "", "KL_IngestOnce must exist in keystats.ahk")
 	

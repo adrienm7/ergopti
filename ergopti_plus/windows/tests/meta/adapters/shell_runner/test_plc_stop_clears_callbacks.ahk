@@ -20,10 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TPSCC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TPSCC_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TPSCC_StripLineComments(Src) {
@@ -43,7 +41,7 @@ _TPSCC_StripLineComments(Src) {
 ; ================================================================
 
 _TPSCC_AllCallbacksCleared() {
-	Src := _TPSCC_StripLineComments(_TPSCC_ReadSource("adapters/process_lifecycle.ahk"))
+	Src := _TPSCC_StripLineComments(_TPSCC_ReadSource("process_lifecycle.ahk"))
 	Assert(Src != "", "adapters/process_lifecycle.ahk must be readable")
 
 	Body := _DriverFuncBody("PLC_Stop")

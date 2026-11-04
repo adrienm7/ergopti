@@ -20,15 +20,12 @@
 #Requires AutoHotkey v2.0
 
 
-_HSE_SRL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Src := ""
-	try Src := FileRead(WindowsDir . "\" . RelPath)
-	return Src
+_HSE_SRL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _HSE_SuppressReleaseBounded() {
-	Src := _HSE_SRL_ReadSource("infra\hotstrings\hotstring_dispatch.ahk")
+	Src := _HSE_SRL_ReadSource("hotstring_dispatch.ahk")
 	Assert(Src != "", "hotstring_dispatch.ahk must be readable")
 
 	; 1. Constant exists and is bounded to <= 100 ms.

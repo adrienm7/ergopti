@@ -24,8 +24,9 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("infra.logger")
+local hs               = hs
+local Logger           = require("infra.logger")
+local AXResponsiveness = require("adapters.accessibility_permission")
 
 local LOG = "adapters.secure_field_detector"
 
@@ -84,6 +85,28 @@ local function resolve_pid(application_or_pid)
 	return pid
 end
 
+--- Reads one attribute of an element; a read the application left unanswered
+--- ("Messaging failed", as the tooltip anchor reads it) puts it in the
+--- unanswered cooldown. After a wake, loginwindow left both classification
+--- reads unanswered (1045 ms), then the AXValueChanged setup and the post-wake
+--- focused-window read waited again (1005 ms, field run 2026-11-03): the
+--- callers that check the cooldown now skip it instead.
+--- @param element userdata|table Accessibility element.
+--- @param attribute string Attribute name.
+--- @return boolean ok False when the read raised.
+--- @return any value Attribute value, or the raised error.
+--- @return any detail Native error returned with a nil value.
+local function read_attribute(element, attribute)
+	local ok, value, detail = pcall(function() return element:attributeValue(attribute) end)
+	if ok and value == nil and type(detail) == "string"
+		and detail:find(AXResponsiveness.UNANSWERED_ERROR, 1, true)
+	then
+		local ok_pid, pid = pcall(function() return element:pid() end)
+		if ok_pid then AXResponsiveness.mark_unanswered(pid) end
+	end
+	return ok, value, detail
+end
+
 
 
 
@@ -106,8 +129,8 @@ function M.isElementSecure(element, observe)
 		if observe then observe(false) end
 		return false
 	end
-	local ok_role, role, role_error = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_sub, subrole, subrole_error = pcall(function() return element:attributeValue("AXSubrole") end)
+	local ok_role, role, role_error = read_attribute(element, "AXRole")
+	local ok_sub, subrole, subrole_error = read_attribute(element, "AXSubrole")
 	-- Native AX failures return nil plus an error without raising a Lua exception.
 	-- Optional nil-only subroles remain valid; a transport refusal is unknown.
 	local role_read = ok_role and not (role == nil and role_error ~= nil)

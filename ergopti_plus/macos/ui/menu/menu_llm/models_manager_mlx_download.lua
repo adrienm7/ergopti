@@ -34,8 +34,12 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local Json = require("json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", ""):gsub("\\", "/")
-local _native_network_directory = _module_source:match("^(.*)/ui/menu/menu_llm/[^/]+$")
+local NativePath = require("native_path")
+-- A backslash is a filename byte on macOS: only the host's separators split it.
+local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+local _source_sep = "[" .. NativePath.separators() .. "]"
+local _native_network_directory = _module_source:match("^(.*)" .. _source_sep .. "ui" .. _source_sep
+	.. "menu" .. _source_sep .. "menu_llm" .. _source_sep .. "[^" .. NativePath.separators() .. "]+$")
 _native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
 
 --- Quotes the Python import directory without a table-only native JSON encoder.
@@ -1136,6 +1140,10 @@ function M.install(ctx)
 
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local network_prelude, network_err = NetworkEnv.managed_http_prelude("MLX")
+			-- A proxy override routes the download through the environment-driven
+			-- client (huggingface_hub reads the exported relay), not the native worker.
+			local managed_transport, transport_err = NetworkEnv.uses_managed_transport()
+			if managed_transport == nil then network_prelude, network_err = nil, transport_err end
 			local native_directory_literal = quote_native_network_directory()
 			if not network_prelude or type(native_directory_literal) ~= "string" then
 				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err or "MLX native network directory quotation refused"))
@@ -1170,9 +1178,11 @@ function M.install(ctx)
 			py:write("atexit.register(_write_exit, 1)\n")
 			py:write("try:\n")
 			py:write("    import truststore; truststore.inject_into_ssl()\n")
-			py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
-			py:write("    from managed_http import install_huggingface_transport\n")
-			py:write("    install_huggingface_transport()\n")
+			if managed_transport then
+				py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
+				py:write("    from managed_http import install_huggingface_transport\n")
+				py:write("    install_huggingface_transport()\n")
+			end
 			py:write("    from huggingface_hub import snapshot_download\n")
 			py:write("except Exception:\n")
 			py:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")

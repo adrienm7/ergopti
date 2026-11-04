@@ -67,10 +67,23 @@ LoggerInfo(args*)      => ""
 LLM_Deps_HasFailed()   => false
 global _MBW_DepsChecking := false
 LLM_Deps_IsChecking()  => _MBW_DepsChecking
+; The owned install the page's button runs, and the backend it must leave alone.
+global _MBW_Installs := [], _MBW_InstallThrows := false, _MBW_BackendSets := []
+LLM_Deps_CheckAndInstall(Model, OnReady, OnFailed) {
+	global _MBW_Installs, _MBW_InstallThrows
+	if _MBW_InstallThrows
+		throw Error("no bootstrap owner")
+	_MBW_Installs.Push(Model)
+}
+LLM_Menu_SetBackend(Id) {
+	global _MBW_BackendSets
+	_MBW_BackendSets.Push(Id)
+	return false
+}
 ; No managed runtime is published under this folder name on a test runner.
 AppDirsWindowsManagedOllamaFolderName() => "ErgoptiModelBrowserRunnerNoManagedOllama"
 _LLM_Menu_ModelDisplayText() => ""
-_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_port" ? 11434 : Default)
+_LLM_DefaultFor(Key, Default := "") => (Key == "llm_ollama_owned_port" ? 11435 : Default)
 _LLM_Menu_ApiEntryPageRows(Rows, Models, Listings := 0) => ""
 LLM_Menu_LocalServersLiveRows() => []
 _LLM_Menu_ConfigBlockReason() => ""
@@ -358,5 +371,106 @@ _MBInject_FreshMachineOffersInstall() {
 	}
 }
 Test("LLM_MBW_InjectCatalogue: a fresh machine greys Ollama and offers its install", _MBInject_FreshMachineOffersInstall)
+
+; Sends one page message through the real COM callback and drains its deferral.
+_MBW_SendAndDrain(Message) {
+	global _LLM_MBW_SessionEpoch
+	PreviousCritical := Critical("Off")
+	Fence := {Done: false}
+	MarkFence := (*) => Fence.Done := true
+	try {
+		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
+		SetTimer(MarkFence, -50)
+		Started := A_TickCount
+		while !Fence.Done && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(Fence.Done, "the deferred page action must have run")
+	} finally {
+		SetTimer(MarkFence, 0)
+		Critical(PreviousCritical)
+	}
+}
+
+_MBW_InstallPayload() {
+	global _LLM_MBW_Queue, _LLM_MBW_Ready
+	_LLM_MBW_Ready := false
+	_LLM_MBW_Queue := []
+	_LLM_MBW_InjectCatalogue()
+	return _LLM_MBW_Queue[_LLM_MBW_Queue.Length].Js
+}
+
+; model-selector-install-click: the button went through the backend selection,
+; which with another backend active restarts Ollama silently or, with the AI off,
+; does nothing: the click must reach the visible owned install either way, and
+; change no backend.
+_MBClick_ReachesTheInstallOnEveryBackend(Backend) {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs, _MBW_BackendSets, _LLM_Menu
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := [], _MBW_BackendSets := []
+	_LLM_Menu["backend"] := Backend
+	try {
+		_MBW_InstallPayload()
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(1, _MBW_Installs.Length, "the click must reach the owned install")
+		AssertEqual(0, _MBW_BackendSets.Length, "an install selects no backend")
+	} finally {
+		_LLM_Menu.Delete("backend")
+		_MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+for Backend in ["ollama", "api"]
+	Test("model browser: an install click reaches the owned install with backend " . Backend,
+		_MBClick_ReachesTheInstallOnEveryBackend.Bind(Backend))
+
+; model-selector-install-refusal: a click that did not start says so in words.
+_MBClick_RefusalIsStatedAndForgotten() {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs, _MBW_InstallThrows
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := [], _MBW_InstallThrows := true
+	try {
+		_MBW_InstallPayload()
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertContains(_MBW_InstallPayload(),
+			'install:{state:"available",failed_key:"model_browser.install_not_started"}')
+		_MBW_InstallThrows := false
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(1, _MBW_Installs.Length)
+		AssertContains(_MBW_InstallPayload(), 'install:{state:"available"}')
+	} finally {
+		_MBW_InstallThrows := false, _MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+Test("model browser: an install that did not start is offered again with its reason", _MBClick_RefusalIsStatedAndForgotten)
+
+; A paused driver greys the install with that reason and installs nothing; an
+; installed runtime keeps stating that it is installed.
+_MBClick_PausedDriverStatesThePause() {
+	global _TestIndex, _MBW_DepsReady, _MBW_Tags, _MBW_Installs
+	_TestIndex := Map("Qwen3.5-2B", Map("ollama", "qwen3.5:2b"))
+	_MBW_DepsReady := false, _MBW_Tags := [], _MBW_Installs := []
+	Suspend(true)
+	try {
+		AssertContains(_MBW_InstallPayload(),
+			'install:{state:"unsupported",reason_key:"model_browser.install_paused"}')
+		_MBW_SendAndDrain('{"action":"group_action","backend":"ollama","id":"install"}')
+		AssertEqual(0, _MBW_Installs.Length, "a paused driver installs nothing")
+		_MBW_DepsReady := true
+		AssertContains(_MBW_InstallPayload(), 'install:{state:"installed"}')
+	} finally {
+		Suspend(false)
+		_MBW_Tags := ["qwen3.5:2b"], _MBW_DepsReady := true
+	}
+}
+Test("model browser: a paused driver states the pause on the install button", _MBClick_PausedDriverStatesThePause)
+
+; model-selector-provider-sections: the page groups Ollama rows by the catalogue
+; provider, as the Lua drivers send it; the user's own model carries none.
+_MBInject_RowsNameTheirProvider() {
+	Listed := _LLM_MBW_LocalRow("Qwen3.5-2B", "qwen3.5:2b", Map("provider", "Alibaba"), false, false, false, false)
+	AssertContains(Listed["json"], ',provider:"Alibaba",')
+	Own := _LLM_MBW_LocalRow("my-tag", "my-tag", Map(), true, false, true, false)
+	AssertContains(Own["json"], ',provider:"",')
+}
+Test("model browser: a catalogue row names its provider, a custom one none", _MBInject_RowsNameTheirProvider)
 
 RunTests()

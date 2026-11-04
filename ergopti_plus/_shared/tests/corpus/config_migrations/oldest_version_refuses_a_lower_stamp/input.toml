@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/oldest_version_refuses_a_lower_stamp/input.toml
+
+[_meta]
+schema_version = 1
+
+[gestures]
+space_wrap = false

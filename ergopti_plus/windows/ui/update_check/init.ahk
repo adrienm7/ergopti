@@ -18,6 +18,10 @@
 ;    switch goes through the channel owner (Updater_SetChannel), What's new
 ;    opens the Versions window, and a failure's Report reuses the error
 ;    window's GitHub report.
+; 5. An offered release carries its body with the repository identity the page's
+;    link policy needs: the page shows the changelog in place, and a clicked link
+;    goes through the allowlist of every manual URL (_Updater_OpenManualUrl). The
+;    native window keeps What's new: its text controls render no Markdown.
 ; 3. One window, bound to the manual check it shows and to an epoch: a late
 ;    answer of another check, or a message of a closed window, is inert.
 ; 4. Without WebView2, or when its WebView cannot be created, the same answer
@@ -34,12 +38,12 @@ global UC_HOST_ACCESS_ALLOW := 1
 
 ; The page's actions, each with the phase it needs ("" = any phase)
 global UC_PAGE_ACTIONS := Map("close", "", "update", "available", "whats_new", "available",
-	"switch_channel", "", "report", "error", "open_log", "error")
+	"open_url", "available", "switch_channel", "", "report", "error", "open_log", "error")
 
 ; The actions that drive the updater, refused while the driver is paused; the
 ; others (close, report, open the log) change nothing ErgoptiPlus does, as in
 ; the error window
-global UC_UPDATER_ACTIONS := Map("update", true, "whats_new", true, "switch_channel", true)
+global UC_UPDATER_ACTIONS := Map("update", true, "whats_new", true, "open_url", true, "switch_channel", true)
 
 ; The phases an answer may carry, as the page knows them
 global UC_ANSWER_STATES := Map("up_to_date", true, "available", true, "no_release", true, "error", true)
@@ -121,6 +125,11 @@ UpdateCheck_ShowResult(Request, Answer) {
 		State["log_path"] := LoggerTodayLogPath()
 	}
 	_UC_Release := (Phase == "available") ? Answer["release"] : 0
+	if (Phase == "available") {
+		State["notes"] := _UpdateCheck_ReleaseNotes(_UC_Release)
+		if Answer.Get("check_only", false)
+			State["check_only"] := true
+	}
 	LoggerInfo("UpdateCheck", "Update check window: {1} (channel {2}).", Phase, Request.Channel)
 	Accepted := _UpdateCheck_Present(State)
 	if Accepted && Phase == "error" && ManagedNetworkFailureWindows_CanonicalReport(Answer.Get("network_report", 0))
@@ -162,7 +171,16 @@ UpdateCheck_Abandon(Request) {
 ; ==================================
 ; ==================================
 
-; The page's state message.
+; What the page's notes pane needs for an offered release.
+; @param Release {Object} The offered release.
+; @returns {Map} { body, owner, repo }
+_UpdateCheck_ReleaseNotes(Release) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	return Map("body", Release.Body, "owner", UPDATER_GH_OWNER, "repo", UPDATER_GH_REPO)
+}
+
+; The page's state message. Release text is data: an HTML-safe JSON literal, as
+; in the update prompt's seed (_Updater_ReleaseNotesSeed).
 ; @param State {Map} The window's state.
 ; @returns {String} JSON
 _UpdateCheck_StateJson(State) {
@@ -176,6 +194,14 @@ _UpdateCheck_StateJson(State) {
 		. ',"current":' . JsonStringLiteral(State.Get("current", ""))
 		. ',"latest":' . JsonStringLiteral(State.Get("latest", ""))
 		. ',"others":[' . Others . ']'
+	if State.Get("check_only", false)
+		Json .= ',"check_only":true'
+	if State.Has("notes") {
+		Notes := State["notes"]
+		Json .= ',"notes":{"body":' . JsonStringLiteral(Notes["body"], true)
+			. ',"owner":' . JsonStringLiteral(Notes["owner"], true)
+			. ',"repo":' . JsonStringLiteral(Notes["repo"], true) . '}'
+	}
 	if (State["state"] == "error") {
 		Json .= ',"reason_key":' . JsonStringLiteral(State["reason_key"])
 			. ',"log_path":' . JsonStringLiteral(State["log_path"])
@@ -248,13 +274,14 @@ _UpdateCheck_NativeTexts(State) {
 ; @param Name {String} One of UC_PAGE_ACTIONS.
 ; @param Channel {String} The channel of a switch line.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only): install,
-;   changelog, set_channel, report, open_log, close, refuse_paused.
+;   changelog, open_url, set_channel, report, open_log, close, refuse_paused.
 ; @param BornSuspended {Boolean} Whether the driver was paused when the click
 ;   arrived: an updater action is then refused visibly.
 ; @param ActionOwner {Object} Optional exact answer captured at dispatch; direct
 ;   synchronous callers capture the current answer at entry.
+; @param Url {String} The clicked link of an open_url action.
 ; @returns {Map} { ok, missing, closed }
-UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset) {
+UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset, Url := "") {
 	global UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
 	Outcome := Map("ok", false, "missing", false, "closed", false)
 	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
@@ -279,6 +306,10 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 			Effect("close", _UpdateCheck_CloseWindow).Call()
 			Outcome["ok"] := true, Outcome["closed"] := true
 		case "update":
+			if State.Get("check_only", false) {
+				LoggerWarn("UpdateCheck", "Refused an update of a release only the public feed announced.")
+				return Outcome
+			}
 			Install := Effect("install", (Release) => _UpdateCheck_Install(Release, Owner))
 			if !_UpdateCheck_ActionCurrent(Owner)
 				return Outcome
@@ -296,6 +327,11 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, A
 				return Outcome
 			Effect("changelog", Changelog_Open).Call(State["channel"])
 			Outcome["ok"] := true
+		case "open_url":
+			Opener := Effect("open_url", _UpdateCheck_OpenUrl)
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Outcome["ok"] := Opener.Call(Url) ? true : false
 		case "switch_channel":
 			if !_UpdateCheck_Lists(Channel, State) {
 				LoggerWarn("UpdateCheck", "Refused a switch to '{1}': the answer did not list it.", Channel)
@@ -352,6 +388,14 @@ _UpdateCheck_Lists(Channel, State := unset) {
 			return true
 	}
 	return false
+}
+
+; Opens a link of the release notes through the repository allowlist of every
+; manual URL, which also refuses it while the driver is paused.
+; @param Url {String}
+; @returns {Boolean} opened
+_UpdateCheck_OpenUrl(Url) {
+	return _Updater_OpenManualUrl(() => Url)
 }
 
 ; Installs the offered release: the user's click is the consent the tray's
@@ -521,7 +565,8 @@ _UpdateCheck_BuildNative() {
 		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
 		_UpdateCheck_CenterRow([SwitchButton], Geo.w)
 	}
-	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", "")
+	CheckOnly := _UC_State.Get("check_only", false)
+	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", CheckOnly ? t("update_check.check_only") : "")
 	Row := []
 	if (Phase == "available") {
 		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
@@ -536,7 +581,7 @@ _UpdateCheck_BuildNative() {
 	}
 	Row.Push(G.Add("Button", (Row.Length ? "x+8 yp" : "xm y+12"), t("common.close")))
 	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "close", ""))
-	if (Phase == "available") {
+	if (Phase == "available" && !CheckOnly) {
 		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
 		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
 	}
@@ -652,19 +697,20 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, Act
 		_UpdateCheck_Send(Epoch, _UpdateCheck_StateJson(_UC_State))
 		return
 	}
-	Name := "", Channel := ""
+	Name := "", Channel := "", Url := ""
 	try {
 		Message := JsonParse(Raw)
 		if (Message is Map) {
 			Name := Message.Get("action", "")
 			Channel := Message.Get("channel", "")
+			Url := Message.Get("url", "")
 		}
 	}
-	if !(Name is String) || !UC_PAGE_ACTIONS.Has(Name) || !(Channel is String) {
+	if !(Name is String) || !UC_PAGE_ACTIONS.Has(Name) || !(Channel is String) || !(Url is String) {
 		LoggerWarn("UpdateCheck", "Refused an update-check message that is not one of its actions.")
 		return
 	}
-	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner)
+	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner, Url)
 }
 
 ; Performs one action and answers it, in the page or the native window.
@@ -674,7 +720,8 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, Act
 ; @param BornSuspended {Boolean} Whether the driver was paused at the click.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only).
 ; @param ActionOwner {Object} Optional exact answer retained by the event source.
-_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset) {
+; @param Url {String} The clicked link of an open_url action.
+_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset, Url := "") {
 	global _UC_WindowEpoch, _UC_ResetDone, _UC_Native, _UC_Gui
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
 		return
@@ -684,7 +731,7 @@ _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, Act
 	LoggerInfo("UpdateCheck", "Update-check window action: {1}.", Name)
 	if !_UpdateCheck_ActionCurrent(Owner)
 		return
-	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended, Owner)
+	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended, Owner, Url)
 	catch as Err {
 		LoggerError("UpdateCheck", "The update-check action '{1}' failed: {2}", Name, Err.Message)
 		Outcome := Map("ok", false, "missing", false, "closed", false)

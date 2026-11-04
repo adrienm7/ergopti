@@ -29,10 +29,8 @@
 ; ==================================================
 ; ==================================================
 
-_PRFSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_PRFSG_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -45,7 +43,7 @@ _PRFSG_ReadSource(RelPath) {
 ; ==================================================
 
 _PRFSG_FlushGuardsSuspend() {
-	Src := _PRFSG_ReadSource("infra/hotstrings/hotstring_prefix_watcher.ahk")
+	Src := _PRFSG_ReadSource("hotstring_prefix_watcher.ahk")
 	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
 	Assert(FlushBody != "", "_PrefixRenderFlush() must exist in hotstring_prefix_watcher.ahk")
 

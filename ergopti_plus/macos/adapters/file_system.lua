@@ -30,6 +30,7 @@ local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
 local NativePath = require("native_path")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
+local WriteLockPath = require("adapters.write_lock_path")
 
 local LOG = "adapters.file_system"
 
@@ -38,7 +39,6 @@ local _temp_sequence = 0
 
 local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 local STAGING_PAYLOAD_NAME = "payload"
-local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
@@ -48,7 +48,8 @@ local LS_BIN = "/bin/ls"
 -- Native advisory locks may permit same-process re-entry depending on the
 -- primitive Hammerspoon exposes. This registry is therefore authoritative for
 -- in-process ownership regardless of kernel re-entry semantics. The handle is
--- retained until explicit release; the stable empty lock file remains.
+-- retained until explicit release; the stable empty lock file remains in the
+-- per-user lock directory.
 local _held_write_locks = {}
 -- A staging owner whose exact release did not commit remains authoritative
 -- across later writes. No successor may reserve another sidecar until this
@@ -111,10 +112,13 @@ end
 --- Derives the one lexical identity used for both the native lock pathname and
 --- the authoritative same-process registry. Destination operations retain their
 --- resolved spelling; only ownership collapses equivalent `.`/`..` spellings.
+--- The pathname sits in the per-user lock directory (adapters/write_lock_path),
+--- so every cooperating writer derives the same inode.
 --- @param resolved_path string Symlink-resolved destination spelling.
---- @return string lock_path Canonical cooperative lock pathname.
+--- @return string|nil lock_path Canonical cooperative lock pathname.
+--- @return string|nil error_message Why no lock pathname can be derived.
 local function cooperative_write_lock_path(resolved_path)
-	return normalize_path(resolved_path) .. WRITE_LOCK_SUFFIX
+	return WriteLockPath.for_canonical(normalize_path(resolved_path), os.getenv("HOME"))
 end
 
 --- Runs one fixed local metadata command and preserves the complete native
@@ -147,18 +151,31 @@ local function run_metadata_command(command, operation)
 	return output
 end
 
---- Captures the extended ACL entries without including the pathname-bearing
---- first ls line. LC_ALL=C keeps the representation stable across locales.
+--- Builds the listing whose lines after the pathname-bearing first one are the
+--- extended ACL entries. LC_ALL=C keeps the representation stable across locales.
+--- @param path string Regular-file pathname.
+--- @return string command
+local function acl_inspection_command(path)
+	return "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
+end
+
+--- Keeps the ACL entries of one `ls -led` listing, dropping its first line.
+--- @param output string Listing of one file.
+--- @return string fingerprint
+local function acl_from_listing(output)
+	local newline = output:find("\n", 1, true)
+	if newline == nil then return "" end
+	return output:sub(newline + 1)
+end
+
+--- Captures the extended ACL entries of one file in its own command.
 --- @param path string Regular-file pathname.
 --- @return string|nil fingerprint
 --- @return string|nil error_message
 local function read_acl_fingerprint(path)
-	local command = "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
-	local output, command_err = run_metadata_command(command, "ACL inspection")
+	local output, command_err = run_metadata_command(acl_inspection_command(path), "ACL inspection")
 	if output == nil then return nil, command_err end
-	local newline = output:find("\n", 1, true)
-	if newline == nil then return "" end
-	return output:sub(newline + 1)
+	return acl_from_listing(output)
 end
 
 --- Captures every extended attribute as raw bytes through Hammerspoon's
@@ -210,9 +227,11 @@ end
 --- used only while rechecking the source; a staged replacement necessarily has
 --- a different inode.
 --- @param path string Regular-file pathname.
+--- @param acl string|nil ACL fingerprint already listed by the caller's own
+---   command; nil lists it here.
 --- @return table|nil snapshot
 --- @return string|nil error_message
-local function capture_security_metadata(path)
+local function capture_security_metadata(path, acl)
 	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
 		return nil, "hs.fs.attributes is unavailable"
 	end
@@ -222,8 +241,11 @@ local function capture_security_metadata(path)
 		return nil, tostring(attributes_err or "metadata source is not a regular file")
 	end
 
-	local acl, acl_err = read_acl_fingerprint(path)
-	if acl == nil then return nil, acl_err end
+	if acl == nil then
+		local acl_err
+		acl, acl_err = read_acl_fingerprint(path)
+		if acl == nil then return nil, acl_err end
+	end
 	local xattrs, xattr_err = read_xattr_snapshot(path)
 	if xattrs == nil then return nil, xattr_err end
 	return {
@@ -288,20 +310,35 @@ end
 --- metadata before its content is replaced. cp -p preserves mode, ownership,
 --- flags, ACLs, and xattrs; explicit snapshots catch its documented best-effort
 --- ownership behavior and any partial metadata copy before publication.
+---
+--- The source's ACL listing before the copy, the copy and the listing after it
+--- run in ONE command: each command is a fork the main thread waits for, and the
+--- Mac field log showed a preferences save spending 600 to 800 ms in four of
+--- them (ledger L17). The in-process attribute and xattr reads still bracket
+--- the command, so every "before" read precedes the copy and every "after" read
+--- follows it. A NUL, which no listing can contain, separates the two listings.
 --- @param source_path string Existing resolved destination.
 --- @param staging_path string Absent private payload pathname.
 --- @return table|nil expected_metadata
 --- @return string|nil error_message
 local function seed_staging_metadata(source_path, staging_path)
-	local expected, capture_err = capture_security_metadata(source_path)
-	if expected == nil then return nil, capture_err end
-	local command = COPY_BIN .. " -p "
+	local command = acl_inspection_command(source_path)
+		.. " && printf '\\000' && " .. COPY_BIN .. " -p "
 		.. TextUtils.shell_quote(source_path) .. " "
 		.. TextUtils.shell_quote(staging_path)
-	local _, copy_err = run_metadata_command(command, "metadata-preserving copy")
-	if copy_err ~= nil then return nil, copy_err end
+		.. " && " .. acl_inspection_command(source_path)
+	local before, before_err = capture_security_metadata(source_path, "")
+	if before == nil then return nil, before_err end
+	local output, copy_err = run_metadata_command(command, "metadata-preserving copy")
+	if output == nil then return nil, copy_err end
+	local separator = output:find("\0", 1, true)
+	if separator == nil or output:find("\0", separator + 1, true) ~= nil then
+		return nil, "metadata-preserving copy returned malformed ACL listings"
+	end
+	local expected = before
+	expected.acl = acl_from_listing(output:sub(1, separator - 1))
 
-	local current, current_err = capture_security_metadata(source_path)
+	local current, current_err = capture_security_metadata(source_path, acl_from_listing(output:sub(separator + 1)))
 	if current == nil then return nil, current_err end
 	local unchanged, compare_err = security_metadata_equal(expected, current, true)
 	if not unchanged then return nil, "metadata source changed during copy: " .. tostring(compare_err) end
@@ -1335,7 +1372,7 @@ function M.create_if_absent(path, content)
 	return created, status, result_detail
 end
 
---- Acquires the stable adjacent native advisory mutex used by all cooperating writers.
+--- Acquires the stable native advisory mutex used by all cooperating writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
 --- across different inodes. The same-process registry remains authoritative
 --- even if the current native primitive would re-grant an existing owner.
@@ -1350,11 +1387,20 @@ acquire_cooperative_write_lock = function(resolved_path)
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
 	end
 
-	local lock_path = cooperative_write_lock_path(resolved_path)
+	local lock_path, path_err = cooperative_write_lock_path(resolved_path)
+	if lock_path == nil then return nil, path_err end
 	if _held_write_locks[lock_path] ~= nil then
 		return nil, "cooperative write lock is already held by this Hammerspoon process"
 	end
 
+	-- prepare_parent_for_create() resolves a symlinked home or Application
+	-- Support before it creates the missing lock directory components.
+	if M.directory_status(parent_dir(lock_path)) ~= "present" then
+		local directory_ready, directory_err = M.prepare_parent_for_create(lock_path)
+		if directory_ready ~= true then
+			return nil, "cooperative write-lock directory unavailable: " .. tostring(directory_err)
+		end
+	end
 	local before, inspect_err = inspect_path(lock_path)
 	if inspect_err ~= nil then return nil, inspect_err end
 	if before ~= nil and before.mode ~= "file" then
@@ -1482,7 +1528,8 @@ function M.acquire_write_locks(paths)
 		if type(resolved_path) ~= "string" or resolved_path == "" then
 			return nil, false, tostring(resolve_err or "path resolution failed")
 		end
-		local lock_path = cooperative_write_lock_path(resolved_path)
+		local lock_path, lock_path_err = cooperative_write_lock_path(resolved_path)
+		if lock_path == nil then return nil, false, tostring(lock_path_err) end
 		if lock_seen[lock_path] then
 			return nil, false,
 				"multiple requested paths share cooperative write lock '" .. lock_path .. "'"
@@ -2324,7 +2371,19 @@ end
 --- @return boolean written
 --- @return string|nil error_message
 function M.write(path, content)
-	local written, detail = write_atomic(path, content, nil)
+	local written, detail = write_atomic(path, content, nil, nil)
+	return written, detail
+end
+
+--- Same as M.write, for a caller that provokes the refusal: on_error receives
+--- the fixed failure category instead of the log. Kept apart so the FileSystem
+--- port keeps its two-argument write.
+--- @param path string Destination path.
+--- @param content string UTF-8 content.
+--- @param on_error function Receives the failure category.
+--- @return boolean written, string|nil detail
+function M.write_reporting(path, content, on_error)
+	local written, detail = write_atomic(path, content, nil, on_error)
 	return written, detail
 end
 
@@ -2390,13 +2449,17 @@ function M.write_if_unchanged_admitted(path, content, expected_source, on_error,
 	return write_atomic(path, content, captured, on_error, admission)
 end
 
---- Appends content to a file, creating it if it does not exist.
+--- Appends content to a file, creating it if it does not exist, for a caller
+--- that provokes the refusal: on_error receives the fixed failure category
+--- instead of the log (M.append is the port's two-argument form).
 --- @param path    string Absolute path to the file.
 --- @param content string UTF-8 content to append.
+--- @param on_error function|nil Receives the failure category; nil logs it.
 --- @return boolean true on success, false on any error.
-function M.append(path, content)
+function M.append_reporting(path, content, on_error)
+	local report = OperationReporter.new(on_error, Logger, LOG)
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "append(): path must be a non-empty string.")
+		report("append", "error", "append(): path must be a non-empty string.")
 		return false
 	end
 	content = type(content) == "string" and content or ""
@@ -2405,23 +2468,23 @@ function M.append(path, content)
 	-- a FIFO without a reader blocks the main thread, and with a reader the bytes
 	-- leave for another process. The metadata follows a symlink to its target.
 	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
-		Logger.error(LOG, "append(): destination metadata is unavailable; refusing to open it.")
+		report("append", "error", "append(): destination metadata is unavailable; refusing to open it.")
 		return false
 	end
 	local probe_ok, attributes = pcall(hs.fs.attributes, path)
 	if not probe_ok then
-		Logger.error(LOG, "append(): cannot inspect the destination — %s", tostring(attributes))
+		report("append", "error", "append(): cannot inspect the destination — %s", tostring(attributes))
 		return false
 	end
 	if type(attributes) == "table" and attributes.mode ~= "file" then
-		Logger.error(LOG, "append(): destination is not a regular file (%s).", tostring(attributes.mode))
+		report("append", "error", "append(): destination is not a regular file (%s).", tostring(attributes.mode))
 		return false
 	end
 
 	local ok, result = pcall(function()
 		local fh, err = io.open(path, "a")
 		if not fh then
-			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
+			report("append", "error", "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
 		local write_ok, written = pcall(function() return fh:write(content) end)
@@ -2430,19 +2493,27 @@ function M.append(path, content)
 		local write_failed = not write_ok or written ~= fh
 		local close_failed = not close_ok or closed ~= true
 		if write_failed then
-			Logger.error(LOG, "append(): native write failed.")
+			report("append", "error", "append(): native write failed.")
 		end
 		if close_failed then
-			Logger.error(LOG, "append(): native close failed.")
+			report("append", "error", "append(): native close failed.")
 		end
 		return not write_failed and not close_failed
 	end)
 
 	if not ok then
-		Logger.error(LOG, "append(): unexpected error on '%s' — %s", path, tostring(result))
+		report("append", "error", "append(): unexpected error on '%s' — %s", path, tostring(result))
 		return false
 	end
 	return result == true
+end
+
+--- Appends content to a file, creating it if it does not exist.
+--- @param path    string Absolute path to the file.
+--- @param content string UTF-8 content to append.
+--- @return boolean true on success, false on any error.
+function M.append(path, content)
+	return M.append_reporting(path, content, nil)
 end
 
 --- Returns true if a file or directory exists at the given path.

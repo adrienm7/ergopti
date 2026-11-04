@@ -11,7 +11,10 @@
 local Json = require("json")
 local Unicode = require("compat.utf8")
 local Parameter = require("program_parameter")
-local M = { MAX_BYTES = 65536, MAX_CHOICES = 64, MAX_NAME_BYTES = 4096 }
+local Timings = require("infra.timings")
+local M = { MAX_BYTES = Timings.count("limits", "shortcuts_reply_bytes"), MAX_CHOICES = 64, MAX_NAME_BYTES = 4096,
+	-- Seconds a query transport lets one discovery or revalidation run.
+	QUERY_TIMEOUT_SEC = 20 }
 
 local function fields(value, allowed, count)
 	if type(value) ~= "table" or Json.is_null(value) or Json.is_array(value) then return false end
@@ -135,7 +138,7 @@ function M.new(ports)
 		if generation ~= epoch then return false, "stale_discovery" end
 		sequence = sequence + 1
 		local request = { version = 1, nonce = sequence, operation = operation, id = selected and selected.id,
-			limit = M.MAX_BYTES, timeout = 20 }
+			limit = M.MAX_BYTES, timeout = M.QUERY_TIMEOUT_SEC }
 		local entry = { epoch = epoch, cli = cli, constructing = true }
 		active = entry
 		local function complete()

@@ -14,7 +14,7 @@ local helpers, TomlCodec, binding_source_fixture =
 
 
 
-helpers.describe("modules/gestures/manager.lua", function()
+helpers.describe("modules.gestures.manager", function()
 
   -- ==========================================================================
   -- 1. Module structural
@@ -254,9 +254,16 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(type(label) == "string")
   end)
 
-  helpers.it("renders the complete shared modifier matrix with universal labels", function()
-    helpers.assert_eq(M.get_action_label("ctrl_a"), "Ctrl + A")
-    helpers.assert_eq(M.get_action_label("ctrl_alt_super_enter"), "Ctrl + Alt + Super + Enter")
+  -- 2026-11-03: the chords read the catalogue's English names (« Enter ») in
+  -- every locale; each key is now named from the key name table.
+  helpers.it("renders the complete shared modifier matrix in the user's language", function()
+    local i18n = require("infra.i18n")
+    local function name(id) return i18n.get("key_name." .. id) end
+    helpers.assert_eq(M.get_action_label("ctrl_a"), name("ctrl") .. " + A")
+    local label = M.get_action_label("ctrl_alt_super_enter")
+    helpers.assert_eq(label, name("ctrl") .. " + " .. name("alt") .. " + " .. name("super") .. " + " .. name("enter"))
+    helpers.assert_true(not label:find("key_name.", 1, true), "every key has a text: " .. label)
+    helpers.assert_eq(M.get_action_label("shift_period"), name("shift") .. " + .")
   end)
 
   helpers.it("get_action_names follows the catalogue order", function()
@@ -340,12 +347,12 @@ helpers.describe("modules/gestures/manager.lua", function()
   -- ==========================================================================
 
   helpers.it("menu_builder renders gestures section when context present", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     M._test_begin_reading({})
     M.enable()
@@ -368,12 +375,12 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("menu_builder handles nil gestures gracefully", function()
-    local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
-    -- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+    local ok_mb, menu_builder = pcall(require, "ui.menu.builder")
+    -- Asserted, not skipped. ui/menu/builder.lua ships with this driver, so
     -- "not available" can only mean it stopped loading — and the skip made that
     -- indistinguishable from a pass in six cases across three files.
     helpers.assert_true(ok_mb and menu_builder ~= nil,
-      "ui.menu.menu_builder must load: " .. tostring(menu_builder))
+      "ui.menu.builder must load: " .. tostring(menu_builder))
 
     local items = menu_builder.build({
       _version = "3.0.0",
@@ -465,9 +472,8 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("does not hardcode the slot arrays (they come from the generated catalogue)", function()
-    local fh = io.open(helpers.driver_root() .. "/modules/gestures/manager.lua", "r")
-    helpers.assert_true(fh ~= nil, "manager source must be readable")
-    local src = fh:read("*a"); fh:close()
+    -- modules/gestures/manager, selected by a declaration unique to it.
+    local src = assert(helpers.read_driver_unit("local function emitter_authority_current("))
     helpers.assert_true(src:find('require, "_generated.action_catalogue"', 1, true) ~= nil,
       "manager must load the generated action catalogue")
     helpers.assert_true(src:find("M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)", 1, true) ~= nil,

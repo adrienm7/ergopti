@@ -34,10 +34,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_SCSR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_SCSR_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -48,7 +46,7 @@ _SCSR_ReadSource(RelPath) {
 ; ==================================================
 
 _SCSR_StopResetsCpuBaseline() {
-	Src := _SCSR_ReadSource("modules/keystats/keystats_sensors.ahk")
+	Src := _SCSR_ReadSource("keystats_sensors.ahk")
 	Seg := _DriverFuncBody("KL_Sensors_Stop")
 	Assert(Seg != "", "KL_Sensors_Stop() declaration must exist in keystats_sensors.ahk")
 	AssertContains(Seg, "KLSensors.prev_idle   := -1",

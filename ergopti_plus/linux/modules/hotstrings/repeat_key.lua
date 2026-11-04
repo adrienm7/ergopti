@@ -37,6 +37,7 @@ local Codec = require("toml_codec")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
 local TextUtils = require("text_utils")
+local Terminators = require("keymap.terminators")
 local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.repeat_key"
@@ -194,6 +195,14 @@ local function last_codepoint(text)
 	return last
 end
 
+--- A word character for the repeat: the shared rule, minus any delimiter the user
+--- added: a custom delimiter ends a word, as on Windows.
+--- @param char string One codepoint.
+--- @return boolean
+local function repeat_word_char(char)
+	return TextUtils.is_hotstring_word_char(char) and not Terminators.is_terminator(char)
+end
+
 --- Decides what a magic key typed after `buffer` should produce.
 ---
 --- Pure, and separate from the daemon that calls it, so the rule can be asserted
@@ -228,10 +237,10 @@ function M.resolve(buffer, magic_key, start_is_boundary)
 	-- never repeated) and so must the one before it. Without a word character
 	-- before it, `c★` is the start of a word, where the user typed the key to ask
 	-- for a text expansion and doubling the letter replaces it with `cc`.
-	if not TextUtils.is_hotstring_word_char(previous) then return nil end
+	if not repeat_word_char(previous) then return nil end
 	local rest = before:sub(1, #before - #previous)
 	local before_previous = last_codepoint(rest)
-	if not before_previous or not TextUtils.is_hotstring_word_char(before_previous) then
+	if not before_previous or not repeat_word_char(before_previous) then
 		return nil
 	end
 	-- The character before the repeated one is the buffer's first and its start

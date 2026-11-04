@@ -27,15 +27,17 @@ local function read_src(selector)
 end
 
 helpers.describe("menu_llm: wrong-typed modifier settings fail closed (F-HIGH-6)", function()
-	helpers.it("format_shortcut_title type-guards mods BEFORE table.concat", function()
+	helpers.it("format_shortcut_title type-guards mods BEFORE naming them", function()
 		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		local fn = src:match("local function format_shortcut_title.-\nend")
 		helpers.assert_true(fn ~= nil, "format_shortcut_title must be locatable")
 		local guard_pos  = fn:find('type(mods) ~= "table"', 1, true)
-		local concat_pos = fn:find("table.concat(mods", 1, true)
+		-- The modifiers are named from the key name table (format_mods), which
+		-- iterates them as a table just as table.concat did.
+		local use_pos = fn:find("format_mods(mods", 1, true)
 		helpers.assert_true(guard_pos ~= nil, "format_shortcut_title must type-guard mods (not just `not mods`)")
-		helpers.assert_true(concat_pos ~= nil, "format_shortcut_title still concatenates mods")
-		helpers.assert_true(guard_pos < concat_pos, "the non-table guard must precede table.concat(mods)")
+		helpers.assert_true(use_pos ~= nil, "format_shortcut_title still names mods")
+		helpers.assert_true(guard_pos < use_pos, "the non-table guard must precede format_mods(mods)")
 	end)
 
 	helpers.it("nav/val modifier reads fail closed to the default on a non-table", function()

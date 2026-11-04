@@ -97,22 +97,21 @@ local function native()
 	local Native = require("infra.openssl_library")
 	local ffi, library = Native.ffi, Native.library
 	if not ffi then return nil end
-	if not M._declared then
-		M._declared = pcall(ffi.cdef, [[
-			typedef struct evp_pkey_st EVP_PKEY;
-			typedef struct evp_md_ctx_st EVP_MD_CTX;
-			typedef struct evp_md_st EVP_MD;
-			EVP_PKEY *d2i_PUBKEY(EVP_PKEY **a, const unsigned char **pp, long length);
-			void EVP_PKEY_free(EVP_PKEY *pkey);
-			EVP_MD_CTX *EVP_MD_CTX_new(void);
-			void EVP_MD_CTX_free(EVP_MD_CTX *ctx);
-			const EVP_MD *EVP_sha256(void);
-			int EVP_DigestVerifyInit(EVP_MD_CTX *ctx, void **pctx, const EVP_MD *type, void *e, EVP_PKEY *pkey);
-			int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sig, size_t siglen,
-				const unsigned char *tbs, size_t tbslen);
-		]])
-	end
-	if not M._declared or not library then return nil end
+	-- Through the library owner: the digest module declares the same EVP
+	-- context functions, and a second ffi.cdef of them is refused.
+	local declared = Native.declare({
+		"typedef struct evp_pkey_st EVP_PKEY;",
+		"typedef struct evp_md_ctx_st EVP_MD_CTX;",
+		"typedef struct evp_md_st EVP_MD;",
+		"EVP_PKEY *d2i_PUBKEY(EVP_PKEY **a, const unsigned char **pp, long length);",
+		"void EVP_PKEY_free(EVP_PKEY *pkey);",
+		"EVP_MD_CTX *EVP_MD_CTX_new(void);",
+		"void EVP_MD_CTX_free(EVP_MD_CTX *ctx);",
+		"const EVP_MD *EVP_sha256(void);",
+		"int EVP_DigestVerifyInit(EVP_MD_CTX *ctx, void **pctx, const EVP_MD *type, void *e, EVP_PKEY *pkey);",
+		"int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sig, size_t siglen, const unsigned char *tbs, size_t tbslen);",
+	})
+	if not declared or not library then return nil end
 	return { ffi = ffi, library = library }
 end
 

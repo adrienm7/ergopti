@@ -124,7 +124,7 @@ _MET_FreshProvenance() {
 	SavedCache := IsSet(_IniCache) ? _IniCache : unset
 	SavedKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	try {
-		KeyboardShortcutAssignments := Map("win_c", "none", "win_d", "none", "magic_editor", "open_hotstrings_editor")
+		KeyboardShortcutAssignments := Map("meta_c", "none", "meta_d", "none", "magic_editor", "open_hotstrings_editor")
 		Defaults := KeyboardShortcutAssignments.Clone()
 		Raw := Map(), Updates := []
 		CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments, Raw, Defaults)
@@ -134,14 +134,14 @@ _MET_FreshProvenance() {
 		_IniCache := Map("shortcuts.keyboard", Raw)
 		AssertFalse(_MagicEditorExplicitClaim(Source, _MET_Layout("00000409")) is Map,
 			"merged neutral defaults are not raw personal provenance")
-		Raw["win_c"] := "none", Updates := []
+		Raw["meta_c"] := "none", Updates := []
 		CollectKeyboardShortcutUpdates(Updates, KeyboardShortcutAssignments, Raw, Defaults)
 		AssertEqual(2, Updates.Length, "an actual personal none remains durable on every full save")
 		Claim := _MagicEditorExplicitClaim(Source, _MET_Layout("00000409"))
-		AssertEqual("win_c", Claim["slot"])
+		AssertEqual("meta_c", Claim["slot"])
 		AssertEqual("none", Claim["action"], "stored none owns the resolved physical chord")
 		AssertEqual(1, Claim["slots"].Length)
-		Raw["win_c"] := "copy", KeyboardShortcutAssignments["win_c"] := "copy"
+		Raw["meta_c"] := "copy", KeyboardShortcutAssignments["meta_c"] := "copy"
 		AssertEqual("copy", _MagicEditorExplicitClaim(Source, _MET_Layout("00000409"))["action"],
 			"a personal action is never replaced by the default editor")
 	} finally {
@@ -156,13 +156,13 @@ _MET_ExistingPhysicalSlots() {
 	try {
 		State["initialized"] := false, State["ordinary_physical"] := Map()
 		Catalogue := MagicEditorPhysicalCatalogue(_SharedDir)
-		AssertFalse(MagicEditorRecordOrdinaryPhysical("win_d", "copy", Catalogue),
+		AssertFalse(MagicEditorRecordOrdinaryPhysical("meta_d", "copy", Catalogue),
 			"ordinary Win+VK slots keep their existing registrar owner")
-		AssertTrue(MagicEditorRecordOrdinaryPhysical("win_sc029", "copy", Catalogue),
+		AssertTrue(MagicEditorRecordOrdinaryPhysical("meta_sc029", "copy", Catalogue),
 			"the existing supported physical Backquote slot joins the sole broker")
-		AssertEqual("win_sc029", State["ordinary_physical"]["SC029"]["slot"])
+		AssertEqual("meta_sc029", State["ordinary_physical"]["SC029"]["slot"])
 		AssertEqual("copy", State["ordinary_physical"]["SC029"]["action"])
-		AssertThrows(() => MagicEditorRecordOrdinaryPhysical("win_sc1ff", "copy", Catalogue),
+		AssertThrows(() => MagicEditorRecordOrdinaryPhysical("meta_sc1ff", "copy", Catalogue),
 			"an invented scan outside the actual physical catalogue cannot acquire input")
 		State["layouts"] := Map(), State["legacy"] := Map()
 		LegacyCalls := 0, LayoutCalls := 0
@@ -180,7 +180,7 @@ _MET_ExistingPhysicalSlots() {
 		AssertThrows(() => MagicEditorRecordLegacy("sc1ff", (*) => 0, Catalogue),
 			"legacy native producers cannot invent a scan outside the actual physical inventory")
 		State["initialized"] := true
-		AssertThrows(() => MagicEditorRecordOrdinaryPhysical("win_sc029", "copy", Catalogue),
+		AssertThrows(() => MagicEditorRecordOrdinaryPhysical("meta_sc029", "copy", Catalogue),
 			"an acquired physical owner cannot be silently replaced")
 	} finally {
 		State.Clear()

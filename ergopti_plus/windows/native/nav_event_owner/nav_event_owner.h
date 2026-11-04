@@ -717,6 +717,54 @@ _Static_assert(sizeof(ErgoptiNav_HookOrderStats) == ERGOPTI_NAV_HOOK_ORDER_STATS
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetHookOrderStats(
 	ErgoptiNav_HookOrderStats *out_stats);
 
+/** Exact size of ErgoptiNav_KeyPress; callers set struct_size to it. */
+#define ERGOPTI_NAV_KEY_PRESS_SIZE 24u
+
+/** The physical key is down, as far as this hook has seen. */
+#define ERGOPTI_NAV_KEY_REAL_DOWN 0x01u
+/** The press was suppressed or replayed, so AutoHotkey's physical state misses it. */
+#define ERGOPTI_NAV_KEY_HIDDEN 0x02u
+/** A system-generated alias of this key is down (the fake LCtrl of AltGr). */
+#define ERGOPTI_NAV_KEY_SYSTEM_DOWN 0x04u
+
+/** One key of the press ledger; see ErgoptiNav_QueryKeyPress. */
+typedef struct ErgoptiNav_KeyPress {
+	uint32_t struct_size;
+	/* ERGOPTI_NAV_KEY_* bits; zero for a key the hook does not hold down. */
+	uint32_t flags;
+	/* Increases with each new press; zero when the key is not really down. */
+	uint64_t press_sequence;
+	/* Key presses the ledger had no slot for since the owner started. */
+	uint64_t overflowed;
+} ErgoptiNav_KeyPress;
+
+_Static_assert(sizeof(ErgoptiNav_KeyPress) == ERGOPTI_NAV_KEY_PRESS_SIZE,
+	"The key press wire size changed.");
+
+/**
+ * Reads what the hook knows about one key held now. The ledger is empty while
+ * the owner is stopped, and it stores no history and no text.
+ *
+ * @param sc Low scan byte, plus 0x100 for an extended key (0x138 is right Alt).
+ * @param out_press Receives the state; its struct_size must be preset.
+ * @return An ErgoptiNav_Status value.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_QueryKeyPress(
+	uint16_t sc,
+	ErgoptiNav_KeyPress *out_press);
+
+/**
+ * Reads how the ledger is kept honest: a release no hook sees (UAC, lock,
+ * Ctrl+Alt+Del) must not leave a key held.
+ *
+ * @param out_desktop_watch Receives 1 while the desktop switch watch is installed.
+ * @param out_resets Receives how many desktop switches let the ledger go.
+ * @return An ErgoptiNav_Status value.
+ */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetKeyLedgerHealth(
+	uint32_t *out_desktop_watch,
+	uint64_t *out_resets);
+
 /**
  * Dispatches an event through the exact production state machine without a hook.
  *
@@ -801,6 +849,12 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookReassertWanted(
 	uint32_t flags,
 	uint64_t extra_info);
+
+/** Empties the press ledger between hook-free test cases. */
+void ERGOPTI_NAV_CALL ErgoptiNav_TestResetKeyLedger(void);
+
+/** Hook-free seam: what the desktop switch watch does on an event. */
+void ERGOPTI_NAV_CALL ErgoptiNav_TestDesktopSwitch(void);
 
 /** Arms the same drain latch used by Stop without creating a hook thread. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBeginDrain(void);

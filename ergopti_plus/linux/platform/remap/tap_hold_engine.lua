@@ -39,10 +39,15 @@
 ---    The waiting keys are then replayed in order, after the tap or under the
 ---    hold. Its tap needs no minimum duration and is not cancelled by the
 ---    release of an earlier key: both are what fast typing looks like.
+--- 6. A key whose hold is a modifier taken at key-down, pressed alone, still
+---    taps up to lone_tap_max_ms (tap_holds.lone_modifier_tap_max_ms, shared
+---    rule in tap_hold.lone_tap); 0 keeps the strict threshold.
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
 local OneShotShift = require("tap_hold.one_shot_shift")
+local LoneTap = require("tap_hold.lone_tap")
+local InputEvent = require("infra.input_event")
 
 local M = {}
 
@@ -147,6 +152,8 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   lone_tap_max_ms = number, how long a modifier key pressed alone still taps,
+---     0 for the strict tap-hold (tap_hold.lone_tap),
 ---   roll_keys = { key_id }|nil, the typing keys decided by the order of the
 ---     releases when they keep their own key on a tap and have a hold,
 ---   nav_layer = table|nil, explicitly compiled navigation chords; absent is native,
@@ -183,6 +190,7 @@ function M.new(opts)
 		by_code = {},
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
+		lone_tap_max_ms = LoneTap.validate(options.lone_tap_max_ms),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
@@ -195,7 +203,9 @@ function M.new(opts)
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
 		one_shot_until = nil,
-		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+		-- code -> "shift" while a one-shot Shift wraps it, "spent" once a later
+		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
+		one_shot_keys = {},
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
@@ -277,6 +287,15 @@ function M.new(opts)
 					and LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE[key_id] or nil,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
+			-- A modifier hold taken at key-down, on a key outside the typing keys:
+			-- pressed alone, its tap may last up to lone_tap_max_ms (see 6.).
+			local entry = self.by_code[code]
+			-- A one-shot Shift is no such tap: armed by a long press, it would shift
+			-- the next letter of a Shift the user held and let go unused.
+			-- Every typing key is left out, as on macOS and Windows, whatever its tap.
+			entry.lone_modifier = #entry.mods > 0 and not entry.layer and not roll_keys[key_id]
+				and not entry.hold_past_threshold and not entry.tap_at_down and not entry.instant
+				and tap ~= "one_shot_shift"
 		end
 		::continue::
 	end
@@ -501,6 +520,24 @@ local function input_arm_current(self, arm)
 	if not arm then return true end
 	local ok, current = pcall(arm.current)
 	return ok and current == true and input_arms[self] == arm
+end
+
+--- Takes the one-shot Shift back from every key it still wraps. The Shift is
+--- that press's own, kept for its repeats only: a key struck before it is
+--- released is typed as it is, as on Windows, where the one-shot capture ends
+--- at the first character. Keeping it down capitalised a fast roll (« abc »
+--- gave « ABc »).
+--- @return boolean spent Whether a Shift went up.
+local function spend_one_shot_shift(self, out)
+	local spent = false
+	for wrapped, state in pairs(self.one_shot_keys) do
+		if state == "shift" then
+			self.one_shot_keys[wrapped] = "spent"
+			release(self, out, KEY_LEFTSHIFT)
+			spent = true
+		end
+	end
+	return spent
 end
 
 local function take_one_shot(self, code, now_ms)
@@ -927,6 +964,8 @@ local function process(self, code, value, now_ms)
 					return swallow_until_release(self, code, now_ms)
 				end
 			end
+			-- A tap-hold key struck under a wrapped key takes its Shift back too.
+			spend_one_shot_shift(self, out)
 			if config.instant then
 				cancel_taps(self, nil)
 				self.instant_down[code] = true
@@ -976,7 +1015,8 @@ local function process(self, code, value, now_ms)
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and not state.tap_blocked
-			and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
+			and elapsed <= LoneTap.tap_max_ms(config.threshold_ms, config.lone_modifier, self.lone_tap_max_ms)
+			and elapsed >= self.tap_min_ms
 		for _, needed_up in ipairs(config.tap_needs_up_at_release or {}) do
 			if self.physical_down[needed_up] then is_tap = false end
 		end
@@ -1013,27 +1053,36 @@ local function process(self, code, value, now_ms)
 	end
 
 	-- The one-shot Shift wraps the next key.
-	if self.one_shot_keys[code] and value == UP then
+	local wrapped = self.one_shot_keys[code]
+	if wrapped and value == UP then
 		self.one_shot_keys[code] = nil
 		release(self, out, code)
-		release(self, out, KEY_LEFTSHIFT)
+		if wrapped == "shift" then release(self, out, KEY_LEFTSHIFT) end
 		if input_arms[self] and input_arms[self].code == code then input_arms[self] = nil end
 		return out
 	end
-	if self.one_shot_keys[code] and value == REPEAT and input_arms[self] then
+	if wrapped and value == REPEAT and input_arms[self] then
 		hold_row(self, out, code, REPEAT)
 		return out
 	end
-	if value == DOWN and not self.one_shot_keys[code] then
+	if value == DOWN and not wrapped then
+		-- A key struck while a wrapped one is still down goes down after its
+		-- Shift is up, and is this engine's to release, like the wrapped key.
+		local rolled = not MODIFIER_KEYS[code] and spend_one_shot_shift(self, out)
 		local verdict, text = take_one_shot(self, code, now_ms)
 		if verdict == "shift" then
-			self.one_shot_keys[code] = true
+			self.one_shot_keys[code] = "shift"
 			press(self, out, KEY_LEFTSHIFT)
 			press(self, out, code)
 			return out
 		elseif verdict == "text" then
 			self.one_shot_swallowed[code] = true
 			return out, type_text(self, out, text)
+		end
+		if rolled then
+			self.one_shot_keys[code] = "rolled"
+			press(self, out, code)
+			return out
 		end
 	end
 	return pass(self, code, value)
@@ -1090,6 +1139,46 @@ end
 --- chord.
 function M:activity()
 	cancel_taps(self, nil, true)
+end
+
+--- Whether the held navigation layer binds a wheel direction: the keyboard hook
+--- then owns the pointer, so a bound notch never also scrolls.
+--- @return boolean
+function M:wheel_bound()
+	if self.layer_depth <= 0 then return false end
+	for _, codes in pairs(InputEvent.WHEEL_LAYER_CODES) do
+		for _, code in pairs(codes) do
+			if self.nav_layer[code] then return true end
+		end
+	end
+	return false
+end
+
+--- The held layer's binding of one wheel direction, or nil.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1.
+--- @return table|nil spec
+function M:wheel_binding(axis, direction)
+	if self.layer_depth <= 0 then return nil end
+	local code = InputEvent.wheel_layer_code(axis, direction)
+	return code and self.nav_layer[code] or nil
+end
+
+--- One wheel notch while the navigation layer is held: the binding of that
+--- direction, pressed and released (volume up for each notch, as on Windows),
+--- or nil when the layer leaves this direction alone and the notch scrolls.
+--- @param axis string "vertical" or "horizontal".
+--- @param direction integer 1 or -1, the sign evdev reports.
+--- @return table|nil events Key events to dispatch instead of the notch.
+function M:wheel(axis, direction)
+	local spec = self:wheel_binding(axis, direction)
+	if not spec then return nil end
+	local out = {}
+	for _, chord in ipairs(spec.chords or { spec }) do
+		chord_events(self, out, chord, DOWN)
+		chord_events(self, out, chord, UP)
+	end
+	return out
 end
 
 --- Lets time pass: presses the hold of every key held past its threshold

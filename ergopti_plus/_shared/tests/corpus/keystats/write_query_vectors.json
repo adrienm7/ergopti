@@ -888,6 +888,208 @@
 				"kind": "v_kind"
 			},
 			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', NULL);"
+		},
+		{
+			"name": "agg.ngram_keycode",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "it's\r\nb\u0000c",
+				"keycode": 38,
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES ('dev-1','2026-10-01','it''s'||char(13)||'\nb'||char(0)||'c',38,7) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.ngram_keycode",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "it's\r\nb\u0000c",
+				"keycode": 38,
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES ('dev-1','2026-10-01','it''s'||char(13)||'\nb'||char(0)||'c',38,7) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.ngram_scancode",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "it's\r\nb\u0000c",
+				"scancode": 30,
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES ('dev-1','2026-10-01','it''s'||char(13)||'\nb'||char(0)||'c',30,7) ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.ngram_scancode",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "it's\r\nb\u0000c",
+				"scancode": 30,
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES ('dev-1','2026-10-01','it''s'||char(13)||'\nb'||char(0)||'c',30,7) ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.ngram_shortcut",
+			"dialect": "native",
+			"values": {
+				"table": "ngram_shortcut_bigrams",
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "Code",
+				"token": "it's\r\nb\u0000c",
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_shortcut_bigrams (device_id, date, app, token, c) VALUES ('dev-1','2026-10-01','Code','it''s'||char(13)||'\nb'||char(0)||'c',7) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.ngram_shortcut",
+			"dialect": "cli_json",
+			"values": {
+				"table": "ngram_shortcut_bigrams",
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"app": "Code",
+				"token": "it's\r\nb\u0000c",
+				"c": 7
+			},
+			"sql": "INSERT INTO ngram_shortcut_bigrams (device_id, date, app, token, c) VALUES ('dev-1','2026-10-01','Code','it''s'||char(13)||'\nb'||char(0)||'c',7) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c;"
+		},
+		{
+			"name": "agg.system_day",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"wifi_changes": 1,
+				"space_switches": 2,
+				"audio_muted_ms": 3,
+				"locked_ms": 4,
+				"sleep_ms": 5,
+				"awake_ms": 6,
+				"passive_count": 7,
+				"night_wake_count": 8
+			},
+			"sql": "INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) VALUES ('dev-1','2026-10-01',1,2,3,4,5,6,7,8) ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes = wifi_changes + excluded.wifi_changes, space_switches = space_switches + excluded.space_switches, audio_muted_ms = audio_muted_ms + excluded.audio_muted_ms, locked_ms = locked_ms + excluded.locked_ms, sleep_ms = sleep_ms + excluded.sleep_ms, awake_ms = awake_ms + excluded.awake_ms, passive_count = passive_count + excluded.passive_count, night_wake_count = night_wake_count + excluded.night_wake_count;"
+		},
+		{
+			"name": "agg.system_day",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev-1",
+				"date": "2026-10-01",
+				"wifi_changes": 1,
+				"space_switches": 2,
+				"audio_muted_ms": 3,
+				"locked_ms": 4,
+				"sleep_ms": 5,
+				"awake_ms": 6,
+				"passive_count": 7,
+				"night_wake_count": 8
+			},
+			"sql": "INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, audio_muted_ms, locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) VALUES ('dev-1','2026-10-01',1,2,3,4,5,6,7,8) ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes = wifi_changes + excluded.wifi_changes, space_switches = space_switches + excluded.space_switches, audio_muted_ms = audio_muted_ms + excluded.audio_muted_ms, locked_ms = locked_ms + excluded.locked_ms, sleep_ms = sleep_ms + excluded.sleep_ms, awake_ms = awake_ms + excluded.awake_ms, passive_count = passive_count + excluded.passive_count, night_wake_count = night_wake_count + excluded.night_wake_count;"
+		},
+		{
+			"name": "events.typing",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev-1",
+				"id": 12,
+				"ts": "2026-10-01 10:00:00.000",
+				"date": "2026-10-01",
+				"app": "Code",
+				"title": "it's\r\nb\u0000c",
+				"is_fullscreen": 0,
+				"in_meeting": 1,
+				"mouse_clicks": 2,
+				"mouse_scrolls": 3,
+				"mouse_distance_px": 44,
+				"pause_before_ms": 90,
+				"battery_level": 80,
+				"audio_volume": 0.5,
+				"wpm": 61.25,
+				"text": "it's\r\nb\u0000c",
+				"events_json": "[]"
+			},
+			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]');"
+		},
+		{
+			"name": "events.typing",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev-1",
+				"id": 12,
+				"ts": "2026-10-01 10:00:00.000",
+				"date": "2026-10-01",
+				"app": "Code",
+				"title": "it's\r\nb\u0000c",
+				"is_fullscreen": 0,
+				"in_meeting": 1,
+				"mouse_clicks": 2,
+				"mouse_scrolls": 3,
+				"mouse_distance_px": 44,
+				"pause_before_ms": 90,
+				"battery_level": 80,
+				"audio_volume": 0.5,
+				"wpm": 61.25,
+				"text": "it's\r\nb\u0000c",
+				"events_json": "[]"
+			},
+			"sql": "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ('dev-1', 12, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', NULL, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, NULL, NULL, NULL, 0, 1, 2, 3, 44, 90, 80, 0.5, 61.25, 'it''s'||char(13)||'\nb'||char(0)||'c', NULL, '[]');"
+		},
+		{
+			"name": "events.llm",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev-1",
+				"id": 13,
+				"ts": "2026-10-01 10:00:00.000",
+				"date": "2026-10-01",
+				"app": "Code",
+				"kind": "accepted",
+				"context": "it's\r\nb\u0000c",
+				"predictions_json": "[\"a\"]",
+				"chosen_index": 1,
+				"deletes": 0,
+				"net_saved_chars": 4,
+				"count": 1,
+				"prompt_tokens": 10,
+				"completion_tokens": 5,
+				"total_tokens": 15,
+				"est_cost_usd": 0.00125
+			},
+			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125);"
+		},
+		{
+			"name": "events.llm",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev-1",
+				"id": 13,
+				"ts": "2026-10-01 10:00:00.000",
+				"date": "2026-10-01",
+				"app": "Code",
+				"kind": "accepted",
+				"context": "it's\r\nb\u0000c",
+				"predictions_json": "[\"a\"]",
+				"chosen_index": 1,
+				"deletes": 0,
+				"net_saved_chars": 4,
+				"count": 1,
+				"prompt_tokens": 10,
+				"completion_tokens": 5,
+				"total_tokens": 15,
+				"est_cost_usd": 0.00125
+			},
+			"sql": "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ('dev-1', 13, '2026-10-01 10:00:00.000', '2026-10-01', 'Code', 'accepted', 'it''s'||char(13)||'\nb'||char(0)||'c', '[\"a\"]', NULL, NULL, 1, 0, NULL, 4, 1, 10, 5, 15, 0.00125);"
 		}
 	]
 }

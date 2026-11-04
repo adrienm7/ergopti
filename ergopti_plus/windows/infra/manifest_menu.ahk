@@ -11,13 +11,15 @@
 ; 1. Single renderer: every submenu (shortcuts, metrics, layout, hotstrings,
 ;    gestures, tap_holds) is built by the same loop — structure lives in the
 ;    manifest, not in per-submenu AHK code.
-; 2. Dynamic escape hatch: items whose ``type`` is "dynamic" are routed
-;    to a caller-supplied Map of handler functions so platform-specific UI
-;    (file trees, dialogs, runtime state) stays in the caller.
+; 2. No escape hatch: the retired ``dynamic`` type handed a row back to the
+;    caller, and the menu compiler refuses it now. A row whose contents are
+;    runtime data is a ``list``, whose provider returns DATA drawn here; only
+;    the legacy ``action`` type still hands its id to a caller handler.
 ; 3. Platform filtering: entries with a ``platforms`` array that does not
 ;    include "ahk" are silently skipped.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 #Include menu_population.ahk
 
 ; Capture only built-in metadata at include, before DATA/user callbacks can run.
@@ -165,11 +167,10 @@ _MR_Get(Obj, Key, Default := "") {
 ;
 ; ``ManifestKey``   — key in ``menu_manifest.json`` (e.g. "shortcuts_menu")
 ; ``CategoryName``  — v1 PascalCase master-gate category (e.g. "Shortcuts")
-; ``DynamicHandlers`` — Map of id → Func to call for ``type:"dynamic"`` and
-;   ``type:"action"`` entries, which receive ``(Menu, CategoryName)``. A
-;   ``dynamic`` handler RETURNS its row DATA (an Array, possibly empty) and this
-;   renderer draws it at the entry's place, so no driver code places a row; an
-;   ``action`` handler still populates the menu in place.
+; ``DynamicHandlers`` — Map of id → Func to call for
+;   ``type:"action"`` entries, which receive ``(Menu, CategoryName)`` and
+;   populate the menu in place. The name is historical: the ``dynamic`` type
+;   it once also served is retired, and a stale one is an unknown type below.
 ; ``GroupBuilders`` — Map of group_id → Func to call for ``type:"group"`` entries.
 ;   Each builder receives no arguments and returns a Menu object (or ``false``
 ;   to skip the entry entirely).
@@ -245,8 +246,13 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	; One question about write admission (a registry deep compare of about 21 ms) is asked by
 	; every greyed row of a build. Within this synchronous build it has one answer.
 	BuildMemo := _MR_BuildMemoEnter()
+	; The rows each entry draws are read off the menu when the next entry starts:
+	; the branches below leave through `continue`.
+	OffRule := Map("reason_key", "", "roles", Map(), "settled", 0, "item", 0)
 	try {
 		for Item in MenuDef {
+			_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters)
+			OffRule["item"] := Item
 			if !_MR_CommandLiteralPrefix(Item, &Prefix) {
 				try LoggerError("MenuRenderer", "Invalid literal command prefix — row refused.")
 				continue
@@ -356,7 +362,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 					Added := _MR_RenderRows(Result, Rows, Id, 1)
 					ItemCount += Added
 				} else {
-					; Same class of drift as the action and dynamic branches: a list
+					; Same class of drift as the action branch: a list
 					; entry with no provider is a whole menu section that vanishes
 					try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
 				}
@@ -365,26 +371,81 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 				if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
 					ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
 
-			} else if ItemType == "dynamic" {
-				Id := _MR_Get(Item, "id")
-				if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-					Rows := (DynamicHandlers[Id])(Result, CategoryName)
-					if !(Rows is Array)
-						throw Error("Dynamic item '" . Id . "' in '" . ManifestKey . "' returned no row data.")
-					_MR_RenderRows(Result, Rows, Id, 1)
-					ItemCount++
-				} else {
-					try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
-				}
-
 			} else {
 				try LoggerWarn("MenuRenderer", "Unknown item type '{1}' in '{2}' — skipped.", ItemType, ManifestKey)
 			}
 		}
+		_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters)
 	} finally _MR_BuildMemoLeave(BuildMemo)
 
+	; Positions are read before the separator pass can move a row.
+	_MR_ApplyCategoryOff(Result, OffRule)
 	_MR_NormalizeSeparators(Result)
 	return Result
+}
+
+; Whether a menu's enable row reads off. An unanswered state is not "off": the
+; row reports its drift where it is drawn, and the menu stays as built.
+; @param Item {Map} The enable row: a toggle, or a choice with its off value.
+; @returns {Boolean}
+_MR_EnableRowReadsOff(Item, ManifestKey, StateGetters) {
+	if _MR_Get(Item, "type") == "toggle" {
+		for Key in Item["checked_when"] {
+			if !StateGetters.Has(Key)
+				return false
+		}
+		return !MenuRenderer_ResolveCheckedWhen(ManifestKey, Item["id"], StateGetters)
+	}
+	Path := Item["path"]
+	return StateGetters.Has(Path) && (StateGetters[Path])() == Item["submenu_off_value"]
+}
+
+; What the category-off rule does to the rows one manifest entry draws: "live"
+; stays clickable, "unreasoned" may already be grey for another cause and still
+; owes the reason, "plain" owes it unless already grey, as a caption or a row
+; naming its own reason is. The shared Lua renderer classifies identically.
+_MR_OffRuleRole(Item) {
+	if Item.Has("submenu_off_reason_key") || _MR_Get(Item, "readable_when_off", false)
+		return "live"
+	if Item.Has("disabled_when") && !Item.Has("disabled_reason_key") && _MR_IsForAhk(Item)
+		return "unreasoned"
+	return "plain"
+}
+
+; Records the rows the previous entry drew, by one-based native position.
+_MR_OffRuleSettle(OffRule, Result, ManifestKey, StateGetters) {
+	Count := TrayMenuItemCount(Result)
+	Item := OffRule["item"]
+	if Item is Map {
+		if Count > OffRule["settled"] && Item.Has("submenu_off_reason_key")
+			&& _MR_EnableRowReadsOff(Item, ManifestKey, StateGetters)
+			OffRule["reason_key"] := Item["submenu_off_reason_key"]
+		Role := _MR_OffRuleRole(Item)
+		loop Count - OffRule["settled"]
+			OffRule["roles"][OffRule["settled"] + A_Index] := Role
+	}
+	OffRule["settled"] := Count
+}
+
+; Greys a finished category submenu whose enable row reads off: one rule,
+; declared on that row in the manifest, so no driver restates it. A greyed row
+; that opens a submenu opens nothing.
+_MR_ApplyCategoryOff(Result, OffRule) {
+	if OffRule["reason_key"] == ""
+		return
+	Suffix := " — " . _MR_ReasonHead(t(OffRule["reason_key"]))
+	Handle := Result.Handle
+	for Position, Role in OffRule["roles"] {
+		Caption := TrayMenuHandleItemText(Handle, Position - 1)
+		if Role == "live" || Caption == ""
+			continue
+		State := TrayMenuHandleItemState(Handle, Position - 1)
+		if State == 0xFFFFFFFF
+			throw OSError(A_LastError, -1, "GetMenuState failed")
+		if !(State & 1) || Role == "unreasoned"	; MF_GRAYED
+			Result.Rename(Position . "&", Caption . Suffix)
+		Result.Disable(Position . "&")
+	}
 }
 
 
@@ -1004,7 +1065,8 @@ MenuRenderer_StatusRows(ManifestKey, RowId, Status) {
 		if !(Item is Map)
 			return false
 		ItemType := Item.Get("type", "")
-		Label := ItemType == "label" && Item.Get("i18n", false) is String && Item["i18n"] != ""
+		Label := (ItemType == "label" || ItemType == "section_header")
+			&& Item.Get("i18n", false) is String && Item["i18n"] != ""
 		if ItemType != "---" && !Label
 			return false
 		for Field in Item
@@ -1814,7 +1876,7 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	Id := _MR_Get(Item, "id"), CmdId := _MR_Get(Item, "command")
 	if CmdId == ""
 		CmdId := Id
-	if Row.Has("action") && ManifestKey == "llm_menu" && Id == "llm_toggle" && CmdId == "llm_toggle"
+	if Row.Has("action") && ManifestKey == "llm_menu" && Id == MenuCommand.LLM_TOGGLE && CmdId == MenuCommand.LLM_TOGGLE
 		Row["action"] := MenuStartupRepeatableToggleCommand(Id, Row["action"])
 	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
 }
@@ -1942,11 +2004,13 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 				CurrentLabel .= " " . t(UnitI18n)
 		}
 	}
-	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
+	Label := t(I18nKey)
 	if _MR_Get(Item, "show_current_choice", false) {
 		if CurrentLabel == ""
 			CurrentLabel := String(Current)
-		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
+		Label := _MR_Get(Item, "current_choice_label_value", false)
+			? LabelValue(Label, CurrentLabel)
+			: StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
 	}
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	; A greyed choice that declares why (``disabled_reason_key``) opens nothing

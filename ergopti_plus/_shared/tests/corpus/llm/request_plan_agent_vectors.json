@@ -3,7 +3,7 @@
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
-		"windows": "Not ported yet: the AutoHotkey agent must replay every vector."
+		"windows": "Replays every vector through the manual refusals and the typing pause (tests/unit/modules/llm/actions/test_llm_agent_plan_corpus.ahk). ai_busy and vision are one fact there, a shown AI tooltip that is not an automatic prediction; the automatic mode names no blocker, so those vectors assert whether a triage left."
 	},
 	"vectors": [
 		{

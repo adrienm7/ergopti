@@ -12,6 +12,9 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
+#Include ../../infra/menu_row_order.ahk
 
 
 
@@ -94,9 +97,9 @@ class WPMWidgetConst {
     static STORE_X            := ""
     static STORE_Y            := ""
     ; Config key names written to config.toml under [metrics].
-    static CFG_VISIBLE        := "wpm_widget_visible"
-    static CFG_COLORS         := "wpm_widget_colors"
-    static CFG_GRAPH          := "wpm_widget_graph"
+    static CFG_VISIBLE        := ConfigLeaf.WPM_WIDGET_VISIBLE
+    static CFG_COLORS         := ConfigLeaf.WPM_WIDGET_COLORS
+    static CFG_GRAPH          := ConfigLeaf.WPM_WIDGET_GRAPH
     ; Ring buffer capacity for recent keystrokes.
     static RING_CAP           := 2000
 }
@@ -173,7 +176,8 @@ class WPMWidget {
     ; used as a color fallback so personal hotstrings match their group color.
     static _last_hs_section   := ""
 
-    ; Display options.
+    ; Display options. Placeholders only: WPMWidget_LoadConfig() replaces them at
+    ; boot with the configured value or the manifest default.
     static use_colors     := false
     static show_graph     := false
 
@@ -263,7 +267,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 	; Per-keystroke hot path — gate the arg-array build behind the cached flag so
 	; nothing is interpolated when DEBUG is off (logger.ahk convention).
 	if is_hs and LoggerIsDebugEnabled()
-		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, StoredCategory)
+		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", HotstringCategoryLogName(category), section, HotstringCategoryLogName(StoredCategory))
 }
 
 
@@ -314,88 +318,6 @@ WPMWidget_Calc() {
 }
 
 
-; Resolve the color for a hotstring category.
-;
-; The USER OVERRIDE comes first. Reading the TOML file directly — which is all
-; this used to do — sees only what is on disk, so a color changed in the config
-; window sat in _HotstringsOverrides and never reached the widget until the next
-; reload: the tooltip repainted immediately and the widget did not, from the same
-; edit. HotstringsResolve owns the full cascade (user section > user category >
-; TOML section > TOML category > default) and is the single place that knows
-; about overrides at all.
-;
-; The direct TOML read remains as the FALLBACK, which is the case the bypass was
-; written for: during early init _SharedDir may not be resolved yet and the
-; resolver would hand back a stale empty entry.
-; Returns "" when neither source has a color.
-; Only the FALLBACK file read is memoized, in a static Map keyed by
-; CategoryName. The resolver is asked on every call and is never memoized here.
-_WPMWidget_ReadTomlColor(CategoryName) {
-    static _color_cache := Map()
-
-    ; Ask the override-aware resolver FIRST, before any cache lookup. The
-    ; cache-hit early return used to sit above this block, so the first call
-    ; that fell through to the fallback (resolver not yet available during early
-    ; init — the exact window the fallback exists for) cached its answer, often
-    ; the empty string, and every later call short-circuited on it. The resolver
-    ; was then skipped permanently for that category: a colour changed in the
-    ; config window repainted the tooltip and left the widget on the manual blue
-    ; until restart, which is the very staleness the resolver was added to fix.
-    ; Its result is deliberately NOT memoized — HotstringsResolve owns a
-    ; generation-invalidated cache of its own (_HSResolveCache /
-    ; HotstringsResolveBumpGen), and a second copy here could only desynchronise
-    ; from it.
-    if (CategoryName != "" and IsSet(HotstringsResolve)) {
-        try {
-            Resolved := HotstringsResolve(CategoryName, "")
-            if (IsObject(Resolved) and Resolved.HasOwnProp("Color") and Resolved.Color != "")
-                return Resolved.Color
-        }
-    }
-
-    ; Resolver unavailable or empty — serve the memoized file read. The WPM tick
-    ; fires every ~100 ms and would otherwise re-read the category TOML dozens of
-    ; times per second.
-    if _color_cache.Has(CategoryName)
-        return _color_cache[CategoryName]
-
-    global _SharedDir, GLOBAL_DEFAULT_COLOR
-    FilePath := HotstringsBundledTomlPath(CategoryName)
-    if !FileExist(FilePath) {
-        LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
-        _color_cache[CategoryName] := ""
-        return ""
-    }
-    FileContent := FileRead(FilePath, "UTF-8")
-    InMeta := false
-    loop parse, FileContent, "`n", "`r" {
-        Line := Trim(A_LoopField, " `t")
-        if (Line == "" or SubStr(Line, 1, 1) == "#")
-            continue
-        if (SubStr(Line, 1, 2) == "[[")
-            break
-        if (Line == "[_meta]") {
-            InMeta := true
-            continue
-        }
-        if (SubStr(Line, 1, 1) == "[") {
-            InMeta := false
-            continue
-        }
-        if InMeta and RegExMatch(Line, '^color\s*=\s*"([^"]+)"', &M) {
-            c := M[1]
-            LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
-            ; Skip the global blue fallback — it means "no category color set"
-            result := (c != GLOBAL_DEFAULT_COLOR) ? c : ""
-            _color_cache[CategoryName] := result
-            return result
-        }
-    }
-    LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
-    _color_cache[CategoryName] := ""
-    return ""
-}
-
 ; Returns the raw compact-mode background hex for a hotstring category
 ; (without leading '#'). Reads the color directly from the TOML group file
 ; via ParseTomlGroupConfig — the same path the tooltip uses — so the widget
@@ -406,7 +328,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
         raw := _WPMWidget_ReadTomlColor(CategoryName)
         if (raw != "") {
             result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
-            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
+            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", HotstringCategoryLogName(CategoryName), result)
             if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
                 return result
             ; Falls through to fallback if format is invalid
@@ -417,7 +339,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
                 raw2 := _WPMWidget_ReadTomlColor(Basecat)
                 if (raw2 != "") {
                     result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
-                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
+                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", HotstringCategoryLogName(CategoryName), Basecat, result2)
                     if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
                         return result2
                     ; Falls through to fallback if format is invalid
@@ -425,9 +347,9 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
             }
         }
     } catch as e {
-        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
+        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", HotstringCategoryLogName(CategoryName), e.Message)
     }
-    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
+    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", HotstringCategoryLogName(CategoryName), FallbackHex)
     return FallbackHex
 }
 
@@ -436,8 +358,7 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
 ; "magickey" → "magickey", "distancesreductionQU" → "distancesreduction").
 ; Returns "" when no known base category can be derived.
 _WPMWidget_SectionBaseCategory(SectionName) {
-    static KnownCats := ["autocorrection", "magickey", "distancesreduction",
-                         "sfbsreduction", "rolls", "personal"]
+    static KnownCats := MenuRowOrderList("hotstring_config_categories")
     Lower := StrLower(SectionName)
     for _, Cat in KnownCats {
         if (SubStr(Lower, 1, StrLen(Cat)) == Cat)

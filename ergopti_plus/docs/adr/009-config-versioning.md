@@ -48,6 +48,12 @@ At boot, before anything applies or saves the file, each driver classifies it:
   replace the file in one atomic publication that refuses if the file changed
   since it was read;
 - **current**: nothing is written;
+- **stamped below `oldest_version`**: the file is never written, the session
+  is read-only, one ERROR is logged and a notice names the way out (run 1.0.8
+  once, or move the file aside). The chain starts at `oldest_version`;
+- **no stamp, once `unstamped_version` is below `oldest_version`**: treated as
+  current, as a hand-written file must keep working. No step runs, no backup is
+  written, the next save stamps it and unknown keys go to the explicit cleanup;
 - **newer**, **invalid** stamp, unreadable or unparsable file, or any failure
   of the above: the file is never written. Every later write to it is refused
   for the session and one ERROR is logged.
@@ -80,6 +86,11 @@ placeholder stamped with the current version.
   files advance their stamp without discarding the user's entries. This
   exception does not remove the generic `delete` opcode or its interpreter
   contract.
+- **Squash old steps**: raise `oldest_version` and delete the steps below it,
+  with the corpus cases that only they exercised. On 2026-11-01 it became v12,
+  the schema of the first public release (1.0.0): v2 to v11 existed only in
+  pre-releases and no release from 1.0.0 on writes them. It stays at or below
+  the oldest public schema unless the maintainer decides otherwise.
 - **Change a value's domain** (an enum renamed, `0`/`1` turned into booleans):
   add a `map_value` op; its `from` and `to` sets are disjoint so a replay
   changes nothing.
@@ -87,7 +98,7 @@ placeholder stamped with the current version.
   `set_if_absent` op that writes the previous effective value into files that
   never set it.
 - **Bump** `current_version` by exactly one per step; steps form a gap-free
-  chain from `unstamped_version`. Every new op kind needs a corpus case, and a
+  chain from `oldest_version`. Every new op kind needs a corpus case, and a
   step naming a driver needs a case that driver replays.
 
 ## Consequences

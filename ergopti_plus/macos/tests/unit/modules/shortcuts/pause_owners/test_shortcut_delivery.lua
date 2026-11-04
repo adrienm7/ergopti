@@ -137,7 +137,14 @@ local function load_real_shortcut_delivery_owner()
 		bind_tap_keys = function() return make_handle(noop, "tap_keys") end,
 		bind_layer_wheel = function() return make_handle(noop, "layer_wheel") end,
 		bind_wrap_text_if_selected = make_wrap_handle,
-		bind_cmd_star = function() return make_handle(noop, "cmd_star") end,
+		-- Cmd+* is the delivery probe: the built-in hotkey whose native callback
+		-- consults the owner's delivery gate (Ctrl+G was until schema v20). It
+		-- counts as the former lock-screen probe did.
+		bind_cmd_star = function(_, delivery_admitted)
+			return make_handle(function()
+				if delivery_admitted() then lock_calls = lock_calls + 1 end
+			end, "cmd_star")
+		end,
 		pause_awake = noop,
 		resume_awake = noop,
 		stop_awake = noop,
@@ -192,12 +199,6 @@ local function load_real_shortcut_delivery_owner()
 		is_paused = "is_apps_actions_paused",
 		has_pending = "has_pending_apps_action",
 	})
-	-- Ctrl+G (open ChatGPT) is the delivery probe: the one fixed Ctrl chord the
-	-- bindings owner still hosts. It counts as the former lock-screen probe did.
-	inert_actions.open_chatgpt = function()
-		lock_calls = lock_calls + 1
-		return true
-	end
 	package.loaded["modules.shortcuts.actions.system"] = system_actions
 	package.loaded["modules.shortcuts.actions.text"] = inert_actions
 	package.loaded["modules.shortcuts.actions.apps"] = inert_actions
@@ -262,7 +263,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 		helpers.it("keeps a retained native hotkey inert after rollback delete " .. mode, function()
 			local ctx = load_real_shortcut_delivery_owner()
 			helpers.assert_true(ctx.bindings.start())
-			local initial_callback = ctx.latest_callback("g")
+			local initial_callback = ctx.latest_callback("cmd_star")
 			helpers.assert_not_nil(initial_callback)
 			initial_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -286,7 +287,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			helpers.assert_eq(script_control.resume_all(), false,
 				"a later resume refusal must roll the real bindings owner back")
 			helpers.assert_true(script_control.is_paused())
-			local retained_callback = ctx.latest_callback("g")
+			local retained_callback = ctx.latest_callback("cmd_star")
 			helpers.assert_not_nil(retained_callback)
 			retained_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 1,
@@ -295,7 +296,7 @@ helpers.describe("HS-012 real shortcut delivery fence", function()
 			ctx.set_delete_mode("true")
 			helpers.assert_true(script_control.resume_all())
 			helpers.assert_eq(script_control.is_paused(), false)
-			local resumed_callback = ctx.latest_callback("g")
+			local resumed_callback = ctx.latest_callback("cmd_star")
 			helpers.assert_not_nil(resumed_callback)
 			resumed_callback()
 			helpers.assert_eq(ctx.get_lock_calls(), 2,

@@ -77,6 +77,7 @@ local function terminal_fixture(config, body)
 			fatal_exit_code = 70,
 			schedule = function() f.watchdogs = f.watchdogs + 1; return { stop = function() return true end } end,
 			user_exit_deadline_seconds = 12,
+			reload_deadline_seconds = 12,
 			mark_reload = function() return true end, clear_reload = function() return true end,
 		}))
 		f.coordinator = coordinator
@@ -153,7 +154,8 @@ helpers.describe("common autocorrection native consumer recovery", function()
 			helpers.assert_true(f.Config.init(f.options))
 			local original = f.source
 			terminal_fixture(f.Config, function(terminal)
-				helpers.assert_true(terminal.coordinator.request_reload("delayed"))
+				-- An exit: an unowned reload refused at its fence reloads natively instead
+				helpers.assert_true(terminal.coordinator.request_exit("delayed", 0))
 				helpers.assert_nil(f.Config.capture_terminal_admission())
 				helpers.assert_eq(f.Config.reload(), false)
 				helpers.assert_eq(f.Config.acquire({}), false)

@@ -377,6 +377,10 @@ function M.layout_key_refusal(key)
 	return string.format("key '%s' is not in the active keyboard layout", name)
 end
 
+--- Why bind() returned no handle when the registrar or macOS refused it: most
+--- often another live registration already holds the same physical key.
+M.OS_REFUSAL = "the registrar or macOS refused the registration"
+
 --- Registers an ordinary named chord through the common native owner.
 --- @param chord string Canonical chord.
 --- @param callback function Delivery callback.
@@ -393,7 +397,7 @@ function M.bind(chord, callback, ...)
 		if refusal then return nil, refusal end
 	end
 	local handle = bind_native(chord, callback)
-	if handle == nil then return nil, "the registrar or macOS refused the registration" end
+	if handle == nil then return nil, M.OS_REFUSAL end
 	return handle
 end
 

@@ -20,6 +20,7 @@
 ;    comparable with the live registrations.
 ;
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include %A_LineFile%\..\..\..\_generated\personal_file_descriptors.ahk
 #Include personal_file_controls.ahk
 ; ==============================================================================
@@ -96,11 +97,11 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "", PathOver
 	;    Features v2 uses snake_case with underscores.
 	V2Cat := Category
 	if (V2Cat == "distancesreduction")
-		V2Cat := "distances_reduction"
+		V2Cat := ConfigLeaf.DISTANCES_REDUCTION
 	else if (V2Cat == "sfbsreduction")
-		V2Cat := "sfbs_reduction"
+		V2Cat := ConfigLeaf.SFBS_REDUCTION
 	else if (V2Cat == "magickey")
-		V2Cat := "magic_key"
+		V2Cat := ConfigLeaf.MAGIC_KEY
 
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
 		return 0
@@ -385,11 +386,11 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 	;    lowercase but Features v2 uses snake_case (same remap as the TOML path).
 	V2Cat := Category
 	if (V2Cat == "distancesreduction")
-		V2Cat := "distances_reduction"
+		V2Cat := ConfigLeaf.DISTANCES_REDUCTION
 	else if (V2Cat == "sfbsreduction")
-		V2Cat := "sfbs_reduction"
+		V2Cat := ConfigLeaf.SFBS_REDUCTION
 	else if (V2Cat == "magickey")
-		V2Cat := "magic_key"
+		V2Cat := ConfigLeaf.MAGIC_KEY
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has(V2Cat) {
 		return 0
 	}

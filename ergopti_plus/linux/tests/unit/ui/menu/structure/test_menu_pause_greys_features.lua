@@ -49,7 +49,7 @@ end
 --- @param resumed table|nil Receives a `count` of resume calls.
 --- @return table items
 local function build(paused, resumed)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		-- This fixture tests pause policy with the genuine present native owner.
 		-- No engine initialization, bootstrap or network action runs here.
@@ -150,7 +150,7 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 	end)
 
 	helpers.it("shows a source run's version without a stray v", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({ config = fake_config(), _version = "local", on_quit = function() end })
 		helpers.assert_eq(items[1].title, "Ergopti — local")
 	end)
@@ -161,7 +161,7 @@ end)
 local function with_shared_header(options, body)
 	local ManifestMenu = require("infra.manifest_menu")
 	local I18n = require("infra.i18n")
-	local old_builder = package.loaded["ui.menu.menu_builder"]
+	local old_builder = package.loaded["ui.menu.builder"]
 	local old_facade = package.loaded["infra.manifest_menu"]
 	local old_template, old_command, old_get = ManifestMenu.template_rows, ManifestMenu.command_row, I18n.get
 	local root = ManifestMenu.get_root()
@@ -216,8 +216,8 @@ local function with_shared_header(options, body)
 			end
 			return rows
 		end
-		package.loaded["ui.menu.menu_builder"] = nil
-		local builder = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		local builder = require("ui.menu.builder")
 		if options.before == "template" then ManifestMenu.template_rows = nil
 		elseif options.before == "command" then ManifestMenu.command_row = nil end
 		local context = { llm = require("modules.llm.prediction_engine"), config = fake_config(),
@@ -247,7 +247,7 @@ local function with_shared_header(options, body)
 			for name, value in next, snapshot.fields do snapshot.record[name] = value end
 		end
 	end
-	package.loaded["infra.manifest_menu"], package.loaded["ui.menu.menu_builder"] = old_facade, old_builder
+	package.loaded["infra.manifest_menu"], package.loaded["ui.menu.builder"] = old_facade, old_builder
 	if not ok then error(failure, 0) end
 end
 

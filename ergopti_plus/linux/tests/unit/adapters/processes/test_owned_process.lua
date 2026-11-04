@@ -428,12 +428,6 @@ end)
 -- handle is a fixture-owned pipe, independently closed on every exit path.
 local function feeder_options(mode, cap)
  local actual_uv = require("luv")
- local paths = require("infra.paths")
- local file = assert(io.open(paths.driver_root() .. "/infra/archive_output.lua", "rb"))
- local source = assert(file:read("*a")); assert(file:close())
- local first = assert(source:find("local retained_tar_operations =", 1, true))
- local last = assert(source:find("--- Constructs only the fixed native registry;", first, true))
- local part = source:sub(first, last - 1)
  local names = { "luv", "infra.managed_http_deadline", "adapters.owned_process" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local pipe, close_ack, captured, starts, reads = nil, false, nil, 0, 0
@@ -461,8 +455,7 @@ local function feeder_options(mode, cap)
   package.loaded.luv = uv
   package.loaded["infra.managed_http_deadline"] = { start = function() return timer end }
   package.loaded["adapters.owned_process"] = process
-  local compile = loadstring or _G.load
-  local construct = assert(compile(part .. "\nreturn new_private_tar_feeder\n", "@private-tar-listing-model"))()
+  local construct = require("infra.archive_tar_feeder").new
   local start = assert(construct({ ffi = { new = function() return { [0] = -1 } end },
    symbols = { allocate_reader = function() reads = reads + 1; return -1 end } }, cap))
   assert(start({ pointer = {}, committed = true }, mode, "/controlled/extract", 3,

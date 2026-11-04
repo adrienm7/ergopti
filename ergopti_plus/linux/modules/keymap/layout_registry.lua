@@ -66,8 +66,8 @@ local REQUEST_OWNER = "layout_registry"
 -- ================================
 -- ================================
 
--- Interpreter of the user installer, looked up in PATH like the installers do.
-local PYTHON = "python3"
+-- The git a clone run asks for its registry changes, resolved through PATH.
+local GIT = "git"
 
 -- Oldest Python the installer supports (the installers' floor).
 local MIN_PYTHON = { 3, 8 }
@@ -180,6 +180,14 @@ local function scoped_deps(source)
 			end)
 		end
 	end
+	if type(source.python) == "function" then
+		scoped.python = function(callback)
+			if not current(epoch) then return false end
+			return source.python(function(...)
+				if current(epoch) then return callback(...) end
+			end)
+		end
+	end
 	if type(source.transport) == "table" then
 		scoped.transport = {}
 		for key, value in pairs(source.transport) do scoped.transport[key] = value end
@@ -214,6 +222,11 @@ end
 -- ================================
 -- ================================
 
+-- The last decode of each shared JSON file, with the exact text it came from:
+-- the settings are resolved for every registry call (twice per keyboard-layout
+-- menu rebuild), and identical bytes decode to the identical, read-only value.
+local _shared_json = {}
+
 --- Reads and decodes one shared JSON file.
 --- @param rel string Path under _shared/.
 --- @return table|nil value
@@ -222,9 +235,12 @@ local function read_shared_json(rel)
 	local path = Paths.shared(rel)
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
+	local known = _shared_json[path]
+	if known ~= nil and known.raw == raw then return known.decoded, nil end
 	-- The shared json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
+	_shared_json[path] = { raw = raw, decoded = decoded }
 	return decoded, nil
 end
 
@@ -311,6 +327,58 @@ local function file_sha256(dir, timeout_ms)
 	end
 end
 
+--- Asks before the one download of Ergopti's own Python, through the menu's
+--- yes/no question (the owned dialog, under the modal keyboard release).
+--- @param bytes number The archive's size.
+--- @return boolean accepted
+local function confirm_python_download(bytes)
+	local Dialogs = require("ui.menu.menu_dialogs")
+	local megabytes = string.format("%d", math.ceil(bytes / 1048576))
+	local text = I18n.get("layouts.managed_python_offer"):gsub("{1}", function() return megabytes end)
+	return Dialogs.ask_yes_no(I18n.get("layouts.managed_python_title"), Dialogs.plain_markup(text),
+		I18n.get("menu.llm.btn_download"), I18n.get("common.cancel")) == true
+end
+
+--- Ergopti's own Python: the installed interpreter, or one downloaded on
+--- consent (modules/keymap/managed_python.lua, pinned in the runtime manifest).
+--- @param confirm function|nil The consent; the owned dialog by default.
+--- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
+local function managed_python(confirm)
+	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local native = require("luv")
+	local deps = {
+		pin = require("_generated.native_runtime").managed_python,
+		data_dir = ConfigPaths.data(),
+		machine = function() return native.os_uname().machine end,
+		exists = FileSystem.exists,
+		confirm = confirm or confirm_python_download,
+		download = function(url, path, bytes, callback)
+			return HttpClient.download(url, {}, path, { timeout_ms = timeout_ms, max_download_bytes = bytes,
+				owner = REQUEST_OWNER, https_only = true }, callback)
+		end,
+		size = function(path)
+			local stat = native.fs_stat(path)
+			return stat and stat.type == "file" and stat.size or nil
+		end,
+		sha256 = function(path, callback)
+			FileDigest.sha256(path, { timeout_ms = timeout_ms, owner = REQUEST_OWNER }, callback)
+		end,
+		unpack = function(archive, into, callback)
+			if not ShellRunner.has_command("tar") then callback(false, "tar is not installed") return end
+			ProcessRunner.run("tar", { "-xzf", archive, "-C", into, "--no-same-owner" }, { timeout_ms = timeout_ms },
+				function(result) callback(result.exit_code == 0 and result.error == nil, result.error or result.stderr) end)
+		end,
+		ensure_dir = ensure_dir,
+		remove_tree = function(path, callback)
+			ProcessRunner.run("rm", { "-rf", "--", path }, { timeout_ms = timeout_ms },
+				function(result) callback(result.exit_code == 0 and result.error == nil) end)
+		end,
+		delete = FileSystem.delete,
+		rename = os.rename,
+	}
+	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
+end
+
 --- The production collaborators.
 --- @param settings table Result of M.settings().
 --- @return table
@@ -331,6 +399,21 @@ local function default_deps(settings)
 	return {
 		settings = settings,
 		local_source = require("infra.installation").is_source_run(),
+		-- The asynchronous runner: the refresh shares the daemon's loop with the
+		-- grabbed keyboard, so a blocking git would delay keys.
+		registry_changes = function(dir, callback)
+			ProcessRunner.run(GIT, Catalogue.registry_changes_args(dir), { timeout_ms = settings.timeout_ms },
+				function(result)
+					if result.exit_code == 0 and result.error == nil then
+						callback(result.stdout or "", nil)
+					elseif result.not_found then
+						callback(nil, "git is not installed")
+					else
+						local stderr = TextUtils.trim(result.stderr or "")
+						callback(nil, tostring(result.error) .. (stderr ~= "" and (": " .. stderr) or ""))
+					end
+				end)
+		end,
 		transport = {
 			get = function(url, headers, timeout_ms, callback)
 				local is_index = url:sub(-#settings.index_file) == settings.index_file
@@ -364,6 +447,7 @@ local function default_deps(settings)
 		exists = FileSystem.exists,
 		ensure_dir = ensure_dir,
 		run = ProcessRunner.run,
+		python = managed_python(),
 		local_dir = local_dir,
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
 		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
@@ -371,6 +455,27 @@ local function default_deps(settings)
 		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
 		translate = I18n.get,
 	}
+end
+
+--- The production managed Python for probes only: the live hardware probe
+--- (tests/hardware/run_managed_python_live.lua) injects its consent; nil keeps
+--- the owned consent dialog (the native caption inventory).
+--- @param confirm function|nil confirm(bytes) -> boolean
+--- @return function python(callback)
+function M._managed_python_for_probe(confirm)
+	assert(confirm == nil or type(confirm) == "function", "a probe consent is a function")
+	return managed_python(confirm)
+end
+
+--- Installs Ergopti's Python ahead of a layout install, for the field report
+--- collector (tools/dev/linux-field-run.sh): the maintainer who runs it gave the
+--- consent, which the collector states in one line from confirm(bytes) before
+--- the download. An installed interpreter answers without calling confirm.
+--- @param confirm function confirm(bytes) -> boolean
+--- @param on_done function on_done(ok, interpreter_or_code, detail)
+function M.install_python(confirm, on_done)
+	assert(type(confirm) == "function" and type(on_done) == "function", "install_python needs a consent and a callback")
+	managed_python(confirm)(on_done)
 end
 
 --- Resolves the collaborators, the production ones by default.
@@ -428,23 +533,31 @@ local function version_probe_args()
 	}
 end
 
---- Runs a Python helper after checking the interpreter.
+--- Runs a Python helper on Ergopti's own interpreter (deps.python: installed,
+--- or downloaded on consent, modules/keymap/managed_python.lua) after checking
+--- that it runs: the host's python3 is never used.
 --- on_done(ok, result_or_code, detail) is called exactly once.
 --- @param deps table
 --- @param args table Argument vector after the interpreter.
 --- @param on_done function
 local function run_python(deps, args, on_done)
-	deps.run(PYTHON, version_probe_args(), { timeout_ms = CHILD_TIMEOUT_MS }, function(probe)
-		if probe.not_found or probe.exit_code == PYTHON_TOO_OLD_EXIT then
-			on_done(false, M.FAILURE_PYTHON, "python3 3.8 or newer is required")
+	deps.python(function(available, interpreter, reason)
+		if not available then
+			on_done(false, M.FAILURE_PYTHON, tostring(interpreter) .. ": " .. tostring(reason))
 			return
 		end
-		if probe.error then
-			on_done(false, M.FAILURE_PYTHON, "python3 does not run: " .. tostring(probe.error))
-			return
-		end
-		deps.run(PYTHON, args, { timeout_ms = CHILD_TIMEOUT_MS }, function(result)
-			on_done(true, result, nil)
+		deps.run(interpreter, version_probe_args(), { timeout_ms = CHILD_TIMEOUT_MS }, function(probe)
+			if probe.not_found or probe.exit_code == PYTHON_TOO_OLD_EXIT then
+				on_done(false, M.FAILURE_PYTHON, interpreter .. " is not Python 3.8 or newer")
+				return
+			end
+			if probe.error then
+				on_done(false, M.FAILURE_PYTHON, interpreter .. " does not run: " .. tostring(probe.error))
+				return
+			end
+			deps.run(interpreter, args, { timeout_ms = CHILD_TIMEOUT_MS }, function(result)
+				on_done(true, result, nil)
+			end)
 		end)
 	end)
 end
@@ -504,6 +617,15 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		rows = rows,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	-- What the conversion could not carry is named, never silently lost.
+	if #result.unplaced > 0 then
+		Logger.warn(LOG, "Layout '%s': %d key(s) have no Linux key name and are left out (macOS codes %s).",
+			entry.id, #result.unplaced, table.concat(result.unplaced, ", "))
+	end
+	if #result.conflicts > 0 then
+		Logger.warn(LOG, "Layout '%s': %d dead-key sequence(s) collide; the first output of each is kept.",
+			entry.id, #result.conflicts)
+	end
 	local out_dir = deps.local_dir .. entry.id .. "/"
 	for _, file in ipairs({
 		{ entry.id .. ".xkb", result.symbols_text },
@@ -885,6 +1007,24 @@ local function session_type()
 	return (os.getenv("XDG_SESSION_TYPE") or ""):lower()
 end
 
+--- How this session loads a user layout live: "x11" (the server's keymap is
+--- replaced), "wayland" (GNOME or KDE select it through their own setting), or nil
+--- with the declared session type. The installer decides again from the full
+--- desktop identity and refuses with session_unsupported where it has no path.
+--- @param deps table|nil { session_type, desktop_is } (tests replace them).
+--- @return string|nil path
+--- @return string session
+function M.live_path(deps)
+	deps = deps or {}
+	local session = (deps.session_type or session_type)()
+	if session == "x11" then return "x11", session end
+	if session == "wayland" then
+		local desktop_is = deps.desktop_is or require("infra.display_server").desktop_is
+		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
+	end
+	return nil, session
+end
+
 --- The layout the options apply to: the one named, else the one this session made
 --- the input source, else the only installed one.
 --- @param id string|nil
@@ -902,13 +1042,17 @@ local function rows_base(id, record)
 end
 
 --- Applies the number-row options to an installed layout and loads it into the
---- running session: the layout is converted again with the options, installed in the
---- user XKB tree and, on X11, compiled into the running server (apply-x11). Nothing is
---- written where the session cannot load a user layout live (Wayland, until a
---- compositor is known to compile one); the stored choice is kept by the caller.
---- on_done(true, { id, rows }) or on_done(false, failure_code, detail, user_message,
---- live_code) runs once unless terminal shutdown cancels its delivery. live_code is the
---- closed code of apply-x11 (not_loaded, compile_failed, ...) when that step failed.
+--- running session: the layout is converted again with the options, then on X11
+--- installed in the user XKB tree and compiled into the running server (apply-x11),
+--- and on GNOME or KDE Wayland installed under the live slot the desktop does not use
+--- and selected through the desktop setting (apply-wayland). Either succeeds only once
+--- the keymap read back from the session (the server, or XWayland which receives the
+--- compositor's) holds the new cells. Nothing is written where the session has no live
+--- path; the stored choice is kept by the caller.
+--- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
+--- user_message, live_code) runs once unless terminal shutdown cancels its delivery.
+--- live_code is the installer's closed code (not_loaded, stale_keymap, select_refused,
+--- ...) when the load failed.
 --- @param id string|nil Installed layout id; nil takes the active or the only one.
 --- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
 --- @param on_done function
@@ -924,8 +1068,8 @@ function M.apply_rows(id, rows, on_done, deps)
 		return false
 	end
 	deps = resolved
-	local session = (deps.session_type or session_type)()
-	if session ~= "x11" then
+	local path, session = M.live_path(deps)
+	if path == nil then
 		Logger.warn(LOG, "The number-row options were not applied: a '%s' session cannot load a user layout live.",
 			session == "" and "unknown" or session)
 		on_done(false, M.FAILURE_SESSION, session, nil)
@@ -961,6 +1105,25 @@ function M.apply_rows(id, rows, on_done, deps)
 		if not current(epoch) then return end
 		if not converted then
 			finish(false, code, convert_err)
+			return
+		end
+		if path == "wayland" then
+			local args = { "apply-wayland", "--layout-id", base, "--display-name", entry.name,
+				"--source-dir", deps.local_dir .. base }
+			for _, language in ipairs(type(entry.languages) == "table" and entry.languages or {}) do
+				args[#args + 1] = "--language"
+				args[#args + 1] = language
+			end
+			run_installer(deps, args, function(applied, applied_report, apply_err, live_code)
+				if not current(epoch) then return end
+				if not applied then
+					local code = live_code == M.FAILURE_SESSION and M.FAILURE_SESSION or M.FAILURE_LIVE
+					finish(false, applied_report == M.FAILURE_INSTALLER and code or applied_report, apply_err, live_code)
+					return
+				end
+				_active = base
+				finish(true, { id = base, rows = report, slot = applied_report.slot })
+			end)
 			return
 		end
 		run_installer(deps, { "install", "--layout-id", base, "--display-name", entry.name,

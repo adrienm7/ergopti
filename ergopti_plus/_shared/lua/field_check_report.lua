@@ -19,6 +19,8 @@
 ---    running, logging and presentation.
 --- ==============================================================================
 
+local LabelValue = require("locale.label_value")
+
 local M = {}
 
 --- Step states. A run passes when no step failed; info and skip never fail it.
@@ -57,6 +59,8 @@ end
 function M.new_report(check_id)
 	assert(type(check_id) == "string" and check_id ~= "", "field check: check id must be a non-empty string")
 	local steps, seen = {}, {}
+	-- The closed code of a prerequisite that kept the check from running, or nil.
+	local not_run = nil
 	local report = {}
 
 	--- Records one step; a repeated step identity is a bug and raises.
@@ -73,6 +77,15 @@ function M.new_report(check_id)
 		return seen[id] == true
 	end
 
+	--- Marks the check as not run: a prerequisite it does not own was missing, so
+	--- the run proves nothing either way (a field run records it as a skip).
+	--- @param code string Closed code of the missing prerequisite.
+	function report.not_run(code)
+		assert(M.sanitize_value(code) == code and code ~= M.REDACTED, "field check: not-run code must be a closed code")
+		assert(not_run == nil, "field check: not-run recorded twice")
+		not_run = code
+	end
+
 	--- Snapshot of the run so far.
 	function report.result()
 		local copy, passed = {}, true
@@ -80,7 +93,7 @@ function M.new_report(check_id)
 			copy[index] = { id = step.id, state = step.state, value = step.value }
 			if step.state == M.STATE_FAIL then passed = false end
 		end
-		return { check = check_id, steps = copy, passed = passed }
+		return { check = check_id, steps = copy, passed = passed, not_run = not_run }
 	end
 
 	return report
@@ -96,8 +109,9 @@ function M.format_log_line(result)
 		if step.value then part = part .. ":" .. step.value end
 		parts[#parts + 1] = part
 	end
+	local verdict = result.not_run and "skip" or result.passed and "pass" or "fail"
 	return string.format("check=%s verdict=%s steps=%d %s", result.check,
-		result.passed and "pass" or "fail", #result.steps, table.concat(parts, " "))
+		verdict, #result.steps, table.concat(parts, " "))
 end
 
 local MARKS = {
@@ -116,7 +130,7 @@ function M.format_text(result, translate)
 	}
 	for _, step in ipairs(result.steps) do
 		local line = MARKS[step.state] .. " " .. translate("field_check.step." .. step.id)
-		if step.value then line = line .. " : " .. step.value end
+		if step.value then line = LabelValue.compose(translate, line, step.value) end
 		lines[#lines + 1] = line
 	end
 	return table.concat(lines, "\n")

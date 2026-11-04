@@ -366,6 +366,97 @@ _CMG_NewerFileIsLoggedAndReadOnly() {
 Test("config migrate: a newer config logs its refusal and refuses candidate rendering "
 	. "(config-migrate-newer-read-only)", _CMG_NewerFileIsLoggedAndReadOnly)
 
+; The chain was squashed to v2: v1 has no path left.
+_CMG_SquashedRegistry() {
+	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(
+		"[registry]`ncurrent_version = 3`nunstamped_version = 1`noldest_version = 2`n`n"
+		. '[steps.v2_to_v3]`nfrom = 2`nto = 3`ndrivers = ["ahk"]`nreason = "r"`n'
+		. 'ops = [{ op = "delete", section = "gestures", key = "old_toggle" }]`n',
+		"the squashed test registry"))
+}
+
+_CMG_OlderFileIsRefusedInWords(Older) {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, Older))
+		Result := ConfigMigrateRun(Path, _CMG_SquashedRegistry(), _CMG_STAMP)
+		AssertEqual("unsupported", Result["status"])
+		AssertEqual(1, Result["read_only"])
+		Assert(InStr(Result["detail"], "oldest this build migrates is v2", true), Result["detail"])
+		Assert(FSUtf8ExactMatches(Path, Older), "the refused file keeps its exact bytes")
+		AssertFalse(FileExist(ConfigMigrateBackupPath(Path, 3, _CMG_STAMP)), "no backup is written over anything")
+		Built := TOML_BuildUpdatedContent(Path, [{ Section: "gestures", Key: "enabled", Value: TOML_Bool(false) }])
+		AssertEqual("error", Built["status"], "a transactional candidate over the refused file must refuse too")
+		Assert(FSUtf8ExactMatches(Path, Older), "the refused file still keeps its exact bytes")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a stamp below the oldest version is refused and left byte for byte "
+	. "(config-migrate-older-refused)", _CMG_OlderFileIsRefusedInWords.Bind(
+	"[_meta]`nschema_version = 1`n`n[gestures]`nold_toggle = false`n"))
+
+_CMG_NoStampIsCurrent() {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Handwritten := "# by hand`n[gestures]`nold_toggle = false`n"
+		AssertTrue(FSWriteDurable(Path, Handwritten))
+		Result := ConfigMigrateRun(Path, _CMG_SquashedRegistry(), _CMG_STAMP)
+		AssertEqual("current", Result["status"])
+		AssertEqual(0, Result["read_only"])
+		Assert(FSUtf8ExactMatches(Path, Handwritten), "no step ran and nothing was written")
+		AssertFalse(FileExist(ConfigMigrateBackupPath(Path, 3, _CMG_STAMP)), "nothing is backed up")
+		AssertEqual("", TOML_WriteRefusal(Path), "the session can save it")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a file with no stamp is current once the chain was squashed "
+	. "(config-migrate-no-stamp-current)", _CMG_NoStampIsCurrent)
+
+_CMG_OldestVersionStillMigrates() {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[_meta]`nschema_version = 2`n`n[gestures]`nold_toggle = false`n"))
+		Result := ConfigMigrateRun(Path, _CMG_SquashedRegistry(), _CMG_STAMP)
+		AssertEqual("migrated", Result["status"])
+		AssertEqual(2, Result["from"])
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a file at the oldest version still climbs the chain "
+	. "(config-migrate-older-refused)", _CMG_OldestVersionStillMigrates)
+
+_CMG_OlderFileNamesItsCauseInWords() {
+	global ConfigurationFile
+	Dir := _CMG_NewDir()
+	Saved := IsSet(ConfigurationFile) ? ConfigurationFile : ""
+	try {
+		ConfigurationFile := Dir . "\config.toml"
+		Old := "[_meta]`nschema_version = 1`n`n[gestures]`nenabled = true`n"
+		AssertTrue(FSWriteDurable(ConfigurationFile, Old))
+		AssertEqual("unsupported", ConfigMigrateBoot(ConfigurationFile)["status"])
+		AssertTrue(ConfigOlderSchemaReadOnly(), "the session names the old file as the cause")
+		AssertFalse(ConfigNewerSchemaReadOnly(), "an old file is not a newer one")
+		Messages := []
+		AssertTrue(ConfigNotifyOlderSchemaAtBoot((Message, *) => Messages.Push(Message)))
+		AssertEqual(1, Messages.Length)
+		AssertEqual(t("config.read_only.older_schema"), Messages[1], "the user reads the sentence, not a key")
+		AssertFalse(Messages[1] == "config.read_only.older_schema", "the locale carries the sentence")
+		Assert(InStr(Messages[1], "1.0.8"), "the sentence names the release that bridges the file")
+		ConfigReportPersistenceFailure("the test", (Message, *) => Messages.Push(Message))
+		AssertEqual(t("config.read_only.older_schema"), Messages[2], "a refused save repeats the cause")
+		AssertEqual("menu.read_only.older_schema", _LLM_Menu_ConfigBlockReason(), "the native parents name the cause")
+		Assert(FSUtf8ExactMatches(ConfigurationFile, Old), "every check leaves the exact bytes")
+	} finally {
+		ConfigurationFile := Saved
+		DirDelete(Dir, true)
+	}
+}
+Test("config migrate: an old file says what to do at boot, on a refused save and in the menus "
+	. "(config-migrate-older-refused)", _CMG_OlderFileNamesItsCauseInWords)
+
 _CMG_AbsentFileIsLeftAlone() {
 	Dir := _CMG_NewDir()
 	try {
@@ -451,7 +542,7 @@ _CMG_RegistryLoaderRejectsDefects() {
 	Assert(Rejected >= 20, "expected at least 20 rejected registries, found " . Rejected)
 	Shipped := ConfigMigrateShippedRegistry()
 	Assert(Shipped["steps"].Length >= 1
-		&& Shipped["steps"].Length == Shipped["current"] - Shipped["unstamped"],
+		&& Shipped["steps"].Length == Shipped["current"] - Shipped["oldest"],
 		"the shipped registry is a gap-free chain with at least one step")
 	AssertEqual(Shipped["current"], ConfigMigrateCurrentVersion())
 }

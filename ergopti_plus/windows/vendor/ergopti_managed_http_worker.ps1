@@ -52,7 +52,9 @@ try {
         param([Uri]$Destination)
         if ($InputValue.fixed_proxy -is [string]) {
             $Endpoint = $InputValue.fixed_proxy
-            if ($Endpoint -ne '') { $Endpoint = Get-ErgoptiHttpRelay $Endpoint $Policy }
+            # A relay with credentials stays in the environment, never in this input file.
+            if ($Endpoint -ceq 'override') { $Endpoint = [Environment]::GetEnvironmentVariable('ERGOPTI_PROXY_OVERRIDE', 'Process') }
+            if ($Endpoint -ne '') { $Endpoint = Resolve-ErgoptiRelayEndpoint $Endpoint $Policy }
             $Selection = @{ Ok = $true; MaxRoutes = $Policy.max_selections; MaxRedirects = $Policy.redirects.max_hops;
                 Routes = @(@{ Kind = $(if ($Endpoint -eq '') { 'direct' } else { 'proxy' }); Endpoint = $Endpoint;
                     Authentication = $(if ($Endpoint -eq '') { 'none' } else { 'current_user_proxy_only' }) }) }
@@ -69,6 +71,7 @@ try {
             throw 'Native full-URL routing was refused.'
         }
         if ($Selection.Routes.Count -lt 1 -or $Selection.Routes.Count -gt $Selection.MaxRoutes) { throw 'Native route count was refused.' }
+        if ($Selection -is [hashtable] -and $Selection.ContainsKey('PacFallbackStage')) { $Answer.pac_fallback_stage = $Selection.PacFallbackStage }
         # The current shared policy preserves environment bypass for selected
         # system relays too. An explicit proxy must not erase no_proxy.
         if ($Policy.selected_proxy_bypass -cne 'environment') { throw 'Canonical selected-proxy bypass policy was refused.' }

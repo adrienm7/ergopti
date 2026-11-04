@@ -238,6 +238,23 @@ HotstringsTerminatorRecordCurrent(Admission) {
 	return false
 }
 
+/**
+ * Whether a source still holds the record a row displays. Other bytes may differ:
+ * the boot and every live setting write the file after the owner read it, and
+ * asking for the same bytes refused a click on any such row. The plan builds on
+ * the given source, so what those writes stored survives the edit.
+ */
+_HotstringsTerminatorSourceHoldsDisplayed(Source, Admission) {
+	if Source == Admission.Source
+		return true
+	for Record in HotstringsTerminatorRecordsResolve(TOML_ParseDocument(Source)).Records {
+		if Record.Key == Admission.Key
+			return Record.Char == Admission.Char && Record.Label == Admission.Label
+				&& Record.Consume == Admission.Consume && Record.Enabled == Admission.Enabled
+	}
+	return false
+}
+
 /** Builds a detached list edit; unknown fields and quarantined rows survive. */
 HotstringsTerminatorRecordPlan(Source, Operation) {
 	if !(Operation is Map) || !(Operation.Get("mode", 0) is String)
@@ -246,7 +263,8 @@ HotstringsTerminatorRecordPlan(Source, Operation) {
 		Admission := Operation["admission"]
 		if !HotstringsTerminatorRecordCurrent(Admission)
 				|| (Operation["mode"] != "remove" && Operation["mode"] != "state")
-				|| Operation.Get("key", 0) !== Admission.Key || Source !== Admission.Source
+				|| Operation.Get("key", 0) !== Admission.Key
+				|| !_HotstringsTerminatorSourceHoldsDisplayed(Source, Admission)
 			throw ValueError("The displayed terminator source owner changed before editing.")
 	}
 	Document := TOML_ParseDocument(Source, , &Physical)
@@ -523,7 +541,7 @@ HotstringsTerminatorRecordsEdit(Operation, Options := unset) {
 		} catch as Err {
 			Receipt["error"] := Err.Message
 			Transferred := Rollback()
-			try LoggerError("HotstringsConfig", "Custom terminator editing was refused before runtime publication.")
+			try LoggerError("HotstringsConfig", "Custom terminator editing was refused before runtime publication: {1}.", Err.Message)
 			return Receipt
 		} finally {
 			if !Transferred

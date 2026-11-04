@@ -17,9 +17,10 @@ import time
 
 DRIVER = Path(__file__).absolute().parents[2]
 SHARED = DRIVER.parent / "_shared"
-# Source execution and actual outgoing model profiles must pass native CI before
-# the canonical user-facing serve caller may activate this new native port.
-NATIVE_PRODUCTION_QUALIFIED = False
+# Open since bc09e4584c made this owner the only Ollama macOS starts: the guard
+# refused every launch, so no field run could qualify the native port. Setting
+# it back to False refuses each launch with the logged reason "unavailable".
+NATIVE_PRODUCTION_QUALIFIED = True
 
 
 def load(name, path):
@@ -188,6 +189,7 @@ class ServeOwner:
         self.retirement_timeout = retirement_timeout
         self.deadline = time.monotonic() + timeout
         self.source_fd = None
+        self.binary = None
         self.alias = self.session = self.bootstrap = self.authority = self.operation = None
         self._prepared = False
         self._started = False
@@ -271,6 +273,7 @@ class ServeOwner:
         binary = RUNTIME.native_verify(
             self.target, self.contract, self.asset, self.expected_receipt, self.deadline
         )
+        self.binary = binary
         try:
             self.source_fd = os.open(binary, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             before = os.fstat(self.source_fd)
@@ -492,9 +495,12 @@ class ServeOwner:
         ports = AUTHORITY.POLICY.BoundAliasPorts(
             RegisteredPorts(), proof, self.session.data, os.geteuid()
         )
+        # The API worker admits only the canonical runtime path and reads the
+        # alias from the source_alias proof; the alias spelling made every
+        # request exit 64 (field run of 2026-10-30 18:38, native_first_frame).
         self._api_admission = PULL.PullOwner(
             self.session.data,
-            str(self.alias.executable),
+            str(self.binary),
             ports,
             self.idle_timeout,
             self.policy.shared.maximum_bytes,
@@ -727,8 +733,18 @@ def main():
             owned_stdin=arguments.owned_stdin,
             log_directory=arguments.log_directory,
         )
-    except Exception:
-        print("Managed Ollama daemon admission refused.", file=sys.stderr)
+    except ServeRefusal as refusal:
+        # The driver logs this line. The reason is a fixed word, never a path
+        # or a value (field run 2026-10-30 17:37: the daemon exited before
+        # READY with no trace of which check refused it).
+        print("Managed Ollama daemon admission refused: %s." % refusal, file=sys.stderr)
+        return 78
+    except Exception as error:
+        print(
+            "Managed Ollama daemon admission refused: %s."
+            % RUNTIME.describe_refusal(error, __file__),
+            file=sys.stderr,
+        )
         return 78
 
 

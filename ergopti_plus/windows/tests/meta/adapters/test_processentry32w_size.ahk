@@ -12,14 +12,12 @@
 
 #Requires AutoHotkey v2.0
 
-_PE32_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_PE32_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _PE32_SourceScanCheck() {
-	Src := _PE32_ReadSource("modules/keystats/keystats_av_state.ahk")
+	Src := _PE32_ReadSource("keystats_av_state.ahk")
 	Assert(Src != "", "Source file keystats_av_state.ahk must exist")
 
 	Body := _DriverFuncBody("_KL_AV_FindCaptureExeSnapshot")

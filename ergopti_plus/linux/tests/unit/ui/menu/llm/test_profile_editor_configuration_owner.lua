@@ -28,7 +28,7 @@ local function with_profile(body)
 		assert(file:write(baseline)); assert(file:close())
 		local bridge = helpers.load_module("ui.prompt_editor.bridge")
 		local i18n = require("infra.i18n")
-		local rows = require("ui.menu.menu_builder").build({
+		local rows = require("ui.menu.builder").build({
 			_version = "0.0.0-dev.12", paused = false, is_paused = function() return false end,
 			llm = { is_enabled = function() return true end, get_live = function() return nil end,
 				set_live = function() return true end }, webview = f.host,
@@ -42,7 +42,7 @@ local function with_profile(body)
 			local execute, confirmations = os.execute, 0
 			os.execute = function(command)
 				if command == "command -v zenity >/dev/null 2>&1" then return 0 end
-				if command:match("^zenity %-%-question ") then
+				if command:match("dialog_host%.lua' %-%-question ") then
 					confirmations = confirmations + 1
 					if during_confirmation then during_confirmation() end
 					return 0

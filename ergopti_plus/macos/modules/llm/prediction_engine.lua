@@ -296,6 +296,9 @@ local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
+-- What an automatic prediction does while a hotstring tooltip shows
+-- (llm.trigger.while_hotstring_tooltip); nil reads the manifest default.
+local while_hotstring_tooltip    = nil
 
 
 --- Schedules one dismissal-telemetry callback behind an exact lifecycle fence.
@@ -911,6 +914,48 @@ function M.set_llm_instant_on_word_end(v)
 	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
 end
 
+--- The manifest's values and default of llm.trigger.while_hotstring_tooltip.
+--- @return table|nil entry
+local function while_hotstring_tooltip_entry()
+	local ok, entry = pcall(function()
+		return require("infra.manifest_reader").find_entry_by_path(ConfigKeys.KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
+	end)
+	return ok and type(entry) == "table" and entry or nil
+end
+
+--- Sets what an automatic prediction does while a hotstring tooltip shows.
+--- @param v string "wait" or "both" (the manifest's values).
+--- @return boolean accepted False, with the previous value kept, for anything else.
+function M.set_llm_while_hotstring_tooltip(v)
+	local entry = while_hotstring_tooltip_entry()
+	for _, accepted in ipairs(entry and entry.enum_values or {}) do
+		if accepted == v then
+			while_hotstring_tooltip = v
+			if type(tooltip.set_shared_hotstring_stack) == "function" then
+				tooltip.set_shared_hotstring_stack(v == "both")
+			end
+			Logger.debug(LOG, "AI prediction while a hotstring tooltip shows: %s.", v)
+			return true
+		end
+	end
+	Logger.error(LOG, "Refused AI prediction choice while a hotstring tooltip shows: %s.", tostring(v))
+	return false
+end
+
+--- The choice in force: the menu's, the manifest default before it publishes one.
+--- @return string|nil
+local function current_while_hotstring_tooltip()
+	if while_hotstring_tooltip ~= nil then return while_hotstring_tooltip end
+	local entry = while_hotstring_tooltip_entry()
+	return entry and entry.default or nil
+end
+
+--- Whether suggestions are shown together with the hotstring rows ("both").
+--- @return boolean
+function M.shows_with_hotstring_rows()
+	return current_while_hotstring_tooltip() == "both"
+end
+
 --- Applies the stored per-application profile overrides.
 --- @param text any The v1 text of llm.app_profile_overrides ("" for none).
 --- @return boolean applied False when the text is unreadable, which leaves the map in force.
@@ -992,6 +1037,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
 	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP then return true, current_while_hotstring_tooltip() end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
 		return true, secure_field_filter_enabled
@@ -1689,6 +1735,33 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	if not is_ai_preview_enabled then
 		Logger.debug(LOG, "AI preview disabled — request skipped.")
 		return
+	end
+	if not live and not force_trigger and request == nil and not M.shows_with_hotstring_rows() then
+		-- Hotstrings win: a suggestion would hide a preview that can still expand.
+		-- The chain after the hotstring asks again once it closes; without it the
+		-- request is dropped, as on Windows and Linux.
+		local rows_ok, rows_visible = pcall(function()
+			return type(tooltip.has_visible_hotstring_rows) == "function" and tooltip.has_visible_hotstring_rows()
+		end)
+		if not rows_ok then
+			Logger.error(LOG, "Hotstring tooltip probe raised — request skipped: %s", tostring(rows_visible))
+			return
+		end
+		if rows_visible == true then
+			local bridge = package.loaded["modules.keymap.llm_bridge"]
+			local chained = false
+			if type(bridge) == "table" and type(bridge.get_llm_runtime_setting) == "function" then
+				local found, value = bridge.get_llm_runtime_setting(ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING)
+				chained = found == true and value == true
+			end
+			if chained then
+				Logger.debug(LOG, "Hotstring tooltip shown — the request waits for it.")
+				defer_check(inactivity_debounce_sec, "Hotstring wait")
+			else
+				Logger.debug(LOG, "Hotstring tooltip shown — request skipped.")
+			end
+			return
+		end
 	end
 	if live then
 		-- Hotstrings win: a live tooltip never covers a hotstring preview. Wait
@@ -2424,6 +2497,48 @@ function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_r
 		return false
 	end
 	return true
+end
+
+--- The AI menu's « Test a prediction »: one prediction on a sample context, showing
+--- the answer or why it could not run (llm/test_prediction.lua). It goes straight
+--- to the backend, past the prediction cache: the notice is plain text, whereas a
+--- prediction tooltip is a text the user could accept into the focused document.
+--- It sends its own high temperature: the same sample at the low generation
+--- temperature repeats one answer, which proves nothing.
+--- @return boolean sent True when the request left.
+function M.test_prediction()
+	if not require_state("test_prediction") then return false end
+	if not M._test_prediction then
+		local function live_refusal()
+			-- A sample is sent, so an empty typing buffer refuses nothing.
+			local reason = manual_refusal()
+			if reason == "empty_context" then return nil end
+			return reason
+		end
+		M._test_prediction = require("llm.test_prediction").new({
+			text = function(key) return i18n.get(key) end,
+			refusal = function()
+				local reason = live_refusal()
+				return reason and MANUAL_REFUSAL_KEYS[reason] or nil
+			end,
+			may_publish = function() return runtime_available() and live_refusal() == nil end,
+			send = function(sample, on_text, on_fail, current)
+				core_llm.fetch_raw_completion(core_llm.get_active_profile(), sample, sample, core_llm.get_current_model(),
+					require("modules.llm.api_common").test_prediction_temperature(), Rewrite.max_tokens(sample),
+					on_text, on_fail, current)
+			end,
+			now_ms = function() return hs.timer.absoluteTime() / 1e6 end,
+			show = function(text)
+				local ok_show, shown = pcall(tooltip.show, text, true, true)
+				if not ok_show or shown ~= true then
+					Logger.warn(LOG, "A test prediction notice was not shown: %s.", tostring(shown))
+				end
+			end,
+			info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+			warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+		})
+	end
+	return M._test_prediction.run()
 end
 
 --- Opens the prediction tooltip for answers (screen reading, translation): it

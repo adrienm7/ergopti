@@ -47,9 +47,21 @@
 ; ======================================================
 
 _PBT_BackspaceIsNotAResetKey() {
-	Body := _DriverFuncBody("_OnPrefixKeyDown")
-	Assert(InStr(Body, "_PrefixFeedBackspace()") > 0,
-		"backspace must shrink the watcher buffer by one character — wiping it left the engine still able to fire a hotstring the tooltip had stopped offering, because HSE_FeedBackspace only decrements")
+	global _PrefixBuffer, HSE_Buffer, _PrefixModifierIsDown
+	Saved := _PrefixBuffer
+	SavedEngine := HSE_Buffer
+	_PrefixModifierIsDown := (*) => false
+	try {
+		HSE_Buffer := "abc"
+		_PrefixBuffer := "abc"
+		_OnPrefixKeyDown(0, 0x08, 0x0E)
+		AssertEqual("ab", _PrefixBuffer,
+			"backspace must shrink the watcher buffer by one character — wiping it left the engine still able to fire a hotstring the tooltip had stopped offering, because HSE_FeedBackspace only decrements")
+		AssertEqual("ab", HSE_Buffer, "the same keydown must decrement the engine exactly once")
+	} finally {
+		_PrefixBuffer := Saved
+		HSE_Buffer := SavedEngine
+	}
 }
 
 ; The decrement must actually be a decrement, and must not underflow.
@@ -115,10 +127,7 @@ _PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
 
 ; VK_BACK must not creep back into the reset list, which is where it lived.
 _PBT_ResetListExcludesBackspace() {
-	Src := _DriverSourceNoComments()
-	Assert(Src != "", "the driver source must be readable")
-	Owner := _DriverFuncBody("KS_IsContextResetKey")
-	Assert(Owner != "", "the canonical context-reset owner must exist")
+	AssertTrue(KS_IsContextResetKey(0x0D), "Enter stays a reset key, so the check below can fail")
 	AssertFalse(KS_IsContextResetKey(0x08),
 		"VK_BACK must not belong to ResetVKs — a reset wipes the preview buffer, and the engine only decrements")
 }

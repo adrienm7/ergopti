@@ -39,6 +39,7 @@
 
 
 
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 #Include ../../_generated/action_catalogue.ahk
 #Include ../../../_shared/ahk/config_binding_identity.ahk
 
@@ -125,7 +126,7 @@ TomlConfigForeignOwnershipRegistry() {
 	; seeds at boot. These are owned settings, never unused configuration keys.
 	for _, Pack in HotstringsLanguageCategories() {
 		for _, Category in Pack["categories"]
-			Registry["category_enabled"][Category["v2"]] := "FeatureState"
+			Registry[ConfigLeaf.CATEGORY_ENABLED][Category["v2"]] := "FeatureState"
 	}
 	return Registry
 }
@@ -302,7 +303,7 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
 ; A binding its owner publishes is owned by that publication, not by spelling:
-; a physical keyboard slot keeps its scan-code case (win_SC03A), which the
+; a physical keyboard slot keeps its scan-code case (meta_SC03A), which the
 ; lowercase grammar alone would offer for deletion. An unpublished domain keeps
 ; the lowercase grammar.
 TomlConfigActionParameterIsOwned(Key) {
@@ -329,9 +330,9 @@ TomlConfigForeignOwner(SectionPath, Key) {
 		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
 	; Admit exactly the slots the keyboard input owner binds (its published
-	; domain); a broad section exemption would hide misspellings such as win_cc
+	; domain); a broad section exemption would hide misspellings such as meta_cc
 	; forever, and a narrower rule would offer a live physical slot for removal.
-	if (SectionPath == "shortcuts.keyboard" && KeyboardSlotIsCatalogued(Key))
+	if (SectionPath == ConfigKey.SHORTCUTS_KEYBOARD && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"
 	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
 	; « first_then_second » (infra/key_combinations.ahk); the manifest declares
@@ -339,6 +340,10 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	; one key twice.
 	if ((SectionPath == "shortcuts.key_combination_taps" || SectionPath == "shortcuts.key_combination_holds")
 			&& RegExMatch(Key, "^(?:" . TomlConfigKeyCombinationKeys() . ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
+		return "KeyCombinations"
+	; The chord slot of a pair lives in its own table, as macOS and Linux keep it.
+	if (Key == "combo" && RegExMatch(SectionPath, "^mod_combos\.config\.(?:" . TomlConfigKeyCombinationKeys()
+			. ")_then_(?:" . TomlConfigKeyCombinationKeys() . ")$"))
 		return "KeyCombinations"
 	return ""
 }
@@ -544,7 +549,7 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		Entry := false
 		if Key == "enabled"
 			return "boolean"
-		if Key == "time_activation_seconds"
+		if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 			return "non-negative number"
 		return ""
 	}
@@ -555,7 +560,7 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		if (InStr(CurrentSection, "hotstrings.personal.") == 1) {
 			if (Key == "enabled")
 				ExpectedType := "boolean"
-			else if (Key == "time_activation_seconds")
+			else if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				ExpectedType := "non-negative number"
 			else
 				return ""
@@ -569,11 +574,11 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 				return ""
 			if Key == "enabled"
 				ExpectedType := "boolean"
-			else if Key == "time_activation_seconds"
+			else if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 				ExpectedType := "non-negative number"
-			else if (Key == "pattern_max_length"
+			else if (Key == ConfigLeaf.PATTERN_MAX_LENGTH
 					&& CurrentSection
-						== "hotstrings.dynamic.text_expansion_personal_information")
+						== ConfigKey.HOTSTRINGS_DYNAMIC_TEXT_EXPANSION_PERSONAL_INFORMATION)
 				ExpectedType := "integer from 1 through 16"
 			else
 				return ""
@@ -625,7 +630,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			if ((IsSet(RawValue) && LiteralKind != "number")
 					|| !(Value is Integer || Value is Float) || Value < 0)
 				return false
-			if (Key == "time_activation_seconds")
+			if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				return TickTryDurationMsFromSeconds(Value, &DurationMs)
 			return true
 		case "integer from 1 through 16":

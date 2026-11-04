@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- Exercises the browser provider with its unrelated tray surfaces isolated.
 --- @param callback function Receives native rows and observable browser ports.
 local function with_browser(callback)
-	local names = { "ui.menu.menu_builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "ui.menu.llm_backend_rows", "infra.manifest_menu", "infra.paths", "infra.i18n",
 		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal",
@@ -59,14 +59,13 @@ local function with_browser(callback)
 		end
 		root.top_level = selected
 		local facade = {}; for key, value in pairs(native) do facade[key] = value end
-		facade.build = function(_, _, dynamic_handlers)
-			local rows = {}
-			dynamic_handlers.llm_model(rows)
-			return rows
+		facade.build = function(_, _, _, _, _, providers)
+			-- The model row is list DATA: the shared renderer materialises it.
+			return native.render_rows(providers.llm_model(), "llm_model")
 		end
 		package.loaded["infra.manifest_menu"] = facade
-		package.loaded["ui.menu.menu_builder"] = nil
-		local Builder = require("ui.menu.menu_builder")
+		package.loaded["ui.menu.builder"] = nil
+		local Builder = require("ui.menu.builder")
 		local ctx = {
 			llm = {
 				is_enabled = function() return false end,
@@ -165,7 +164,7 @@ local function scripted_notices()
 	return notices, function() package.loaded["adapters.application_notifier"] = previous end
 end
 
---- Answers zenity's question with the given exit, recording the commands it ran.
+--- Answers the native question with the given exit, recording the commands it ran.
 --- @param answer boolean True presses Delete, false presses Cancel.
 --- @return table commands, function restore
 local function scripted_question(answer)
@@ -173,8 +172,8 @@ local function scripted_question(answer)
 	local commands = {}
 	os.execute = function(command)
 		commands[#commands + 1] = command
-		if command:find("command -v zenity", 1, true) then return true end
-		return answer
+		-- The dialog exits 0 for Delete and 1 for Cancel.
+		return answer and 0 or 1
 	end
 	return commands, function() os.execute = previous end
 end

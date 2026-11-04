@@ -136,6 +136,8 @@ function M.complete()
 	end
 	local boot_cpu_ms = M.cpu_ms()
 	Logger.info(LOG, "Boot complete in %.0f ms (cpu %.0f ms).", _boot_ms, boot_cpu_ms)
+	require("perf_budget").judge(Logger, LOG, "boot", _boot_ms,
+		function() return require("infra.timings").ms("budgets", "boot_total_ms") end)
 	-- One never-collapsed summary: every stage's milliseconds and the heap, so
 	-- startup cost and its memory are read from a single line.
 	local parts = {}

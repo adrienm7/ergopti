@@ -197,7 +197,7 @@ final class OwnedRuntimeServiceLifecycleLock {
 		var principal: SecCode?
 		guard SecCodeCopySelf([], &principal) == errSecSuccess, let principal else { return false }
 		return signingLeaf(principal, identifier: kErgoptiBundleId) != nil
-			|| signingLeaf(principal, identifier: "com.ergoptiplus.app.runtime-installer") != nil
+			|| signingLeaf(principal, identifier: Identifiers.SigningIds.runtimeInstaller) != nil
 	}
 	/// This actual invalid-FD native observation creates only sticky cleanup debt, never native authority.
 	func fixtureObserveEarlierNativeCloseRefusal() -> Bool {

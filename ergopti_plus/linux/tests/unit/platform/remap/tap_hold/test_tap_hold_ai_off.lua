@@ -40,7 +40,7 @@ local function engine()
 			space = { tap_action = "llm_generate_prediction", hold_modifier = "ctrl", time_activation_seconds = 0.2 },
 			escape = { tap_action = "llm_generate_prediction" },
 		},
-		tap_min_ms = 0, one_shot_timeout_ms = 2000,
+		tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 		tap_blocked = AiActions.blocked,
 		nav_layer = require("tests.support.nav_layer_fixture").recommended(),
 	})
@@ -95,7 +95,7 @@ helpers.describe("tap-hold taps bound to an AI action (ai-off-taphold)", functio
 		with_ai(function()
 			local e = Engine.new({
 				keys = { space = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = 0.2 } },
-				tap_min_ms = 0, one_shot_timeout_ms = 2000, tap_blocked = AiActions.blocked,
+				tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000, tap_blocked = AiActions.blocked,
 				nav_layer = require("tests.support.nav_layer_fixture").recommended(),
 			})
 			e:process(SPACE, DOWN, 0)

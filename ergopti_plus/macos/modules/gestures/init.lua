@@ -21,6 +21,7 @@ local Logger        = require("infra.logger")
 local Manifest      = require("infra.manifest_reader")
 local Timings       = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local GestureFrameEvidence = require("infra.gesture_frame_evidence")
 local LOG           = "gestures"
 local GESTURE_ACTION_PARENT = "gestures"
 
@@ -194,6 +195,9 @@ local CoreState = {
 	-- Flat binding__action → parameter map. Keeping this separate from action
 	-- assignments prevents a URL selected for one gesture leaking into another.
 	action_params  = {},
+	-- Whether macOS itself uses a slot's gesture right now: the engine fires no
+	-- action of a slot it holds, so there is never a double action.
+	system_held    = Conflicts.slot_held_by_system,
 }
 
 -- Initialize active actions with defaults
@@ -500,6 +504,8 @@ local function create_watcher(deviceID)
 				end
 				frame_stamp = nil
 			end
+			-- The field run proves the stamp from these counts (ledger L46).
+			GestureFrameEvidence.note(frame_stamp)
 			if not Logger.pcall(LOG, Engine.process_frame, touches, frame_stamp) then
 				-- A failed frame may leave the native scroll blocker engaged
 				pcall(Engine.emergency_reset)
@@ -661,6 +667,8 @@ function M.refresh_system_gestures(callback) return Conflicts.refresh(callback) 
 function M.system_gesture_conflicts() return Conflicts.active_conflicts(CoreState.enabled and CoreState.ga or {}) end
 function M.open_system_gestures() return Conflicts.open_settings() end
 function M.system_pinch_enabled() return Conflicts.native_pinch_enabled() end
+function M.system_slot_state(slot) return Conflicts.slot_system_state(slot) end
+function M.set_system_gestures_listener(listener) return Conflicts.set_state_listener(listener) end
 function M.get_action(slot)         return CoreState.ga[slot]                   end
 
 --- Stores one gesture action through an exact project-level setter contract.

@@ -12,14 +12,12 @@
 ; allocation capacity.
 ; ==============================================================================
 
-_CRL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_CRL_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _CRL_AssertNoAClipboardRef() {
-    Src := _CRL_ReadSource("modules/keystats/keystats_clipboard.ahk")
+    Src := _CRL_ReadSource("keystats_clipboard.ahk")
     Body := _DriverFuncBody("KL_Clip_OnChange")
     Assert(Body != "", "KL_Clip_OnChange must exist in keystats_clipboard.ahk")
     

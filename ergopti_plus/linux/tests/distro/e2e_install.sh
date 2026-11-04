@@ -216,7 +216,7 @@ INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_R
 
 
 section "Runtime dependencies"
-for cmd in luajit notify-send zenity sqlite3 xkbcli sha256sum; do
+for cmd in luajit notify-send sqlite3 xkbcli sha256sum; do
 	if as_user "command -v ${cmd}" >/dev/null 2>&1; then ok "${cmd} is on PATH"; else fail "${cmd} is missing after install"; fi
 done
 # The tap-holds run in the daemon: no remap unit may grab the keyboard first.

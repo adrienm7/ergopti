@@ -167,7 +167,7 @@ helpers.describe("Ollama install state on Linux", function()
 	end
 	local function llm(models, origin)
 		return { get_cached_models = function() return models or {} end,
-			get_base_url = function() return origin or "http://127.0.0.1:11434" end }
+			get_base_url = function() return origin or "http://127.0.0.1:11435" end }
 	end
 
 	helpers.it("(linux-ollama-install-state) greys an absent or failed runtime with its reason", function()
@@ -175,7 +175,8 @@ helpers.describe("Ollama install state on Linux", function()
 		local cases = {
 			{ fields = {}, available = false, cause = "absent" },
 			{ fields = { managed = "installed" }, available = true, cause = "installed" },
-			{ fields = { system = true }, available = true, cause = "system" },
+			-- An Ollama the user installed never counts: Ergopti runs only its own.
+			{ fields = { system = true }, available = false, cause = "absent" },
 			{ fields = { failure = "runtime_install_failed", managed = "installed" }, available = false, cause = "install_failed" },
 			{ fields = {}, models = { "qwen3:4b" }, available = true, cause = "answering" },
 			{ fields = {}, origin = "http://gpu.lan:11434", available = true, cause = "remote" },
@@ -205,18 +206,52 @@ helpers.describe("Ollama install state on Linux", function()
 		State._reset()
 	end)
 
+	-- docs/design/proxy-auth-relay.md: a refused proxy sign-in leaves the models on
+	-- disk usable, and names its own fix on the pull alone.
+	helpers.it("(proxy-auth-relay) a refused proxy sign-in keeps Ollama usable and refuses the pull with the relay's message", function()
+		local State = helpers.load_module("modules.llm.ollama_install_state")
+		State._reset()
+		local live = ports({ managed = "installed" })
+		live.failure = State.failure
+		local ORIGIN = "http://127.0.0.1:11434"
+		local cases = {
+			sign_in_unavailable = "network.relay.sign_in_unavailable",
+			ntlm_requires_windows = "network.relay.ntlm_requires_windows",
+			sign_in_rejected = "network.relay.sign_in_rejected",
+			upstream_scheme_unsupported = "network.relay.scheme_unsupported",
+			relay_unavailable = "network.relay.failed",
+			upstream_timeout = "network.relay.failed",
+		}
+		for refusal, key in pairs(cases) do
+			State.note_repair({ ok = true, origin = ORIGIN, relay_refusal = refusal })
+			local available, reason = State.capture(llm(), live)
+			helpers.assert_eq(available, true, refusal)
+			helpers.assert_nil(reason, refusal)
+			helpers.assert_eq(State.pull_refusal_key(ORIGIN), key, refusal)
+			helpers.assert_eq(State.relay_refusal(ORIGIN), refusal)
+			helpers.assert_nil(State.pull_refusal_key("http://127.0.0.1:11500"), "another daemon's pull goes ahead")
+		end
+		State.note_repair({ ok = false, error = "runtime_install_failed" })
+		local _, reason = State.capture(llm(), live)
+		helpers.assert_eq(reason, "model_browser.reason_ollama_missing", "another failure keeps the generic reason")
+		helpers.assert_true(State.pull_refusal_key(ORIGIN) ~= nil, "a failed repair leaves the earlier daemon and its receipt")
+		State.note_repair({ ok = true, origin = ORIGIN })
+		helpers.assert_eq(State.capture(llm(), live), true)
+		helpers.assert_nil(State.pull_refusal_key(ORIGIN), "a daemon under its proxy pulls again")
+		State._reset()
+	end)
+
 	helpers.it("(linux-ollama-install-state) the page binding greys the Ollama group with that reason", function()
-		local source = assert(io.open(helpers.driver_root() .. "/ui/model_browser/bridge.lua", "r"))
-		local code = source:read("*a"); source:close()
+		-- Each file selected by a declaration unique to it: the model browser
+		-- bridge, the backend rows and the prediction engine.
+		local code = assert(helpers.read_driver_unit("local function load_catalogue("))
 		helpers.assert_true(code:find("_bound.ollama_state(frame.llm)", 1, true) ~= nil, "the payload reads the bound state")
 		helpers.assert_true(code:find('backend_entry("ollama", { available = blocked == nil and ollama_ok, reason_key = blocked or ollama_reason', 1, true) ~= nil,
 			"the Ollama group is greyed with the state's reason")
-		local rows = assert(io.open(helpers.driver_root() .. "/ui/menu/llm_backend_rows.lua", "r"))
-		local bind = rows:read("*a"); rows:close()
+		local bind = assert(helpers.read_driver_unit("local function save_failed("))
 		helpers.assert_true(bind:find('require("modules.llm.ollama_install_state").capture(engine)', 1, true) ~= nil,
 			"the menu binds the real install state")
-		local engine_file = assert(io.open(helpers.driver_root() .. "/modules/llm/prediction_engine.lua", "r"))
-		local engine_code = engine_file:read("*a"); engine_file:close()
+		local engine_code = assert(helpers.read_driver_unit("local function SYSTEM_CLOCK("))
 		helpers.assert_true(engine_code:find('require("modules.llm.ollama_install_state").note_repair(result)', 1, true) ~= nil,
 			"the owned repair records its result")
 	end)

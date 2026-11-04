@@ -18,6 +18,59 @@ _DSNC_NativeIdentity() {
 }
 Test("driver symbols: native function identity ignores case (driver-symbol-case)", _DSNC_NativeIdentity)
 
+; The line-by-line definition the native comment stripper must keep matching.
+_DSNC_StripOracle(Src) {
+	Out := ""
+	for Line in StrSplit(Src, "`n", "`r")
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	return Out
+}
+
+_DSNC_StripMatchesLineContract() {
+	; Chr(59): a spaced semicolon ends an enclosed multi-line expression's line.
+	C := Chr(59)
+	for Sample in ["", "`n", C, "code", C . " a`ncode`n", "`r`n`t" . C . " a`r`n`r`nb " . C . " c`r`n",
+		"`n`n " . C . " a`n`n", "a`rb`n`r" . C . " c`n", "`f" . C . " a`nb", "`r`r" . C . "a`r`r`nb`r`r"]
+		AssertEqual(_DSNC_StripOracle(Sample), _StripFullLineComments(Sample), "stripper sample " . A_Index)
+	Actual := _DriverSourceConcat()
+	Assert(StrLen(Actual) > 100000, "the differential must cover the actual driver source")
+	Assert(_DSNC_StripOracle(Actual) == _StripFullLineComments(Actual),
+		"the native stripper must equal the line contract on the whole driver")
+}
+Test("source helpers: native comment stripping equals the line contract (meta-source-memo)", _DSNC_StripMatchesLineContract)
+
+; A cached mask must never answer for different text, including text of the same
+; length and a rewritten file: the memo is what a fixture writer could be fooled by.
+_DSNC_MaskMemoFollowsContent() {
+	Padding := "`n" . Format("{:2000}", "")
+	First := 'x := "aaa"' . Padding
+	Second := 'x := bbbbb' . Padding
+	AssertEqual(StrLen(First), StrLen(Second), "the fixture must exercise equal lengths")
+	FirstMask := _DriverMaskNonCode(&First)
+	AssertEqual(FirstMask, _DriverMaskNonCode(&First), "a repeated text keeps its mask")
+	AssertFalse(InStr(FirstMask, "aaa"), "a string literal is masked")
+	AssertContains(_DriverMaskNonCode(&Second), "bbbbb", "equal-length code must get its own mask")
+	Path := A_Temp . "\ergopti_mask_memo_" . DllCall("GetCurrentProcessId") . ".ahk"
+	try {
+		FileAppend(First, Path, "UTF-8")
+		Read := FileRead(Path, "UTF-8")
+		AssertFalse(InStr(_DriverMaskNonCode(&Read), "bbbbb"), "the first fixture bytes are scanned")
+		FileDelete(Path)
+		FileAppend(Second, Path, "UTF-8")
+		Read := FileRead(Path, "UTF-8")
+		AssertContains(_DriverMaskNonCode(&Read), "bbbbb", "a rewritten fixture must not see the earlier mask")
+	} finally {
+		try FileDelete(Path)
+	}
+	Block := "/*`nhidden`n*/`nvisible := 1" . Padding
+	AssertContains(_DriverMaskNonCode(&Block, true), "visible", "the block-only view keeps code")
+	Literal := 'x := "kept"`n/*`nhidden`n*/' . Padding
+	AssertContains(_DriverMaskNonCode(&Literal, true), "kept", "the block-only view keeps literals")
+	AssertFalse(InStr(_DriverMaskNonCode(&Literal), "kept"), "the two views must not share one memo")
+}
+Test("source helpers: the mask memo follows content, never a stale file (meta-source-memo)", _DSNC_MaskMemoFollowsContent)
+
 _DSNC_Extract(Variant, Indexed) {
 	Source := "CaseSubject() {`n`treturn 37`n}"
 	Original := Source
@@ -162,6 +215,39 @@ _DSFR_Moved(Root) {
 }
 Test("driver symbols: actual file moves and deletion invalidate prior source locations (driver-production-symbol)",
 	_DSFR_With.Bind(_DSFR_Moved))
+
+; The per-file memory must answer from an aged, unchanged file without reading it
+; (the exclusive lock proves no read happened) and must drop it once a new stamp
+; or a fresh, racy write says the bytes may differ.
+_DSFR_RememberedSource(Root) {
+	Path := _DSFR_Write(Root, "one\first.ahk", "ExportSubject() {`nreturn 37`n}`n")
+	Aged := DateAdd(A_Now, -1, "Hours")
+	FileSetTime(Aged, Path)
+	AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root))
+	Handle := DllCall("CreateFileW", "str", Path, "uint", 0x80000000, "uint", 0,
+		"ptr", 0, "uint", 3, "uint", 0, "ptr", 0, "ptr")
+	Assert(Handle != -1, "the fixture must own a real exclusive native source lock")
+	try {
+		AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root),
+			"an unchanged aged source is answered without another read")
+		_DSFR_Failure(() => _DriverProductionFileForSymbol("OtherSubject", Root), "No production definition")
+	} finally DllCall("CloseHandle", "ptr", Handle)
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "OtherExport() {`nreturn 37`n}`n")
+	FileSetTime(Aged, Path)
+	_DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "No production definition")
+	AssertEqual(Path, _DriverProductionFileForSymbol("OtherExport", Root),
+		"a size change under the same modification time invalidates the memory")
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "ExportSubjecT() {`nreturn 37`n}`n")
+	AssertEqual(Path, _DriverProductionFileForSymbol("ExportSubject", Root),
+		"a fresh write is never answered from the memory")
+	FileDelete(Path)
+	_DSFR_Write(Root, "one\first.ahk", "OtherSubjecT() {`nreturn 37`n}`n")
+	_DSFR_Failure(() => _DriverProductionFileForSymbol("ExportSubject", Root), "No production definition")
+}
+Test("driver symbols: unchanged sources are remembered and any new stamp or racy write invalidates them (driver-production-symbol)",
+	_DSFR_With.Bind(_DSFR_RememberedSource))
 
 _DSFR_Unreadable(Root) {
 	Expected := _DSFR_Write(Root, "one\first.ahk", "ExportSubject() {`nreturn 37`n}`n")

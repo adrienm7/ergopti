@@ -427,17 +427,20 @@
 			}
 		},
 		{
-			"id": "pointer_is_not_a_linux_source",
-			"description": "The native daemon observes pointer activity without intercepting it, so buttons and wheel bindings are refused with localized reasons.",
+			"id": "pointer_buttons_are_not_a_linux_source",
+			"description": "The native daemon takes the mouse only while the layer binds its wheel, so a wheel direction binds on Linux and a button stays refused with its localized reason.",
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
 			"expected": {
 				"errors": [
-					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux",
-					"unavailable_on_os|nav|linux|WheelDown|platform_reason.layer_wheel_source_is_not_linux",
-					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_not_linux"
+					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux"
 				],
-				"layers": { "nav": {} }
+				"layers": {
+					"nav": {
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
 			}
 		},
 		{
@@ -617,7 +620,7 @@
 		},
 		{
 			"id": "recommended_layer_on_linux",
-			"description": "The same preset on Linux: the Windows chords, the Super key for window placement, and no number-row entry.",
+			"description": "The same preset on Linux: the Windows chords, the Super key for window placement, the wheel as volume, and no number-row entry.",
 			"os": "linux",
 			"file": "layers.recommended.toml",
 			"expected": {
@@ -657,7 +660,9 @@
 						"Period": "keystroke:meta+ArrowRight",
 						"Quote": "keystroke:shift+meta+ArrowRight",
 						"Semicolon": "keystroke:ctrl+ArrowRight@repeat",
-						"Slash": "keystroke:End"
+						"Slash": "keystroke:End",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
 					}
 				}
 			}

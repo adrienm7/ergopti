@@ -32,6 +32,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import Security
 import ServiceManagement
 import XCTest
 @testable import ErgoptiPlus
@@ -48,7 +49,7 @@ private let kStoppedSiblingObservationSeconds: TimeInterval = 0.2
 /// Grace before test cleanup force-kills its exact sibling child.
 private let kSiblingTerminationGraceSeconds: TimeInterval = 0.5
 /// Marker polling interval used only by the POSIX test witness.
-private let kSiblingProgressPollMicroseconds: useconds_t = 10_000
+private let kSiblingProgressPollMicroseconds = LauncherTimings.testPoll.microseconds
 
 /// Keeps one unrelated test process and its execution-progress witness together.
 private struct ProgressingTestSibling {
@@ -498,7 +499,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		}
 		XCTAssertTrue(observedExclusiveLock,
 			"the real guardian process must own the singleton before the test proceeds")
-		usleep(350_000)
+		usleep(LauncherTimings.testGuardianSettle.microseconds)
 		XCTAssertTrue(process.isRunning,
 			"a guardian backed only by GCD sources must not fall out of an empty RunLoop")
 
@@ -1034,6 +1035,193 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(approvalLegacyCalls, 0)
 	}
 
+	/// An ad hoc build never registers the Background Items job: macOS killed
+	/// its fresh spawn even after a full reset (CODESIGNING 4, Launch
+	/// Constraint Violation, field run 2026-10-31). It runs the legacy agent
+	/// only, after removing a record an earlier build left.
+	func testAdhocBuildNeverRegistersTheBackgroundItemsJob() throws {
+		guard #available(macOS 13.0, *) else { return }
+		for initial in [SMAppService.Status.enabled, .notRegistered, .notFound] {
+			let service = ScriptedModernGuardianService(status: initial)
+			var order: [String] = []
+			var lines: [String] = []
+			let outcome = resolveAdhocRemapGuardianRegistration(
+				service: service,
+				leasesAreEmpty: { order.append("leases"); return true },
+				guardianHealth: { XCTFail("no lease keeps the record"); return false },
+				guardianHasExited: { order.append("exit:\(service.unregisterCalls)"); return true },
+				ownLegacyAgentLoaded: { false },
+				ensureLegacy: {
+					order.append("legacy:\(service.status == .enabled)")
+					return true
+				},
+				report: { lines.append($0) }
+			)
+			XCTAssertEqual(outcome, RemapGuardianRegistrationOutcome(status: .ready, note: .adhocLegacyOnly))
+			XCTAssertEqual(service.registerCalls, 0, "an ad hoc build never registers the job: \(lines)")
+			XCTAssertEqual(service.unregisterCalls, initial == .enabled ? 1 : 0)
+			XCTAssertEqual(order, initial == .enabled
+				? ["leases", "exit:1", "legacy:false"] : ["legacy:false"])
+			XCTAssertTrue(lines.contains { $0.contains("legacy agent is ready") }, "\(lines)")
+		}
+		let unavailable = resolveAdhocRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(status: .notRegistered),
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { false },
+			report: { _ in }
+		)
+		XCTAssertEqual(unavailable, RemapGuardianRegistrationOutcome(status: .unavailable, note: .adhocLegacyOnly))
+	}
+
+	/// Live leases and a pending approval keep the record; a removal that is
+	/// refused or whose job never exits is named and still runs the legacy agent.
+	func testAdhocBuildKeepsLiveLeasesApprovalAndNamesUnprovenRemovals() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let live = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: live,
+			leasesAreEmpty: { false },
+			guardianHealth: { true },
+			guardianHasExited: { XCTFail("live leases"); return true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { XCTFail("a healthy guardian keeps its leases"); return true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetDeferred))
+		XCTAssertEqual(live.unregisterCalls, 0)
+		XCTAssertEqual(live.registerCalls, 0)
+
+		let pending = ScriptedModernGuardianService(status: .requiresApproval)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: pending,
+			leasesAreEmpty: { true },
+			guardianHealth: { true },
+			guardianHasExited: { true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { XCTFail("approval is the user's"); return true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .requiresApproval, note: .adhocResetDeferred))
+		XCTAssertEqual(pending.unregisterCalls + pending.registerCalls, 0)
+
+		let stuck = ScriptedModernGuardianService(
+			status: .enabled,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: stuck,
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { XCTFail("refused"); return true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(stuck.registerCalls, 0)
+
+		let draining = ScriptedModernGuardianService(status: .enabled)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: draining,
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { false },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(draining.registerCalls, 0)
+	}
+
+	/// Installed-app CI, 2026-10-31: the first registration of an ad hoc build
+	/// loads its legacy agent, after which Background Items reads `.enabled`
+	/// for the shared label. The repeat registration took that for a stale
+	/// record, failed to remove it and answered `developer_adhoc_reset_refused`;
+	/// it now recognises its own agent and stays legacy only. A record that is
+	/// not this app's agent is still removed, and still named when refused.
+	func testAdhocRepeatRegistrationKeepsItsOwnLegacyAgent() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let service = ScriptedModernGuardianService(
+			status: .notRegistered,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		var legacyLoaded = false
+		func register() -> RemapGuardianRegistrationOutcome {
+			return resolveAdhocRemapGuardianRegistration(
+				service: service,
+				leasesAreEmpty: { true },
+				guardianHealth: { legacyLoaded },
+				guardianHasExited: { false },
+				ownLegacyAgentLoaded: { legacyLoaded },
+				ensureLegacy: {
+					// macOS then reports the label the legacy agent holds as enabled.
+					legacyLoaded = true
+					service.status = .enabled
+					return true
+				},
+				report: { _ in }
+			)
+		}
+		let ready = RemapGuardianRegistrationOutcome(status: .ready, note: .adhocLegacyOnly)
+		XCTAssertEqual(register(), ready)
+		XCTAssertEqual(service.status, .enabled)
+		XCTAssertEqual(register(), ready, "the repeat registration keeps its own agent")
+		XCTAssertEqual(service.unregisterCalls, 0, "its own agent is never removed as a stale record")
+		XCTAssertEqual(service.registerCalls, 0)
+
+		let stale = ScriptedModernGuardianService(
+			status: .enabled,
+			unregistrationError: NSError(domain: kRemapGuardianServiceErrorDomain, code: 1)
+		)
+		XCTAssertEqual(resolveAdhocRemapGuardianRegistration(
+			service: stale,
+			leasesAreEmpty: { true },
+			guardianHealth: { false },
+			guardianHasExited: { XCTFail("refused"); return true },
+			ownLegacyAgentLoaded: { false },
+			ensureLegacy: { true },
+			report: { _ in }
+		), RemapGuardianRegistrationOutcome(status: .ready, note: .adhocResetRefused))
+		XCTAssertEqual(stale.unregisterCalls, 1, "a record that is not this app's agent is still removed")
+	}
+
+	/// A legacy plist written for another executable, or one launchd does not
+	/// hold, is not this app's loaded agent.
+	func testOwnLegacyAgentNeedsItsExactPlistAndALoadedLabel() throws {
+		let home = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-own-legacy-" + UUID().uuidString)
+		let agents = home.appendingPathComponent("Library/LaunchAgents")
+		try FileManager.default.createDirectory(at: agents, withIntermediateDirectories: true)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let executable = "/Applications/" + Identifiers.App.bundle + "/Contents/MacOS/" + Identifiers.App.name
+		let plist = agents.appendingPathComponent(kRemapGuardianPlistName)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [true]), homeDirectory: home.path),
+			"no plist installed")
+		try Data(legacyGuardianPlist(executablePath: "/Other/App").utf8).write(to: plist)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [true]), homeDirectory: home.path),
+			"a plist for another executable")
+		try Data(legacyGuardianPlist(executablePath: executable).utf8).write(to: plist)
+		XCTAssertFalse(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: ScriptedGuardianLaunchctlRunner(results: [false]), homeDirectory: home.path),
+			"launchd does not hold the label")
+		let loaded = ScriptedGuardianLaunchctlRunner(results: [true])
+		XCTAssertTrue(legacyRemapGuardianIsOwnLoadedAgent(executablePath: executable,
+			runner: loaded, homeDirectory: home.path))
+		XCTAssertEqual(loaded.calls, [["print", "gui/\(getuid())/" + kRemapGuardianLabel]])
+	}
+
+	/// Only a signature without a team is ad hoc: Developer ID builds keep
+	/// their registration, and an unsigned answer is not mistaken for ad hoc.
+	func testAdhocSignatureIsAnIdentifierWithoutATeam() {
+		let identifier = kSecCodeInfoIdentifier as String
+		let team = kSecCodeInfoTeamIdentifier as String
+		XCTAssertTrue(signingInformationIsAdhoc([identifier: Identifiers.BundleIds.launcher]))
+		XCTAssertFalse(signingInformationIsAdhoc([identifier: Identifiers.BundleIds.launcher, team: "ABCDE12345"]))
+		XCTAssertFalse(signingInformationIsAdhoc([:]))
+	}
+
 	/// Runtime observation is read-only and requires both eligibility and health.
 	func testModernGuardianObservationNeverRegistersAndRequiresExactHealth() {
 		guard #available(macOS 13.0, *) else { return }
@@ -1083,6 +1271,37 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 		XCTAssertEqual(observed, .requiresApproval)
 		XCTAssertEqual(service.registerCalls, 0)
+	}
+
+	/// Installed-app CI, 2026-11-01: the readback straight after an ad hoc
+	/// legacy bootstrap saw Background Items move from not registered to
+	/// enabled while it read the guardian's health, and answered unavailable
+	/// for a healthy guardian. A move between the states that defer to legacy
+	/// health keeps ready; a move to approval or an unhealthy guardian does not.
+	func testModernGuardianObservationKeepsReadyAcrossALegacyLabelStatusMove() {
+		guard #available(macOS 13.0, *) else { return }
+		for (before, after) in [
+			(SMAppService.Status.notRegistered, SMAppService.Status.enabled),
+			(SMAppService.Status.notFound, SMAppService.Status.enabled),
+			(SMAppService.Status.enabled, SMAppService.Status.notRegistered),
+		] {
+			let service = ScriptedModernGuardianService(status: before)
+			XCTAssertEqual(observeModernRemapGuardianRegistration(
+				service: service,
+				guardianHealth: { service.status = after; return true }
+			), .ready, "\(before) -> \(after)")
+			let unhealthy = ScriptedModernGuardianService(status: before)
+			XCTAssertEqual(observeModernRemapGuardianRegistration(
+				service: unhealthy,
+				guardianHealth: { unhealthy.status = after; return false }
+			), .unavailable)
+			XCTAssertEqual(service.registerCalls + service.unregisterCalls, 0)
+		}
+		let approval = ScriptedModernGuardianService(status: .notRegistered)
+		XCTAssertEqual(observeModernRemapGuardianRegistration(
+			service: approval,
+			guardianHealth: { approval.status = .requiresApproval; return true }
+		), .requiresApproval)
 	}
 
 	/// Current approval state is checked independently of legacy guardian health.
@@ -1318,7 +1537,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			withIntermediateDirectories: true,
 			attributes: [.posixPermissions: 0o700]
 		)
-		let executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let executable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 		let expectedPlist = try XCTUnwrap(legacyGuardianPlist(
 			executablePath: executable
 		).data(using: .utf8))
@@ -1353,7 +1572,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			attributes: [.posixPermissions: 0o700]
 		)
 		let staleExecutable = "/Applications/ErgoptiPlus-old.app/Contents/MacOS/ErgoptiPlus"
-		let currentExecutable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		let currentExecutable = "/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus"
 		let plistURL = launchAgents.appendingPathComponent(kRemapGuardianPlistName)
 		try XCTUnwrap(legacyGuardianPlist(
 			executablePath: staleExecutable
@@ -1449,7 +1668,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				guard let data = try? Data(contentsOf: recordURL),
 					let observed = LeaseGuardianRecord.parse(data)
 				else {
-					usleep(5_000)
+					usleep(LauncherTimings.testRecordPoll.microseconds)
 					continue
 				}
 				let descriptor = Darwin.open(recordURL.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
@@ -1831,7 +2050,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			_ = Darwin.unlink(fixture.paths.recordPath(token: record.token))
 			Darwin.close(descriptor)
 		}
-		usleep(100_000)
+		usleep(LauncherTimings.testGuardianRetireSettle.microseconds)
 		runtime = nil
 	}
 
@@ -2822,7 +3041,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	/// Proves the public worker accepts only the final mode/tombstone argv shape.
 	func testWorkerIdentityUsesOneModeAndOneTombstone() {
 		let arguments = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseWorkerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3039,7 +3258,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	/// Proves invalid identity data fails before any executable can be launched.
 	func testIdentityRejectsMismatchedNamesAndUnboundedHeartbeat() {
 		let base = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseWorkerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3059,7 +3278,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			)
 		}
 		let innerBase = [
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 			kKarabinerLeaseInnerFlag,
 			kCanonicalKarabinerCLIPath,
 			"ergopti_mode_\(token)",
@@ -3094,7 +3313,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		for (role, flag, suffix) in roles {
 			for runtime in LeaseRuntime.allCases {
 				let arguments = [
-					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 					flag,
 					runtime.cliPath,
 					"ergopti_mode_\(token)",
@@ -3123,11 +3342,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
 			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
 			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
-			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 		]
 		for forbiddenPath in forbiddenPaths {
 			let arguments = [
-				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 				kKarabinerLeaseWorkerFlag,
 				forbiddenPath,
 				"ergopti_mode_\(token)",
@@ -3238,7 +3457,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		]
 		for (role, flag, suffix) in roles {
 			let arguments = [
-				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 				flag,
 				kCanonicalKarabinerCLIPath,
 				"ergopti_mode_\(token)",
@@ -3253,7 +3472,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		for forbiddenPath in forbiddenPaths {
 			for (role, flag, suffix) in roles {
 				let arguments = [
-					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					"/Applications/\(Identifiers.App.bundle)/Contents/MacOS/ErgoptiPlus",
 					flag,
 					forbiddenPath,
 					"ergopti_mode_\(token)",
@@ -3989,7 +4208,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let writerDescriptor = sockets[0]
 		DispatchQueue.global(qos: .userInitiated).async {
 			for sequence in UInt32(1)...UInt32(3) {
-				usleep(50_000)
+				usleep(LauncherTimings.testLeaseLineInterval.microseconds)
 				guard writeLeaseLine(
 					"HEARTBEAT 1 \(sequence)",
 					to: writerDescriptor
@@ -6294,7 +6513,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				processID > 0 {
 				return processID
 			}
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return nil
 	}
@@ -6308,7 +6527,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + timeout
 		repeat {
 			if FileManager.default.fileExists(atPath: url.path) { return true }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return FileManager.default.fileExists(atPath: url.path)
 	}
@@ -6325,7 +6544,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			let waited = waitpid(processID, &status, WUNTRACED | WNOHANG)
 			if waited == processID { return status & 0x7F == 0x7F }
 			if waited == -1 && errno != EINTR { return false }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return false
 	}
@@ -6339,7 +6558,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let deadline = ProcessInfo.processInfo.systemUptime + timeout
 		repeat {
 			if !isAlive(processID) { return true }
-			usleep(10_000)
+			usleep(LauncherTimings.testPoll.microseconds)
 		} while ProcessInfo.processInfo.systemUptime < deadline
 		return !isAlive(processID)
 	}

@@ -113,7 +113,7 @@ helpers.describe("category submenu: its rows", function()
 				local called, result = pcall(function()
 					local row = rolls_row(config)
 					os.execute = function(command)
-						if command:find("zenity", 1, true) then asked[#asked + 1] = command; return 0 end
+						if command:find("dialog_host.lua", 1, true) then asked[#asked + 1] = command; return 0 end
 						return execute(command)
 					end
 					return row.menu[enabled and 1 or 2].fn()
@@ -253,7 +253,7 @@ helpers.describe("personal category scope parity", function()
 				config.get_groups = function() return { "personal" } end
 				config.get_category = function(id) if id == "personal" then return category end end
 				config.is_group_enabled = function(id) return id == "personal" and posture end
-				local mb = helpers.load_module("ui.menu.menu_builder")
+				local mb = helpers.load_module("ui.menu.builder")
 				local captured = nil
 				local function find(rows)
 					for _, row in ipairs(rows or {}) do
@@ -320,7 +320,7 @@ helpers.describe("shared category file command", function()
 		with_file_command(function()
 			local calls = 0
 			local ctx = { on_open_file = function() calls = calls + 1; return true end }
-			local mb = helpers.load_module("ui.menu.menu_builder")
+			local mb = helpers.load_module("ui.menu.builder")
 			ctx.config = fake_config({})
 			local function find(rows)
 				for _, row in ipairs(rows or {}) do
@@ -369,7 +369,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 			return execute(command)
 		end
 		local called, result = pcall(action)
@@ -523,7 +523,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		category.sections.hc.extension = { id = "ergopti", name = "Ergopti" }
 		local getter = config.get_category
 		config.get_category = function(id) if id == "rolls" then return category end; return getter(id) end
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)
@@ -544,7 +544,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
-			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			if command:find("dialog_host.lua", 1, true) then notices[#notices + 1] = command; return 0 end
 			return execute(command)
 		end
 		local called, result = pcall(action)

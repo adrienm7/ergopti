@@ -458,13 +458,64 @@ class X11LiveReplaceTests(unittest.TestCase):
             before = server.levels("AE01")
             # A desktop that put its own layout back after the upload.
             with mock.patch.object(
-                desktop_activation, "x11_loaded_symbols", return_value="pc+us+inet(evdev)"
+                desktop_activation,
+                "x11_loaded_keymap",
+                return_value='xkb_symbols "pc+us+inet(evdev)" { };',
             ):
                 self.assertEqual(
                     desktop_activation.apply_x11_user_tree(spec, self.root, environ),
                     (False, desktop_activation.X11_NOT_LOADED),
                 )
             self.assertNotEqual(server.levels("AE01"), before, "the upload itself did happen")
+
+    def test_a_server_holding_an_older_build_of_the_same_name_is_refused(self) -> None:
+        # A desktop that puts its own copy back (a system layout of that name, a
+        # settings daemon replaying the previous build) keeps the layout's name: only
+        # the cells read back from the server tell the new build from the old one.
+        source = self.sources["ergol"]
+        with XvfbServer() as server:
+            environ = self.environment(server)
+            self.assertTrue(installer.apply_x11("ergol", self.root, environ)["ok"])
+            old = server.levels("AE01")
+            symbols = source / "ergol.xkb"
+            text = symbols.read_text(encoding="utf-8")
+            symbols.write_text(
+                text.replace("[1, 1, EuroSign", "[7, 1, EuroSign", 1), encoding="utf-8"
+            )
+            installer.install(
+                "ergol", "ergol", source, ["fr"], self.root, self.home, {}, allow_xorg=True
+            )
+            real_run = subprocess.run
+
+            def upload_replaced_by_the_desktop(command, *args, **kwargs):
+                # The upload "succeeds" but the server keeps the previous build.
+                if command[0] == "xkbcomp" and command[-1] == server.display:
+                    return subprocess.CompletedProcess(command, 0)
+                return real_run(command, *args, **kwargs)
+
+            with mock.patch.object(
+                desktop_activation.subprocess, "run", side_effect=upload_replaced_by_the_desktop
+            ):
+                applied, code = desktop_activation.apply_x11_user_tree(
+                    LayoutSpec("ergol"), self.root, environ
+                )
+            self.assertFalse(applied, "the old build of the same name is not the new layout")
+            self.assertEqual(code, "stale_keymap")
+            self.assertEqual(server.levels("AE01"), old, "the server still holds the old build")
+            self.assertTrue(installer.apply_x11("ergol", self.root, environ)["ok"])
+            self.assertEqual(server.levels("AE01")[0], "7")
+
+    def test_the_layout_is_found_in_any_group_of_the_server_keymap(self) -> None:
+        held = 'xkb_symbols "pc+us+ergol:2+inet(evdev)" {\n key <AE01> { symbols[Group1]= [ 1, exclam ], symbols[Group2]= [ ampersand, 1 ] };'
+        expected = 'xkb_symbols "pc+ergol+inet(evdev)" {\n key <AE01> { type= "T", symbols[Group1]= [ ampersand, 1 ] };'
+        self.assertEqual(desktop_activation.keymap_layout_group(held, "ergol"), 2)
+        self.assertIsNone(desktop_activation.keymap_layout_group(held, "erg"))
+        self.assertTrue(desktop_activation.keymap_carries_layout(held, expected, "ergol"))
+        self.assertFalse(
+            desktop_activation.keymap_carries_layout(
+                held, expected.replace("ampersand", "7"), "ergol"
+            )
+        )
 
     def test_an_uninstalled_layout_is_refused_before_any_tool_runs(self) -> None:
         with self.assertRaises(installer.InstallError) as refusal:

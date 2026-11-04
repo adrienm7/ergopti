@@ -86,9 +86,40 @@ try {
 		Assert-Model ($start.EnvironmentVariables['OLLAMA_MODELS'] -ceq 'C:\captured\models') 'The managed models path replaces ambient storage for this child.'
 		Assert-Model ([Environment]::GetEnvironmentVariable('OLLAMA_HOST', 'Process') -ceq 'https://unowned.invalid:4444') 'The personal process environment survives.'
 	}
+	Case 'a pull refused for a Windows-login relay has its own exit code' {
+		$code = Get-OllamaPullProxyLoginExitCode
+		Assert-Model ($code -is [int] -and $code -gt 1) 'The refusal is told apart from success and from a generic failure.'
+	}
 	Case 'display strings and metacharacters are rejected at native boundary' {
 		foreach ($model in @('Qwen Display Name', 'tag" --other', 'tag;Remove-Item', 'tag`nnext')) {
 			Refuse { New-OllamaModelStart 'C:\captured\ollama.exe' 'C:\captured\models' 18148 $model $environment }
+		}
+	}
+	# The launcher holds the version with DELETE access and shares no DELETE for the
+	# daemon's life: seen live, the worker's own lease open refused every pull.
+	Case 'the pull worker observes the version the running launcher leases' {
+		$root = Join-Path ([IO.Path]::GetTempPath()) ('ergopti-pull-lease-' + [Guid]::NewGuid().ToString('N'))
+		[IO.Directory]::CreateDirectory($root) | Out-Null
+		$file = Join-Path $root 'ollama.exe'
+		[IO.File]::WriteAllText($file, 'image')
+		$lease = [Ergopti.Ollama.ManagedNative]::OpenDirectory($root, $true)
+		$fileLease = [Ergopti.Ollama.ManagedNative]::OpenRegularFile($file, $true)
+		try {
+			Refuse { [Ergopti.Ollama.ManagedNative]::OpenDirectory($root, $true) }
+			Refuse { [Ergopti.Ollama.ManagedNative]::OpenRegularFile($file, $true) }
+			$seen = [Ergopti.Ollama.ManagedNative]::OpenObservedDirectory($root)
+			$read = [Ergopti.Ollama.ManagedNative]::OpenObservedFile($file)
+			try {
+				Assert-Model ([Ergopti.Ollama.ManagedNative]::Identity($seen) -ceq [Ergopti.Ollama.ManagedNative]::Identity($lease)) 'The observer sees the leased version.'
+				Assert-Model ($read.Length -eq 5) 'The observer reads the leased image.'
+			} finally {
+				$read.Dispose()
+				Assert-Model ([Ergopti.Ollama.ManagedNative]::CloseHandle($seen)) 'The observer closes.'
+			}
+		} finally {
+			$fileLease.Dispose()
+			Assert-Model ([Ergopti.Ollama.ManagedNative]::CloseHandle($lease)) 'The lease closes.'
+			[IO.Directory]::Delete($root, $true)
 		}
 	}
 	$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)

@@ -38,10 +38,10 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	-- The switch is the command registered for the manifest's shortcuts_toggle
 	-- row, captured where the menu hands it to the renderer.
 	local render_ctx = nil
-	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
+	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, ctx)
 		render_ctx = ctx
 		return {}
-	end }
+	end)
 	package.loaded["ui.menu.shortcut_utils"] = {}
 	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
@@ -378,7 +378,8 @@ local function with_chord_fixture(mode, body)
 		local failure, inverse_blocked, paused, terminal = mode, false, false, false
 		local called, result = xpcall(function()
 			return require("tests.support.toml_output_fixture").with_output(function(path)
-				local source = '# retained chord header\n[shortcuts]\nenabled = false\n[shortcuts.script_control]\nchords_enabled = true\nfuture = "retain" # neighbor\n[foreign]\nflag = false # independent\n'
+				-- Shortcuts on: an off category greys the script-chord row (category-off rule).
+				local source = '# retained chord header\n[shortcuts]\nenabled = true\n[shortcuts.script_control]\nchords_enabled = true\nfuture = "retain" # neighbor\n[foreign]\nflag = false # independent\n'
 				local file = assert(io.open(path, "wb")); assert(file:write(source)); file:close()
 				local loaded, status = Preferences.load(path)
 				helpers.assert_eq(status, "ok")
@@ -502,7 +503,9 @@ local function assert_chord_retained(f)
 	helpers.assert_eq(f.state.script_control_enabled, true)
 	helpers.assert_eq(f.runtime(), true)
 	helpers.assert_eq(f.read(), f.source)
-	helpers.assert_eq(f.state.shortcuts, false)
+	-- The fixture's source turns Shortcuts on (category-off rule); the chord
+	-- transaction must leave that switch as it found it.
+	helpers.assert_eq(f.state.shortcuts, true)
 	helpers.assert_true(rawequal(f.state.script_control_shortcuts, f.slots))
 	helpers.assert_eq(f.calls.updates, 0)
 end
@@ -545,7 +548,9 @@ helpers.describe("script chord logical mutation admission", function()
 				local saved, status = f.preferences.load(f.path)
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(saved.script_control_enabled, false)
-				helpers.assert_eq(saved.shortcuts, nil)
+				-- The source's Shortcuts switch differs from the default (off), so the
+				-- sparse save keeps it as written.
+				helpers.assert_eq(saved.shortcuts, true)
 				helpers.assert_eq(require("infra.manifest_reader").default_for("shortcuts.enabled"), false)
 				helpers.assert_true(f.read():find('future = "retain" # neighbor', 1, true) ~= nil)
 				helpers.assert_true(f.read():find('flag = false # independent', 1, true) ~= nil)

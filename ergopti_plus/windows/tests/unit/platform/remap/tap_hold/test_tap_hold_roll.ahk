@@ -332,15 +332,27 @@ _THR_HoldStaysTheSharedOwners() {
 		Assert(!InStr(Body, "InputHook(") and !InStr(Body, "KeyWait("),
 			Name . " must neither capture input nor wait on a key by itself")
 	}
-	Resolve := _DriverFuncBody("_TapHoldRollResolve")
-	SuspendAt := InStr(Resolve, "if A_IsSuspended")
-	Assert(SuspendAt > 0 and SuspendAt < InStr(Resolve, "PressFn.Call()") and SuspendAt < InStr(Resolve, "TapFn.Call()"),
-		"a decision reached while the driver is paused types no tap and presses no hold")
 	Assert(InStr(_DriverFuncBody("_TapHoldRollWaitUp"), "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC") > 0,
 		"the wait for a key whose tap is typed is bounded like every release wait")
 }
 Test("tap-hold roll: the hold of a typing key is still the shared owner's (tap-hold-roll-is-a-tap-2026-10-01)",
 	_THR_HoldStaysTheSharedOwners)
+
+; The pause lands while the owner waits for the release: whichever way the key
+; resolves, the user who paused sees nothing typed and nothing held.
+_THR_DecisionUnderAPause(Released) {
+	World := _THR_World()
+	try
+		_THR_Run(World, (*) => Suspend(true), Released)
+	finally
+		Suspend(false)
+	Text := World.Joined()
+	Assert(!InStr(Text, "tap") && !InStr(Text, "press"), "a paused decision did: " . Text)
+}
+Test("tap-hold roll: a tap decided under a pause types nothing (tap-hold-roll-is-a-tap-2026-10-01)",
+	_THR_DecisionUnderAPause.Bind(true))
+Test("tap-hold roll: a hold decided under a pause presses nothing (tap-hold-roll-is-a-tap-2026-10-01)",
+	_THR_DecisionUnderAPause.Bind(false))
 
 ; Suspend disarms new hotkeys, but threads already waiting inside a roll keep
 ; running. Their withheld physical keys must not escape as synthetic output.

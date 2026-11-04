@@ -147,8 +147,10 @@ _KLRHU_WriterRoundTrip(Db) {
 	AssertTrue(KLR_LoadSchema(Db))
 	AssertTrue(KLR_EnsureTypingProjectionTable(Db))
 	SavedDevice := Keystats._device_id_lit
+	SavedDeviceId := Keystats.device_id
 	try {
-		Keystats._device_id_lit := SQLite_Q("writer'Ω")
+		Keystats.device_id := "writer'Ω"
+		Keystats._device_id_lit := SQLite_Q(Keystats.device_id)
 		Expected := Map()
 		Vectors := ["ascii", "éà", "e" . Chr(0x301), Chr(0x10000), Chr(0x40000),
 			Chr(0x80000), Chr(0xC0000), Chr(0x10FFFF), Chr(0x1F600) . "x"]
@@ -172,7 +174,10 @@ _KLRHU_WriterRoundTrip(Db) {
 			AssertEqual(Expected[Row["app"]][2], Row["hs_chars"])
 			AssertEqual(1, Row["hs_triggers"])
 		}
-	} finally Keystats._device_id_lit := SavedDevice
+	} finally {
+		Keystats._device_id_lit := SavedDevice
+		Keystats.device_id := SavedDeviceId
+	}
 }
 
 _KLRHU_UnsupportedDeclaration(Db, Unit) {

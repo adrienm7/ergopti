@@ -122,6 +122,7 @@ _MM_GetManifestRoot() {
 	}
 
 	_MM_MANIFEST_ROOT_CACHE := Root
+	JsonKnownRoot(FileContent, Root)
 	return Root
 }
 
@@ -267,21 +268,21 @@ MenuManifest_LoadDebugMenu() {
 ; Hard-coded fallback — mirrors the canonical order defined in menu_manifest.json.
 _MM_DebugFallback() {
 	return [
-		Map("id", "window_spy"),
-		Map("id", "list_vars"),
-		Map("id", "key_history"),
+		Map("id", MenuCommand.WINDOW_SPY),
+		Map("id", MenuCommand.LIST_VARS),
+		Map("id", MenuCommand.KEY_HISTORY),
 		Map("id", "---"),
-		Map("id", "log_level"),
-		Map("id", "open_logs"),
-		Map("id", "open_today_log"),
-		Map("id", "open_error_log"),
+		Map("id", ConfigLeaf.LOG_LEVEL),
+		Map("id", MenuCommand.OPEN_LOGS),
+		Map("id", MenuCommand.OPEN_TODAY_LOG),
+		Map("id", MenuCommand.OPEN_ERROR_LOG),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
 		Map("id", MenuCommand.SEND_PROBE),
 		Map("id", MenuCommand.HOOK_PROBE),
 		Map("id", MenuCommand.COMPOSER_CHECK),
-		Map("id", "report_bug"),
-		Map("id", "suggest_feature"),
+		Map("id", MenuCommand.REPORT_BUG),
+		Map("id", MenuCommand.SUGGEST_FEATURE),
 	]
 }
 

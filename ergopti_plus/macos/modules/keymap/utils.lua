@@ -28,14 +28,53 @@ local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
 local SecureFieldDetector = require("adapters.secure_field_detector")
+local AccessibilityPermission = require("adapters.accessibility_permission")
+local FieldRunSelftest = require("infra.field_run_selftest")
 
 local LOG = "keymap.utils"
 
 -- Re-export pure-Lua functions from the shared module so callers that require
 -- this HS adapter keep working unchanged without needing to know about the split.
-M.tokens_from_repl          = shared_utils.tokens_from_repl
 M.plain_text                = shared_utils.plain_text
 M.resolve_prediction_overlap = shared_utils.resolve_prediction_overlap
+
+-- The decoded send_keys.json, read the first time an output holds a token.
+local _send_vocabulary = nil
+
+--- A missing or malformed vocabulary raises: outputs would otherwise be typed as
+--- the literal tokens the user asked to press.
+--- @return table
+local function send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local path = require("infra.paths").shared("modules/actions/send_keys.json")
+	local raw = require("adapters.file_system").read(path)
+	local decoded = raw and require("adapters.json_codec").decode(raw) or nil
+	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
+		error("keymap.utils: the send-input vocabulary is unreadable at " .. tostring(path))
+	end
+	_send_vocabulary = decoded
+	return decoded
+end
+
+--- @param repl string A hotstring output.
+--- @return table The {kind, value} tokens macOS plays for it.
+function M.tokens_from_repl(repl)
+	return shared_utils.tokens_from_repl(repl, send_vocabulary)
+end
+
+--- @param repl string A hotstring output.
+--- @return string repl The output with {U+XXXX} and the brace escapes resolved
+---   when it presses no key; unchanged otherwise.
+--- @return boolean has_keys True when the output presses a key.
+function M.resolve_output(repl)
+	local has_keys = false
+	local plain = {}
+	for _, token in ipairs(M.tokens_from_repl(repl)) do
+		if token.kind == "key" then has_keys = true else plain[#plain + 1] = token.value end
+	end
+	if has_keys then return repl, true end
+	return table.concat(plain), false
+end
 
 
 
@@ -1062,6 +1101,9 @@ local _ignored_win_cache_value = nil
 -- (focus change, first call, or TTL elapsed). Watchers set this to true
 -- synchronously whenever the focused window/app is known to have changed.
 local _ignored_win_cache_dirty = true
+-- The field run's published scratch window when the cache was filled: a
+-- publication or retraction changes what a Hammerspoon window classifies as.
+local _ignored_win_cache_selftest_window = nil
 -- One cheap NSWorkspace watcher plus three narrowly scoped AX watchers. Never use
 -- hs.window.filter here: its first access enumerates every application's windows
 -- and has already stalled the Hammerspoon runloop for multiple seconds.
@@ -1380,6 +1422,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
+	_ignored_win_cache_selftest_window = FieldRunSelftest.window_id()
 	_secure_field_cache_value = nil
 	_text_destination = nil
 	_probe_failed_stage = nil
@@ -1404,8 +1447,28 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
 	-- the NSWorkspace frontmost app are evaluated against their own window title,
 	-- not the title of the previously active app.
+	-- The front application comes from NSWorkspace, without Accessibility: an
+	-- application that just let a focused-window read time out is not asked
+	-- again while it stays in front, since each read holds the main thread for
+	-- the whole messaging timeout. The classification stays fail-closed.
+	local ok_front, front = pcall(hs.application.frontmostApplication)
+	local ok_pid, front_pid = false, nil
+	if ok_front and front then ok_pid, front_pid = pcall(function() return front:pid() end) end
+	if not ok_pid then front_pid = nil end
+	-- The cooldown is shared with every Accessibility reader of the driver, so
+	-- an application the tooltip or the context capture found unanswering is
+	-- not asked here either. This process's own windows stay asked: the field
+	-- run's selftest types into one.
+	if AccessibilityPermission.is_unanswering(front_pid, now) then
+		_probe_failed_stage = "focused_window"
+		return mark_ignored_win_unknown()
+	end
+	local window_started = TimerScheduler.now_ns()
 	local ok_win, win = pcall(hs.window.focusedWindow)
-	if not ok_win or not win then return stage("focused_window", true) end
+	if not ok_win or not win then
+		AccessibilityPermission.note_read(front_pid, (TimerScheduler.now_ns() - window_started) / 1e9, now)
+		return stage("focused_window", true)
+	end
 	stage("focused_window")
 
 	local ok_app, app = pcall(function() return win:application() end)
@@ -1419,7 +1482,15 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		return stage("app_name", true)
 	end
 	stage("app_name")
-	if app_name == "Hammerspoon" then
+	-- The field run's scratch window is the one Hammerspoon window that is a
+	-- typing destination: its hotstring check types into it (field run
+	-- 2026-10-31 saw its trigger left unexpanded there).
+	local scratch = false
+	if app_name == "Hammerspoon" and _ignored_win_cache_selftest_window ~= nil then
+		local ok_id, win_id = pcall(function() return win:id() end)
+		scratch = ok_id and win_id == _ignored_win_cache_selftest_window
+	end
+	if app_name == "Hammerspoon" and not scratch then
 		if not ensure_ignored_win_context_watchers(app, win, false) then
 			return stage("context_watchers", true)
 		end
@@ -1584,6 +1655,11 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 
 	if _ignored_win_cache_dirty or _ignored_win_cache_value == nil then
 		schedule_ignored_win_refresh()
+		return nil, _ignored_win_context_generation
+	end
+
+	if FieldRunSelftest.window_id() ~= _ignored_win_cache_selftest_window then
+		invalidate_ignored_win_cache()
 		return nil, _ignored_win_context_generation
 	end
 

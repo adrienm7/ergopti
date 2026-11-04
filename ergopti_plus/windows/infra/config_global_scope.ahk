@@ -21,7 +21,7 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 		throw TypeError("Global scope options must be an owner map.")
 	Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)
 	Plan := ManifestScopePlan("global", Mode, [], Owners)
-	if Plan.presets.Length != 1 || Plan.presets[1].scope != "tap_holds"
+	if Plan.presets.Length != 1 || Plan.presets[1].scope != ConfigLeaf.TAP_HOLDS
 			|| Plan.presets[1].preset != "tap_hold" || Plan.presets[1].mode != Mode
 		throw Error("The global scope declares an unsupported separate-file owner.")
 	if !_HCW_FlushNumericWrite(false)
@@ -54,7 +54,13 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 		}
 		return Rows
 	}
-	return ConfigScopeCommitOperations("global", Mode, Operations, Selected, Files)
+	; The global clear composes the Gestures clear, so it also puts the touchpad
+	; back to its system state, before the commit for the reason _GES_ApplyScope gives.
+	Touchpad := Mode == "clear" ? TouchpadRegistryClearFromScope(Selected) : ""
+	Receipt := ConfigScopeCommitOperations("global", Mode, Operations, Selected, Files)
+	if (Touchpad != "")
+		Receipt["touchpad"] := Touchpad
+	return Receipt
 }
 
 ; This composition has no lifecycle, backup, publication or recovery authority.

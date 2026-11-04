@@ -8,11 +8,61 @@
 
 #Requires AutoHotkey v2.0
 
+_THS_Throw(Message, *) {
+	throw Error(Message)
+}
+
+; Runs Body with warnings on and returns every warning line the logger delivered.
+_THS_CaptureWarnings(Body) {
+	global _LOGGER_WARN_ENABLED, _LOGGER_REPEAT_ENABLED
+	Saved := _LOGGER_WARN_ENABLED
+	; The logger folds equal lines itself, consecutive or repeated; only the dispatcher's
+	; throttle is measured, so the repeat layer is off and _THS_Separate ends a streak.
+	SavedRepeat := _LOGGER_REPEAT_ENABLED
+	_LOGGER_REPEAT_ENABLED := false
+	Lines := []
+	_LOGGER_WARN_ENABLED := true
+	LoggerSetTestSink((Line) => InStr(Line, "[WARN") ? Lines.Push(Line) : 0)
+	try Body.Call()
+	finally {
+		LoggerClearTestSink()
+		_LOGGER_WARN_ENABLED := Saved
+		_LOGGER_REPEAT_ENABLED := SavedRepeat
+	}
+	return Lines
+}
+
+_THS_Separate() {
+	LoggerWarn("THS", "A different line ends the logger's consecutive dedup.")
+}
+
+_THS_Matching(Lines, Needle) {
+	Found := []
+	for Line in Lines
+		if InStr(Line, Needle)
+			Found.Push(Line)
+	return Found
+}
+
+; A throwing subscriber must neither reach the keystroke's caller nor cost the
+; subscribers after it, and it logs once per signature, not once per keystroke.
 _THS_Check() {
-	Src := _DriverDirConcat("infra")
-	Assert(Src != "", "Source file must exist")
-	Assert(InStr(Src, "catch as e") > 0, "HookDispatcher must catch subscriber exceptions")
-	Assert(InStr(Src, 'LoggerWarn("HookDispatcher"') > 0, "HookDispatcher must log subscriber exceptions")
+	Evt := "test_swallow_" . A_TickCount
+	Later := 0
+	Thrower := _THS_Throw.Bind("swallowed-" . Evt)
+	Peer := (*) => (Later += 1)
+	HookDispatcher.Register(Evt, Thrower)
+	HookDispatcher.Register(Evt, Peer)
+	try {
+		Lines := _THS_CaptureWarnings(() => (HookDispatcher.Dispatch(Evt), _THS_Separate(), HookDispatcher.Dispatch(Evt)))
+		Lines := _THS_Matching(Lines, "swallowed-" . Evt)
+		AssertEqual(2, Later, "the subscriber after the throwing one runs on every dispatch")
+		AssertEqual(1, Lines.Length, "two equal faults within the throttle window log one warning")
+		AssertContains(Lines[1], "swallowed-" . Evt, "the warning names the fault")
+	} finally {
+		HookDispatcher.Unregister(Evt, Thrower)
+		HookDispatcher.Unregister(Evt, Peer)
+	}
 }
 
 ; Regression guard: the catch block must escalate to the global error handler so
@@ -80,8 +130,6 @@ Test("hook_dispatcher: subscriber-fault escalation is gated on the ready boot ph
 ; since they run on every keystroke.
 _THS_TrackerFaultsAreReported() {
 	Src := _DriverDirConcat("infra")
-	Assert(InStr(Src, "static _TrackFault(") > 0,
-		"HookDispatcher must expose a throttled tracker-fault reporter")
 	; Every tracker call must be paired with exactly one fault report: count both.
 	TryCount := 0, Pos := 1
 	while (Pos := InStr(Src, "try TapHoldTrack", , Pos)) {
@@ -99,6 +147,11 @@ _THS_TrackerFaultsAreReported() {
 		. TryCount . " call(s) but " . ReportCount . " report(s))")
 	Assert(InStr(Src, '_TrackFault("TapHoldTrackKeyDownByScancode"') > 0,
 		"the key-down tracker fault must route through the throttled reporter")
+	Label := "test_tracker_" . A_TickCount
+	Lines := _THS_Matching(_THS_CaptureWarnings(() => (HookDispatcher._TrackFault(Label, Error("broken")), _THS_Separate(),
+		HookDispatcher._TrackFault(Label, Error("broken")), _THS_Separate(), HookDispatcher._TrackFault(Label, Error("other")))), Label)
+	AssertEqual(2, Lines.Length, "one warning per fault signature, whatever the keystroke rate")
+	AssertContains(Lines[1], Label, "the warning names the tracker")
 }
 Test("hook_dispatcher: tap-hold tracker faults are reported, not silently swallowed",
 	_THS_TrackerFaultsAreReported)

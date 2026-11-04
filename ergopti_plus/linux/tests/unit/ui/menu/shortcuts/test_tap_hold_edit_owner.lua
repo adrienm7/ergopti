@@ -1,7 +1,7 @@
 --- tests/unit/ui/menu/shortcuts/test_tap_hold_edit_owner.lua
 
 local helpers = require("tests.helpers")
-local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.menu_builder", "ui.action_picker.bridge" }
+local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.builder", "ui.action_picker.bridge" }
 local INITIAL = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
 local function read(path)
 	local f = io.open(path, "rb"); if not f then return nil end
@@ -41,7 +41,7 @@ local function with_editor(body, options)
 			assert(opts.presentation_id == "tap_hold_action"); s.confirm = confirm; return true
 		end }
 		os.execute = function(command)
-			if command:find("zenity --error", 1, true) then s.notices = s.notices + 1; return 1 end
+			if command:find("dialog_host.lua' --error", 1, true) then s.notices = s.notices + 1; return 1 end
 			return execute(command)
 		end
 		local I18n = require("infra.i18n"); I18n.init()
@@ -55,6 +55,21 @@ local function with_editor(body, options)
 				if row.menu and row.title:sub(1, #label) == label then caps = row; return end
 				if row.menu then locate(row.menu) end
 			end
+		end
+		if options.expect_off then
+			-- Category-off rule: an off Tap-Holds menu greys the key row and opens no editor.
+			local greyed
+			local function find(items)
+				for _, row in ipairs(items) do
+					if type(row.title) == "string" and row.title:sub(1, #label) == label then greyed = row; return end
+					if row.menu then find(row.menu) end
+				end
+			end
+			find(rows); assert(greyed, "actual CapsLock row")
+			helpers.assert_eq(greyed.disabled, true, "the CapsLock row is greyed while tap-holds are off")
+			helpers.assert_nil(greyed.menu, "the CapsLock row opens no editor while tap-holds are off")
+			helpers.assert_nil(greyed.fn, "the CapsLock row runs nothing while tap-holds are off")
+			return
 		end
 		locate(rows); assert(caps, "actual CapsLock menu")
 		local caption = I18n.get("tap_hold.picker.tap"); local prefix = caption:match("^(.-)%%s") or caption
@@ -169,12 +184,13 @@ helpers.describe("TapHold deferred configuration owner", function()
 			helpers.assert_eq(s.manager.keys().caps_lock.tap_action, "delete")
 		end)
 	end)
+	-- Category-off rule (b76cfff999): with tap-holds off, by the runtime switch,
+	-- the file's flag or no file, the key editors are greyed, not reachable.
 	for _, mode in ipairs({ "off", "file_off", "absent" }) do
-		helpers.it("allows an original editor with " .. mode, function()
-			with_editor(function(s)
-				s.tap(); assert(s.confirm); helpers.assert_eq(s.confirm("backspace"), true)
-				helpers.assert_eq(s.manager.keys().caps_lock.tap_action, "backspace")
-			end, { [mode] = true })
+		helpers.it("greys the original editor with " .. mode, function()
+			local reached = false
+			with_editor(function() reached = true end, { [mode] = true, expect_off = true })
+			helpers.assert_eq(reached, false, "no editor is handed out while tap-holds are off")
 		end)
 	end
 	for _, receipt in ipairs({ "false", "nil", "truthy", "throw" }) do

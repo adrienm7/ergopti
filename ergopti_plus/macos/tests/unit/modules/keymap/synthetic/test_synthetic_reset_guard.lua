@@ -128,6 +128,27 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_true(source:find("if dispatch.pending then dispatch.timer_elapsed = true; return end", 1, true) ~= nil)
 	end)
 
+	-- The selftest class is the one owned key the keymap may decode as typing,
+	-- so its emitter has exactly one production caller, the field run's
+	-- scratch typing, and the class is set by exactly one adapter call.
+	helpers.it("allows exactly one selftest emitter and one caller", function()
+		local all = strip_line_comments(helpers.read_driver_source())
+		helpers.assert_eq(count_literal(all, "emit_selftest_key_stroke("), 1,
+			"the selftest emitter is declared once and never called directly")
+		helpers.assert_eq(count_literal(all, "emit_selftest_key_stroke, "), 1,
+			"the selftest emitter has exactly one production caller")
+		local adapter = read_unit("M.MAGIC = \"ERGOPTI_SYNTHETIC_V1\"")
+		helpers.assert_eq(count_literal(adapter, "function M.emit_selftest_key_stroke("), 1)
+		helpers.assert_eq(count_literal(all, "append_pair(batch, modifiers, key, false, nil, false, true)"), 1,
+			"only the selftest emitter may build a pair with the selftest class")
+		helpers.assert_eq(count_literal(all, "selftest = selftest == true"), 2,
+			"the class is recorded on both phases of the one pair builder")
+		local caller = read_unit("local function scratch_typing")
+		helpers.assert_eq(count_literal(caller,
+			'pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])'), 1,
+			"the field run's scratch typing is the only selftest caller")
+	end)
+
 	helpers.it("keeps raw keyboard injection behind the tagged adapter", function()
 		local all = strip_line_comments(helpers.read_driver_source())
 		helpers.assert_eq(count_literal(all, "eventtap.keyStroke("), 0,

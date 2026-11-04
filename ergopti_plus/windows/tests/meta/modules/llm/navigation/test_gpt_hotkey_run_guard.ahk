@@ -16,18 +16,18 @@ _GHG_ReadSource(RelPath) {
 }
 
 _GHG_ConfiguredUrlLaunchIsGuarded() {
-    Body := _DriverFuncBody("LaunchGptShortcut")
-    Source := _GHG_ReadSource("modules/shortcuts/win.ahk")
-    Assert(Body != "", "LaunchGptShortcut must own the Win+G callback")
-    Assert(InStr(Source, 'AddShortcut("#", "g", LaunchGptShortcut)') > 0,
-        "Win+G must dispatch through the guarded LaunchGptShortcut callback")
+    Body := _DriverFuncBody("GestureOpenChatGpt")
+    Source := _DriverDirConcat("modules/gestures")
+    Assert(Body != "", "GestureOpenChatGpt must own the Win+G callback")
+    Assert(InStr(Source, '"open_chatgpt", {') > 0,
+        "open_chatgpt must dispatch through the guarded GestureOpenChatGpt callback")
     Assert(InStr(Body, "try") > 0 && InStr(Body, "catch as Err") > 0,
-        "LaunchGptShortcut must contain Run/config failures")
+        "GestureOpenChatGpt must contain Run/config failures")
     Assert(InStr(Body, "Run(Link)") > 0,
-        "LaunchGptShortcut must launch the configured link only inside its guard")
+        "GestureOpenChatGpt must launch the configured link only inside its guard")
     Assert(InStr(Body, "LoggerError") > 0 && InStr(Body, "TrayTip") > 0,
         "a failed Win+G launch must be logged and reported without a modal dialog")
     Assert(InStr(Body, "Type(Link)") > 0,
-        "LaunchGptShortcut must reject a non-string/empty config before Run")
+        "GestureOpenChatGpt must reject a non-string/empty config before Run")
 }
 Test("shortcuts: Win+G contains configured URL launch failures", _GHG_ConfiguredUrlLaunchIsGuarded)

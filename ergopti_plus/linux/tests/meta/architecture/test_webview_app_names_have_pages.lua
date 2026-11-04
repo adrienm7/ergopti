@@ -78,13 +78,14 @@ print("=== webview app names resolve to real pages ===")
 -- quietly stop covering a file that gets renamed.
 local CALLER_FILES = {
 	"ergopti_hotstrings.lua",
-	"ui/menu/menu_builder.lua",
+	"ui.menu.builder",
 }
 
 local seen = {}
 local call_count = 0
 for _, relative in ipairs(CALLER_FILES) do
-	local source = read_driver_file(relative)
+	-- The tray root is read with the section modules it binds.
+	local source = relative == "ui.menu.builder" and helpers.read_menu_source() or read_driver_file(relative)
 	-- Matches `show("name")` on either receiver spelling the driver uses
 	-- (ctx.webview.show / webview_manager.show); both end in `.show("`.
 	for app_name in source:gmatch('%.show%("([%a_][%w_]*)"%)') do
@@ -119,7 +120,7 @@ print("=== registered bridges are keyed by a page name ===")
 -- Parsed out of the source rather than required: webview_manager pulls in GTK
 -- and the whole daemon state at load time, and this assertion is about a literal
 -- table in a file.
-local manager_source = read_driver_file("ui/webview_manager.lua")
+local manager_source = assert(helpers.read_module_source("ui.webview_manager"))
 local block = manager_source:match("local BRIDGE_MODULES = {(.-)\n}")
 helpers.assert_true(block ~= nil,
 	"could not find the BRIDGE_MODULES table in ui/webview_manager.lua — this test cannot check what it cannot read")

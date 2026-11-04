@@ -158,6 +158,10 @@ PRIVATE_USE_FIRST = 0xF0000
 
 NO_SYMBOL = "NoSymbol"
 
+# macOS codes of the numeric keypad. XKB keeps its own keypad symbols, so a
+# layout's keypad keys are not placed and not reported (see Conversion.unplaced).
+KEYPAD_CODES = range(65, 93)
+
 
 class KeylayoutError(ValueError):
     """The .keylayout is malformed or uses a construct the converter rejects."""
@@ -168,10 +172,19 @@ class KeylayoutError(ValueError):
 # ---------------------------------------------------------------------------
 
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# XML lets an attribute value sit in double or single quotes; both are read.
 _TAG_RE = re.compile(
-    r"<(/?)([A-Za-z][A-Za-z0-9]*)((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*\"[^\"]*\")*)\s*(/?)>"
+    r"<(/?)([A-Za-z][A-Za-z0-9]*)"
+    r"((?:\s+[A-Za-z_:][\w:.-]*\s*=\s*(?:\"[^\"]*\"|'[^']*'))*)\s*(/?)>"
 )
-_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*\"([^\"]*)\"")
+_ATTR_RE = re.compile(r"([A-Za-z_:][\w:.-]*)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')")
+# The elements a conversion reads. A tag of one of them that the grammar above
+# cannot read is refused: skipping it silently dropped keys or whole keyMaps.
+_KNOWN_ELEMENTS = (
+    "keyboard|layouts|layout|modifierMap|keyMapSelect|modifier|keyMapSet|keyMap|key|"
+    "actions|action|when|terminators"
+)
+_KNOWN_TAG_START_RE = re.compile(r"<(/?)(?:%s)(?=[\s/>])" % _KNOWN_ELEMENTS)
 _ENTITY_RE = re.compile(r"&(#x[0-9A-Fa-f]+|#[0-9]+|lt|gt|amp|quot|apos);")
 _NAMED_ENTITIES = {"lt": "<", "gt": ">", "amp": "&", "quot": '"', "apos": "'"}
 
@@ -391,9 +404,20 @@ def parse_keylayout(text: str) -> Keylayout:
     current_action: Optional[Action] = None
     in_terminators = False
 
+    read_starts = set()
+    for match in _TAG_RE.finditer(body):
+        read_starts.add(match.start())
+    for start in _KNOWN_TAG_START_RE.finditer(body):
+        if start.start() not in read_starts:
+            line = body.count("\n", 0, start.start()) + 1
+            raise KeylayoutError("malformed tag on line %d of the comment-free text" % line)
+
     for match in _TAG_RE.finditer(body):
         closing, tag, raw_attrs, self_closing = match.groups()
-        attrs = {name: decode_entities(value) for name, value in _ATTR_RE.findall(raw_attrs)}
+        attrs = {
+            name: decode_entities(double if double or not single else single)
+            for name, double, single in _ATTR_RE.findall(raw_attrs)
+        }
         if closing:
             if tag == "modifierMap":
                 current_modifier_map = None
@@ -582,12 +606,12 @@ class Conversion:
         # works on keysyms, so two keys typing the same keysym cannot be told
         # apart; the first output wins and the conflict is reported here.
         self.conflicts: List[Tuple[str, str, str]] = []
-        # (dead-key state, action) outputs no key can reach: the Compose line
-        # names the character the action is called after, but every key using
-        # that action sends another keysym (a dead key pressed inside a
-        # dead-key state sends its own dead keysym). Reported, not fixed, so
-        # the shipped Ergopti files keep their historical sequences.
-        self.unreachable: List[Tuple[str, str]] = []
+        # macOS codes of keys the layout defines (an output that types
+        # something, or an action) that the shared keycode table names no XKB
+        # key for, keypad excepted: what they type is not on the Linux layout.
+        # A JIS or ABNT key is the usual case. Reported, so a registry layout
+        # that has one fails its conversion test instead of losing keys.
+        self.unplaced: List[int] = []
 
 
 class _Converter:
@@ -674,6 +698,29 @@ class _Converter:
         if len(text) == 1:
             return self.keysyms.get(text) or unicode_keysym(text)
         return self.keysyms.get(text, text)
+
+    def state_keysyms(self, action_id: str) -> List[str]:
+        """Keysyms ending a Compose sequence for ``action_id`` in a dead state.
+
+        A key pressed inside a dead-key state sends what it sends from the
+        neutral state: a dead key sends its own dead keysym, not the character
+        it types alone, and an action whose one-character id is not what it
+        types sends its output. Naming only the base keysym (base_keysym) left
+        those untypable (Ergopti's ^ ^) and made a plain action and a dead-key
+        action whose base keysyms agree collide on one sequence (Bépo's "^" and
+        circumflex dead key inside its science dead key). The base keysym
+        stays first when a key sends it, so those lines keep their historical
+        form; a dead key also using the action adds its own trigger, and an
+        action no key uses (untypable on macOS too) keeps its base keysym.
+        """
+        typed = self._keysyms_typing_action(action_id)
+        base = self.base_keysym(action_id)
+        if not typed:
+            return [base]
+        if base not in typed:
+            return list(typed)
+        dead = set(self.dead_triggers.values())
+        return [base] + [keysym for keysym in typed if keysym in dead and keysym != base]
 
     def dead_trigger(self, state: str) -> str:
         """Keysym a dead key entering ``state`` produces."""
@@ -810,11 +857,6 @@ class _Converter:
         for state in sorted(outputs):
             if state not in sequences:
                 continue
-            for action_id, _output in sorted(outputs[state]):
-                # An action no key uses cannot be typed on macOS either.
-                typed = self._keysyms_typing_action(action_id)
-                if typed and self.base_keysym(action_id) not in typed:
-                    self.result.unreachable.append((state, action_id))
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
@@ -824,13 +866,14 @@ class _Converter:
                     "%s\t: %s" % (head, compose_string(self.layout.terminators.get(state, "")))
                 )
                 for action_id, output in sorted(outputs[state]):
-                    sequence = "%s <%s>" % (head, self.base_keysym(action_id))
-                    if sequence in emitted:
-                        if emitted[sequence] != output:
-                            self.result.conflicts.append((sequence, emitted[sequence], output))
-                        continue
-                    emitted[sequence] = output
-                    lines.append("%s\t: %s" % (sequence, compose_string(output)))
+                    for keysym in self.state_keysyms(action_id):
+                        sequence = "%s <%s>" % (head, keysym)
+                        if sequence in emitted:
+                            if emitted[sequence] != output:
+                                self.result.conflicts.append((sequence, emitted[sequence], output))
+                            continue
+                        emitted[sequence] = output
+                        lines.append("%s\t: %s" % (sequence, compose_string(output)))
         return 'include "%L"\n\n' + "\n".join(lines) + "\n"
 
 
@@ -883,11 +926,26 @@ def convert_layout(
     ):
         converter.dead_trigger(state)
     result = converter.result
+    result.unplaced = unplaced_codes(layout, keycodes)
     result.symbols_text = converter.symbols(template, layout_id, display_name)
     result.compose_text = converter.compose()
     result.borrowed = dict(converter.borrowed)
     result.dead_triggers = dict(converter.dead_triggers)
     return result
+
+
+def unplaced_codes(layout: Keylayout, keycodes: Sequence[Tuple[str, int]]) -> List[int]:
+    """Codes of defined keys the keycode table places nowhere (keypad excepted)."""
+    placed = {code for _xkb, code in keycodes}
+    found = set()
+    for maps in layout.key_map_sets.values():
+        for entries in maps.values():
+            for code, (kind, value) in entries.items():
+                if code in placed or code in KEYPAD_CODES:
+                    continue
+                if kind == "action" or is_printable(value):
+                    found.add(code)
+    return sorted(found)
 
 
 def write_package(result: Conversion, out_dir: Path, layout_id: str) -> List[Path]:

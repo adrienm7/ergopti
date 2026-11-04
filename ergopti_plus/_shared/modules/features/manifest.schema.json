@@ -202,7 +202,7 @@
 		"feature_entry": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["id", "description_key", "input_altering"],
+			"required": ["id", "description_key", "family", "requires"],
 			"properties": {
 				"id": {
 					"type": "string",
@@ -233,15 +233,24 @@
 						"linux": {}
 					}
 				},
-				"input_altering": {
-					"type": "boolean"
+				"family": {
+					"enum": ["feature", "setting"],
+					"description": "A feature changes the keyboard or the behaviour: its default is neutral and its recommended value is the Ergopti setup. A setting says how a feature works once active: its recommended value equals its default. tools/lib/feature-family-rule.cjs holds the rule."
+				},
+				"rule_exception": {
+					"type": "string",
+					"description": "Why a row its family's rule would refuse is one; forbidden on a row that follows the rule."
+				},
+				"restore_exempt_reason": {
+					"type": "string",
+					"description": "Why a row stays out of every configuration scope, so that no restore touches it."
 				},
 				"active_by_default": {
 					"const": true,
-					"description": "Only on an input_altering entry the maintainer decided to switch on in an empty configuration (the script-management chords, 2026-09-30). Its default must equal its recommended value on every platform; every other input-altering entry defaults to off."
+					"description": "Only on a feature the maintainer decided to switch on in an empty configuration (the script-management chords, 2026-09-30). Its default must equal its recommended value on every platform."
 				},
 				"cleared": {
-					"description": "Required with active_by_default, forbidden without it: the off value (false, \"none\" or \"\") a clear writes explicitly, because deleting the key restores the preset."
+					"description": "Required with active_by_default, optional on a setting that starts on, forbidden elsewhere: the off value (false, \"none\" or \"\") a clear writes explicitly, because deleting the key restores the preset."
 				},
 				"type": {
 					"enum": ["boolean", "enum", "string", "number", "array", "action", "feature"]
@@ -279,6 +288,29 @@
 					},
 					"minItems": 1,
 					"uniqueItems": true
+				},
+				"requires": {
+					"type": "object",
+					"additionalProperties": false,
+					"minProperties": 1,
+					"properties": {
+						"macos": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						},
+						"linux": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						},
+						"windows": {
+							"type": "array",
+							"items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+							"uniqueItems": true
+						}
+					},
+					"description": "What the feature needs outside its driver, per OS it is available on (hs = macos, ahk = windows), as ids of requirements.toml; an empty list means nothing external. tools/test/test-feature-requirements.cjs derives the same lists from the drivers and fails on any difference."
 				},
 				"choice_values": {
 					"type": "array",

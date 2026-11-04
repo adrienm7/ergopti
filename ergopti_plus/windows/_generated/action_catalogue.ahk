@@ -9,7 +9,7 @@
 ; Every action the Windows driver offers, already filtered to its platform:
 ; the picker order with heading levels and locale keys, the modifier-chord
 ; block the driver expands from its own chord registry, and per-action
-; metadata (label key, parameter kind, confirmation). A data function rather
+; metadata (label key, parameter kind, confirmation, requirements). A data function rather
 ; than a global, so include order cannot matter, and no TOML is parsed to
 ; build the picker.
 ; ==============================================================================
@@ -23,6 +23,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "left_click_toggle" })
 	Items.Push({ Kind: "action", Id: "right_click_toggle" })
 	Items.Push({ Kind: "action", Id: "app_switcher" })
+	Items.Push({ Kind: "action", Id: "app_window_previous" })
 	Items.Push({ Kind: "action", Id: "alt_tab_windows" })
 	Items.Push({ Kind: "action", Id: "alt_tab_monitor" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.edition" })
@@ -87,6 +88,10 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "para_next" })
 	Items.Push({ Kind: "action", Id: "doc_start" })
 	Items.Push({ Kind: "action", Id: "doc_end" })
+	Items.Push({ Kind: "action", Id: "home" })
+	Items.Push({ Kind: "action", Id: "end" })
+	Items.Push({ Kind: "action", Id: "page_up" })
+	Items.Push({ Kind: "action", Id: "page_down" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.selection" })
 	Items.Push({ Kind: "action", Id: "sel_up" })
 	Items.Push({ Kind: "action", Id: "sel_down" })
@@ -162,7 +167,9 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "clear_clipboard" })
 	Items.Push({ Kind: "action", Id: "center_mouse" })
 	Items.Push({ Kind: "action", Id: "open_app" })
+	Items.Push({ Kind: "action", Id: "open_path" })
 	Items.Push({ Kind: "action", Id: "run_program" })
+	Items.Push({ Kind: "action", Id: "run_command" })
 	Items.Push({ Kind: "action", Id: "quit_frontmost_app" })
 	Items.Push({ Kind: "action", Id: "force_quit_frontmost" })
 	Items.Push({ Kind: "action", Id: "empty_trash" })
@@ -175,6 +182,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "screen_capture" })
 	Items.Push({ Kind: "action", Id: "screen_capture_instant" })
 	Items.Push({ Kind: "action", Id: "ocr_screenshot" })
+	Items.Push({ Kind: "action", Id: "open_chatgpt" })
 	Items.Push({ Kind: "action", Id: "open_url" })
 	Items.Push({ Kind: "action", Id: "open_downloads" })
 	Items.Push({ Kind: "action", Id: "open_file_manager" })
@@ -183,6 +191,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_emoji_picker" })
 	Items.Push({ Kind: "action", Id: "take_note" })
 	Items.Push({ Kind: "action", Id: "activity_simulation" })
+	Items.Push({ Kind: "action", Id: "display_mirror_toggle" })
 	Items.Push({ Kind: "action", Id: "search_web" })
 	Items.Push({ Kind: "action", Id: "copy_selected_path" })
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
@@ -196,6 +205,20 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "ctrl_delete" })
 	Items.Push({ Kind: "action", Id: "space" })
 	Items.Push({ Kind: "action", Id: "caps_lock" })
+	Items.Push({ Kind: "action", Id: "sticky_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd" })
+	Items.Push({ Kind: "action", Id: "sticky_option" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_option_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_option_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_ctrl_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option_shift" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_option_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_cmd_shift_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_option_shift_ctrl" })
+	Items.Push({ Kind: "action", Id: "sticky_hyper" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_app" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.ui" })
 	Items.Push({ Kind: "action", Id: "open_metrics_typing" })
@@ -231,6 +254,7 @@ GestureActionCatalogueData() {
 	Actions["alt_tab_monitor"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_monitor", Parameter: "", Confirm: false }
 	Actions["alt_tab_windows"] := { Family: "sg", LabelKey: "sg_actions.alt_tab_windows", Parameter: "", Confirm: false }
 	Actions["app_switcher"] := { Family: "sg", LabelKey: "sg_actions.app_switcher", Parameter: "", Confirm: false }
+	Actions["app_window_previous"] := { Family: "sg", LabelKey: "sg_actions.app_window_previous", Parameter: "", Confirm: false }
 	Actions["arrow_down"] := { Family: "sg", LabelKey: "sg_actions.arrow_down", Parameter: "", Confirm: false }
 	Actions["arrow_left"] := { Family: "sg", LabelKey: "sg_actions.arrow_left", Parameter: "", Confirm: false }
 	Actions["arrow_right"] := { Family: "sg", LabelKey: "sg_actions.arrow_right", Parameter: "", Confirm: false }
@@ -255,23 +279,26 @@ GestureActionCatalogueData() {
 	Actions["desktop_next_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_next_wrap", Parameter: "", Confirm: false }
 	Actions["desktop_prev"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev", Parameter: "", Confirm: false }
 	Actions["desktop_prev_wrap"] := { Family: "sg", LabelKey: "sg_actions.desktop_prev_wrap", Parameter: "", Confirm: false }
+	Actions["display_mirror_toggle"] := { Family: "sg", LabelKey: "sg_actions.display_mirror_toggle", Parameter: "", Confirm: false }
 	Actions["doc_end"] := { Family: "sg", LabelKey: "sg_actions.doc_end", Parameter: "", Confirm: false }
 	Actions["doc_start"] := { Family: "sg", LabelKey: "sg_actions.doc_start", Parameter: "", Confirm: false }
 	Actions["eject_all_disks"] := { Family: "sg", LabelKey: "sg_actions.eject_all_disks", Parameter: "", Confirm: false }
 	Actions["empty_trash"] := { Family: "sg", LabelKey: "sg_actions.empty_trash", Parameter: "", Confirm: true }
+	Actions["end"] := { Family: "sg", LabelKey: "sg_actions.end", Parameter: "", Confirm: false }
 	Actions["enter"] := { Family: "sg", LabelKey: "sg_actions.enter", Parameter: "", Confirm: false }
 	Actions["escape"] := { Family: "sg", LabelKey: "sg_actions.escape", Parameter: "", Confirm: false }
 	Actions["find"] := { Family: "sg", LabelKey: "sg_actions.find", Parameter: "", Confirm: false }
 	Actions["force_quit_frontmost"] := { Family: "sg", LabelKey: "sg_actions.force_quit_frontmost", Parameter: "", Confirm: true }
 	Actions["fullscreen"] := { Family: "sg", LabelKey: "sg_actions.fullscreen", Parameter: "", Confirm: false }
+	Actions["home"] := { Family: "sg", LabelKey: "sg_actions.home", Parameter: "", Confirm: false }
 	Actions["left_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.left_click_toggle", Parameter: "", Confirm: false }
 	Actions["line_down"] := { Family: "sg", LabelKey: "sg_actions.line_down", Parameter: "", Confirm: false }
 	Actions["line_end"] := { Family: "sg", LabelKey: "sg_actions.line_end", Parameter: "", Confirm: false }
 	Actions["line_start"] := { Family: "sg", LabelKey: "sg_actions.line_start", Parameter: "", Confirm: false }
 	Actions["line_up"] := { Family: "sg", LabelKey: "sg_actions.line_up", Parameter: "", Confirm: false }
 	Actions["llm_agent_auto_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_auto_toggle", Parameter: "", Confirm: false }
-	Actions["llm_agent_command"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_command", Parameter: "", Confirm: false }
-	Actions["llm_agent_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_selection", Parameter: "", Confirm: false }
+	Actions["llm_agent_command"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_command", Parameter: "", Confirm: false, Requires: ["ai:on"] }
+	Actions["llm_agent_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_agent_selection", Parameter: "", Confirm: false, Requires: ["ai:on"] }
 	Actions["llm_generate_prediction"] := { Family: "sg", LabelKey: "sg_actions.llm_generate_prediction", Parameter: "", Confirm: false }
 	Actions["llm_live_prompt_toggle"] := { Family: "sg", LabelKey: "sg_actions.llm_live_prompt_toggle", Parameter: "llm_prompt", Confirm: false }
 	Actions["llm_predict_advanced"] := { Family: "sg", LabelKey: "sg_actions.llm_predict_advanced", Parameter: "", Confirm: false }
@@ -310,6 +337,7 @@ GestureActionCatalogueData() {
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
 	Actions["open_app"] := { Family: "sg", LabelKey: "sg_actions.open_app", Parameter: "app", Confirm: false }
 	Actions["open_changelog"] := { Family: "sg", LabelKey: "sg_actions.open_changelog", Parameter: "", Confirm: false }
+	Actions["open_chatgpt"] := { Family: "sg", LabelKey: "sg_actions.open_chatgpt", Parameter: "", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
 	Actions["open_downloads"] := { Family: "sg", LabelKey: "sg_actions.open_downloads", Parameter: "", Confirm: false }
 	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }
@@ -326,6 +354,7 @@ GestureActionCatalogueData() {
 	Actions["open_metrics_apps"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_apps", Parameter: "", Confirm: false }
 	Actions["open_metrics_typing"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_typing", Parameter: "", Confirm: false }
 	Actions["open_model_browser"] := { Family: "sg", LabelKey: "sg_actions.open_model_browser", Parameter: "", Confirm: false }
+	Actions["open_path"] := { Family: "sg", LabelKey: "sg_actions.open_path", Parameter: "path", Confirm: false }
 	Actions["open_paths_editor"] := { Family: "sg", LabelKey: "sg_actions.open_paths_editor", Parameter: "", Confirm: false }
 	Actions["open_personal_hotstrings"] := { Family: "sg", LabelKey: "sg_actions.open_personal_hotstrings", Parameter: "", Confirm: false }
 	Actions["open_personal_info"] := { Family: "sg", LabelKey: "sg_actions.open_personal_info", Parameter: "", Confirm: false }
@@ -336,6 +365,8 @@ GestureActionCatalogueData() {
 	Actions["open_today_log"] := { Family: "sg", LabelKey: "sg_actions.open_today_log", Parameter: "", Confirm: false }
 	Actions["open_url"] := { Family: "sg", LabelKey: "sg_actions.open_url", Parameter: "url", Confirm: false }
 	Actions["open_window_spy"] := { Family: "sg", LabelKey: "sg_actions.open_window_spy", Parameter: "", Confirm: false }
+	Actions["page_down"] := { Family: "sg", LabelKey: "sg_actions.page_down", Parameter: "", Confirm: false }
+	Actions["page_up"] := { Family: "sg", LabelKey: "sg_actions.page_up", Parameter: "", Confirm: false }
 	Actions["para_next"] := { Family: "sg", LabelKey: "sg_actions.para_next", Parameter: "", Confirm: false }
 	Actions["para_prev"] := { Family: "sg", LabelKey: "sg_actions.para_prev", Parameter: "", Confirm: false }
 	Actions["paste"] := { Family: "sg", LabelKey: "sg_actions.paste", Parameter: "", Confirm: false }
@@ -344,6 +375,7 @@ GestureActionCatalogueData() {
 	Actions["quit_frontmost_app"] := { Family: "sg", LabelKey: "sg_actions.quit_frontmost_app", Parameter: "", Confirm: false }
 	Actions["redo"] := { Family: "sg", LabelKey: "sg_actions.redo", Parameter: "", Confirm: false }
 	Actions["right_click_toggle"] := { Family: "sg", LabelKey: "sg_actions.right_click_toggle", Parameter: "", Confirm: false }
+	Actions["run_command"] := { Family: "sg", LabelKey: "sg_actions.run_command", Parameter: "command", Confirm: false }
 	Actions["run_program"] := { Family: "sg", LabelKey: "sg_actions.run_program", Parameter: "program", Confirm: false }
 	Actions["screen_capture"] := { Family: "sg", LabelKey: "sg_actions.screen_capture", Parameter: "", Confirm: false }
 	Actions["screen_capture_instant"] := { Family: "sg", LabelKey: "sg_actions.screen_capture_instant", Parameter: "", Confirm: false }
@@ -380,6 +412,20 @@ GestureActionCatalogueData() {
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }
 	Actions["spotlight_mouse"] := { Family: "sg", LabelKey: "sg_actions.spotlight_mouse", Parameter: "", Confirm: false }
+	Actions["sticky_cmd"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_option_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_option_shift", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_shift", Parameter: "", Confirm: false }
+	Actions["sticky_cmd_shift_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_cmd_shift_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_ctrl_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_ctrl_shift", Parameter: "", Confirm: false }
+	Actions["sticky_hyper"] := { Family: "sg", LabelKey: "sg_actions.sticky_hyper", Parameter: "", Confirm: false }
+	Actions["sticky_option"] := { Family: "sg", LabelKey: "sg_actions.sticky_option", Parameter: "", Confirm: false }
+	Actions["sticky_option_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_ctrl", Parameter: "", Confirm: false }
+	Actions["sticky_option_shift"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_shift", Parameter: "", Confirm: false }
+	Actions["sticky_option_shift_ctrl"] := { Family: "sg", LabelKey: "sg_actions.sticky_option_shift_ctrl", Parameter: "", Confirm: false }
 	Actions["surround_parens"] := { Family: "sg", LabelKey: "sg_actions.surround_parens", Parameter: "", Confirm: false }
 	Actions["tab"] := { Family: "sg", LabelKey: "sg_actions.tab", Parameter: "", Confirm: false }
 	Actions["tab_close"] := { Family: "sg", LabelKey: "sg_actions.tab_close", Parameter: "", Confirm: false }

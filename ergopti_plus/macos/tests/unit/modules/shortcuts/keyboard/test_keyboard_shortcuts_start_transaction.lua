@@ -23,7 +23,9 @@ local function load_subject()
 		bind = function(chord, _, options)
 			counters.bind = counters.bind + 1
 			controls.options[chord] = options
-			if controls.refuse_on_call == counters.bind then return nil, "OS_REFUSED" end
+			if controls.refuse_on_call == counters.bind or controls.refuse_always then
+				return nil, controls.refusal or "OS_REFUSED"
+			end
 			local token = "handle#" .. tostring(counters.bind)
 			live[token] = true
 			return token
@@ -36,6 +38,28 @@ local function load_subject()
 			end
 			if live[token] ~= true then return false end
 			live[token] = nil
+			return true
+		end,
+		OS_REFUSAL = "OS_REFUSED",
+	}
+	controls.timers = {}
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			local timer = {delay = delay, callback = callback, cancelled = false}
+			controls.timers[#controls.timers + 1] = timer
+			return timer, true
+		end,
+		cancel = function(timer) timer.cancelled = true; return true end,
+	}
+	package.loaded["modules.shortcuts.refusal_retry"] = nil
+	controls.rebinds = 0
+	package.loaded["modules.shortcuts"] = {
+		rebind_for_layout = function()
+			controls.rebinds = controls.rebinds + 1
+			if controls.rebind_restarts then
+				controls.subject.stop()
+				controls.subject.start()
+			end
 			return true
 		end,
 	}
@@ -57,6 +81,7 @@ local function load_subject()
 
 	require("tests.support.keyboard_config_fixture").install({ primary_a = "script_pause_toggle", primary_b = "script_pause_toggle" })
 	local subject = require("modules.shortcuts.keyboard_shortcuts")
+	controls.subject = subject
 	return subject, controls, counters
 end
 
@@ -91,6 +116,41 @@ helpers.describe("configurable shortcuts: startup transaction (shortcut-refusal-
 			"the retry binds the refused slot alone")
 		helpers.assert_eq(counters.bind, 3)
 		helpers.assert_eq(next(subject.pending_slots()), nil)
+	end)
+
+	helpers.it("rebinds every shortcut on each bounded retry while macOS refuses a held key", function()
+		-- Field log 2026-10-30: after a layout switch Ctrl+G still held keycode 5,
+		-- the Ergopti '.', and retrying Ctrl+. alone failed for 11 minutes. At
+		-- 18:30 a probe layout flipped back and forth: the one rebind a minute
+		-- then allowed ran on a stale map, and the four later retries never
+		-- rebound, so Ctrl+. stayed refused.
+		local subject, controls = load_subject()
+		controls.refuse_always = true
+		controls.rebind_restarts = true
+		helpers.assert_eq(subject.start(), true)
+		local delays = {}
+		for _ = 1, 10 do
+			local due = nil
+			for _, timer in ipairs(controls.timers) do
+				if not timer.cancelled and not timer.fired then due = timer end
+			end
+			if due == nil then break end
+			due.fired = true
+			delays[#delays + 1] = due.delay
+			due.callback()
+		end
+		helpers.assert_eq(table.concat(delays, ","), "1,3,10,30",
+			"a rebind continues its bounded series instead of restarting it")
+		helpers.assert_eq(controls.rebinds, 4, "each retry asks for one full rebind")
+	end)
+
+	helpers.it("does not rebind everything for a key the layout lacks", function()
+		local subject, controls = load_subject()
+		controls.refuse_always = true
+		controls.refusal = "key '.' is not in the active keyboard layout"
+		helpers.assert_eq(subject.start(), true)
+		subject.bind_pending(false)
+		helpers.assert_eq(controls.rebinds, 0)
 	end)
 
 	helpers.it("asks the registrar to refuse a key the layout lacks, except on the final retry", function()

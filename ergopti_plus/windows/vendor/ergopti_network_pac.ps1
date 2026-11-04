@@ -275,7 +275,9 @@ public static class ErgoptiNetworkPac
                 if(BitConverter.ToString(actual).Replace("-","").ToLowerInvariant()!=expectedHash)
                     throw new InvalidOperationException();
             }
-            script=Fetch(location,workDeadline,deadline,scriptLimit,maxRedirects);
+            try {script=Fetch(location,workDeadline,deadline,scriptLimit,maxRedirects);}
+            catch(PacOwnerDebtException){throw;}
+            catch {answer.FailureOrigin="pac_download";return answer;}
             url=new UTF8Encoding(false,true).GetBytes(destination);hostname=new UTF8Encoding(false,true).GetBytes(host);
             if(url.Length==0||url.Length>outputLimit||hostname.Length==0||hostname.Length>outputLimit)
                 throw new InvalidOperationException();

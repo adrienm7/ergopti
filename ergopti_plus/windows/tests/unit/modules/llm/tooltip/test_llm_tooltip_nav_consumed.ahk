@@ -352,54 +352,58 @@ Test("LLM nav: a tap-hold's Tab under one Shift navigates like the physical Shif
 ; side, then the arrows with the configured modifiers, bare by default, as the
 ; macOS footer does. It showed the arrows only under a modifier, so the default
 ; bare arrows were never advertised. Distinct tokens stand for the shared
-; strings, which this harness does not load (UiStyle_LoadSharedConst).
+; glyphs, which this harness does not load (UiStyle_LoadSharedConst). The words
+; are locale text and the keys key names: the footer read French (« Tab pour
+; accepter », « ⇧G + Tab ») in every locale until 2026-11-03.
 _LTNC_FooterAdvertisesEveryChord() {
-	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT
-	global UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT
-	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT
-	global UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS
-	Saved := [UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_SINGLE, UI_LLM_HINT_NAV_LEFT,
-		UI_LLM_HINT_NAV_RIGHT, UI_LLM_HINT_ACCEPT_CENTER, UI_LLM_HINT_ARROW_LEFT,
-		UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_OR, UI_LLM_HINT_ARROW_SEP_LEFT,
-		UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS]
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_KEY, UI_LLM_HINT_NAV_LEFT_KEYS
+	global UI_LLM_HINT_NAV_RIGHT_KEYS, UI_LLM_HINT_ARROW_LEFT
+	global UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_ARROW_SEP_LEFT
+	global UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER
+	Saved := [UI_LLM_FOOTER_SPACE_DIV, UI_LLM_HINT_ACCEPT_KEY, UI_LLM_HINT_NAV_LEFT_KEYS,
+		UI_LLM_HINT_NAV_RIGHT_KEYS, UI_LLM_HINT_ARROW_LEFT,
+		UI_LLM_HINT_ARROW_RIGHT, UI_LLM_HINT_ARROW_SEP_LEFT,
+		UI_LLM_HINT_ARROW_SEP_RIGHT, UI_LLM_SHORTCUT_ORDER]
 	try {
-		; The modifier words come from the shared shortcut spec.
+		; The modifier words come from the shared key name table.
 		UI_LLM_SHORTCUT_ORDER := "ctrl,alt,shift,cmd"
-		UI_LLM_SHORTCUT_LABELS := "Ctrl,Alt,Shift,Win"
 		UI_LLM_FOOTER_SPACE_DIV := "|"
-		UI_LLM_HINT_ACCEPT_SINGLE := "[single]"
-		UI_LLM_HINT_NAV_LEFT := "[left shift+tab]"
-		UI_LLM_HINT_NAV_RIGHT := "[right shift+tab]"
-		UI_LLM_HINT_ACCEPT_CENTER := "[accept]"
+		UI_LLM_HINT_ACCEPT_KEY := "tab"
+		UI_LLM_HINT_NAV_LEFT_KEYS := "left_shift+tab"
+		UI_LLM_HINT_NAV_RIGHT_KEYS := "right_shift+tab"
 		UI_LLM_HINT_ARROW_LEFT := "[up/left]"
 		UI_LLM_HINT_ARROW_RIGHT := "[down/right]"
-		UI_LLM_HINT_OR := " or "
 		UI_LLM_HINT_ARROW_SEP_LEFT := "<"
 		UI_LLM_HINT_ARROW_SEP_RIGHT := ">"
-		AssertEqual("[single]", _LLM_BuildNavHint(1, ""),
+		Tab := t("key_name.tab")
+		Left := t("key_name.left_shift") . " + " . Tab
+		Right := t("key_name.right_shift") . " + " . Tab
+		Either := (First, Second) => StrReplace(StrReplace(t("llm.tooltip.hint_or"), "{1}", First), "{2}", Second)
+		Accept := StrReplace(t("llm.tooltip.hint_accept_center"), "{1}", Tab)
+		Single := _LLM_BuildNavHint(1, "")
+		AssertEqual(StrReplace(t("llm.tooltip.hint_accept_single"), "{1}", Tab), Single,
 			"one prediction only offers Tab")
-		AssertEqual("[left shift+tab] or [up/left]|<|[accept]|>|[right shift+tab] or [down/right]",
+		AssertFalse(InStr(Single, "{") || InStr(Single, "llm.tooltip."), "the hint is text: " . Single)
+		AssertEqual(Either(Left, "[up/left]") . "|<|" . Accept . "|>|" . Either(Right, "[down/right]"),
 			_LLM_BuildNavHint(3, ""),
 			"the bare arrows, the default chord, must be advertised beside Shift+Tab")
-		AssertEqual("[left shift+tab] or Ctrl + [up/left]|<|[accept]|>|[right shift+tab] or Ctrl + [down/right]",
+		Ctrl := t("key_name.ctrl")
+		AssertEqual(Either(Left, Ctrl . " + [up/left]") . "|<|" . Accept . "|>|" . Either(Right, Ctrl . " + [down/right]"),
 			_LLM_BuildNavHint(3, "ctrl"),
 			"the arrows carry the configured modifiers")
-		AssertEqual("[left shift+tab]|<|[accept]|>|[right shift+tab]",
+		AssertEqual(Left . "|<|" . Accept . "|>|" . Right,
 			_LLM_BuildNavHint(2, "none"),
 			"'none' hides the arrows, as on macOS")
 	} finally {
 		UI_LLM_FOOTER_SPACE_DIV := Saved[1]
-		UI_LLM_HINT_ACCEPT_SINGLE := Saved[2]
-		UI_LLM_HINT_NAV_LEFT := Saved[3]
-		UI_LLM_HINT_NAV_RIGHT := Saved[4]
-		UI_LLM_HINT_ACCEPT_CENTER := Saved[5]
-		UI_LLM_HINT_ARROW_LEFT := Saved[6]
-		UI_LLM_HINT_ARROW_RIGHT := Saved[7]
-		UI_LLM_HINT_OR := Saved[8]
-		UI_LLM_HINT_ARROW_SEP_LEFT := Saved[9]
-		UI_LLM_HINT_ARROW_SEP_RIGHT := Saved[10]
-		UI_LLM_SHORTCUT_ORDER := Saved[11]
-		UI_LLM_SHORTCUT_LABELS := Saved[12]
+		UI_LLM_HINT_ACCEPT_KEY := Saved[2]
+		UI_LLM_HINT_NAV_LEFT_KEYS := Saved[3]
+		UI_LLM_HINT_NAV_RIGHT_KEYS := Saved[4]
+		UI_LLM_HINT_ARROW_LEFT := Saved[5]
+		UI_LLM_HINT_ARROW_RIGHT := Saved[6]
+		UI_LLM_HINT_ARROW_SEP_LEFT := Saved[7]
+		UI_LLM_HINT_ARROW_SEP_RIGHT := Saved[8]
+		UI_LLM_SHORTCUT_ORDER := Saved[9]
 	}
 }
 

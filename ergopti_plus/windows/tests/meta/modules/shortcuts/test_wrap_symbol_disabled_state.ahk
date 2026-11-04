@@ -8,14 +8,12 @@
 
 #Requires AutoHotkey v2.0
 
-_TWD_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_TWD_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TWD_Check() {
-	Src := _TWD_ReadSource("infra/wrap_symbols_config.ahk")
+	Src := _TWD_ReadSource("wrap_symbols_config.ahk")
 	Assert(Src != "", "Source file wrap_symbols_config.ahk must exist")
 	Assert(InStr(Src, "[[disabled]]") > 0, "wrap_symbols_config.ahk must use [[disabled]] array format")
 	Assert(InStr(Src, "char = ") > 0, "wrap_symbols_config.ahk must save char individually")

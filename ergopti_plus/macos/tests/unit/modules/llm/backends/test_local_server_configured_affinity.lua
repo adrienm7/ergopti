@@ -27,8 +27,15 @@ end
 local function isolated(scenario)
 	helpers.with_fresh_modules({ "modules.llm.local_servers", "modules.llm.api_remote" }, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
-		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
+		-- The four servers these cases drive run; every other catalogue server is
+		-- stopped, so a longer catalogue changes no case.
+		local scan_overrides = {}
+		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api, scan_overrides)
 		local servers = require("modules.llm.local_servers")
+		local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
+		for _, id in ipairs(servers.ORDER) do
+			if not driven[id] then scan_overrides[id] = { running = false, pids = {}, detail = "no running process" } end
+		end
 		local probes = {}
 		local clients = upvalue(api._probe_local_target, "_local_probe_clients")
 		for _, id in ipairs(servers.ORDER) do
@@ -163,11 +170,21 @@ helpers.describe("Configured nondefault discovery views (local-configured-views)
 				helpers.assert_true(api.detect_local_servers())
 				helpers.assert_eq(probes[id] and probes[id].url, entry.base_url .. "/models", "the configured port must be probed")
 				helpers.assert_eq(probes[id].headers.Authorization, nil)
-				helpers.assert_eq(table.concat(servers.ORDER, ","), "omlx,lmstudio,llamacpp,jan")
+				-- A configured view never joins the catalogue order
+				local file = assert(io.open(helpers.shared("modules/llm/local_servers.json"), "r"))
+				local shipped = require("json").decode(file:read("*a")).server_order
+				file:close()
+				helpers.assert_eq(table.concat(servers.ORDER, ","), table.concat(shipped, ","))
 				helpers.assert_eq(api.PROVIDERS[id], nil, "a view never becomes a registered API provider")
 				helpers.assert_eq(servers.view_servers()[id].label, api.PROVIDERS[provider].label)
 				probes[id].callback({ ok = true, status = 200, body = '{"object":"list","data":[{"id":"mlx-community/Qwen3-8B-4bit","object":"model","owned_by":"omlx"}]}' })
-				for _, known in ipairs(servers.ORDER) do probes[known].callback({ ok = false, status = 0, body = "" }) end
+				-- Only the running servers were probed; the stopped ones have no probe
+				for _, known in ipairs(servers.ORDER) do
+					if probes[known] then probes[known].callback({ ok = false, status = 0, body = "" }) end
+				end
+				for _, known in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
+					helpers.assert_true(probes[known] ~= nil, known .. " runs and is probed")
+				end
 				helpers.assert_eq(servers.detected(), { id })
 				helpers.assert_eq(servers.result(id).models, { "mlx-community/Qwen3-8B-4bit" })
 				helpers.assert_eq(api.local_server_entry(id), entry)

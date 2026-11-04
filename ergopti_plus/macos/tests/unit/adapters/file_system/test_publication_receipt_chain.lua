@@ -46,7 +46,7 @@ local function with_files(body)
 			for _, handle in ipairs(handles) do assert(handle:close()) end
 			for _, path in ipairs(paths) do
 				if fixture.HOST_ATTRIBUTES(path) ~= nil then assert(os.remove(path)) end
-				local lock = path .. fixture.WRITE_LOCK_SUFFIX
+				local lock = fixture.write_lock_path(path)
 				if fixture.HOST_ATTRIBUTES(lock) ~= nil then assert(os.remove(lock)) end
 			end
 		end, debug.traceback)
@@ -126,7 +126,7 @@ helpers.describe("FileSystem original publication receipt lineage", function()
 			local open = io.open
 			io.open = function(target, mode, ...)
 				local handle, detail = open(target, mode, ...)
-				if target ~= path .. fixture.WRITE_LOCK_SUFFIX or mode ~= "a+" or handle == nil then
+				if target ~= fixture.write_lock_path(path) or mode ~= "a+" or handle == nil then
 					return handle, detail
 				end
 				-- Exact original mutex FD is genuinely open. This SDK close-refusal

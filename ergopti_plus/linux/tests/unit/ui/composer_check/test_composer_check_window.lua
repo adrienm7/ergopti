@@ -66,7 +66,11 @@ local function with_window(build_env, body)
 		local Window = require("ui.field_check.composer_check")
 		Window._reset()
 		world.services = {
-			translate = function(key) return "[" .. key .. "]" end,
+			-- The label-value join is the locale's own template (common.label_value).
+			translate = function(key)
+				if key == "common.label_value" then return "{1} : {2}" end
+				return "[" .. key .. "]"
+			end,
 			env = build_env,
 			notify = function(message) world.notes[#world.notes + 1] = message end,
 			dialog = function(title, text, copy_label, close_label)
@@ -169,15 +173,16 @@ helpers.describe("composer check window (Linux)", function()
 		local manifest = Json.decode(handle:read("*a"))
 		handle:close()
 		local rows = {}
-		for _, row in ipairs(manifest.debug_menu) do
-			if row.id == "composer_check" then rows[#rows + 1] = row end
+		for _, key in ipairs({ "debug_menu", "debug_tests_menu" }) do
+			for _, row in ipairs(manifest[key]) do
+				if row.id == "composer_check" then rows[#rows + 1] = row; rows.key = key end
+			end
 		end
 		helpers.assert_eq(#rows, 1, "declared once")
+		helpers.assert_eq(rows.key, "debug_tests_menu", "it hangs in the Tests submenu")
 		helpers.assert_eq(rows[1].i18n, "menu.debug.composer_check")
 		helpers.assert_nil(rows[1].platforms, "shown on every platform")
-		local builder = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "rb"))
-		local source = builder:read("*a")
-		builder:close()
+		local source = helpers.read_menu_source()
 		helpers.assert_true(source:find('[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check")', 1, true) ~= nil,
 			"the Linux debug menu routes the row")
 		local main = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))

@@ -26,8 +26,17 @@ require("test.runner_home").isolate()
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
 --- the key (the usual one) would drop the whole row; a stub that replaces the
---- baseline starts from these.
-M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+--- baseline starts from these. A numbered caption (caption_format "numbered")
+--- refuses one without its {1} the same way: the keyboard groups' Add rows echo
+--- their key followed by the modifiers they are filled with.
+M.I18N_PLACEHOLDER_FORMATS = {
+	["menu.llm.server_port_label"] = "%s server port: %s",
+	["menu.shortcuts.alt_add"] = "menu.shortcuts.alt_add {1}",
+	["menu.shortcuts.ctrl_add"] = "menu.shortcuts.ctrl_add {1}",
+	["menu.shortcuts.ctrl_shift_add"] = "menu.shortcuts.ctrl_shift_add {1}",
+	["menu.shortcuts.cmd_add"] = "menu.shortcuts.cmd_add {1}",
+	["menu.shortcuts.cmd_shift_add"] = "menu.shortcuts.cmd_shift_add {1}",
+}
 
 --- The shared timing registry, built from the real file on first use. A fixture that virtualises
 --- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
@@ -148,6 +157,16 @@ end
 
 
 -- Read canonical data before individual fixtures replace file and environment ports.
+-- The shared TOML writer splices the refused setting into this notice's {1}: a stub
+-- that echoes the key would hide that name, so the baseline carries the real format.
+-- It is read on first use: a suite that re-roots the driver has no locale tree.
+local CASE_TWIN_KEY = "dialog.config_save.case_twin"
+setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
+	if key ~= CASE_TWIN_KEY then return nil end
+	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
+	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
+	return formats[key]
+end })
 local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
 local logger_privacy_owners = setmetatable({}, { __mode = "k" })
 
@@ -440,6 +459,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["adapters.one_shot_shift"] = nil
 	-- The console owner captures the native API and must follow the current stub.
 	loaded["ui.console_window"] = nil
+	-- The Accessibility adapter remembers which application left a read
+	-- unanswered and captures hs: each test starts with no cooldown.
+	loaded["adapters.accessibility_permission"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
@@ -478,7 +500,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
-	-- canonical "— … —" decoration, so the stub must expose them or any builder
+	-- shared header format (menu.labels), so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
 	-- A caption that takes several getters (caption_getters) refuses a format without its
 	-- placeholders, so the keys the AI menu builds that way carry their English format.
@@ -487,8 +509,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return "— " .. text .. " —" end,
-		section          = function(key) return "— " .. key .. " —" end,
+		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would
@@ -707,6 +729,29 @@ function M.read_driver_unit(symbol)
 	return matches[1]
 end
 
+--- The module name a driver-relative source path is required by: dots for
+--- slashes, `.lua` dropped, and a package's `init` dropped. Whole-tree scans key
+--- their allowlists by this name, as the code names the module, never by path.
+--- @param rel string Path under the driver root, e.g. "modules/keystats/init.lua".
+--- @return string module_name e.g. "modules.keystats".
+function M.module_name_of(rel)
+	local name = rel:gsub("\\", "/"):gsub("^%./", ""):gsub("%.lua$", ""):gsub("/", ".")
+	return (name:gsub("%.init$", ""))
+end
+
+--- The source of a production module, resolved from its module name through
+--- package.searchpath exactly as require would find it (the Linux helper of the
+--- same name is its twin).
+--- The read goes through SourceFile, so an open, read or close failure raises
+--- naming its phase and path instead of reading as an absent module.
+--- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
+function M.read_module_source(module_name)
+	local path, missing = package.searchpath(module_name, package.path)
+	if not path then return nil, missing end
+	return SourceFile.read(path)
+end
+
 
 
 
@@ -864,6 +909,7 @@ function M.make_logger_stub()
 		-- Every dialog_util modal runs through this wrapper; it has no clock here.
 		run_modal = function(fn, ...) return fn(...) end,
 		redact_message = function(text) return text end,
+		follow_config_dir = noop,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
 		-- The logs-folder resolver every consumer asks; a stub without it would

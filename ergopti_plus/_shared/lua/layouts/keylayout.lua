@@ -114,7 +114,7 @@ local function strip_comments(text)
 end
 
 --- Matches one element tag at `at` (the position of a "<"), the way
---- `</?Name (attr="v")* /?>` reads; nil when the text there is not such a tag.
+--- `</?Name (attr="v" | attr='v')* /?>` reads; nil when the text there is not such a tag.
 --- @param text string
 --- @param at number
 --- @return table|nil tag { closing, name, attrs, self_closing, next }
@@ -133,10 +133,12 @@ local function match_tag(text, at)
 		local attr = text:match("^[A-Za-z_:][%w_:.%-]*", after_space)
 		if not attr then break end
 		local cursor = after_space + #attr
-		local equals = text:match("^%s*=%s*\"", cursor)
+		-- XML lets an attribute value sit in double or single quotes.
+		local equals = text:match("^%s*=%s*[\"']", cursor)
 		if not equals then break end
+		local quote = equals:sub(-1)
 		local value_start = cursor + #equals
-		local value_end = text:find('"', value_start, true)
+		local value_end = text:find(quote, value_start, true)
 		if not value_end then break end
 		attrs[#attrs + 1] = { attr, decode_entities(text:sub(value_start, value_end - 1)) }
 		pos = value_end + 1
@@ -149,6 +151,28 @@ local function match_tag(text, at)
 	for _, pair in ipairs(attrs) do map[pair[1]] = pair[2] end
 	return { closing = closing, name = name, attrs = map, self_closing = self_closing, next = pos + 1 }
 end
+
+-- The elements a conversion reads. A tag of one of them that match_tag cannot
+-- read is refused: skipping it silently dropped keys or whole keyMaps. Twin of
+-- _KNOWN_ELEMENTS in keylayout_to_xkb.py.
+local KNOWN_ELEMENTS = {
+	keyboard = true, layouts = true, layout = true, modifierMap = true, keyMapSelect = true, modifier = true,
+	keyMapSet = true, keyMap = true, key = true, actions = true, action = true, when = true, terminators = true,
+}
+
+--- Whether the text at `at` (a "<") opens a tag of a known element.
+--- @param text string
+--- @param at number
+--- @return boolean
+local function known_tag_start(text, at)
+	local name = text:match("^</?([A-Za-z][A-Za-z0-9]*)[%s/>]", at)
+	return name ~= nil and KNOWN_ELEMENTS[name] == true
+end
+
+-- The text helpers a .keylayout editor shares with this reader
+-- (layouts/keylayout_rows.lua), so both read a tag the same way.
+M.strip_comments = strip_comments
+M.match_tag = match_tag
 
 --- Parses a modifier `keys` attribute into sorted required and optional tokens.
 --- @param keys string
@@ -207,6 +231,10 @@ function M.parse(text)
 		if not open then break end
 		local tag = match_tag(body, open)
 		if not tag then
+			if known_tag_start(body, open) then
+				local _, newlines = body:sub(1, open):gsub("\n", "")
+				return nil, "malformed tag on line " .. (newlines + 1) .. " of the comment-free text"
+			end
 			pos = open + 1
 		else
 			pos = tag.next
@@ -338,6 +366,88 @@ function M.parse(text)
 		out.terminators[#out.terminators + 1] = { state = state, output = terminators[state] }
 	end
 	return out
+end
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 3/ Element Positions =======
+-- ====================================
+-- ====================================
+
+--- Where the elements of a comment-free .keylayout text are, for an editor that
+--- rewrites cells in place (layouts/keylayout_rows.lua): the editor reads values
+--- through M.parse and positions through this, so tags are read in this module
+--- only. Positions are byte offsets into `body`; `open_stop` is the first byte
+--- after an opening tag, `close_start` the "<" of its closing tag and `stop` the
+--- first byte after the whole element.
+--- @param body string Comment-free text (M.strip_comments).
+--- @return table|nil positions { default_modifiers, modifier_maps = { [id] = { open_stop,
+---   self_closing } }, key_map_sets = { [id] = { open_stop, close_start, maps = { [index] =
+---   { start, open_stop, close_start, stop, self_closing } } } } }
+--- @return string|nil err
+function M.positions(body)
+	local out = { modifier_maps = {}, key_map_sets = {} }
+	local pos, set, map = 1, nil, nil
+	while true do
+		local open = body:find("<", pos, true)
+		if not open then break end
+		local tag = match_tag(body, open)
+		if not tag then
+			pos = open + 1
+		else
+			pos = tag.next
+			local attrs, kind = tag.attrs, tag.name
+			if tag.closing then
+				if kind == "keyMapSet" and set ~= nil then
+					set.close_start, set = open, nil
+				elseif kind == "keyMap" and map ~= nil then
+					map.close_start, map.stop, map = open, tag.next, nil
+				end
+			elseif kind == "layout" and attrs.first == "0" and out.default_modifiers == nil then
+				out.default_modifiers = attrs.modifiers
+			elseif kind == "modifierMap" and attrs.id ~= nil then
+				out.modifier_maps[attrs.id] = { open_stop = tag.next, self_closing = tag.self_closing }
+			elseif kind == "keyMapSet" and attrs.id ~= nil then
+				if out.key_map_sets[attrs.id] then return nil, "keyMapSet '" .. attrs.id .. "' is defined twice" end
+				set = { open_stop = tag.next, maps = {} }
+				out.key_map_sets[attrs.id] = set
+				if tag.self_closing then set.close_start, set = tag.next, nil end
+			elseif kind == "keyMap" and set ~= nil and tonumber(attrs.index) ~= nil then
+				local index = tonumber(attrs.index)
+				if set.maps[index] then return nil, "keyMap " .. index .. " is defined twice" end
+				map = { start = open, open_stop = tag.next, self_closing = tag.self_closing }
+				set.maps[index] = map
+				if tag.self_closing then map.stop, map = tag.next, nil end
+			end
+		end
+	end
+	return out, nil
+end
+
+--- The <key> elements of a keyMap's content, in order.
+--- @param content string The text between a keyMap's opening and closing tags.
+--- @return table keys Array of { code, start, stop, self_closing }.
+function M.key_positions(content)
+	local keys, pos = {}, 1
+	while true do
+		local open = content:find("<", pos, true)
+		if not open then break end
+		local tag = match_tag(content, open)
+		if not tag then
+			pos = open + 1
+		else
+			pos = tag.next
+			if tag.name == "key" and not tag.closing and tonumber(tag.attrs.code) ~= nil then
+				keys[#keys + 1] = { code = tonumber(tag.attrs.code), start = open, stop = tag.next,
+					self_closing = tag.self_closing }
+			end
+		end
+	end
+	return keys
 end
 
 return M

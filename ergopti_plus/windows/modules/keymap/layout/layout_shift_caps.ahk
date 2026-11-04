@@ -33,6 +33,8 @@
 ; matter.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -160,7 +162,7 @@ RegisterShiftLayer() {
 	; reset leaks it into every later Hotkey() call in the driver — silently
 	; gating unrelated layers behind this condition.
 	try {
-		HotIf((*) => Features["layout"]["ergopti_base"])
+		HotIf((*) => Features["layout"][ConfigLeaf.ERGOPTI_BASE])
 		for SC in SHIFTED_LETTERS {
 			if _SHIFT_DIGIT_SCS.Has(SC)
 				continue ; the digit row, registered below
@@ -173,7 +175,7 @@ RegisterShiftLayer() {
 		}
 		; The digit row stands down where the swap owns it, decided per press on
 		; the foreground window's layout, so no layout switch needs a reload.
-		HotIf((*) => Features["layout"]["ergopti_base"]
+		HotIf((*) => Features["layout"][ConfigLeaf.ERGOPTI_BASE]
 			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
 		for SC in _SHIFT_DIGIT_SCS
 			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
@@ -243,7 +245,7 @@ NumberRowEmulatedBase(Sc) {
 	; A number row switched off is the OS layout's.
 	if !ERGOPTI_NUMBER_ROW.Has(Sc) || !LayoutRowIsEmulated(Sc)
 		return ""
-	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
+	if KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) {
 		if !KLE_KeyCodes.Has(Sc)
 			return ""
 		Level := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Sc])
@@ -302,7 +304,7 @@ _LayoutRowPassthroughCriterion(Sc, HotkeyName := "", *) {
 	if !BuiltinNumberRowIsActive() || LayoutRowIsEmulated(Sc)
 		return false
 	if !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
-		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		&& Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
 		return true
 	; A chosen source owns only its plain press. Its wildcard and modifier
 	; variants follow the effective row; a layout's own source keeps every level.
@@ -343,7 +345,7 @@ NumberRowRegistryOwnsRow() {
 }
 
 _NumberRowRegistryOwnsRowRead(&Owned) {
-	Owned := LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive("ergopti_base"), LayoutRowSwitches()) == "emulated"
+	Owned := LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE), LayoutRowSwitches()) == "emulated"
 }
 
 ; A number-row criterion that throws once the driver is ready is a bug, not the
@@ -364,7 +366,7 @@ BuiltinNumberRowIsActive() {
 	; Indexed, not Get: the number-row policy reads its stored choice once
 	; through Get, and the producer fixtures count exactly that read.
 	return IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		&& Features["layout"].Has("ergopti_base") && Features["layout"]["ergopti_base"] == true
+		&& Features["layout"].Has(ConfigLeaf.ERGOPTI_BASE) && Features["layout"][ConfigLeaf.ERGOPTI_BASE] == true
 }
 
 RegisterCapsLockLayer() {
@@ -387,11 +389,11 @@ RegisterCapsLockLayer() {
 	; happened to be active. RegisterShiftLayer already guards this way; this
 	; sibling did not.
 	try {
-		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		HotIf((*) => GetCapsLockCondition() and Features["hotstrings"][ConfigLeaf.MAGIC_KEY]["replace"]["enabled"])
 		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 		; --- Letters and symbols (registered last, highest precedence) ---
-		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
+		HotIf((*) => GetCapsLockCondition() and Features["layout"][ConfigLeaf.ERGOPTI_BASE])
 		for SC in SHIFTED_LETTERS {
 			if _SHIFT_DIGIT_SCS.Has(SC)
 				continue ; the digit row, registered below
@@ -405,7 +407,7 @@ RegisterCapsLockLayer() {
 		; direct_access_digits hotkeys with an ergopti_base variant, silently
 		; regressing the auto-advance-skips-a-field fix for OTP/device-login
 		; digit boxes.
-		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"]
+		HotIf((*) => GetCapsLockCondition() and Features["layout"][ConfigLeaf.ERGOPTI_BASE]
 			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
 		for SC in _SHIFT_DIGIT_SCS
 			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
@@ -471,7 +473,7 @@ NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
 			|| !IsSet(CategoryEnabled) || !(CategoryEnabled is Map) || !CategoryEnabled.Has("Layout")
 			|| !(CategoryEnabled["Layout"] is Integer) || CategoryEnabled["Layout"] != true
 		return "native"
-	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
+	Mode := NumberRowPolicyMode(Features["layout"].Get(ConfigLeaf.DIRECT_ACCESS_DIGITS, ""))
 	if Mode == "" || Mode == "native"
 		return "native"
 	if !IsSet(Caps)
@@ -555,7 +557,7 @@ global _NumberRowMenuSignature := ""
 NumberRowMenuSignature(Hkl, Caps) {
 	global Features
 	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		? NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", "")) : ""
+		? NumberRowPolicyMode(Features["layout"].Get(ConfigLeaf.DIRECT_ACCESS_DIGITS, "")) : ""
 	Availability := NumberRowAvailability(Hkl, Caps)
 	return Stored . "|" . NumberRowEffectiveMode(Hkl, Caps) . "|" . Availability["digits"]
 		. "|" . Availability["symbols"] . "|" . NumberRowEdgesState(Hkl, Caps)["reason"]
@@ -594,7 +596,7 @@ NumberRowSymbolsLevel(Sc, Caps) {
 	global KLE_Id, Features
 	Refused := Map("supported", false, "shift", false)
 	if !IsSet(Features) || !(Features is Map) || !IsSet(KLE_Id) || !(KLE_Id is String)
-			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive("ergopti_base")
+			|| !((Caps is Integer) && (Caps == true || Caps == false)) || !KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE)
 			|| Sc < 0x02 || Sc > 0x0B
 			|| StrCompare(KLE_Id, KeylayoutEmulation_SelectedId(MasterGateDesiredFeatures(Features)), true) != 0
 		return Refused
@@ -682,7 +684,7 @@ NumberRowEdgesState(Hkl := unset, Caps := unset) {
 	if !IsSet(Caps)
 		Caps := KS_CapsLockToggleState()
 	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
-		&& Features["layout"].Has("number_row_reorder_edges") && Features["layout"]["number_row_reorder_edges"] == true
+		&& Features["layout"].Has(ConfigLeaf.NUMBER_ROW_REORDER_EDGES) && Features["layout"][ConfigLeaf.NUMBER_ROW_REORDER_EDGES] == true
 	Edges := []
 	for _, Sc in NUMBER_ROW_EDGE_SCS {
 		Row := _DigitRowEffectiveKey(Sc, Hkl, Caps)

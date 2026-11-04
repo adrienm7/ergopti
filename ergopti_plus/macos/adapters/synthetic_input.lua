@@ -1443,11 +1443,12 @@ end
 --- @param key string|number Key name/code or one UTF-8 character.
 --- @param unicode boolean Whether key is Unicode text.
 --- @param loopback boolean Whether keymap must process this synthetic signal.
+--- @param selftest boolean|nil Whether this is a field-run selftest key.
 --- @return table down_event
 --- @return table up_event
 --- @return number down_tag
 --- @return number up_tag
-local function build_key_pair(batch, modifiers, key, unicode, loopback)
+local function build_key_pair(batch, modifiers, key, unicode, loopback, selftest)
 	local tx = batch.tx
 	local ordinal = tx.next_ordinal + 1
 	-- Unicode text rides a carrier key the user is not holding: a key-down of a
@@ -1479,12 +1480,12 @@ local function build_key_pair(batch, modifiers, key, unicode, loopback)
 		down_tag = register_record({
 			generation = common.generation, owner = common.owner, effect = common.effect,
 			batch = common.batch, ordinal = common.ordinal, phase = "down", control = false,
-			loopback = common.loopback,
+			loopback = common.loopback, selftest = selftest == true,
 		})
 		up_tag = register_record({
 			generation = common.generation, owner = common.owner, effect = common.effect,
 			batch = common.batch, ordinal = common.ordinal, phase = "up", control = false,
-			loopback = common.loopback,
+			loopback = common.loopback, selftest = selftest == true,
 		})
 	end, debug.traceback)
 	if not allocated then
@@ -1518,8 +1519,9 @@ end
 --- @param unicode boolean Unicode mode.
 --- @param collector table|nil Ambient callback collector.
 --- @param loopback boolean|nil Whether keymap must process this signal.
-local function append_pair(batch, modifiers, key, unicode, collector, loopback)
-	local down, up, down_tag, up_tag = build_key_pair(batch, modifiers, key, unicode, loopback)
+--- @param selftest boolean|nil Whether this is a field-run selftest key.
+local function append_pair(batch, modifiers, key, unicode, collector, loopback, selftest)
+	local down, up, down_tag, up_tag = build_key_pair(batch, modifiers, key, unicode, loopback, selftest)
 	batch.events[#batch.events + 1] = down
 	batch.events[#batch.events + 1] = up
 	batch.tags[#batch.tags + 1] = down_tag
@@ -2714,66 +2716,114 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 end
 
 
---- Emits one action signal that is intentionally routed back through keymap.
---- @param modifiers table Modifiers.
---- @param key string|number Key.
---- @param delay number|nil Legacy delay; only values truncated to zero are valid.
---- @param explicit_tx table|nil Action transaction override.
---- @return boolean success
-function M.emit_loopback_key_stroke(modifiers, key, delay, explicit_tx)
-	local tx, implicit = resolve_emission_transaction(explicit_tx, true)
-	local arguments_ok, arguments_err = xpcall(function()
-		delay = delay or 0
-		assert(type(delay) == "number" and delay >= 0 and delay < 1,
-			"adapters.synthetic_input.emit_loopback_key_stroke: delay must be in [0, 1) microseconds")
-		assert(tx.effect == "action",
-			"adapters.synthetic_input.emit_loopback_key_stroke: transaction effect must be action")
-	end, debug.traceback)
-	if not arguments_ok then
-		cancel_failed_emission(tx, "loopback key-stroke")
-		error(arguments_err, 0)
-	end
-	local token = nil
-	if tx.sealed then
-		for candidate in pairs(tx.retains) do token = candidate break end
-	end
-	local batch
-	local ok, accepted = xpcall(function()
-		batch = create_batch(tx, "loopback", token)
-		M.loopbackKeyStroke(batch, modifiers, key)
-		assert(not tx.cancelled and not tx.completed and batch.status == "building",
-			"loopback construction lost its exact transaction")
-		local LoopbackOwner = require("adapters.synthetic_input_loopback_owner")
-		local owner = LoopbackOwner.new(TimerScheduler, batch.events, {
-			admit = function() return batch.status == "queued" and not tx.failed and not tx.completed end,
-			withdraw = function() untrack_pending_loopback(batch) end,
-			discard = function() discard_batch_records(batch) end,
-			diagnostic = function(format, detail) defer_diagnostic("error", format, detail) end,
-			terminal = function(status, detail)
-				if detail then tx.failure = detail end
-				if status == "cancelled" then tx.cancelled, tx.sealed = true, true end
-				finish_batch(batch, status)
-			end,
-		})
-		batch.loopback_owner = owner
-		batch.status = "queued"
-		track_pending_loopback(batch)
-		-- Acquire retries before native Down: the first global pair now waits
-		-- the canonical owner tick instead of a one-shot zero-delay turn.
-		return owner.start(M.PERIODIC_OWNER_TICK_SEC)
-	end, debug.traceback)
-	if not ok then
-		tx.failure = tostring(accepted)
-		if batch and batch.loopback_owner == nil then
-			-- A native constructor may return after reentrant cancellation.
-			discard_batch_records(batch)
+-- A block scope: the main chunk is at Lua's 200-local limit, and only the
+-- two global-pair emitters need the shared poster.
+do
+	--- Posts one tagged key pair globally after the current callback, so every
+	--- tap, the keymap's included, sees it as an independent Quartz event.
+	--- @param tx table Owning transaction.
+	--- @param label string Diagnostic label of the emitter.
+	--- @param append function fn(batch) appending exactly one tagged pair.
+	--- @return boolean accepted
+	local function post_global_pair(tx, label, append)
+		local token = nil
+		if tx.sealed then
+			for candidate in pairs(tx.retains) do token = candidate break end
 		end
-		cancel_failed_emission(tx, "loopback key-stroke")
-		error(accepted, 0)
+		local batch
+		local ok, accepted = xpcall(function()
+			batch = create_batch(tx, "loopback", token)
+			append(batch)
+			assert(not tx.cancelled and not tx.completed and batch.status == "building",
+				"loopback construction lost its exact transaction")
+			local LoopbackOwner = require("adapters.synthetic_input_loopback_owner")
+			local owner = LoopbackOwner.new(TimerScheduler, batch.events, {
+				admit = function() return batch.status == "queued" and not tx.failed and not tx.completed end,
+				withdraw = function() untrack_pending_loopback(batch) end,
+				discard = function() discard_batch_records(batch) end,
+				diagnostic = function(format, detail) defer_diagnostic("error", format, detail) end,
+				terminal = function(status, detail)
+					if detail then tx.failure = detail end
+					if status == "cancelled" then tx.cancelled, tx.sealed = true, true end
+					finish_batch(batch, status)
+				end,
+			})
+			batch.loopback_owner = owner
+			batch.status = "queued"
+			track_pending_loopback(batch)
+			-- Acquire retries before native Down: the first global pair now waits
+			-- the canonical owner tick instead of a one-shot zero-delay turn.
+			return owner.start(M.PERIODIC_OWNER_TICK_SEC)
+		end, debug.traceback)
+		if not ok then
+			tx.failure = tostring(accepted)
+			if batch and batch.loopback_owner == nil then
+				-- A native constructor may return after reentrant cancellation.
+				discard_batch_records(batch)
+			end
+			cancel_failed_emission(tx, label)
+			error(accepted, 0)
+		end
+		if accepted ~= true then cancel_failed_emission(tx, label) end
+		return accepted == true
 	end
-	if accepted ~= true then cancel_failed_emission(tx, "loopback key-stroke") end
-	if implicit and not tx.cancelled then M.seal(tx) end
-	return accepted == true
+
+
+	--- Emits one action signal that is intentionally routed back through keymap.
+	--- @param modifiers table Modifiers.
+	--- @param key string|number Key.
+	--- @param delay number|nil Legacy delay; only values truncated to zero are valid.
+	--- @param explicit_tx table|nil Action transaction override.
+	--- @return boolean success
+	function M.emit_loopback_key_stroke(modifiers, key, delay, explicit_tx)
+		local tx, implicit = resolve_emission_transaction(explicit_tx, true)
+		local arguments_ok, arguments_err = xpcall(function()
+			delay = delay or 0
+			assert(type(delay) == "number" and delay >= 0 and delay < 1,
+				"adapters.synthetic_input.emit_loopback_key_stroke: delay must be in [0, 1) microseconds")
+			assert(tx.effect == "action",
+				"adapters.synthetic_input.emit_loopback_key_stroke: transaction effect must be action")
+		end, debug.traceback)
+		if not arguments_ok then
+			cancel_failed_emission(tx, "loopback key-stroke")
+			error(arguments_err, 0)
+		end
+		local accepted = post_global_pair(tx, "loopback key-stroke", function(batch)
+			M.loopbackKeyStroke(batch, modifiers, key)
+		end)
+		if implicit and not tx.cancelled then M.seal(tx) end
+		return accepted
+	end
+
+
+	-- The one producer of the selftest class, read by tests that pin its caller.
+	M.SELFTEST_OWNER = "field_run.selftest"
+
+	--- Emits one field-run selftest key pair, posted globally like a loopback so
+	--- the keymap tap sees it. The record's selftest field lets the keymap decode
+	--- it as typing, but only while the field run's scratch window has the focus
+	--- (modules/keymap/selftest_gate.lua); everywhere else it is consumed. The
+	--- class is a record field, not a tag bit: once its record is evicted the key
+	--- is ordinary synthetic output, which no tap counts or expands. It is a
+	--- replacement effect, so it publishes no action epoch that would reset the
+	--- keymap's buffer between two keys of one typed word. Not loopback-pinned.
+	--- @param modifiers table Modifier names.
+	--- @param key string|number Key name, code or single character.
+	--- @return boolean accepted
+	function M.emit_selftest_key_stroke(modifiers, key)
+		assert(#_callback_stack == 0,
+			"adapters.synthetic_input.emit_selftest_key_stroke: selftest keys are posted outside every eventtap callback")
+		assert(type(modifiers) == "table",
+			"adapters.synthetic_input.emit_selftest_key_stroke: modifiers must be a table")
+		assert(type(key) == "string" or type(key) == "number",
+			"adapters.synthetic_input.emit_selftest_key_stroke: key must be a string or number")
+		local tx = M.begin(M.SELFTEST_OWNER, "replacement")
+		local accepted = post_global_pair(tx, "selftest key-stroke", function(batch)
+			append_pair(batch, modifiers, key, false, nil, false, true)
+		end)
+		if not tx.cancelled then M.seal(tx) end
+		return accepted
+	end
 end
 
 
@@ -4242,6 +4292,9 @@ function M.decode_tag(tag)
 		effect = effect,
 		loopback = effect == "action" and encoded_loopback,
 		physical_replay = physical_replay,
+		-- The selftest class lives only in the live record: an evicted selftest
+		-- key decodes as ordinary synthetic output, which no tap treats as typing.
+		selftest = false,
 		sequence = integer_tag & TAG_SEQUENCE_MASK,
 		enriched = false,
 		stale = true,
@@ -4268,6 +4321,7 @@ local function copy_record(record)
 		control = record.control == true,
 		loopback = record.loopback == true,
 		physical_replay = record.physical_replay == true,
+		selftest = record.selftest == true,
 		source_pid = record.source_pid,
 		sequence = record.tag & TAG_SEQUENCE_MASK,
 		enriched = true,

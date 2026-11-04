@@ -45,7 +45,7 @@ _ALNT_OnlyAUserLCtrlIsRecorded() {
 	for _, Name in ["_LCtrlHandleHold", "_LCtrlHandleTapOnly"] {
 		Body := _DriverFuncBody(Name)
 		Record := InStr(Body, "TapHoldRecordLCtrlPress()")
-		Wait := Max(InStr(Body, "TapHoldOwnImmediateModifier("), InStr(Body, 'KeyWait("SC01D"'))
+		Wait := Max(InStr(Body, "TapHoldOwnImmediateModifier("), InStr(Body, 'KS_WaitReleased("SC01D"'))
 		AssertFalse(InStr(Body, 'UpdateLastSentCharacter("LControl")') > 0, Name . " must not push LControl before it knows")
 		AssertTrue(Wait > 0 and Record > Wait, Name . " must record the press once it has resolved, after the AltGr that followed it")
 	}

@@ -105,7 +105,8 @@ end
 
 helpers.describe("New providers: listed in catalogue order, each where it can serve", function()
 	local catalogue = read_shared("modules/llm/api_providers.json")
-	local local_ids = { "omlx", "lmstudio", "llamacpp", "jan" }
+	-- Every local server of the shipped catalogue, in its order
+	local local_ids = read_shared("modules/llm/local_servers.json").server_order
 	local expected_order = {}
 	for _, id in ipairs(catalogue.provider_order) do expected_order[#expected_order + 1] = id end
 	for _, id in ipairs(local_ids) do expected_order[#expected_order + 1] = id end
@@ -122,7 +123,7 @@ helpers.describe("New providers: listed in catalogue order, each where it can se
 			for _, id in ipairs(catalogue.provider_order) do
 				local format = catalogue.providers[id].format
 				if format ~= "decisions" then chat[#chat + 1] = id end
-				if format ~= "decisions" and format ~= "backboard" then vision[#vision + 1] = id end
+				if format ~= "decisions" and format ~= "backboard" and format ~= "perplexity_agent" then vision[#vision + 1] = id end
 			end
 			for _, id in ipairs(local_ids) do
 				chat[#chat + 1] = id
@@ -379,5 +380,30 @@ helpers.describe("Jev through Backboard: the questions in system_one, the answer
 			helpers.assert_true(remote.is_decision_entry(TYPESAFE))
 			helpers.assert_true(not remote.is_decision_entry({ provider = "groq", model = "typesafe/x" }))
 		end)
+	end)
+end)
+
+helpers.describe("Perplexity goes to the Agent API", function()
+	helpers.it("the request has the documented endpoint, key and shape", function()
+		local Remote = helpers.load_module("modules.llm.api_remote")
+		Remote._reset_for_test()
+		local request = assert(Remote.build_request({ provider = "perplexity", token = "k" },
+			{ { role = "system", content = "sys" }, { role = "user", content = "hello" } },
+			{ temperature = 0.5, max_tokens = 16 }))
+		helpers.assert_eq(request.url, "https://api.perplexity.ai/v1/agent")
+		helpers.assert_eq(request.headers.Authorization, "Bearer k")
+		helpers.assert_eq(request.payload.model, "perplexity/sonar")
+		helpers.assert_eq(request.payload.input, "hello")
+		helpers.assert_eq(request.payload.instructions, "sys")
+		helpers.assert_eq(request.payload.max_output_tokens, 16)
+		helpers.assert_nil(request.payload.messages, "no chat completion field")
+		helpers.assert_nil(request.payload.max_tokens, "no chat completion field")
+	end)
+
+	helpers.it("it chats but takes no screenshot", function()
+		local Remote = helpers.load_module("modules.llm.api_remote")
+		Remote._reset_for_test()
+		helpers.assert_true(Remote.serves("perplexity", "chat"))
+		helpers.assert_true(not Remote.serves("perplexity", "vision"))
 	end)
 end)

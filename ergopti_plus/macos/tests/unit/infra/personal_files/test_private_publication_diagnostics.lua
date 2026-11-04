@@ -110,7 +110,7 @@ helpers.describe("private publication diagnostic ownership", function()
 			io.open, os.remove = original_open, original_remove
 			retained = false
 			pcall(adapter.write, path, "fixture cleanup")
-			original_remove(path); original_remove(path .. fixture.WRITE_LOCK_SUFFIX)
+			original_remove(path); original_remove(fixture.write_lock_path(path))
 			if not ok then error(failure, 0) end
 		end)
 	end)

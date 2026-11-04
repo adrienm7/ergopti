@@ -39,10 +39,8 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_AVFM_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+_AVFM_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -64,7 +62,7 @@ Test("Keystats AV: KL_AV_SlowTick never calls KL_AV_PollFocusMode (av-focus-mode
 
 
 _AVFM_NoBlockingRegistryWalk() {
-	Src := _AVFM_ReadSource("modules/keystats/keystats_av_state.ahk")
+	Src := _AVFM_ReadSource("keystats_av_state.ahk")
 	Assert(InStr(Src, "loop reg") = 0,
 		"keystats_av_state.ahk must contain no loop-reg walk - a recursive registry enumeration on the SLOW_TICK_MS timer path blocks the AHK main thread and locks the keyboard")
 }

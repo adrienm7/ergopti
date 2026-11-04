@@ -18,6 +18,7 @@ local gestures_mod  = require("modules.gestures")
 local MenuUtils = require("ui.menu.menu_utils")
 local dialog        = require("infra.dialog_util")
 local i18n          = require("infra.i18n")
+local LabelValue = require("locale.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
@@ -304,10 +305,23 @@ function M.build(ctx)
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
 		if type(gestures.get_action_parameter_spec) ~= "function"
 			or gestures.get_action_parameter_spec(current) ~= "program" then
-			actionLbl = ParameterLabel.format(actionLbl, parameter)
+			actionLbl = ParameterLabel.for_spec(actionLbl, type(gestures.get_action_parameter_spec) == "function"
+				and gestures.get_action_parameter_spec(current) or nil, parameter)
 		end
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+
+		-- A slot whose macOS gesture is on is greyed with a short suffix and the
+		-- engine holds it back (never a double action); the Infos dialog says
+		-- where to turn the macOS gesture off. The row stays short on purpose.
+		local system_state = type(gestures.system_slot_state) == "function"
+			and gestures.system_slot_state(slot) or "free"
+		local held_suffix = (system_state == "taken" and i18n.get("menu.gestures.slot_taken_by_macos"))
+			or (system_state == "unverified" and i18n.get("menu.gestures.slot_unverified_macos"))
+			or nil
+		local rowLabel = LabelValue.compose(i18n.get, slotLbl, actionLbl)
+			.. (held_suffix and (" — " .. held_suffix) or "")
+		local rowDisabled = not state.gestures or paused or held_suffix ~= nil or nil
 
 		-- Provider data from here down: `label` / `action` / `items`, which the
 		-- renderer materialises. These rows used to be built in this driver's own
@@ -374,8 +388,8 @@ function M.build(ctx)
 			})
 			if not swipeSubmenu then return nil end
 			return {
-				label    = slotLbl .. " : " .. actionLbl,
-				disabled = not state.gestures or paused or nil,
+				label    = rowLabel,
+				disabled = rowDisabled,
 				items    = swipeSubmenu,
 			}
 		end
@@ -384,8 +398,8 @@ function M.build(ctx)
 		local change_action_rows = ManifestMenu.template_rows("gesture_change_action", slot_commands, slot_getters)
 		if not change_action_rows then return nil end
 		return {
-			label    = slotLbl .. " : " .. actionLbl,
-			disabled = not state.gestures or paused or nil,
+			label    = rowLabel,
+			disabled = rowDisabled,
 			items    = change_action_rows,
 		}
 	end
@@ -477,6 +491,12 @@ function M.build(ctx)
 		["gesture_slots_4"] = slots_provider(4),
 		["gesture_slots_5"] = slots_provider(5),
 	}
+
+	-- A macOS gesture turned on or off since the last read greys or restores its
+	-- slot: the recheck asks for the next build.
+	if type(gestures.set_system_gestures_listener) == "function" and type(ctx.updateMenu) == "function" then
+		gestures.set_system_gestures_listener(ctx.updateMenu)
+	end
 
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end

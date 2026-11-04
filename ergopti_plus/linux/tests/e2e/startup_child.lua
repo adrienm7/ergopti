@@ -17,7 +17,9 @@
 --- Actions: boot (start and idle), restore_recommended (start, then the menu's
 --- « Restore recommended values », committed through the same composition the
 --- row calls), delimiters_add (persist a custom delimiter through its owner),
---- and delimiters_verify (check its state after a cold start).
+--- delimiters_verify (check its state after a cold start), delimiters_edit
+--- (the tray's toggle and Delete rows, then a refused write rolled back and
+--- retried) and delimiters_verify_edit (that edit after a cold start).
 --- Output: the daemon's log lines, E2E_* observation lines and a
 --- final E2E_DONE line.
 --- ==============================================================================
@@ -114,22 +116,30 @@ io.open = function(path, mode)
 	return real_open(path, mode)
 end
 
--- User-visible error dialogs: zenity/kdialog errors, and notifications raised
+-- User-visible error dialogs: the owned dialog's errors, and notifications raised
 -- at the error level.
 local function watch_command(command)
-	if type(command) == "string" and (command:find("zenity%s+%-%-error") or command:find("kdialog%s+%-%-error")
-		or command:find("kdialog%s+%-%-sorry")) then
+	if type(command) == "string" and command:find("dialog_host%.lua'%s+%-%-error") then
 		record("DIALOG", command:sub(1, 200))
 	end
 end
 local real_execute, real_popen = os.execute, io.popen
 os.execute = function(command, ...) watch_command(command); return real_execute(command, ...) end
 io.popen = function(command, ...) watch_command(command); return real_popen(command, ...) end
+-- A feature switched off is announced at the error level on purpose
+-- (_shared/lua/feature_notice.lua); the delimiter steps name the one they cause.
+local expected_off_notice = nil
 package.preload["adapters.notifier"] = function()
 	local notifier = dofile("adapters/notifier.lua")
 	local send = notifier.send
 	notifier.send = function(message, opts)
-		if type(opts) == "table" and opts.level == "error" then record("DIALOG", "notification: " .. tostring(message)) end
+		if type(opts) == "table" and opts.level == "error" then
+			if expected_off_notice ~= nil and tostring(message) == expected_off_notice then
+				record("NOTICE", "feature off: " .. tostring(message))
+			else
+				record("DIALOG", "notification: " .. tostring(message))
+			end
+		end
 		return send(message, opts)
 	end
 	return notifier
@@ -176,6 +186,13 @@ if SEED and SEED ~= "" then
 	local source = assert(real_open(SEED, "rb"))
 	local content = source:read("*a")
 	source:close()
+	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
+	if not content:find("schema_version%s*=") then
+		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
+		local text = registry:read("*a")
+		registry:close()
+		content = "[_meta]\nschema_version = " .. assert(text:match("\noldest_version = (%d+)")) .. "\n\n" .. content
+	end
 	local fh = assert(real_open(target, "wb"))
 	fh:write(content)
 	fh:close()
@@ -189,14 +206,16 @@ hook.held_text_modifier_codes = function() return {} end
 hook.emergency_stop = function(why) record("EMERGENCY_STOP", why) end
 hook.pump = function() return 0 end
 
--- The tray: rows kept, not drawn.
+-- The tray: rows kept, not drawn. The delimiter steps click the latest tree it
+-- was handed, as GTK would.
+local published_menu = nil
 package.preload["platform.tray.appindicator"] = function()
 	local live = false
 	return {
 		is_available = function() return true end,
 		create = function() live = true; return true end,
 		set_icon = function() return true end,
-		set_menu = function() return true end,
+		set_menu = function(items) published_menu = items; return true end,
 		pump = function() return 0 end,
 		destroy = function() live = false end,
 		is_live = function() return live end,
@@ -219,14 +238,57 @@ end
 
 -- The menu context the tray builds, kept for the recommended restore.
 local menu_ctx = nil
-package.preload["ui.menu.menu_builder"] = function()
-	local builder = dofile("ui/menu/menu_builder.lua")
+package.preload["ui.menu.builder"] = function()
+	local builder = dofile("ui/menu/builder.lua")
 	local build = builder.build
 	builder.build = function(ctx)
 		menu_ctx = ctx
 		return build(ctx)
 	end
 	return builder
+end
+
+--- A user delimiter's rows in the tray's published word-delimiter submenu: its toggle,
+--- found by the label its user typed, and the row after it when that row is
+--- its Delete command.
+--- @param label string The custom delimiter's label.
+--- @return table|nil toggle, table|nil delete
+local function delimiter_rows(label)
+	local i18n = require("infra.i18n")
+	local section = i18n.get("menu.hotstrings.word_expanders")
+	local delete = i18n.get("menu.hotstrings.delete_delimiter")
+	local function title_of(row)
+		return type(row) == "table" and type(row.title) == "string" and (row.title:gsub("^%s+", "")) or ""
+	end
+	local function search(items, inside)
+		for index, row in ipairs(items or {}) do
+			local title = title_of(row)
+			-- The label alone, or followed by the consumed suffix.
+			local named = title == label or title:sub(1, #label + 1) == label .. " "
+			if inside and named and type(row.fn) == "function" then
+				local after = items[index + 1]
+				return row, title_of(after) == delete and after or nil
+			end
+			local toggle, removal = search(row.menu, inside or title == section)
+			if toggle then return toggle, removal end
+		end
+	end
+	return search(published_menu, false)
+end
+
+--- The Hotstrings category's own enable row in the published tray: the one
+--- row of that submenu an off category leaves clickable.
+--- @return table|nil row
+local function hotstrings_switch()
+	local title = require("infra.i18n").get("menu.hotstrings.enable")
+	local function search(items)
+		for _, row in ipairs(items or {}) do
+			if type(row) == "table" and row.title == title and type(row.fn) == "function" then return row end
+			local found = type(row) == "table" and search(row.menu) or nil
+			if found then return found end
+		end
+	end
+	return search(published_menu)
 end
 
 -- Long enough for every deferred start-up step (the longest, the AI warm-up,
@@ -309,12 +371,18 @@ package.preload["adapters.event_loop"] = function()
 				record("SCENARIO_FAILED", "the tray never built its menu context")
 			else
 				local GlobalScope = require("infra.global_scope")
-				local committed, report = GlobalScope.apply("recommended", GlobalScope.participants(menu_ctx))
+				-- The layout category may settle after a child answers: the loop runs on.
+				local settled
+				GlobalScope.apply("recommended", GlobalScope.participants(menu_ctx), function(committed, report)
+					settled = { committed = committed, report = report }
+				end)
+				soak(loop)
+				local committed, report = settled and settled.committed, settled and settled.report
 				record("FACT", "restore_committed=" .. tostring(committed))
 				if committed ~= true then
-					record("SCENARIO_FAILED", "the recommended restore did not commit: " .. tostring(report and report.detail))
+					record("SCENARIO_FAILED", "the recommended restore did not commit: "
+						.. tostring(settled == nil and "it never settled" or (report and report.detail)))
 				end
-				soak(loop)
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
 			local Terminators = require("keymap.terminators")
@@ -340,6 +408,86 @@ package.preload["adapters.event_loop"] = function()
 				and Terminators.is_terminator("¤") and Terminators.is_terminator("µ")
 				and Terminators.terminator_is_consumed("¤") and not Terminators.terminator_is_consumed("µ")
 			record("FACT", "custom_list_verified=" .. tostring(verified == true))
+		elseif ACTION == "delimiters_edit" or ACTION == "delimiters_verify_edit" then
+			local Terminators = require("keymap.terminators")
+			local Codec = require("toml_codec")
+			local path = require("infra.config_paths").config("config.toml")
+			local function bytes()
+				local source = real_open(path, "rb")
+				local content = source and source:read("*a") or ""
+				if source then source:close() end
+				return content
+			end
+			--- The saved enabled state of the hand-written ¤ delimiter, nil when absent.
+			local function saved_state()
+				local document = Codec.decode(bytes())
+				local hotstrings = type(document) == "table" and document.hotstrings or {}
+				local states = type(hotstrings.terminator_states) == "table" and hotstrings.terminator_states or {}
+				return states["custom_¤"]
+			end
+			--- Clicks a published row, then lets one idle tick publish the redrawn tray.
+			--- @param row table
+			local function click(row)
+				row.fn()
+				loop.onIdle()
+			end
+			--- Clicks the ¤ toggle the tray published last.
+			local function click_toggle()
+				local toggle = delimiter_rows("¤")
+				if not toggle then return false end
+				expected_off_notice = string.format(require("infra.i18n").get("notify.word_expander_prefix"),
+					(toggle.title:gsub("^%s+", "")))
+				click(toggle)
+				expected_off_notice = nil
+				return true
+			end
+			if ACTION == "delimiters_edit" then
+				-- The seed enables no hotstring section, so the category reads off
+				-- and its submenu is greyed but for its enable row (b76cfff999): the
+				-- delimiter rows are unreachable until the user turns Hotstrings on
+				-- from that row, as here.
+				local switch = hotstrings_switch()
+				local greyed = delimiter_rows("¤") == nil and switch ~= nil and switch.checked ~= true
+				if switch then click(switch) end
+				local enabled = hotstrings_switch()
+				record("FACT", "delimiter_rows_greyed_while_off=" .. tostring(greyed
+					and enabled ~= nil and enabled.checked == true))
+				record("FACT", "delimiter_toggled_off=" .. tostring(click_toggle() and not Terminators.is_terminator("¤")
+					and saved_state() == false))
+				local _, removal = delimiter_rows("µ")
+				if removal then click(removal) end
+				record("FACT", "delimiter_deleted=" .. tostring(removal ~= nil and not Terminators.is_terminator("µ")
+					and delimiter_rows("µ") == nil and not bytes():find("custom_µ", 1, true)))
+				-- A refused write: the folder is read-only, which root ignores.
+				local id = io.popen("id -u")
+				local uid = id and id:read("*l") or ""
+				if id then id:close() end
+				if uid == "0" then
+					record("FACT", "delimiter_refusal=skipped_root")
+				else
+					local folder = path:match("^(.*)/[^/]+$")
+					local before = bytes()
+					assert(os.execute("chmod 0555 '" .. folder .. "'"), "cannot make the configuration folder read-only")
+					local clicked = click_toggle()
+					local rolled_back = clicked and bytes() == before and not Terminators.is_terminator("¤")
+					assert(os.execute("chmod 0755 '" .. folder .. "'"), "cannot make the configuration folder writable")
+					-- The retry turns it on (its default, so no saved key), then off again.
+					local retried = click_toggle() and Terminators.is_terminator("¤") and saved_state() == nil
+					local final = click_toggle() and not Terminators.is_terminator("¤") and saved_state() == false
+					record("FACT", "delimiter_refusal=" .. tostring(rolled_back and retried and final))
+				end
+			end
+			local document = Codec.decode(bytes())
+			local hotstrings = type(document) == "table" and document.hotstrings or nil
+			local list = type(hotstrings) == "table" and hotstrings.terminators or nil
+			local first = type(list) == "table" and list[1] or nil
+			local verified = type(first) == "table" and first.key == "custom_¤" and first.future == "kept"
+				and #list == 1 and hotstrings.unknown == "kept" and saved_state() == false
+				and type(document.other) == "table" and document.other.value == 42
+				and bytes():find("# Keep this user comment.", 1, true) ~= nil
+				and not Terminators.is_terminator("¤") and not Terminators.is_terminator("µ")
+				and Terminators.is_terminator_enabled("custom_¤") == false
+			record("FACT", "edited_list_verified=" .. tostring(verified == true))
 		elseif ACTION ~= "boot" then
 			record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 		end

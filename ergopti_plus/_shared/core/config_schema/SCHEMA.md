@@ -54,8 +54,11 @@ All TOML keys are `snake_case`. That is the standard TOML convention.
 ### Universal vs. platform-specific sections
 
 Which driver reads a section is declared once, in `[sections.*]` and the
-per-entry `platforms` of `_shared/modules/features/manifest.toml`; the generated
-`config_template.toml` of each driver carries exactly its own sections and keys.
+per-entry `platforms` of `_shared/modules/features/manifest.toml`. The generated
+`_shared/_generated/config_template.toml` writes the default config of the three
+drivers once (a driver-only key as `platform.<driver>.<key>`), and each driver's
+generated `config_template.toml`, its projection, carries exactly its own
+sections and keys.
 A key that only one driver writes is declared once in the manifest, never in a
 driver-prefixed section.
 

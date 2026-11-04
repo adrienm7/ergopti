@@ -562,7 +562,7 @@ end)
 
 helpers.describe("http_client: native body allocator compatibility", function()
 	helpers.it("linux-http-body-cleanup: current luv allocator requests nonblocking native pipe ends", function()
-		local allocator = dofile("infra/http_body_pipe.lua")
+		local allocator = helpers.fresh_module("infra.http_body_pipe")
 		local pair = allocator.allocate({ pipe = function(read_flags, write_flags)
 			helpers.assert_true(read_flags.nonblock and write_flags.nonblock)
 			return { read = 40, write = 41 }
@@ -583,7 +583,7 @@ helpers.describe("http_client: native body allocator compatibility", function()
 					descriptors[0], descriptors[1] = 70, 71
 					return 0
 				end } }
-			local ok, pair, detail = pcall(function() return dofile("infra/http_body_pipe.lua").allocate({}) end)
+			local ok, pair, detail = pcall(function() return helpers.fresh_module("infra.http_body_pipe").allocate({}) end)
 			package.loaded["ffi"] = previous
 			helpers.assert_true(ok)
 			helpers.assert_eq(calls, 1)
@@ -595,7 +595,7 @@ helpers.describe("http_client: native body allocator compatibility", function()
 	helpers.it("linux-http-body-cleanup: unavailable native allocation refuses without a synthetic pipe", function()
 		local previous = package.loaded["ffi"]
 		package.loaded["ffi"] = { os = "unavailable" }
-		local ok, pair, detail = pcall(function() return dofile("infra/http_body_pipe.lua").allocate({}) end)
+		local ok, pair, detail = pcall(function() return helpers.fresh_module("infra.http_body_pipe").allocate({}) end)
 		package.loaded["ffi"] = previous
 		helpers.assert_true(ok)
 		helpers.assert_nil(pair)

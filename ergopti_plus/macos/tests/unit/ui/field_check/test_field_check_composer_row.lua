@@ -57,7 +57,11 @@ local function with_window(composer_env, body)
 		local logger = helpers.make_logger_stub()
 		logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = { get = function(key) return "[" .. key .. "]" end }
+		-- The label-value join is the locale's own template (common.label_value).
+		package.loaded["infra.i18n"] = { get = function(key)
+			if key == "common.label_value" then return "{1} : {2}" end
+			return "[" .. key .. "]"
+		end }
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["ui.field_check"] = nil
@@ -80,10 +84,13 @@ helpers.describe("composer check row", function()
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}
-		for _, row in ipairs(manifest.debug_menu) do
-			if row.id == "composer_check" then rows[#rows + 1] = row end
+		for _, key in ipairs({ "debug_menu", "debug_tests_menu" }) do
+			for _, row in ipairs(manifest[key]) do
+				if row.id == "composer_check" then rows[#rows + 1] = row; rows.key = key end
+			end
 		end
 		helpers.assert_eq(#rows, 1, "declared once")
+		helpers.assert_eq(rows.key, "debug_tests_menu", "it hangs in the Tests submenu")
 		helpers.assert_eq(rows[1].type, "command")
 		helpers.assert_eq(rows[1].i18n, "menu.debug.composer_check")
 		helpers.assert_nil(rows[1].platforms, "shown on every platform")

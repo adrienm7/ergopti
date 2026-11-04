@@ -119,14 +119,19 @@ _HSE_CaseConformAllows(Buf, Spec, ObservedLength := 0) {
 ; Returns the matching Spec (longest match wins) or "" when nothing
 ; matches. Side-effect: HSE_LastEndChar is set to "" (star match) or to
 ; ``JustTypedChar`` (end-char match).
-HSE_FindMatchAtEnd(JustTypedChar) {
+;
+; TextIsClaimed: the previous key completed a final entry that changes nothing,
+; so this end character must not hand that text to a lower entry.
+; HSE_FinalNoOpFound reports that outcome for this call.
+HSE_FindMatchAtEnd(JustTypedChar, TextIsClaimed := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RegistryByLastChar
 		global HSE_WORD_TERMINATORS, HSE_LastEndChar, HSE_TypoNbspStripped
 		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
-		global HSE_MAX_BUFFER_LEN
+		global HSE_MAX_BUFFER_LEN, HSE_FinalNoOpFound
 
+		HSE_FinalNoOpFound := false
 		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0) {
 				return ""
 		}
@@ -216,8 +221,15 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 				}
 		}
 
+		; An immediate entry would fire on this letter, before the end character a
+		; final entry of strictly higher priority is waiting for.
+		if IsObject(BestMatch) and _HSE_FinalEndOutranks(BestMatch) {
+				BestMatch := ""
+				BestEndChar := ""
+		}
+
 		; ── END-CHAR path ──────────────────────────────────────────────
-		if IsTerminator and (BodyLastChar != "") {
+		if IsTerminator and (BodyLastChar != "") and !TextIsClaimed {
 				; ``:`` and ``;`` on the Ergopti Shift layer always arrive as
 				; ``NNBSP + :``. The NNBSP lands in the buffer BEFORE the ``:``
 				; end-char, so ``BodyBuf`` ends in ``…triggerNNBSP`` rather than
@@ -283,12 +295,39 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		; or consume a delimiter even when its registered strings are identical.
 		if _HSE_IsLiteralNoOp(BestMatch, HSE_Buffer, BestEndChar,
 				HSE_TypoNbspStripped) {
+				HSE_FinalNoOpFound := BestEndChar == ""
+						and BestMatch.HasOwnProp("FinalResult") and BestMatch.FinalResult
 				BestMatch := ""
 				BestEndChar := ""
 		}
 
 		HSE_LastEndChar := BestEndChar
 		return BestMatch
+}
+
+; Whether a final end-character entry of strictly higher priority, at least as
+; long, also ends at the caret: it holds the immediate Star back. The shared Lua
+; engine and macOS apply the same rule (final_end_outranks).
+_HSE_FinalEndOutranks(Star) {
+		global HSE_Buffer, HSE_PRIORITY_COMMON, HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN
+		global HSE_EndByTriggerCI, HSE_EndByTriggerCS
+		StarPriority := Star.HasOwnProp("Priority") ? Star.Priority : HSE_PRIORITY_COMMON
+		loop Min(StrLen(HSE_Buffer), HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN) {
+				if (A_Index < Star.Length)
+						continue
+				Suffix := SubStr(HSE_Buffer, -A_Index)
+				LowerSuffix := StrLower(Suffix)
+				for Specs in [HSE_EndByTriggerCS.Get(Suffix, []), HSE_EndByTriggerCI.Get(LowerSuffix, [])] {
+						for _, Spec in Specs {
+								if (Spec.HasOwnProp("FinalResult") and Spec.FinalResult
+										and Spec.HasOwnProp("Priority") and Spec.Priority > StarPriority
+										and _HSE_WordBoundaryAllows(HSE_Buffer, Spec)
+										and _HSE_CaseConformAllows(HSE_Buffer, Spec))
+										return true
+						}
+				}
+		}
+		return false
 }
 
 ; Only a static text replacement can be classified without invoking user code.

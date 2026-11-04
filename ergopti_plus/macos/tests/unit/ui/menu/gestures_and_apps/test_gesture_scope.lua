@@ -372,8 +372,8 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 					end
 					helpers.assert_eq(core.enabled, true)
 					local _, providers = actual_menu_frame(owner, gestures, state)
-					local expected_label = restore and "gesture.slots.swipe_2_left : sg_actions.none"
-						or "gesture.slots.swipe_2_left : arrow_up"
+					local expected_label = restore and "gesture.slots.swipe_2_left: sg_actions.none"
+						or "gesture.slots.swipe_2_left: arrow_up"
 					local found = 0
 					for _, row in ipairs(providers.gesture_slots_2()) do
 						if row.label == expected_label then found = found + 1 end

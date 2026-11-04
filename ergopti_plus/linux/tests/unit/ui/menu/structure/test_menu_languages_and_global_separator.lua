@@ -64,7 +64,7 @@ end
 
 helpers.describe("tray layout (linux): language header and global separator", function()
 	helpers.it("hotstring languages: header, separator and flag before the language row", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+		local mb = helpers.load_module("ui.menu.builder")
 		local i18n = require("infra.i18n")
 		local rows, at = submenu_with(mb.build({ config = fake_config(), _version = "9.9.9" }), "Français")
 		helpers.assert_true(rows ~= nil, "the French language pack row must be drawn")
@@ -76,8 +76,8 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 		helpers.assert_true(is_separator(rows[at - 2]), "and a separator must precede that header")
 	end)
 
-	helpers.it("configuration: restore and clear, the cleanup, then the two windows", function()
-		local mb = helpers.load_module("ui.menu.menu_builder")
+	helpers.it("configuration: restore and clear, the cleanup, the two windows, then the proxy", function()
+		local mb = helpers.load_module("ui.menu.builder")
 		local i18n = require("infra.i18n")
 		local shown = {}
 		local items = mb.build({
@@ -100,7 +100,9 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 			"-",
 			i18n.get("menu.global.config_folder"),
 			i18n.get("menu.global.setup_wizard"),
-		}, " | "), "Uninstall moved to the Version / Updates submenu; no separator is left dangling")
+			"-",
+			i18n.get("menu.debug.proxy_override"),
+		}, " | "), "Uninstall moved to the Version / Updates submenu; the download proxy moved here from Debug")
 		-- The folders editor, as on the other two drivers, not the file manager.
 		local folder = rows[6]
 		local fn = folder.fn or folder.action
@@ -117,7 +119,7 @@ end)
 local function configuration_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
@@ -125,7 +127,7 @@ local function configuration_parent_fixture(body)
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
 	require("infra.i18n").init()
-	local native = helpers.load_module("ui.menu.menu_builder")
+	local native = helpers.load_module("ui.menu.builder")
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
 	local language = locale.current_locale()
 	local callbacks = {}
@@ -184,7 +186,7 @@ end
 local function language_callback_fixture(body)
 	local previous, original_safe = {}, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do previous[name] = value end
-	for _, name in ipairs({ "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }) do
+	for _, name in ipairs({ "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }) do
 		rawset(package.loaded, name, nil)
 	end
 	local native, scope_held = nil, false
@@ -192,12 +194,13 @@ local function language_callback_fixture(body)
 	local completed, failure = xpcall(function()
 		native = require("infra.i18n")
 		native.init()
-		local builder, renderer = require("ui.menu.menu_builder"), require("infra.manifest_menu")
+		local builder, renderer = require("ui.menu.builder"), require("infra.manifest_menu")
 		local producer = language_callback_capture(builder.build, "_build_language")
-		local production_source = debug.getinfo(builder.build, "S").source
-		helpers.assert_eq(debug.getinfo(producer, "S").source, production_source,
-			"the actual loaded MenuBuilder must own the language producer")
-		helpers.assert_true(production_source:find("/ui/menu/menu_builder.lua", 1, true) ~= nil)
+		-- The root binds the producer from its own module (ui/menu/menu_language.lua).
+		local production_source = debug.getinfo(producer, "S").source
+		helpers.assert_true(rawequal(producer, require("ui.menu.menu_language").build),
+			"the actual loaded MenuBuilder must bind the language module's producer")
+		helpers.assert_true(production_source:find("/ui/menu/menu_language.lua", 1, true) ~= nil)
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())

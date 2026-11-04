@@ -378,12 +378,11 @@ _RemotePayload_OpenAI_StreamFalse() {
 Test("_LLMRemoteBuildPayload: openai payload has stream:false", _RemotePayload_OpenAI_StreamFalse)
 
 
-; qwen-3.8-27b reasons at xhigh effort by default and stalls tiny probes, so
-; the catalogue carries reasoning_effort:none for it and the openai branch
-; merges those extras. A provider without extras keeps a bare payload.
+; The openai branch merges a model's catalogue extras generically. A provider
+; without extras keeps a bare payload. (qwen-3.8-27b's reasoning_effort moved
+; to thinking_off: test_llm_thinking_off.ahk.)
 _RemotePayload_OpenAI_MergesModelExtras() {
-	global LLM_API_PROVIDERS
-	Extras := LLM_API_PROVIDERS["cerebras"]["ModelExtras"]["qwen-3.8-27b"]
+	Extras := Map("reasoning_effort", "none")
 	p := _LLMRemoteBuildPayload("openai", "qwen-3.8-27b", "s", "u", 0, 16, Extras)
 	AssertContains(p, '"reasoning_effort":"none"')
 	AssertContains(p, '"stream":false')
@@ -464,8 +463,9 @@ _RemoteResolve_ExposesModelExtras() {
 		"Token", "sekret", "Model", "qwen-3.8-27b")
 	R := _LLMRemoteResolveEntry(Entry)
 	AssertTrue(R is Map, "the cerebras entry must resolve")
-	AssertTrue(R["Extras"].Has("reasoning_effort"),
-		"the resolved entry must carry its model extras")
+	AssertTrue(R["Extras"] is Map, "the resolved entry must carry its model extras")
+	AssertTrue(R["ThinkingDialect"].Has("effort"),
+		"the resolved entry must carry the provider's thinking dialect")
 	Plain := Map("Provider", "openai", "BaseUrl", "https://api.openai.com/v1",
 		"Token", "sekret", "Model", "gpt-4o-mini")
 	R2 := _LLMRemoteResolveEntry(Plain)

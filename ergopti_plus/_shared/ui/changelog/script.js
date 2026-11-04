@@ -733,7 +733,8 @@ function renderReleaseList() {
 
 	if (_releases.length === 0) {
 		var empty = document.createElement('div');
-		empty.style.cssText = 'color:#555;font-size:12px;padding:16px 14px;';
+		empty.style.cssText =
+			'color:' + ThemeTokens.color('grey-555') + ';font-size:12px;padding:16px 14px;';
 		empty.textContent = _t('changelog_window.no_releases');
 		list.appendChild(empty);
 		return;

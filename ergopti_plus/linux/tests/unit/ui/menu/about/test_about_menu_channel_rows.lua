@@ -99,7 +99,7 @@ local function build(up, changed, source_run)
 	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
 	Installation.is_source_run = function() return source_run == true end
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ok, items = pcall(mb.build, {
 		_version = "0.0.0-dev.140",
 		updater = up,
@@ -257,7 +257,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			local rows = submenu_of(build(up), "menu.about.title")
 			local picker = rows[CHANNEL_AT + 2]
 			helpers.assert_eq(picker.title,
-				i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. pair[2]),
+				require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. pair[2])),
 				"the parent row names the preset in force for " .. pair[1] .. " s")
 			helpers.assert_eq(#picker.menu, #presets, "one row per shared preset")
 			local ticked = 0
@@ -286,7 +286,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local first = up.INTERVAL_PRESETS[1].code
 		local expected = {
 			i18n.get("menu.about.check_for_updates"),
-			i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. first),
+			require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. first)),
 		}
 		local found = {}
 		for index, row in ipairs(rows) do
@@ -586,7 +586,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			up.get_check_interval = function() return expected.stored end
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
 			local i18n = require("infra.i18n")
-			helpers.assert_eq(row.title, i18n.get(corpus.i18n) .. ": " .. i18n.get("menu.about.frequency." .. expected.code))
+			helpers.assert_eq(row.title, require("locale.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
 			for index, choice in ipairs(corpus.choices) do
 				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
@@ -699,7 +699,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 		end
 		choices[1].i18n = corpus.alternate_i18n
 		root.about_update_frequency_menu = {{type = "choice", id = corpus.id, path = corpus.path,
-			i18n = corpus.i18n, show_current_choice = true, current_choice_suffix = corpus.suffix,
+			i18n = corpus.i18n, show_current_choice = true, current_choice_label_value = corpus.label_value,
 			choices = choices}}
 		local ok, detail = pcall(function()
 			local up, calls = fake_updater("dev"), {}
@@ -723,7 +723,7 @@ end)
 --- Exercises the real About provider with unrelated tray surfaces isolated.
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
-	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
+	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
 		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
@@ -788,8 +788,8 @@ local function with_source_command(alternative, callback)
 			TIMING = timing, get_menu_label = function() error("A source checkout has no live update label.") end,
 			get_state = function() return "idle" end,
 			check_for_updates = effect, install = effect, get_cached_release = function() return nil end }
-		package.loaded["ui.menu.menu_builder"] = nil
-		local rows = require("ui.menu.menu_builder").build({ updater = up, on_quit = effect,
+		package.loaded["ui.menu.builder"] = nil
+		local rows = require("ui.menu.builder").build({ updater = up, on_quit = effect,
 			on_menu_changed = effect, webview = { show = effect } })
 		local title = alternative and labels["common.restore_recommended"] or "menu.about.check_for_updates"
 		local reason = alternative and "Canonical alternate reason" or "Source checkout"
@@ -938,7 +938,7 @@ helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("refuses the actual updater block when its required fragment is missing", function()
 		with_version_fragment(nil, function()
 			local up, calls = fake_updater("dev")
-			local actual = helpers.load_module("ui.menu.menu_builder")._about_update_rows({updater = up})
+			local actual = helpers.load_module("ui.menu.builder")._about_update_rows({updater = up})
 			helpers.assert_eq(actual, {})
 			helpers.assert_eq(#calls.set, 0)
 			helpers.assert_eq(calls.checks, 0)

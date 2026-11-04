@@ -33,9 +33,9 @@
 			}
 		},
 		{
-			"id": "crash_multi_line_without_recent_issues",
+			"id": "error_multi_line_without_recent_issues",
 			"error": {
-				"kind": "crash",
+				"kind": "error",
 				"module": "daemon",
 				"message": "attempt to index a nil value (field 'engine')\nstack traceback:\n\tergopti_hotstrings.lua:1510: in function 'main'",
 				"time": "2026-09-23T21:04:11Z",
@@ -51,7 +51,7 @@
 				"err_count": 0
 			},
 			"expected": {
-				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | local |\n| Commit |  |\n| OS | Fedora Linux 41 |\n| Driver | linux |\n| Generated (UTC) | 2026-09-24T07:00:00Z |\n| Warnings / errors this session | 0 / 0 |\n\n```text\nerror:\n  kind: crash\n  message: attempt to index a nil value (field 'engine')\n    stack traceback:\n    \tergopti_hotstrings.lua:1510: in function 'main'\n  module: daemon\n  time: 2026-09-23T21:04:11Z\n```\n",
+				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | local |\n| Commit |  |\n| OS | Fedora Linux 41 |\n| Driver | linux |\n| Generated (UTC) | 2026-09-24T07:00:00Z |\n| Warnings / errors this session | 0 / 0 |\n\n```text\nerror:\n  kind: error\n  message: attempt to index a nil value (field 'engine')\n    stack traceback:\n    \tergopti_hotstrings.lua:1510: in function 'main'\n  module: daemon\n  time: 2026-09-23T21:04:11Z\n```\n",
 				"fields": {
 					"title": "daemon: attempt to index a nil value (field 'engine')",
 					"version": "local",
@@ -90,6 +90,25 @@
 		}
 	],
 	"invalid_errors": [
+		{
+			"id": "retired_crash_kind",
+			"error": {
+				"kind": "crash",
+				"module": "m",
+				"message": "x",
+				"time": "t",
+				"recent": []
+			},
+			"identity": {
+				"version": "1",
+				"commit": "",
+				"os": "o",
+				"driver": "linux",
+				"generated_utc": "g",
+				"warn_count": 0,
+				"err_count": 0
+			}
+		},
 		{
 			"id": "unknown_kind",
 			"error": {

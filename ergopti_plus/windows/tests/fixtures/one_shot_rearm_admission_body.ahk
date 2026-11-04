@@ -61,6 +61,10 @@ KeyWait(Name, Options) {
 	return true
 }
 
+KS_WaitReleased(Name, TimeoutSec) {
+	return KeyWait(Name, "T" . TimeoutSec)
+}
+
 LoggerWarn(*) {
 	throw Error("No malformed scalar belongs to the existing rearm corpus.")
 }

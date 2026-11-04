@@ -112,18 +112,49 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 		helpers.assert_true(source:find('require("platform.remap.runtime_owner")', 1, true) ~= nil)
 	end)
 
-	helpers.it("binds and starts the owner only inside the opt-in start function", function()
+	helpers.it("binds the owner only inside the opt-in bind function", function()
 		local source = init_source()
 		local _, inits = source:gsub("Owner%.init%(", "")
 		helpers.assert_eq(inits, 1)
-		local start = source:find("function M._owned.start()", 1, true)
+		local bind = source:find("function M._owned.bind()", 1, true)
 		local bound = source:find("Owner.init(", 1, true)
-		helpers.assert_true(start ~= nil and bound ~= nil and start < bound)
-		local calls = {}
-		for at in source:gmatch("()M%._owned%.start%(%)") do calls[#calls + 1] = at end
-		helpers.assert_eq(#calls, 2, "the definition and one call")
-		local gate = source:find("if M._owned.selected() and _state.enabled then\n\t\tif M._owned.start()", 1, true)
-		helpers.assert_true(gate ~= nil, "the single call sits behind the opt-in and the integration switch")
+		helpers.assert_true(bind ~= nil and bound ~= nil and bind < bound)
+		local reconcile = source:find("function M._owned.reconcile()", 1, true)
+		helpers.assert_true(reconcile ~= nil and source:find("local activation = M._owned.bind()", reconcile, true) ~= nil)
+	end)
+
+	helpers.it("reaches the activation rule only behind the opt-in, at boot, on pause and on resume", function()
+		local source = init_source()
+		helpers.assert_true(source:find("if M._owned.selected() then\n\t\tif M._owned.reconcile() ~= true then", 1, true)
+			~= nil, "the boot call sits behind the opt-in")
+		local pause = source:find("function M.pause(on_done, onboarding_gate)", 1, true)
+		local pause_gate = source:find("if not _state or not _state.enabled then", pause, true)
+		local paused = source:find("M._owned.paused = true", pause, true)
+		helpers.assert_true(paused ~= nil and paused < pause_gate, "a pause stops ours before any integration check")
+		local resume = source:find("function M.resume(on_done)", 1, true)
+		local resume_gate = source:find("if not _state or not _state.enabled then", resume, true)
+		local resumed = source:find("M._owned.paused = false", resume, true)
+		helpers.assert_true(resumed ~= nil and resumed < resume_gate, "a resume starts ours before any integration check")
+		helpers.assert_true(source:find("paused = M._owned.paused == true", 1, true) ~= nil,
+			"the rule reads the pause, not a menu switch")
+	end)
+
+	helpers.it("never ties the owned runtime to the Tap-Hold or integration switches", function()
+		local source = init_source()
+		local tap_holds = source:find("function M.set_tap_holds_enabled(value)", 1, true)
+		local tap_end = source:find("\nend\n", tap_holds, true)
+		helpers.assert_eq(source:sub(tap_holds, tap_end):find("_owned", 1, true), nil)
+		local enabled = source:find("function M.set_enabled(value, on_done, onboarding_gate)", 1, true)
+		local enabled_end = source:find("\nend\n", enabled, true)
+		helpers.assert_eq(source:sub(enabled, enabled_end):find("_owned", 1, true), nil)
+	end)
+
+	helpers.it("gives a closed Karabiner back on a quit but never on a reload", function()
+		local source = init_source()
+		helpers.assert_true(source:find(
+			'if M._owned.activation and M._owned.teardown_reason ~= "hammerspoon_reload" then', 1, true) ~= nil)
+		local revoke = source:find("function M.revoke(reason, on_done)", 1, true)
+		helpers.assert_true(source:find("M._owned.teardown_reason = reason", revoke, true) ~= nil)
 	end)
 
 	helpers.it("selects the shared runtime when the preference is absent", function()
@@ -144,6 +175,41 @@ helpers.describe("the remap bridge reaches the owned runtime only after an opt-i
 	helpers.it("skips the official-application wizard for an owned boot", function()
 		local source = init_source()
 		helpers.assert_true(source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true) ~= nil)
+	end)
+
+	helpers.it("removes an earlier build's rules from the user's own karabiner.json on an owned boot", function()
+		-- The README promised this migration while no code did it: shared-mode rules
+		-- stayed active inside the user's Karabiner-Elements after the switch.
+		local source = init_source()
+		local boot = source:find("if M._owned.selected() then\n\t\tif M._owned.reconcile() ~= true then", 1, true)
+		local retire = source:find("M._owned.retire_shared_rules()", boot, true)
+		local wizard = source:find("if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session", 1, true)
+		helpers.assert_true(boot ~= nil and retire ~= nil and retire < wizard, "the owned boot calls the migration")
+		local owned = source:find("if runtime == M._owned.paths.RUNTIME_OWNED then", 1, true)
+		local kept = source:find("M._owned.shared_config = KARABINER_OUT", owned, true)
+		local moved = source:find("KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))", owned, true)
+		helpers.assert_true(kept ~= nil and moved ~= nil and kept < moved,
+			"the shared path is kept before the output moves to the owned file")
+		local body = source:find("function M._owned.retire_shared_rules()", 1, true)
+		local body_end = source:find("\nend\n", body, true)
+		local text = source:sub(body, body_end)
+		helpers.assert_true(text:find('remove_managed_rules("Owned runtime migration", shared)', 1, true) ~= nil,
+			"the marker-exact byte-span removal owner does the cleaning")
+		helpers.assert_true(source:find("ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)", 1, true) ~= nil)
+	end)
+
+	helpers.it("saves a bulk edit for the admission instead of reverting it while ours is not admitted", function()
+		-- Restore recommended on a Mac without the runtime reverted its edit and
+		-- opened a blocking dialog (E2E, hardening-a/b, owned default).
+		local source = init_source()
+		local off = source:find('"persisted-integration-off"', 1, true)
+		local owned = source:find('"persisted-owned-runtime-not-admitted"', 1, true)
+		local dispatch = source:find('transaction.phase = "candidate-regeneration-pending"', 1, true)
+		helpers.assert_true(off ~= nil and owned ~= nil and dispatch ~= nil and off < owned and owned < dispatch,
+			"the owned settlement sits with the integration-off one, before the candidate dispatch")
+		local gate = source:find("local REGENERATION_REFUSED_BEFORE_DEPLOY = {", 1, true)
+		local gate_end = source:find("\n}\n", gate, true)
+		helpers.assert_true(source:sub(gate, gate_end):find('["owned-runtime-not-admitted"] = true', 1, true) ~= nil)
 	end)
 
 	helpers.it("deploys an owned boot only through the owned writer", function()

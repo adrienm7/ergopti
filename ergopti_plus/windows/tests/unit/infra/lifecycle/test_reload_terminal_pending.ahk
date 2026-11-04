@@ -236,6 +236,74 @@ Test("reload terminal: only a launched successor's Reload can claim "
 ; ================================================
 ; ================================================
 
+; The successor asks to close once only, and the close request can interrupt a log
+; flush that cannot resume until OnExit returns. Refusing the reload then stopped
+; a healthy successor and showed an error (menu-click-replay failed 4 runs of 6).
+_RTP_InterruptedGateRetriesTheSameReload() {
+	global _RTP_Events
+	_RTP_Events := []
+	Bundle := _RTP_Acquire("deferred-claim")
+	Port := _RTP_NewPort()
+	try {
+		Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
+			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
+			_RTP_Record.Bind("refused"), _RTP_Record.Bind("release"))
+		State := {Settled: false, Runs: 0}
+		Retry := {Settled: () => State.Settled, Run: () => State.Runs += 1, BudgetMs: 1000, PollMs: 20}
+		AssertFalse(ReloadTerminalHandoffDeferClaim("Reload", Retry), "nothing claimed yet: nothing to return")
+		AssertEqual(Record, ReloadTerminalHandoffClaim("Reload"))
+		AssertFalse(ReloadTerminalHandoffDeferClaim("Exit", Retry), "only a Reload close request is deferred")
+		AssertTrue(ReloadTerminalHandoffDeferClaim("Reload", Retry), "the claim goes back to pending")
+		AssertEqual(Record, ReloadTerminalHandoffPending())
+		AssertEqual(0, Port["probe"]["terminated"], "the waiting successor is not stopped")
+		_RTP_RunArmed(Port)
+		AssertEqual(0, State.Runs, "no retry before the interrupted owner settles")
+		State.Settled := true
+		_RTP_RunArmed(Port)
+		AssertEqual(1, State.Runs, "the settled owner retries once")
+		AssertEqual(Record, ReloadTerminalHandoffClaim("Reload"), "the retry claims the same record")
+		AssertTrue(ReloadTerminalHandoffCommit(Record))
+		AssertTrue(ReloadTerminalHandoffFinish(Record))
+		AssertEqual("launch,commit,success", _RTP_Join(_RTP_Events), "the deferred reload ends as an ordinary one")
+		AssertEqual(0, Port["probe"]["terminated"])
+	} finally _RTP_Cleanup(Bundle)
+}
+Test("reload terminal: a gate that interrupted a settling owner retries the same reload",
+	_RTP_InterruptedGateRetriesTheSameReload)
+
+_RTP_DeferredReloadEndsWhenItCannotRetry() {
+	global _RTP_Events
+	for Ending in ["budget", "successor died", "commit gate"] {
+		_RTP_Events := []
+		Bundle := _RTP_Acquire("deferred-" . StrReplace(Ending, " ", "-"))
+		Port := _RTP_NewPort()
+		try {
+			Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
+				_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
+				_RTP_Record.Bind("refused"), _RTP_Record.Bind("release"))
+			State := {Runs: 0}
+			Retry := {Settled: () => false, Run: () => State.Runs += 1, BudgetMs: 1000, PollMs: 20}
+			AssertEqual(Record, ReloadTerminalHandoffClaim("Reload"))
+			if Ending == "commit gate" {
+				AssertTrue(ReloadTerminalHandoffCommit(Record))
+				AssertFalse(ReloadTerminalHandoffDeferClaim("Reload", Retry), "a committed reload cannot go back")
+				continue
+			}
+			AssertTrue(ReloadTerminalHandoffDeferClaim("Reload", Retry))
+			if Ending == "budget"
+				Port["probe"]["now"] += 1000
+			else
+				Port["probe"]["alive"] := false
+			_RTP_RunArmed(Port)
+			AssertEqual(0, State.Runs, Ending . ": an exit is never retried")
+			AssertFalse(ReloadTerminalHandoffPending(), Ending . ": the reload ends in the real refusal")
+			AssertEqual(Ending == "budget" ? 1 : 0, Port["probe"]["terminated"])
+		} finally _RTP_Cleanup(Bundle)
+	}
+}
+Test("reload terminal: a deferred reload ends in a refusal past its budget or without a successor",
+	_RTP_DeferredReloadEndsWhenItCannotRetry)
+
 _RTP_LaunchFailureLeavesTheCallerOwner() {
 	global _RTP_Events
 	_RTP_Events := []

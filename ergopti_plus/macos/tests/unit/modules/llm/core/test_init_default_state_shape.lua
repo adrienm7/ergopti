@@ -400,3 +400,5 @@ helpers.describe("Core.set_backend / get_backend", function()
 		if not test_ok then error(test_error, 0) end
 	end)
 end)
+
+require("test.pred_indent_default_contract")(helpers, Core.DEFAULT_STATE.llm_pred_indent)

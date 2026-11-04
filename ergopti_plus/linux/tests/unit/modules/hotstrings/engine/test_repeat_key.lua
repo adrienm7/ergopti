@@ -56,6 +56,16 @@ helpers.describe("magic-key repeat: the rule", function()
 			"the whole codepoint, not its trailing byte")
 	end)
 
+	helpers.it("a delimiter the user added ends a word, as on Windows (PAR-8)", function()
+		local Terminators = require("keymap.terminators")
+		helpers.assert_true(RepeatKey.resolve("ab1" .. STAR, STAR) ~= nil, "before: a digit is a word character")
+		helpers.assert_eq(Terminators.add_custom_terminator("custom_1", "1", "1", false), true)
+		local repeated, resting = RepeatKey.resolve("ab1" .. STAR, STAR), RepeatKey.resolve("1a" .. STAR, STAR)
+		helpers.assert_eq(Terminators.remove_custom_terminator("custom_1"), true)
+		helpers.assert_eq(repeated, nil, "the delimiter itself is not repeated")
+		helpers.assert_eq(resting, nil, "and the letter after it starts a word")
+	end)
+
 	helpers.it("works with a magic key the user chose", function()
 		local out = RepeatKey.resolve("ab@", "@")
 		helpers.assert_eq(out.replacement, "b",

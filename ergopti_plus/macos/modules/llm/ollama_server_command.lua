@@ -10,7 +10,12 @@
 --- The optional managed daemon uses its foreground source owner and original
 --- inherited network settings. Stock serving starts with the system network
 --- settings (modules/llm/network_env.lua), since Ollama reads only its own
---- relay variables and a managed network lets nothing else out.
+--- relay variables and a managed network lets nothing else out. A relay that
+--- demands an NTLM or Negotiate sign-in is answered by Ergopti's local relay
+--- (run_with_proxy_sign_in_relay in network-retry.sh,
+--- docs/design/proxy-auth-relay.md), with deadlines from the timings registry.
+--- A refused sign-in starts it without the proxy and leaves a receipt
+--- (modules/llm/proxy_relay_receipt.lua) that refuses the pull.
 --- ==============================================================================
 
 local M = {}
@@ -19,6 +24,7 @@ local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
 local NativePath = require("native_path")
+local Timings    = require("infra.timings")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -119,10 +125,17 @@ function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
 	-- the daemon to start anyway, for the models already on disk.
 	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)
 	if not network then return nil, network_err end
+	local refusal_file = require("modules.llm.proxy_relay_receipt").path()
 
 	return table.concat({
 		network,
 		"LOG_DIR=", text_utils.shell_quote(log_dir), "; ",
+		"ERGOPTI_PROXY_RELAY_REFUSAL_FILE=", text_utils.shell_quote(refusal_file or ""), "; ",
+		"ERGOPTI_PROXY_RELAY_DIAL_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_dial_timeout_ms")), "; ",
+		"ERGOPTI_PROXY_RELAY_HANDSHAKE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_handshake_timeout_ms")), "; ",
+		"ERGOPTI_PROXY_RELAY_IDLE_MS=", string.format("%.0f", Timings.ms("adapters", "proxy_relay_idle_timeout_ms")), "; ",
+		-- /usr/bin/env carries the bind address into the child the relay may own.
+		"run_with_proxy_sign_in_relay /usr/bin/env ",
 		"OLLAMA_HOST=", text_utils.shell_quote(OLLAMA_HOST .. ":" .. tostring(port)), " ",
 		text_utils.shell_quote(ollama_bin), " serve 2>&1 | ",
 		"while IFS= read -r LINE || [ -n \"$LINE\" ]; do ",

@@ -213,9 +213,15 @@ helpers.describe("action picker items (Linux)", function()
 				local items
 				without_tools(function() items = Bridge.build_init_payload({}).items end)
 				local headings, actions = 0, {}
+				-- The group names its modifiers in the locale's words: « Strg » in German.
+				local ctrl_name = i18n.get("key_name.ctrl")
 				local ctrl_title = (i18n.get("sg_actions.sg_order.header.modifier_chord_group")
-					:gsub("{1}", "Ctrl"))
+					:gsub("{1}", function() return ctrl_name end))
 				local found_ctrl = false
+				-- 2026-11-03: the chords read « Ctrl + Shift + Enter » in every locale;
+				-- each key is now named from the key name table.
+				local chord = { de = "Strg + Umschalt + Eingabe", en = "Ctrl + Shift + Enter" }
+				local found_chord = false
 				for _, item in ipairs(items) do
 					if item.type == "heading" then
 						headings = headings + 1
@@ -227,8 +233,13 @@ helpers.describe("action picker items (Linux)", function()
 						found_ctrl = found_ctrl or (item.level == 2 and item.text == ctrl_title)
 					else
 						actions[#actions + 1] = item.id
+						if item.id == "ctrl_shift_enter" then
+							helpers.assert_eq(item.label, chord[code], code .. ": a chord names its keys in the user's language")
+							found_chord = true
+						end
 					end
 				end
+				helpers.assert_true(found_chord, code .. ": the Ctrl + Shift + Enter chord reached the page")
 				helpers.assert_true(headings >= 15, code .. ": only " .. headings .. " heading(s) reached the page")
 				helpers.assert_true(found_ctrl, code .. ": the Ctrl chord group must read " .. ctrl_title)
 				local expected = {}
@@ -361,7 +372,7 @@ helpers.describe("gesture slots in the tray (Linux)", function()
 		M.init({ enabled = false, persist = false })
 		M._test_begin_reading({})
 		helpers.assert_true(M.enable(), "the test reader must permit enabling gestures")
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu_builder = helpers.load_module("ui.menu.builder")
 		local items, opened = nil, 0
 		-- Building a tray does not open a GTK window. Use the same owned native
 		-- webview edge as the dispatcher cases, even when real lgi is installed.

@@ -43,7 +43,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows
 local function shortcuts_menu(ctx_extra)
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ctx = { _version = "9.9.9", shortcuts = fake_shortcuts() }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -208,7 +208,7 @@ end
 
 -- Own the genuine native translation cohort while exercising cold and warm trays.
 local function with_shortcut_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.menu_builder" }
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.builder" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local native, owner, receipt, acquired
 	local ok, detail = xpcall(function()

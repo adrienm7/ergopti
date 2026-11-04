@@ -68,6 +68,10 @@ do
 	end
 end
 
+-- Before the first module load: every later `require`, lazy ones included, then
+-- skips Hammerspoon's wrapper, which costs 300 us per call on the main thread.
+local direct_require_installed = require("infra.direct_require").install(_G)
+
 
 
 
@@ -108,6 +112,9 @@ do
 	end
 end
 local Storage            = require("adapters.storage")
+if not direct_require_installed then
+	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
+end
 
 -- Instance admission comes before every settings write, timer, watcher and
 -- path resolution: a process that may not run the driver must leave no trace
@@ -229,6 +236,10 @@ end
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("infra.boot_profiler")
 local BootJournal        = require("adapters.boot_journal")
+local ReloadBreadcrumb   = require("adapters.reload_breadcrumb")
+-- A controlled reload's trail ends with this line when a boot followed it
+-- (field run 2026-10-30 21:06: the reload lost the app and no boot followed).
+ReloadBreadcrumb.record_boot()
 -- Observe the in-process getter before onboarding can defer the rest of boot.
 local scripting_observed, scripting_written = pcall(BootJournal.record_native_scripting_state, hs)
 if scripting_observed ~= true or scripting_written ~= true then
@@ -269,6 +280,8 @@ local BootFatal          = require("adapters.boot_fatal")
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
 -- reload. Shared Karabiner processes remain live; the old Ergopti lease does not.
+-- Taken before the clear: a reload this boot follows is measured at its end.
+local _reload_started_epoch_ms = reload_guard.take_started()
 reload_guard.clear()
 local _native_hs_reload = hs.reload
 hs.reload = function(...)
@@ -369,6 +382,12 @@ if config_paths_ready ~= true then
 	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
+-- config.toml's [script] rows (locale, log level, error window) win over the
+-- saved values at start, as on Windows. i18n started above from the saved
+-- locale, before the config path existed, so it adopts the configured one now,
+-- before any menu is built.
+require("infra.script_scope").adopt_configured()
+i18n.adopt_saved_locale()
 -- Configuration consumers may perform reads during require; path ownership comes first.
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
@@ -538,8 +557,13 @@ local LauncherGuard
 local _termination_coordinator_ready = false
 local _local_teardown_state = TeardownTransaction.new_state()
 local _local_teardown_started = false
-local _mlx_teardown_pending = false
-local _mlx_teardown_settled = false
+-- One record per local owner whose stop completes asynchronously (MLX server,
+-- owned Ollama daemon): the root teardown awaits each exact callback before
+-- its synchronous steps run.
+local _awaited_teardown_owners = {
+	mlx = { pending = false, settled = false },
+	ollama = { pending = false, settled = false },
+}
 -- Set only after the controlled path has drained and released the logger. The
 -- native shutdown callback still fires for hs.reload(); without this fence it
 -- would reopen the synchronous fallback sink and request the already-STOPPED
@@ -772,6 +796,62 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 	return true
 end
 
+--- Starts or observes one asynchronous owner stop for the root teardown.
+--- The owner's module (ui.menu.menu_llm) calls back once with the exact result;
+--- that callback alone authorizes the coordinator's retry of the whole pass.
+--- @param owner table `{ key, label, method }` of `_awaited_teardown_owners`.
+--- @param on_teardown_ready function|nil Coordinator readiness callback.
+--- @return boolean accepted
+--- @return string|nil state `pending` while the exact callback is retained.
+local function await_teardown_owner(owner, on_teardown_ready)
+	local record = _awaited_teardown_owners[owner.key]
+	if record.settled then return true end
+	if record.pending then return true, "pending" end
+	local module = package.loaded["ui.menu.menu_llm"]
+	if module == nil then
+		record.settled = true
+		return true
+	end
+	if type(module[owner.method]) ~= "function" then
+		Logger.error(LOG, "%s teardown refused: %s is unavailable.", owner.label, owner.method)
+		return false
+	end
+	if type(on_teardown_ready) ~= "function" then
+		Logger.error(LOG, "%s teardown refused: readiness callback is unavailable.", owner.label)
+		return false
+	end
+	local callback_claimed = false
+	record.pending = true
+	local function on_settled(settled, detail)
+		if callback_claimed then return false end
+		callback_claimed = true
+		record.pending = false
+		record.settled = settled == true
+		local callback_ok, callback_error = xpcall(function()
+			return on_teardown_ready(settled == true, detail)
+		end, debug.traceback)
+		if not callback_ok then
+			Logger.error(LOG, "%s teardown readiness callback failed: %s.",
+				owner.label, tostring(callback_error))
+		end
+		return callback_ok and settled == true
+	end
+
+	local stop_ok, accepted_or_error = xpcall(function()
+		return module[owner.method](on_settled)
+	end, debug.traceback)
+	-- Exact synchronous completion outranks a later native return or throw;
+	-- the coordinator observed the callback and owns the authorized retry
+	if callback_claimed then return true, "pending" end
+	if not stop_ok or accepted_or_error ~= true then
+		record.pending = false
+		Logger.error(LOG, "%s teardown stop was refused: %s.", owner.label, tostring(accepted_or_error))
+		return false
+	end
+	Logger.debug(LOG, "%s teardown is awaiting exact task completion.", owner.label)
+	return true, "pending"
+end
+
 --- Releases every Lua-owned resource. This function never owns Karabiner's
 --- shared processes; controlled callers invoke it only after the exact token
 --- fence. The native shutdown callback intentionally does not call it because
@@ -792,53 +872,18 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	local layout_accepted, layout_state = quit_layout_step.run(termination_kind, on_teardown_ready)
 	if layout_state == "pending" then return layout_accepted, layout_state end
 
-	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
-	-- Keep every remaining local owner alive until its exact callback proves the
-	-- captured listener absent, then let the coordinator retry this stateful pass
-	if not _mlx_teardown_settled then
-		if _mlx_teardown_pending then return true, "pending" end
-		local module = package.loaded["ui.menu.menu_llm"]
-		if module == nil then
-			_mlx_teardown_settled = true
-		elseif type(module.stop_mlx_server) ~= "function" then
-			Logger.error(LOG, "MLX teardown refused: stop_mlx_server is unavailable.")
-			return false
-		elseif type(on_teardown_ready) ~= "function" then
-			Logger.error(LOG, "MLX teardown refused: readiness callback is unavailable.")
-			return false
-		else
-			local callback_claimed = false
-			_mlx_teardown_pending = true
-			local function on_mlx_settled(settled, detail)
-				if callback_claimed then return false end
-				callback_claimed = true
-				_mlx_teardown_pending = false
-				_mlx_teardown_settled = settled == true
-				local callback_ok, callback_error = xpcall(function()
-					return on_teardown_ready(settled == true, detail)
-				end, debug.traceback)
-				if not callback_ok then
-					Logger.error(LOG, "MLX teardown readiness callback failed: %s.",
-						tostring(callback_error))
-				end
-				return callback_ok and settled == true
-			end
-
-			local stop_ok, accepted_or_error = xpcall(function()
-				return module.stop_mlx_server(on_mlx_settled)
-			end, debug.traceback)
-			-- Exact synchronous completion outranks a later native return or throw;
-			-- the coordinator observed the callback and owns the authorized retry
-			if callback_claimed then return true, "pending" end
-			if not stop_ok or accepted_or_error ~= true then
-				_mlx_teardown_pending = false
-				Logger.error(LOG, "MLX teardown stop was refused: %s.",
-					tostring(stop_ok and accepted_or_error or accepted_or_error))
-				return false
-			end
-			Logger.debug(LOG, "MLX teardown is awaiting exact task completion.")
-			return true, "pending"
-		end
+	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM,
+	-- and the owned Ollama daemon retires only on its native RETIRED receipt after
+	-- stdin EOF. Keep every remaining local owner alive until each exact callback
+	-- settles, then let the coordinator retry this stateful pass. Without the
+	-- Ollama wait, the helper step refused on every reload while the daemon ran
+	-- (field run 2026-10-31: both reloads failed their teardown).
+	for _, owner in ipairs({
+		{ key = "mlx", label = "MLX", method = "stop_mlx_server" },
+		{ key = "ollama", label = "Owned Ollama", method = "retire_owned_ollama" },
+	}) do
+		local accepted, state = await_teardown_owner(owner, on_teardown_ready)
+		if accepted ~= true or state == "pending" then return accepted, state end
 	end
 
 	local physical_accepted, physical_state = settle_loaded_physical_owner(on_teardown_ready)
@@ -998,6 +1043,22 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			return true
 		end,
 	}
+	-- Each step names itself in the reload breadcrumb before it runs, so a step
+	-- that loses the app is the trail's last line, and names a refusal after it:
+	-- the logged refusal is queued and was lost with both 2026-10-31 reloads.
+	for _, step in ipairs(steps) do
+		local run, stage = step.run, "step_" .. step.name
+		step.run = function()
+			-- A diagnostic never fails a step, even before its owner is wired
+			pcall(function() return ReloadBreadcrumb.record(termination_kind, stage) end)
+			local results = table.pack(xpcall(run, debug.traceback))
+			if results[1] ~= true or results[2] == false then
+				pcall(function() return ReloadBreadcrumb.record(termination_kind, "failed_" .. stage) end)
+			end
+			if results[1] ~= true then error(results[2], 0) end
+			return table.unpack(results, 2, results.n)
+		end
+	end
 	-- The logger pump is intentionally NOT finalized here. The coordinator first
 	-- asks its native worker to ACK this final announcement and every earlier
 	-- teardown record; only that asynchronous completion may call
@@ -1206,7 +1267,10 @@ do
 				return hs.timer.doAfter(delay, callback)
 			end,
 			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+			reload_deadline_seconds = require("infra.timings").sec("ui", "reload_deadline_ms"),
+			record_stage = ReloadBreadcrumb.record,
 			mark_reload = function()
+				reload_guard.mark_started(TimerScheduler.now() * 1000)
 				reload_guard.mark_reload()
 				return reload_guard.is_reloading() == true
 			end,
@@ -1262,6 +1326,10 @@ do
 	local ConfigMigrate = require("config_migrate")
 	require("toml_codec.writer").set_sparse_defaults(
 		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
+	require("toml_codec.writer").set_case_twin_reporter(function(message)
+		local sent, notice_error = require("infra.notifications").notify(i18n.get("paths_editor.save_failed_title"), message, "error")
+		if not sent then error(tostring(notice_error)) end
+	end)
 	local catalogue_ok, action_catalogue = pcall(require, "_generated.action_catalogue")
 	local context, context_error
 	if catalogue_ok then
@@ -1487,20 +1555,33 @@ if mlx_deps_checker.configure_pause_owner(shortcuts) ~= true
 	error("dependency bootstrap pause-owner registration did not commit")
 end
 
--- Fast-path LLM check: only admitted native opt-in permits the MLX cleanup
--- (lsof + curl), whose warmup retry consumer is also gated on LLM being enabled.
--- Absent or obsolete settings stay untouched and skip this early cleanup.
--- This is a deliberately separate, quick gate; the full
--- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
--- fallback) runs later in Section 3. Named distinctly so the two never shadow
--- each other and the intent of each is unambiguous.
 -- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
--- and the native llm.enabled consent read below sits beside it: the two readers
--- of one setting must not sit on opposite sides of the layer that populates it.
+-- and the llm.enabled read below sits beside it: the two readers of one
+-- setting must not sit on opposite sides of the layer that populates it.
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED) == true
+-- The boot's one answer to "is the AI on": the native value, else config.toml,
+-- else the shipped default. The MLX port cleanup (lsof + curl) only serves the
+-- AI warmup, so it reads this same value. It used to read the native value
+-- alone: a config.toml that turned the AI on, with no native value yet, started
+-- the AI bootstrap and skipped the cleanup.
+local Preferences = require("infra.preferences")
+local ok_core_llm, core_llm = pcall(require, "modules.llm")
+local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
+local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
+if boot_llm_enabled == nil then
+	if type(boot_saved_prefs.llm_enabled) == "boolean" then
+		boot_llm_enabled = boot_saved_prefs.llm_enabled
+	elseif ok_core_llm and type(core_llm) == "table"
+		and type(core_llm.DEFAULT_STATE) == "table" then
+		boot_llm_enabled = (core_llm.DEFAULT_STATE.llm_enabled == true)
+	else
+		boot_llm_enabled = false
+	end
+end
+
+local mlx_cleanup_enabled = boot_llm_enabled == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1566,8 +1647,8 @@ Boot.stage("LLM backend bootstrap")
 -- edit by hand (log_level). The [features] layer was retired: each declared
 -- feature has one canonical leaf, and a leftover [features] table is reported by
 -- the unused-key scan. All overrides live in the driver-specific config.
--- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
--- that reads a value it can write.)
+-- (config_overrides.apply already ran in Section 2, before the AI setting the
+-- MLX cleanup gate and the LLM bootstrap both read.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
 -- (above), BEFORE config_overrides — so a [script] log_level override
@@ -1579,21 +1660,6 @@ do
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
-	end
-end
-
-local Preferences = require("infra.preferences")
-local ok_core_llm, core_llm = pcall(require, "modules.llm")
-local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
-if boot_llm_enabled == nil then
-	if type(boot_saved_prefs.llm_enabled) == "boolean" then
-		boot_llm_enabled = boot_saved_prefs.llm_enabled
-	elseif ok_core_llm and type(core_llm) == "table"
-		and type(core_llm.DEFAULT_STATE) == "table" then
-		boot_llm_enabled = (core_llm.DEFAULT_STATE.llm_enabled == true)
-	else
-		boot_llm_enabled = false
 	end
 end
 
@@ -2345,6 +2411,13 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- The reload this boot follows, from its reload call to this boot's end.
+if _reload_started_epoch_ms then
+	local reload_ms = TimerScheduler.now() * 1000 - _reload_started_epoch_ms
+	Logger.info(LOG, "Reload completed in %.0f ms (reload call to boot complete).", reload_ms)
+	require("perf_budget").judge(Logger, LOG, "reload", math.max(0, reload_ms),
+		function() return require("infra.timings").ms("budgets", "driver_reload_ms") end)
+end
 -- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
 -- child processes): one summary line per family every interval, never at boot.
 require("infra.phase_stats").start()

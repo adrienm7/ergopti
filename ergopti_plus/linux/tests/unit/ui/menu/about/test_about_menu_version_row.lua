@@ -130,7 +130,7 @@ local function version_row(identity)
 	local Version = require("infra.version")
 	local real_identity = Version.identity
 	Version.identity = function() return identity end
-	local mb = helpers.load_module("ui.menu.menu_builder")
+	local mb = helpers.load_module("ui.menu.builder")
 	local ok, items = pcall(mb.build, { on_quit = function() end })
 	Version.identity = real_identity
 	if not ok then error(items, 0) end

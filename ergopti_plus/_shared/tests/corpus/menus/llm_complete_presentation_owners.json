@@ -34,18 +34,6 @@
 		},
 		{
 			"parent": "llm_profile",
-			"section": "llm_after_profile_boundary",
-			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_main.ahk",
-				"hs": "macos/ui/menu/menu_llm/init.lua"
-			},
-			"signatures": {
-				"ahk": "_LLM_Menu_EmitRow(id, disabled) {",
-				"hs": "local function build_item()"
-			}
-		},
-		{
-			"parent": "llm_profile",
 			"section": "llm_profile_app_override_frame",
 			"owners": {
 				"ahk": "windows/ui/menu/menu_llm/menu_profiles.ahk"
@@ -108,32 +96,26 @@
 		},
 		{
 			"parent": "llm_generation_settings",
-			"section": "llm_generation_native_controls",
+			"section": "llm_generation_context_controls",
 			"owners": {
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
 				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
+				"ahk": "_LLM_Menu_GenerationContextRows() {",
 				"hs": "local function build_item()"
-			}
-		},
-		{
-			"parent": "llm_generation_settings",
-			"section": "llm_generation_context_controls",
-			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
-			},
-			"signatures": {
-				"ahk": "_LLM_Menu_GenerationRows() {"
 			}
 		},
 		{
 			"parent": "llm_generation_settings",
 			"section": "llm_generation_word_controls",
 			"owners": {
-				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk"
+				"ahk": "windows/ui/menu/menu_llm/menu_settings.ahk",
+				"hs": "macos/ui/menu/menu_llm/init.lua"
 			},
 			"signatures": {
-				"ahk": "_LLM_Menu_GenerationRows() {"
+				"ahk": "_LLM_Menu_GenerationRows() {",
+				"hs": "local function build_item()"
 			}
 		},
 		{
@@ -183,19 +165,9 @@
 	"unchanged_dynamic_parents": ["llm_model", "llm_profile"],
 	"outer_boundaries": {
 		"section": "llm_menu",
-		"rows": [
-			{
-				"preceding_id": "llm_profile",
-				"declaration": {
-					"type": "list",
-					"id": "llm_after_profile_boundary",
-					"platforms": ["hs"],
-					"unavailable": "hide"
-				}
-			}
-		],
+		"rows": [],
 		"owner": "macos/ui/menu/menu_llm/init.lua",
 		"signature": "local function build_item()",
-		"adjacent_without_boundary": ["llm_model", "llm_profile"]
+		"adjacent_without_boundary": ["llm_model", "llm_profile", "llm_test_prediction"]
 	}
 }

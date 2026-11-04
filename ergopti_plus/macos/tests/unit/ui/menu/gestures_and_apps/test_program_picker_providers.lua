@@ -111,6 +111,7 @@ local function with_provider(kind, options, body)
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { shortcuts = true },
 			get_keyboard_slot_groups = function() return { { prefix = "primary_", fixed = true } } end,
+			get_keyboard_group_label = function() return "primary_" end,
 			assigned_keyboard_slots = function() return { { id = "primary_1", action = fixture.action } } end,
 			get_keyboard_action = function() return fixture.action end, set_keyboard_action = set_action,
 			keyboard_binding_id = function(id) return "keyboard__" .. id end,
@@ -145,11 +146,11 @@ local function with_provider(kind, options, body)
 			package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {} }
 			package.loaded["ui.menu.menu_utils"] = {}
 			package.loaded["infra.manifest_reader"] = {}
-			package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(id, _, _, groups, _, providers)
+			package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(id, _, _, groups, _, providers)
 				if id == "shortcuts_menu" then return groups.script_control() end
 				rows = providers.script_control_shortcuts()
 				return rows
-			end }
+			end)
 			ctx.script_control = { ACTIONS = { selected }, SCRIPT_BINDING_PREFIX = "script__",
 				script_chord_slots = function() return { { id = "script_altgr_enter" } } end,
 				set_shortcut_action = set_action,

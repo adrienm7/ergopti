@@ -83,4 +83,27 @@ helpers.describe("gesture emit actions (macOS)", function()
 		helpers.assert_eq(table.concat(close_window.mods, ","), "cmd")
 	end)
 
+	helpers.it("goes back and forward in the browser history with Cmd+arrow (action-parity-nav-history)", function()
+		-- nav_back and nav_forward were Windows-only, though every macOS browser
+		-- answers Cmd+Left and Cmd+Right. Cmd+[ is not used: the key typing "["
+		-- moves with the keyboard layout, the arrows do not.
+		local by_id = {}
+		for _, row in ipairs(require("_generated.gesture_emit_actions")) do by_id[row.id] = row end
+		for id, key in pairs({ nav_back = "left", nav_forward = "right" }) do
+			helpers.assert_true(by_id[id] ~= nil, id .. " must be declared for macOS")
+			helpers.assert_eq(by_id[id].key, key, id .. " key")
+			helpers.assert_eq(table.concat(by_id[id].mods, ","), "cmd", id .. " modifiers")
+		end
+	end)
+
+	helpers.it("presses Space from a binding, as on Windows and Linux (action-parity-space)", function()
+		-- space was a Windows and Linux tap-hold value only; macOS had no row,
+		-- so a shared tap-hold layout could not put Space on a key there.
+		local by_id = {}
+		for _, row in ipairs(require("_generated.gesture_emit_actions")) do by_id[row.id] = row end
+		helpers.assert_true(by_id.space ~= nil, "space must be declared for macOS")
+		helpers.assert_eq(by_id.space.key, "space")
+		helpers.assert_eq(#by_id.space.mods, 0, "a bare Space, without Command (that is Spotlight)")
+	end)
+
 end)

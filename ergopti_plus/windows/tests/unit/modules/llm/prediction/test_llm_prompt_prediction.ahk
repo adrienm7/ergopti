@@ -61,9 +61,14 @@ _LPP_Menu(Enabled := true) {
 }
 
 ; The engine state matching that menu. Streaming and the per-app overrides are
-; off so the scenario is deterministic; the rate floor starts open.
+; off so the scenario is deterministic; the rate floor starts open. The clone is
+; shallow: any LLM_Engine_Init test plants a request plan on the real engine, so
+; a shared plan carried one scenario's send into the 300 ms floor of the next,
+; and an automatic request deferred, in a whole-group run only.
 _LPP_Engine(Base) {
 	Engine := Base.Clone()
+	if Engine.Has("request_plan")
+		Engine.Delete("request_plan")
 	Settings := Map(
 		"enabled", true, "backend", "api",
 		"api_entries", [_LPP_Entry()], "api_entry_id", "remote-a",
@@ -71,7 +76,7 @@ _LPP_Engine(Base) {
 		"min_words", 1, "max_words", 5, "ctx_chars", 500, "language", "fr",
 		"streaming", false, "show_all_at_once", true, "inline_autotype", false,
 		"disable_password_fields", false, "disabled_apps", [],
-		"app_profile_overrides", Map(), "last_request_tick", 0,
+		"app_profile_overrides", Map(), "min_request_interval_ms", 300,
 		"last_ctx", "", "last_results", [], "last_semantic_signature", "")
 	for Key, Value in Settings
 		Engine[Key] := Value
@@ -235,7 +240,7 @@ _LPP_RewriteEndToEnd() {
 	_LPP_Run(_LPP_Menu(), LPP_BUFFER, _Body)
 	_Body(Calls, Lines) {
 		global GestureActionParameters, _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer, LPP_SENTENCE
-		Binding := "keyboard__ctrl_shift_r"
+		Binding := "keyboard__primary_shift_r"
 		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := "rewrite|2"
 		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding),
 			"the bound action must request a prediction")
@@ -300,6 +305,31 @@ _LPP_RewriteEndToEnd() {
 Test("LLM prompt prediction: a rewrite binding runs end to end with a fake network and keyboard",
 	_LPP_RewriteEndToEnd)
 
+; A scenario's own request never reaches the floor of the real engine or of the
+; next scenario, even when the real engine already carries a plan.
+_LPP_ScenariosKeepTheirOwnFloor() {
+	global LPP_BUFFER, _LLM_Engine
+	SavedEngine := _LLM_Engine
+	Base := SavedEngine.Clone()
+	Outer := LLMRequestPlan(_LLM_Engine_FloorMs)
+	Base["request_plan"] := Outer
+	_LLM_Engine := Base
+	try {
+		loop 2 {
+			_LPP_Run(_LPP_Menu(), LPP_BUFFER, _Body)
+			AssertEqual("", Outer.LastSentMs, "a scenario's send must not move the real engine's floor")
+		}
+	} finally _LLM_Engine := SavedEngine
+	_Body(Calls, Lines) {
+		global _LLM_Engine, LPP_BUFFER
+		AssertEqual("", _LLM_Engine_Plan().LastSentMs, "each scenario's rate floor starts open")
+		LLM_Engine_FirePrediction(LPP_BUFFER)
+		AssertEqual(1, Calls.Length, "the automatic trigger dispatches at once")
+	}
+}
+Test("LLM prompt prediction: a scenario's request stays out of the next one's rate floor",
+	_LPP_ScenariosKeepTheirOwnFloor)
+
 ; Every built-in gets a ready-made action running it with the menu's count.
 _LPP_PresetsRunTheirProfile() {
 	global LPP_BUFFER
@@ -308,7 +338,7 @@ _LPP_PresetsRunTheirProfile() {
 		global LLM_PROFILE_BUILTIN_ORDER, _LLM_Engine, _LLM_Menu, LPP_SENTENCE
 		Checked := 0
 		for Id in LLM_PROFILE_BUILTIN_ORDER {
-			_LLM_Engine["last_request_tick"] := 0
+			_LLM_Engine_Plan().LastSentMs := ""
 			Before := Calls.Length
 			AssertTrue(GestureInvokeAction("llm_predict_" . Id),
 				"llm_predict_" . Id . " must request a prediction")
@@ -670,7 +700,7 @@ _LPP_PublicPredictionAdmission(ProfileId, Boundary, Cancel) {
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
 			AssertTrue(Seen, "the actual public prediction must reach its selected request boundary")
@@ -756,7 +786,7 @@ _LPP_VariantStopAdmission(ProfileId, Boundary, Cancel) {
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
 			AssertTrue(Seen, "the first actual variant must reach its selected admission boundary")
@@ -919,23 +949,24 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 				AssertTrue(Request.Aborted || Request.Completed, "a retired ordinary prediction cannot retain its acquired child")
 			}
 			if Mode == "newer" {
+				New := 0
 				SavedCritical := Critical("Off")
 				Started := A_TickCount
 				try {
 					loop {
 						for State in Requests
-							if State["id"] != OriginalId
+							if State["id"] != OriginalId && State["starts"] > 0
 								New := State
-						if New is Map || A_TickCount - Started > LLM_ApiCommon_GetRateLimitMs("api") + 2000
+						if New is Map || A_TickCount - Started > _LLM_Engine["min_request_interval_ms"] + 2000
 							break
 						Sleep(1)
 					}
 				} finally Critical(SavedCritical)
-				AssertTrue(New is Map && New.Has("request"), "the real deferred newer request must acquire its own native worker")
+				AssertTrue(New is Map && New.Has("request"), "the real newer request must acquire its own native worker")
 				AssertEqual(1, New["starts"])
 				Complete(New, "REWRITE: Nouvelle demande actuelle.")
 				Final := _LPP_LastFinalRender()
-				AssertTrue(IsObject(Final), "the actual deferred newer request must retain its accepted response")
+				AssertTrue(IsObject(Final), "the actual newer request must retain its accepted response")
 				AssertEqual(1, Final.slots.Length)
 			}
 
@@ -962,7 +993,7 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 			}
 		}
 		Invoke(Profile) {
-			Binding := "keyboard__ctrl_shift_r"
+			Binding := "keyboard__primary_shift_r"
 			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
 			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the actual public gesture must admit the request")
 		}
@@ -1018,8 +1049,7 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 				_LLM_Bridge_Buffer .= " Nouveau texte pour la nouvelle demande."
 				Invoke("rewrite")
 				AssertTrue(_LLM_Engine["request_id"] > OldRequest, "the actual newer public request must replace the old generation")
-				AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"),
-					"the actual rate floor must retain the newer deferred request rather than inventing a new worker")
+				AssertFalse(_LLM_Engine["timer_active"], "the floor never holds this explicit request")
 			}
 		}
 		Complete(State, Text) {
@@ -1099,7 +1129,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 		try {
 			Options := _LLM_Engine.Clone(), Options["backend"] := "ollama", Options["model"] := Menu["model"]
 			LLM_Engine_Init(Options)
-			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"])
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"], , , , , (*) => true)
 			AssertTrue(LLM_Deps_IsReady(), "controlled reachability must enter the actual dependency owner")
 			Constructor.DefineProp("Call", {Call: WarmupConstructor})
 			if CompletedRetry {
@@ -1169,7 +1199,8 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 				WaitUntil(() => State["runs"].Length > 0 || _LLM_Ollama_Async.Count == 0,
 					"the genuine deferred origin request must either retire or reach native acquisition")
 				AssertTrue(State["seen"])
-				AssertEqual(Mode == "unchanged" ? 1 : 0, State["runs"].Length,
+				; The newer explicit request is sent at once: it owns the one child of that mode.
+				AssertEqual(Mode == "bridge" ? 0 : 1, State["runs"].Length,
 					"an ordinary local prediction cannot borrow a newer generation after origin capture")
 			} else {
 				WaitUntil(() => State["runs"].Length == 1, "the actual first local prediction must own a native child")
@@ -1185,7 +1216,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 						_LLM_Bridge_Buffer .= " Nouveau contexte pour la demande suivante."
 						Invoke("advanced")
 						AssertTrue(_LLM_Engine["request_id"] > Before)
-						AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"))
+						AssertFalse(_LLM_Engine["timer_active"], "the floor never holds this explicit request")
 					} else if Mode == "bridge"
 						LLM_Bridge_Stop()
 					ReportedCurrent := _LLM_Ollama_RequesterCurrent(Queued["requester_current"])
@@ -1239,7 +1270,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 	}
 	Invoke(Profile) {
 		global GestureActionParameters
-		Binding := "keyboard__ctrl_shift_r"
+		Binding := "keyboard__primary_shift_r"
 		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
 		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the genuine public local action must be admitted")
 	}
@@ -1253,7 +1284,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 			_LLM_Bridge_Buffer .= " Nouveau contexte pour la demande suivante."
 			Invoke("rewrite")
 			AssertTrue(_LLM_Engine["request_id"] > Before)
-			AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"))
+			AssertFalse(_LLM_Engine["timer_active"], "the floor never holds this explicit request")
 		} else if Mode == "bridge"
 			LLM_Bridge_Stop()
 		return Result
@@ -1292,7 +1323,7 @@ _LPP_LocalQueuedCustody(Boundary, Mode, CompletedRetry := false, WithdrawComplet
 	}
 	WaitUntil(Check, Message) {
 		Started := A_TickCount
-		while !Check.Call() && TickElapsed64(Started) < LLM_ApiCommon_GetRateLimitMs("ollama") + 2000
+		while !Check.Call() && TickElapsed64(Started) < _LLM_Engine["min_request_interval_ms"] + 2000
 			Sleep(1)
 		Passed := Check.Call()
 		if !Passed && InStr(Message, "real warmup poll") && Warm.Has("request") {

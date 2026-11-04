@@ -464,6 +464,11 @@ local function load_fixture()
 	local function tagged_action_event()
 		return action_event({ effect = "action", loopback = false })
 	end
+	-- A field-run selftest key reaches keystats as owned provenance, exactly as
+	-- adapters/event_provenance classifies a live selftest record.
+	local function selftest_event()
+		return action_event({ owned = true, effect = "replacement", loopback = false, selftest = true })
+	end
 	local function physical_action_event() return action_event(nil) end
 	local function physical_replay_event(event_type)
 		helpers.assert_type(handle_key, "function")
@@ -486,6 +491,7 @@ local function load_fixture()
 			hs_stub.timer.absoluteTime = function() error("monotonic clock unavailable") end
 		end,
 		tagged_action_event = tagged_action_event,
+		selftest_event = selftest_event,
 		physical_action_event = physical_action_event,
 		physical_replay_event = physical_replay_event,
 		queue_fence = function(events) pending_fence = { events = events } end,
@@ -614,6 +620,21 @@ helpers.describe("keystats action epochs", function()
 		fixture.tagged_action_event()
 		helpers.assert_eq(fixture.deferred_calls(), 1,
 			"one action epoch must detach the human run exactly once")
+		fixture.keystats.stop()
+	end)
+
+	helpers.it("never counts a field-run selftest key, which the keymap may type as physical", function()
+		local fixture = load_fixture()
+		fixture.core_state().is_enabled = true
+		local before = #fixture.core_state().buffer_events
+		fixture.selftest_event()
+		helpers.assert_eq(#fixture.core_state().buffer_events, before,
+			"a selftest key is the driver's own output and must never enter the keystats")
+		helpers.assert_eq(fixture.physical_fence_claims(), 0, "an owned key takes no physical fence")
+		-- The same key untagged is counted: the assertion above can fail.
+		fixture.physical_action_event()
+		helpers.assert_true(#fixture.core_state().buffer_events > before,
+			"the control physical key must be recorded")
 		fixture.keystats.stop()
 	end)
 

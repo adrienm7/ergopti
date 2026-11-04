@@ -74,8 +74,8 @@ _AHK16_ConfigClassPartitionIsExhaustive() {
 		"show_info_bar", "show_all_at_once", "pred_indent", "nav_modifiers", "val_modifiers"
 	]
 	ExpectedPolicy := [
-		"debounce_ms", "instant_on_word_end", "after_hotstring", "reset_on_nav",
-		"disable_url_bars", "disable_password_fields", "disabled_apps", "streaming"
+		"debounce_ms", "min_request_interval_ms", "instant_on_word_end", "after_hotstring",
+		"while_hotstring_tooltip", "reset_on_nav", "disable_url_bars", "disable_password_fields", "disabled_apps", "streaming"
 	]
 	_AHK16_AssertExactClass(LLM_ENGINE_SEMANTIC_CONFIG_KEYS, ExpectedSemantic, "semantic")
 	_AHK16_AssertExactClass(LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS, ExpectedDisplay, "display-only")
@@ -100,8 +100,8 @@ _AHK16_ConfigClassPartitionIsExhaustive() {
 	Emitted := Map()
 	MatchCount := 0
 	Position := 1
-	while RegExMatch(BuildOptsBody, 'm)^\s*"([a-z_]+)",\s+', &Match, Position) {
-		Key := Match[1]
+	while RegExMatch(BuildOptsBody, 'm)^\s*(?:"([a-z_]+)"|ConfigLeaf\.([A-Z0-9_]+)),\s+', &Match, Position) {
+		Key := Match[1] != "" ? Match[1] : StrLower(Match[2])
 		AssertFalse(Emitted.Has(Key),
 			"AHK-16 LLM_Menu_BuildOpts emits duplicate option '" . Key . "'")
 		Emitted[Key] := true

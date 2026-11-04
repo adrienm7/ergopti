@@ -51,6 +51,7 @@ local FileSystem = require("adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local LedgerAppend = require("adapters.ledger_append")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PowerSource = require("adapters.power_source")
 local LOG     = "keystats.log_manager"
 
 local SqliteWriter = require("modules.keystats.sqlite_writer")
@@ -90,6 +91,21 @@ local RECOVERY_SLICE_NS = 8 * 1000 * 1000
 --- Pause between two recovery slices: long enough for queued key events and
 --- timers to run, short enough that a recovery finishes close to its CPU cost.
 local RECOVERY_RESUME_SEC = 0.01
+
+--- CPU share one recovery may take on battery. At the mains pause it took 45 %
+--- of a core for minutes (field run 2026-11-01: 1554 slices in the 30 s idle
+--- window, on battery); the idle check allows 3 % and the driver idles near 2 %.
+local RECOVERY_BATTERY_CPU_SHARE = 0.005
+
+--- Longest pause after a slice on battery: one slice that overran its budget (a
+--- 300 ms flush) must not silence the recovery for a whole minute.
+local RECOVERY_BATTERY_MAX_PAUSE_SEC = 30
+
+--- A power source read is a native call: slices reuse it for this long.
+local RECOVERY_POWER_RECHECK_NS = 5 * 1000 * 1000 * 1000
+
+--- How often a recovery held for a lock-free reader asks whether it may go on.
+local RECOVERY_HOLD_RECHECK_SEC = 0.25
 
 --- Raw rows replayed between two budget checks; a clock read per row would cost
 --- more than the walk itself.
@@ -1017,7 +1033,11 @@ end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
 local REPLAY_FLUSH_EVENT_COUNT = 500
-local AGGREGATE_CACHE_REVISION = "2"
+-- Revision 3 rebuilds every n-gram key from the raw events in token encoding 2
+-- (keystats_tokens.json); the previous cache is kept beside the live one first.
+local AGGREGATE_CACHE_REVISION = "3"
+local PRE_ENCODING_REVISION = "2"
+local PRE_ENCODING_BACKUP_SUFFIX = ".pre-ngram-encoding-2.bak"
 -- Every table written by aggregator/sql.lua.  Replaying a device's canonical
 -- raw rows is additive, so its old derived partition must be cleared first.
 local DERIVED_DEVICE_TABLES = {
@@ -1116,18 +1136,28 @@ local LEDGER_REPLAY_KEY = "local_ledger_replay"
 --- Bytes between two progress lines of a long replay.
 local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
 
+--- Meta key holding the resume point of a full aggregate rebuild. It commits in
+--- the same transaction as the rows it counts, so an interrupted rebuild resumes
+--- exactly there instead of clearing and walking everything again at each start.
+local RECOVERY_PROGRESS_KEY = "aggregate_recovery_progress"
+
+--- Order of a rebuild's stages inside one device partition.
+local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4 }
+
 --- Reads the pending replay state, or nil when no replay is pending.
 ---@param db userdata
 ---@return table|nil state
 local function _read_ledger_replay_state(db)
+	local stored = nil
 	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(LEDGER_REPLAY_KEY)) do
-		local ok, decoded = pcall(json.decode, row.value or "")
-		if ok and LedgerReplay.is_state(decoded) then return decoded end
-		-- An unreadable state restarts the replay: batches are idempotent.
-		Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
-		return LedgerReplay.new_state()
+		stored = row.value or ""
 	end
-	return nil
+	if stored == nil then return nil end
+	local ok, decoded = pcall(json.decode, stored)
+	if ok and LedgerReplay.is_state(decoded) then return decoded end
+	-- An unreadable state restarts the replay: batches are idempotent.
+	Logger.warn(LOG, "Local ledger replay state is unreadable; the replay restarts at byte 0.")
+	return LedgerReplay.new_state()
 end
 
 --- Persists the replay state; the cache row is the resume point of the next start.
@@ -1224,6 +1254,49 @@ local function _replay_local_data_sql(db, state)
 	end
 end
 
+--- Persists the resume point of a full rebuild.
+---@param db userdata
+---@param progress table Resume point; takes the walker context as it is now.
+---@return boolean written
+local function _write_recovery_progress(db, progress)
+	progress.ctx = Aggregator.get_ngram_ctx() or {}
+	local ok, encoded = pcall(json.encode, progress)
+	if not ok or type(encoded) ~= "string" then return false end
+	return db:exec("INSERT OR REPLACE INTO meta(key, value) VALUES(" .. _sq(RECOVERY_PROGRESS_KEY) .. ", "
+		.. _sq(encoded) .. ");") == sqlite3.OK
+end
+
+--- Reads the resume point of an interrupted rebuild of the current revision.
+--- Anything else restarts the rebuild, which is always safe.
+---@param db userdata
+---@return table|nil progress
+local function _read_recovery_progress(db)
+	local stored = nil
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY)) do
+		stored = row.value
+	end
+	if type(stored) ~= "string" then return nil end
+	local ok, progress = pcall(json.decode, stored)
+	if ok and type(progress) == "table" and progress.revision == AGGREGATE_CACHE_REVISION
+		and type(progress.devices) == "table" and type(progress.cutoffs) == "table"
+		and progress.devices[math.tointeger(progress.index) or 0] ~= nil
+		and RECOVERY_STAGE_RANK[progress.stage] ~= nil then
+		progress.index = math.tointeger(progress.index)
+		return progress
+	end
+	Logger.warn(LOG, "Aggregate recovery progress is unreadable; the rebuild restarts.")
+	return nil
+end
+
+--- The resume point of the recovery running in this coroutine, or nil: a partial
+--- rebuild from ingest shares the flush below and has none.
+---@return table|nil progress
+local function _running_recovery_progress()
+	local job = _recovery
+	if job == nil or coroutine.running() ~= job.co then return nil end
+	return job.progress
+end
+
 --- Flush the current recovery walker batch atomically.
 ---@param db userdata
 ---@return boolean
@@ -1237,6 +1310,14 @@ local function _flush_recovery_batch(db)
 	if not ok or not flushed_or_err then
 		pcall(function() db:exec("ROLLBACK;") end)
 		Logger.error(LOG, "Aggregate recovery flush failed: %s.", tostring(flushed_or_err or "pending aggregate rows"))
+		return false
+	end
+	-- Inside the transaction: a resume point ahead of or behind its rows would
+	-- lose events or count them twice.
+	local progress = _running_recovery_progress()
+	if progress ~= nil and not _write_recovery_progress(db, progress) then
+		pcall(function() db:exec("ROLLBACK;") end)
+		Logger.error(LOG, "Aggregate recovery progress could not be written: %s.", db:errmsg() or "?")
 		return false
 	end
 	local commit_rc = db:exec("COMMIT;")
@@ -1327,10 +1408,11 @@ end
 --- This value must never be appended to data.sql itself: it is a cursor-local
 --- recovery record, not data to replay into a different device cache.
 local function _get_local_outbox(db)
+	local outbox = ""
 	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
-		return type(row.value) == "string" and row.value or ""
+		outbox = type(row.value) == "string" and row.value or ""
 	end
-	return ""
+	return outbox
 end
 
 --- Yields the running aggregate recovery once its slice has spent its budget.
@@ -1353,10 +1435,11 @@ local function _outbox_covers_typing(db, device_id, after_id)
 	local facts = Export._typing_rollover_boundaries(outbox, _sq(device_id), true, _has_trailing_rollover)
 	if not facts or facts.unreadable or facts.has_markers then return false end
 	local condition = after_id ~= nil and (" AND id>" .. tostring(after_id)) or ""
+	local covered = true
 	for row in db:nrows("SELECT id FROM events_typing WHERE device_id=" .. _sq(device_id) .. condition) do
-		if not facts.ids[tonumber(row.id)] then return false end
+		if not facts.ids[tonumber(row.id)] then covered = false end
 	end
-	return true
+	return covered
 end
 
 --- Read boundaries before any derived DELETE; cache-only rows need exact authority.
@@ -1405,7 +1488,11 @@ end
 local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 	local device_ids = {}
 	local rebuilding_local = false
-	if type(requested_device_ids) == "table" then
+	-- The resume point of an interrupted full rebuild, read before it moves on.
+	local resume = requested_device_ids == nil and _running_recovery_progress() or nil
+	if resume ~= nil then
+		device_ids, rebuilding_local = resume.devices, true
+	elseif type(requested_device_ids) == "table" then
 		local seen = {}
 		for _, device_id in ipairs(requested_device_ids) do
 			if type(device_id) == "string" and device_id ~= "" and not seen[device_id] then
@@ -1444,14 +1531,31 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 	if #device_ids == 0 then return true end
 
 	-- Validate every partition first; a later source refusal must not erase an earlier one.
-	local boundary_maps = {}
-	for _, replay_device_id in ipairs(device_ids) do
-		local read_ok, cutoffs, detail = pcall(_typing_replay_cutoffs, db, replay_device_id)
-		if not read_ok or not cutoffs then
-			Logger.error(LOG, "Cannot read typing rollover facts: %s.", tostring(read_ok and detail or cutoffs))
-			return false
+	-- A resumed rebuild kept them: the scan reads the whole ledger into memory.
+	local boundary_maps = resume ~= nil and resume.cutoffs or {}
+	if resume == nil then
+		for _, replay_device_id in ipairs(device_ids) do
+			local read_ok, cutoffs, detail = pcall(_typing_replay_cutoffs, db, replay_device_id)
+			if not read_ok or not cutoffs then
+				Logger.error(LOG, "Cannot read typing rollover facts: %s.", tostring(read_ok and detail or cutoffs))
+				return false
+			end
+			boundary_maps[replay_device_id] = cutoffs
 		end
-		boundary_maps[replay_device_id] = cutoffs
+	end
+
+	-- Only the full rebuild of the recovery coroutine owns a resume point.
+	local progress = resume
+	local job = _recovery
+	if progress == nil and requested_device_ids == nil and job ~= nil and coroutine.running() == job.co then
+		progress = { revision = AGGREGATE_CACHE_REVISION, devices = device_ids, cutoffs = boundary_maps,
+			index = 1, stage = "clear", segment = 1 }
+		if _write_recovery_progress(db, progress) then
+			job.progress = progress
+		else
+			Logger.warn(LOG, "Aggregate recovery progress could not be saved; a restart repeats the whole rebuild.")
+			progress = nil
+		end
 	end
 
 	-- Foreign-only recovery must not inject the other device's n-gram continuity
@@ -1462,11 +1566,35 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 		if ok_ctx then saved_local_ctx = encoded end
 	end
 
-	for _, replay_device_id in ipairs(device_ids) do
-		if not _clear_derived_device_rows(db, replay_device_id) then return false end
+	for device_index = progress and progress.index or 1, #device_ids do
+		local replay_device_id = device_ids[device_index]
+		-- The exact row this walk resumes after, copied before `progress` moves on.
+		local start = nil
+		if resume ~= nil and device_index == resume.index and resume.stage ~= "clear" then
+			start = { stage = resume.stage, segment = resume.segment, ts = resume.ts, id = resume.id, ctx = resume.ctx }
+		end
+		if start == nil and not _clear_derived_device_rows(db, replay_device_id) then return false end
 		Aggregator.set_device_id(replay_device_id)
 		Aggregator.reset_ngram_ctx()
 		Aggregator.reset_batch()
+		if start ~= nil then Aggregator.set_ngram_ctx(start.ctx or {})
+		elseif progress ~= nil then progress.stage, progress.segment, progress.ts, progress.id = "typing", 1, nil, nil end
+
+		local function due(stage)
+			return start == nil or RECOVERY_STAGE_RANK[stage] >= RECOVERY_STAGE_RANK[start.stage]
+		end
+		-- The walk's own (ts, id) order: rows up to the resume point are committed.
+		local function after_resume_point(stage, segment)
+			if start == nil or start.ts == nil or start.stage ~= stage or start.segment ~= segment then return "" end
+			local stamp = _sq(start.ts)
+			return " AND (ts>" .. stamp .. " OR (ts=" .. stamp .. " AND id>"
+				.. tostring(math.tointeger(start.id) or start.id) .. "))"
+		end
+		local function reached(stage, segment, row)
+			if progress ~= nil then
+				progress.stage, progress.segment, progress.ts, progress.id = stage, segment, row.ts, row.id
+			end
+		end
 		local processed = 0
 		local function flush_if_needed(force)
 			if processed == 0 or (not force and processed < REPLAY_FLUSH_EVENT_COUNT) then return true end
@@ -1483,35 +1611,46 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 		end
 		local quoted_device = _sq(replay_device_id)
 		local ok, replay_err = pcall(function()
-			local previous = nil
 			local cutoffs = boundary_maps[replay_device_id]
-			for segment = 1, #cutoffs + 1 do
-				local upper = cutoffs[segment]
-				local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
-				if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
-				for row in db:nrows("SELECT ts, app, title, layout, events_json FROM events_typing WHERE device_id="
-					.. quoted_device .. range .. " ORDER BY ts, id") do
-					local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
-					if decoded_ok and type(events) == "table" then
-						Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
-						if not walked() then error("typing aggregate flush failed") end
+			local first_segment = start ~= nil and start.stage == "typing" and start.segment or 1
+			local previous = cutoffs[first_segment - 1]
+			if due("typing") then
+				for segment = first_segment, #cutoffs + 1 do
+					local upper = cutoffs[segment]
+					local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
+					if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
+					range = range .. after_resume_point("typing", segment)
+					for row in db:nrows("SELECT ts, app, title, layout, events_json, id FROM events_typing WHERE device_id="
+						.. quoted_device .. range .. " ORDER BY ts, id") do
+						local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
+						if decoded_ok and type(events) == "table" then
+							Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+							reached("typing", segment, row)
+							if not walked() then error("typing aggregate flush failed") end
+						end
+					end
+					if upper ~= nil then
+						-- Discard the retired generation, then retain any cache-only outbox rows above it.
+						Aggregator.reset_ngram_ctx()
+						previous = upper
 					end
 				end
-				if upper ~= nil then
-					-- Discard the retired generation, then retain any cache-only outbox rows above it.
-					Aggregator.reset_ngram_ctx()
-					previous = upper
+			end
+			if due("app_switch") then
+				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_app_switch({ timestamp=row.ts, prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
+					reached("app_switch", 1, row)
+					if not walked() then error("app-switch aggregate flush failed") end
 				end
 			end
-			for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms FROM events_app_switch WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
-				Aggregator.walk_app_switch({ timestamp=row.ts, prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
-				if not walked() then error("app-switch aggregate flush failed") end
+			if due("window_switch") then
+				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_window_switch({ timestamp=row.ts, app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
+					reached("window_switch", 1, row)
+					if not walked() then error("window-switch aggregate flush failed") end
+				end
 			end
-			for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
-				Aggregator.walk_window_switch({ timestamp=row.ts, app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
-				if not walked() then error("window-switch aggregate flush failed") end
-			end
-			for row in db:nrows("SELECT ts, action, metadata_json FROM events_system WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
+			for row in db:nrows("SELECT ts, action, metadata_json, id FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
 				local entry = {}
 				local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
 				if decoded_ok and type(metadata) == "table" then
@@ -1519,6 +1658,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 				end
 				entry.timestamp, entry.action = row.ts, row.action
 				Aggregator.walk_system_event(entry)
+				reached("system", 1, row)
 				if not walked() then error("system aggregate flush failed") end
 			end
 			if not flush_if_needed(true) then error("final aggregate flush failed") end
@@ -1535,6 +1675,13 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 			end
 			Logger.error(LOG, "Device aggregate recovery failed: %s.", tostring(replay_err))
 			return false
+		end
+		if progress ~= nil and device_index < #device_ids then
+			progress.index, progress.stage, progress.segment, progress.ts, progress.id =
+				device_index + 1, "clear", 1, nil, nil
+			if not _write_recovery_progress(db, progress) then
+				Logger.warn(LOG, "Aggregate recovery progress could not be saved between two devices.")
+			end
 		end
 	end
 	Aggregator.set_device_id(_device_id)
@@ -1597,10 +1744,27 @@ end
 ---@param db userdata
 ---@return string
 local function _aggregate_cache_revision(db)
+	local revision = "0"
 	for row in db:nrows("SELECT value FROM meta WHERE key='aggregate_cache_revision'") do
-		return tostring(row.value or "0")
+		revision = tostring(row.value or "0")
 	end
-	return "0"
+	return revision
+end
+
+--- Copies the cache of the old token encoding aside before its keys are rebuilt.
+--- The ledgers stay the source, so a refused copy is reported, not fatal; a copy
+--- that already exists is the older one and stays. SQLite refuses VACUUM while
+--- any statement of this connection is running, so every row loop that ran
+--- before it must drain its statement (tests/meta/lua_safety/test_sqlite_row_loops_drain.lua).
+---@param db userdata
+local function _keep_pre_encoding_cache(db)
+	local backup = _paths.sqlite_path .. PRE_ENCODING_BACKUP_SUFFIX
+	if fs.attributes(backup) ~= nil then return end
+	if db:exec("VACUUM INTO " .. _sq(backup) .. ";") ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot keep the metrics cache before its rebuild: %s.", tostring(db:errmsg()))
+		return
+	end
+	Logger.info(LOG, "Metrics cache kept as %s before the n-gram keys are rebuilt.", backup)
 end
 
 --- Mark a fully rebuilt derived cache and make every dashboard snapshot stale.
@@ -1620,6 +1784,8 @@ local function _mark_aggregate_cache_rebuilt(db, partition_only)
 			local version_rc = db:exec("UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION)
 				.. " WHERE key='aggregate_cache_revision';")
 			if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
+			_exec_sqlite_or_error(db, "DELETE FROM meta WHERE key=" .. _sq(RECOVERY_PROGRESS_KEY) .. ";",
+				"cannot retire the rebuild's resume point")
 		end
 		local rev_rc = db:exec(Queries.render("meta.rev_bump", "native"))
 		if rev_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update metrics revision") end
@@ -1776,8 +1942,10 @@ local function _recover_aggregate_cache(db, replay_state)
 	end
 	-- Foreign ledgers also carry raw rows only. Import them before the
 	-- deterministic aggregate walk so cross-device totals survive a normal
-	-- TMPDIR purge and older caches gain the missing foreign aggregates.
-	_sync_foreign_data_sql()
+	-- TMPDIR purge and older caches gain the missing foreign aggregates. A resumed
+	-- walk leaves them to ingest, whose partition rebuild counts what they add:
+	-- a row imported here could land before its resume point and never be walked.
+	if _running_recovery_progress() == nil then _sync_foreign_data_sql() end
 	if not _rebuild_aggregates_from_raw(db) then
 		Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
 	elseif _mark_aggregate_cache_rebuilt(db) then
@@ -1789,10 +1957,50 @@ end
 
 local _cancel_aggregate_recovery
 
+--- The pause after a slice. On the mains the recovery finishes close to its CPU
+--- cost; on battery the pause scales with the time the slice really took, so the
+--- CPU share holds whatever a slice overran by.
+--- @param job table The running recovery.
+--- @param slice_ns number How long the slice ran.
+--- @return number seconds
+local function _recovery_pause_sec(job, slice_ns)
+	local now = timer.absoluteTime()
+	if job.power_read_ns == nil or now - job.power_read_ns >= RECOVERY_POWER_RECHECK_NS then
+		job.power_read_ns = now
+		local on_battery = PowerSource.on_battery()
+		if on_battery ~= job.on_battery then
+			Logger.info(LOG, "Aggregate cache recovery paced for %s.", on_battery and "the battery" or "the mains")
+		end
+		job.on_battery = on_battery
+	end
+	if not job.on_battery then return RECOVERY_RESUME_SEC end
+	return math.min(RECOVERY_BATTERY_MAX_PAUSE_SEC,
+		math.max(RECOVERY_RESUME_SEC, slice_ns / 1e9 / RECOVERY_BATTERY_CPU_SHARE))
+end
+
 --- Runs one budgeted slice of the recovery and schedules the next one.
 --- @param job table The exact recovery owned by `_recovery`.
 local function _run_recovery_slice(job)
 	if _recovery ~= job or job.cancelled then return end
+	--- Forward-declared handle: the callback compares against this exact one.
+	local function schedule(delay_sec)
+		local handle
+		local committed
+		handle, committed = TimerScheduler.after(delay_sec, function()
+			if job.handle == handle then job.handle = nil end
+			_run_recovery_slice(job)
+		end)
+		if handle and handle.timer ~= nil then job.handle = handle end
+		if committed ~= true then
+			-- Nothing is marked rebuilt, so the next start resumes the recovery.
+			Logger.error(LOG, "Aggregate cache recovery could not schedule its next slice; it retries at the next start.")
+			_cancel_aggregate_recovery()
+		end
+	end
+	if job.held_until_ns ~= nil then
+		if timer.absoluteTime() < job.held_until_ns then return schedule(RECOVERY_HOLD_RECHECK_SEC) end
+		job.held_until_ns = nil
+	end
 	job.slice_start_ns = timer.absoluteTime()
 	job.slices = job.slices + 1
 	local resumed, resume_err = coroutine.resume(job.co)
@@ -1813,19 +2021,7 @@ local function _run_recovery_slice(job)
 		Logger.info(LOG, "Aggregate cache recovery continues in %.0f ms slices; ingest waits for it.",
 			RECOVERY_SLICE_NS / 1e6)
 	end
-	-- Forward-declared: the callback compares against this exact handle.
-	local handle
-	local committed
-	handle, committed = TimerScheduler.after(RECOVERY_RESUME_SEC, function()
-		if job.handle == handle then job.handle = nil end
-		_run_recovery_slice(job)
-	end)
-	if handle and handle.timer ~= nil then job.handle = handle end
-	if committed ~= true then
-		-- Nothing is marked rebuilt, so the next start retries the whole recovery.
-		Logger.error(LOG, "Aggregate cache recovery could not schedule its next slice; it retries at the next start.")
-		_cancel_aggregate_recovery()
-	end
+	schedule(_recovery_pause_sec(job, timer.absoluteTime() - job.slice_start_ns))
 end
 
 --- Starts the aggregate recovery as a coroutine fed by timer slices. The first
@@ -1835,12 +2031,19 @@ local function _start_aggregate_recovery(db, replay_state)
 	assert(_recovery == nil, "one aggregate recovery at a time")
 	local job = { db = db, slices = 0, started_ns = timer.absoluteTime(), handle = nil }
 	job.co = coroutine.create(function() _recover_aggregate_cache(db, replay_state) end)
+	-- A pending ledger replay means a fresh cache: nothing of a rebuild survived.
+	job.progress = replay_state == nil and _read_recovery_progress(db) or nil
+	if job.progress ~= nil then
+		Logger.info(LOG, "Aggregate cache recovery resumes at device %d of %d (%s).",
+			job.progress.index, #job.progress.devices, tostring(job.progress.stage))
+	end
 	_recovery = job
 	_run_recovery_slice(job)
 end
 
---- Abandons a running recovery before teardown. Its derived rows stay unmarked,
---- so the next start repeats it; no SQLite transaction is open between slices.
+--- Abandons a running recovery before teardown. Its derived rows stay unmarked
+--- and its resume point stays committed, so the next start continues from there;
+--- no SQLite transaction is open between slices.
 --- @return boolean settled False while its timer cleanup remains pending.
 _cancel_aggregate_recovery = function()
 	local job = _recovery
@@ -1857,7 +2060,7 @@ _cancel_aggregate_recovery = function()
 	end
 	if job.durability_off and not _restore_replay_durability(job.db, job) then settled = false end
 	if settled then _recovery = nil end
-	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it restarts at the next start.",
+	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it continues at the next start.",
 		job.slices)
 	if not _local_ledger_replay_pending then pcall(_restore_live_aggregator, job.db) end
 	return settled
@@ -1867,6 +2070,18 @@ end
 --- @return boolean
 function M.is_recovering()
 	return _recovery ~= nil
+end
+
+--- Keeps a running recovery from writing for a while: between two slices no
+--- transaction is open, so a lock-free reader sees one stable file. The next
+--- slice then waits, and a pending timer changes nothing.
+--- @param seconds number How long to hold; 0 releases the hold now.
+--- @return boolean held True when a recovery was running.
+function M.hold_recovery(seconds)
+	local job = _recovery
+	if job == nil then return false end
+	job.held_until_ns = seconds > 0 and timer.absoluteTime() + seconds * 1e9 or nil
+	return true
 end
 
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
@@ -2154,14 +2369,22 @@ local function _start_ingest_timer()
 	return true
 end
 
+--- The reason day_rollover names when an aggregate recovery holds the ingest.
+M.ROLLOVER_WAITS_FOR_RECOVERY = "recovering"
+
 --- Day rollover handler. Drains remaining today.log then delegates to
 --- Rotation.rollover to reset the file and offset.
 --- @return boolean True when the drain fully completed and rollover ran; false
 --- when the drain stalled and today.log/state were deliberately preserved for
 --- retry on the next midnight tick.
+--- @return string|nil reason ROLLOVER_WAITS_FOR_RECOVERY when nothing was tried.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
 	if _pending_rollover then return _resume_pending_rollover() end
+	-- Ingest waits for the recovery, so a drain could only report a stall. On a
+	-- months-old ledger on battery that lasted 33 min over midnight, with three
+	-- warnings at each tick (field report 2026-11-02); today.log loses nothing.
+	if _recovery ~= nil or _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
@@ -2453,7 +2676,14 @@ local function _init(core_state)
 		end
 		-- Last: the live context above must not land in the middle of its walk.
 		-- It ran synchronously here and held the event taps for 22 s (issue #104).
-		if recovery_due then _start_aggregate_recovery(db, replay_state) end
+		if recovery_due then
+			-- A rebuild already under way has cleared rows: that is no older cache.
+			if not cache_was_fresh and _aggregate_cache_revision(db) == PRE_ENCODING_REVISION
+				and _read_recovery_progress(db) == nil then
+				_keep_pre_encoding_cache(db)
+			end
+			_start_aggregate_recovery(db, replay_state)
+		end
 	end
 
 	-- Rotation is normally initialised inside the SQLite branch above, which is

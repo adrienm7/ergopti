@@ -45,6 +45,7 @@ local Outdated = require("config_outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local Migration = require("platform.remap.tap_hold_migration")
 local ConfigKeys = require("config_keys")
+local LoneTap = require("tap_hold.lone_tap")
 
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
@@ -53,6 +54,13 @@ local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 -- the timing registry's, the one declaration every driver reads or is pinned to.
 local MAX_THRESHOLD_SECONDS = 10
 M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
+
+-- How long a modifier key pressed alone still taps ([tap_hold]
+-- lone_modifier_tap_max_ms, the manifest's tap_holds.lone_modifier_tap_max_ms):
+-- Linux keeps it in tap_hold.toml beside the `enabled` switch.
+M.LONE_TAP_FIELD = ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS
+local LONE_TAP_FIELD = M.LONE_TAP_FIELD
+M.LONE_TAP_DEFAULT_MS = LoneTap.validate(Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS))
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 
@@ -266,6 +274,19 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 					tostring(seconds), MAX_THRESHOLD_SECONDS, M.GLOBAL_DEFAULT_SECONDS))
 		end
 	end
+	-- How long a modifier key pressed alone still taps: the user's when the file
+	-- sets a valid one, else the manifest's default.
+	local lone_tap_max_ms = M.LONE_TAP_DEFAULT_MS
+	local stored_lone_tap = section[LONE_TAP_FIELD]
+	if stored_lone_tap ~= nil then
+		if pcall(LoneTap.validate, stored_lone_tap) then
+			lone_tap_max_ms = stored_lone_tap
+		else
+			Outdated.report_in_file(user_file, { "tap_hold", LONE_TAP_FIELD },
+				string.format("%s is not 0 or a whole number of milliseconds; the window stays %d ms",
+					tostring(stored_lone_tap), M.LONE_TAP_DEFAULT_MS))
+		end
+	end
 	-- Shipped data like the hold picker: a user file cannot move a key.
 	local catalog = KeyCatalog.for_platform(defaults, "linux")
 	local remappable = {}
@@ -330,6 +351,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 		keys = keys,
 		global_seconds = global_seconds,
 		global_user_set = global_user_set,
+		lone_tap_max_ms = lone_tap_max_ms,
 		user_error = user_err,
 		user_path = user_file,
 		user_fields = user_fields,

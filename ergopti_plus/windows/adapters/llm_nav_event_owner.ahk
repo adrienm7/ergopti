@@ -3141,7 +3141,7 @@ _LLM_NavEventOwnerTerminalRouteSource() {
 	Caps := GetKeyState("CapsLock", "T") ? 1 : 0
 	if !IsSet(KLE_Model) || !(KLE_Model is Map)
 		return Map("active", false, "caps", Caps)
-	return Map("active", KeylayoutEmulation_LayerIsActive("ergopti_base") ? 1 : 0,
+	return Map("active", KeylayoutEmulation_LayerIsActive(ConfigLeaf.ERGOPTI_BASE) ? 1 : 0,
 		"caps", Caps, "model", KLE_Model, "layout_name", KLE_Id,
 		"keys", KLE_KeyCodes.Clone(), "composition_state", KLE_State,
 		"capture", KeylayoutEmulation_CaptureReplayRoute,
@@ -3613,8 +3613,14 @@ _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
 		}
 		throw StartError
 	}
+	; The ledger is read from #HotIf criteria on the keystroke path, and resolving an
+	; export re-proves the whole issued image (about 280 us). Resolve it once here:
+	; the module is process-resident, so the address outlives every owner restart.
+	KeyPressExport := _LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress")
+	KS_NativeKeyPressPort((Sc) => LLM_NavEventOwner_KeyPress(Sc, KeyPressExport))
 	if !LLM_NavEventOwner_RefreshTerminalRoutes()
 		throw Error("Terminal route metadata registration was not admitted at startup.")
+	_LLM_NavEventOwnerLogDesktopWatch()
 	return 1
 }
 
@@ -3657,6 +3663,32 @@ LLM_NavEventOwner_HookOrderStats() {
 		"last_failure_error", NumGet(Stats, 40, "UInt"))
 }
 
+; Reads one key of the native press ledger, which is empty while the owner is
+; stopped. This runs inside #HotIf criteria, so the buffer is not reallocated.
+; @param Sc {Integer} Scan code, 0x100 set for an extended key.
+; @param Export {Integer} The resolved query, which a keystroke-path caller passes;
+;     0 resolves it now.
+; @returns {Object} flags (ERGOPTI_NAV_KEY_* bits) and sequence (press number).
+LLM_NavEventOwner_KeyPress(Sc, Export := 0) {
+	static Press := Buffer(24, 0)
+	NumPut("UInt", 24, Press, 0)
+	Status := DllCall(Export ? Export : _LLM_NavEventOwnerNativeExport("ErgoptiNav_QueryKeyPress"),
+		"UShort", Sc, "Ptr", Press, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key press query")
+	return { flags: NumGet(Press, 4, "UInt"), sequence: NumGet(Press, 8, "UInt64") }
+}
+
+; How the ledger is kept honest: a release no hook sees must not leave a key held.
+; @returns {Map} desktop_watch (installed, so 0 once stopped) and resets (desktop
+;   switches seen by the last session).
+LLM_NavEventOwner_KeyLedgerHealth() {
+	Watching := 0, Resets := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_GetKeyLedgerHealth"),
+		"UInt*", &Watching, "Int64*", &Resets, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Navigation owner key ledger health")
+	return Map("desktop_watch", Watching, "resets", Resets)
+}
+
 ; The same counters for the diagnostic snapshot, read only when the native owner
 ; is already loaded: the snapshot must never load the DLL as a side effect.
 ; @returns {Map|Integer} The HookOrderStats map, or 0 when the owner is not loaded.
@@ -3667,6 +3699,18 @@ LLM_NavEventOwner_HookHealth() {
 	return LLM_NavEventOwner_HookOrderStats()
 }
 
+; Reports the desktop watch while the owner runs: a stopped owner has unhooked it,
+; so its health can only be read before the stop.
+_LLM_NavEventOwnerLogDesktopWatch() {
+	try {
+		if LLM_NavEventOwner_KeyLedgerHealth()["desktop_watch"]
+			LoggerDebug("KeyboardArbiter", "stage=key_ledger desktop_watch=1.")
+		else
+			LoggerWarn("KeyboardArbiter", "stage=key_ledger desktop_watch=0: a release missed on a secure desktop or the lock screen can stay held.")
+	} catch as Failure
+		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
+}
+
 ; One counters-only record per native session: no key identity, no text.
 _LLM_NavEventOwnerLogHookOrder() {
 	try {
@@ -3675,6 +3719,10 @@ _LLM_NavEventOwnerLogHookOrder() {
 		try LoggerWarn("KeyboardArbiter", "stage=hook_order outcome=unreadable detail={1}.", Failure.Message)
 		return
 	}
+	; The reset count outlives the stop; the watch itself does not.
+	try LoggerDebug("KeyboardArbiter", "stage=key_ledger resets={1}.", LLM_NavEventOwner_KeyLedgerHealth()["resets"])
+	catch as Failure
+		LoggerWarn("KeyboardArbiter", "stage=key_ledger outcome=unreadable detail={1}.", Failure.Message)
 	try LoggerDebug("KeyboardArbiter",
 		"stage=hook_order keys={1} injected_armed={2} reinstalls={3} failures={4} last_error={5} hires={6}.",
 		Counts["keys_seen"], Counts["injected_armed"], Counts["reinstalls"],
@@ -4939,7 +4987,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
 		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
 		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_TestDispatch"]
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_GetHookOrderStats", "ErgoptiNav_QueryKeyPress", "ErgoptiNav_GetKeyLedgerHealth", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {

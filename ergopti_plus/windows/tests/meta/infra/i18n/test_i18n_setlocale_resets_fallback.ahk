@@ -20,10 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
-_TISLRF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
+_TISLRF_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 _TISLRF_StripLineComments(Src) {
@@ -46,7 +44,7 @@ _TISLRF_StripLineComments(Src) {
 ; =============================================================================
 
 _TISLRF_FallbackWarmReset() {
-	Src := _TISLRF_StripLineComments(_TISLRF_ReadSource("infra/i18n.ahk"))
+	Src := _TISLRF_StripLineComments(_TISLRF_ReadSource("i18n.ahk"))
 	Assert(Src != "", "infra/i18n.ahk must be readable")
 
 	Body := _DriverFuncBody("I18nSetLocale")

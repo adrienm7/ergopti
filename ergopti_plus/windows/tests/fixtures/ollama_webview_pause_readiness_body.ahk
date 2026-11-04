@@ -237,7 +237,7 @@ _OPR_Main() {
 		_OllamaWV_Epoch += 1, World.Epoch := _OllamaWV_Epoch
 		World.Safety := _OPR_SafetyCallback(World.Epoch)
 		_OCSD_Note("before-endpoint")
-		_OPR_Require(LLM_Ollama_SetPort(11434), "the actual endpoint must be initialized through its real validator")
+		_OPR_Require(LLM_Ollama_SetPort(11435), "the actual endpoint must be initialized through its real validator")
 		_OCSD_Note("after-endpoint")
 		_LLM_Menu["enabled"] := true
 		Ports := Map("deps_ready", _OPR_DependencyReady.Bind(World), "deps_check", _OPR_DependencyCheck.Bind(World))

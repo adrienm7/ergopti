@@ -80,7 +80,7 @@ test("real native prerequisite receipts", function()
 	local definitions = {
 		{ "sha256sum", { "--help" }, { "GNU coreutils", "--zero" } },
 		{ "tar", { "--version" }, { "GNU tar" } },
-		{ "tar", { "--help" }, { "--zstd", "--no-same-owner", "--no-same-permissions" } },
+		{ "tar", { "--help" }, { "--use-compress-program", "--no-same-owner", "--no-same-permissions" } },
 		{ "mv", { "--help" }, { "GNU coreutils", "--no-clobber", "--no-target-directory" } },
 		{ "zstd", { "--version" }, { "Zstandard CLI" } },
 	}

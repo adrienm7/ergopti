@@ -7,6 +7,8 @@ Test("Ollama runtime: foreign cancellation receipt cannot grant file cleanup", _
 Test("Ollama runtime: canonical lazy task adopted before start", _ORT_Adoption)
 Test("Ollama runtime: every launch carries the shared serve environment", _ORT_ServeEnvironment)
 Test("Ollama runtime: owner refuses a launch without the shared serve environment", _ORT_ServeEnvironmentRequired)
+Test("Ollama runtime: every launch carries the captured proxy dependencies (owned-ollama-proxy)", _ORT_ProxyCaptures)
+Test("Ollama runtime: owner refuses a launch without its proxy captures (owned-ollama-proxy)", _ORT_ProxyCapturesRequired)
 Test("Ollama runtime: failed start strict physical ACK without callback", _ORT_FailedStart)
 Test("Ollama runtime: nonBoolean termination cannot release leases", _ORT_FalseAck)
 Test("Ollama runtime: retained file retirement debt blocks successors", _ORT_RetirementDebt)
@@ -21,6 +23,29 @@ Test("Ollama runtime: native spawn forwards canonical private slots", _ORT_Canon
 Test("Ollama runtime: native architecture uses closed host machine observation", _ORT_Architecture)
 Test("Ollama runtime: terminal during refused start cannot publish exit", _ORT_EarlyTerminal)
 Test("Ollama runtime: receipt read cannot renew the original readiness deadline", _ORT_Deadline)
+Test("Ollama runtime: a receipt held exclusively is not ready yet, and no error (proxy-relay-e2e)", _ORT_ReceiptHeldExclusively)
+
+; The launcher readmits its receipt exclusively for an instant before exposing it:
+; seen live, the read answered false and the JSON parser threw on it.
+_ORT_ReceiptHeldExclusively() {
+	Root := A_Temp . "\ergopti-ort-" . A_TickCount
+	DirCreate(Root)
+	Target := Map("managed_root", Root, "runtime_ticket", "22222222222222222222222222222222")
+	Path := Root . "\.runtime-" . Target["runtime_ticket"] . ".json"
+	Owner := _ORT_Fixture().Owner
+	try {
+		AssertFalse(Owner._NativeReadReady(Target), "no receipt file is not ready")
+		Held := FileOpen(Path, "w -rwd", "UTF-8-RAW")
+		Held.Write('{"runtime_ticket":"x"}')
+		Held.Close()
+		Held := FileOpen(Path, "r -rwd", "UTF-8-RAW")
+		try AssertFalse(Owner._NativeReadReady(Target), "an exclusive holder is not an error")
+		finally Held.Close()
+		Observation := Owner._NativeReadReady(Target)
+		AssertTrue(Observation is Map, "the released receipt is read")
+		AssertEqual("x", Observation["receipt"]["runtime_ticket"])
+	} finally DirDelete(Root, true)
+}
 
 class _ORT_Fixture {
 	__New() {
@@ -51,11 +76,12 @@ class _ORT_Fixture {
 			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"environment", "C:\bundled\managed_ollama_environment.json",
 			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"proxy", _ORT_Proxy(),
 			"spawn", ObjBindMethod(this, "Spawn"), "read_ready", ObjBindMethod(this, "Read"),
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
 		this.Receipt := Map("launcher_pid", 5001, "child_pid", 5002, "child_created_filetime", 133700000000000000, "leases_held", 1,
-			"ready_file_identity", "34567890:3456789012345678")
+			"ready_file_identity", "34567890:3456789012345678", "proxy_mode", "direct", "proxy_tunnel", "none", "proxy_relay", "not_applicable")
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			this.Receipt[Name] := this.Target[Name]
 	}
@@ -161,13 +187,77 @@ _ORT_ServeEnvironmentRequired() {
 			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 			"environment", "C:\bundled\managed_ollama_environment.json",
 			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-			"on_retired", (*) => true)
+			"proxy", _ORT_Proxy(), "on_retired", (*) => true)
 		Options.Delete(Name)
 		Refused := false
 		try OllamaRuntimeOwner(Options)
 		catch TypeError
 			Refused := true
 		Assert(Refused, "A launch without the captured serve environment is refused: " . Name)
+	}
+}
+
+; The captured proxy dependencies the launcher looks the daemon's proxy up with.
+_ORT_Proxy() {
+	return Map("VendorDirectory", "C:\bundled\vendor",
+		"VendorSha256", "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		"ProxyPolicyPath", "C:\bundled\proxy_policy.json",
+		"ProxyPolicySha256", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		"UpdaterDefaultsPath", "C:\bundled\defaults.json",
+		"UpdaterDefaultsSha256", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		"RouteOriginsPath", "C:\bundled\route_origins.json",
+		"RouteOriginsSha256", "0000000000000000000000000000000000000000000000000000000000000000",
+		"ProxyRelayContractPath", "C:\bundled\proxy_auth_relay.json",
+		"ProxyRelayContractSha256", "1111111111111111111111111111111111111111111111111111111111111111",
+		"ProxyRelayDialMs", 10000, "ProxyRelayHandshakeMs", 15000, "ProxyRelayIdleMs", 300000, "ProxyRelayProbeMs", 30000)
+}
+
+; No relay is installed in the fixture: the launcher reads its empty default, and
+; an installed one reaches it with the digest it verifies before running it.
+_ORT_RelayPathIsOptional() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "A start without the relay is admitted.")
+	Assert(!InStr(_ORT_Args(F.Arguments), "-ProxyRelayPath"), "No relay installed, no relay path.")
+	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+	Options := Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+		"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"environment", "C:\bundled\managed_ollama_environment.json",
+		"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		"proxy", _ORT_Proxy(), "on_retired", (*) => true)
+	Options["proxy"]["ProxyRelayPath"] := "C:\bundled\vendor\ergopti-proxy-relay.exe"
+	AssertThrows(() => OllamaRuntimeOwner(Options), "An installed relay needs its digest.")
+}
+Test("Ollama runtime: the relay path is optional and needs its digest (proxy-auth-relay)", _ORT_RelayPathIsOptional)
+
+; The owned daemon reads only HTTPS_PROXY and NO_PROXY: the launcher looks them
+; up from these captures, so every launch carries them all.
+_ORT_ProxyCaptures() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "Actual start is admitted.")
+	Args := _ORT_Args(F.Arguments)
+	for Name, Value in _ORT_Proxy()
+		Assert(InStr(Args, "-" . Name . "`n" . Value . "`n"), "The launcher receives " . Name . ".")
+	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+}
+
+_ORT_ProxyCapturesRequired() {
+	for Name in ["", "VendorDirectory", "VendorSha256", "RouteOriginsPath", "RouteOriginsSha256",
+			"ProxyRelayContractPath", "ProxyRelayContractSha256", "ProxyRelayDialMs", "ProxyRelayProbeMs"] {
+		Proxy := _ORT_Proxy()
+		if (Name != "")
+			Proxy.Delete(Name)
+		Options := Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"environment", "C:\bundled\managed_ollama_environment.json",
+			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"on_retired", (*) => true)
+		if (Name != "")
+			Options["proxy"] := Proxy
+		Refused := false
+		try OllamaRuntimeOwner(Options)
+		catch TypeError
+			Refused := true
+		Assert(Refused, "A launch without its proxy captures is refused: " . (Name == "" ? "proxy" : Name))
 	}
 }
 
@@ -344,6 +434,23 @@ _ORT_CancelForeignReceipt() {
 	AssertEqual(F.RetireTarget["ready_file_identity"], "", "A different runtime ticket cannot authorize receipt deletion.")
 	AssertEqual(F.RetireTarget["ready_image_sha256"], "")
 }
+
+; The fixture's receipt held 11 fields while the launcher wrote 13 from 743181a933,
+; so the real runtime could never be admitted as ready and every test stayed green.
+_ORT_ReceiptFieldsAreExact() {
+	F := _ORT_Fixture()
+	try {
+		for Name in OLLAMA_RUNTIME_RECEIPT_FIELDS
+			AssertTrue(F.Receipt.Has(Name), "The fixture writes what the launcher writes: " . Name)
+		AssertEqual(OLLAMA_RUNTIME_RECEIPT_FIELDS.Length, F.Receipt.Count)
+		AssertTrue(F.Run())
+		F.Receipt["unknown_field"] := "foreign"
+		AssertFalse(F.Owner.ObserveReady(), "A foreign field refuses the image.")
+		F.Receipt.Delete("unknown_field")
+		AssertTrue(F.Owner.ObserveReady(), "The launcher's exact fields are admitted.")
+	} finally F.Owner.Stop()
+}
+Test("Ollama runtime: readiness admits exactly the launcher's receipt fields (ollama-runtime-receipt-fields)", _ORT_ReceiptFieldsAreExact)
 
 _ORT_MissingCreationIdentity() {
 	F := _ORT_Fixture()

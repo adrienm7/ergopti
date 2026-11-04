@@ -21,6 +21,7 @@ helpers.describe("MLX downloader system trust admission", function()
 				return "# qualified managed MLX receiver", nil
 			end,
 			opaque_prelude = function() error("Managed MLX must not require opaque PAC admission") end,
+			uses_managed_transport = function() return true, nil end,
 		}
 		support.with_fixture({network_env = network}, function(fixture)
 			helpers.assert_true(fixture.controls.pull())
@@ -38,10 +39,43 @@ helpers.describe("MLX downloader system trust admission", function()
 		end)
 	end)
 
+	helpers.it("a proxy override leaves the native transport out of the downloader", function()
+		local network = {
+			managed_http_prelude = function() return "# environment-driven MLX admission", nil end,
+			uses_managed_transport = function() return false, nil end,
+		}
+		support.with_fixture({network_env = network}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local scripts = 0
+			for path, body in pairs(fixture.controls.files) do
+				if path:match("%.py$") then
+					scripts = scripts + 1
+					helpers.assert_eq(body:find("install_huggingface_transport", 1, true), nil,
+						"huggingface_hub must read the override's exported relay")
+					helpers.assert_true(body:find("snapshot_download", 1, true) ~= nil)
+				end
+			end
+			helpers.assert_eq(scripts, 1)
+		end)
+	end)
+
+	helpers.it("refuses a stored override the settings cannot read, before any child", function()
+		local network = {
+			managed_http_prelude = function() return "# admission", nil end,
+			uses_managed_transport = function() return nil, "the proxy override in the settings is not valid" end,
+		}
+		support.with_fixture({network_env = network}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			support.assert_cancelled(fixture, "network_policy_missing")
+			helpers.assert_eq(#fixture.controls.tasks.launcher, 0)
+		end)
+	end)
+
 	helpers.it("refuses missing managed admission without an opaque fallback or child", function()
 		local network = {
 			managed_http_prelude = function() return nil, "native receiver unavailable" end,
 			opaque_prelude = function() error("A managed refusal must not start an opaque client") end,
+			uses_managed_transport = function() return true, nil end,
 		}
 		support.with_fixture({network_env = network}, function(fixture)
 			helpers.assert_eq(fixture.controls.pull(), false)

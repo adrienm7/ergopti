@@ -16,14 +16,6 @@ return {
 		"distancesreduction",
 		"personal",
 	},
-	["llm_menu_rows"] = {
-		"llm_model",
-		"llm_profile",
-		"llm_trigger",
-		"llm_generation_settings",
-		"llm_display",
-		"llm_navigation",
-	},
 	["model_tag_emoji"] = {
 		"🏆",
 		"⚡",

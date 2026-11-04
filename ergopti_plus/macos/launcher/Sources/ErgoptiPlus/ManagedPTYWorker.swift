@@ -28,8 +28,10 @@ struct ManagedPTYRequest {
 			let nonce = fields["nonce"] as? String, !nonce.isEmpty, nonce.utf8.count <= 128,
 			nonce.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 })
 		else { return nil }
-		let official = URL(fileURLWithPath: source).lastPathComponent == "ensure-ollama-deps.sh"
-		let admittedNames: Set<String> = official ? ["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS",
+		// The Ollama verifier only checks the runtime the driver resolved; the stock
+		// download it once ran is retired (owned-runtimes row "Ollama installers").
+		let verifier = URL(fileURLWithPath: source).lastPathComponent == "ensure-ollama-deps.sh"
+		let admittedNames: Set<String> = verifier ? ["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS",
 			"ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN", "ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR", "ERGOPTI_BOOTSTRAP_PYTHON"]
 			: ["PROJECT_ROOT", "ERGOPTI_NATIVE_ARCH", "ERGOPTI_NATIVE_PYTHONS", "ERGOPTI_MLX_REPAIR"]
 		var names = Set<String>()
@@ -40,15 +42,13 @@ struct ManagedPTYRequest {
 				!pair[1].utf8.contains(0), names.insert(pair[0]).inserted else { return nil }
 			environment.append((pair[0], pair[1]))
 		}
-		if official {
+		if verifier {
 			let values = Dictionary(uniqueKeysWithValues: environment)
 			guard names == admittedNames, values["ERGOPTI_BOOTSTRAP_PYTHON"] == "",
 				["arm64", "x86_64"].contains(values["ERGOPTI_NATIVE_ARCH"] ?? ""),
 				let resolved = values["ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN"],
-				resolved.isEmpty || (resolved.hasPrefix("/") && URL(fileURLWithPath: resolved).standardizedFileURL.path == resolved),
-				let home = ProcessInfo.processInfo.environment["HOME"], home.hasPrefix("/"),
-				values["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR"] == (resolved.isEmpty
-					? URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Ergopti/ollama").standardizedFileURL.path : "")
+				resolved.hasPrefix("/"), URL(fileURLWithPath: resolved).standardizedFileURL.path == resolved,
+				values["ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR"] == ""
 			else { return nil }
 		}
 		return ManagedPTYRequest(sourcePath: source, sourceSHA256: digest, environment: environment,
@@ -297,8 +297,11 @@ enum ManagedPTYWorker {
 	private static let guardianFlag = "--managed-pty-guardian"
 	private static let controlDescriptor: Int32 = 3
 	private static let pollMilliseconds: Int32 = 20
-	/// The only installers the guardian runs, relative to the driver folder.
-	static let admittedSourceNames = ["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh"]
+	/// The only installers the guardian runs, relative to the driver folder;
+	/// ensure-ollama-deps.sh is the verifier of an already resolved runtime, and
+	/// ensure-managed-pyobjc.sh installs App Cloner's pinned PyObjC into the managed Python.
+	static let admittedSourceNames = ["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh",
+		"ensure-managed-pyobjc.sh"]
 
 	/// Absolute installer paths the guardian admits for one Lua source. They live
 	/// in the folder the embedded runtime reads its Lua from: the signed payload

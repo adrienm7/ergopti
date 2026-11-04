@@ -167,6 +167,9 @@ local function run_isolated(options, assertions)
 				return true
 			end,
 			is_reloading = function() return reload_marked end,
+			-- The reload's duration: recorded at the reload call, taken back at boot
+			mark_started = function(epoch_ms) state.reload_started_ms = epoch_ms end,
+			take_started = function() return nil end,
 		}
 
 		local LeaseController = {
@@ -212,6 +215,7 @@ local function run_isolated(options, assertions)
 				return true
 			end,
 			terminate_helper_processes = function() return true end,
+			retire_owned_ollama = function(callback) callback(true, "fixture daemon retired"); return true end,
 			terminate_orphan_mlx_server = function() return true end,
 		}
 
@@ -235,6 +239,8 @@ local function run_isolated(options, assertions)
 					state.cancel_all_calls = state.cancel_all_calls + 1
 					return true
 				end,
+				-- The wall clock the reload duration is measured with
+				now = function() return 1000 end,
 			},
 			["adapters.synthetic_input"] = {
 				when_idle = function(callback)
@@ -280,6 +286,7 @@ local function run_isolated(options, assertions)
 			["infra.i18n"] = {
 				set_locale_injector = function() end,
 				init = function() return true end,
+				adopt_saved_locale = function() return false end,
 				get = function(key) return tostring(key) end,
 			},
 			["infra.locale"] = {
@@ -293,6 +300,8 @@ local function run_isolated(options, assertions)
 			["infra.reload_guard"] = ReloadGuard,
 			["infra.emergency_exit"] = { request = function() return true end },
 			["infra.startup_transaction"] = {},
+			-- The boot lets config.toml's [script] rows win once the path resolves.
+			["infra.script_scope"] = { adopt_configured = function() return {} end },
 			["infra.config_paths"] = {
 				init = function() return true end,
 				get_config_dir = function() return "/virtual/config" end,
@@ -348,11 +357,12 @@ local function run_isolated(options, assertions)
 				-- acknowledged parser; this fixture never opens a user override file.
 				parse = function(path) return require("toml_codec.reader").parse(path) end,
 			},
-			-- Keep this deadline independent of the native timing loader; the root
+			-- Keep these deadlines independent of the native timing loader; the root
 			-- coordinator reads no other timing in this early-boot fixture.
 			["infra.timings"] = {
 				sec = function(section, key)
-					helpers.assert_eq(section .. "." .. key, "ui.user_quit_deadline_ms")
+					local name = section .. "." .. key
+					helpers.assert_true(name == "ui.user_quit_deadline_ms" or name == "ui.reload_deadline_ms", name)
 					return 12
 				end,
 			},
@@ -499,7 +509,7 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 		end)
 	end)
 
-	helpers.it("fails the exact controlled waiter when MLX cleanup is refused (HS-008)", function()
+	helpers.it("reloads natively once when MLX cleanup is refused (HS-008)", function()
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			helpers.assert_eq(hs_stub.reload("mlx-cleanup-refused"), true)
 			helpers.assert_eq(type(state.mlx_stop_callback), "function")
@@ -507,17 +517,19 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 
 			local exact_callback = state.mlx_stop_callback
 			helpers.assert_eq(exact_callback(false, "cleanup_refused"), false)
-			helpers.assert_eq(state.fatal_exit_calls, 1,
-				"a negative exact teardown terminal must leave pending state through fatal exit")
-			helpers.assert_true(type(state.fatal_exit_code) == "number" and state.fatal_exit_code ~= 0)
-			helpers.assert_eq(state.native_reload_calls, 0)
+			-- A reload replaces its Lua state natively instead of losing the app
+			-- (reload-teardown-failed); an exit keeps the fatal backstop
+			helpers.assert_eq(state.native_reload_calls, 1,
+				"a negative exact teardown terminal must leave pending state through a native reload")
+			helpers.assert_eq(state.fatal_exit_calls, 0)
 			helpers.assert_eq(state.drain_calls, 0,
 				"logger drain cannot start after listener absence was refused")
 			helpers.assert_eq(state.logger_stop_calls, 0)
 
 			exact_callback(false, "duplicate")
-			helpers.assert_eq(state.fatal_exit_calls, 1,
+			helpers.assert_eq(state.native_reload_calls, 1,
 				"the same shutdown waiter cannot publish two negative terminals")
+			helpers.assert_eq(state.fatal_exit_calls, 0)
 		end)
 	end)
 

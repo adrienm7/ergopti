@@ -2,6 +2,7 @@
 ; Tray state <-> Features["llm"] <-> config.toml (no menu handlers / hotkeys).
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
 
 ; Foreign scalar/array preferences belong to this owner, not the Features map.
 ; Removing their overrides reuses this owner's existing load-time defaults.
@@ -86,11 +87,11 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		return false
 	Validated := Map()
 	for Key in ["enabled", "model", "backend", "profile_id", "n_predictions",
-		"auto_profile_for_model", "temperature", "min_words", "max_words",
-		"ctx_chars", "auto_raise_temp", "reset_on_nav", "show_info_bar",
-		"streaming", "show_all_at_once", "pred_indent", "debounce_ms",
-		"instant_on_word_end", "after_hotstring", "inline_autotype",
-		"disable_url_bars", "disable_password_fields", "val_modifiers"] {
+		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, "temperature", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS,
+		"ctx_chars", ConfigLeaf.AUTO_RAISE_TEMP, ConfigLeaf.RESET_ON_NAV, ConfigLeaf.SHOW_INFO_BAR,
+		"streaming", "show_all_at_once", ConfigLeaf.PRED_INDENT, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
+		ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING, ConfigLeaf.INLINE_AUTOTYPE,
+		"disable_url_bars", "disable_password_fields", ConfigLeaf.VAL_MODIFIERS] {
 		if !MenuState.Has(Key)
 				|| !LLM_Option_TryNormalize(Key, MenuState[Key], &Normalized) {
 			try LoggerError("LLM",
@@ -113,7 +114,18 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		}
 		AgentValues[Key] := Normalized
 	}
-	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated["val_modifiers"])
+	; Absent until the user's settings are restored: Features then keeps the
+	; manifest default it was built with.
+	WhileHotstringTooltip := false
+	if MenuState.Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP) {
+		if !LLM_Option_TryNormalize(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+				MenuState[ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], &WhileHotstringTooltip) {
+			try LoggerError("LLM",
+				"Refusing to sync invalid option '{1}' into Features.", ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+			return false
+		}
+	}
+	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated[ConfigLeaf.VAL_MODIFIERS])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",
 			"Refusing to sync invalid validation modifiers into Features.")
@@ -124,27 +136,30 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	llm["models"]["ollama"]                   := Validated["model"]
 	llm["models"]["selected"]                 := Validated["backend"]
 	llm["profiles"]["active"]                 := Validated["profile_id"]
-	llm["profiles"]["num_predictions"]        := Validated["n_predictions"]
-	llm["profiles"]["auto_profile_for_model"] := Validated["auto_profile_for_model"]
+	llm["profiles"][ConfigLeaf.NUM_PREDICTIONS]        := Validated["n_predictions"]
+	llm["profiles"][ConfigLeaf.AUTO_PROFILE_FOR_MODEL] := Validated[ConfigLeaf.AUTO_PROFILE_FOR_MODEL]
 	llm["generation"]["temperature"]          := Float(Validated["temperature"])
-	llm["generation"]["min_words"]            := Validated["min_words"]
-	llm["generation"]["max_words"]            := Validated["max_words"]
-	llm["generation"]["context_length"]       := Validated["ctx_chars"]
-	llm["generation"]["auto_raise_temp"]      := Validated["auto_raise_temp"]
-	llm["generation"]["reset_on_nav"]         := Validated["reset_on_nav"]
-	llm["display"]["show_info_bar"]           := Validated["show_info_bar"]
+	llm["generation"][ConfigLeaf.MIN_WORDS]            := Validated[ConfigLeaf.MIN_WORDS]
+	llm["generation"][ConfigLeaf.MAX_WORDS]            := Validated[ConfigLeaf.MAX_WORDS]
+	llm["generation"][ConfigLeaf.CONTEXT_LENGTH]       := Validated["ctx_chars"]
+	llm["generation"][ConfigLeaf.AUTO_RAISE_TEMP]      := Validated[ConfigLeaf.AUTO_RAISE_TEMP]
+	llm["generation"][ConfigLeaf.RESET_ON_NAV]         := Validated[ConfigLeaf.RESET_ON_NAV]
+	llm["display"][ConfigLeaf.SHOW_INFO_BAR]           := Validated[ConfigLeaf.SHOW_INFO_BAR]
 	llm["display"]["streaming"]               := Validated["streaming"]
-	llm["display"]["streaming_multi"]         := LLM_DisplayProgressive(Validated["show_all_at_once"])
-	llm["display"]["pred_indent"]             := Validated["pred_indent"]
-	llm["trigger"]["debounce_ms"]             := Validated["debounce_ms"]
-	llm["trigger"]["instant_on_word_end"]     := Validated["instant_on_word_end"]
-	llm["trigger"]["after_hotstring"]         := Validated["after_hotstring"]
-	llm["trigger"]["inline_autotype"]         := Validated["inline_autotype"]
-	llm["trigger"]["url_bar_filter_enabled"]  := Validated["disable_url_bars"]
-	llm["trigger"]["secure_filter_enabled"]   := Validated["disable_password_fields"]
-	llm["navigation"]["val_modifiers"]          := ValModifiers
+	llm["display"][ConfigLeaf.STREAMING_MULTI]         := LLM_DisplayProgressive(Validated["show_all_at_once"])
+	llm["display"][ConfigLeaf.PRED_INDENT]             := Validated[ConfigLeaf.PRED_INDENT]
+	llm["trigger"][ConfigLeaf.DEBOUNCE_MS]             := Validated[ConfigLeaf.DEBOUNCE_MS]
+	llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS] := Validated[ConfigLeaf.MIN_REQUEST_INTERVAL_MS]
+	llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END]     := Validated[ConfigLeaf.INSTANT_ON_WORD_END]
+	llm["trigger"][ConfigLeaf.AFTER_HOTSTRING]         := Validated[ConfigLeaf.AFTER_HOTSTRING]
+	llm["trigger"][ConfigLeaf.INLINE_AUTOTYPE]         := Validated[ConfigLeaf.INLINE_AUTOTYPE]
+	llm["trigger"][ConfigLeaf.URL_BAR_FILTER_ENABLED]  := Validated["disable_url_bars"]
+	llm["trigger"][ConfigLeaf.SECURE_FILTER_ENABLED]   := Validated["disable_password_fields"]
+	llm["navigation"][ConfigLeaf.VAL_MODIFIERS]          := ValModifiers
 	for Key, Value in AgentValues
 		llm[Key] := Value
+	if WhileHotstringTooltip is String
+		llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP] := WhileHotstringTooltip
 	return true
 }
 
@@ -158,21 +173,21 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 			&& !LLM_Option_TryNormalize("api_entry_id",
 				MenuState["api_entry_id"], &ApiEntryId)
 		return false
-	if !MenuState.Has("user_profiles")
+	if !MenuState.Has(ConfigLeaf.USER_PROFILES)
 		return false
 	NavModifiersText := false
-	if !MenuState.Has("nav_modifiers")
-			|| !LLM_Option_TryNormalize("nav_modifiers",
-				MenuState["nav_modifiers"], &NavModifiersText)
+	if !MenuState.Has(ConfigLeaf.NAV_MODIFIERS)
+			|| !LLM_Option_TryNormalize(ConfigLeaf.NAV_MODIFIERS,
+				MenuState[ConfigLeaf.NAV_MODIFIERS], &NavModifiersText)
 		return false
 	NavModifiers := _LLM_Menu_ModifiersStringToArray(NavModifiersText)
 	if !(NavModifiers is Array)
 		return false
-	Apps := MenuState.Has("disabled_apps") ? MenuState["disabled_apps"] : []
-	if !LLM_Option_TryNormalize("disabled_apps", Apps, &Apps)
+	Apps := MenuState.Has(ConfigLeaf.DISABLED_APPS) ? MenuState[ConfigLeaf.DISABLED_APPS] : []
+	if !LLM_Option_TryNormalize(ConfigLeaf.DISABLED_APPS, Apps, &Apps)
 		return false
-	if !LLM_Option_TryNormalize("user_profiles",
-			MenuState["user_profiles"], &Profiles)
+	if !LLM_Option_TryNormalize(ConfigLeaf.USER_PROFILES,
+			MenuState[ConfigLeaf.USER_PROFILES], &Profiles)
 		return false
 	ProfilesPayload := _LLM_Menu_SerializeUserProfiles(Profiles)
 	if !(ProfilesPayload is String)
@@ -189,10 +204,10 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 		Updates.Push({ Section: "llm", Key: "ollama_port", Value: OllamaPort })
 	if MenuState.Has("api_entry_id")
 		Updates.Push({ Section: "llm", Key: "api_entry_id", Value: ApiEntryId })
-	Updates.Push({ Section: "llm", Key: "user_profiles", Value: ProfilesPayload })
-	Updates.Push({ Section: "llm.navigation", Key: "nav_modifiers",
+	Updates.Push({ Section: "llm", Key: ConfigLeaf.USER_PROFILES, Value: ProfilesPayload })
+	Updates.Push({ Section: ConfigKey.LLM_NAVIGATION, Key: ConfigLeaf.NAV_MODIFIERS,
 		Value: NavModifiers })
-	Updates.Push({ Section: "llm.trigger", Key: "disabled_apps", Value: Apps })
+	Updates.Push({ Section: ConfigKey.LLM_TRIGGER, Key: ConfigLeaf.DISABLED_APPS, Value: Apps })
 	return true
 }
 
@@ -223,13 +238,13 @@ _LLM_Menu_PutValidatedPersistedOption(Opts, Key, Value, SourceKey := "") {
 _LLM_Menu_LoadAppProfileOverridesFromCache(SavedOpts, Cache) {
 	if !(SavedOpts is Map) || !(Cache is Map)
 		return false
-	Raw := IniCacheGet(Cache, "llm", "app_profile_overrides")
+	Raw := IniCacheGet(Cache, "llm", ConfigLeaf.APP_PROFILE_OVERRIDES)
 	if (Raw is String) {
 		if (Raw == "_" || Raw == "")
 			return true
 		Overrides := _LLM_Menu_DeserializeAppProfileOverrides(Raw)
 		if (Overrides is Map) {
-			SavedOpts["app_profile_overrides"] := Overrides
+			SavedOpts[ConfigLeaf.APP_PROFILE_OVERRIDES] := Overrides
 			return true
 		}
 		LoggerError("LLM",
@@ -248,27 +263,28 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		return opts
 	llm := Features["llm"]
 	for Entry in [
-		["enabled", llm["enabled"], "llm.enabled"],
-		["model", llm["models"]["ollama"], "llm.models.ollama"],
-		["backend", llm["models"]["selected"], "llm.models.selected"],
-		["profile_id", llm["profiles"]["active"], "llm.profiles.active"],
-		["n_predictions", llm["profiles"]["num_predictions"], "llm.profiles.num_predictions"],
-		["auto_profile_for_model", llm["profiles"]["auto_profile_for_model"], "llm.profiles.auto_profile_for_model"],
-		["min_words", llm["generation"]["min_words"], "llm.generation.min_words"],
-		["max_words", llm["generation"]["max_words"], "llm.generation.max_words"],
-		["ctx_chars", llm["generation"]["context_length"], "llm.generation.context_length"],
-		["debounce_ms", llm["trigger"]["debounce_ms"], "llm.trigger.debounce_ms"],
-		["instant_on_word_end", llm["trigger"]["instant_on_word_end"], "llm.trigger.instant_on_word_end"],
-		["after_hotstring", llm["trigger"]["after_hotstring"], "llm.trigger.after_hotstring"],
-		["reset_on_nav", llm["generation"]["reset_on_nav"], "llm.generation.reset_on_nav"],
-		["auto_raise_temp", llm["generation"]["auto_raise_temp"], "llm.generation.auto_raise_temp"],
-		["inline_autotype", llm["trigger"]["inline_autotype"], "llm.trigger.inline_autotype"],
-		["show_info_bar", llm["display"]["show_info_bar"], "llm.display.show_info_bar"],
-		["streaming", llm["display"]["streaming"], "llm.display.streaming"],
-		["show_all_at_once", llm["display"]["streaming_multi"], "llm.display.streaming_multi"],
-		["pred_indent", llm["display"]["pred_indent"], "llm.display.pred_indent"],
-		["disable_url_bars", llm["trigger"]["url_bar_filter_enabled"], "llm.trigger.url_bar_filter_enabled"],
-		["disable_password_fields", llm["trigger"]["secure_filter_enabled"], "llm.trigger.secure_filter_enabled"]
+		["enabled", llm["enabled"], ConfigKey.LLM_ENABLED],
+		["model", llm["models"]["ollama"], ConfigKey.LLM_MODELS_OLLAMA],
+		["backend", llm["models"]["selected"], ConfigKey.LLM_MODELS_SELECTED],
+		["profile_id", llm["profiles"]["active"], ConfigKey.LLM_PROFILES_ACTIVE],
+		["n_predictions", llm["profiles"][ConfigLeaf.NUM_PREDICTIONS], ConfigKey.LLM_PROFILES_NUM_PREDICTIONS],
+		[ConfigLeaf.AUTO_PROFILE_FOR_MODEL, llm["profiles"][ConfigLeaf.AUTO_PROFILE_FOR_MODEL], ConfigKey.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL],
+		[ConfigLeaf.MIN_WORDS, llm["generation"][ConfigLeaf.MIN_WORDS], ConfigKey.LLM_GENERATION_MIN_WORDS],
+		[ConfigLeaf.MAX_WORDS, llm["generation"][ConfigLeaf.MAX_WORDS], ConfigKey.LLM_GENERATION_MAX_WORDS],
+		["ctx_chars", llm["generation"][ConfigLeaf.CONTEXT_LENGTH], ConfigKey.LLM_GENERATION_CONTEXT_LENGTH],
+		[ConfigLeaf.DEBOUNCE_MS, llm["trigger"][ConfigLeaf.DEBOUNCE_MS], ConfigKey.LLM_TRIGGER_DEBOUNCE_MS],
+		[ConfigLeaf.MIN_REQUEST_INTERVAL_MS, llm["trigger"][ConfigLeaf.MIN_REQUEST_INTERVAL_MS], ConfigKey.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS],
+		[ConfigLeaf.INSTANT_ON_WORD_END, llm["trigger"][ConfigLeaf.INSTANT_ON_WORD_END], ConfigKey.LLM_TRIGGER_INSTANT_ON_WORD_END],
+		[ConfigLeaf.AFTER_HOTSTRING, llm["trigger"][ConfigLeaf.AFTER_HOTSTRING], ConfigKey.LLM_TRIGGER_AFTER_HOTSTRING],
+		[ConfigLeaf.RESET_ON_NAV, llm["generation"][ConfigLeaf.RESET_ON_NAV], ConfigKey.LLM_GENERATION_RESET_ON_NAV],
+		[ConfigLeaf.AUTO_RAISE_TEMP, llm["generation"][ConfigLeaf.AUTO_RAISE_TEMP], ConfigKey.LLM_GENERATION_AUTO_RAISE_TEMP],
+		[ConfigLeaf.INLINE_AUTOTYPE, llm["trigger"][ConfigLeaf.INLINE_AUTOTYPE], ConfigKey.LLM_TRIGGER_INLINE_AUTOTYPE],
+		[ConfigLeaf.SHOW_INFO_BAR, llm["display"][ConfigLeaf.SHOW_INFO_BAR], ConfigKey.LLM_DISPLAY_SHOW_INFO_BAR],
+		["streaming", llm["display"]["streaming"], ConfigKey.LLM_DISPLAY_STREAMING],
+		["show_all_at_once", llm["display"][ConfigLeaf.STREAMING_MULTI], ConfigKey.LLM_DISPLAY_STREAMING_MULTI],
+		[ConfigLeaf.PRED_INDENT, llm["display"][ConfigLeaf.PRED_INDENT], ConfigKey.LLM_DISPLAY_PRED_INDENT],
+		["disable_url_bars", llm["trigger"][ConfigLeaf.URL_BAR_FILTER_ENABLED], ConfigKey.LLM_TRIGGER_URL_BAR_FILTER_ENABLED],
+		["disable_password_fields", llm["trigger"][ConfigLeaf.SECURE_FILTER_ENABLED], ConfigKey.LLM_TRIGGER_SECURE_FILTER_ENABLED]
 	]
 		_LLM_Menu_PutValidatedPersistedOption(
 			opts, Entry[1], Entry[2], Entry[3])
@@ -278,26 +294,38 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 	TemperatureRaw := llm["generation"]["temperature"]
 	if (TemperatureRaw is Integer) || (TemperatureRaw is Float)
 		_LLM_Menu_PutValidatedPersistedOption(opts, "temperature",
-			Format("{:.2f}", TemperatureRaw + 0), "llm.generation.temperature")
+			Format("{:.2f}", TemperatureRaw + 0), ConfigKey.LLM_GENERATION_TEMPERATURE)
 	else
-		_LLM_Menu_LogInvalidPersistedOption("llm.generation.temperature")
+		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_GENERATION_TEMPERATURE)
+	; A feature tree written before this option keeps the manifest default the
+	; reader falls back to (LLM_Menu_WhileHotstringTooltip).
+	if llm["trigger"].Has(ConfigLeaf.WHILE_HOTSTRING_TOOLTIP)
+		_LLM_Menu_PutValidatedPersistedOption(opts, ConfigLeaf.WHILE_HOTSTRING_TOOLTIP,
+			llm["trigger"][ConfigLeaf.WHILE_HOTSTRING_TOOLTIP], ConfigKey.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP)
 	for Key in LLM_AGENT_SETTING_KEYS {
 		if llm.Has(Key)
 			_LLM_Menu_PutValidatedPersistedOption(opts, Key, llm[Key], "llm." . Key)
 	}
-	val_raw := llm["navigation"]["val_modifiers"]
+	val_raw := llm["navigation"][ConfigLeaf.VAL_MODIFIERS]
 	ValModifiers := (val_raw is Array)
 		? _LLM_Menu_ModifiersArrayToString(val_raw)
 		: ((val_raw is String)
 			? _LLM_Menu_ModifiersArrayToString(
 				_LLM_Menu_ModifiersStringToArray(val_raw)) : false)
 	if (ValModifiers is String)
-		opts["val_modifiers"] := ValModifiers
+		opts[ConfigLeaf.VAL_MODIFIERS] := ValModifiers
 	else
-		_LLM_Menu_LogInvalidPersistedOption("llm.navigation.val_modifiers")
+		_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 	if IsSet(Cache) {
+		; One admitted snapshot serves the four manifest reads below: each read of
+		; its own compared the whole snapshot with its shadow twice.
+		BootSnapshot := ConfigTomlBootSnapshot(Cache)
 		raw := IniCacheGet(Cache, "llm", "ollama_port")
-		if !((raw is String) && raw == "_")
+		; Earlier releases saved the stock port, which now belongs to the user's
+		; own Ollama: such a value is dropped once, as on macOS, and is no error.
+		if LLM_Option_IsStockOllamaPort(raw)
+			LoggerInfo("LLM", "Saved Ollama port {1} is the stock port; Ergopti's own Ollama keeps its port.", raw)
+		else if !((raw is String) && raw == "_")
 			_LLM_Menu_PutValidatedPersistedOption(
 				opts, "ollama_port", raw, "llm.ollama_port")
 		raw := IniCacheGet(Cache, "llm", "api_entry_id")
@@ -305,56 +333,56 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			_LLM_Menu_PutValidatedPersistedOption(
 				opts, "api_entry_id", raw, "llm.api_entry_id")
 		}
-		raw := IniCacheGet(Cache, "llm", "user_profiles")
+		raw := IniCacheGet(Cache, "llm", ConfigLeaf.USER_PROFILES)
 		if !((raw is String) && raw == "_") {
 			Profiles := (raw is String)
 				? _LLM_Menu_DeserializeUserProfiles(raw) : false
 			if (Profiles is Array)
 				_LLM_Menu_PutValidatedPersistedOption(
-					opts, "user_profiles", Profiles, "llm.user_profiles")
+					opts, ConfigLeaf.USER_PROFILES, Profiles, ConfigKey.LLM_USER_PROFILES)
 			else
-				_LLM_Menu_LogInvalidPersistedOption("llm.user_profiles")
+				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_USER_PROFILES)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw)
-			raw := IniCacheGet(Cache, "llm", "onboarding_seen")
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM, ConfigLeaf.ONBOARDING_SEEN, &raw))
+			raw := IniCacheGet(Cache, "llm", ConfigLeaf.ONBOARDING_SEEN)
 		if !((raw is String) && raw == "_") {
 			if LLM_Option_TryParseConfigBoolean(raw, &OnboardingSeen)
-				opts["onboarding_seen"] := OnboardingSeen
+				opts[ConfigLeaf.ONBOARDING_SEEN] := OnboardingSeen
 			else
-				_LLM_Menu_LogInvalidPersistedOption("llm.onboarding_seen")
+				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_ONBOARDING_SEEN)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw)
-			raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS, &raw))
+			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.VAL_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			Value := (arr is Array) ? _LLM_Menu_ModifiersArrayToString(arr) : false
 			if (Value is String)
-				opts["val_modifiers"] := Value
+				opts[ConfigLeaf.VAL_MODIFIERS] := Value
 			else {
-				if opts.Has("val_modifiers")
-					opts.Delete("val_modifiers")
-				_LLM_Menu_LogInvalidPersistedOption("llm.navigation.val_modifiers")
+				if opts.Has(ConfigLeaf.VAL_MODIFIERS)
+					opts.Delete(ConfigLeaf.VAL_MODIFIERS)
+				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_VAL_MODIFIERS)
 			}
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw)
-			raw := IniCacheGet(Cache, "llm.navigation", "nav_modifiers")
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS, &raw))
+			raw := IniCacheGet(Cache, ConfigKey.LLM_NAVIGATION, ConfigLeaf.NAV_MODIFIERS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			Value := (arr is Array) ? _LLM_Menu_ModifiersArrayToString(arr) : false
 			if (Value is String)
-				opts["nav_modifiers"] := Value
+				opts[ConfigLeaf.NAV_MODIFIERS] := Value
 			else
-				_LLM_Menu_LogInvalidPersistedOption("llm.navigation.nav_modifiers")
+				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_NAVIGATION_NAV_MODIFIERS)
 		}
-		if !ConfigTomlTryReadBootValue(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw)
-			raw := IniCacheGet(Cache, "llm.trigger", "disabled_apps")
+		if !(IsObject(BootSnapshot) && ConfigTomlBootSnapshotValue(BootSnapshot, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS, &raw))
+			raw := IniCacheGet(Cache, ConfigKey.LLM_TRIGGER, ConfigLeaf.DISABLED_APPS)
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			arr := (arr is Array) ? LLM_Option_NormalizeStringArray(arr, true) : false
 			if (arr is Array)
-				opts["disabled_apps"] := arr
+				opts[ConfigLeaf.DISABLED_APPS] := arr
 			else
-				_LLM_Menu_LogInvalidPersistedOption("llm.trigger.disabled_apps")
+				_LLM_Menu_LogInvalidPersistedOption(ConfigKey.LLM_TRIGGER_DISABLED_APPS)
 		}
 	}
 	return opts

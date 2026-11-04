@@ -22,10 +22,8 @@
 ; ===================================================
 ; ===================================================
 
-_LFOB_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_LFOB_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 
@@ -36,7 +34,7 @@ _LFOB_ReadSource(RelPath) {
 ; ===================================================
 
 _LFOB_CheckFanOutNoDirectAppend() {
-	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Src := _LFOB_ReadSource("logger.ahk")
 	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	FanOut := _DriverFuncBody("_LoggerFanOut")
@@ -47,7 +45,7 @@ _LFOB_CheckFanOutNoDirectAppend() {
 }
 
 _LFOB_CheckSubPendingQueue() {
-	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Src := _LFOB_ReadSource("logger.ahk")
 	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	Assert(InStr(Src, "_LOGGER_SUB_PENDING"),
@@ -55,7 +53,7 @@ _LFOB_CheckSubPendingQueue() {
 }
 
 _LFOB_CheckFlushDrainsSubPending() {
-	Src := _LFOB_ReadSource("infra/logger.ahk")
+	Src := _LFOB_ReadSource("logger.ahk")
 	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	; The public wrapper serializes ownership; the owned implementation performs

@@ -40,10 +40,8 @@
 ; =================================================
 ; =================================================
 
-_TSCGR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
+_TSCGR_ReadSource(FileName) {
+	return _DriverFileSource(FileName)
 }
 
 ; Extracts the body of _TextSendClipboard from the source.
@@ -76,7 +74,7 @@ _TSCGR_ExtractBody(Src) {
 ; ===================================================
 
 _TSCGR_CheckGenerationRecheck() {
-	Src := _TSCGR_ReadSource("adapters/text_sender.ahk")
+	Src := _TSCGR_ReadSource("text_sender.ahk")
 	Assert(Src != "", "adapters/text_sender.ahk must be readable")
 
 	Body := _TSCGR_ExtractBody(Src)

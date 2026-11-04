@@ -29,12 +29,17 @@
 ---    (unreachable_direct, http_<status>_direct, invalid_direct) and the chain
 ---    steps prove whether the direct path works. A driver without that port
 ---    refuses such downloads, so the failure stays a failure.
+--- 6. A plain http relay the route plan selects is probed for a sign-in the
+---    daemon cannot give (docs/design/proxy-auth-relay.md): proxy_relay names
+---    not_needed, required_<scheme>, relay_not_installed, or the relay's
+---    closed refusal.
 --- ==============================================================================
 
 local M = {}
 
 local PacCheck = require("network.pac_check")
 local RoutePlan = require("network.route_plan")
+local ProxyAuthRelay = require("network.proxy_auth_relay")
 
 --- Step identities in report order; the locale key of each is
 --- field_check.step.<id>.
@@ -43,7 +48,7 @@ M.STEP_IDS = { "proxy_settings", "pac_download", "pac_script", "route_lookup", "
 --- Steps macOS and Linux report after the chain: the route each origin of the managed
 --- Ollama daemon takes (the Windows check does not report it yet, so the identities the
 --- Windows list must equal stay M.STEP_IDS).
-M.PLAN_STEPS = { "route_plan" }
+M.PLAN_STEPS = { "route_plan", "proxy_relay" }
 
 --- The closed names of the managed Ollama daemon's origins, in the order of
 --- route_origins.json "ollama" (the registry, then its blob host). A host name never
@@ -133,6 +138,7 @@ end
 --- failure of the download: it goes direct, so the step says so (info).
 --- @param answer table { entries = { { origin, route }, ... } } or { failure = token }
 --- @param pac_fallback function|nil fn(stage) -> boolean, the driver's fallback policy.
+--- @return table|nil plan The settled plan, nil when the step failed.
 local function record_route_plan(report, answer, pac_fallback)
 	if answer.failure then
 		if pac_fallback and pac_fallback(answer.failure) == true then
@@ -140,7 +146,7 @@ local function record_route_plan(report, answer, pac_fallback)
 		else
 			report.step("route_plan", STATE.fail, answer.failure)
 		end
-		return
+		return nil
 	end
 	local entries = answer.entries
 	assert(type(entries) == "table" and #entries == #M.OLLAMA_ORIGIN_TOKENS,
@@ -148,13 +154,46 @@ local function record_route_plan(report, answer, pac_fallback)
 	local plan, reason = RoutePlan.plan(entries)
 	if not plan then
 		report.step("route_plan", STATE.fail, reason)
-		return
+		return nil
 	end
 	local parts = {}
 	for index, entry in ipairs(entries) do
 		parts[index] = M.OLLAMA_ORIGIN_TOKENS[index] .. ":" .. (entry.route == "direct" and "direct" or "relay")
 	end
 	report.step("route_plan", STATE.info, table.concat(parts, "+"))
+	return plan
+end
+
+--- Probes the relay the plan selected for a sign-in the daemon cannot give.
+--- The answer is the one the daemon's start acts on: not needed, the local
+--- relay, or the refusal that stops the start.
+--- @param report table The run's report.
+--- @param plan table|nil The settled route plan.
+--- @param relay_probe function fn(upstream, callback(answer|nil, reason|nil)).
+--- @param relay table The shared relay policy.
+--- @param done function Called once the step is recorded.
+local function record_proxy_relay(report, plan, relay_probe, relay, done)
+	if not plan then
+		report.step("proxy_relay", STATE.skip, "no_plan")
+		return done()
+	end
+	local upstream = relay.upstream(plan.proxy)
+	if not upstream then
+		report.step("proxy_relay", STATE.skip, plan.proxy == "direct" and "direct" or "not_applicable")
+		return done()
+	end
+	relay_probe(upstream, function(answer, reason)
+		if answer and answer.status == ProxyAuthRelay.NOT_INSTALLED then
+			report.step("proxy_relay", STATE.skip, "relay_not_installed")
+		elseif answer and answer.status == "required" then
+			report.step("proxy_relay", STATE.pass, "required_" .. answer.scheme)
+		elseif answer then
+			report.step("proxy_relay", STATE.pass, "not_needed")
+		else
+			report.step("proxy_relay", STATE.fail, relay.is_refusal(reason) and reason or ProxyAuthRelay.UNAVAILABLE)
+		end
+		done()
+	end)
 end
 
 --- Runs the check.
@@ -169,17 +208,22 @@ end
 ---                             "direct" or a relay, or callback{ failure = token }
 ---   pac_fallback(stage)       optional: true when a failed lookup stage sends the
 ---                             download direct (the driver's PAC fallback policy)
+---   relay                     the shared sign-in relay policy (network/proxy_auth_relay.lua)
+---   relay_probe(upstream, callback)  callback(answer|nil, reason|nil) as
+---                             policy.read_probe() answers for the registry
 --- @param ports table
 --- @param report table Report from field_check_report.new_report().
 --- @param finish function Called once, after the last step.
 function M.run(ports, report, finish)
 	assert(type(ports.route_plan) == "function", "the network check needs a route_plan port")
+	assert(type(ports.relay_probe) == "function" and type(ports.relay) == "table",
+		"the network check needs the sign-in relay ports")
 	local function native_chain()
 		ports.chain(function(helper_code, steps)
 			record_chain(report, helper_code, helper_code == 0 and steps or {})
 			ports.route_plan(function(answer)
-				record_route_plan(report, answer, ports.pac_fallback)
-				finish()
+				local plan = record_route_plan(report, answer, ports.pac_fallback)
+				record_proxy_relay(report, plan, ports.relay_probe, ports.relay, finish)
 			end)
 		end)
 	end

@@ -121,6 +121,46 @@ helpers.describe("phase stats: the phases the macOS driver records (PAR-54)", fu
 			"the daemon's tray rebuild goes through the timed build")
 	end)
 
+	helpers.it("(linux-menu-rebuild-budget) writes the macOS rebuild line and judges menu_rebuild_ms", function()
+		local stats, lines = fixture(20)
+		local clock = 0
+		stats.use_clock(function() return clock end)
+		package.loaded["infra.phase_stats"] = stats
+		package.loaded["ui.menu.timed_build"] = nil
+		local Timings = require("infra.timings")
+		local held_ms = Timings.ms
+		Timings.ms = function(section, key)
+			if section == "budgets" and key == "menu_rebuild_ms" then return 250 end
+			return held_ms(section, key)
+		end
+		local ok, failure = pcall(function()
+			local TimedBuild = require("ui.menu.timed_build")
+			TimedBuild.run(function() clock = clock + 120 * MS; return { 1, 2, 3 } end, {})
+			TimedBuild.run(function() clock = clock + 300 * MS; return { 1 } end, {})
+		end)
+		Timings.ms = held_ms
+		if not ok then error(failure, 0) end
+		local rebuilt, over = {}, {}
+		for _, line in ipairs(lines) do
+			if line:find("Menu tree rebuilt in ", 1, true) then rebuilt[#rebuilt + 1] = line end
+			if line:find("Over budget: ", 1, true) then over[#over + 1] = line end
+		end
+		helpers.assert_eq(#rebuilt, 2, "every rebuild writes the line the field log analyser reads")
+		helpers.assert_contains(rebuilt[1], "Menu tree rebuilt in 120.0 ms (3 top-level item(s)).")
+		helpers.assert_eq(#over, 1, "only the rebuild past its budget is reported")
+		helpers.assert_contains(over[1], "Over budget: menu.rebuild took 300 ms (budget 250 ms).")
+	end)
+
+	helpers.it("(linux-reload-budget) the successor reports the reload at its boot completion", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = file:read("*a")
+		file:close()
+		local completed = source:find("local boot_ms = BootProfiler.complete()", 1, true)
+		local reported = source:find('require("infra.reload_timing").complete()', 1, true)
+		helpers.assert_true(completed ~= nil and reported ~= nil and reported > completed,
+			"the reload is reported once the boot it ends is complete")
+	end)
+
 	helpers.it("times each TOML parse as toml.parse and leaves the shared reader's other functions alone", function()
 		local stats = fixture(20)
 		package.loaded["infra.toml.reader"] = nil

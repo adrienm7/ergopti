@@ -290,7 +290,7 @@ local function register_registry(h, driver)
 		h.it("the shipped registry loads as a gap-free chain", function()
 			local registry, err = Engine.load_registry(shared_root() .. "/" .. Engine.REGISTRY_PATH)
 			h.assert_true(registry ~= nil, tostring(err))
-			h.assert_true(#registry.steps == registry.current - registry.unstamped,
+			h.assert_true(#registry.steps == registry.current - registry.oldest,
 				"one step per version between unstamped and current")
 			h.assert_true(#registry.steps >= 1, "the registry ships at least one step")
 		end)
@@ -387,6 +387,10 @@ local function register_boot(h, driver)
 				h.assert_eq(read_bytes(path), newer, "the newer file keeps its exact bytes")
 				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "nothing is backed up")
 				h.assert_eq(count_level(lines, "error"), 1, "the refusal is logged as ERROR")
+				local logged = {}
+				for _, line in ipairs(lines) do logged[#logged + 1] = line.text end
+				h.assert_true(table.concat(logged, "\n"):find("v999 is newer than this build's v", 1, true) ~= nil,
+					"the refusal names both schema versions: " .. table.concat(logged, " | "))
 				h.assert_true(type(Engine.read_only_reason(path)) == "string", "the session is read-only")
 				h.assert_eq(Engine.read_only_notice_key(result), "config.read_only.newer_schema",
 					"the driver tells the user why settings do not stick")
@@ -396,6 +400,75 @@ local function register_boot(h, driver)
 				local wrote = TomlWriter.batch_write(path, { { section = "gestures", key = "enabled", value = false } })
 				h.assert_true(wrote ~= true, "a later write through the shared writer is refused")
 				h.assert_eq(read_bytes(path), newer, "the refused write changed nothing")
+			end)
+		end)
+
+		-- The chain was squashed to v2: v1 has no path left.
+		local squashed = table.concat({
+			"[registry]", "current_version = 3", "unstamped_version = 1", "oldest_version = 2", "",
+			"[steps.v2_to_v3]", "from = 2", "to = 3", "drivers = [\"ahk\", \"hs\", \"linux\"]",
+			"reason = \"Contract: delete.\"",
+			"ops = [{ op = \"delete\", section = \"gestures\", key = \"space_wrap\" }]", "",
+		}, "\n")
+		for label, older in pairs({
+			["a stamp below the oldest version"] = "[_meta]\nschema_version = 1\n\n[gestures]\nspace_wrap = false\n",
+		}) do
+			h.it("refuses " .. label .. " in words and leaves it byte for byte", function()
+				with_config(older, function(path)
+					local logger, lines = recording_logger()
+					local result = Engine.run({ path = path, driver = driver,
+						registry = registry_from(squashed), stamp = STAMP, logger = logger })
+					h.assert_eq(result.status, "unsupported")
+					h.assert_eq(result.read_only, true)
+					h.assert_eq(read_bytes(path), older, "the refused file keeps its exact bytes")
+					h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "no backup is written over anything")
+					h.assert_eq(count_level(lines, "error"), 1, "the refusal is logged as ERROR")
+					h.assert_true(tostring(result.detail):find("oldest this build migrates is v2", 1, true) ~= nil,
+						"the refusal names the oldest version: " .. tostring(result.detail))
+					h.assert_eq(Engine.read_only_notice_key(result), "config.read_only.older_schema",
+						"the driver tells the user what to do")
+					h.assert_eq(Engine.read_only_status(path), "unsupported",
+						"the menus can name an old file as the cause of their greyed saves")
+					local wrote = TomlWriter.batch_write(path, { { section = "gestures", key = "enabled", value = false } })
+					h.assert_true(wrote ~= true, "a later write through the shared writer is refused")
+					h.assert_eq(read_bytes(path), older, "the refused write changed nothing")
+				end)
+			end)
+		end
+
+		h.it("treats a file with no stamp as current: no step, no backup, no refusal", function()
+			local handwritten = "# by hand\n[gestures]\nspace_wrap = false\n"
+			with_config(handwritten, function(path)
+				local result = Engine.run({ path = path, driver = driver,
+					registry = registry_from(squashed), stamp = STAMP, logger = (recording_logger()) })
+				h.assert_eq(result.status, "current", tostring(result.detail))
+				h.assert_eq(result.read_only, false)
+				h.assert_eq(read_bytes(path), handwritten, "no step ran and nothing was written")
+				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "nothing is backed up")
+				h.assert_nil(Engine.read_only_notice_key(result), "a working file earns no notice")
+				h.assert_true(TomlWriter.batch_write(path, { { section = "gestures", key = "enabled", value = true } }),
+					"the session can save it")
+				local saved = read_bytes(path)
+				h.assert_true(saved:find("schema_version = 3", 1, true) ~= nil, "the next save stamps it: " .. saved)
+				h.assert_true(saved:find("# by hand", 1, true) ~= nil and saved:find("space_wrap = false", 1, true) ~= nil,
+					"and keeps every other byte: " .. saved)
+			end)
+		end)
+
+		h.it("still refuses a stamped old file while no stamp is current", function()
+			local plan = Engine.plan("[_meta]\nschema_version = 1\n", registry_from(squashed), driver)
+			h.assert_eq(plan.outcome, "unsupported")
+			h.assert_eq(Engine.plan("[gestures]\nenabled = true\n", registry_from(squashed), driver).outcome, "current")
+			h.assert_eq(Engine.plan("[gestures]\nenabled = true\n", registry_from(SCENARIO_REGISTRY), driver).outcome,
+				"migrated", "an unsquashed chain still climbs from no stamp")
+		end)
+
+		h.it("still migrates a file stamped at the oldest version", function()
+			with_config("[_meta]\nschema_version = 2\n\n[gestures]\nspace_wrap = false\n", function(path)
+				local result = Engine.run({ path = path, driver = driver,
+					registry = registry_from(squashed), stamp = STAMP, logger = (recording_logger()) })
+				h.assert_eq(result.status, "migrated", tostring(result.detail))
+				h.assert_eq(result.from, 2)
 			end)
 		end)
 
@@ -1005,7 +1078,8 @@ local function register_schema_admission(h, driver)
 		h.it('rejects a cloned current-looking registry rather than issuing native readiness', function()
 			with_config(current(false), function(path)
 				local registry = registry_from(SCENARIO_REGISTRY)
-				local clone = { current = registry.current, unstamped = registry.unstamped, steps = registry.steps }
+				local clone = { current = registry.current, unstamped = registry.unstamped,
+					oldest = registry.oldest, steps = registry.steps }
 				h.assert_true(Engine.boot({ path = path, driver = driver, registry = clone, logger = recording_logger() }).read_only)
 				h.assert_eq(read_bytes(path), current(false))
 			end)
