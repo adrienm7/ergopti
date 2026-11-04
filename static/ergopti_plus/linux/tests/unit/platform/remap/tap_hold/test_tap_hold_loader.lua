@@ -28,6 +28,35 @@ local function load(text)
 end
 
 helpers.describe("tap-hold config: the user file over the shared defaults", function()
+	helpers.it("refuses a FIFO tap-hold source without blocking or calling it absent", function()
+		local uv = require("luv")
+		local Shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
+		local code = string.format([[package.path = %q
+local loader = require("platform.remap.tap_hold_loader")
+local result = loader.load(%q, %q)
+assert(type(result.user_error) == "string", "a FIFO is not an absent source")
+assert(result.enabled == false and next(result.keys) == nil)
+]], package.path, DEFAULTS, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "tap-hold initialization must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
 
 	helpers.it("keeps every key neutral when the user file is absent", function()
 		local loaded = Config.load(DEFAULTS, "/nonexistent/tap_hold.toml")
