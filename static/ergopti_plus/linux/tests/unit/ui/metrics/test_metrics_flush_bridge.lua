@@ -77,6 +77,43 @@ local function fixture(app)
 end
 
 H.describe("metrics flush bridge", function()
+	H.it("(metrics-pause-privacy) a dashboard resume cannot clear secure-field suppression", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local secure, paused = true, false
+		F.K.suppress = function() secure = true end
+		F.K.unsuppress = function() secure = false end
+		F.K.is_suppressed = function() return secure end
+		F.K.suspend_collection = function() paused = true end
+		F.K.resume_collection = function() paused = false end
+		F.K.is_collection_suspended = function() return paused end
+		local pause = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(paused, true, "pause owns the user pause instead of the secure-field flag")
+		H.assert_eq(pause.suspended, true)
+		H.assert_eq(secure, true)
+		local resume = F.B.on_message({ action = "resume" }, F.state, F.context)
+		H.assert_eq(resume.suspended, false)
+		H.assert_eq(resume.suppressed, true)
+		H.assert_eq(secure, true, "secure focus continues to block capture")
+	end)
+	H.it("(metrics-pause-privacy) resume alone preserves an active secure-field guard", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local secure = true
+		F.K.unsuppress = function() secure = false end
+		F.K.is_suppressed = function() return secure end
+		F.K.resume_collection = function() end
+		F.K.is_collection_suspended = function() return false end
+		F.B.on_message({ action = "resume" }, F.state, F.context)
+		H.assert_eq(secure, true, "resuming user collection must not disarm secure input")
+	end)
+	H.it("(metrics-pause-privacy) refuses to claim a pause without its owner", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		local result = F.B.on_message({ action = "pause" }, F.state, F.context)
+		H.assert_eq(result.supported, false)
+		H.assert_nil(result.suppressed)
+	end)
 	for _, app in ipairs({ "metrics_apps", "metrics_typing" }) do
 		H.it(app .. " defers ready without reading then pushes complete data", function()
 			local F = fixture(app)
