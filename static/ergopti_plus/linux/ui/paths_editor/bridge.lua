@@ -93,7 +93,10 @@ local function build_initial_payload(state)
 	}
 end
 
-local function hide(state)
+local function hide(state, context)
+	if type(context) == "table" and type(context.close_owned_window) == "function" then
+		return context.close_owned_window() == true
+	end
 	local manager = dependency(state, "webview_manager", "ui.webview_manager")
 	if not manager or type(manager.hide) ~= "function" then return false end
 	local ok, hidden = pcall(manager.hide, APP_NAME)
@@ -104,13 +107,25 @@ end
 --- @param payload any Action table from host_bridge.js.
 --- @param state table Daemon state and optional test-injected authorities.
 --- @return table|nil Diagnostic response; page data is pushed through eval_js.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then return nil end
 	local action = payload.action
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local epoch = type(context) == "table" and context.epoch or nil
+	local current_epoch = manager and manager.current_epoch
+	local function page_current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
+			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager
+			or manager.current_epoch ~= current_epoch then return false end
+		local ok, observed = pcall(current_epoch, APP_NAME)
+		return ok and observed == epoch and manager.current_epoch == current_epoch
+	end
+	if not page_current() then return nil end
 	if action == "ready" then
 		local data = build_initial_payload(state)
-		if not data then return { pushed = false } end
+		if not data or not page_current() then return { pushed = false } end
 		return { pushed = push(state, "initData", data), data = data }
 	elseif action == "browse" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
@@ -127,6 +142,7 @@ function M.on_message(payload, state)
 			dependency(state, "i18n", "infra.i18n"),
 			current
 		)
+		if not page_current() then return { picked = false } end
 		if not selected then
 			Logger.debug(LOG, "Folder picker returned no directory: %s.", tostring(select_err))
 			return { picked = false }
@@ -168,12 +184,14 @@ function M.on_message(payload, state)
 			end
 			logs_dir = payload.logsDir
 		end
+		if not page_current() then return { saved = false } end
 		local saved = config_paths and type(config_paths.set_paths) == "function"
 			and config_paths.set_paths(payload.configDir, logs_dir) == true
 		if not saved then
         Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 			return { saved = false }
 		end
+		if not page_current() then return { saved = true, hidden = false, reloaded = false } end
 		if logs_dir ~= nil then
 			-- The daemon outlives this editor's reload, so the running sink is
 			-- moved now; until it is, every opener names the folder it writes.
@@ -185,6 +203,7 @@ function M.on_message(payload, state)
 					tostring(move_err))
 				return { saved = false }
 			end
+			if not page_current() then return { saved = true, hidden = false, reloaded = false } end
 			Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
 		end
 		local reloaded = false
@@ -196,13 +215,13 @@ function M.on_message(payload, state)
 			Logger.warn(LOG, "Configuration directory saved; daemon reload is unavailable.")
 		end
 		local hidden = false
-		if reloaded then
-			hidden = hide(state)
+		if reloaded and page_current() then
+			hidden = hide(state, context)
 			Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
 		end
 		return { saved = true, hidden = hidden, reloaded = reloaded }
 	elseif action == "cancel" then
-		return { cancelled = true, hidden = hide(state) }
+		return { cancelled = true, hidden = hide(state, context) }
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))

@@ -53,6 +53,35 @@ helpers.describe("ui.bridge_handlers", function()
 			}, values, captured
 		end
 
+		helpers.it("(paths-editor-owner) does not push a picked path into a replacement page", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			local picker = require("ui.config_dir_picker")
+			local original = picker.pick
+			picker.pick = function() epoch = 2; return "/tmp/selected" end
+			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
+				{ app_name = "paths_editor", epoch = 1 })
+			picker.pick = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(paths-editor-owner) does not close a replacement page after reload", function()
+			local state, _, captured = paths_state()
+			local epoch = 1
+			state.webview_manager.current_epoch = function() return epoch end
+			state.webview_manager.page_current = function(_, value) return epoch == value end
+			state.on_reload = function() epoch = 2; return true end
+			local context = { app_name = "paths_editor", epoch = 1,
+				close_owned_window = function() error("old page is gone") end }
+			local result = handler.on_message({ action = "save", configDir = "/tmp/saved" }, state, context)
+			helpers.assert_eq(result.saved, true)
+			helpers.assert_eq(result.hidden, false)
+			helpers.assert_eq(captured.hidden, 0)
+		end)
+
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPaths")
     end)
