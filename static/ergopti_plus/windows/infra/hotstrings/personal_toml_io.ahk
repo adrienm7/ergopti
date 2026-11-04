@@ -716,15 +716,15 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 ; durable target: even a partial stage write is isolated under a unique name.
 _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		DeleteFn := 0, AuthorizeFn := 0, PublishFn := 0,
-		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0) {
+		OpeningSource := 0, OwnerToken := 0, PreservationSource := 0, BeforeNativeFn := 0) {
 	static WriteSeq := 0
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		; The process-wide path owner supplies isolation. Do not inherit a caller's
-		; Critical state into stale-temp cleanup, staging or atomic replacement.
+		; Critical state into stale-temp cleanup, staging or arbitrary replacement ports.
 		Critical("Off")
 		try return _PersonalTomlWriteAtomic(FilePath, Content, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken, PreservationSource)
+			ReplaceFn, DeleteFn, AuthorizeFn, PublishFn, OpeningSource, OwnerToken, PreservationSource, BeforeNativeFn)
 		finally Critical(InheritedCritical)
 	}
 	HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
@@ -815,13 +815,23 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		}
 	}
 
-	; Filesystem filters and antivirus can block an atomic rename. The exact
-	; global owner stays held, but Critical must not span this OS call.
+	; Baseline probe: the optional internal cutpoint models a queued callback
+	; after earlier admission checks, before the original unguarded native move.
+	; No final admission or configuration native adapter is added in this probe.
 	Replaced := false
 	ReplaceError := ""
-	try Replaced := HasMethod(ReplaceFn, "Call")
-		? ReplaceFn.Call(StagePath, FilePath)
-		: FSAtomicMoveReplace(StagePath, FilePath)
+	try {
+		if HasMethod(ReplaceFn, "Call")
+			Replaced := ReplaceFn.Call(StagePath, FilePath)
+		else {
+			if HasMethod(BeforeNativeFn, "Call")
+				BeforeNativeFn.Call()
+			else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+				throw TypeError("The internal personal TOML native cutpoint must be callable or zero.")
+			; Baseline probe deliberately retains the original unguarded producer.
+			Replaced := FSAtomicMoveReplace(StagePath, FilePath)
+		}
+	}
 	catch as Err {
 		Replaced := false
 		ReplaceError := Err.Message
@@ -887,12 +897,12 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 ; The durable target is never opened for writing: the candidate goes through
 ; the same same-directory stage and atomic replacement as a full editor save.
 _PersonalTomlCommitPatch(FilePath, BuildFn, ReaderFn := 0, WriterFn := 0,
-		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, BeforeNativeFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _PersonalTomlCommitPatch(FilePath, BuildFn, ReaderFn,
-			WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+			WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, BeforeNativeFn)
 		finally Critical(InheritedCritical)
 	}
 	if !HasMethod(BuildFn, "Call") {
@@ -959,7 +969,7 @@ _PersonalTomlCommitPatch(FilePath, BuildFn, ReaderFn := 0, WriterFn := 0,
 		return _PersonalTomlWriteAtomic(FilePath, CandidateContent,
 			WriterFn, ReplaceFn, DeleteFn,
 			_PersonalTomlAuthorizeOwnedWrite.Bind(
-				OwnerToken, FilePath, AuthorizeFn))
+				OwnerToken, FilePath, AuthorizeFn), 0, 0, OwnerToken, 0, BeforeNativeFn)
 	} finally {
 		; A yielded stage writer can repopulate caches from the old durable
 		; target. Invalidate again after every terminal outcome before ownership
@@ -1603,8 +1613,8 @@ _PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
 		&& _ConfigWriteLeaseKey(ConfiguredPath) == Source["configured_key"]
 }
 
-_PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath) {
-	Replacement := HasMethod(ReplaceFn, "Call") ? ReplaceFn : FSAtomicMoveReplace
+_PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath,
+		BeforeNativeFn := 0) {
 	; Atomic dispatches this boundary after staging and authorization, outside
 	; Critical. Reading here must not be moved into its authorization callback.
 	Observed := _PersonalInfoReadWriteSource(FilePath)
@@ -1618,7 +1628,14 @@ _PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath
 		return false
 	; This is a witness check, not an OS-atomic external compare-and-swap.
 	; Preserve the original port's receipt for the canonical strict status check.
-	return Replacement.Call(StagePath, FilePath)
+	if HasMethod(ReplaceFn, "Call")
+		return ReplaceFn.Call(StagePath, FilePath)
+	if HasMethod(BeforeNativeFn, "Call")
+		BeforeNativeFn.Call()
+	else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+		throw TypeError("The internal personal-information native cutpoint must be callable or zero.")
+	; Baseline probe deliberately retains the original unguarded producer.
+	return FSAtomicMoveReplace(StagePath, FilePath)
 }
 
 ; Serialise one detached personal-information snapshot and atomically replace
