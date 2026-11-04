@@ -102,8 +102,8 @@ local function run_tool(args, input)
 		.. " 2>" .. ShellRunner.quote(err_path)
 		.. "; printf '%s' $? >" .. ShellRunner.quote(status_path)
 	local output = ""
-	local pipe = io.popen(command, input and "w" or "r")
-	if not pipe then
+	local started, pipe = pcall(io.popen, command, input and "w" or "r")
+	if not started or not pipe then
 		pcall(remove_err)
 		pcall(remove_status)
 		uv.fs_rmdir(dir)
