@@ -111,10 +111,6 @@ do
 		return
 	end
 end
--- The builds before the single folder name kept paths.toml and the default
--- configuration folder elsewhere; they move once, here, before config_paths
--- reads paths.toml.
-require("adapters.legacy_folder_migration").run(Logger)
 local Storage            = require("adapters.storage")
 if not direct_require_installed then
 	Logger.warn("init", "Hammerspoon exposes no rawrequire: each require keeps costing about 300 us on the main thread.")
@@ -174,6 +170,11 @@ do
 		return
 	end
 end
+-- The builds before the single folder name kept paths.toml and the default
+-- configuration folder elsewhere; they move once, here: after the instance
+-- admission, so a refused process leaves every folder as it found it, and
+-- before the breadcrumb, the logs and config_paths read them.
+require("adapters.legacy_folder_migration").run(Logger)
 local TimerScheduler     = require("adapters.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
