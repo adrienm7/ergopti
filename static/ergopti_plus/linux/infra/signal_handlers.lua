@@ -80,7 +80,15 @@ function M.start(opts)
 		owner.entries[#owner.entries + 1] = entry
 		local callback, number = spec[2], spec[3]
 		local started, receipt = pcall(native.signal_start, handle, spec[1], function()
-			if active == owner and owner.admitted then callback(number) end
+			if active == owner and owner.admitted then
+				local ok, err = pcall(callback, number)
+				if not ok then
+					pcall(function()
+						require("logger.shim").error("infra.signal_handlers", "Signal callback raised: %s",
+							require("error_description").describe(err))
+					end)
+				end
+			end
 		end)
 		if not started or receipt == nil or receipt == false then
 			stop()
