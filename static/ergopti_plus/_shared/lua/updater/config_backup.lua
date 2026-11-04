@@ -36,6 +36,7 @@ M.SCHEMA_VERSION = 1
 -- A backup id is a folder name; a release tag inside it keeps only these bytes.
 local TAG_SAFE = "[^%w%._%-]"
 local STAMP_PATTERN = "^%d%d%d%d%d%d%d%d%-%d%d%d%d%d%d$"
+local ISO_PATTERN = "^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$"
 local ROOT_ID_PATTERN = "^[a-z][a-z_]*$"
 
 
@@ -288,7 +289,7 @@ function M.new(options)
 		Logger.start(LOG, "Backing up the configuration (%s)…", kind)
 		local time = clock()
 		if type(time) ~= "table" or type(time.stamp) ~= "string" or not time.stamp:match(STAMP_PATTERN)
-			or type(time.iso) ~= "string" then
+			or type(time.iso) ~= "string" or not time.iso:match(ISO_PATTERN) then
 			Logger.error(LOG, "Configuration backup refused: the clock gave no usable time.")
 			return nil, "clock"
 		end
@@ -369,13 +370,25 @@ function M.new(options)
 		local record, decode_err = json.decode(raw)
 		if type(record) ~= "table" or decode_err then return nil, "unreadable manifest" end
 		if record.schema_version ~= M.SCHEMA_VERSION or record.id ~= id
-			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil then
+			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil
+			or type(record.created_at) ~= "string" or not record.created_at:match(ISO_PATTERN)
+			or type(record.tag) ~= "string" or type(record.from_version) ~= "string" then
 			return nil, "unexpected manifest"
 		end
-		for _, file in ipairs(record.files) do
+		local count = 0
+		for index in pairs(record.files) do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then return nil, "unexpected manifest" end
+			count = count + 1
+		end
+		local seen = {}
+		for index = 1, count do
+			local file = record.files[index]
 			if type(file) ~= "table" or not target(file.root, file.path) then
 				return nil, "manifest names a file outside the configuration"
 			end
+			local identity = file.root .. "\0" .. file.path
+			if seen[identity] then return nil, "manifest repeats a configuration file" end
+			seen[identity] = true
 		end
 		record.path = path
 		return record, nil

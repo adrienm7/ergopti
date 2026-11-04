@@ -360,7 +360,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 			cancel_non_stream_timer(timeout_handle)
 
 			if status ~= 200 then
-				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
+				Logger.error(LOG, "MLX HTTP %s (response body withheld).", tostring(status))
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				return
 			end

@@ -989,7 +989,7 @@ local function handle_key(event_obj)
 		table.sort(active_mods)
 
 		local shift_side = flags.capslock and "capslock"
-			or (_keymap_mod and type(_keymap_mod.get_shift_side) == "function"
+			or (flags.shift and _keymap_mod and type(_keymap_mod.get_shift_side) == "function"
 				and _keymap_mod.get_shift_side()
 				or "none")
 

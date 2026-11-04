@@ -693,6 +693,56 @@ for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], [
 	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
 		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
 
+_RIT_DuplicateBackupManifestRefused() {
+	Root := A_Temp . "\ergopti_backup_duplicate_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "original`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Backup := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Manifest := Backup["path"] . "\" . Rules["manifest"]
+		Text := FSReadUtf8Exact(Manifest)
+		Item := '{"root":"config","path":"config.toml"}'
+		Duplicate := '{"root":"config","path":"CONFIG.toml"}'
+		Text := StrReplace(Text, Item, Item . "," . Duplicate, , &Changed)
+		AssertEqual(1, Changed)
+		AssertTrue(FSWriteDurable(Manifest, Text))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "current`n"))
+		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Clock)
+		AssertFalse(Result["ok"], "duplicate destination must not be restored")
+		AssertEqual("missing", Result["reason"])
+		AssertEqual("current`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup refuses duplicate destinations", _RIT_DuplicateBackupManifestRefused)
+
+_RIT_MalformedBackupTimestampRefused() {
+	Root := A_Temp . "\ergopti_backup_time_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "content`n")
+		Rules := ConfigBackup_Rules()
+		First := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Second := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Healthy := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, First)
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Second)
+		Manifest := Damaged["path"] . "\" . Rules["manifest"]
+		Text := StrReplace(FSReadUtf8Exact(Manifest), '"2026-09-30T11:15:00Z"', '"zzz"', , &Changed)
+		AssertEqual(1, Changed)
+		AssertTrue(FSWriteDurable(Manifest, Text))
+		AssertEqual(Healthy["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+		AssertFalse(ConfigBackup_Restore(Cfg, Damaged["id"], Rules, Second)["ok"])
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup refuses malformed timestamps", _RIT_MalformedBackupTimestampRefused)
+
 
 ; A fixed stage basename is not authority over an existing private sidecar.
 _R7RS_RestorePreservesForeignStage() {

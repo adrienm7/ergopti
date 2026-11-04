@@ -110,14 +110,13 @@ function getCmdGroups() {
 // ====================================
 
 /**
- * Normalizes a raw token name into its canonical PascalCase representation.
+ * Normalizes known token aliases while preserving unknown literal brace text.
  * @param {string} name - The raw token name.
  * @returns {string} The normalized token name.
  */
 function normToken(name) {
-	const canonical = TOKEN_NORM[name.toLowerCase()];
-	if (canonical) return canonical;
-	return name.charAt(0).toUpperCase() + name.slice(1);
+	const key = name.toLowerCase();
+	return Object.hasOwn(TOKEN_NORM, key) ? TOKEN_NORM[key] : name;
 }
 
 /**

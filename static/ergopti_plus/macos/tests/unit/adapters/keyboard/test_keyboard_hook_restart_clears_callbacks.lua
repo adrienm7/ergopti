@@ -132,6 +132,18 @@ end
 -- ============================================
 
 helpers.describe("KeyboardHook restart — old onKey cleared when omitted on second start()", function()
+	helpers.it("routes AppKit control characters to onKey rather than onChar (keyboard-hook-control-characters)", function()
+		local eventtap_stub, fire_char = make_eventtap_stub()
+		local hook = helpers.load_with_stubs("adapters.keyboard_hook", { eventtap = eventtap_stub })
+		local chars, keys = {}, 0
+		helpers.assert_true(hook.start({ onChar = function(event) chars[#chars + 1] = event.char end,
+			onKey = function() keys = keys + 1 end }))
+		for _, text in ipairs({ "\t", "\r", "\127", utf8.char(0xF700) }) do fire_char(text) end
+		fire_char("é")
+		helpers.assert_eq(keys, 4)
+		helpers.assert_eq(chars, { "é" })
+		helpers.assert_true(hook.stop())
+	end)
 
 	helpers.it("fn_b (old onKey) is NOT called after restart without onKey", function()
 		local eventtap_stub, _fire_char, fire_key = make_eventtap_stub()

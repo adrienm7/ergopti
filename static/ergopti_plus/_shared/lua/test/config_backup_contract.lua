@@ -232,6 +232,23 @@ function M.register(helpers, env)
 			helpers.assert_eq(latest and latest.tag, "v2")
 		end)
 
+		helpers.it("does not let a backup with invalid metadata hide a healthy backup", function()
+			for _, mode in ipairs({ "missing_time", "bad_time", "bad_tag" }) do
+				local owner, fs, _, json = fixture({ times = { "20260930-101500", "20260930-111500" } })
+				local healthy = assert(owner.create("pre_install", { tag = "v1" }))
+				local damaged = assert(owner.create("pre_install", { tag = "v2" }))
+				local metadata = { schema_version = 1, id = damaged.id, kind = "pre_install", files = damaged.files,
+					created_at = damaged.created_at, tag = "v2", from_version = "" }
+				if mode == "missing_time" then metadata.created_at = nil
+				elseif mode == "bad_time" then metadata.created_at = "zzz"
+				else metadata.tag = false end
+				fs.files[damaged.path .. "/backup.json"] = json.encode(metadata)
+				local latest = owner.latest("pre_install")
+				helpers.assert_eq(latest and latest.id, healthy.id)
+				helpers.assert_eq(owner.restore(damaged.id), false)
+			end
+		end)
+
 		helpers.it("restores after backing the replaced configuration up", function()
 			local owner, fs = fixture({ times = { "20260930-101500", "20260930-111500" } })
 			local record = assert(owner.create("pre_install", { tag = "v0.0.0-dev.139" }))
@@ -281,6 +298,7 @@ function M.register(helpers, env)
 			local record = assert(owner.create("pre_install", {}))
 			local manifest = record.path .. "/backup.json"
 			fs.files[manifest] = json.encode({ schema_version = 1, id = record.id, kind = "pre_install",
+				created_at = record.created_at, tag = "", from_version = "",
 				files = { { root = "config", path = "../../etc/passwd" } } })
 			local writes = #fs.writes
 			local restored, reason = owner.restore(record.id)
@@ -288,6 +306,24 @@ function M.register(helpers, env)
 			helpers.assert_eq(reason, "missing")
 			helpers.assert_eq(#fs.writes, writes, "nothing is written for a manifest leaving its root")
 			helpers.assert_eq(owner.restore("../x"), false)
+		end)
+
+		helpers.it("refuses malformed manifest file inventories before restoring", function()
+			for _, files in ipairs({
+				{ hidden = { root = "config", path = "config.toml" } },
+				{ { root = "config", path = "config.toml" }, { root = "config", path = "config.toml" } },
+				{ [1] = { root = "config", path = "config.toml" }, [3] = { root = "config", path = "layers.toml" } },
+			}) do
+				local owner, fs, _, json = fixture()
+				local record = assert(owner.create("pre_install", {}))
+				fs.files[record.path .. "/backup.json"] = json.encode({ schema_version = 1, id = record.id,
+					kind = "pre_install", created_at = record.created_at, tag = "", from_version = "", files = files })
+				local writes = #fs.writes
+				local restored, reason = owner.restore(record.id)
+				helpers.assert_eq(restored, false, "a corrupt inventory must not report a successful restore")
+				helpers.assert_eq(reason, "missing")
+				helpers.assert_eq(#fs.writes, writes, "invalid inventory must not write configuration or pre-backup")
+			end
 		end)
 	end)
 end
