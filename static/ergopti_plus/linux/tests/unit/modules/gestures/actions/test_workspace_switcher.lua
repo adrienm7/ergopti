@@ -209,6 +209,23 @@ helpers.describe("workspace switcher: Wayland compositors", function()
 		end)
 	end)
 
+	helpers.it("rejects an excessive KWin workspace count before allocating it", function()
+		in_session({ kind = "wayland", desktop = "kde", tools = { ["qdbus6"] = true } }, function(Switcher)
+			local ok = pcall(Switcher.parse_kwin, "1", "1000000")
+			helpers.assert_eq(ok, false, "an implausible count must not allocate one million entries")
+		end)
+	end)
+
+	helpers.it("falls back once when KWin's workspace count is excessive", function()
+		in_session({ kind = "wayland", desktop = "kde", tools = { ["qdbus6"] = true }, answers = {
+			["org.kde.KWin.currentDesktop"] = "1", ["VirtualDesktopManager.count"] = "1000000",
+		} }, function(Switcher, commands, pressed, press)
+			helpers.assert_eq(Switcher.switch("next", false, press), "pressed")
+			helpers.assert_eq(pressed, { "ctrl+alt+Right" })
+			helpers.assert_eq(switches(commands, "setCurrentDesktop"), {})
+		end)
+	end)
+
 	helpers.it("names qdbus when KDE has no D-Bus client on the PATH", function()
 		in_session({ kind = "wayland", desktop = "kde", tools = {} }, function(Switcher)
 			local backend, reason = Switcher.detect()

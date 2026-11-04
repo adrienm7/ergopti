@@ -48,6 +48,9 @@ local LOG = "modules.gestures.workspace_switcher"
 
 -- Seconds each tool call may take (see FEATURES 3).
 local TOOL_TIMEOUT_S = 1
+-- KWin's count is external input; even thousands of desktops already exceed
+-- practical interactive use, and must not allocate unbounded memory here.
+local MAX_KWIN_WORKSPACES = 4096
 
 -- The combination the desktops bind to the previous and the next workspace,
 -- pressed when no interface can switch. Under Wayland it is the only way
@@ -129,7 +132,7 @@ function M.parse_kwin(current_text, count_text)
 	if not current or not count then
 		error("KWin answered '" .. tostring(current_text) .. "' / '" .. tostring(count_text) .. "'", 0)
 	end
-	if count < 1 or current < 1 or current > count then
+	if count < 1 or count > MAX_KWIN_WORKSPACES or current < 1 or current > count then
 		error("KWin's current desktop " .. current .. " is outside its " .. count .. " desktop(s)", 0)
 	end
 	local ids = {}
