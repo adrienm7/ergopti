@@ -70,7 +70,7 @@ function M.new(opts)
 	check_opts(opts)
 
 	-- nil while no selection can exist; otherwise the PRIMARY content read when
-	-- the window opened ("" when nothing, or nothing readable, was published).
+	-- the window opened ("" when the reader confirms nothing was published).
 	local baseline, baseline_epoch = nil, nil
 	local context_epoch = opts.context_epoch
 	-- Native reads and policy callbacks may reenter a selection event. Only its
@@ -94,10 +94,10 @@ function M.new(opts)
 	--- Opens the selection window, remembering what PRIMARY held before it.
 	local function open_window(owner, epoch)
 		local ok, text = opts.read_primary()
-		if not current(owner, epoch) then return end
+		if not current(owner, epoch) or ok ~= true or type(text) ~= "string" then return end
 		local active = opts.is_active()
 		if not current(owner, epoch) or not active then return end
-		baseline = (ok and type(text) == "string") and text or ""
+		baseline = text
 		baseline_epoch = epoch
 	end
 
