@@ -51,6 +51,8 @@ local _path = nil
 local _scheduler = nil
 -- A rejected source stays authoritative until its preservation is acknowledged.
 local _load_blocked = false
+-- Exact source used by the in-memory learning map.
+local _source = nil
 
 
 
@@ -79,10 +81,12 @@ end
 local function load()
 	if _map and not _load_blocked then return end
 	_map = Store.new_map()
+	_source = nil
 	local path = state_path()
 	local fh, _, errno = RegularFileReader.open_source(path)
 	if not fh then
 		_load_blocked = errno ~= ENOENT
+		if not _load_blocked then _source = { path = path, status = "absent" } end
 		if _load_blocked then Logger.error(LOG, "The agent's learning source could not be read; mutations are blocked.") end
 		return
 	end
@@ -100,10 +104,14 @@ local function load()
 		_load_blocked = not preserve_corrupt(path)
 		if _load_blocked then
 			Logger.error(LOG, "The agent's learning source could not be preserved; mutations are blocked.")
-		else Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.") end
+		else
+			_source = { path = path, status = "absent" }
+			Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.")
+		end
 		return
 	end
 	_load_blocked = false
+	_source = { path = path, status = "ok", content = text }
 	for app, entry in pairs(root.apps) do
 		if type(app) == "string" and type(entry) == "table" and type(entry.used) == "number"
 			and type(entry.thresholds) == "table" then
@@ -120,6 +128,18 @@ local function load()
 	Logger.debug(LOG, "Agent learning loaded.")
 end
 
+-- Check the exact source again before publishing; an unreadable or changed
+-- image never authorizes replacing another process's learning updates.
+local function source_current(path)
+	if not _source or _source.path ~= path or state_path() ~= path then return false end
+	local fh, _, errno = RegularFileReader.open_source(path)
+	if not fh then return _source.status == "absent" and errno == ENOENT end
+	local read_ok, text = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	return read_ok and type(text) == "string" and close_ok and closed == true
+		and _source.status == "ok" and text == _source.content
+end
+
 --- Writes the map now: a temporary file, then a rename.
 --- @return boolean saved
 function M.flush()
@@ -130,6 +150,10 @@ function M.flush()
 	if _load_blocked then return false end
 	if not _map then return true end
 	local path = state_path()
+	if not source_current(path) then
+		Logger.warn(LOG, "The agent's learning source changed; save refused.")
+		return false
+	end
 	local dir = NativePath.dirname(path)
 	if dir and not require("adapters.shell_runner").run("mkdir -p "
 		.. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
@@ -138,7 +162,7 @@ function M.flush()
 	end
 	local text = Json.encode({ version = VERSION, apps = _map.apps })
 	local temp = path .. ".tmp"
-	local opened, fh, _, _, remove_owned = pcall(RegularFileWriter.open, temp, "wx")
+	local opened, fh, _, _, remove_owned, current_image = pcall(RegularFileWriter.open, temp, "wx")
 	if not opened or not fh or not text then
 		if opened and fh then pcall(fh.close, fh); remove_owned() end
 		Logger.error(LOG, "The agent's learning could not be written.")
@@ -153,12 +177,19 @@ function M.flush()
 		Logger.error(LOG, "The agent's learning write or close was refused.")
 		return false
 	end
+	local checked, stage_current = pcall(current_image, text)
+	if not checked or stage_current ~= true or not source_current(path) then
+		remove_owned()
+		Logger.warn(LOG, "The agent's learning source or staging file changed; save refused.")
+		return false
+	end
 	local called, renamed, err = pcall(os.rename, temp, path)
 	if not called or renamed ~= true then
 		remove_owned()
 		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(called and err or renamed))
 		return false
 	end
+	_source = { path = path, status = "ok", content = text }
 	return true
 end
 
@@ -218,7 +249,7 @@ end
 function M._reset_for_test(opts)
 	opts = opts or {}
 	_path, _scheduler = opts.path, opts.scheduler
-	_map, _save_timer, _load_blocked = nil, nil, false
+	_map, _save_timer, _load_blocked, _source = nil, nil, false, nil
 end
 
 return M

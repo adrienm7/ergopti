@@ -60,6 +60,52 @@ helpers.describe("agent learning source admission", function()
 		end)
 	end
 
+	for _, initial in ipairs({ "present", "absent" }) do
+		helpers.it("preserves another learning update after loading an " .. initial .. " source", function()
+			with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+				if initial == "absent" then assert(os.remove(path)) end
+				Learning.record(config, "Mine", "calendar", true)
+				local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
+				local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+				helpers.assert_eq(Learning.flush(), false)
+				helpers.assert_eq(read(path), successor)
+			end)
+		end)
+	end
+
+	helpers.it("preserves a newer learning file published during staging", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			Learning.record(config, "Mine", "calendar", true)
+			local writer, original = require("infra.regular_file_writer"), nil
+			original = writer.open
+			local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
+			writer.open = function(...)
+				local stream, detail, errno, cleanup, current = original(...)
+				if not stream then return stream, detail, errno, cleanup, current end
+				return stream, detail, errno, cleanup, function(text)
+					local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+					return current(text)
+				end
+			end
+			local ok, result = pcall(Learning.flush)
+			writer.open = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(read(path), successor)
+			helpers.assert_nil(read(path .. ".tmp"))
+		end)
+	end)
+
+	helpers.it("updates the source receipt after a successful learning save", function()
+		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
+			Learning.record(config, "Mail", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			Learning.record(config, "Mail", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			helpers.assert_eq(assert(Json.decode_lossless(read(path))).apps.Mail.used, 9)
+		end)
+	end)
+
 	helpers.it("(agent-learning-source) overflow LRU clocks cannot crash a later record", function()
 		local apps = {}
 		local limit = require("modules.llm.agent_learning").MAX_APPS
