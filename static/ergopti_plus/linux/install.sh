@@ -198,6 +198,17 @@ ergopti_resolve_config_home CONFIG_ROOT
 CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
 SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
+# The installed tree and launcher must stay under the physical prefix that the
+# uninstaller admits; linked parents could redirect either publication elsewhere.
+if ! $SETUP_PERMS_ONLY; then
+	for install_parent in "${PREFIX}/lib" "$BIN_DIR"; do
+		if [ -L "$install_parent" ] || { [ -e "$install_parent" ] && [ ! -d "$install_parent" ]; }; then
+			printf '[install] code=invalid-parent path=%q\n' "$install_parent" >&2
+			exit 1
+		fi
+	done
+fi
+
 # A prior installation may contain a user's nested checkout. The uninstaller
 # refuses that tree; do not overwrite it or create another unremovable install.
 if ! $SETUP_PERMS_ONLY && { [ -e "$LIB_DIR" ] || [ -L "$LIB_DIR" ]; }; then
