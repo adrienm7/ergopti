@@ -343,6 +343,16 @@ if (process.platform === 'linux') {
 
 const errors = [];
 
+{
+	const missingPrefix = spawnSync(bashExecutable(), [bashPath(INSTALLER), '--prefix'], {
+		encoding: 'utf8',
+		env: { ...process.env, LC_ALL: 'C' }
+	});
+	assert.equal(missingPrefix.status, 64);
+	assert.match(missingPrefix.stderr, /Missing --prefix value/);
+	assert.doesNotMatch(missingPrefix.stderr, /unbound variable/);
+}
+
 // Lua interprets these bytes inside every module-search template, so a driver
 // installed under either prefix cannot load its own modules.
 for (const prefixName of ['invalid;prefix', 'invalid?prefix']) {
