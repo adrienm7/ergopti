@@ -703,6 +703,11 @@ _LATRT_Marker(State) {
 
 _LATRT_Sink(State, Line) {
     global _LLM_Menu_ApiTestProgress, _LLM_Remote_Async
+    if InStr(Line, "[LLM.remote]", true) || InStr(Line, "[LLM]", true) {
+        State.Logs.Push(SubStr(Line, 1, 400))
+        if State.Logs.Length > 12
+            State.Logs.RemoveAt(1)
+    }
     if State.Cutpoint || !InStr(Line,
             "Provider 'deepseek' refused the thinking field 'thinking'", true)
         return
@@ -717,8 +722,7 @@ _LATRT_Sink(State, Line) {
         if State.Cancel {
             State.Cancelled := _LLM_Menu_ApiTestProgressCancel(State.Progress)
             State.OwnerRetiredAtCutpoint := !LLM_AuxIsCurrent(State.Owner)
-            State.WindowRetiredAtCutpoint := !State.Progress.Has("gui")
-                || !WMHandleExists(State.Progress["gui"].Hwnd)
+            State.WindowRetiredAtCutpoint := !WMHandleExists(State.ProgressHwnd)
         }
         ; The principal test thread cannot resume _LATRT_Wait's predicate before
         ; this synchronous poll callback, or the timer interrupting it, returns.
@@ -824,11 +828,14 @@ _LATRT_Retire(State) {
             if _LLM_Menu_ApiTestProgress == State.Progress
                 _LLM_Menu_ApiTestProgressCancel(State.Progress)
             ; Retain the exact GUI object if a prior Destroy refused.
-            if State.Progress.Has("gui") && WMHandleExists(State.Progress["gui"].Hwnd)
+            if WMHandleExists(State.ProgressHwnd) && State.Progress.Has("gui")
                 State.Progress["gui"].Destroy()
-            if State.Progress.Has("gui") && WMHandleExists(State.Progress["gui"].Hwnd)
+            if WMHandleExists(State.ProgressHwnd) {
+                State.CleanupIssues.Push("gui:live")
                 Complete := false
-        } catch {
+            }
+        } catch Any as Failure {
+            State.CleanupIssues.Push("gui:" . Type(Failure))
             Complete := false
         }
     }
@@ -836,23 +843,32 @@ _LATRT_Retire(State) {
         try {
             if LLM_AuxIsCurrent(State.Owner)
                 LLM_AuxFinish(State.Owner)
-            if LLM_AuxIsCurrent(State.Owner)
+            if LLM_AuxIsCurrent(State.Owner) {
+                State.CleanupIssues.Push("owner:current")
                 Complete := false
-        } catch {
+            }
+        } catch Any as Failure {
+            State.CleanupIssues.Push("owner:" . Type(Failure))
             Complete := false
         }
     }
     try {
         _LATRT_CancelRequests(State)
-        if !_LATRT_Wait(() => _LATRT_RequestsGone(State), 10000)
+        if !_LATRT_Wait(() => _LATRT_RequestsGone(State), 10000) {
+            State.CleanupIssues.Push("requests:pending")
             Complete := false
-    } catch {
+        }
+    } catch Any as Failure {
+        State.CleanupIssues.Push("requests:" . Type(Failure))
         Complete := false
     }
     try {
-        if !_LATRT_StopPeer(State)
+        if !_LATRT_StopPeer(State) {
+            State.CleanupIssues.Push("peer:ack-pending")
             Complete := false
-    } catch {
+        }
+    } catch Any as Failure {
+        State.CleanupIssues.Push("peer:" . Type(Failure))
         Complete := false
     }
     return Complete
@@ -887,6 +903,32 @@ _LATRT_DrainDebt() {
     return true
 }
 
+_LATRT_Diagnostic(State, Notices, Phase) {
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LOGGER_WARN_ENABLED
+    Data := Map("phase", Phase, "case", State.Mode, "remote_counter", _LLM_Remote_AsyncCounter,
+        "counter_delta", _LLM_Remote_AsyncCounter - State.CounterBefore,
+        "remote_census", _LLM_Remote_Async.Count, "peer_calls", State.PeerCalls,
+        "peer_code", State.PeerCode, "peer_output", SubStr(State.PeerOutput, 1, 600),
+        "peer_errors", SubStr(State.PeerErrors, 1, 600), "notices", Notices,
+        "logger_warn_enabled", _LOGGER_WARN_ENABLED, "logs", State.Logs,
+        "cleanup_issues", State.CleanupIssues, "original_id", State.OriginalId,
+        "original_present", _LLM_Remote_Async.Has(State.OriginalId),
+        "retry_id", State.RetryId, "cutpoint", State.Cutpoint)
+    if State.Owner is Map
+        Data["owner_current"] := LLM_AuxIsCurrent(State.Owner)
+    Data["window_alive"] := WMHandleExists(State.ProgressHwnd)
+    if State.OriginalEntry is Map && State.OriginalEntry.Has("http") {
+        Http := State.OriginalEntry["http"]
+        try Data["http"] := Map("status", Http.Status, "completed", Http.Completed,
+            "aborted", Http.Aborted, "managed_payload_published", Http.ManagedPayloadPublished,
+            "encoding_valid", Http.ResponseEncodingValid)
+    }
+    ReceiptPath := State.Directory . "\receipt.json"
+    if FSStrictExists(ReceiptPath)
+        Data["peer_receipt"] := JsonParse(FSReadUtf8ExactBounded(ReceiptPath, 16384))
+    _TestPrint("# THINKING_RETRY_DEBUG " . KL_JsonEncode(Data))
+}
+
 _LATRT_Case(Cancel) {
     global _DriverDir, _LLM_Menu, _LLM_Menu_ApiTestProgress
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Remote_RetryOf
@@ -908,7 +950,7 @@ _LATRT_Case(Cancel) {
     Mode := Cancel ? "cancel" : "positive"
     State := {Cancel: Cancel, Nonce: Nonce, Mode: Mode, Directory: "", Registry: "",
         Peer: 0, PeerPid: 0, PeerCalls: 0, PeerCode: -1, PeerOutput: "", PeerErrors: "",
-        Progress: 0, Owner: 0, OriginalId: 0, OriginalEntry: 0, RetryId: 0, RetryEntry: 0,
+        Progress: 0, ProgressHwnd: 0, Logs: [], CleanupIssues: [], Owner: 0, OriginalId: 0, OriginalEntry: 0, RetryId: 0, RetryEntry: 0,
         Cutpoint: false, AfterCutpoint: false, OriginalGone: false, Cancelled: false,
         OwnerCurrentAtCutpoint: false, OwnerRetiredAtCutpoint: false,
         WindowRetiredAtCutpoint: false, Failure: 0, Marker: 0}
@@ -921,6 +963,7 @@ _LATRT_Case(Cancel) {
     PreviousCritical := Critical("Off")
     Primary := 0, Retired := false, Notices := [], CounterBefore := _LLM_Remote_AsyncCounter
     try {
+        State.CounterBefore := CounterBefore
         State.Directory := A_Temp . "\ergopti_llm_retry_proposal_" . Nonce . "_" . Mode
         FSCreateDirectoryExclusiveStrict(State.Directory)
         State.Registry := _LATRT_RegistryKey(Nonce)
@@ -960,6 +1003,9 @@ _LATRT_Case(Cancel) {
         AssertTrue(_LLM_Menu_TestActiveApiEntry((Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))),
             "the genuine Menu API Test must admit the original request")
         State.Progress := _LLM_Menu_ApiTestProgress
+        AssertTrue(State.Progress.Has("gui"), "this native fixture requires its actual progress window")
+        State.ProgressHwnd := State.Progress["gui"].Hwnd
+        AssertTrue(WMHandleExists(State.ProgressHwnd), "snapshot the owned HWND before any retirement")
         AssertTrue(State.Progress.Has("entry") && State.Progress["entry"] == EntryId)
         State.Owner := State.Progress["owner"]
         State.OriginalId := State.Progress["req_id"]
@@ -1009,12 +1055,15 @@ _LATRT_Case(Cancel) {
         AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"))
     } catch Any as Failure {
         Primary := Failure
+        try _LATRT_Diagnostic(State, Notices, "before-cleanup")
     } finally {
         try Retired := _LATRT_Retire(State)
         catch Any as CleanupFailure {
             if !IsObject(Primary)
                 Primary := CleanupFailure
         }
+        if IsObject(Primary) || !Retired
+            try _LATRT_Diagnostic(State, Notices, "after-cleanup")
         if !Retired
             _LATRT_Debt[Nonce] := State
         ; Keep real request registry and monotonic counters untouched.

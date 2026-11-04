@@ -34,7 +34,7 @@ function Test-Control([string]$Name) {
 }
 try {
     $CrLf = ([string][char]13) + [char]10
-    $Bad = '{"error":{"message":"Unknown parameter: thinking"}}'
+    $Bad = '{"error":{"message":"Unknown parameter: thinking.type"}}'
     $Good = '{"choices":[{"message":{"content":"owned-thinking-retry-ok"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}'
     $BadResponse = 'HTTP/1.1 400 Bad Request' + $CrLf + 'Content-Type: application/json' + $CrLf +
         'Content-Length: ' + $Encoding.GetByteCount($Bad) + $CrLf + 'Connection: close' + $CrLf + $CrLf + $Bad
