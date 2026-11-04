@@ -535,22 +535,34 @@ Test("personal-toml-live-transaction: deferred reload failure is visible and ret
 ; Guard the sibling call sites as a class: a correct gateway is inert if one
 ; editor returns to the old write-then-reload split sequence.
 _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
-	for FunctionName in ["_SaveData", "_HsEdWeb_Save"] {
+	; Native _SaveData now owns only the detached-model handoff. Its qualified
+	; receipt helper owns the actual durable/live gateway and deferred callback.
+	WrapperBody := _DriverFuncBody("_SaveData")
+	Assert(WrapperBody != "", "the native save wrapper must exist")
+	Assert(InStr(WrapperBody, "return _PersonalEditorSaveEntryCandidate(") > 0,
+		"the native wrapper must return its qualified receipt owner's result")
+	Assert(InStr(WrapperBody, "_PersonalTomlCloneDetached(Data)") > 0,
+		"the native wrapper must hand off a detached complete model")
+	for FunctionName in ["_SaveData", "_PersonalEditorSaveEntryCandidate", "_HsEdWeb_Save"] {
 		Body := _DriverFuncBody(FunctionName)
 		Assert(Body != "", FunctionName . " must exist in the driver source")
-		Assert(InStr(Body, "PersonalTomlCommitAndReload(") > 0,
-			FunctionName . " must delegate durable and live publication to the shared gateway")
+		if FunctionName != "_SaveData"
+			Assert(InStr(Body, "PersonalTomlCommitAndReload(") > 0,
+				FunctionName . " must delegate durable and live publication to the shared gateway")
 		Assert(InStr(Body, "WritePersonalToml(") == 0,
 			FunctionName . " must not release path ownership before its live reload")
 		Assert(InStr(Body, "ReloadPersonalSection(") == 0,
 			FunctionName . " must not own a second, reentrant reload loop")
 	}
-	NativeBody := _DriverFuncBody("_SaveData")
-	Assert(InStr(NativeBody, "CompletionFn") > 0,
-		"the native editor must receive a terminal result after DEFERRED")
+	NativeBody := _DriverFuncBody("_PersonalEditorSaveEntryCandidate")
+	Assert(InStr(NativeBody, "_PersonalEditorEntryCompleted.Bind(Request)") > 0,
+		"the native gateway must bind its exact request for the DEFERRED terminal callback")
 	Assert(InStr(NativeBody, "PERSONAL_TOML_COMMIT_DEFERRED") > 0
 			&& InStr(NativeBody, "return false") > 0,
-		"the native editor must not report a DEFERRED admission as saved")
+		"the native owner must not report a DEFERRED admission as saved")
+	NativeCompletion := _DriverFuncBody("_PersonalEditorEntryCompleted")
+	Assert(NativeCompletion != "" && InStr(NativeCompletion, "editor.hotstrings.err_write") > 0,
+		"the bound native completion must keep a terminal refusal visibly unsaved")
 	WebBody := _DriverFuncBody("_HsEdWeb_Save")
 	Assert(InStr(WebBody, "_HsEdWeb_DeferredSaveCompleted") > 0,
 		"the WebView editor must receive a terminal result after DEFERRED")
@@ -706,6 +718,7 @@ _PT102_WithCase(Mode, Body) {
 	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
 	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
 	global _HsEdWeb_Gui, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
 	static Sequence := 0, RetainedHandles := Map()
 	if RetainedHandles.Count
@@ -715,6 +728,7 @@ _PT102_WithCase(Mode, Body) {
 	Names := ["_ReadPersonalTomlCache", "_TomlUnreadableFiles", "_PersonalEditorGui",
 		"_PersonalEditorData", "_PersonalEditorSection", "_PersonalEditorPrioCtrl",
 		"_PersonalEditorOpeningSource", "_PersonalEditorSessionEpoch",
+		"_PersonalEditorEntryCohort", "_PersonalEditorEntryBusy",
 		"_HsEdWeb_Gui", "_HsEdWeb_OpeningSource", "_HsEdWeb_SessionEpoch"]
 	Saved := Map()
 	for Name in Names {
@@ -735,6 +749,7 @@ _PT102_WithCase(Mode, Body) {
 		live: Map(), fail_remaining: 0, queue_pending: false, queued_result: "unreached"}
 	try {
 		Suspend(false)
+		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
 		ScriptInformation["PersonalTomlPath"] := Path
 		_TomlUnreadableFiles := _TomlUnreadableFiles.Clone()
 		_ReadPersonalTomlCache := false
