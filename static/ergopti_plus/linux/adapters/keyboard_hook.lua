@@ -3137,8 +3137,9 @@ local function _best_pointers()
 	return pointer and { pointer } or {}
 end
 
-local function _close_paths(paths, slot_for, tx)
+local function _close_paths(paths, slot_for, tx, cancelled)
 	for _, path in ipairs(paths) do
+		if cancelled and cancelled() then return false end
 		local slot = slot_for(path)
 		-- A failed observer may reenter cleanup after this descriptor closed;
 		-- that nested pass must not send another reset for the same lifetime.
@@ -3153,11 +3154,14 @@ local function _close_paths(paths, slot_for, tx)
 			local lease=_buffered_reader_cleanup[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
+		if cancelled and cancelled() then return false end
 		_pending_events[slot] = nil
 		if pointer_open and _on_pointer_event then
 			_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, slot)
 		end
+		if cancelled and cancelled() then return false end
 	end
+	return true
 end
 
 --- Releases virtual keys whose last physical owner is leaving the source set.
@@ -4270,7 +4274,9 @@ function M.stop()
 	if _capture_session ~= session then return false end
 	_capture_session = nil
 	if not _running and not _reacquiring then return end
-	if _release_remapped() == false then
+	local remaps_released = _release_remapped()
+	if _capture_session ~= nil then return false end
+	if remaps_released == false then
 		M.emergency_stop("combination key retirement refused during stop")
 		return false
 	end
@@ -4278,12 +4284,14 @@ function M.stop()
 	for _, path in ipairs(_devices) do sources[#sources + 1] = path end
 	for _, path in ipairs(_pointer_devices) do sources[#sources + 1] = pointer_slot(path) end
 	local released, release_err = _release_forwarded_sources(sources)
+	if _capture_session ~= nil then return false end
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
 		return
 	end
-	_close_paths(_pointer_devices, pointer_slot)
-	_close_paths(_devices, keyboard_slot)
+	local function successor() return _capture_session ~= nil end
+	if not _close_paths(_pointer_devices, pointer_slot, nil, successor) then return false end
+	if not _close_paths(_devices, keyboard_slot, nil, successor) then return false end
 	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	LayerPointer.slots, LayerPointer.buttons = {}, {}
