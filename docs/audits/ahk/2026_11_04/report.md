@@ -689,3 +689,18 @@ Consequence: Accepted replay data silently combines independent counts and delay
 Regression: Three native fail-before probes retain literal SQL hex(app)/hex(token), repeated additive controls and a genuine typing replay. The fix escapes only internal tuple fields and preserves raw row values for SQL. Five further cases cover shared array byte vectors, real JSON context roundtrip and legacy retirement, cache17 refusal, checkpoint3 restart and obsolete stage cleanup. Existing aggregation, distribution merge, rollover and current checkpoint controls remain. Cache18/checkpoint4 force reconstruction without changing raw ledgers or persisted token encoding2. Scope is Windows: the separately measured shared Lua Chr1 collision and Linux aggregate-history migration remain open outside this OS correction; no Lua source is changed. Post-fix native qualification is pending.
 
 The ongoing register now contains **39 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41898084279
+
+At `83bb702`, **53 selected personal publication and native-guard cases passed
+individually and 53/53 in reverse order**. Production-entry compilation passed,
+with a successful full-graph receipt and no parse skip. The native SQLite / CLI
+preparation controls passed 15 cases. Evidence: [replay artifact](https://github.com/adrienm7/ergopti/actions/runs/41898084279/artifacts/13356668542)
+and [entry artifact](https://github.com/adrienm7/ergopti/actions/runs/41898084279/artifacts/13356763051).
+
+AHK-038 therefore has measured fail-before (three positive controls and ten
+withdrawal failures) and pass-after native evidence. The entry artifact explicitly
+records hotstring E2E as `not-selected`, with `full_suite_qualified: false`;
+HTTP E2E is also outside this file-publication selection. Neither exclusion is
+reported as a behavioral pass. AHK-039 awaits its 111-case aggregation, migration
+and rebuild replay; the register remains **39 distinct new findings**.
