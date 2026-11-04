@@ -10,6 +10,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local APP_FOLDER = require("app_dirs").linux.folder_name
 local Json = require("json")
 local Policy = require("control.driver_control")
 local DriverControl = require("infra.driver_control")
@@ -26,7 +29,7 @@ end
 
 local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver_control.json")))
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
-local FOLDER = "/run/user/1000/ergopti_plus/control"
+local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 
 --- A session over in-memory files.
 local NOW = 1700000000
@@ -121,7 +124,8 @@ helpers.describe("Linux local driver control", function()
 		local function spelled(platform, base)
 			local parts = { "$" .. base }
 			for _, segment in ipairs(SPEC.folders[platform].segments) do
-				parts[#parts + 1] = segment == "{app}" and require("app_dirs").folder_name or segment
+				-- Each OS spells its own application folder (`Ergopti` on macOS).
+				parts[#parts + 1] = segment == "{app}" and require("app_dirs")[platform].folder_name or segment
 			end
 			return table.concat(parts, "/")
 		end

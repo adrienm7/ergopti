@@ -255,6 +255,7 @@ local function with_remap(options, body)
 		end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = options.enabled ~= false,
 				tap_hold_config = {},
 				mod_combos_config = {},

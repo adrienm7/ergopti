@@ -458,7 +458,7 @@ function M.storage(opts)
 	end
 
 	-- The store's file, which the configuration backup copies.
-	function fake.path() return opts.path or "/fake/ergopti_plus/storage.json" end
+	function fake.path() return opts.path or ("/fake/" .. require("app_dirs").linux.folder_name .. "/storage.json") end
 
 	function fake.set(key, value)
 		if opts.writes_fail or aliases[key] ~= nil then return false end

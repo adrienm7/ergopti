@@ -139,6 +139,12 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
+  **Revised by the maintainer for the release after 1.0.9:** owned becomes the
+  default (`Config.RUNTIME_DEFAULT`), shared stays readable as a hand-written
+  `runtime = "shared"`, and the Configuration rows that switched and cleaned
+  the user's Karabiner-Elements are deleted. The flip lands on its own commit
+  so it can wait for the native install and acceptance
+  (`docs/tooling/next-release-handoff.md`).
 - An incompatible VirtualHIDDevice (only one version can be active system-wide)
   blocks owned mode in an explicit named unavailable state with an explanation.
   The decided policy offers a driver-only update requiring explicit confirmation:
@@ -183,8 +189,8 @@ handovers on 2026-10-29 and stay in Git at `49c62d77a1`, under
   Ergopti labels only, and `test_owned_runtime_uninstall_scope.lua` pins them).
 - The artifact pin is `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`,
   judged by `platform/remap/runtime_manifest.lua` and gated by
-  `tools/test/test-remap-runtime-manifest.cjs` (`--require-pinned` refuses the
-  unbuilt runtime fields until the hosted build fills them).
+  `tools/test/test-remap-runtime-manifest.cjs`, which refuses any unpinned
+  field since the hosted build's `16.3.0-ergopti.2` artifact was pinned.
 - The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
   runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
   producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the

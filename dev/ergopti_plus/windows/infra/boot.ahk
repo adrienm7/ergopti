@@ -40,8 +40,8 @@ global OneShotShiftEnabled := False
 
 ; Read path overrides from paths.toml — same file format as Hammerspoon.
 ; Auto-generated with defaults if absent.
-; In compiled mode the file lives in %APPDATA%\Ergopti\ — a stable location that
-; persists across updates. The bundle dir (LocalAppData\Ergopti\bundle\) is wiped
+; In compiled mode the file lives in %LOCALAPPDATA%\Ergopti\ — a stable location
+; that persists across updates. The bundle dir (LocalAppData\Ergopti\bundle\) is wiped
 ; and re-extracted on every version change, so storing paths.toml there caused
 ; ConfigDirPath overrides to be lost on every update, which triggered the
 ; onboarding wizard again even for existing users. A developer run
@@ -50,14 +50,20 @@ global OneShotShiftEnabled := False
 global _PathsFile := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\paths.toml")
 		: (DevSource_UsesInstalledPaths()
-				? (A_AppData . "\Ergopti\paths.toml")
+				? AppFoldersPathsFile()
 				: (A_ScriptDir . "\_generated\paths.toml"))
-; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\. Named before
+; The OS-default logs folder, %LOCALAPPDATA%\Ergopti\logs\. Named before
 ; the transition recovery below: a refusal it writes to bootstrap.log lands
 ; here, which under the startup smoke keeps it inside the isolated tree.
 global _DefaultLogsDir := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\" . AppDirsWindowsLogsRelative() . "\")
 		: LoggerDefaultLogsDir()
+; The builds before the single folder name kept paths.toml in Roaming AppData
+; and the configuration under %USERPROFILE%\.config; they move into the Ergopti
+; root once, before anything reads paths.toml. Never under the startup smoke,
+; which must not touch the real user folders.
+if (_DriverStartupSmokeDir == "")
+		LegacyFolderMigrationRun(_PathsFile)
 ; A valid transition chooses one complete old/new image before the locator is
 ; read. Quarantine is visible and fatal: continuing would let a mixed image
 ; select the wrong config directory and later be persisted as coherent state.
@@ -65,11 +71,11 @@ ConfigTransitionRecoverAtBootOrThrow(_PathsFile)
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
-; Defaults to %USERPROFILE%\.config\ergopti_plus\ (mirrors XDG-style on Unix);
-; must end with a backslash.
+; Defaults to %LOCALAPPDATA%\Ergopti\config\ (infra/app_folders.ahk); must end
+; with a backslash.
 global _DefaultConfigDir := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\config\")
-		: (EnvGet("USERPROFILE") . "\.config\ergopti_plus\")
+		: AppFoldersDefaultConfigDir()
 global _ConfigDir := ConfigTransitionSelectBootConfigDir(
 		_PathsOverrides, _DefaultConfigDir)
 if !(_ConfigDir ~= "[/\\]$")

@@ -429,7 +429,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		let session = try ManagedPTYTestSession(script: """
 		#!/bin/bash
 		test "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" && test -f "$0" && test ! -w "$0" || exit 91
-		case "$0" in "$HOME/Library/Application Support/ErgoptiPlus/pty-sources/op."*/ensure-ollama-native-deps.sh) ;; *) exit 96;; esac
+		case "$0" in "$HOME/\(kMacOSSupportHomeRelativePath)/pty-sources/op."*/ensure-ollama-native-deps.sh) ;; *) exit 96;; esac
 		test -t 0 && test -t 1 && test -t 2 || exit 92
 		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/modules/llm" || exit 93
 		case "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" in ''|*[!0-9]*) exit 94;; esac

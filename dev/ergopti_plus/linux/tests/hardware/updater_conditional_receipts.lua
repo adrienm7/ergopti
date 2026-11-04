@@ -7,6 +7,9 @@ local root = assert(os.getenv("HTTP_CONDITIONAL_ROOT"))
 local mode = assert(os.getenv("HTTP_CONDITIONAL_MODE"))
 local Paths = require("infra.config_paths")
 Paths.home = function() return root end
+-- Boot creates the cache folder (infra/legacy_folder_migration.lua run());
+-- the updater only makes a request conditional when it exists.
+assert(os.execute("mkdir -p '" .. Paths.cache() .. "'"), "the cache folder is prepared like boot does")
 local M = require("modules.updater.manager")
 M.release_api_url = function()
 	return assert(os.getenv("HTTP_CONDITIONAL_ORIGIN")) .. "/releases?per_page=20"
@@ -32,7 +35,7 @@ end
 local old = '[{"tag_name":"v0.1.1","draft":false,"prerelease":false,"assets":[]}]'
 local fresh = old:gsub("v0%.1%.1", "v0.1.2")
 local function read(path)
-	local file = assert(io.open(root .. "/" .. path, "rb"))
+	local file = assert(io.open(path:sub(1, 1) == "/" and path or (root .. "/" .. path), "rb"))
 	local value = file:read("*a")
 	assert(file:close())
 	return value
@@ -67,7 +70,7 @@ if mode == "reset" then
 	local failed = fetch(2)
 	assert(exits[2].code == 56, "the server performs a real reset after curl receives the 304 header")
 	assert(receipts[2].error_body == nil, "a failed 304 has no completed error-body receipt")
-	assert(read(".cache/ergopti_updater_etag_main-page-1-size-20.txt") == '"fixture-v2"\n',
+	assert(read(Paths.cache("updater_etag_main-page-1-size-20.txt")) == '"fixture-v2"\n',
 		"the real failed transfer advanced its native ETag file")
 	check("incomplete 304 rejects its stale page and validator association", failed.body == nil
 		and failed.status == 304 and type(failed.error) == "string" and failed.reason == "no_connection"

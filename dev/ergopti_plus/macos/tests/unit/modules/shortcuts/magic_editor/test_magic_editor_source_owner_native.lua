@@ -180,7 +180,9 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			helpers.assert_eq(subject.start(spec), true)
 			state.cancel_refuses = true
 			state.source_id, state.trigger = "source.second", "ù"
-			helpers.assert_eq(subject.refresh(), false)
+			-- Accepted and deferred: the fenced proof's settlement retargets, so a
+			-- caller must not report it as cleanup debt (stop() still does, above).
+			helpers.assert_eq(subject.refresh(), true)
 			helpers.assert_eq(#state.requests, 1, "replacement cannot race the old task")
 			respond(1)
 			helpers.assert_eq(registrar.live_count(), 0, "settled stale proof remains fenced")

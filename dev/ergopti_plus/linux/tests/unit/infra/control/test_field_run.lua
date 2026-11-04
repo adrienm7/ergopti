@@ -19,10 +19,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local APP_FOLDER = require("app_dirs").linux.folder_name
 local Json = require("json")
 local FieldRun = require("infra.field_run")
 
-local FOLDER = "/run/user/1000/ergopti_plus/field-run"
+local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/field-run"
 
 local function read_json(path)
 	local handle = assert(io.open(path, "rb"))
@@ -123,7 +126,7 @@ helpers.describe("Linux field run (linux-field-run)", function()
 		helpers.assert_eq(spec.max_request_bytes, shared.max_request_bytes)
 		helpers.assert_eq(FieldRun.steps_relative(shared.steps_file.linux), "data/field_run_steps.json")
 		-- The installed folder's application segment is the one every Linux folder uses.
-		helpers.assert_eq(shared.folder.linux.segments[1], require("app_dirs").folder_name)
+		helpers.assert_eq(shared.folder.linux.segments[1], APP_FOLDER)
 		for key in pairs(linux_steps()) do
 			helpers.assert_true(shared[key] == nil or key == "_comment",
 				"the Linux steps file repeats the shared key " .. key)

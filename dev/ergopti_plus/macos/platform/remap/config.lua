@@ -126,14 +126,14 @@ M.INTEGRATION_ENABLED_DEFAULT = true
 local INTEGRATION_SECTION = "karabiner"
 local INTEGRATION_KEY = "integration_enabled"
 --- Hidden `[karabiner] runtime`: which Karabiner runtime the generated rules
---- target (ADR 011). `shared` (the absent default) is the official application
---- and the user's karabiner.json; `owned` is the Ergopti background runtime and
---- its own complete configuration. It is deliberately not a menu row and not in
---- the shared manifest: the owned runtime is not shipped, so only a user who
---- edits config_karabiner.toml by hand opts in. A value that is not one of the
---- two names refuses the whole file, like a corrupt one, because a typo must not
---- silently select the other runtime.
-M.RUNTIME_DEFAULT = KePaths.RUNTIME_SHARED
+--- target (ADR 011). `owned` (the absent default, the maintainer's decision for
+--- the release after 1.0.9) is the Ergopti background runtime and its own
+--- complete configuration; `shared` is the official application and the user's
+--- karabiner.json, kept as a hand-written fallback until shared mode is retired.
+--- It is deliberately not a menu row and not in the shared manifest. A value
+--- that is not one of the two names refuses the whole file, like a corrupt one,
+--- because a typo must not silently select the other runtime.
+M.RUNTIME_DEFAULT = KePaths.RUNTIME_OWNED
 local RUNTIME_KEY = "runtime"
 
 --- Hidden `[karabiner] close_other_instances`: whether the owned runtime may ask

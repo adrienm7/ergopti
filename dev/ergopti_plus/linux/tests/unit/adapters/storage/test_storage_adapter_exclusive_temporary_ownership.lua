@@ -21,6 +21,9 @@
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
 local Fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local helpers, make_temp_config_root =
 	Fixture.helpers, Fixture.make_temp_config_root
 
@@ -32,7 +35,7 @@ helpers.describe("storage exclusive temporary ownership", function()
 		for _, alias in ipairs({ "regular", "symlink", "hardlink", "dangling" }) do
 			helpers.it("linux-storage-exclusive-temp: " .. method .. " refuses foreign " .. alias .. " staging", function()
 				local root = make_temp_config_root()
-				local path, target = root .. "/ergopti_plus/storage.json", root .. "/foreign"
+				local path, target = root .. "/" .. FOLDER .. "/storage.json", root .. "/foreign"
 				local original, foreign = '{"value":"retained"}', "Retained foreign bytes"
 				local function write(name, bytes)
 					local file = assert(io.open(name, "wb")); assert(file:write(bytes) and file:close())
@@ -65,7 +68,7 @@ helpers.describe("storage exclusive temporary ownership", function()
 				os.getenv = real_getenv
 				package.loaded["adapters.storage"] = nil
 				os.remove(path .. ".tmp"); os.remove(path); os.remove(target)
-				os.remove(root .. "/ergopti_plus"); os.remove(root)
+				os.remove(root .. "/" .. FOLDER); os.remove(root)
 				helpers.assert_true(ok, tostring(err))
 			end)
 		end
@@ -114,7 +117,7 @@ helpers.describe("storage concurrent backup ownership", function()
 		for _, depth in ipairs({ 0, 1 }) do
 			helpers.it("linux-storage-backup-race: retains concurrent " .. alias .. " at suffix " .. depth, function()
 				local root = make_temp_config_root()
-				local path = root .. "/ergopti_plus/storage.json"
+				local path = root .. "/" .. FOLDER .. "/storage.json"
 				local backup = path .. ".corrupt" .. (depth == 0 and "" or ".1")
 				local original, history = "{Malformed original bytes", "Retained concurrent backup bytes"
 				local real_open, real_getenv = io.open, os.getenv
@@ -161,7 +164,7 @@ helpers.describe("storage concurrent backup ownership", function()
 				io.open, os.getenv = real_open, real_getenv
 				package.loaded["adapters.storage"] = nil
 				os.remove(backup); os.remove(next_backup); os.remove(path .. ".corrupt"); os.remove(path)
-				os.remove(root .. "/ergopti_plus"); os.remove(root)
+				os.remove(root .. "/" .. FOLDER); os.remove(root)
 				helpers.assert_true(ok, tostring(err))
 			end)
 		end
@@ -176,7 +179,7 @@ helpers.describe("storage backup path inspection", function()
 		for _, depth in ipairs({ 0, 1 }) do
 			helpers.it("linux-storage-backup-type: skips occupied " .. alias .. " at suffix " .. depth, function()
 				local root = make_temp_config_root()
-				local path = root .. "/ergopti_plus/storage.json"
+				local path = root .. "/" .. FOLDER .. "/storage.json"
 				local backup = path .. ".corrupt" .. (depth == 0 and "" or ".1")
 				local target, original, history = root .. "/foreign", "{malformed original bytes", "Retained previous bytes"
 				local function write(name, bytes)
@@ -214,7 +217,7 @@ helpers.describe("storage backup path inspection", function()
 				os.getenv = real_getenv
 				package.loaded["adapters.storage"] = nil
 				os.remove(backup); os.remove(next_backup); os.remove(path .. ".corrupt")
-				os.remove(path); os.remove(target); os.remove(root .. "/ergopti_plus"); os.remove(root)
+				os.remove(path); os.remove(target); os.remove(root .. "/" .. FOLDER); os.remove(root)
 				helpers.assert_true(ok, tostring(err))
 			end)
 		end
@@ -222,7 +225,7 @@ helpers.describe("storage backup path inspection", function()
 	for _, kind in ipairs({ "refused", "empty", "unknown", "raised" }) do
 		helpers.it("linux-storage-backup-type: refuses " .. kind .. " native inspection", function()
 			local root = make_temp_config_root()
-			local path, original = root .. "/ergopti_plus/storage.json", "{malformed original bytes"
+			local path, original = root .. "/" .. FOLDER .. "/storage.json", "{malformed original bytes"
 			local file = assert(io.open(path, "wb")); assert(file:write(original) and file:close())
 			local Shell = require("adapters.shell_runner")
 			local real_checked, real_getenv = Shell.exec_checked, os.getenv
@@ -240,7 +243,7 @@ helpers.describe("storage backup path inspection", function()
 			end, debug.traceback)
 			Shell.exec_checked, os.getenv = real_checked, real_getenv
 			package.loaded["adapters.storage"] = nil
-			os.remove(path .. ".corrupt"); os.remove(path); os.remove(root .. "/ergopti_plus"); os.remove(root)
+			os.remove(path .. ".corrupt"); os.remove(path); os.remove(root .. "/" .. FOLDER); os.remove(root)
 			helpers.assert_true(ok, tostring(err))
 		end)
 	end
@@ -308,7 +311,7 @@ helpers.describe("storage native open receipts", function()
 	for _, receipt in ipairs({ 13, 1, 20, 5, 24, 40, "unknown", "throw" }) do
 		helpers.it("linux-storage-read-receipts: blocks mutation after " .. receipt, function()
 			local root = make_temp_config_root()
-			local path = root .. "/ergopti_plus/storage.json"
+			local path = root .. "/" .. FOLDER .. "/storage.json"
 			local original = '{"preserve":"original"}'
 			local file = assert(io.open(path, "wb"))
 			assert(file:write(original) and file:close())
@@ -345,7 +348,7 @@ helpers.describe("storage native open receipts", function()
 			assert(file:close())
 			os.remove(path)
 			os.remove(path .. ".tmp")
-			os.remove(root .. "/ergopti_plus")
+			os.remove(root .. "/" .. FOLDER)
 			os.remove(root)
 			helpers.assert_true(ok, tostring(err))
 			helpers.assert_eq(preserved, original)
@@ -360,7 +363,7 @@ helpers.describe("storage root JSON shape", function()
 	for index, body in ipairs({ "[]", '["original"]', '[{"keep":"é","nested":[1,2]}]', '[null,"original"]' }) do
 		helpers.it("linux-storage-shape-receipts: preserves array history " .. index, function()
 			local root = make_temp_config_root()
-			local path = root .. "/ergopti_plus/storage.json"
+			local path = root .. "/" .. FOLDER .. "/storage.json"
 			local file = assert(io.open(path, "wb"))
 			assert(file:write(body) and file:close())
 			local real_getenv = os.getenv
@@ -384,7 +387,7 @@ helpers.describe("storage root JSON shape", function()
 			package.loaded["adapters.storage"] = nil
 			os.remove(path)
 			os.remove(path .. ".corrupt")
-			os.remove(root .. "/ergopti_plus")
+			os.remove(root .. "/" .. FOLDER)
 			os.remove(root)
 			helpers.assert_true(ok, tostring(err))
 		end)
@@ -399,7 +402,7 @@ helpers.describe("storage durable snapshot ownership", function()
 		for _, source in ipairs({ "input", "returned", "refused" }) do
 			helpers.it("linux-storage-snapshot-receipts: " .. method .. " detaches " .. source, function()
 				local root = make_temp_config_root()
-				local path = root .. "/ergopti_plus/storage.json"
+				local path = root .. "/" .. FOLDER .. "/storage.json"
 				local real_getenv, real_rename = os.getenv, os.rename
 				os.getenv = function(name)
 					if name == "XDG_CONFIG_HOME" then return root end
@@ -430,7 +433,7 @@ helpers.describe("storage durable snapshot ownership", function()
 				package.loaded["adapters.storage"] = nil
 				os.remove(path)
 				os.remove(path .. ".tmp")
-				os.remove(root .. "/ergopti_plus")
+				os.remove(root .. "/" .. FOLDER)
 				os.remove(root)
 				helpers.assert_true(ok, tostring(err))
 			end)
@@ -445,7 +448,7 @@ helpers.describe("storage backup open receipts", function()
 	for _, receipt in ipairs({ 13, 5, "unknown", "throw" }) do
 		helpers.it("linux-storage-backup-receipts: preserves prior backup after " .. receipt, function()
 			local root = make_temp_config_root()
-			local path = root .. "/ergopti_plus/storage.json"
+			local path = root .. "/" .. FOLDER .. "/storage.json"
 			local backup = path .. ".corrupt"
 			local originals = { [path] = "{ broken current bytes", [backup] = "{ older recovery bytes" }
 			for target, bytes in pairs(originals) do
@@ -481,7 +484,7 @@ helpers.describe("storage backup open receipts", function()
 				os.remove(target)
 			end
 			os.remove(path .. ".tmp")
-			os.remove(root .. "/ergopti_plus")
+			os.remove(root .. "/" .. FOLDER)
 			os.remove(root)
 			helpers.assert_true(ok, tostring(err))
 			helpers.assert_eq(preserved, originals, "both byte histories must remain intact")
@@ -531,8 +534,8 @@ helpers.describe("storage adapter uses the shared JSON codec", function()
 		-- and a fresh storage module; the temp-path instance must not leak.
 		os.getenv = real_getenv
 		package.loaded["adapters.storage"] = nil
-		os.remove(temp_root .. "/ergopti_plus/storage.json")
-		os.remove(temp_root .. "/ergopti_plus/storage.json.tmp")
+		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json")
+		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json.tmp")
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -652,8 +655,8 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		restore_faults()
 		os.getenv = real_getenv
 		package.loaded["adapters.storage"] = nil
-		os.remove(temp_root .. "/ergopti_plus/storage.json")
-		os.remove(temp_root .. "/ergopti_plus/storage.json.tmp")
+		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json")
+		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json.tmp")
 		if not ok then error(err, 0) end
 	end)
 
@@ -672,7 +675,7 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 
 		os.getenv = real_getenv
 		package.loaded["adapters.storage"] = nil
-		os.remove(temp_root .. "/ergopti_plus/storage.json")
+		os.remove(temp_root .. "/" .. FOLDER .. "/storage.json")
 		helpers.assert_eq(first, "one")
 		helpers.assert_eq(second, "two",
 			"related preferences must survive together rather than one rename apart")

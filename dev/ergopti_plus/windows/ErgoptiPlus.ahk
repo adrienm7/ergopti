@@ -368,6 +368,10 @@ SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click 
 ; Application folder, logs folder and log file names, generated from
 ; _shared/modules/paths/app_dirs.toml; functions too, read by the logger.
 #Include _generated/app_dirs.ahk
+; The Ergopti root and its purpose folders, and the one-time move of the folders
+; of the builds before the single folder name (run by infra/boot.ahk).
+#Include infra/app_folders.ahk
+#Include infra/legacy_folder_migration.ahk
 #Include infra/tick_count.ahk
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk
@@ -1066,7 +1070,8 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 						try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
 						return false
 				}
-				StubDir := LocalAppData . "\Ergopti\_generated"
+				; The compile-time #Include below spells the same folder.
+				StubDir := AppFoldersRoot() . "_generated"
 		} else {
 				StubDir := A_ScriptDir . "\_generated"
 		}

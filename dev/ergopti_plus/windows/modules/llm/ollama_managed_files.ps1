@@ -325,12 +325,44 @@ function Write-OllamaExtractedJson($Wal, [string]$Stage, [string]$Relative, $Val
 	} finally { $owned.stream.Dispose() }
 }
 
+# The parent of the managed root, a direct LocalApplicationData child such as
+# the Ergopti root, may keep its inherited ACL, but no principal other than the
+# user, SYSTEM and Administrators may write, delete, re-permission or take it:
+# whoever can do one of those can rename the protected root away and plant a
+# replacement under the same name.
+function Assert-OllamaTrustedParent([string]$Path) {
+	$security = Get-Acl -LiteralPath $Path
+	$sid = Get-OllamaSid
+	$trusted = @($sid, 'S-1-5-18', 'S-1-5-32-544')
+	if ($security.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $trusted) {
+		throw 'The managed root parent has an untrusted owner.'
+	}
+	$rights = [Security.AccessControl.FileSystemRights]
+	$writeMask = [int]($rights::WriteData -bor $rights::AppendData -bor $rights::WriteExtendedAttributes -bor
+		$rights::DeleteSubdirectoriesAndFiles -bor $rights::WriteAttributes -bor $rights::Delete -bor
+		$rights::ChangePermissions -bor $rights::TakeOwnership)
+	foreach ($rule in @($security.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
+		if ($rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
+		if (([int]$rule.FileSystemRights -band $writeMask) -eq 0) { continue }
+		$identity = $rule.IdentityReference.Value
+		# CREATOR OWNER only ever reaches a child its creator made, and only the
+		# trusted principals can create one here.
+		$creatorOnly = $identity -eq 'S-1-3-0' -and
+			($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -ne 0
+		if ($identity -notin $trusted -and -not $creatorOnly) {
+			throw 'The managed root parent lets another principal write, delete or re-permission it.'
+		}
+	}
+}
+
 function Open-OllamaManagedRoot([string]$Root, [bool]$AllowCreate = $true) {
 	Initialize-OllamaManagedNative
 	$rootPath = Assert-OllamaLocalPath $Root
 	$base = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
-	if (-not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($rootPath), $base)) {
-		throw 'The managed root must be one explicitly selected child of the current user LocalApplicationData.'
+	$parentPath = [IO.Path]::GetDirectoryName($rootPath)
+	if ($null -eq $parentPath -or
+		-not [StringComparer]::OrdinalIgnoreCase.Equals([IO.Path]::GetDirectoryName($parentPath), $base)) {
+		throw 'The managed root must be one folder inside a direct child of the current user LocalApplicationData.'
 	}
 	$handles = [Collections.Generic.List[IntPtr]]::new()
 	try {
@@ -340,6 +372,14 @@ function Open-OllamaManagedRoot([string]$Root, [bool]$AllowCreate = $true) {
 			$handles.Add([Ergopti.Ollama.ManagedNative]::OpenDirectory($ancestor.FullName, $false))
 			$ancestor = $ancestor.Parent
 		}
+		if (-not [IO.Directory]::Exists($parentPath)) {
+			if (-not $AllowCreate) { throw 'Cleanup and publication cannot create the managed root parent.' }
+			[void][IO.Directory]::CreateDirectory($parentPath)
+		}
+		# The parent is held without DELETE sharing too, and refused as a reparse
+		# point, so it cannot be swapped while the root below it is in use.
+		$handles.Add([Ergopti.Ollama.ManagedNative]::OpenDirectory($parentPath, $false))
+		Assert-OllamaTrustedParent $parentPath
 		$created = -not [IO.Directory]::Exists($rootPath)
 		if ($created -and -not $AllowCreate) { throw 'Cleanup and publication cannot create a replacement managed root.' }
 		if ($created) {

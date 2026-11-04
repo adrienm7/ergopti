@@ -299,7 +299,7 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.runtime_owner_ports",
 		contract = { "new", "unpinned_count" },
-		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
+		-- Required by the remap bridge on an owned boot, the default unless `runtime = "shared"`.
 		wired    = true,
 	},
 	{
@@ -530,6 +530,12 @@ local ADAPTER_SPECS = {
 		id       = "adapters.write_lock_path",
 		contract = { "for_canonical" },
 		-- Every cooperative publication and removal of adapters.file_system.
+		wired    = true,
+	},
+	{
+		id       = "adapters.legacy_folder_migration",
+		contract = { "native_ports", "plan", "rewrites", "run" },
+		-- init.lua moves the old folders once at boot, before paths.toml is read.
 		wired    = true,
 	},
 	{

@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 --- Loads the adapter over a fresh file path and a scripted clock.
 --- @return table breadcrumb, string path, table clock
@@ -101,7 +102,8 @@ helpers.describe("reload breadcrumb", function()
 		local breadcrumb = require("adapters.reload_breadcrumb")
 		breadcrumb.configure_for_tests(nil)
 		local path = breadcrumb.path()
-		helpers.assert_true(type(path) == "string" and path:match("/Library/Logs/ergopti_plus/reload_breadcrumb%.txt$") ~= nil,
+		local suffix = "/" .. AppDirs.macos.relative .. "/" .. AppDirs.macos.reload_breadcrumb
+		helpers.assert_true(type(path) == "string" and path:sub(-#suffix) == suffix,
 			tostring(path))
 	end)
 end)

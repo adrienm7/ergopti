@@ -621,8 +621,8 @@ local _thinking_families = nil
 -- state file at the first request, written at each new refusal.
 local _thinking_refused = nil
 
--- The state file of the refusals, under the XDG state home
-local THINKING_REFUSED_FILE = "ergopti_plus/llm_thinking_refused.json"
+-- The state file of the refusals, in the driver's XDG state folder
+local THINKING_REFUSED_FILE = "llm_thinking_refused.json"
 
 -- Its path, replaced by the tests
 local _thinking_refused_path = nil
@@ -634,7 +634,7 @@ local ENOENT = 2
 --- @return string
 local function thinking_refused_path()
 	return _thinking_refused_path
-		or (require("infra.config_paths").state_home() .. "/" .. THINKING_REFUSED_FILE)
+		or require("infra.config_paths").state(THINKING_REFUSED_FILE)
 end
 
 -- Defined below; declared here for thinking_refused, which reads its expiry

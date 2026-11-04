@@ -73,8 +73,8 @@ struct OwnedSuspendedImageRequest {
 			let arguments = fields["arguments"] as? [String], arguments == ["serve"],
 			arguments.allSatisfy({ !$0.utf8.contains(0) && $0.utf8.count <= 8192 }),
 			validPath(launcher) else { return nil }
-		let runtime = home + "/Library/Application Support/Ergopti/ollama-native-http/"
-		let sessions = home + "/Library/Application Support/Ergopti/ollama-native-sessions/"
+		let runtime = home + "/" + kMacOSSupportHomeRelativePath + "/ollama-native-http/"
+		let sessions = home + "/" + kMacOSSupportHomeRelativePath + "/ollama-native-sessions/"
 		guard executable.hasPrefix(runtime), session.hasPrefix(sessions),
 			fields["bootstrap_path"] != nil || models.isEmpty || models.hasPrefix(home + "/") else { return nil }
 		let sessionName = String(session.dropFirst(sessions.count))

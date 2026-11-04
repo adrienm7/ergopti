@@ -4,7 +4,7 @@
 --- MODULE: Config Paths — Logs Folder Override
 --- DESCRIPTION:
 --- paths.toml may move the logs folder through LogsDirPath. An empty value is
---- the OS default, ~/Library/Logs/ergopti_plus.
+--- the OS default, ~/<app_dirs macos.relative>.
 ---
 --- WHAT IS PINNED (config-paths-logs-dir):
 --- 1. The default, and the override read back from paths.toml.
@@ -21,6 +21,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
+
+-- The application folder name every override ends with.
+local APP = AppDirs.macos.folder_name
 
 --- Loads a resolver over an in-memory paths.toml.
 --- @param bootstrap_content string|nil Existing paths.toml bytes.
@@ -70,10 +74,10 @@ local function fresh_resolver(bootstrap_content)
 	return ConfigPaths, observations, initialized
 end
 
-local DEFAULT_LOGS = "/fixture/home/Library/Logs/ergopti_plus/"
+local DEFAULT_LOGS = "/fixture/home/" .. AppDirs.macos.relative .. "/"
 
 helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", function()
-	helpers.it("defaults to ~/Library/Logs/ergopti_plus", function()
+	helpers.it("defaults to the OS logs folder", function()
 		local ConfigPaths, _, initialized = fresh_resolver(nil)
 		helpers.assert_true(initialized, "an absent paths.toml must initialise")
 		helpers.assert_eq(ConfigPaths.get_default_logs_dir(), DEFAULT_LOGS)
@@ -81,13 +85,13 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 	end)
 
 	helpers.it("reads an override named after the application as is", function()
-		local ConfigPaths = fresh_resolver('LogsDirPath = "/fixture/sync/ergopti_plus"\n')
-		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/sync/ergopti_plus/")
+		local ConfigPaths = fresh_resolver('LogsDirPath = "/fixture/sync/' .. APP .. '"\n')
+		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/sync/" .. APP .. "/")
 	end)
 
 	helpers.it("appends the application folder to a foreign folder", function()
 		local ConfigPaths = fresh_resolver('LogsDirPath = "/fixture/Documents/"\n')
-		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/Documents/ergopti_plus/")
+		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/Documents/" .. APP .. "/")
 	end)
 
 	helpers.it("refuses a relative override at load", function()
@@ -101,22 +105,22 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 		helpers.assert_nil(err)
 		helpers.assert_true(changed == true, "a new logs folder is a change")
 		local written = observations.writes[#observations.writes]
-		helpers.assert_contains(written, 'LogsDirPath = "/fixture/Documents/ergopti_plus/"')
+		helpers.assert_contains(written, 'LogsDirPath = "/fixture/Documents/' .. APP .. '/"')
 		helpers.assert_contains(written, 'ConfigDirPath = "/fixture/cfg/"')
-		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/Documents/ergopti_plus/")
+		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/Documents/" .. APP .. "/")
 		helpers.assert_eq(ConfigPaths.get_config_dir(), "/fixture/cfg/")
 	end)
 
 	helpers.it("keeps the logs override when only the configuration folder moves", function()
-		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/ergopti_plus/"\n')
+		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/' .. APP .. '/"\n')
 		helpers.assert_true(ConfigPaths.set_config_dir("/fixture/cfg2/") == true)
 		local written = observations.writes[#observations.writes]
-		helpers.assert_contains(written, 'LogsDirPath = "/fixture/sync/ergopti_plus/"')
+		helpers.assert_contains(written, 'LogsDirPath = "/fixture/sync/' .. APP .. '/"')
 		helpers.assert_contains(written, 'ConfigDirPath = "/fixture/cfg2/"')
 	end)
 
 	helpers.it("clears an override equal to the default", function()
-		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/ergopti_plus/"\n')
+		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/' .. APP .. '/"\n')
 		local changed = ConfigPaths.set_paths(nil, DEFAULT_LOGS)
 		helpers.assert_true(changed == true)
 		local written = observations.writes[#observations.writes]
@@ -141,12 +145,12 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 	end)
 
 	helpers.it("refuses a relative override at save and keeps the stored one", function()
-		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/ergopti_plus/"\n')
+		local ConfigPaths, observations = fresh_resolver('LogsDirPath = "/fixture/sync/' .. APP .. '/"\n')
 		local writes_before = #observations.writes
 		local changed, err = ConfigPaths.set_paths(nil, "relative/logs")
 		helpers.assert_true(changed == false, "a relative folder must be refused")
 		helpers.assert_not_nil(err)
 		helpers.assert_eq(#observations.writes, writes_before, "a refusal publishes nothing")
-		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/sync/ergopti_plus/")
+		helpers.assert_eq(ConfigPaths.get_logs_dir(), "/fixture/sync/" .. APP .. "/")
 	end)
 end)

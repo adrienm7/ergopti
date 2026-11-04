@@ -677,6 +677,8 @@ do
 			  read_only_notice_key = function() return nil end }
 			local environment = setmetatable({ arg = launch_args, require = function(name)
 			  if name == "config_migrate" then return startup_migration end
+			  -- The legacy folder move is an inert boundary too: no account folder moves.
+			  if name == "infra.legacy_folder_migration" then return require("tests.support.legacy_folder_migration_stub") end
 			  return require(name)
 			end, os = setmetatable({ exit = function(code) error("controlled Main exit " .. tostring(code)) end }, { __index = os }) }, { __index = _G })
 			if setfenv then setfenv(main, environment) else main = assert(loadfile(root .. "/ergopti_hotstrings.lua", "t", environment)) end

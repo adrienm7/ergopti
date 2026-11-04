@@ -43,27 +43,23 @@ local pipe = io.popen("curl -fsS --max-time 20" .. auth
 local releases_json = pipe and pipe:read("*a") or ""
 if pipe then pipe:close() end
 -- The repository also publishes releases that are not Ergopti versions (the
--- Linux remap runtime, remap-runtime-v…), which the page rightly never lists:
--- the head is the highest Ergopti version, as the page orders them.
-local function version_key(tag)
-	local major, minor, patch, pre = tag:match("^v(%d+)%.(%d+)%.(%d+)(.*)$")
-	if not major then return nil end
-	local pre_number = tonumber(pre:match("(%d+)$") or "0")
-	return { tonumber(major), tonumber(minor), tonumber(patch), pre == "" and 1 or 0, pre_number }
-end
-local function newer(a, b)
-	for i = 1, #a do
-		if a[i] ~= b[i] then return a[i] > b[i] end
-	end
-	return false
-end
-local latest, latest_key = nil, nil
+-- Linux remap runtime, remap-runtime-v…), which the page rightly never lists.
+-- The page keeps GitHub's order, newest published first: the head is the first
+-- Ergopti release the channel shows (the dev view also shows stable releases).
+local ergopti_tags = {}
 for tag in releases_json:gmatch('"tag_name"%s*:%s*"([^"]+)"') do
-	local key = version_key(tag)
-	if key and (not latest_key or newer(key, latest_key)) then latest, latest_key = tag, key end
+	if tag:match("^v%d+%.%d+%.%d+") then ergopti_tags[#ergopti_tags + 1] = tag end
 end
-if not latest then abort("GitHub's release API is unreachable or lists no Ergopti release.") end
-print("  newest published Ergopti release: " .. latest)
+if #ergopti_tags == 0 then abort("GitHub's release API is unreachable or lists no Ergopti release.") end
+--- The first release the channel's view lists, in GitHub's order.
+--- @param channel string "dev" or "main".
+--- @return string|nil tag
+local function head_for(channel)
+	for _, tag in ipairs(ergopti_tags) do
+		if channel == "dev" or tag:match("^v%d+%.%d+%.%d+$") then return tag end
+	end
+end
+print("  newest published Ergopti release: " .. ergopti_tags[1])
 
 local Manager = require("ui.webview_manager")
 local Updater = require("modules.updater.manager")
@@ -137,8 +133,9 @@ local state = wait_for(webview, STATE, function(value) return value:find('"tags"
 print("  page: " .. state:sub(1, 300))
 expect(state ~= "", "the page state probe returned a value")
 expect(not state:find('"error":true', 1, true), "no error is shown")
+local latest = head_for(expected_channel) or "?"
 expect(state:find('"tags":["' .. latest .. '"', 1, true) ~= nil,
-	"the newest release (" .. latest .. ") heads the list")
+	"the newest release of the " .. expected_channel .. " view (" .. latest .. ") heads the list")
 expect(state:find('"dev":' .. tostring(expected_channel == "dev"), 1, true) ~= nil,
 	"the list opens on the channel the installation follows (" .. expected_channel .. ")")
 

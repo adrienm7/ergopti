@@ -37,7 +37,7 @@
 ---    lines in between into its first occurrence plus one timed summary.
 --- 6. Unified rotating file sink: the acknowledged native worker writes one file
 ---    per calendar day in the logs folder (LogsDirPath in paths.toml, or
----    ~/Library/Logs/ergopti_plus/), named ErgoptiPlus_YYYY-MM-DD.log. This
+---    ~/Library/Logs/Ergopti/), named ErgoptiPlus_YYYY-MM-DD.log. This
 ---    module is the one resolver of that folder and of today's file names.
 ---    Files older than max_age_days are purged automatically on init and after
 ---    the first successful write of each new calendar day.
@@ -578,7 +578,7 @@ local function _dated_log_paths(log_dir, date)
 end
 
 --- Points the sink at the logs folder resolved by infra/config_paths
---- (LogsDirPath, or ~/Library/Logs/ergopti_plus/) with daily rotation and
+--- (LogsDirPath, or ~/Library/Logs/Ergopti/) with daily rotation and
 --- purges files older than max_age_days. Best-effort: an I/O failure cannot
 --- block init, but every rejected or throwing asynchronous purge boundary is
 --- logged explicitly.

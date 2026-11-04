@@ -350,13 +350,29 @@ local function owned_readiness(callback)
 	local source_available = require("adapters.installed_physical_source").new().available()
 	require("adapters.karabiner_coexistence").new().describe(function(facts)
 		local OwnerPorts = require("adapters.runtime_owner_ports")
-		callback({
+		local readiness = {
 			unpinned = OwnerPorts.unpinned_count(),
 			virtual_hid_version = OwnerPorts.virtual_hid_version(),
+			artifact = OwnerPorts.artifact_receipt_state(),
 			source = source_available == true,
 			helper_present = facts.helper_present,
 			active = facts.active_processes,
-		})
+		}
+		-- The install role refuses an ad hoc launcher (launcher_unsigned): the
+		-- helper must carry this launcher's own certificate leaf.
+		local launcher = require("platform.remap.lease_helper").resolve()
+		local bundle = type(launcher) == "string" and launcher:match("^(.-%.app)/Contents/") or nil
+		if not bundle then
+			readiness.launcher_identity = "no_launcher"
+			return callback(readiness)
+		end
+		exec("/usr/bin/codesign", { "-dv", "--verbose=2", bundle }, 5, function(code, output, errors)
+			local identity = require("infra.field_check_probes").parse_signing_identity(
+				tostring(output or "") .. "\n" .. tostring(errors or ""))
+			readiness.launcher_identity = (code == 0 or identity == "unsigned") and identity
+				or (code == nil and "timeout" or ("exit_" .. tostring(code)))
+			callback(readiness)
+		end)
 	end)
 end
 
@@ -385,6 +401,22 @@ local function owned_activation()
 		fetch = function(callback) require("adapters.runtime_owner_ports").fetch_artifact(callback) end,
 		other_active = function(callback) require("adapters.karabiner_coexistence").new().detect(callback) end,
 		marker = function() return require("adapters.runtime_owner_ports").marker().get() end,
+		-- The first install with no confirmation dialog: the field run is the request.
+		install_reasons = function() return Remap().OWNED_INSTALL_REASONS end,
+		install = function(callback)
+			if Remap().install_owned_runtime(callback) ~= true then callback(false, "install_not_offered") end
+		end,
+		driver_active = function(callback)
+			exec("/usr/bin/systemextensionsctl", { "list" }, 5, function(code, output)
+				local version = require("adapters.runtime_owner_ports").virtual_hid_version()
+				if code ~= 0 or type(version) ~= "string" then return callback(nil) end
+				local Vhid = require("platform.remap.runtime_vhid")
+				callback(Vhid.assess(Vhid.parse(output), version).ok == true)
+			end)
+		end,
+		open_driver_pane = function()
+			return hs.urlevent.openURL(require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL)
+		end,
 	}
 end
 

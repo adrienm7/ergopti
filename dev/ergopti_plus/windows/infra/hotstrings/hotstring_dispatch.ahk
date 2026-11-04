@@ -204,7 +204,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 		InsertedText: InsertedText,
 		EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: !ClearAll && InsertedText != ""
-			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0
+			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet())
 	}
 	BufferCritical := Critical("On")
 	PreviousBuffer := HSE_Buffer
@@ -282,7 +282,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 				InsertedText: InsertedText,
 				EndCharEmitted: false,
 				KnownBoundaryAfter: HSE_Buffer != ""
-					&& InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
+					&& _HSE_CharOpensWord(SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1)), _HSE_WordBoundarySet())
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -704,7 +704,7 @@ _HSE_CommitNotepadOwner(Owner) {
 	Effect := { IsPrivate: Owner["IsPrivate"], ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
 		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: InsertedText != ""
-			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0 }
+			&& _HSE_CharOpensWord(SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1)), _HSE_WordBoundarySet()) }
 	PreviousBuffer := HSE_Buffer
 	PreviousBoundary := HSE_StartIsWordBoundary
 	try {
@@ -1056,7 +1056,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 												InsertedText: Ins,
 												EndCharEmitted: false,
 												KnownBoundaryAfter: HSE_Buffer != ""
-														and InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))) > 0
+														and _HSE_CharOpensWord(SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1)), _HSE_WordBoundarySet())
 										}
 										_HSE_MirrorCanonicalEffectToLlm(CanonicalEffect)
 										CommittedEffect := CanonicalEffect

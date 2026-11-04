@@ -183,7 +183,7 @@ local function alive(pid)
 	return status ~= nil and status:match("State:%s*(%u)") ~= "Z"
 end
 
-local session_path = scratch .. "/run/" .. require("app_dirs").folder_name .. "/control/session.json"
+local session_path = scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/session.json"
 local function session_pid() return tonumber(((read(session_path) or ""):match('"pid":(%d+)'))) end
 
 --- Waits until the session is published by the generation `count`.
@@ -251,7 +251,7 @@ local fifth = wait_generation(5)
 check(code == 2 and result.state == "timeout" and result.reason == "deadline",
 	"a successor ready past the deadline: " .. tostring(result.state) .. "/" .. tostring(result.reason))
 check(fifth ~= nil, "the late successor still runs")
-local stored = read(scratch .. "/run/" .. require("app_dirs").folder_name .. "/control/reload.result") or ""
+local stored = read(scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/reload.result") or ""
 check(stored:find('"state":"timeout"', 1, true) ~= nil and not stored:find('"completed"', 1, true),
 	"the record says timeout, never completed")
 

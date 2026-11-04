@@ -52,7 +52,7 @@ final class OwnedRuntimeDownloadedHelperTests: XCTestCase {
 		try keepDownload()
 		let located = try OwnedRuntimeDownloadedHelper.locate(pin: pin, home: home.path).get()
 		XCTAssertEqual(located.standardizedFileURL.path, helper.standardizedFileURL.path)
-		XCTAssertTrue(located.path.hasPrefix(home.path + "/Library/Application Support/ErgoptiPlus/RemapRuntime/" + version + "/payload/"))
+		XCTAssertTrue(located.path.hasPrefix(home.path + "/" + kMacOSSupportHomeRelativePath + "/RemapRuntime/" + version + "/payload/"))
 		XCTAssertFalse(located.path.contains("OwnedRuntimeInstaller"))
 	}
 

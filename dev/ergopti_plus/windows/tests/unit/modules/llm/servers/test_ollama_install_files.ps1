@@ -21,7 +21,10 @@ $fixtures = $FixtureRoot
 $receipts = [IO.File]::ReadAllText([IO.Path]::Combine($fixtures, 'receipts.json')) | ConvertFrom-Json
 $payloads = [IO.File]::ReadAllText([IO.Path]::Combine($fixtures, 'payloads.json')) | ConvertFrom-Json
 $token = [Guid]::NewGuid().ToString('N')
-$rootPath = [IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'ergopti-ollama-test-' + $token)
+# The evidence folder stands for the Ergopti root: a direct LocalApplicationData
+# child holding the protected managed root.
+$evidencePath = [IO.Path]::Combine([Environment]::GetFolderPath('LocalApplicationData'), 'ergopti-ollama-test-' + $token)
+$rootPath = [IO.Path]::Combine($evidencePath, 'ollama')
 $sourcePath = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'ergopti-ollama-source-' + $token)
 [void][IO.Directory]::CreateDirectory($sourcePath)
 $script:passed = 0
@@ -62,6 +65,41 @@ try {
 		$script:root = Open-OllamaManagedRoot $rootPath
 		Assert-OllamaPrivateSecurity $rootPath
 		Assert-Receipt ([IO.File]::Exists([IO.Path]::Combine($rootPath, 'root-owner.json'))) 'Root ownership marker exists.'
+	}
+	# Each weakening is applied to the actual folder, refused, removed, and the
+	# same root then opens again, so the refusal comes from that ACE alone.
+	function Assert-WeakenedRefused([string]$Path, [string]$Sid, [string]$Rights, [string]$Inheritance) {
+		# Only the DACL is read and written: the audit section needs a privilege.
+		$item = [IO.DirectoryInfo]::new($Path)
+		$acl = $item.GetAccessControl([Security.AccessControl.AccessControlSections]::Access)
+		$rule = New-Object Security.AccessControl.FileSystemAccessRule(
+			(New-Object Security.Principal.SecurityIdentifier($Sid)), $Rights, $Inheritance, 'None', 'Allow')
+		$acl.AddAccessRule($rule)
+		$item.SetAccessControl($acl)
+		try { Must-Refuse { Open-OllamaManagedRoot $rootPath $false } }
+		finally {
+			$acl = $item.GetAccessControl([Security.AccessControl.AccessControlSections]::Access)
+			[void]$acl.RemoveAccessRule($rule)
+			$item.SetAccessControl($acl)
+		}
+		$again = Open-OllamaManagedRoot $rootPath $false
+		Close-OllamaManagedRoot $again
+	}
+	Case 'parent granting Users modify is refused' {
+		Assert-WeakenedRefused $evidencePath 'S-1-5-32-545' 'Modify' 'None'
+	}
+	Case 'parent granting Everyone inheritable delete-child is refused' {
+		Assert-WeakenedRefused $evidencePath 'S-1-1-0' 'DeleteSubdirectoriesAndFiles' 'ContainerInherit, ObjectInherit'
+	}
+	Case 'managed root granting Users read is refused' {
+		Assert-WeakenedRefused $rootPath 'S-1-5-32-545' 'ReadAndExecute' 'None'
+	}
+	Case 'a direct LocalApplicationData child and a deeper folder are refused before creation' {
+		$sibling = $evidencePath + '-sibling'
+		Must-Refuse { Open-OllamaManagedRoot $sibling }
+		Must-Refuse { Open-OllamaManagedRoot ([IO.Path]::Combine($rootPath, 'nested')) }
+		Assert-Receipt (-not [IO.Directory]::Exists($sibling)) 'The refused sibling was never created.'
+		Assert-Receipt (-not [IO.Directory]::Exists([IO.Path]::Combine($rootPath, 'nested'))) 'The refused nested root was never created.'
 	}
 	foreach ($name in @('traversal', 'ads', 'rooted', 'device', 'collision', 'trailing-dot', 'receipt-collision', 'directory-cli', 'symlink')) {
 		# Bind each fixture name through an independent function scope.
@@ -219,7 +257,7 @@ try {
 	if ($null -ne $root) { Close-OllamaManagedRoot $root }
 	# Preserve native evidence and the immutable published fixture version. No
 	# wildcard recursive removal or replacement of production/user directories.
-	Write-Output ('Evidence root: ' + $rootPath)
+	Write-Output ('Evidence root: ' + $evidencePath)
 	Write-Output ('Independent source receipts: ' + $sourcePath)
 	Write-Output ('RESULT passed=' + $script:passed + ' failed=' + $script:failed + ' skipped=0')
 }

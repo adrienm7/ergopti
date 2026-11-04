@@ -39,8 +39,12 @@ global _TomlFileSectionCounts := Map()
 ; without that group the boot loader would silently skip the whole entry and the
 ; per-hotstring priority feature would be a no-op (the value is then read back by
 ; _ParseEntryPriority, which is order-tolerant).
+; The trigger is a quoted key or a bare one (A-Z a-z 0-9 _ -); the branch reset
+; keeps it group 1 either way. The editor wrote bare keys (1.0.9) that this
+; pattern skipped, so a personal `par` hotstring never loaded and never fired.
+; HS_PREFIX_ENTRY_PATTERN (hotstring_registry.ahk) holds the same key grammar.
 global _HOTSTRING_ENTRY_PATTERN :=
-		'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
+		'i)^(?|"([^"\\]*(?:\\.[^"\\]*)*)"|([A-Za-z0-9_\-]+))\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
 ; Simple `key = "value"` entry shape that LoadExtTomlFile also registers (as a
 ; CreateCaseSensitiveHotstrings call) when the full inline-table pattern misses.

@@ -53,6 +53,7 @@ local function load_remap(initially_enabled, options)
 		compute_non_canonical_combos = function() return {} end,
 		load_user_config = function()
 			return {
+				runtime = "shared",
 				enabled = initially_enabled,
 				tap_hold_config = { caps = { tap = "ergopti_output", hold = "none" } },
 				mod_combos_config = {},

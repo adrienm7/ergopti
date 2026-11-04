@@ -365,7 +365,7 @@ helpers.describe("updater bounded pagination", function()
 	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
 		local real_fs = require("adapters.file_system")
 		local controlled_fs = setmetatable({ exists = function(path)
-			if path:match("/%.cache$") or path:match("/%.cache/ergopti_updater_etag_[^/]+%.txt$") then return true end
+			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return real_fs.exists(path)
 		end }, { __index = real_fs })
 		local M = helpers.load_module_with_dependency("modules.updater.manager", "adapters.file_system", controlled_fs)
@@ -376,7 +376,7 @@ helpers.describe("updater bounded pagination", function()
 			local index = tonumber(url:match("&page=(%d+)$"))
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
-			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
+			helpers.assert_eq(options.max_body_bytes, 8 * 1024 * 1024)
 			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			etag_response(response, "https://etag-fixture.invalid/releases/page-" .. index, '"PAGE-' .. index .. '"', cached)
 			if cached then helpers.assert_true(options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end

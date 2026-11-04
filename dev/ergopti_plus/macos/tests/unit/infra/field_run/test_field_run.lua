@@ -267,11 +267,15 @@ helpers.describe("field run: developer source mode only", function()
 		end)
 	end)
 
-	helpers.it("is started by init.lua only behind the developer source check", function()
+	helpers.it("is started by init.lua only for a developer clone or the collector's admitted clone", function()
 		local source = assert(helpers.read_driver_unit('require("infra.field_run").start('))
-		local gate = source:find('if require("infra.dev_source").is_active() then', 1, true)
+		-- The installed signed app takes the clone only from ERGOPTI_FIELD_RUN_ROOT, which its launcher admits.
+		local root = source:find('local field_run_root = require("infra.dev_source").is_active() and '
+			.. 'require("infra.dev_source").root()\n\tor os.getenv(require("identifiers").field_report.environment)', 1, true)
+		helpers.assert_not_nil(root, "the root must come from developer source mode or the collector's variable only")
+		local gate = source:find('if type(field_run_root) == "string" and field_run_root ~= "" then', 1, true)
 		local start = source:find('require("infra.field_run").start(', 1, true)
-		helpers.assert_not_nil(gate, "init.lua must gate the field run on developer source mode")
+		helpers.assert_not_nil(gate, "init.lua must gate the field run on an admitted clone")
 		helpers.assert_not_nil(start, "init.lua must start the field run")
 		helpers.assert_true(gate < start, "the gate must come before the start")
 		local between = source:sub(gate, start)
@@ -532,15 +536,22 @@ helpers.describe("field run: a run", function()
 			session:start()
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
 			state.advance(0)
-			-- The timed reload: this state is torn down, the reloaded one carries on
-			helpers.assert_eq(#state.reloads, 1, "the reload step asks for one reload")
-			helpers.assert_eq(state.reloads[1].reason, FieldRun.TIMED_RELOAD_REASON)
-			helpers.assert_nil(state.files[FOLDER .. "/results/r11/done.json"], "a suspended run writes no done")
-			session:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
-			helpers.assert_not_nil(state.files[FOLDER .. "/running.json"], "the running marker survives the reload")
-			state.now = state.now + 4200
-			FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343, ports = state.ports }):start()
-			state.advance(0)
+			-- Each timed reload: this state is torn down, the reloaded one carries on
+			local reload_steps = 0
+			for _, step in ipairs(spec.steps) do if step.kind == "reload" then reload_steps = reload_steps + 1 end end
+			helpers.assert_true(reload_steps >= 1, "the shipped run keeps its reloads")
+			for reload = 1, reload_steps do
+				helpers.assert_eq(#state.reloads, reload, "each reload step asks for one reload")
+				helpers.assert_eq(state.reloads[reload].reason, FieldRun.TIMED_RELOAD_REASON)
+				helpers.assert_nil(state.files[FOLDER .. "/results/r11/done.json"], "a suspended run writes no done")
+				session:stop({ kind = "reload", reason = FieldRun.TIMED_RELOAD_REASON })
+				helpers.assert_not_nil(state.files[FOLDER .. "/running.json"], "the running marker survives the reload")
+				state.now = state.now + 4200
+				session = FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343 + reload,
+					ports = state.ports })
+				session:start()
+				state.advance(0)
+			end
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))
 				helpers.assert_not_nil(result, "no result for " .. step.id)

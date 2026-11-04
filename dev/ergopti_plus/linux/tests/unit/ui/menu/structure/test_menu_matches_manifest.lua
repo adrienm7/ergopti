@@ -35,6 +35,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 -- Rebound rather than required: `infra.manifest_menu` captures the i18n MODULE
 -- TABLE when it is loaded, and tests/unit/infra/i18n/test_i18n_persistence.lua wipes
 -- `package.loaded["infra.i18n"]` nine times. Whichever of them ran first, the
@@ -240,8 +243,8 @@ local function build_fixture_menu(context)
 	local ok, rows = pcall(function()
 		local lfs = require("lfs"); editor_fs = lfs
 		editor_directory = os.tmpname(); assert(os.remove(editor_directory)); assert(lfs.mkdir(editor_directory))
-		assert(lfs.mkdir(editor_directory .. "/ergopti_plus"))
-		editor_source = editor_directory .. "/ergopti_plus/storage.json"
+		assert(lfs.mkdir(editor_directory .. "/" .. FOLDER))
+		editor_source = editor_directory .. "/" .. FOLDER .. "/storage.json"
 		local seed = assert(io.open(editor_source, "wb"))
 		assert(seed:write('{"hotstring_editor.default_section":"","future":{"keep":true}}\n')); assert(seed:close())
 		os.getenv = function(name)
@@ -310,10 +313,10 @@ local function build_fixture_menu(context)
 	if magic_path then cleanup(function() assert(os.remove(magic_path)) end) end
 	if editor_directory then cleanup(function()
 		local lfs = editor_fs
-		for file in lfs.dir(editor_directory .. "/ergopti_plus") do
-			if file ~= "." and file ~= ".." then assert(os.remove(editor_directory .. "/ergopti_plus/" .. file)) end
+		for file in lfs.dir(editor_directory .. "/" .. FOLDER) do
+			if file ~= "." and file ~= ".." then assert(os.remove(editor_directory .. "/" .. FOLDER .. "/" .. file)) end
 		end
-		assert(lfs.rmdir(editor_directory .. "/ergopti_plus")); assert(lfs.rmdir(editor_directory))
+		assert(lfs.rmdir(editor_directory .. "/" .. FOLDER)); assert(lfs.rmdir(editor_directory))
 	end) end
 	helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
 	for _, name in ipairs(names) do helpers.assert_true(rawequal(rawget(package.loaded, name), saved[name]), name) end

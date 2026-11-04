@@ -14,6 +14,9 @@
 ---    and gives the user's Karabiner back, clearing the record. The resume is
 ---    queued for after the run has written its results, because a resume
 ---    reloads the driver (one capture per Lua VM) and must not cut the run.
+--- 3. owned_install: a missing runtime is installed with no click of Ergopti's (the
+---    macOS administrator prompt is the one human step), then the driver approval
+---    is waited for; the field run's next step reloads so the owner admits it.
 --- Restore-on-quit cannot run inside a field run, which ends with the app; it
 --- shares restore_if_closed with the pause and is pinned by the unit suite.
 ---
@@ -142,6 +145,63 @@ function M.pause(ports, report, finish)
 				finish_with_resume()
 			end)
 		end)
+	end)
+end
+
+--- Seconds the administrator prompt, the install and the driver approval may
+--- take together, inside the step's own deadline (data/field_run.json).
+M.INSTALL_WAIT_SEC = 840
+--- Seconds between two looks at the driver while macOS waits for the approval.
+M.DRIVER_POLL_SEC = 5
+
+--- The first install with no click of Ergopti's: when the owner reports a
+--- missing runtime, the install runs directly (the macOS administrator prompt
+--- is the one human step), then the driver approval pane opens and the check
+--- waits for macOS to report pqrs' driver active. The reload step that follows
+--- in the field run lets the next owner admit the runtime.
+--- @param ports table Field check ports; uses `owned_activation` and `after`.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+function M.install(ports, report, finish)
+	local port = ports.owned_activation
+	if type(port) ~= "table" or port.selected() ~= true then
+		skip_all(report, { "install_needed", "installed", "driver_active" }, "shared_runtime")
+		return finish()
+	end
+	local function driver()
+		local waited, pane_opened = 0, false
+		local function look()
+			port.driver_active(function(active)
+				if active == true then report.step("driver_active", "pass", "active"); return finish() end
+				if not pane_opened then
+					pane_opened = true
+					port.open_driver_pane()
+				end
+				if waited >= M.INSTALL_WAIT_SEC then
+					report.step("driver_active", "fail", active == nil and "unreadable" or "not_approved")
+					return finish()
+				end
+				waited = waited + M.DRIVER_POLL_SEC
+				ports.after(M.DRIVER_POLL_SEC, look)
+			end)
+		end
+		look()
+	end
+	local reason = port.owner_reason()
+	if port.install_reasons()[reason] ~= true then
+		report.step("install_needed", "info", "no:" .. tostring(port.owner_state()) .. ":" .. tostring(reason))
+		report.step("installed", "skip", "not_needed")
+		return driver()
+	end
+	report.step("install_needed", "info", "yes:" .. tostring(reason))
+	port.install(function(ok, why)
+		if ok ~= true then
+			report.step("installed", "fail", tostring(why))
+			report.step("driver_active", "skip", "not_installed")
+			return finish()
+		end
+		report.step("installed", "pass", "installed")
+		driver()
 	end)
 end
 

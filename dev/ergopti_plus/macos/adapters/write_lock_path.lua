@@ -22,9 +22,11 @@
 local M = {}
 
 local NativePath = require("native_path")
+local AppDirs = require("app_dirs")
 
 M.SUFFIX = ".ergoptiplus-write-lock-v1"
-M.DIRECTORY = "Library/Application Support/ErgoptiPlus/write-locks"
+-- Relative to the home folder, inside the one Ergopti root.
+M.DIRECTORY = AppDirs.macos.support_relative .. "/write-locks"
 
 local FNV64_OFFSET_BASIS = -3750763034362895579 -- 0xcbf29ce484222325 as a signed integer
 local FNV64_PRIME = 1099511628211

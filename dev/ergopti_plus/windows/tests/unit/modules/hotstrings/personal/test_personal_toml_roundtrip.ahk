@@ -188,3 +188,152 @@ _PTIO_DuplicateCandidateOrderStaysCanonicalAcrossTwoCycles() {
 }
 Test("personal-toml-order-dedup: two cycles keep one section and one entry",
 	_PTIO_DuplicateCandidateOrderStaysCanonicalAcrossTwoCycles)
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 4/ Editor rows load and fire from disk =========
+; =========================================================
+; =========================================================
+
+; Field report on 1.0.9: a personal hotstring typing `(){left}` could not be
+; created, nor `()` alone. The editor wrote a letters-only trigger as a bare TOML
+; key (`par = { ... }`) and every Windows loader pattern admitted quoted keys only,
+; so the section loader skipped the row: it never fired after a section toggle,
+; a new-section save or a restart. These tests go through the real writer and the
+; real section loader, then type the trigger.
+
+global _PTIO_LoadBursts := []
+
+_PTIO_LoadRecord(Keys) {
+	global _PTIO_LoadBursts
+	_PTIO_LoadBursts.Push(Keys)
+	return 1
+}
+
+_PTIO_PersoSource(Rows) {
+	Q := Chr(34)
+	return "[_meta]`ndescription = " . Q . "Perso" . Q . "`n"
+		. "sections_order = [" . Q . "perso" . Q . "]`n`n"
+		. "[_meta.sections]`nperso = " . Q . "Perso" . Q . "`n`n"
+		. "[[perso]]`n" . Rows
+}
+
+; Loads the [[perso]] section of Path the way boot and every live rebuild do,
+; types Typed and returns the bursts it sent.
+_PTIO_LoadAndType(Path, Typed) {
+	global _PTIO_LoadBursts, _AHK_SendInput
+	_PersonalTomlInvalidateCaches(Path)
+	_AHK_SendInput := _PTIO_LoadRecord
+	_PTIO_LoadBursts := []
+	HSE_RegistryClear()
+	HSE_HardReset()
+	HSE_FeedReset(true)
+	LoadHotstringsSection("personal", "perso", { TimeActivationSeconds: 0 })
+	_HCA_Type(Typed)
+	return _PTIO_LoadBursts
+}
+
+_PTIO_EditorRowFiresFromDiskImpl() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TargetPath := A_Temp . "\ergopti_personal_editor_row_load_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	try {
+		try FileDelete(TargetPath)
+		FileAppend(_PTIO_PersoSource(""), TargetPath, "UTF-8")
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+		; The exact save payload of the shared editor page, decoded as the bridge does.
+		Payload := JsonParse('{"sections_order":["perso"],"sections":{"perso":{"description":"Perso",'
+			. '"entries":[{"trigger":"par","output":"(){Left}","is_word":true,"auto_expand":true,'
+			. '"is_case_sensitive":false,"final_result":false,"is_case_sensitive_strict":false}]}}}')
+		AssertTrue(WritePersonalToml(Map("meta_description", "Perso",
+			"sections_order", Payload["sections_order"], "sections", Payload["sections"])),
+			"the editor save of a letters-only trigger must be written")
+		AssertTrue(InStr(FileRead(TargetPath, "UTF-8"), '"par" = { output = "(){Left}"') > 0,
+			"the writer quotes the trigger key, as the macOS and Linux writers do")
+		Bursts := _PTIO_LoadAndType(TargetPath, "par")
+		AssertEqual(1, Bursts.Length, "the saved personal hotstring must load from disk and fire")
+		AssertEqual("{BackSpace 3}(){Left}", Bursts.Length ? Bursts[1] : "",
+			"it types the parentheses and presses Left between them")
+	} finally {
+		try FileDelete(TargetPath)
+		try _PersonalTomlInvalidateCaches(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal-editor-row-loads: a saved letters-only trigger fires from disk (personal-paren-left)",
+	() => _HCA_Run(1, _PTIO_EditorRowFiresFromDiskImpl))
+
+; Files 1.0.9 already wrote keep their bare rows until the row is edited again.
+_PTIO_BareRowFiresFromDiskImpl() {
+	global ScriptInformation
+	TargetPath := A_Temp . "\ergopti_personal_bare_row_load_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	try {
+		try FileDelete(TargetPath)
+		FileAppend(_PTIO_PersoSource('par = { output = "()", is_word = true, auto_expand = true,'
+			. ' is_case_sensitive = false, final_result = false }`n'), TargetPath, "UTF-8")
+		OldPath := ScriptInformation["PersonalTomlPath"]
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		try Bursts := _PTIO_LoadAndType(TargetPath, "par")
+		finally ScriptInformation["PersonalTomlPath"] := OldPath
+		AssertEqual(1, Bursts.Length, "a bare TOML key is a trigger like a quoted one")
+		AssertEqual("{BackSpace 3}{Text}()", Bursts.Length ? Bursts[1] : "",
+			"and its output is typed")
+		Line := 'par = { output = "()", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }'
+		AssertTrue(RegExMatch(Line, HS_PREFIX_ENTRY_PATTERN, &M) > 0,
+			"the preview index reads the same bare row")
+		AssertEqual("par", M[1], "and keeps the trigger as group 1")
+	} finally {
+		try FileDelete(TargetPath)
+		try _PersonalTomlInvalidateCaches(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+	}
+}
+Test("personal-editor-row-loads: a bare trigger key on disk fires (personal-paren-left)",
+	() => _HCA_Run(1, _PTIO_BareRowFiresFromDiskImpl))
+
+; The shared editor page names the strict flag is_case_sensitive_strict, as the
+; TOML and the macOS and Linux models do. The Windows model called it
+; strict_case, so a box ticked in the WebView editor was dropped on save.
+_PTIO_WebViewStrictFlagSurvivesSave() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TargetPath := A_Temp . "\ergopti_personal_strict_flag_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	try {
+		try FileDelete(TargetPath)
+		FileAppend(_PTIO_PersoSource(""), TargetPath, "UTF-8")
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+		Payload := JsonParse('{"sections_order":["perso"],"sections":{"perso":{"description":"Perso",'
+			. '"entries":[{"trigger":"sru","output":"SRU","is_word":true,"auto_expand":false,'
+			. '"is_case_sensitive":true,"final_result":false,"is_case_sensitive_strict":true}]}}}')
+		AssertTrue(WritePersonalToml(Map("meta_description", "Perso",
+			"sections_order", Payload["sections_order"], "sections", Payload["sections"])),
+			"the editor save of a strict entry must be written")
+		AssertTrue(InStr(FileRead(TargetPath, "UTF-8"), "is_case_sensitive_strict = true") > 0,
+			"the strict flag the page sent reaches the file")
+		_ReadPersonalTomlCache := false
+		Entry := ReadPersonalToml(true)["sections"]["perso"]["entries"][1]
+		AssertEqual(true, Entry.Get("is_case_sensitive_strict", false) ? true : false,
+			"and the model reads it back under the same name")
+	} finally {
+		try FileDelete(TargetPath)
+		try _PersonalTomlInvalidateCaches(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal-editor-strict-flag: the WebView strict flag survives a save (personal-strict-name)",
+	_PTIO_WebViewStrictFlagSurvivesSave)

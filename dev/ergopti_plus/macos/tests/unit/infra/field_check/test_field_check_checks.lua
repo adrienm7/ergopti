@@ -272,6 +272,30 @@ helpers.describe("owned runtime check", function()
 		helpers.assert_eq(unreadable.artifact_pin.value, "unreadable")
 	end)
 
+	helpers.it("reports both owned jobs, the downloaded artifact and whether the launcher can install", function()
+		-- WP9 reads the whole owned install from one field report: the VirtualHIDDevice
+		-- job was never reported, and an ad hoc developer app cannot install at all.
+		local ports, world = make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 0, source = true, helper_present = false, active = 0,
+				artifact = "fetched:16.3.0-ergopti.3", launcher_identity = "adhoc" })
+		end })
+		world.existing["/Library/LaunchDaemons/com.ergoptiplus.runtime.vhid.plist"] = true
+		world.outputs["/bin/launchctl print system/com.ergoptiplus.runtime.core"] = { 0, "" }
+		world.outputs["/bin/launchctl print system/com.ergoptiplus.runtime.vhid"] = { 113, "" }
+		local steps, result = run("owned_runtime", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.vhid_job_file.value, "yes")
+		helpers.assert_eq(steps.job_loaded.value, "loaded")
+		helpers.assert_eq(steps.vhid_job_loaded.value, "not_loaded")
+		helpers.assert_eq(steps.artifact_receipt.value, "fetched:16.3.0-ergopti.3")
+		helpers.assert_eq(steps.install_launcher.value, "refused:adhoc")
+		local signed = run("owned_runtime", make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 0, source = true, helper_present = false, active = 0, launcher_identity = "certificate" })
+		end }))
+		helpers.assert_eq(signed.install_launcher.value, "possible:certificate")
+		helpers.assert_eq(signed.artifact_receipt.value, "unknown")
+	end)
+
 	helpers.it("fails when the stream source is selected at default startup", function()
 		local ports = make_ports({ keystats_facts = function()
 			return { credit_source = "gap", capture_loaded = false, ledger_drained = 0 }
@@ -399,6 +423,7 @@ helpers.describe("field check commands are read-only", function()
 		local allowed = {
 			[CLI .. " --version"] = true,
 			["/bin/launchctl print system/com.ergoptiplus.runtime.core"] = true,
+			["/bin/launchctl print system/com.ergoptiplus.runtime.vhid"] = true,
 			["/usr/bin/systemextensionsctl list"] = true,
 			["/usr/bin/pgrep -f org.pqrs/Karabiner"] = true,
 			["/usr/bin/pgrep -f ErgoptiPlus/Runtime"] = true,

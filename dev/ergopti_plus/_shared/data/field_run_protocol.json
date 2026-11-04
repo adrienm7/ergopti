@@ -29,8 +29,8 @@
 	"step_kinds": ["field_check", "diagnostics", "ai", "reload", "guard"],
 	"folder": {
 		"clone": "build/field-run",
-		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["ergopti_plus", "field-run"] },
-		"windows": { "base": "LOCALAPPDATA", "segments": ["ergopti_plus", "field-run"] }
+		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["ergopti", "field-run"] },
+		"windows": { "base": "LOCALAPPDATA", "segments": ["Ergopti", "field-run"] }
 	},
 	"steps_file": {
 		"macos": "static/ergopti_plus/macos/data/field_run.json",

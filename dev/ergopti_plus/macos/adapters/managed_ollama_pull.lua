@@ -39,7 +39,7 @@ end
 function M.handles(executable)
 	local home = os.getenv("HOME")
 	return type(home) == "string" and home:sub(1, 1) == "/"
-		and executable == home:gsub("/+$", "") .. "/Library/Application Support/Ergopti/ollama-native-http/ollama"
+		and executable == home:gsub("/+$", "") .. "/" .. require("app_dirs").macos.support_relative .. "/ollama-native-http/ollama"
 end
 
 local RECEIPT_STATES = { retired = true, pending = true }

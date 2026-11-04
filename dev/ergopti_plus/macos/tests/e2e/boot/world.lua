@@ -560,6 +560,24 @@ local function lease_worker(api)
 	end
 end
 
+--- Whether every path a command names is inside Ergopti's own runtime folder.
+--- @param args table Arguments of /bin/rm or /bin/mkdir.
+--- @return boolean inside
+local function owned_artifact_paths(args)
+	local paths = 0
+	for _, arg in ipairs(args) do
+		if tostring(arg):sub(1, 1) ~= "-" then
+			-- The owned folder's name comes from app_dirs (one Ergopti folder per OS).
+			local artifact_home = require("platform.remap.ke_paths").OWNED.ARTIFACT_HOME:gsub("^~", "")
+			if not tostring(arg):find(artifact_home .. "/", 1, true) then
+				return false
+			end
+			paths = paths + 1
+		end
+	end
+	return paths > 0
+end
+
 --- Answers one command of the set-up Mac.
 --- @param path string Executable.
 --- @param args table Arguments.
@@ -637,6 +655,13 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
+	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
+	-- its folder steps succeed and the E2E Mac is offline, so the download fails
+	-- by name and the owned boot reports artifact_fetch_failed.
+	if (path == "/bin/rm" or path == "/bin/mkdir") and owned_artifact_paths(args) then return { code = 0 } end
+	if path == "/usr/bin/curl" and tostring(args[#args]):find("/releases/download/remap-runtime-v", 1, true) then
+		return { code = 6, stderr = "curl: (6) Could not resolve host: github.com" }
+	end
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
 end
 
@@ -677,7 +702,8 @@ end
 --- @return table env
 function M.launcher_environment(app_root, home)
 	local bundle = app_root .. "/ErgoptiPlus.app"
-	local logs = home .. "/Library/Logs/ergopti_plus"
+	local AppDirs = require("app_dirs")
+	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
 		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),
 		ERGOPTI_LAUNCHER_PID = "4242",
@@ -686,13 +712,13 @@ function M.launcher_environment(app_root, home)
 		ERGOPTI_LOG_TOKEN = string.rep("e2e-token-", 5),
 		ERGOPTI_LAUNCHER_VERSION = "0.0.0-e2e",
 		ERGOPTI_CONFIG_DIR = bundle .. "/Contents/Resources/static/ergopti_plus/macos",
-		ERGOPTI_PATHS_FILE = home .. "/Library/Application Support/ErgoptiPlus/paths.toml",
+		ERGOPTI_PATHS_FILE = home .. "/" .. AppDirs.config.macos_paths_file,
 		ERGOPTI_LAUNCHER_EXECUTABLE = bundle .. "/Contents/MacOS/ErgoptiPlus",
 		ERGOPTI_REMAP_GUARDIAN_STATUS = "ready",
 		ERGOPTI_LAUNCHER_DEVICE = "16777233",
 		ERGOPTI_LAUNCHER_INODE = "424242",
-		ERGOPTI_FATAL_REPORT_FILE = logs .. "/hammerspoon-fatal.txt",
-		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/launcher.log",
+		ERGOPTI_FATAL_REPORT_FILE = logs .. "/" .. AppDirs.macos.fatal_report,
+		ERGOPTI_LAUNCHER_LOG_FILE = logs .. "/" .. AppDirs.macos.launcher_log,
 		HOME = home,
 	}
 end

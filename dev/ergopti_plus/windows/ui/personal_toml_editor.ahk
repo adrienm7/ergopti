@@ -426,7 +426,7 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 		"auto_expand", ChkAutoExp.Value == 1,
 		"is_case_sensitive", ChkCaseSens.Value == 1,
 		"final_result", ChkFinal.Value == 1,
-		"strict_case", StrictCase == true,
+		"is_case_sensitive_strict", StrictCase == true,
 		"priority", PrioVal,
 		"line_index", 0,
 	)
@@ -566,7 +566,7 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 		return
 	}
 	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal,
-		Entries[Row].Get("strict_case", false))
+		Entries[Row].Get("is_case_sensitive_strict", false))
 	Entry["line_index"] := Entries[Row]["line_index"]
 	Entries[Row] := Entry
 	_SaveData(W, LV, StatusText)

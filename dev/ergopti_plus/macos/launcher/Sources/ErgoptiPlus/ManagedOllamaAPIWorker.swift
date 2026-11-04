@@ -34,7 +34,7 @@ struct ManagedOllamaRequest {
 			Set(fields.keys) == (discovery ? common : common.union(request)).union(fields["source_alias"] == nil ? [] : ["source_alias"]),
 			ManagedBootstrapRequest.integer(fields["version"]) == 1,
 			let executable = fields["executable"] as? String,
-			executable == URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Ergopti/ollama-native-http/ollama").standardizedFileURL.path,
+			executable == URL(fileURLWithPath: home).appendingPathComponent(kMacOSSupportHomeRelativePath + "/ollama-native-http/ollama").standardizedFileURL.path,
 			let device = integer(fields["device"]), device <= UInt64(UInt32.max),
 			let inode = integer(fields["inode"]), inode > 0,
 			let port = ManagedBootstrapRequest.integer(fields["port"]), port > 1023, port <= 65535

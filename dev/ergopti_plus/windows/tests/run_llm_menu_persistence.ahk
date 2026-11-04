@@ -16,6 +16,8 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../infra/wall_clock.ahk
 #Include ../_generated/config_keys.ahk
 #Include ../_generated/app_dirs.ahk
+#Include ../infra/app_folders.ahk
+#Include ../infra/legacy_folder_migration.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
 #Include ../adapters/crypto.ahk

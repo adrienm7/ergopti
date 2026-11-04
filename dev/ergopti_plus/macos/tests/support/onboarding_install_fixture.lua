@@ -15,6 +15,8 @@ local MODULE_NAMES = {
 	"adapters.task_environment",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
+	-- The onboarding names its download cache from the shared folder table.
+	"app_dirs",
 	"hs",
 	"infra.dialog_util",
 	"infra.i18n",

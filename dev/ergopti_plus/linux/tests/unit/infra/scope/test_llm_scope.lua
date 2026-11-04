@@ -26,7 +26,9 @@ local function with_scope(body)
 		local backup = path .. ".scope-backup"
 		local ok, err = pcall(function()
 			package.loaded["infra.config_paths"] = { config = function() return path end,
-				config_home = function() return path .. ".home" end }
+				config_home = function() return path .. ".home" end,
+				-- The storage adapter keeps storage.json in the default configuration folder.
+				default_config_dir = function() return path .. ".home/" .. require("app_dirs").linux.folder_name end }
 			package.loaded["adapters.secure_field_detector"] = { isSecureField = function() return false end,
 				isUrlBar = function() return false end }
 			package.loaded["adapters.http_client"] = {

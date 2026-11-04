@@ -9,7 +9,12 @@ import os
 import pathlib
 import subprocess
 import tempfile
+import tomllib
 import time
+
+# The application folder under every XDG base, read from the one declaration.
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"
+FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
 WORKER = r"""
@@ -34,7 +39,7 @@ def main():
 
         def case(kind, depth):
             home = root / f"{kind}-{depth}"
-            directory = home / "ergopti_plus"
+            directory = home / FOLDER
             directory.mkdir(parents=True)
             store = directory / "storage.json"
             first = directory / "storage.json.corrupt"

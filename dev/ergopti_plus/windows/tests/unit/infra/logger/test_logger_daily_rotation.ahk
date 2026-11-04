@@ -51,7 +51,7 @@ _LDR_WithTempConfigDir(Body) {
 
 	_ConfigDir := A_Temp . "\ergopti_logrotate_test\"
 	_AhkSubDir := "autohotkey\"
-	_LogsDir := A_Temp . "\ergopti_logrotate_test\ergopti_plus\"
+	_LogsDir := A_Temp . "\ergopti_logrotate_test\" . AppDirsFolderName() . "\"
 	try {
 		Body()
 	} finally {

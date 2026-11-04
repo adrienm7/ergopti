@@ -17,10 +17,13 @@ local helpers = require("tests.helpers")
 local Json = require("json")
 local Share = require("healthcheck.share")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 local HOME = "/home/jdoe"
 local LOGS_DIR = "/var/tmp/ergopti_report_logs"
 local NAME = "ergopti-diagnostics-linux-2026-09-24T10_00_00Z.md"
-local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /home/jdoe/.config/ergopti_plus (jdoe)\n"
+local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /home/jdoe/.config/" .. FOLDER .. " (jdoe)\n"
 
 --- Reads a shared JSON document.
 --- @param rel string Path under _shared/.

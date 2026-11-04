@@ -139,6 +139,9 @@ function M.new(ports)
 		waiters = nil
 		if ok then
 			Logger.success(LOG, "Owned runtime artifact ready at %s.", tostring(value))
+		elseif value == REASON.DOWNLOAD then
+			-- No network is a state of the Mac, not a defect; the Tap-Holds row says so.
+			Logger.warn(LOG, "Owned runtime artifact not downloaded (%s): %s", tostring(value), tostring(detail))
 		else
 			Logger.error(LOG, "Owned runtime artifact refused (%s): %s", tostring(value), tostring(detail))
 		end
@@ -164,6 +167,9 @@ function M.new(ports)
 	--- @param pin table Runtime pin.
 	--- @return boolean kept
 	local function kept(home, pin)
+		-- A first start has no folder yet: reading through a missing parent is an
+		-- ERROR of the file system adapter, while an absent receipt is the normal case.
+		if ports.exists(home .. "/receipt") ~= true then return false end
 		local receipt = ports.read(home .. "/receipt")
 		if type(receipt) ~= "string" or receipt:match("^(%x+)") ~= pin.sha256 then return false end
 		for _, product in ipairs(M.PRODUCTS) do

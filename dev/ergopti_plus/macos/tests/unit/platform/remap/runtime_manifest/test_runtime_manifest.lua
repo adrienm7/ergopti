@@ -4,8 +4,8 @@
 --- MODULE: Owned Runtime Artifact Pin
 --- DESCRIPTION:
 --- Pins platform/remap/runtime_manifest.lua: a manifest is pinned only when
---- every field of M.FIELDS has its shape, the shipped manifest is honestly
---- unpinned until the hosted build exists, and an unpinned manifest produces a
+--- every field of M.FIELDS has its shape, the shipped manifest pins the
+--- artifact of the green hosted build, and an unpinned manifest produces a
 --- named refusal instead of a version guess.
 ---
 --- ROOT CAUSE ENCODED: the digest of the runtime and the designated requirement
@@ -81,11 +81,18 @@ end
 -- ==================================
 
 helpers.describe("owned runtime manifest: what ships", function()
-	helpers.it("pins the VirtualHIDDevice and the capture but not the unbuilt runtime", function()
-		local Manifest = load_module()
-		helpers.assert_eq(Manifest.unpinned(shipped()), {
-			"runtime.version", "runtime.file_name", "runtime.source_url", "runtime.sha256", "runtime.size",
-		})
+	helpers.it("pins every field, the runtime built by the hosted job included", function()
+		helpers.assert_eq(load_module().unpinned(shipped()), {})
+	end)
+
+	helpers.it("pins the artifact of the green hosted build, under its release tag", function()
+		local runtime = shipped().runtime
+		helpers.assert_eq(runtime.version, "16.3.0-ergopti.3")
+		helpers.assert_eq(runtime.file_name, "ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.3.tar.gz")
+		helpers.assert_eq(runtime.source_url, "https://github.com/adrienm7/ergopti/releases/download/"
+			.. "remap-runtime-v16.3.0-ergopti.3/ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.3.tar.gz")
+		helpers.assert_eq(runtime.sha256, "eced1bfd39a10e6a461e37a211e3e415c2a31cd382f451c5f471e88f59dc4567")
+		helpers.assert_eq(runtime.size, 12351916)
 	end)
 
 	helpers.it("pins the capture to the launcher signed by the stable identity", function()
@@ -93,14 +100,14 @@ helpers.describe("owned runtime manifest: what ships", function()
 			'identifier "com.ergoptiplus.app" and certificate leaf = H"759d8aae58886bac8886d834f9eeae52274051bc"')
 	end)
 
-	helpers.it("refuses the shipped manifest with a sentence naming the first missing field", function()
+	helpers.it("hands the owner the shipped driver version and capture declaration", function()
 		local pinned, reason = load_module().pinned(shipped())
-		helpers.assert_nil(pinned)
-		helpers.assert_contains(reason, "runtime.version")
-		helpers.assert_contains(reason, "4 more")
+		helpers.assert_nil(reason)
+		helpers.assert_eq(pinned.virtual_hid_version, "8.5.0")
+		helpers.assert_eq(pinned.capture.batch_limit, 64)
 	end)
 
-	helpers.it("hands the field check the pinned driver version while the runtime is unbuilt", function()
+	helpers.it("hands the field check the pinned driver version", function()
 		helpers.assert_eq(load_module().virtual_hid_version(shipped()), "8.5.0")
 	end)
 

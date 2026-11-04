@@ -15,7 +15,7 @@
 --- FEATURES & RATIONALE:
 --- 1. A request file in the declared folder, noticed by an inotify watcher: the
 ---    clone's build/field-run for a developer run (infra/dev_source.lua), else
----    $XDG_RUNTIME_DIR/ergopti_plus/field-run, a folder only this user can
+---    $XDG_RUNTIME_DIR/ergopti/field-run, a folder only this user can
 ---    write. The work runs on a later turn, never inside the watcher callback,
 ---    and a request is consumed before it runs so it never runs twice.
 --- 2. One result per step: verdict, closed codes, timings and the check's own

@@ -10,6 +10,9 @@
 --- ==============================================================================
 
 local uv = require("luv")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local ffi = require("ffi")
 local RLIMIT_FSIZE = 1 -- Linux resource ABI; only this fixture's soft limit changes.
 local SIG_IGN, SIG_ERR = 1, -1 -- POSIX signal handler sentinels.
@@ -77,8 +80,8 @@ end
 
 local function configured_directory(name)
 	local state = directory(name)
-	directory(name .. "/ergopti_plus")
-	local dir = directory(name .. "/ergopti_plus/logs")
+	directory(name .. "/" .. FOLDER)
+	local dir = directory(name .. "/" .. FOLDER .. "/logs")
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
 	assert(require("infra.config_paths").get_logs_dir() == dir)
 	return dir
@@ -186,8 +189,8 @@ end
 check("repoint repairs a retired main channel in the same directory", function()
 	local state = directory("repaired")
 	assert(uv.os_setenv("XDG_STATE_HOME", state))
-	directory("repaired/ergopti_plus")
-	local dir = directory("repaired/ergopti_plus/logs")
+	directory("repaired/" .. FOLDER)
+	local dir = directory("repaired/" .. FOLDER .. "/logs")
 	assert(require("infra.config_paths").get_logs_dir() == dir, "repair must use the actual configured target")
 	local main = paths(dir)
 	local message = "Force a buffered native EFBIG before repair."
@@ -327,7 +330,7 @@ for _, operation in ipairs({ "install", "repoint" }) do
 			local main, errors = paths(target)
 			local expected = "Unrelated refused mirror bytes.\n"
 			if refusal == "directory" then
-				directory(name .. "/ergopti_plus/logs/" .. errors:match("([^/]+)$"))
+				directory(name .. "/" .. FOLDER .. "/logs/" .. errors:match("([^/]+)$"))
 			else
 				write(errors, expected)
 				assert(uv.fs_chmod(errors, 256))
@@ -363,8 +366,8 @@ for _, operation in ipairs({ "install", "prepare", "repoint" }) do
 			assert(Sink.install(Logger, { log_dir = directory("probe-original") }))
 			local state = directory("probe-state")
 			assert(uv.os_setenv("XDG_STATE_HOME", state))
-			directory("probe-state/ergopti_plus")
-			dir = directory("probe-state/ergopti_plus/logs")
+			directory("probe-state/" .. FOLDER)
+			dir = directory("probe-state/" .. FOLDER .. "/logs")
 		else dir = directory("probe-" .. operation) end
 		local path, content = dir .. "/.write_probe", "Pre-existing user-owned bytes.\n"
 		write(path, content)

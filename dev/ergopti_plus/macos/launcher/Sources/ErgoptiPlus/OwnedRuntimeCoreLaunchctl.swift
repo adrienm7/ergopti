@@ -10,10 +10,13 @@ enum OwnedRuntimeCoreLaunchctl {
 	struct Observation { let status: Int32, bytes: Data }
 	private struct ChildObservation { let status: Int32, bytes: Data, timedOut: Bool }
 	static func run(arguments: [String]) throws -> Observation {
+		// Each label is spelled through the generated enum, so the stock-process isolation gate folds it.
 		guard arguments == ["print", "system/\(Identifiers.ServiceLabels.macosCore)"]
 			|| arguments == ["bootout", "system/\(Identifiers.ServiceLabels.macosCore)"]
 			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"]
-			|| arguments == ["kickstart", "system/\(Identifiers.ServiceLabels.macosCore)"] else { throw OwnedRuntimeInstallFailure.source }
+			|| arguments == ["kickstart", "system/\(Identifiers.ServiceLabels.macosCore)"]
+			|| arguments == ["print", "system/\(Identifiers.ServiceLabels.macosVirtualHid)"]
+			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosVirtualHid).plist"] else { throw OwnedRuntimeInstallFailure.source }
 		let result = try child(path: "/bin/launchctl", arguments: arguments, timeout: 3)
 		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		return Observation(status: result.status, bytes: result.bytes)

@@ -9,6 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local APP_FOLDER = require("app_dirs").linux.folder_name
 local Json = require("json")
 local Policy = require("control.driver_control")
 local DriverControl = require("infra.driver_control")
@@ -25,7 +28,7 @@ end
 
 local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver_control.json")))
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
-local FOLDER = "/run/user/1000/ergopti_plus/control"
+local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/control"
 
 helpers.describe("hotstring reload outcome", function()
 	helpers.it("reports a published catalogue as reloaded", function()

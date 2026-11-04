@@ -24,6 +24,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 
 
 
@@ -50,8 +53,8 @@ local TMP_HOME     = (REAL_GETENV("TEMP") or REAL_GETENV("TMP") or "/tmp")
 	:gsub("\\", "/"):gsub("/$", "") .. "/ergopti_cr_sandbox_home"
 
 -- The crash directory the module must derive from TMP_HOME: the crash_reports
--- folder of the default logs folder, ~/.local/state/ergopti_plus/logs.
-local EXPECTED_DIR = TMP_HOME .. "/.local/state/ergopti_plus/logs/crash_reports"
+-- folder of the default logs folder, ~/.local/state/ergopti/logs.
+local EXPECTED_DIR = TMP_HOME .. "/.local/state/" .. FOLDER .. "/logs/crash_reports"
 
 
 

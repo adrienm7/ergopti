@@ -21,8 +21,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
-local MANAGED_FILE = "/Users/test/Library/Application Support/ErgoptiPlus/paths.toml"
+local MANAGED_FILE = "/Users/test/" .. AppDirs.config.macos_paths_file
 local BUNDLE_DIR = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/"
 local CUSTOM_DIR = "/Volumes/User Config/"
 

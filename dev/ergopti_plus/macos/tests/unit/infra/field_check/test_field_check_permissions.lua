@@ -157,6 +157,9 @@ helpers.describe("permissions probe", function()
 			helpers.assert_eq(Probes.parse_signing_identity("TeamIdentifier=G43BCU2T37\n"), "team:G43BCU2T37")
 			helpers.assert_eq(Probes.parse_signing_identity("x: code object is not signed at all\n"), "unsigned")
 			helpers.assert_eq(Probes.parse_signing_identity("TeamIdentifier=not set\n"), "adhoc")
+			-- The stable self-signed identity has no Team ID; it was reported as ad hoc.
+			helpers.assert_eq(Probes.parse_signing_identity(
+				"Identifier=com.ergoptiplus.app\nAuthority=ErgoptiPlus Self-Signed\nTeamIdentifier=not set\n"), "certificate")
 			helpers.assert_eq(Probes.parse_signing_identity(""), "unknown")
 		end)
 	end)

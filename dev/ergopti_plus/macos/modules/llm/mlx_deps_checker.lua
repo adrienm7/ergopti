@@ -252,7 +252,7 @@ function M.venv_dir()
 	if config_ok and type(config_dir) == "string" and config_dir ~= "" then
 		local home_ok, home = pcall(os.getenv, "HOME")
 		if not home_ok or type(home) ~= "string" or home:sub(1, 1) ~= "/" then return nil end
-		return home .. "/Library/Application Support/Ergopti/mlx-venv"
+		return home .. "/" .. require("app_dirs").macos.support_relative .. "/mlx-venv"
 	end
 	local hs_root = resolve_hs_root()
 	return hs_root and (hs_root .. "/.venv") or nil

@@ -547,7 +547,7 @@ _LNWPrivacyConfigDirNames() {
 	FileObject := _LNWPrivacyFile(), Receipt := Map("text", "")
 	try {
 		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
-		_ConfigDir := "D:\Private Folder\ergopti_plus\"
+		_ConfigDir := "D:\Private Folder\Ergopti\"
 		Prefix := "2026-10-10 09:00:00:123 [INFO] [TomlLoader] "
 		Body := "Loading '" . _ConfigDir . "extensions\Secret Pack\hidden.toml'" . Chr(0x2026)
 		AssertTrue(_LoggerAppendComplete("C:\private-recording-log.txt", Prefix . Body . "`r`n", false,

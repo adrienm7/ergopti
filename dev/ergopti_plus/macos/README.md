@@ -30,8 +30,9 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
   follows its own channel until another one is picked in the app's About menu.
   The two casks conflict: to switch, `brew uninstall --cask ergoptiplus@dev`
   then `brew install --cask ergoptiplus` (or the reverse); the settings in
-  `~/.config/ergopti_plus/` stay. A channel chosen in the About menu is kept in
-  `config.toml` and wins over the installed build's channel. The stable cask
+  `~/Library/Application Support/Ergopti/config/` stay. A channel chosen in
+  the About menu is kept in `config.toml` and wins over the installed build's
+  channel. The stable cask
   exists once the first stable release is published.
 - **Updates.** Two paths update the same app. `brew upgrade` updates it with
   the other casks: brew quits the app, replaces it and relaunches it if it was
@@ -42,8 +43,9 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
 - **Gatekeeper.** The app is not notarised; the cask clears its quarantine
   flag after installing, as the manual `xattr` step does.
 - **Uninstall.** `brew uninstall --cask ergoptiplus` removes the app;
-  `--zap` also removes `~/.config/ergopti_plus/` and the launcher's
-  preferences and caches.
+  `--zap` also removes the Ergopti folders
+  (`~/Library/Application Support/Ergopti/`, `~/Library/Logs/Ergopti/`,
+  `~/Library/Caches/Ergopti/`) and the launcher's preferences and caches.
 
 The release job (`Publish Homebrew cask` in
 [`ci-release.yml`](../../../.github/workflows/ci-release.yml)) renders the released channel's

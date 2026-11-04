@@ -14,13 +14,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local Json = require("json")
 local Share = require("healthcheck.share")
 
 local HOME = "/Users/jdoe"
-local LOGS = HOME .. "/Library/Logs/ergopti_plus"
+local LOGS = HOME .. "/" .. AppDirs.macos.relative
 local NAME = "ergopti-diagnostics-macos-2026-09-24T10_00_00Z.md"
-local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /Users/jdoe/.config/ergopti_plus (jdoe)\n"
+local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /Users/jdoe/" .. AppDirs.config.macos_relative .. " (jdoe)\n"
 
 --- Reads a shared JSON document.
 --- @param rel string Path under _shared/.
@@ -376,7 +377,7 @@ end
 --- @return table
 local function paths()
 	return {
-		config_dir = HOME .. "/.config/ergopti_plus",
+		config_dir = HOME .. "/" .. AppDirs.config.macos_relative,
 		logs_dir = LOGS,
 		diagnostics_dir = LOGS .. "/diagnostics",
 	}
@@ -794,7 +795,7 @@ end)
 helpers.describe("redaction context carries the configuration directory (config-dir-masking)", function()
 	helpers.it("a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)", function()
 		local Report, _, overrides = load_report()
-		local dir = HOME .. "/.config/ergopti_plus"
+		local dir = HOME .. "/" .. AppDirs.config.macos_relative
 		overrides.identity = function() return { home = HOME, user = "jdoe", config_dir = dir } end
 		local context = Report.redaction_context(overrides)
 		helpers.assert_eq(context.config_dir, dir)

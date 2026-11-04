@@ -1536,6 +1536,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		-- Main writes a pre-sink fatal record only when startup is refused.
 		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["compat.utf8"] = { install = function() return false end }
+		-- Main moves the legacy folders first; the isolated Main moves none.
+		modules["infra.legacy_folder_migration"] = require("tests.support.legacy_folder_migration_stub")
 		modules["logger.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["infra.logger_sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }

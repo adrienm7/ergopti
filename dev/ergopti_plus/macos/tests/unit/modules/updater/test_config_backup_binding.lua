@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local Json = require("json")
 
@@ -70,7 +71,7 @@ local function with_binding(tree, body)
 			end,
 		}
 		package.loaded["infra.config_paths"] = {
-			get_config_dir = function() return "/Users/me/.config/ergopti_plus/" end,
+			get_config_dir = function() return "/Users/me/" .. AppDirs.config.macos_relative .. "/" end,
 			ensure_dir = function() return true end,
 		}
 		package.loaded["infra.paths"] = {
@@ -87,7 +88,7 @@ helpers.describe("config_backup binding (macOS)", function()
 	helpers.it("backs up the configuration folder under the shared rules", function()
 		with_binding({}, function(Binding)
 			local owner = assert(Binding.owner())
-			helpers.assert_eq(owner.folder, "/Users/me/.config/ergopti_plus/backups")
+			helpers.assert_eq(owner.folder, "/Users/me/" .. AppDirs.config.macos_relative .. "/backups")
 		end)
 	end)
 end)

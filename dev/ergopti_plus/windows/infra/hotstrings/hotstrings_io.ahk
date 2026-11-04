@@ -4,7 +4,7 @@
 ; MODULE: Hotstrings Config — Override File I/O
 ; DESCRIPTION:
 ; Reads and writes the hotstrings override file
-; (%USERPROFILE%\.config\ergopti_plus\hotstrings_config.toml) that stores
+; (<configuration folder>\hotstrings_config.toml) that stores
 ; per-category/section delay, color, show_tooltip, and priority overrides
 ; shared between the AHK and Hammerspoon drivers.
 ;

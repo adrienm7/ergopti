@@ -11,8 +11,8 @@
 // keeps the native side from becoming a second source for any of them.
 // ==============================================================================
 
-/// Folder named after the application, on every OS.
-let kAppFolderName = "ergopti_plus"
+/// Folder named after the application on macOS (and Windows).
+let kAppFolderName = "Ergopti"
 
 /// Daily unified log: <prefix>yyyy-MM-dd<extension>.
 let kLogUnifiedPrefix = "ErgoptiPlus_"
@@ -27,7 +27,7 @@ let kLogTopicalPrefix = "ErgoptiPlus_"
 let kLogFileExtension = ".log"
 
 /// Default logs folder, relative to the home folder.
-let kMacOSLogsHomeRelativePath = "Library/Logs/ergopti_plus"
+let kMacOSLogsHomeRelativePath = "Library/Logs/Ergopti"
 
 /// Launcher diagnostic log, always in the default logs folder.
 let kLauncherLogFileName = "launcher.log"
@@ -36,4 +36,13 @@ let kLauncherLogFileName = "launcher.log"
 let kFatalReportFileName = "hammerspoon-fatal.txt"
 
 /// The paths.toml that may move the configuration folder, relative to the home folder.
-let kMacOSPathsFileHomeRelativePath = "Library/Application Support/ErgoptiPlus/paths.toml"
+let kMacOSPathsFileHomeRelativePath = "Library/Application Support/Ergopti/paths.toml"
+
+/// The Ergopti root (managed runtimes, locks, control), relative to the home folder.
+let kMacOSSupportHomeRelativePath = "Library/Application Support/Ergopti"
+
+/// The cache folder, relative to the home folder.
+let kMacOSCacheHomeRelativePath = "Library/Caches/Ergopti"
+
+/// Folder name the owned Karabiner runtime is compiled with, kept until its rebuild.
+let kMacOSOwnedRuntimeFolderName = "ErgoptiPlus"

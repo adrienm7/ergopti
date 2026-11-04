@@ -9,7 +9,7 @@
 --- to "fr" (matching the macOS default) when no preference is saved.
 ---
 --- FEATURES & RATIONALE:
---- 1. Storage-backed: the active locale is saved to ~/.config/ergopti_plus/
+--- 1. Storage-backed: the active locale is saved to ~/.config/ergopti/
 ---    storage.json on every change and loaded on init.
 --- 2. Locale discovery: list_locales() scans _shared/data/locales/ for
 ---    available .json files so the language menu is always up-to-date.

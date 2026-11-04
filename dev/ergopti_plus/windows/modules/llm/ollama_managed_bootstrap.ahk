@@ -334,7 +334,7 @@ class OllamaManagedBootstrap {
 		this.AuxPrefix := "ollama_managed_" . this._Ticket() . "_"
 		NativeArchitecture := OllamaRuntime_HostArchitecture()
 		Asset := NativeArchitecture == "arm64" ? "windows-arm64" : "windows-amd64"
-		Root := EnvGet("LOCALAPPDATA") . "\" . AppDirsWindowsManagedOllamaFolderName()
+		Root := AppFoldersManagedOllamaRoot()
 		Directory := _StaticDir . "\ergopti_plus\windows\modules\llm"
 		Catalogue := _SharedDir . "\modules\llm\ollama_release.json"
 		Updater := _SharedDir . "\modules\updater\defaults.json"

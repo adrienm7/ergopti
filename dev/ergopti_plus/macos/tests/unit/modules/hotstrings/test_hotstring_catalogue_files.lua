@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local CatalogueFiles = require("hotstrings.catalogue_files")
 local TomlCodec = require("toml_codec.codec")
 
@@ -32,7 +33,7 @@ helpers.describe("hotstring catalogue (macos): metadata is never a category", fu
 		-- wrap_symbols.toml: either one read as a category made the boot load
 		-- that folder instead of the bundled catalogue, and every shipped
 		-- hotstring was gone (hardening-a-startup-zero-error).
-		helpers.assert_eq(CatalogueFiles.is_category_file("/Users/u/.config/ergopti_plus/layers.toml"), false,
+		helpers.assert_eq(CatalogueFiles.is_category_file("/Users/u/" .. AppDirs.config.macos_relative .. "/layers.toml"), false,
 			"layers.toml is the navigation layer")
 		helpers.assert_eq(CatalogueFiles.is_category_file("wrap_symbols.toml"), false,
 			"wrap_symbols.toml is an older release's wrap symbols")

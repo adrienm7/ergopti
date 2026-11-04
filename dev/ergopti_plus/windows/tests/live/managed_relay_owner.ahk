@@ -12,7 +12,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The logger is not included: its file sink would write the maintainer's
-;    %LOCALAPPDATA%\ergopti_plus logs, which a test must never touch. Warnings go
+;    %LOCALAPPDATA%\Ergopti logs, which a test must never touch. Warnings go
 ;    to the result instead, so a refused receipt still names its cause.
 ; ==============================================================================
 

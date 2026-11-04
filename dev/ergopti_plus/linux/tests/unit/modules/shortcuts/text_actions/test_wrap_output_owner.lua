@@ -271,7 +271,7 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 					.. "local results = require('tests.helpers').get_results()\n"
 					.. "assert(results.passed == 33 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
 					.. "local storage = require('adapters.storage')\n"
-					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/ergopti_plus/storage.json', 'the store must remain private')\n"
+					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/' .. require('app_dirs').linux.folder_name .. '/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"
 					.. "local file = assert(io.open(storage.path(), 'rb'))\n"
 					.. "local bytes = assert(file:read('*a')); assert(file:close())\n"

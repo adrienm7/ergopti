@@ -10,10 +10,12 @@ Windows uses.
 ## Runtime modes
 
 [ADR 011](../../../docs/adr/011-owned-karabiner-runtime.md) defines two modes.
-Everything below this section describes the shared mode, which is the only one
-implemented today.
+Owned is the default since the release after 1.0.9; shared stays as a
+hand-written `[karabiner] runtime = "shared"` until it is retired. The sections
+after this one describe the shared mode's merge and lease, which the owned mode
+reuses for its own file.
 
-- **Shared (legacy, current production).** Onboarding installs the official
+- **Shared (legacy, hand-written fallback).** Onboarding installs the official
   Karabiner-Elements 16.0.0 application and ErgoptiPlus merges its token-scoped
   rules into the user's `karabiner.json`. Karabiner-Elements is then shared,
   multi-process infrastructure: its UI and menubar process, root Core Service
@@ -22,7 +24,7 @@ implemented today.
   `Karabiner-VirtualHIDDevice-Daemon`/DriverKit helpers are never owned, killed,
   unloaded, launched or restarted by ErgoptiPlus, and the user's personal rules
   stay active alongside the generated ones.
-- **Owned (decided 2026-09-29, not yet shipped).** No Karabiner-Elements
+- **Owned (decided 2026-09-29, the default).** No Karabiner-Elements
   application. Ergopti runs its own background runtime: the unmodified pqrs
   VirtualHIDDevice plus a self-signed headless fork of Karabiner-Elements
   16.3.0 (Core-Service, Console-User-Server, `karabiner_cli`) that also streams
@@ -32,14 +34,14 @@ implemented today.
   instances » (on by default), quits any other active Karabiner while it runs.
   The HS-274 delivery plan lists the work packages that build it.
 
-  Dormant Lua side (WP6 and WP7): `runtime_owner.lua` admits the runtime (pinned
+  Lua side (WP6 and WP7): `runtime_owner.lua` admits the runtime (pinned
   artifact, install, VirtualHIDDevice version through `runtime_vhid.lua`,
   launchd jobs, other running Karabiner) and names every refusal, then requests
   the physical capture. The signed launcher's installed-source role owns the
   Console (ADR 011, decision 8), so the owner spawns no process and is ready
-  only when the capture admits its first stream. It is reached only when `config_karabiner.toml`
-  holds the hidden `[karabiner] runtime = "owned"`; the absent default is
-  `shared` and changes nothing. `ke_paths.lua` selects the command line tool of
+  only when the capture admits its first stream. It is reached unless
+  `config_karabiner.toml` holds `[karabiner] runtime = "shared"`
+  (`Config.RUNTIME_DEFAULT` is `owned`). `ke_paths.lua` selects the command line tool of
   the runtime once, `Generator.deploy_owned_config` writes the complete file
   under `~/Library/Application Support/ErgoptiPlus/karabiner/`, and
   `onboarding.health_check("owned")` checks the owned install. The real ports
@@ -48,12 +50,18 @@ implemented today.
   own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
   the capture port (`adapters/runtime_capture_port.lua` over
   `adapters/installed_physical_source.lua`). The artifact comes from
-  `vendor/remap-runtime/manifest.json`, whose runtime fields stay unpinned until
-  the hosted `runtime-artifact` job's digest is applied
-  (`tools/build/remap_runtime_publish.py`), so an opted-in boot reports
-  `artifact_unpinned` today; once pinned, `runtime_artifact_fetch.lua`
-  downloads and verifies it into `~/Library/Application Support/ErgoptiPlus/RemapRuntime/`
-  on the first admission and reuses it after. The artifact is the signed privileged
+  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.3`, the
+  hosted `runtime-artifact` job's digest, published under the prerelease
+  `remap-runtime-v16.3.0-ergopti.3` and written by the `apply` command of
+  `tools/build/remap_runtime_publish.py`; `runtime_artifact_fetch.lua`
+  downloads and verifies it into
+  `~/Library/Application Support/Ergopti/RemapRuntime/` on the first
+  admission and reuses it after. A missing runtime is offered once by itself:
+  the launcher's install role (`platform/remap/runtime_install.lua`) runs that
+  helper behind one administrator prompt, which publishes the files, starts the
+  Core service and loads the VirtualHIDDevice job (installing pqrs' pinned
+  package first when no driver is installed); a Tap-Holds row retries it. The
+  artifact is the signed privileged
   helper `ErgoptiPlus-Runtime-Installer.app` with the runtime products sealed in its
   `Contents/Resources/OwnedRuntime/` (the `runtime-artifact` job runs
   `remap_runtime_build.py --package-owned`); the launcher's administrator install
@@ -86,8 +94,11 @@ exact ErgoptiPlus marker removed from `karabiner.json` by
 re-encoding the file, so personal rules stay byte-identical, and it refuses any
 document it cannot prove. Turning the switch off removes the rules only after
 the exact lease reported `STOPPED` and the off decision was persisted. The
-Configuration menu's « Remove Ergopti from Karabiner » runs the same path, or
-only the cleanup when the switch is already off.
+Configuration rows « Ergopti uses Karabiner » and « Remove Ergopti from
+Karabiner » acted on the user's own Karabiner-Elements and were deleted with
+the owned default; the key is now only written by hand, and
+`M.set_enabled` keeps its transaction until shared mode is retired; turning it
+off also removes Ergopti's rules from `karabiner.json` when it already is off.
 
 ## Virtual keyboard type
 
@@ -186,7 +197,6 @@ The module optionally supplies its live managed output keycodes to `modules.keys
 | `M.regenerate()`               | Build and merge a fresh token-scoped rule set, then start its lease                      |
 | `M.pause()` / `M.resume()`     | Request an acknowledged pause transition for the active generation                       |
 | `M.set_enabled(value)`         | Enable or disable only ErgoptiPlus remapping; off removes its rules                      |
-| `M.remove_from_karabiner()`    | Turn the switch off (or only clean `karabiner.json` when already off)                    |
 | `M.guardian_state()`           | Guardian state for diagnostics: ready, requires_approval, unavailable, not_used, unknown |
 | `M.set_approval_presenter(fn)` | Register the boot's Login Items steps, offered before the approval banner                |
 | `M.stop()`                     | Stop ErgoptiPlus resources and revoke its exact lease                                    |

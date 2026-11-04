@@ -56,9 +56,9 @@ _THPA_Effects(Calls, Options := 0) {
 ; The snapshot's paths section of the fixture.
 _THPA_Paths() {
 	return Map(
-		"logs_dir",        "C:\Users\JDoe\AppData\Local\ergopti_plus\logs",
-		"diagnostics_dir", "C:\Users\JDoe\AppData\Local\ergopti_plus\logs\diagnostics",
-		"errors_today",    "C:\Users\JDoe\AppData\Local\ergopti_plus\logs\ErgoptiPlus_errors_2026-09-24.log")
+		"logs_dir",        "C:\Users\JDoe\AppData\Local\Ergopti\logs",
+		"diagnostics_dir", "C:\Users\JDoe\AppData\Local\Ergopti\logs\diagnostics",
+		"errors_today",    "C:\Users\JDoe\AppData\Local\Ergopti\logs\ErgoptiPlus_errors_2026-09-24.log")
 }
 
 ; Joins the recorded calls for a readable assertion.
@@ -468,7 +468,7 @@ Test("Diagnostics export: closed recent error observations exclude private text"
 
 _THPA_ConfigDirContext() {
 	Config := HealthCheck_Config()
-	Dir := "D:\Work\config\ergopti_plus"
+	Dir := "D:\Work\config\Ergopti"
 	Effects := _THPA_Effects([])
 	Effects["identity"] := () => Map("home", "C:\Users\JDoe", "user", "JDoe", "config_dir", Dir)
 	Context := HealthCheck_RedactionContext(Effects)
@@ -519,7 +519,7 @@ _THPA_DayLog() {
 		if (SubStr(Call, 1, 5) == "save:")
 			Saves.Push(Call)
 	AssertEqual(2, Saves.Length)
-	AssertEqual("save:C:\Users\JDoe\AppData\Local\ergopti_plus\logs\diagnostics\ergopti-day-log-windows-2026-09-24T10_00_00Z.log:" . Redacted, Saves[1])
+	AssertEqual("save:C:\Users\JDoe\AppData\Local\Ergopti\logs\diagnostics\ergopti-day-log-windows-2026-09-24T10_00_00Z.log:" . Redacted, Saves[1])
 	AssertContains(Saves[2], With["name"])
 
 	; Copy never carries the log

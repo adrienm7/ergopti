@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Log Folders
 --- DESCRIPTION:
---- The one formula of the macOS default logs folder, ~/Library/Logs/ergopti_plus/,
+--- The one formula of the macOS default logs folder, ~/Library/Logs/Ergopti/,
 --- built on the generated application-folders data. Pure and dependency-free:
 --- the logger (early-boot fallback) and the paths.toml resolver both need it,
 --- and the logger is loaded before anything else can be.
@@ -24,7 +24,7 @@ end
 --- location exists to prefer.
 --- @return string folder With a trailing slash.
 function M.homeless_logs_dir()
-	return "/tmp/" .. AppDirs.folder_name .. "/"
+	return "/tmp/" .. AppDirs.macos.folder_name .. "/"
 end
 
 return M

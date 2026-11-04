@@ -100,7 +100,9 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 			local notices, changed, refused_publications = 0, 0, 0
 			local ok, failure = xpcall(function()
 				package.loaded["infra.config_paths"] = { config = function() return path end,
-					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end }
+					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
+					-- The storage adapter keeps storage.json in the default configuration folder.
+					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("app_dirs").linux.folder_name end }
 				package.loaded["ui.menu.start_at_login"] = {
 					enabled = function() return false end,
 					command_available = function() return true end,

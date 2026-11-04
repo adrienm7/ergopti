@@ -79,7 +79,8 @@ local MANIFEST_PATH = _SELF_DIR .. "../../vendor/karabiner-elements/manifest.lua
 
 -- Where the downloaded DMG is cached. Standard macOS cache location for
 -- regenerable, app-specific data.
-local CACHE_DIR = (os.getenv("HOME") or "") .. "/Library/Caches/Ergopti/karabiner-elements/"
+local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("app_dirs").macos.cache_relative
+	.. "/karabiner-elements/"
 
 -- Filesystem signposts revealing the install state of KE.
 local KE_APP_PATH      = "/Applications/Karabiner-Elements.app"
@@ -97,7 +98,7 @@ local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 -- Karabiner-Elements v16+ relies on Accessibility (per the v16.0.0 release
 -- notes); pre-v16 versions rely on Input Monitoring instead. Both panes are
 -- exposed so the wizard can route the user to the right one.
-local URL_SYSTEM_EXTENSIONS = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
+local URL_SYSTEM_EXTENSIONS = KePaths.EXTENSIONS_SETTINGS_URL
 
 -- Re-poll cadence after the user takes a wizard action, so the next step
 -- pops automatically once macOS reflects the change. Capped to avoid leaking

@@ -52,7 +52,7 @@ end)
 test("version asset and complete digest form immutable directory name", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
 	local plan = assert(Policy.posix_plan({ HOME = "/home/test" }, AppDirs, asset))
-	expect(plan.directory == "/home/test/.local/share/ergopti_plus/runtimes/ollama/0.40.4-linux-amd64-15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a/ollama", "independent complete immutable name")
+	expect(plan.directory == "/home/test/.local/share/" .. AppDirs.linux.folder_name .. "/runtimes/ollama/0.40.4-linux-amd64-15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a/ollama", "independent complete immutable name")
 	expect(plan.executable == plan.directory .. "/bin/ollama" and plan.libraries == plan.directory .. "/lib/ollama", "whole archive layout")
 end)
 

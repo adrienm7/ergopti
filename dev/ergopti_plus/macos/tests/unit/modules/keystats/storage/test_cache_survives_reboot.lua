@@ -7,12 +7,13 @@
 --- start after a reboot found a fresh cache, lost the saved today.log offset
 --- with it and replayed the whole 320 MB ledger (138 s main-thread hold before
 --- the replay was sliced). The cache now lives in the CACHE_DIR the caller
---- passes (~/Library/Caches/ergopti_plus/metrics in production). With TMPDIR
+--- passes (~/<app_dirs macos.cache_relative>/metrics in production). With TMPDIR
 --- emptied, a start keeps the cache and its saved offset and replays nothing;
 --- a cache an earlier version left in TMPDIR is moved once.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local DEVICE_ID = "00000000-0000-4000-8000-0000000000b0"
 local HOST_SIGNATURE = "TEST-HOST-CACHE-REBOOT"
@@ -198,7 +199,7 @@ helpers.describe("keystats cache location: a reboot keeps the cache (L64)", func
 		local ConfigPaths = helpers.load_with_stubs("infra.config_paths")
 		local home = os.getenv("HOME")
 		helpers.assert_eq(ConfigPaths.metrics_cache_dir(),
-			home:gsub("/$", "") .. "/Library/Caches/ergopti_plus/metrics")
+			home:gsub("/$", "") .. "/" .. AppDirs.macos.cache_relative .. "/metrics")
 		package.loaded["infra.config_paths"] = nil
 		local src = helpers.read_driver_source("Central shared-state table passed by reference to all sub-modules")
 		helpers.assert_true(src:find('CACHE_DIR = require("infra.config_paths").metrics_cache_dir()', 1, true) ~= nil,

@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local Identifiers = require("identifiers")
+local AppDirs = require("app_dirs")
 local M = {}
 
 -- Shared package root. Command-line helpers remain under bin/, while v15.7+
@@ -70,7 +71,13 @@ M.NON_PRIVILEGED_AGENTS = SUPPORT_DIR
 M.RUNTIME_SHARED = "shared"
 M.RUNTIME_OWNED = "owned"
 
-local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
+-- The owned runtime is compiled with its own folder name (app_dirs
+-- owned_runtime), kept until the runtime is rebuilt; everything else Ergopti
+-- writes lives in the one Ergopti root.
+local OWNED_FOLDER = AppDirs.owned_runtime.macos_folder_name
+local OWNED_RUNTIME_DIR = "/Library/Application Support/" .. OWNED_FOLDER .. "/Runtime"
+local OWNED_CONFIG_HOME = "~/Library/Application Support/" .. OWNED_FOLDER
+local SUPPORT_HOME = "~/" .. AppDirs.macos.support_relative
 
 --- Everything the owned runtime puts on disk. The runtime directory and the
 --- launchd labels are the ones the Swift installer writes
@@ -87,15 +94,20 @@ M.OWNED = {
 	CORE_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist",
 	CORE_LABEL = Identifiers.service_labels.macos_core,
 	VIRTUAL_HID_LABEL = Identifiers.service_labels.macos_virtual_hid,
-	CONFIG_HOME = "~/Library/Application Support/ErgoptiPlus",
-	CONFIG_FILE = "~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json",
+	CONFIG_HOME = OWNED_CONFIG_HOME,
+	CONFIG_FILE = OWNED_CONFIG_HOME .. "/karabiner/karabiner.json",
 	-- The downloaded, verified runtime artifact, one folder per pinned version
 	-- (platform/remap/runtime_artifact_fetch.lua). Never /Applications.
-	ARTIFACT_HOME = "~/Library/Application Support/ErgoptiPlus/RemapRuntime",
+	ARTIFACT_HOME = SUPPORT_HOME .. "/RemapRuntime",
 	-- Written when Ergopti closed the user's own Karabiner, cleared once it was
 	-- given back (platform/remap/runtime_activation.lua).
-	CLOSED_OTHER_MARKER = "~/Library/Application Support/ErgoptiPlus/karabiner/closed-other-karabiner",
+	CLOSED_OTHER_MARKER = OWNED_CONFIG_HOME .. "/karabiner/closed-other-karabiner",
 }
+
+--- The System Settings pane where macOS asks to allow a driver extension
+--- (Login Items & Extensions, Extensions section): the onboarding of the
+--- shared runtime and the owned runtime's approval watch open it.
+M.EXTENSIONS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
 
 --- Rejects a runtime name that is not one of the two.
 --- @param runtime any Candidate runtime name.

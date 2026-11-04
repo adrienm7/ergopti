@@ -46,6 +46,8 @@ const APP_SELECTION_MODE = Object.freeze({
 
 const app_state = {
 	historical_cache: null,
+	// Host serial of historical_cache; the macOS host omits a history it names
+	historical_serial: null,
 	today_live_data: null,
 	data: {
 		c: {},

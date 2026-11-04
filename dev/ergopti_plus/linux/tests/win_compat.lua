@@ -98,7 +98,8 @@ local _is_jit = type(jit) == "table"
 local WIN_TMP = "/tmp/ergopti-win-test"
 local WIN_HOME = "/tmp/ergopti-win-home"
 local WIN_CONFIG = WIN_HOME .. "/.config"
-local WIN_STORE_DIR = WIN_CONFIG .. "/ergopti_plus"
+-- The storage folder the driver resolves under XDG_CONFIG_HOME.
+local WIN_STORE_DIR = WIN_CONFIG .. "/" .. require("app_dirs").linux.folder_name
 local WIN_DATA = WIN_HOME .. "/.local/share"
 
 --- Drive letter the fixture tree lives on, detected from the suite's working

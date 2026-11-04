@@ -94,19 +94,28 @@ end
 --- The XDG config root ($XDG_CONFIG_HOME, or ~/.config).
 --- @return string Absolute path, no trailing slash.
 function M.config_home()
-	return absolute_directory(os.getenv("XDG_CONFIG_HOME")) or child_directory(M.home(), ".config")
+	return absolute_directory(os.getenv(AppDirs.linux.config_env))
+		or child_directory(M.home(), AppDirs.linux.config_fallback)
 end
 
 --- The XDG data root ($XDG_DATA_HOME, or ~/.local/share).
 --- @return string Absolute path, no trailing slash.
 function M.data_home()
-	return absolute_directory(os.getenv("XDG_DATA_HOME")) or child_directory(M.home(), ".local/share")
+	return absolute_directory(os.getenv(AppDirs.linux.data_env))
+		or child_directory(M.home(), AppDirs.linux.data_fallback)
+end
+
+--- The XDG cache root ($XDG_CACHE_HOME, or ~/.cache).
+--- @return string Absolute path, no trailing slash.
+function M.cache_home()
+	return absolute_directory(os.getenv(AppDirs.linux.cache_env))
+		or child_directory(M.home(), AppDirs.linux.cache_fallback)
 end
 
 --- The default driver configuration directory, without a user override.
 --- @return string Absolute path, no trailing slash.
 function M.default_config_dir()
-	return child_directory(M.config_home(), "ergopti")
+	return child_directory(M.config_home(), AppDirs.linux.folder_name)
 end
 
 --- The effective driver configuration directory.
@@ -204,7 +213,27 @@ end
 --- @param rel string|nil Path relative to the driver data dir.
 --- @return string Absolute path, no trailing slash.
 function M.data(rel)
-	local base = child_directory(M.data_home(), "ergopti")
+	local base = child_directory(M.data_home(), AppDirs.linux.folder_name)
+	if type(rel) ~= "string" or rel == "" then return base end
+	return (base .. "/" .. (rel:gsub("^/+", "")))
+end
+
+--- The driver's cache directory, optionally with a path appended. Everything
+--- here may be deleted at any time and is rebuilt on demand.
+--- @param rel string|nil Path relative to the driver cache dir.
+--- @return string Absolute path, no trailing slash.
+function M.cache(rel)
+	local base = child_directory(M.cache_home(), AppDirs.linux.folder_name)
+	if type(rel) ~= "string" or rel == "" then return base end
+	return (base .. "/" .. (rel:gsub("^/+", "")))
+end
+
+--- The driver's state directory (beside the logs), optionally with a path
+--- appended: machine state that is neither configuration nor a cache.
+--- @param rel string|nil Path relative to the driver state dir.
+--- @return string Absolute path, no trailing slash.
+function M.state(rel)
+	local base = child_directory(M.state_home(), AppDirs.linux.folder_name)
 	if type(rel) ~= "string" or rel == "" then return base end
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
@@ -233,7 +262,7 @@ function M.state_home()
 		or child_directory(M.home(), AppDirs.linux.base_fallback)
 end
 
---- The default logs folder, ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs.
+--- The default logs folder, ${XDG_STATE_HOME:-~/.local/state}/ergopti/logs.
 --- @return string Absolute path, no trailing slash.
 function M.default_logs_dir()
 	return child_directory(M.state_home(), AppDirs.linux.relative)
@@ -253,8 +282,8 @@ function M.normalize_logs_dir(path)
 	if normalized:sub(1, 1) ~= "/" then
 		return nil, "the logs folder must be an absolute path"
 	end
-	if normalized ~= M.default_logs_dir() and NativePath.basename(normalized) ~= AppDirs.folder_name then
-		normalized = normalized .. "/" .. AppDirs.folder_name
+	if normalized ~= M.default_logs_dir() and NativePath.basename(normalized) ~= AppDirs.linux.folder_name then
+		normalized = normalized .. "/" .. AppDirs.linux.folder_name
 	end
 	return normalized
 end

@@ -14,7 +14,7 @@
 	},
 	"max_request_bytes": 4096,
 	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
-	"deadline_seconds": { "default": 9220, "min": 60, "max": 9220 },
+	"deadline_seconds": { "default": 10300, "min": 60, "max": 10300 },
 	"log_window_max_lines": 200,
 	"verdicts": ["pass", "fail", "skip", "timeout", "needs_person", "needs_typing"],
 	"reasons": ["malformed", "unknown_step", "bad_deadline", "busy", "duplicate_request", "failed"],
@@ -25,6 +25,19 @@
 			"check": "lease",
 			"deadline_seconds": 45,
 			"proves": "The Karabiner lease is healthy: CLI present, lease phase, guardian ready, no lease failure, key loss or swallowed key this session; the lease answers that timed out, the free memory and the last karabiner.json write (size, time) are named."
+		},
+		{
+			"id": "field_owned_install",
+			"kind": "field_check",
+			"check": "owned_install",
+			"deadline_seconds": 900,
+			"proves": "A Mac without Ergopti's own Karabiner runtime gets it installed with no click of Ergopti's (the macOS administrator prompt is the one human step), and pqrs' driver is reported active once macOS approved it."
+		},
+		{
+			"id": "owned_install_reload",
+			"kind": "reload",
+			"deadline_seconds": 180,
+			"proves": "The driver reloads after the install, so the owner admits the installed runtime before the owned checks run."
 		},
 		{
 			"id": "field_owned_runtime",

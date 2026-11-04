@@ -180,7 +180,7 @@ local function alive(pid)
 	return status ~= nil and status:match("State:%s*(%u)") ~= "Z"
 end
 
-local session_path = scratch .. "/run/" .. require("app_dirs").folder_name .. "/control/session.json"
+local session_path = scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/session.json"
 local function wait_generation(count)
 	for _ = 1, 400 do
 		local list = pids()

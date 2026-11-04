@@ -375,12 +375,13 @@ end
 --- is off. Needs no lease, token or Karabiner process; personal rules keep their
 --- exact bytes and an unprovable file is left untouched.
 --- @param context string Stable diagnostic label.
+--- @param path string|nil The karabiner.json to clean; this boot's output when nil.
 --- @return boolean removed True when no marked rule remains.
 --- @return string detail `absent`, `unchanged`, `removed`, or the refusal.
 --- @return integer removed_count Number of rules removed.
-local function remove_managed_rules(context)
+local function remove_managed_rules(context, path)
 	local call_ok, removed, detail, removed_count = xpcall(function()
-		return ManagedRuleRemoval.remove_managed_rules(KARABINER_OUT)
+		return ManagedRuleRemoval.remove_managed_rules(path or KARABINER_OUT)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "%s: managed-rule removal raised: %s.", context, tostring(removed))
@@ -4138,24 +4139,6 @@ function M.set_enabled(value, on_done, onboarding_gate)
 end
 
 
---- « Remove Ergopti from Karabiner »: turns the integration off through the
---- exact lease when it is on, then removes every ErgoptiPlus rule from
---- karabiner.json. With the switch already off it only cleans the file.
---- Karabiner itself is never quit, launched or reconfigured.
---- @param on_done function|nil Callback fn(ok, reason, removed_count).
---- @return boolean accepted True when accepted or settled successfully.
-function M.remove_from_karabiner(on_done)
-	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
-	if not require_state(require("config_keys").COMMAND.REMOVE_FROM_KARABINER) then
-		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
-		return false
-	end
-	if _state.enabled == true or _enabled_transition ~= nil or _enabled_preflight ~= nil then
-		return M.set_enabled(false, on_done)
-	end
-	return M.set_enabled(false, on_done)
-end
-
 --- Clones the persisted settings without sharing either nested binding table.
 --- @param source table Source state.
 --- @return table candidate Detached settings candidate.
@@ -4236,6 +4219,7 @@ local REGENERATION_REFUSED_BEFORE_DEPLOY = {
 	["pause-intent-pending"] = true,
 	["token-unavailable"] = true,
 	["layout-refresh-exhausted"] = true,
+	["owned-runtime-not-admitted"] = true,
 }
 
 --- Completes the original bulk caller exactly once.
@@ -4738,6 +4722,18 @@ local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite
 		)
 		return true
 	end
+	-- Ergopti's own runtime not admitted yet (not installed, a user Karabiner
+	-- running, no network...): the regeneration would be refused before any
+	-- deploy, and Restore recommended reverted its saved edit behind a blocking
+	-- dialog. The admission's own regeneration builds from what is saved here.
+	if M._owned.selected() and not (M._owned.owner and M._owned.owner.admitted()) then
+		settle_bulk_settings_saved_for_later(
+			transaction,
+			"persisted-owned-runtime-not-admitted",
+			"when Ergopti's own Karabiner runtime is admitted"
+		)
+		return true
+	end
 
 	transaction.phase = "candidate-regeneration-pending"
 	return dispatch_bulk_regeneration(transaction, label .. " regeneration",
@@ -5220,6 +5216,31 @@ function M.update_virtual_hid_driver(on_done)
 		return false
 	end
 	require("adapters.runtime_owner_ports").update_virtual_hid(on_done)
+	return true
+end
+
+--- The owner's reasons a first install resolves: no runtime files, a job
+--- missing, or no VirtualHIDDevice driver at all.
+M.OWNED_INSTALL_REASONS = {
+	runtime_not_installed = true,
+	runtime_job_not_loaded = true,
+	virtual_hid_absent = true,
+}
+
+--- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
+--- caller reloads after telling the user, so the next owner admits it or names
+--- the System Settings approval macOS may still wait for
+--- (ui/owned_runtime_install.lua).
+--- @param on_done function fn(ok, reason|nil, detail|nil) called once.
+--- @return boolean started False when the owned runtime is not blocked by a missing install.
+function M.install_owned_runtime(on_done)
+	assert(type(on_done) == "function", "install_owned_runtime(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table" or not M.OWNED_INSTALL_REASONS[status.reason] then
+		Logger.error(LOG, "Owned runtime install refused: the runtime is not blocked by a missing install.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").install_runtime(on_done)
 	return true
 end
 
@@ -6930,6 +6951,29 @@ function M._owned.bind()
 	return M._owned.activation
 end
 
+--- Removes the rules an earlier shared-mode build merged into the user's own
+--- `~/.config/karabiner/karabiner.json`. An owned boot writes its own file, so
+--- those rules would keep remapping inside the user's Karabiner-Elements, which
+--- the user gets back on a pause or a quit, with a lease nobody renews. Only
+--- rules carrying the exact ErgoptiPlus marker go, by byte-span surgery; personal
+--- rules keep their bytes, and an unprovable file stays untouched and is logged.
+--- @return boolean retired True when no marked rule remains in the shared file.
+function M._owned.retire_shared_rules()
+	local shared = M._owned.shared_config
+	if type(shared) ~= "string" or shared == "" then
+		-- ERGOPTI_KARABINER_OUT redirects this boot: the user's own file is not ours to read.
+		Logger.info(LOG, "Shared karabiner.json left alone: this boot's output path is overridden.")
+		return true
+	end
+	local removed, detail, count = remove_managed_rules("Owned runtime migration", shared)
+	if removed and count > 0 then
+		Logger.info(LOG, "Removed %d rule(s) an earlier build merged into '%s'.", count, shared)
+	elseif removed then
+		Logger.debug(LOG, "No earlier ErgoptiPlus rule in '%s' (%s).", shared, detail)
+	end
+	return removed
+end
+
 --- Applies the activation rule (platform/remap/runtime_activation.lua): while
 --- Ergopti runs and is not paused its own runtime is active and closes the
 --- user's Karabiner; paused, it stops and gives back a Karabiner it closed. Admission
@@ -7012,18 +7056,21 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- The runtime this boot targets: shared unless config_karabiner.toml opted
-	-- in by hand. The command line tool every variable writer spells is chosen
-	-- here, once, and an owned boot writes its own complete file.
-	local runtime = user_cfg.runtime or M._owned.paths.RUNTIME_SHARED
+	-- The runtime this boot targets: owned unless config_karabiner.toml keeps
+	-- the shared one by hand. The command line tool every variable writer spells
+	-- is chosen here, once, and an owned boot writes its own complete file.
+	local runtime = user_cfg.runtime or Config.RUNTIME_DEFAULT
 	local runtime_ok, runtime_err = pcall(M._owned.paths.select_runtime, runtime)
 	if not runtime_ok then
 		Logger.error(LOG, "Karabiner bridge initialization refused: %s", tostring(runtime_err))
 		return false
 	end
 	if runtime == M._owned.paths.RUNTIME_OWNED then
-		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		Logger.info(LOG, "Ergopti's own Karabiner runtime is selected.")
+		M._owned.shared_config = nil
 		if not (env_override and env_override ~= "") then
+			-- Still the shared path here: the migration cleans it once this boot is owned.
+			M._owned.shared_config = KARABINER_OUT
 			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
 			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
 		end
@@ -7314,6 +7361,7 @@ function M.init(file_system)
 		if M._owned.reconcile() ~= true then
 			Logger.error(LOG, "Owned Karabiner runtime could not be bound; remapping stays off.")
 		end
+		M._owned.retire_shared_rules()
 	end
 	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true

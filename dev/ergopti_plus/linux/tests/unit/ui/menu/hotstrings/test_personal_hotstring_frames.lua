@@ -9,6 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local function upvalue(callback, wanted)
 	for index = 1, 100 do
 		local name, value = debug.getupvalue(callback, index)
@@ -31,8 +34,8 @@ local function with_personal_frame(scenario, options)
 	local lfs = require("lfs")
 	local ok, result = xpcall(function()
 		scratch = assert(os.tmpname()); assert(os.remove(scratch)); assert(lfs.mkdir(scratch))
-		assert(lfs.mkdir(scratch .. "/ergopti_plus"))
-		store = scratch .. "/ergopti_plus/storage.json"
+		assert(lfs.mkdir(scratch .. "/" .. FOLDER))
+		store = scratch .. "/" .. FOLDER .. "/storage.json"
 		local seed = assert(io.open(store, "wb"))
 		assert(seed:write('{"hotstring_editor.default_section":"beta","hotstring_editor.auto_close":false,"future":{"keep":"bytes"}}\n'))
 		assert(seed:close())
@@ -90,10 +93,10 @@ local function with_personal_frame(scenario, options)
 	for name, value in pairs(previous) do package.loaded[name] = value end
 	local cleanup_ok, cleanup_error = pcall(function()
 		if scratch then
-			for filename in lfs.dir(scratch .. "/ergopti_plus") do
-				if filename ~= "." and filename ~= ".." then assert(os.remove(scratch .. "/ergopti_plus/" .. filename)) end
+			for filename in lfs.dir(scratch .. "/" .. FOLDER) do
+				if filename ~= "." and filename ~= ".." then assert(os.remove(scratch .. "/" .. FOLDER .. "/" .. filename)) end
 			end
-			assert(lfs.rmdir(scratch .. "/ergopti_plus")); assert(lfs.rmdir(scratch))
+			assert(lfs.rmdir(scratch .. "/" .. FOLDER)); assert(lfs.rmdir(scratch))
 		end
 	end)
 	for name, value in pairs(previous) do assert(rawequal(rawget(package.loaded, name), value), name) end

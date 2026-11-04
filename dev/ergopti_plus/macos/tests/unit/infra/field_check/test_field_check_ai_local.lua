@@ -128,4 +128,18 @@ helpers.describe("local AI probe", function()
 		helpers.assert_eq(steps.mlx_runtime.value, "unknown")
 		helpers.assert_eq(steps.mlx_models_installed.value, "unknown")
 	end)
+
+	helpers.it("never asks the owned endpoint without an owned Ollama (ai-local-no-owned-listing)", function()
+		-- Field run 2026-11-03 10:31:17: the listing of an endpoint nothing could
+		-- serve logged "The local server's model list is unavailable" as an ERROR.
+		local ports, world = make_ports()
+		world.facts = { mlx_runtime = true, mlx_installed = 2 }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(world.refreshes, 0, "the owned endpoint must not be listed without its binary")
+		helpers.assert_eq(steps.ollama_listing.state, "skip")
+		helpers.assert_eq(steps.ollama_listing.value, "not_installed")
+		helpers.assert_eq(steps.ollama_prediction.value, "not_installed")
+		helpers.assert_nil(world.prediction)
+	end)
 end)

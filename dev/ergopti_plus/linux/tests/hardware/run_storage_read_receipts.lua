@@ -4,6 +4,9 @@
 --- never become an empty store that a subsequent mutation overwrites.
 --- No filesystem API is mocked; TOML persistence is outside this fixture.
 local uv = require("luv")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-storage-XXXXXX"))
 local previous_xdg = uv.os_getenv("XDG_CONFIG_HOME")
 local directories, files = { root }, {}
@@ -67,7 +70,7 @@ for _, operation in ipairs(operations) do
 	for _, refusal in ipairs({ "unreadable-file", "unsearchable-parent", "non-directory" }) do
 		check(operation.name .. " rejects " .. refusal, function()
 			local config = mkdir(root .. "/" .. operation.name .. "-" .. refusal)
-			local parent = config .. "/ergopti_plus"
+			local parent = config .. "/" .. FOLDER
 			local store = parent .. "/storage.json"
 			if refusal == "non-directory" then
 				write(parent, ORIGINAL)
@@ -90,7 +93,7 @@ for _, operation in ipairs(operations) do
 	end
 	check(operation.name .. " accepts a genuinely missing store", function()
 		local config = mkdir(root .. "/" .. operation.name .. "-missing")
-		local parent = mkdir(config .. "/ergopti_plus")
+		local parent = mkdir(config .. "/" .. FOLDER)
 		local store = parent .. "/storage.json"
 		files[#files + 1] = store
 		local storage = fresh(config)
@@ -104,7 +107,7 @@ end
 
 check("readable native store preserves unrelated nested values", function()
 	local config = mkdir(root .. "/readable")
-	local parent = mkdir(config .. "/ergopti_plus")
+	local parent = mkdir(config .. "/" .. FOLDER)
 	write(parent .. "/storage.json", ORIGINAL)
 	local storage = fresh(config)
 	assert(storage.get("preserve") == "original")
@@ -116,7 +119,7 @@ end)
 
 check("fresh owner recovers after native permissions are repaired", function()
 	local config = mkdir(root .. "/repaired")
-	local parent = mkdir(config .. "/ergopti_plus")
+	local parent = mkdir(config .. "/" .. FOLDER)
 	local store = parent .. "/storage.json"
 	write(store, ORIGINAL)
 	assert(uv.fs_chmod(store, 0))
@@ -133,7 +136,7 @@ end)
 for index, body in ipairs({ "[]", '["original"]', '[{"keep":"é","nested":[1,2]}]', '[null,"original"]' }) do
 	check("preserves non-object store history " .. index, function()
 		local config = mkdir(root .. "/shape-array-" .. index)
-		local parent = mkdir(config .. "/ergopti_plus")
+		local parent = mkdir(config .. "/" .. FOLDER)
 		local store = parent .. "/storage.json"
 		write(store, body)
 		files[#files + 1] = store .. ".corrupt"
@@ -151,7 +154,7 @@ end
 for index, body in ipairs({ "{}", " \n\t{}", '{"1":"original","nested":{"values":[false,0,"é"]}}' }) do
 	check("accepts object store control " .. index, function()
 		local config = mkdir(root .. "/shape-object-" .. index)
-		local parent = mkdir(config .. "/ergopti_plus")
+		local parent = mkdir(config .. "/" .. FOLDER)
 		write(parent .. "/storage.json", body)
 		local storage = fresh(config)
 		assert(storage.set("replacement", true) and storage.recovery_status() == nil)
@@ -169,7 +172,7 @@ for _, method in ipairs({ "set", "set_many" }) do
 	for _, source in ipairs({ "input", "returned", "refused" }) do
 		check(method .. " owns its durable snapshot after " .. source .. " mutation", function()
 			local config = mkdir(root .. "/snapshot-" .. method .. "-" .. source)
-			local parent = mkdir(config .. "/ergopti_plus")
+			local parent = mkdir(config .. "/" .. FOLDER)
 			local store = parent .. "/storage.json"
 			files[#files + 1] = store
 			local storage = fresh(config)
@@ -200,7 +203,7 @@ end
 
 check("durable native snapshots retain scalar JSON values", function()
 	local config = mkdir(root .. "/snapshot-scalars")
-	local parent = mkdir(config .. "/ergopti_plus")
+	local parent = mkdir(config .. "/" .. FOLDER)
 	files[#files + 1] = parent .. "/storage.json"
 	local storage = fresh(config)
 	assert(storage.set_many({ flag = false, count = 0, text = "é\0\n" }))
@@ -214,7 +217,7 @@ for _, suffix in ipairs({ 0, 1, 3 }) do
 	for _, inaccessible in ipairs({ true, false }) do
 		check("corrupt backup suffix " .. suffix .. (inaccessible and " is protected after refusal" or " is preserved before recovery"), function()
 			local config = mkdir(root .. "/backup-" .. suffix .. (inaccessible and "-denied" or "-readable"))
-			local parent = mkdir(config .. "/ergopti_plus")
+			local parent = mkdir(config .. "/" .. FOLDER)
 			local store = parent .. "/storage.json"
 			local broken = "{ broken current bytes"
 			write(store, broken)

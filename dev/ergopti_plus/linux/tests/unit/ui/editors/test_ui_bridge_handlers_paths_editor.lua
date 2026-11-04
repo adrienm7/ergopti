@@ -8,6 +8,9 @@
 
 package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
 local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local helpers, build_mock_state = Fixture.helpers, Fixture.build_mock_state
 
 
@@ -587,10 +590,10 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
 		os.remove(root)
-		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/ergopti_plus")
+		local made = os.execute("mkdir -p " .. string.format("%q", root .. "/" .. FOLDER)
 			.. " " .. string.format("%q", root .. "/config"))
 		helpers.assert_true(made == true or made == 0)
-		local storage_path = root .. "/ergopti_plus/storage.json"
+		local storage_path = root .. "/" .. FOLDER .. "/storage.json"
 		local config_path = root .. "/config/config.toml"
 		local storage_seed = '{"locale":"zz_UNSUPPORTED","future":{"retained":true}}\n'
 		local config_seed = '[gestures]\nenabled = false\n[future]\nvalue = "retained"\n'
@@ -600,7 +603,9 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		local observed = nil
 		local ok, err = xpcall(function()
 			-- config() is where the locale owner rewrites a held [script] locale.
+			-- default_config_dir() is where the storage adapter keeps storage.json.
 			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+				default_config_dir = function() return root .. "/" .. FOLDER end,
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
@@ -658,7 +663,7 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		os.rename = original_rename
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		os.remove(storage_path .. ".tmp"); os.remove(storage_path); os.remove(config_path)
-		os.execute("rmdir " .. string.format("%q", root .. "/ergopti_plus")
+		os.execute("rmdir " .. string.format("%q", root .. "/" .. FOLDER)
 			.. " " .. string.format("%q", root .. "/config"))
 		os.execute("rmdir " .. string.format("%q", root))
 		if not ok then error(err, 0) end

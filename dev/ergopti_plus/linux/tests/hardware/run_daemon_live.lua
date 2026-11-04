@@ -164,12 +164,13 @@ assert(Shell.run(prepare), "the live daemon configuration must be prepared befor
 -- The AI configured as a user would leave it after "Add an API": enabled, the
 -- API backend selected, one entry in the private keys file.
 if LLM_PORT then
-	os.execute("mkdir -p '" .. home .. "/.config/ergopti_plus'")
-	local keys = io.open(home .. "/.config/ergopti_plus/api_keys.json", "w")
+	local config_dir = home .. "/.config/" .. require("app_dirs").linux.folder_name
+	os.execute("mkdir -p '" .. config_dir .. "'")
+	local keys = io.open(config_dir .. "/api_keys.json", "w")
 	keys:write(string.format('{"version":1,"active_id":"live","entries":[{"id":"live","provider":"openai_compat",'
 		.. '"label":"Live","token":"%s","model":"live-model","base_url":"http://127.0.0.1:%s/v1"}]}', LLM_KEY, LLM_PORT))
 	keys:close()
-	os.execute("chmod 600 '" .. home .. "/.config/ergopti_plus/api_keys.json'")
+	os.execute("chmod 600 '" .. config_dir .. "/api_keys.json'")
 end
 os.execute(string.format(
 	-- XDG roots pinned too: a runner's XDG_CONFIG_HOME survives sudo, and the

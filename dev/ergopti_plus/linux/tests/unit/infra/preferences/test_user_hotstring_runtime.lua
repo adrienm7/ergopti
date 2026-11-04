@@ -161,6 +161,8 @@ local function with_configuration_scope(f, body)
 		package.loaded["infra.config_paths"] = setmetatable({ get_config_dir = function() return "/owned" end,
 			config = function(relative) return relative and directory .. "/" .. relative or directory end,
 			home = function() return directory end, config_home = function() return directory end,
+			-- The storage adapter keeps storage.json in the default configuration folder.
+			default_config_dir = function() return directory .. "/" .. require("app_dirs").linux.folder_name end,
 			data_home = function() return directory end }, { __index = NativeConfigPaths })
 		package.loaded["modules.hotstrings.loader"] = { find_toml_files = function() return {} end,
 			list_subdirs = function() return {} end, read_file = function() return nil end,

@@ -4,8 +4,8 @@
 		{
 			"id": "mac_home_everywhere_in_free_text",
 			"context": { "home": "/Users/jdoe", "user": "jdoe", "case_insensitive": false },
-			"input": "config_dir: /Users/jdoe/.config/ergopti_plus\nlog: /Users/jdoe/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-23.log",
-			"expected": "config_dir: ~/.config/ergopti_plus\nlog: ~/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-23.log"
+			"input": "config_dir: /Users/jdoe/Library/Application Support/Ergopti/config\nlog: /Users/jdoe/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-09-23.log",
+			"expected": "config_dir: ~/Library/Application Support/Ergopti/config\nlog: ~/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-09-23.log"
 		},
 		{
 			"id": "home_alone_and_trailing_slash_in_context",
@@ -22,8 +22,8 @@
 		{
 			"id": "windows_home_both_slashes_any_case",
 			"context": { "home": "C:\\Users\\JDoe", "user": "JDoe", "case_insensitive": true },
-			"input": "C:\\Users\\JDoe\\AppData\\Local\\ergopti_plus\\logs and c:/users/jdoe/Documents and C:\\USERS\\JDOE",
-			"expected": "~\\AppData\\Local\\ergopti_plus\\logs and ~/Documents and ~"
+			"input": "C:\\Users\\JDoe\\AppData\\Local\\Ergopti\\logs and c:/users/jdoe/Documents and C:\\USERS\\JDOE",
+			"expected": "~\\AppData\\Local\\Ergopti\\logs and ~/Documents and ~"
 		},
 		{
 			"id": "account_name_outside_the_home",
@@ -168,10 +168,10 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "Loaded 'D:\\Work\\config\\ergopti_plus\\hotstrings\\perso_test\\cat_a\\item_1_root.toml' (12 entries)",
+			"input": "Loaded 'D:\\Work\\config\\Ergopti\\hotstrings\\perso_test\\cat_a\\item_1_root.toml' (12 entries)",
 			"expected": "Loaded '<config>\\hotstrings\\<name>\\<name>\\<name>' (12 entries)"
 		},
 		{
@@ -179,10 +179,10 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "Read D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml and D:\\Work\\config\\ergopti_plus\\autohotkey\\tap_hold.toml: 136 applied",
+			"input": "Read D:\\Work\\config\\Ergopti\\autohotkey\\config.toml and D:\\Work\\config\\Ergopti\\autohotkey\\tap_hold.toml: 136 applied",
 			"expected": "Read <config>\\autohotkey\\config.toml and <config>\\autohotkey\\tap_hold.toml: 136 applied"
 		},
 		{
@@ -190,10 +190,10 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "Skipped D:\\Work\\config\\ergopti_plus\\hotstrings\\my pack\\a.toml because it is empty",
+			"input": "Skipped D:\\Work\\config\\Ergopti\\hotstrings\\my pack\\a.toml because it is empty",
 			"expected": "Skipped <config>\\hotstrings\\<name>\\<name> because it is empty"
 		},
 		{
@@ -201,32 +201,32 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "Parsing \"D:\\Work\\config\\ergopti_plus\\hotstrings\\Zoe's pack\\my words.toml\": ok",
+			"input": "Parsing \"D:\\Work\\config\\Ergopti\\hotstrings\\Zoe's pack\\my words.toml\": ok",
 			"expected": "Parsing \"<config>\\hotstrings\\<name>\\<name>\": ok"
 		},
 		{
 			"id": "config_dir_under_home_is_found_raw_and_after_the_home_pass",
 			"context": {
-				"home": "/Users/jdoe",
+				"home": "/home/jdoe",
 				"user": "jdoe",
-				"config_dir": "/Users/jdoe/.config/ergopti_plus",
+				"config_dir": "/home/jdoe/.config/ergopti",
 				"case_insensitive": false
 			},
-			"input": "Opened /Users/jdoe/.config/ergopti_plus/hotstrings/perso/a.toml and (older line) ~/.config/ergopti_plus/hotstrings/perso/b.toml and ~/.config/ergopti_plus2/x",
-			"expected": "Opened <config>/hotstrings/<name>/<name> and (older line) <config>/hotstrings/<name>/<name> and ~/.config/ergopti_plus2/x"
+			"input": "Opened /home/jdoe/.config/ergopti/hotstrings/perso/a.toml and (older line) ~/.config/ergopti/hotstrings/perso/b.toml and ~/.config/ergopti2/x",
+			"expected": "Opened <config>/hotstrings/<name>/<name> and (older line) <config>/hotstrings/<name>/<name> and ~/.config/ergopti2/x"
 		},
 		{
 			"id": "config_dir_compares_like_the_file_system",
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\Config\\Ergopti_Plus",
+				"config_dir": "D:\\Work\\Config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "d:\\work\\config\\ergopti_plus\\HotStrings\\Mine\\x.toml",
+			"input": "d:\\work\\config\\ergopti\\HotStrings\\Mine\\x.toml",
 			"expected": "<config>\\HotStrings\\<name>\\<name>"
 		},
 		{
@@ -245,28 +245,28 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "Reading 'D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml'… and D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml… done",
+			"input": "Reading 'D:\\Work\\config\\Ergopti\\autohotkey\\config.toml'… and D:\\Work\\config\\Ergopti\\autohotkey\\config.toml… done",
 			"expected": "Reading '<config>\\autohotkey\\config.toml'… and <config>\\autohotkey\\config.toml… done"
 		},
 		{
 			"id": "config_dir_without_context_is_untouched",
 			"context": {},
-			"input": "D:\\Work\\config\\ergopti_plus\\hotstrings\\perso\\a.toml",
-			"expected": "D:\\Work\\config\\ergopti_plus\\hotstrings\\perso\\a.toml"
+			"input": "D:\\Work\\config\\Ergopti\\hotstrings\\perso\\a.toml",
+			"expected": "D:\\Work\\config\\Ergopti\\hotstrings\\perso\\a.toml"
 		},
 		{
 			"id": "config_dir_prefix_lookalike_is_untouched",
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "D:\\Work\\config\\ergopti_plus_old\\hotstrings\\perso",
-			"expected": "D:\\Work\\config\\ergopti_plus_old\\hotstrings\\perso"
+			"input": "D:\\Work\\config\\Ergopti_old\\hotstrings\\perso",
+			"expected": "D:\\Work\\config\\Ergopti_old\\hotstrings\\perso"
 		},
 		{
 			"id": "config_dir_trailing_separator_in_context",
@@ -284,10 +284,10 @@
 			"context": {
 				"home": "C:\\Users\\Jane",
 				"user": "Jane",
-				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"config_dir": "D:\\Work\\config\\Ergopti",
 				"case_insensitive": true
 			},
-			"input": "'D:\\Work\\config\\ergopti_plus\\hotstrings\\Café Été\\mots.toml'",
+			"input": "'D:\\Work\\config\\Ergopti\\hotstrings\\Café Été\\mots.toml'",
 			"expected": "'<config>\\hotstrings\\<name>\\<name>'"
 		},
 		{

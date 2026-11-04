@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Config Paths — First Launch Without the Managed Folder
 --- DESCRIPTION:
---- The packaged launcher exports ERGOPTI_PATHS_FILE inside
---- ~/Library/Application Support/ErgoptiPlus, a folder the first save creates.
+--- The packaged launcher exports ERGOPTI_PATHS_FILE inside the Ergopti support
+--- folder (app_dirs config.macos_paths_file), a folder the first save creates.
 ---
 --- ROOT CAUSE ENCODED:
 --- On the first launch of a fresh install that folder does not exist yet. The
@@ -14,9 +14,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
-local MANAGED_DIR = "/Users/test/Library/Application Support/ErgoptiPlus"
-local MANAGED_FILE = MANAGED_DIR .. "/paths.toml"
+local MANAGED_FILE = "/Users/test/" .. AppDirs.config.macos_paths_file
+local MANAGED_DIR = MANAGED_FILE:match("^(.*)/[^/]+$")
 
 --- Answers an lstat-style query: the managed folder and everything in it are
 --- missing, every other folder exists.

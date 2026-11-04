@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Runtime state, not configuration: the map lives in the XDG state folder
----    (${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/agent_learning.json),
+---    (${XDG_STATE_HOME:-~/.local/state}/ergopti/agent_learning.json),
 ---    never in config.toml.
 --- 2. Loaded at start, saved on change after a short debounce, and written
 ---    through a temporary file then a rename, so a crash never leaves half a
@@ -29,8 +29,8 @@ local NativePath = require("native_path")
 
 local LOG = "modules.llm.agent_learning"
 
--- The file under the XDG state folder
-local STATE_FILE = "ergopti_plus/agent_learning.json"
+-- The file in the driver's XDG state folder
+local STATE_FILE = "agent_learning.json"
 -- How many applications are remembered
 M.MAX_APPS = LearningStore.MAX_APPS
 -- How long after a change the file is written
@@ -65,7 +65,7 @@ local _load_blocked = false
 --- @return string
 local function state_path()
 	if _path then return _path end
-	return require("infra.config_paths").state_home() .. "/" .. STATE_FILE
+	return require("infra.config_paths").state(STATE_FILE)
 end
 
 --- Preserves the rejected source without replacing an older recovery file.

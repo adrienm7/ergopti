@@ -176,10 +176,13 @@ OnError(_FatalErrorHandler)
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
+#Include ../infra/app_folders.ahk
+#Include ../infra/legacy_folder_migration.ahk
 #Include ../infra/logger.ahk
 ; The logs folder every logger test writes to: a private temp folder, never the
-; user's real %LOCALAPPDATA%\ergopti_plus\logs\ (boot.ahk sets it in the driver).
-global _LogsDir := A_Temp . "\ergopti_test_logs\ergopti_plus\"
+; user's real %LOCALAPPDATA%\Ergopti\logs\ (boot.ahk sets it in the driver). It
+; ends in the application folder name, as a resolved LogsDirPath always does.
+global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/ui/healthcheck/test_diagnostic_logging.ahk.
@@ -1026,6 +1029,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/config/migration/test_config_migrate.ahk
 #Include unit/infra/config/migration/test_config_migrate_variant_metadata.ahk
 #Include unit/infra/config/migration/test_config_migrate_same_registry.ahk
+#Include unit/infra/config/migration/test_legacy_folder_migration.ahk
 #Include unit/infra/config/migration/test_config_journal_boot.ahk
 #Include unit/infra/config/migration/test_config_journal_ai_admission.ahk
 #Include unit/infra/config/migration/test_config_journal_settlement.ahk

@@ -21,6 +21,9 @@
 
 package.loaded["tests.support.adapters.storage.storage_adapter_fixture"] = nil
 local Fixture = require("tests.support.adapters.storage.storage_adapter_fixture")
+
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
 local helpers, make_temp_config_root, storage_cohort_fixture =
 	Fixture.helpers, Fixture.make_temp_config_root, Fixture.storage_cohort_fixture
 
@@ -36,7 +39,7 @@ local helpers, make_temp_config_root, storage_cohort_fixture =
 helpers.describe("storage adapter preserves corrupt input for recovery", function()
 	helpers.it("moves invalid JSON aside before creating a new durable store", function()
 		local temp_root = make_temp_config_root()
-		local store_path = temp_root .. "/ergopti_plus/storage.json"
+		local store_path = temp_root .. "/" .. FOLDER .. "/storage.json"
 		local raw = assert(io.open(store_path, "w"))
 		raw:write("{ definitely not JSON")
 		raw:close()

@@ -13,6 +13,11 @@ import socket
 import stat
 import subprocess
 import tempfile
+import tomllib
+
+# The application folder under every XDG base, read from the one declaration.
+APP_DIRS = pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml"
+FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folder_name"]
 
 
 ORIGINAL = '{"preserve":"original"}'
@@ -58,7 +63,7 @@ def main():
             )
         ):
             root = pathlib.Path(folder) / str(number)
-            source = root / "ergopti_plus" / "storage.json"
+            source = root / FOLDER / "storage.json"
             source.parent.mkdir(parents=True)
             endpoint = root / "endpoint"
             native_socket = None

@@ -261,7 +261,7 @@ function M.start(opts)
 		assert(read and type(text) == "string", "the control declaration could not be read")
 		assert(closed and acknowledged == true, "the control declaration close was not acknowledged")
 		local spec = Policy.validate(Json.decode(text))
-		local folder, why = Policy.folder(spec, "linux", os.getenv, require("app_dirs").folder_name, "/")
+		local folder, why = Policy.folder(spec, "linux", os.getenv, require("app_dirs").linux.folder_name, "/")
 		if not folder then error(why, 0) end
 		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, reload = opts.reload,
 			boot_outcome = opts.boot_outcome })

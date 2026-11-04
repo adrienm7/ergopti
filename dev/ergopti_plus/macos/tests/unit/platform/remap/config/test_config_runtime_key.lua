@@ -4,12 +4,12 @@
 --- MODULE: Hidden Karabiner Runtime Key
 --- DESCRIPTION:
 --- Pins `[karabiner] runtime` of config_karabiner.toml (ADR 011): absent means
---- the shared runtime, `owned` opts in, anything else refuses the file, and an
---- ordinary save keeps the key the user wrote by hand.
+--- Ergopti's own runtime, `shared` keeps the official application by hand,
+--- anything else refuses the file, and an ordinary save keeps the key the user
+--- wrote by hand and writes none for the default.
 ---
 --- ROOT CAUSE ENCODED: a typo such as `runtime = "ownd"` must never silently
---- select the other runtime, and the dormant default must not move for any
---- file written before the key existed.
+--- select the other runtime.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -48,26 +48,37 @@ local function with_file(source, body)
 end
 
 helpers.describe("Karabiner runtime key", function()
-	helpers.it("defaults to the shared runtime for a file written before the key existed", function()
+	helpers.it("defaults to Ergopti's own runtime for a file that names none", function()
 		with_file("[karabiner]\nintegration_enabled = true\n", function(f)
 			local state, status = f.load()
 			helpers.assert_eq(status, "ok")
-			helpers.assert_eq(state.runtime, "shared")
-			helpers.assert_eq(f.config.RUNTIME_DEFAULT, "shared")
+			helpers.assert_eq(state.runtime, "owned")
+			helpers.assert_eq(f.config.RUNTIME_DEFAULT, "owned")
 		end)
 	end)
 
-	helpers.it("defaults to shared when there is no karabiner table at all", function()
+	helpers.it("defaults to owned when there is no karabiner table at all", function()
 		with_file("[tap_holds]\nenabled = true\n", function(f)
 			local state = f.load()
-			helpers.assert_eq(state.runtime, "shared")
+			helpers.assert_eq(state.runtime, "owned")
 		end)
 	end)
 
-	helpers.it("reads the explicit opt-in", function()
+	helpers.it("reads an explicit owned runtime and the hand-kept shared one", function()
 		with_file('[karabiner]\nruntime = "owned"\n', function(f)
+			helpers.assert_eq(f.load().runtime, "owned")
+		end)
+		with_file('[karabiner]\nruntime = "shared"\n', function(f)
+			helpers.assert_eq(f.load().runtime, "shared")
+		end)
+	end)
+
+	helpers.it("writes no runtime key for the default on an ordinary save", function()
+		with_file("[tap_holds]\nenabled = true\n", function(f)
 			local state = f.load()
-			helpers.assert_eq(state.runtime, "owned")
+			helpers.assert_true(f.config.save_user_config(state, f.path))
+			helpers.assert_eq(f.read():find("runtime", 1, true), nil)
+			helpers.assert_eq(f.load().runtime, "owned")
 		end)
 	end)
 

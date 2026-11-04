@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local HOME = "/Users/jdoe"
 
@@ -46,8 +47,8 @@ local function load_window(controls)
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	logger.ring_buffer_snapshot = function() return {} end
 	logger.session_issues = function() return { warn_count = 0, err_count = 0 } end
-	logger.ERRORS_LOG_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-24.log"
-	logger.UNIFIED_LOG_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_2026-09-24.log"
+	logger.ERRORS_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log"
+	logger.UNIFIED_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_2026-09-24.log"
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["infra.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
@@ -146,7 +147,7 @@ local function load_window(controls)
 			schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
 			detailed = type(opts) == "table" and opts.detailed == true or false,
 			extensive = type(opts) == "table" and opts.extensive == true or false,
-			sections = { paths = { diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" } },
+			sections = { paths = { diagnostics_dir = HOME .. "/" .. AppDirs.macos.relative .. "/diagnostics" } },
 			probes = { github_api = { state = "pending" } },
 		}
 	end

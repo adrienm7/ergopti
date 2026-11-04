@@ -19,9 +19,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 local HOME = "/Users/jdoe"
-local ERRORS_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-24.log"
+local ERRORS_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log"
 
 --- Loads the real window over controlled natives and collaborators.
 --- @param controls table|nil { stored = boolean|nil }
@@ -108,7 +109,7 @@ local function load_dialog(controls)
 					versions = { ergopti_version = context.version or "2.1.0", commit = "abc1234 (build)" },
 					system = { os = "macOS 15.1" },
 					issues = { warn_count = 1, err_count = 2, recent = { "2026-09-24 10:15:02:117 [ERROR] [keystats] x" } },
-					paths = { errors_today = ERRORS_FILE, diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" },
+					paths = { errors_today = ERRORS_FILE, diagnostics_dir = HOME .. "/" .. AppDirs.macos.relative .. "/diagnostics" },
 				},
 			}
 		end,
@@ -402,7 +403,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(init.kind, "error")
 		helpers.assert_eq(init.module, "keystats")
 		helpers.assert_eq(init.message, "Flush failed: ~/notes.txt", "the message must be redacted")
-		helpers.assert_eq(init.log_path, "~/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-24.log")
+		helpers.assert_eq(init.log_path, "~/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log")
 		helpers.assert_true(init.text:find("# ErgoptiPlus diagnostics", 1, true) ~= nil, "the report must be sent")
 		helpers.assert_true(init.text:find(HOME, 1, true) == nil, "the report must be redacted")
 		helpers.assert_true(init.text:find("keystats", 1, true) ~= nil, "the report must name the module")

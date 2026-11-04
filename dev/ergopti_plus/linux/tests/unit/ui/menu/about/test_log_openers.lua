@@ -13,6 +13,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 --- Loads the openers over a sink whose paths the test controls.
 --- @param state table { day, existing = { [path] = true } }
 --- @param body function Receives the openers module.
@@ -22,9 +25,9 @@ local function with_openers(state, body)
 	local saved_reader = package.loaded["infra.regular_file_reader"]
 	local reader = require("infra.regular_file_reader")
 	package.loaded["infra.logger_sink"] = {
-		log_dir = function() return "/fixture/logs/ergopti_plus" end,
-		main_log_path = function() return "/fixture/logs/ergopti_plus/unified-" .. state.day .. ".log" end,
-		errors_log_path = function() return state.path or "/fixture/logs/ergopti_plus/errors-" .. state.day .. ".log" end,
+		log_dir = function() return "/fixture/logs/" .. FOLDER end,
+		main_log_path = function() return "/fixture/logs/" .. FOLDER .. "/unified-" .. state.day .. ".log" end,
+		errors_log_path = function() return state.path or "/fixture/logs/" .. FOLDER .. "/errors-" .. state.day .. ".log" end,
 	}
 	package.loaded["ui.log_openers"] = nil
 	if not state.native then
@@ -70,11 +73,11 @@ helpers.describe("log openers (log-openers)", function()
 
 	helpers.it("opens an existing errors file", function()
 		local state = { day = "2099-01-02", existing = {} }
-		state.existing["/fixture/logs/ergopti_plus/errors-2099-01-02.log"] = true
+		state.existing["/fixture/logs/" .. FOLDER .. "/errors-2099-01-02.log"] = true
 		with_openers(state, function(Openers)
 			local open_fn, targets = recorder()
 			helpers.assert_true(Openers.open_today_errors(open_fn, function() error("must not notify") end))
-			helpers.assert_eq(targets, { "/fixture/logs/ergopti_plus/errors-2099-01-02.log" })
+			helpers.assert_eq(targets, { "/fixture/logs/" .. FOLDER .. "/errors-2099-01-02.log" })
 		end)
 	end)
 
@@ -87,9 +90,9 @@ helpers.describe("log openers (log-openers)", function()
 			Openers.open_today_log(open_fn)
 			Openers.open_logs_folder(open_fn)
 			helpers.assert_eq(targets, {
-				"/fixture/logs/ergopti_plus/unified-2099-01-03.log",
-				"/fixture/logs/ergopti_plus/unified-2099-01-04.log",
-				"/fixture/logs/ergopti_plus",
+				"/fixture/logs/" .. FOLDER .. "/unified-2099-01-03.log",
+				"/fixture/logs/" .. FOLDER .. "/unified-2099-01-04.log",
+				"/fixture/logs/" .. FOLDER,
 			})
 		end)
 	end)

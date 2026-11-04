@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local Json = require("json")
 local raw = assert(helpers.read_fixture("paths_editor_original_native_captions.json"))
 local original = assert(Json.decode(raw))
@@ -273,9 +274,9 @@ helpers.describe("paths editor declared host title receiving", function()
 				is_initialized = function() return true end,
 				get = function(key) return "/tmp/ergopti/" .. tostring(key) end,
 				get_config_dir = function() return "/tmp/ergopti/" end,
-				get_default_config_dir = function() return "/Users/test/.config/ergopti_plus/" end,
-				get_logs_dir = function() return "/tmp/ergopti-logs/ergopti_plus/" end,
-				get_default_logs_dir = function() return "/Users/test/Library/Logs/ergopti_plus/" end,
+				get_default_config_dir = function() return "/Users/test/" .. AppDirs.config.macos_relative .. "/" end,
+				get_logs_dir = function() return "/tmp/ergopti-logs/" .. AppDirs.macos.folder_name .. "/" end,
+				get_default_logs_dir = function() return "/Users/test/" .. AppDirs.macos.relative .. "/" end,
 			}
 			hs.webview.usercontent = { new = function()
 				return { setCallback = function() return true end }

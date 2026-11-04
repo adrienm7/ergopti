@@ -93,6 +93,23 @@ M.REASON = {
 }
 local REASON = M.REASON
 
+--- The blocks the user can act on or must be told about: the runtime or its
+--- driver is missing, the driver waits for approval or conflicts, a user
+--- Karabiner holds the keyboards, or the artifact could not be downloaded. The
+--- Tap-Holds menu explains each and the boot raises one notice for the first.
+M.USER_BLOCKS = {
+	[REASON.NOT_INSTALLED] = true,
+	[REASON.JOB_NOT_LOADED] = true,
+	[Vhid.REASON_ABSENT] = true,
+	[Vhid.REASON_NOT_ACTIVE] = true,
+	[Vhid.REASON_INCOMPATIBLE] = true,
+	[REASON.OTHER_RUNNING] = true,
+	[REASON.CLOSE_UNSUPPORTED] = true,
+	[REASON.CLOSE_FAILED] = true,
+	[REASON.OTHER_STILL_RUNNING] = true,
+	[REASON.ARTIFACT_FETCH_FAILED] = true,
+}
+
 local PORT_FUNCTIONS = {
 	fs = { "exists", "expand" },
 	launchd = { "loaded" },

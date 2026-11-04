@@ -561,7 +561,7 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 						; DIFFERENT sets here let one character satisfy both at once, so a
 						; quote blocked the expansion and licensed the doubling that
 						; replaced it.
-						return PredChar != "" && InStr(Boundaries, PredChar) == 0
+						return PredChar != "" && !_HSE_CharOpensWord(PredChar, Boundaries)
 				}
 				return true
 		}
@@ -569,9 +569,21 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 		if (BeforeLen >= 1) {
 				BeforeStart := _TextCodepointStart(Buf, BeforeLen)
 				BeforeChar := _TextCompleteTailScalar(SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1))
-				return BeforeChar != "" && InStr(Boundaries, BeforeChar) > 0
+				return _HSE_CharOpensWord(BeforeChar, Boundaries)
 		}
 		return HSE_StartIsWordBoundary
+}
+
+; Whether a word starts right after Ch. A word-only trigger is refused only
+; after a word character, the rule macOS and Linux share (HSE_IsWordChar), so
+; "=", "-", "(" and every other ASCII symbol open a word; the boundary set
+; (terminators, quotes, the user's own delimiters) opens one too. Requiring the
+; boundary set alone refused "(teh" and a personal "(" typed after "=" on Windows.
+; @param Ch {String} One complete character, "" when unknown.
+; @param Boundaries {String} The value of _HSE_WordBoundarySet().
+; @returns {Boolean}
+_HSE_CharOpensWord(Ch, Boundaries) {
+		return Ch != "" && (InStr(Boundaries, Ch) > 0 || !HSE_IsWordChar(Ch))
 }
 
 ; THE word-boundary set, DERIVED on every read rather than cached.

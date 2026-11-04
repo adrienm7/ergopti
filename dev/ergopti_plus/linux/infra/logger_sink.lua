@@ -65,7 +65,7 @@ local TextUtils = require("text_utils")
 --- Application folder and log file names, generated from
 --- _shared/modules/paths/app_dirs.toml. The folder itself is resolved by
 --- infra/config_paths (LogsDirPath, or ${XDG_STATE_HOME:-~/.local/state}/
---- ergopti_plus/logs).
+--- ergopti/logs).
 local AppDirs = require("app_dirs")
 local Redact = require("diagnostics.redact")
 local Json = require("json")

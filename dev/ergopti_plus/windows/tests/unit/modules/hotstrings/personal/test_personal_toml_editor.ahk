@@ -219,7 +219,7 @@ TestPE_RoundTrip() {
 					"auto_expand",       true,
 					"is_case_sensitive", false,
 					"final_result",      false,
-					"strict_case",       false,
+					"is_case_sensitive_strict",       false,
 					"line_index",        0,
 				)],
 			),
@@ -454,7 +454,7 @@ TestPE_RoundTripTwoSections() {
 				"entries", [Map(
 					"trigger", "aa", "output", "Alpha!", "is_word", true,
 					"auto_expand", true, "is_case_sensitive", false,
-					"final_result", false, "strict_case", false, "line_index", 0,
+					"final_result", false, "is_case_sensitive_strict", false, "line_index", 0,
 				)],
 			),
 			"beta", Map(
@@ -462,7 +462,7 @@ TestPE_RoundTripTwoSections() {
 				"entries", [Map(
 					"trigger", "bb", "output", "Beta!", "is_word", true,
 					"auto_expand", false, "is_case_sensitive", true,
-					"final_result", false, "strict_case", false, "line_index", 0,
+					"final_result", false, "is_case_sensitive_strict", false, "line_index", 0,
 				)],
 			),
 		),
@@ -500,7 +500,7 @@ TestPE_RoundTripSpecialCharsInOutput() {
 				"entries", [Map(
 					"trigger", "q", "output", SpecialOutput, "is_word", true,
 					"auto_expand", false, "is_case_sensitive", false,
-					"final_result", false, "strict_case", false, "line_index", 0,
+					"final_result", false, "is_case_sensitive_strict", false, "line_index", 0,
 				)],
 			),
 		),
@@ -544,13 +544,13 @@ TestPE_RoundTripPriority() {
 					Map(
 						"trigger", "win", "output", "WINNER", "is_word", true,
 						"auto_expand", true, "is_case_sensitive", false,
-						"final_result", false, "strict_case", false,
+						"final_result", false, "is_case_sensitive_strict", false,
 						"priority", 90, "line_index", 0,
 					),
 					Map(
 						"trigger", "def", "output", "DEFAULT", "is_word", true,
 						"auto_expand", true, "is_case_sensitive", false,
-						"final_result", false, "strict_case", false,
+						"final_result", false, "is_case_sensitive_strict", false,
 						"priority", "", "line_index", 0,
 					),
 				],
@@ -601,7 +601,7 @@ TestPE_ReloadClearsStaleGroup() {
 				"entries", [Map(
 					"trigger", "rlx", "output", "FIRST", "is_word", true,
 					"auto_expand", true, "is_case_sensitive", true,
-					"final_result", false, "strict_case", false, "line_index", 0,
+					"final_result", false, "is_case_sensitive_strict", false, "line_index", 0,
 				)],
 			),
 		),
@@ -655,7 +655,7 @@ TestPE_ReloadSkipsDisabledSection() {
 				"entries", [Map(
 					"trigger", "gtx", "output", "SHOULD_NOT_REGISTER", "is_word", true,
 					"auto_expand", true, "is_case_sensitive", true,
-					"final_result", false, "strict_case", false, "line_index", 0,
+					"final_result", false, "is_case_sensitive_strict", false, "line_index", 0,
 				)],
 			),
 		),
@@ -699,9 +699,9 @@ TestPE_BuildEntryPreservesHiddenStrictCase() {
 			ChkAutoExp, ChkCaseSens, ChkFinal, true)
 		DefaultEntry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord,
 			ChkAutoExp, ChkCaseSens, ChkFinal)
-		AssertEqual(true, StrictEntry["strict_case"],
+		AssertEqual(true, StrictEntry["is_case_sensitive_strict"],
 			"editing must preserve the hidden strict-case flag")
-		AssertEqual(false, DefaultEntry["strict_case"],
+		AssertEqual(false, DefaultEntry["is_case_sensitive_strict"],
 			"new entries must retain the non-strict default")
 	} finally {
 		_PersonalEditorPrioCtrl := OldPriorityCtrl
@@ -728,7 +728,7 @@ TestPE_WebViewCarriesStrictCase() {
 					"entries", [Map(
 						"trigger", "Case", "output", "exact", "is_word", true,
 						"auto_expand", false, "is_case_sensitive", true,
-						"final_result", false, "strict_case", true, "line_index", 0,
+						"final_result", false, "is_case_sensitive_strict", true, "line_index", 0,
 					)],
 				),
 			),

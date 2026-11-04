@@ -23,11 +23,11 @@ _PELD_InitDataCarriesTheLogsFolder() {
 	if !IsSet(_DefaultConfigDir)
 		_DefaultConfigDir := A_Temp . "\ergopti_test_config\"
 	try {
-		_LogsDir := "D:\Sync\ergopti_plus\"
-		_DefaultLogsDir := "C:\Local\ergopti_plus\logs\"
+		_LogsDir := "D:\Sync\Ergopti\"
+		_DefaultLogsDir := "C:\Local\Ergopti\logs\"
 		Js := _PathsEdWeb_InitDataJs()
-		AssertContains(Js, 'logsDir:"D:/Sync/ergopti_plus/"')
-		AssertContains(Js, 'defaultLogsDir:"C:/Local/ergopti_plus/logs/"')
+		AssertContains(Js, 'logsDir:"D:/Sync/Ergopti/"')
+		AssertContains(Js, 'defaultLogsDir:"C:/Local/Ergopti/logs/"')
 		AssertContains(Js, "paths_editor.label_logs_dir")
 	} finally {
 		_LogsDir := Saved[1]
@@ -41,14 +41,14 @@ _PELD_SaveStoresTheResolvedLogsFolder() {
 	global _LogsDir, _DefaultLogsDir
 	Saved := [_LogsDir, _DefaultLogsDir]
 	try {
-		_DefaultLogsDir := "C:\Local\ergopti_plus\logs\"
-		_LogsDir := "D:\Sync\ergopti_plus\"
-		AssertEqual("", _PathsEdWeb_LogsOverride("C:/Local/ergopti_plus/logs/"),
+		_DefaultLogsDir := "C:\Local\Ergopti\logs\"
+		_LogsDir := "D:\Sync\Ergopti\"
+		AssertEqual("", _PathsEdWeb_LogsOverride("C:/Local/Ergopti/logs/"),
 			"the default folder is stored as no override")
 		AssertEqual("", _PathsEdWeb_LogsOverride(""), "an empty field is the default")
-		AssertEqual("E:\Picked\ergopti_plus\", _PathsEdWeb_LogsOverride("E:/Picked/"),
+		AssertEqual("E:\Picked\" . AppDirsFolderName() . "\", _PathsEdWeb_LogsOverride("E:/Picked/"),
 			"a picked folder gets the application subfolder")
-		AssertEqual("D:\Sync\ergopti_plus\", _PathsEdWeb_LogsOverride(0),
+		AssertEqual("D:\Sync\Ergopti\", _PathsEdWeb_LogsOverride(0),
 			"a page that sends no logs folder keeps the stored one")
 	} finally {
 		_LogsDir := Saved[1]
@@ -65,8 +65,8 @@ _PELD_RelativeLogsFolderIsRefused() {
 	global _LogsDir, _DefaultLogsDir
 	Saved := [_LogsDir, _DefaultLogsDir]
 	try {
-		_DefaultLogsDir := "C:\Local\ergopti_plus\logs\"
-		_LogsDir := "D:\Sync\ergopti_plus\"
+		_DefaultLogsDir := "C:\Local\Ergopti\logs\"
+		_LogsDir := "D:\Sync\Ergopti\"
 		AssertThrows(() => _PathsEdWeb_LogsOverride("relative\logs"),
 			"a relative logs folder is refused, never replaced by the default")
 		AssertThrows(() => _PathsEdWeb_LogsOverride("logs"),
@@ -89,11 +89,11 @@ _PELD_UncreatableLogsFolderIsRefused() {
 	try {
 		DirCreate(Root)
 		FileAppend("x", Blocker, "UTF-8")
-		Fresh := Root . "\fresh\ergopti_plus\"
+		Fresh := Root . "\fresh\" . AppDirsFolderName() . "\"
 		_PathsEdWeb_PrepareLogsFolder(Fresh)
 		AssertTrue(DirExist(Fresh) != "", "a new logs folder is created before it is stored")
 		_PathsEdWeb_PrepareLogsFolder("")
-		AssertThrows(() => _PathsEdWeb_PrepareLogsFolder(Blocker . "\ergopti_plus\"),
+		AssertThrows(() => _PathsEdWeb_PrepareLogsFolder(Blocker . "\" . AppDirsFolderName() . "\"),
 			"a logs folder that cannot be created is refused")
 	} finally {
 		try DirDelete(Root, true)

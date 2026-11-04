@@ -67,7 +67,7 @@ local LOG = "keymap"
 -- A value of 0 means the expansion fires regardless of typing speed.
 -- These values are the ULTIMATE fallback. The live values are resolved at
 -- startup by `modules.hotstrings_config` from each category TOML's `[_meta]`
--- block and from `~/.config/ergopti_plus/hotstrings_config.toml` user overrides.
+-- block and from `<config folder>/hotstrings_config.toml` user overrides.
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…

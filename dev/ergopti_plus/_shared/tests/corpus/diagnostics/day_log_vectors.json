@@ -9,7 +9,7 @@
 	"context": {
 		"home": "/Users/jdoe",
 		"user": "jdoe",
-		"config_dir": "/Users/jdoe/.config/ergopti_plus",
+		"config_dir": "/Users/jdoe/Library/Application Support/Ergopti/config",
 		"case_insensitive": false
 	},
 	"vectors": [
@@ -131,7 +131,7 @@
 		},
 		{
 			"id": "pack_names_under_the_configuration_directory_never_reach_the_attachment",
-			"raw": "2026-10-23 09:59:59:999 [INFO] [A] read '/Users/jdoe/.config/ergopti_plus/hotstrings/my_pack/a.toml'\nno stamp here",
+			"raw": "2026-10-23 09:59:59:999 [INFO] [A] read '/Users/jdoe/Library/Application Support/Ergopti/config/hotstrings/my_pack/a.toml'\nno stamp here",
 			"file_size": 100,
 			"expected": {
 				"ok": true,

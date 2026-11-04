@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 
 -- Distinct values: a stub that answers 0 for every level would hide the bug.
 local LEVELS = { normal = 0, floating = 3, modalPanel = 8, screenSaver = 1000 }
@@ -362,7 +363,7 @@ local function load_error_dialog(view, app)
 		run = function()
 			return {
 				generated_at = "2026-09-29T08:00:00Z",
-				sections = { paths = { errors_today = "/Users/jdoe/Library/Logs/ergopti_plus/errors.log" } },
+				sections = { paths = { errors_today = "/Users/jdoe/" .. AppDirs.macos.relative .. "/errors.log" } },
 			}
 		end,
 	}

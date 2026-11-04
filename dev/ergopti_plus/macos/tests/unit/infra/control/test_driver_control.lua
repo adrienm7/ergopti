@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local AppDirs = require("app_dirs")
 local Json = require("json")
 local Policy = require("control.driver_control")
 
@@ -26,7 +27,7 @@ end
 local SPEC_TEXT = read(helpers.shared("modules/control/driver_control.json"))
 local SPEC = Policy.validate(Json.decode(SPEC_TEXT))
 local TOKEN = Json.decode(read(helpers.shared("tests/corpus/control/driver_control.json"))).token
-local FOLDER = "/Users/u/Library/Application Support/ergopti_plus/control"
+local FOLDER = "/Users/u/" .. AppDirs.macos.support_relative .. "/control"
 
 --- A session over in-memory files; `coordinator(reason, on_aborted)` answers the reload.
 local function world(coordinator, files)

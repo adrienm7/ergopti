@@ -30,7 +30,7 @@ import Foundation
 /// - Parameter homeDirectory: Current user's Foundation home directory.
 /// - Returns: Absolute lock path.
 func launcherInstanceLockPath(homeDirectory: String = NSHomeDirectory()) -> String {
-	return homeDirectory + "/Library/Application Support/ErgoptiPlus/launcher.lock"
+	return homeDirectory + "/" + kMacOSSupportHomeRelativePath + "/launcher.lock"
 }
 
 /// Result of one attempt to become the sole launcher.

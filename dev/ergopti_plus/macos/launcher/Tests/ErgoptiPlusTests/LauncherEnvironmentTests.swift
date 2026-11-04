@@ -232,7 +232,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 	func testManagedBootstrapPathIsOutsideTheBundleAndExported() {
 		XCTAssertEqual(
 			managedPathsFile(homeDirectory: "/Users/test"),
-			"/Users/test/Library/Application Support/ErgoptiPlus/paths.toml"
+			"/Users/test/" + kMacOSPathsFileHomeRelativePath
 		)
 
 		var childEnvironment: [String: String] = [:]
@@ -558,8 +558,8 @@ final class LauncherEnvironmentTests: XCTestCase {
 			loggerWorkerFactory: { loggerWorker }
 		)
 		let failure = LogDirectoryFailure(
-			path: "/Users/u/.config/ergopti_plus/hammerspoon/logs",
-			refusal: .danglingSymlink(link: "/Users/u/.config/ergopti_plus/hammerspoon/logs")
+			path: "/Users/u/" + kMacOSLogsHomeRelativePath,
+			refusal: .danglingSymlink(link: "/Users/u/" + kMacOSLogsHomeRelativePath)
 		)
 
 		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
@@ -711,7 +711,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertFalse(FileManager.default.fileExists(atPath: store.path))
 		XCTAssertEqual(childEnvironment[kFatalReportEnvironment], store.path)
 		XCTAssertEqual(childEnvironment[kLauncherLogEnvironment], LauncherLog.filePath)
-		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ergopti_plus/launcher.log"))
+		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/" + kMacOSLogsHomeRelativePath + "/" + kLauncherLogFileName))
 	}
 
 	/// The app no longer ships Ollama, so the child gets no bundled path to

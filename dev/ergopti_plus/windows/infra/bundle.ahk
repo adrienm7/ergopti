@@ -131,7 +131,7 @@ _Bundle_ResolveDir() {
 	LocalAppData := ResolveLocalAppDataDir()
 	if (LocalAppData == "")
 		return ""
-	return LocalAppData . "\Ergopti\bundle"
+	return LocalAppData . "\" . AppDirsWindowsSupportRelative() . "\bundle"
 }
 
 ; Reads the complete build marker; returns "" if the file is missing or

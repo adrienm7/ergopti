@@ -20,6 +20,9 @@
 
 local helpers = require("tests.helpers")
 
+-- The application folder under every XDG base, from the shared registry.
+local FOLDER = require("app_dirs").linux.folder_name
+
 local HOME = "/home/jdoe"
 
 --- Loads the real bridge with controlled collaborators.
@@ -327,7 +330,7 @@ end)
 
 helpers.describe("diagnostics bridge stable-metadata report", function()
 	helpers.it("completes the actual attachment before opening a form without editable query defaults", function()
-		with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
+		with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
 			local fs = require("adapters.file_system")
@@ -373,7 +376,7 @@ end)
 --- Owns only a deferred launcher port; every returned native-style receipt is
 --- delivered explicitly by the subject, outside the producer's protected call.
 local function with_deferred_opener(body)
-	with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
+	with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
 		local shell, fs = package.loaded["adapters.shell_runner"], require("adapters.file_system")
 		local held_write, desktop = fs.write, package.loaded["adapters.desktop_opener"]
 		context.openers, context.writes = {}, 0

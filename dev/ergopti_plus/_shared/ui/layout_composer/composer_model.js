@@ -261,6 +261,32 @@ var LayoutComposer = (function () {
 	}
 
 	/**
+	 * Removes every XML comment in one left-to-right scan. A comment ends at
+	 * the first "-->", so a scan, unlike a pattern replacement, cannot splice
+	 * the remains of two fragments into a new "<!--" that later code reads.
+	 * @param {string} text - The file content.
+	 * @returns {string} The content without its comments.
+	 * @throws {ComposerError} When a comment is never closed.
+	 */
+	function stripComments(text) {
+		const parts = [];
+		let position = 0;
+		for (;;) {
+			const start = text.indexOf('<!--', position);
+			if (start === -1) break;
+			const end = text.indexOf('-->', start + 4);
+			if (end === -1) {
+				const line = text.slice(0, start).split('\n').length;
+				throw new ComposerError('keylayout_malformed_tag', `line ${line}`);
+			}
+			parts.push(text.slice(position, start));
+			position = end + 3;
+		}
+		parts.push(text.slice(position));
+		return parts.join('');
+	}
+
+	/**
 	 * Reads the text of a .keylayout into the maps the readers walk.
 	 * @param {string} text - The file content.
 	 * @returns {object} Name, mapSet, defaultIndex, selects, keyMapSets, bases,
@@ -268,7 +294,7 @@ var LayoutComposer = (function () {
 	 * @throws {ComposerError} When a part every reader needs is missing.
 	 */
 	function parseModel(text) {
-		const body = text.replace(/<!--[\s\S]*?-->/g, '');
+		const body = stripComments(text);
 		const model = {
 			name: '',
 			mapSet: '',

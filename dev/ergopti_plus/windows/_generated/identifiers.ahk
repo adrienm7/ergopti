@@ -49,5 +49,6 @@ class Identifiers {
 		static BRANCH_PREFIX := "field/"
 		static FOLDER := "docs/field-reports"
 		static BASE_CONFIG_KEY := "ergoptiFieldBase"
+		static ENVIRONMENT := "ERGOPTI_FIELD_RUN_ROOT"
 	}
 }

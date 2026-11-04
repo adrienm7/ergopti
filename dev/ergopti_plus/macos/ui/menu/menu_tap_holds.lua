@@ -1123,22 +1123,49 @@ end
 --- Only one VirtualHIDDevice version can be active on a Mac, so a user
 --- Karabiner with another driver version blocks it (ADR 011), and a driver
 --- macOS has not approved blocks it until it is allowed in System Settings.
+--- The others, keyed by the owner's stable reasons (runtime_owner.lua REASON):
+--- the runtime is not installed or its jobs are not loaded, a user Karabiner
+--- runs while the consent row below is unticked, Karabiner's own quit was
+--- refused, or the pinned artifact could not be downloaded. Without these rows
+--- the tap-holds were simply off, with nothing saying why.
 -- Literal template names, so the menu parity gate sees each publication.
-local VHID_BLOCK_ROWS = {
+local NOT_INSTALLED = function() return ManifestMenu.template_rows("tap_hold_owned_not_installed_rows", {}) end
+local CLOSE_FAILED = function() return ManifestMenu.template_rows("tap_hold_owned_close_failed_rows", {}) end
+local BLOCK_ROWS = {
 	virtual_hid_incompatible = function() return ManifestMenu.template_rows("tap_hold_vhid_incompatible_rows", {}) end,
 	virtual_hid_not_active = function() return ManifestMenu.template_rows("tap_hold_vhid_not_active_rows", {}) end,
+	runtime_not_installed = NOT_INSTALLED,
+	runtime_job_not_loaded = NOT_INSTALLED,
+	virtual_hid_absent = NOT_INSTALLED,
+	other_karabiner_running = function() return ManifestMenu.template_rows("tap_hold_owned_other_running_rows", {}) end,
+	close_other_unsupported = CLOSE_FAILED,
+	close_other_failed = CLOSE_FAILED,
+	other_karabiner_still_running = CLOSE_FAILED,
+	artifact_fetch_failed = function() return ManifestMenu.template_rows("tap_hold_owned_fetch_failed_rows", {}) end,
 }
 
---- The disabled row that explains a VirtualHIDDevice block of the owned runtime.
+--- The reasons this menu explains, so a test can hold them to the owner's
+--- USER_BLOCKS, which the boot notice reads.
+--- @return table reasons Set of stable reasons.
+function M._explained_owned_reasons()
+	local reasons = {}
+	for reason in pairs(BLOCK_ROWS) do reasons[reason] = true end
+	return reasons
+end
+
+--- The disabled row that explains why the owned runtime does not run.
 --- @param karabiner table Remap facade.
---- @return table rows Empty unless the owner reports such a block.
+--- @return table rows Empty unless the owner reports a block the user can act on.
 local function owned_runtime_block_rows(karabiner)
 	if type(karabiner.owned_runtime_status) ~= "function" then return {} end
 	local ok, status = pcall(karabiner.owned_runtime_status)
-	if not ok or type(status) ~= "table" or status.state ~= "unavailable" then return {} end
-	local rows = VHID_BLOCK_ROWS[status.reason]
-	if not rows then return {} end
-	rows = rows() or {}
+	-- A refused quit of the user's Karabiner settles as failed, the other blocks as unavailable.
+	if not ok or type(status) ~= "table" or (status.state ~= "unavailable" and status.state ~= "failed") then
+		return {}
+	end
+	local rows_fn = BLOCK_ROWS[status.reason]
+	if not rows_fn then return {} end
+	local rows = rows_fn() or {}
 	if status.reason == require("platform.remap.runtime_vhid").REASON_INCOMPATIBLE
 		and type(karabiner.update_virtual_hid_driver) == "function" then
 		-- ADR 011's driver-only update: the row opens a confirmation, never the update itself.
@@ -1150,6 +1177,22 @@ local function owned_runtime_block_rows(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The VirtualHIDDevice driver update could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	if rows_fn == NOT_INSTALLED and type(karabiner.install_owned_runtime) == "function" then
+		-- WP8's first install: the row opens a confirmation, never the install itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_owned_install_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_INSTALL] = function()
+				Logger.info(LOG, "Showing the owned runtime install from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.owned_runtime_install").open(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The owned runtime install could not be shown: %s.", tostring(shown))
 					return false
 				end
 				return shown == true
