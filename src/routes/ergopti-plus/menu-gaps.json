@@ -1,0 +1,144 @@
+[
+	{
+		"path": "llm_display_menu.llm_token_streaming",
+		"labels": {
+			"fr": "Afficher chaque suggestion en streaming (token par token)",
+			"en": "Show each suggestion in streaming (token by token)"
+		},
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Not on Windows yet: the token-by-token display has not been validated on Windows, so this option stays inactive.",
+				"fr": "Pas encore sous Windows : l'affichage jeton par jeton n'a pas été validé sous Windows, donc cette option reste inactive."
+			}
+		}
+	},
+	{
+		"path": "shortcuts_menu.scope_restore",
+		"labels": { "fr": "↺ Restaurer les valeurs conseillées", "en": "↺ Restore recommended values" },
+		"platforms": { "windows": true, "macos": false, "linux": true },
+		"reasons": {
+			"macos": {
+				"en": "Not on macOS yet: its key combinations are kept in the Karabiner settings, and only the Configuration menu's restore brings them back together with the other shortcut settings.",
+				"fr": "Pas encore sous macOS : ses combinaisons de touches sont gardées dans les réglages de Karabiner, et seule la restauration du menu Configuration les rétablit avec les autres réglages des raccourcis."
+			}
+		}
+	},
+	{
+		"path": "shortcuts_menu.scope_clear",
+		"labels": {
+			"fr": "✕ Tout effacer (comportement du système)",
+			"en": "✕ Clear all (system behaviour)"
+		},
+		"platforms": { "windows": true, "macos": false, "linux": true },
+		"reasons": {
+			"macos": {
+				"en": "Not on macOS yet: its key combinations are kept in the Karabiner settings, and only the Configuration menu's restore brings them back together with the other shortcut settings.",
+				"fr": "Pas encore sous macOS : ses combinaisons de touches sont gardées dans les réglages de Karabiner, et seule la restauration du menu Configuration les rétablit avec les autres réglages des raccourcis."
+			}
+		}
+	},
+	{
+		"path": "shortcuts_menu.physical_shortcuts_editor",
+		"labels": { "fr": "Raccourcis physiques", "en": "Physical shortcuts" },
+		"platforms": { "windows": false, "macos": true, "linux": true },
+		"reasons": {
+			"windows": {
+				"en": "Not yet on Windows: The physical shortcut editor is not yet available on Windows.",
+				"fr": "Pas encore sur Windows : L’éditeur de raccourcis physiques n’est pas encore disponible sur Windows."
+			}
+		}
+	},
+	{
+		"path": "layout_menu.layout_emulated_rows",
+		"labels": {
+			"fr": "Rangées émulées (apprentissage progressif)",
+			"en": "Emulated rows (progressive learning)"
+		},
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			},
+			"linux": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			}
+		}
+	},
+	{
+		"path": "layout_emulated_rows_group.layout.emulate_number_row",
+		"labels": { "fr": "Rangée des chiffres", "en": "Number row" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			},
+			"linux": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			}
+		}
+	},
+	{
+		"path": "layout_emulated_rows_group.layout.emulate_top_row",
+		"labels": { "fr": "Rangée du haut", "en": "Top letter row" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			},
+			"linux": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			}
+		}
+	},
+	{
+		"path": "layout_emulated_rows_group.layout.emulate_home_row",
+		"labels": { "fr": "Rangée de repos", "en": "Home row" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			},
+			"linux": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			}
+		}
+	},
+	{
+		"path": "layout_emulated_rows_group.layout.emulate_bottom_row",
+		"labels": { "fr": "Rangée du bas", "en": "Bottom row" },
+		"platforms": { "windows": true, "macos": false, "linux": false },
+		"reasons": {
+			"macos": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			},
+			"linux": {
+				"en": "Windows only: this driver emulates the Ergopti layout itself, so it has an emulation to switch off. macOS installs the layout as a system input source and Linux installs it as a system keyboard layout (XKB), so there is nothing to switch off there.",
+				"fr": "Windows uniquement : ce pilote émule lui-même la disposition Ergopti, il a donc une émulation à désactiver. macOS installe la disposition comme source de saisie du système et Linux l'installe comme disposition de clavier du système (XKB) : il n'y a rien à désactiver là-bas."
+			}
+		}
+	},
+	{
+		"path": "hotstrings_params_group.tap_hold_resets_word",
+		"labels": {
+			"fr": "Un tap ou un hold sur une touche tap-hold commence un nouveau mot",
+			"en": "A tap or hold of a tap-hold key starts a new word"
+		},
+		"platforms": { "windows": true, "macos": false, "linux": true },
+		"reasons": {
+			"macos": {
+				"en": "Not on macOS: Karabiner-Elements runs the tap-holds there, and what they send arrives like keys typed on the keyboard, so a shortcut sent by a tap-hold follows the shortcut option.",
+				"fr": "Pas sous macOS : Karabiner-Elements y gère les tap-holds, et ce qu’ils envoient arrive comme des touches tapées au clavier, donc un raccourci envoyé par un tap-hold suit l’option des raccourcis."
+			}
+		}
+	}
+]

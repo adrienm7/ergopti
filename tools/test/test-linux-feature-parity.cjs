@@ -39,12 +39,28 @@ const inventoryActions = require('smol-toml').parse(
 		'utf8'
 	)
 );
-const beforeInventory = inventory.render(inventoryModel, inventoryLocales, inventoryActions);
+const inventoryMenu = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json'),
+		'utf8'
+	)
+);
+const beforeInventory = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	inventoryActions,
+	inventoryMenu
+);
 const changedModel = structuredClone(inventoryModel);
 changedModel[0].platforms = ['ahk'];
-const afterInventory = inventory.render(changedModel, inventoryLocales, inventoryActions);
+const afterInventory = inventory.render(
+	changedModel,
+	inventoryLocales,
+	inventoryActions,
+	inventoryMenu
+);
 for (const file of Object.keys(beforeInventory).filter(
-	(name) => !name.endsWith('action-inventory.json')
+	(name) => !name.endsWith('action-inventory.json') && !name.endsWith('menu-gaps.json')
 )) {
 	assert.notStrictEqual(
 		beforeInventory[file],
@@ -71,7 +87,12 @@ function build(config = evidenceConfig) {
 
 const expandedActions = structuredClone(inventoryActions);
 expandedActions.sg_actions.lookup = { platform: 'all' };
-const expandedInventory = inventory.render(inventoryModel, inventoryLocales, expandedActions);
+const expandedInventory = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	expandedActions,
+	inventoryMenu
+);
 for (const file of ['src/routes/ergopti-plus/action-inventory.json', 'docs/feature-inventory.md']) {
 	assert.notStrictEqual(
 		beforeInventory[file],
@@ -82,9 +103,27 @@ for (const file of ['src/routes/ergopti-plus/action-inventory.json', 'docs/featu
 const changedActions = structuredClone(inventoryActions);
 delete changedActions.sg_actions.lookup.reason_ahk;
 assert.throws(
-	() => inventory.render(inventoryModel, inventoryLocales, changedActions),
+	() => inventory.render(inventoryModel, inventoryLocales, changedActions, inventoryMenu),
 	/Missing action reason/
 );
+
+const changedMenu = structuredClone(inventoryMenu);
+changedMenu.llm_display_menu
+	.find((item) => item.id === 'llm_token_streaming')
+	.platforms.push('ahk');
+const expandedMenuInventory = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	inventoryActions,
+	changedMenu
+);
+for (const file of ['src/routes/ergopti-plus/menu-gaps.json', 'docs/feature-inventory.md']) {
+	assert.notStrictEqual(
+		beforeInventory[file],
+		expandedMenuInventory[file],
+		`${file} must reflect menu changes`
+	);
+}
 
 const rows = build();
 const summary = summarize(rows);
