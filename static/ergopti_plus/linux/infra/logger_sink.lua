@@ -391,7 +391,13 @@ local function purge_old()
 		local name = entry.name
 		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)) then
 			local path = NativeDirectory.join(_dir, name)
-			local stat = NativeDirectory.stat(path)
+			local inspected, stat, stat_message, stat_code = pcall(NativeDirectory.stat, path)
+			if not inspected then
+				report_purge_refusal("inspect", path, stat)
+				stat = nil
+			elseif not stat and stat_code ~= "ENOENT" then
+				report_purge_refusal("inspect", path, stat_message)
+			end
 			-- lstat again: the entry may have been replaced since the listing.
 			if stat and stat.kind == "file" and stat.modified and stat.modified < cutoff then
 				local removed, remove_error = os.remove(path)
