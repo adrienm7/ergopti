@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 100 distinct confirmed defects. This snapshot records **8 new distinct findings**, not 100. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **36 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -590,3 +590,26 @@ reference. It is deliberately tested against the still-unfixed production
 protocol before implementation. This expected-red probe adds no finding count;
 HTTP E2E is explicitly outside this unrelated selection. The register remains
 **35 distinct new findings**.
+
+## AHK-036: Retired tap-hold frames can release or overwrite a resumed gesture
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The remap owner protocol in platform/remap/constants.ahk identifies release authority only by key name. Native Suspend leaves waiting frames alive. A late finally therefore consumes a new reference, while paired Tab-up/finally paths can consume twice in the same epoch. Companion AltGr handback, roll decisions and layer teardown carry similarly unqualified identity across callouts.
+
+Reproduction: Acquire a real immediate modifier, enter native Suspend and genuine remap teardown, resume and acquire the same modifier again before the old KeyWait frame returns. The retired frame consumes the new reference. The native fail-before replay41889866195 at7ee17bcef5076c4238a2e090cf41cb6d70ccf90b reports the exact missing-successor-ledger assertion.
+
+Consequence: A held Ctrl/Alt/Shift can be released under another gesture or a newly physical-held key; an old frame may remove successor metadata or dispatch an obsolete tap after resume.
+
+Regression: Fourteen reachable synthetic-owner cases drive the genuine modifier, Tab, AltGr, rollover and navigation-layer owners with native Suspend/resume and the real lifecycle drain. Passive input, clock and wait ports expose release receipts, debt, physical observations and exact successor preservation without typing into the desktop. Two additional dispatch cases use the genuine logger test sink to revoke during the actual cancellation log and preserve resumed tracking. Native qualification is recorded separately with exact revisions.
+
+The ongoing register now contains **36 distinct new findings**. The requested target of 1,000 remains unmet.
+
+The primary owner regression failed natively before the fix in run
+`41889866195` at `7ee17bcef5076c4238a2e090cf41cb6d70ccf90b`.
+The independent actual-logger sibling failed in run `41895428966` at
+`d17134a05d7dcea57f92ff0dbf2b6bc3e7f80540`, both alone and in reverse:
+an admitted control passed, while the revoked dispatcher emitted one tap
+instead of zero. These are one gesture-authority family, counted once.
+Source fixes are `7b0d49c` and `8ecf909`. The 99-case owner qualification
+and post-fix dispatch replay remain pending at this documentation checkpoint.
