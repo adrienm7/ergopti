@@ -79,7 +79,8 @@ function M.new(ports)
 	end
 	assert(type(ports.checker) == "table" and type(ports.checker.start) == "function",
 		"tap_copy.new: checker must be a tap_hold.copy_check checker")
-	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil, stats = M.empty_stats() }, Owner)
+	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil,
+		generation = 0, stats = M.empty_stats() }, Owner)
 end
 
 -- How many press durations the statistics keep, the most recent ones.
@@ -130,7 +131,9 @@ end
 --- @param why string What came instead.
 function Owner:report_missing(released, why)
 	local ports = self.ports
+	local generation = self.generation
 	ports.defer("tap copy missing", function()
+		if self.generation ~= generation then return end
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
 		local past = type(released.held_ms) == "number" and type(threshold_ms) == "number"
@@ -219,13 +222,15 @@ function Owner:key_down(event, stamp, lateness_ms)
 	local copy = type(flags) == "table" and flags.cmd == true and not flags.ctrl and not flags.alt
 		and not flags.shift and ports.event_chars(event) == "c"
 	local gap_ms = ports.duration_ms(released.stamp, stamp)
-	if not copy or type(gap_ms) ~= "number" or gap_ms > M.ATTRIBUTION_WINDOW_MS then
-		self:report_missing(released, copy and "the Cmd+C came too late to be its own" or "the next key was not Cmd+C")
+	if not copy or type(gap_ms) ~= "number" or gap_ms < 0 or gap_ms > M.ATTRIBUTION_WINDOW_MS then
+		self:report_missing(released, copy and "the Cmd+C timing did not match the tap" or "the next key was not Cmd+C")
 		return
 	end
 	-- Read now: the application has not received this Cmd+C yet.
 	local baseline = ports.change_count()
+	local generation = self.generation
 	ports.defer("tap copy check", function()
+		if self.generation ~= generation then return end
 		local tap, threshold_ms = ports.key_config(released.key_id)
 		if tap ~= COPY_ACTION then return end
 		self.stats.sent = self.stats.sent + 1
@@ -240,6 +245,7 @@ end
 
 --- Forgets every press in flight and abandons a pending check.
 function Owner:stop()
+	self.generation = self.generation + 1
 	self.down, self.candidate, self.released = {}, nil, nil
 	self.ports.checker:stop()
 end

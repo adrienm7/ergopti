@@ -746,10 +746,19 @@ cg = ctypes.cdll.LoadLibrary(CG)
 cg.CGGetOnlineDisplayList.restype = ctypes.c_int32
 cg.CGMainDisplayID.restype        = ctypes.c_uint32
 cg.CGDisplayIsInMirrorSet.restype = ctypes.c_bool
+cg.CGBeginDisplayConfiguration.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+cg.CGConfigureDisplayMirrorOfDisplay.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32]
+cg.CGCompleteDisplayConfiguration.argtypes = [ctypes.c_void_p, ctypes.c_int32]
+cg.CGCancelDisplayConfiguration.argtypes = [ctypes.c_void_p]
+
+def check(stage, code):
+    if code != 0:
+        raise RuntimeError(f"{stage} failed with CoreGraphics error {code}")
+
 MAX = 16
 n   = ctypes.c_uint32(0)
 ids = (ctypes.c_uint32 * MAX)()
-cg.CGGetOnlineDisplayList(MAX, ids, ctypes.byref(n))
+check("CGGetOnlineDisplayList", cg.CGGetOnlineDisplayList(MAX, ids, ctypes.byref(n)))
 count = n.value
 if count < 2:
     print("single_screen")
@@ -757,19 +766,17 @@ if count < 2:
 main      = cg.CGMainDisplayID()
 mirroring = any(cg.CGDisplayIsInMirrorSet(ids[i]) for i in range(count) if ids[i] != main)
 cfg = ctypes.c_void_p()
-cg.CGBeginDisplayConfiguration(ctypes.byref(cfg))
-if mirroring:
+check("CGBeginDisplayConfiguration", cg.CGBeginDisplayConfiguration(ctypes.byref(cfg)))
+try:
     for i in range(count):
         if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], 0)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_disabled")
-else:
-    for i in range(count):
-        if ids[i] != main:
-            cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], main)
-    cg.CGCompleteDisplayConfiguration(cfg, 1)
-    print("mirror_enabled")
+            check("CGConfigureDisplayMirrorOfDisplay",
+                  cg.CGConfigureDisplayMirrorOfDisplay(cfg, ids[i], 0 if mirroring else main))
+except Exception:
+    cg.CGCancelDisplayConfiguration(cfg)
+    raise
+check("CGCompleteDisplayConfiguration", cg.CGCompleteDisplayConfiguration(cfg, 1))
+print("mirror_disabled" if mirroring else "mirror_enabled")
 ]]
 
 	-- Asynchronous: a Python interpreter start plus a display-configuration round

@@ -77,7 +77,8 @@ local function disarm_reload_deadline(transaction)
 	local timer = transaction.reload_deadline
 	if timer == nil then return end
 	transaction.reload_deadline = nil
-	if type(timer) == "table" and type(timer.stop) == "function" then pcall(timer.stop, timer) end
+	-- Hammerspoon timers are userdata, while test doubles may be tables.
+	pcall(function() timer:stop() end)
 end
 
 local function require_state(func_name)

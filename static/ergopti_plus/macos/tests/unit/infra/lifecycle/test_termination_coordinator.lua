@@ -135,6 +135,7 @@ local function load_coordinator(options)
 			-- The reload deadline has its own bound; it never joins the call order
 			if delay == 30 then
 				calls.reload_deadline_callback = callback
+				if options.reload_timer ~= nil then return options.reload_timer end
 				return { stop = function() calls.reload_deadline_stopped = true; return true end }
 			end
 			calls.watchdog_delay = delay
@@ -942,6 +943,17 @@ helpers.describe("controlled termination coordinator", function()
 		calls.lease_callback(true, "late")
 		helpers.assert_eq(calls.reloads, 1)
 		helpers.assert_eq(calls.teardowns, 0)
+	end)
+
+	helpers.it("stops a userdata reload deadline when its transaction aborts (reload-userdata-timer)", function()
+		local timer = assert(io.tmpfile())
+		timer:close()
+		local stopped = false
+		debug.setmetatable(timer, { __index = { stop = function() stopped = true end } })
+		local coordinator, calls = load_coordinator({ reload_timer = timer })
+		helpers.assert_true(coordinator.request_reload_owned("userdata_timer", function() end))
+		calls.lease_callback(false, "refused")
+		helpers.assert_true(stopped, "Hammerspoon's userdata timer must be stopped on abort")
 	end)
 
 	helpers.it("disarms the reload deadline once the reload settles, aborts or becomes an exit (reload-deadline)", function()

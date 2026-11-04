@@ -477,6 +477,22 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		handle:deliver(0, "single_screen\n", "")
 	end)
 
+	helpers.it("reports CoreGraphics failures instead of a successful mirror toggle", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
+		local handle = fixture.shells[1]
+		local quote = require("infra.text_utils").shell_quote
+		local command = "python3 -B " .. quote(helpers.driver_root()
+			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
+			.. " " .. quote(handle.args[2]) .. " 2>&1"
+		local process = assert(io.popen(command, "r"))
+		local output = assert(process:read("a"))
+		local closed, reason, status = process:close()
+		helpers.assert_true(closed == true and reason == "exit" and status == 0,
+			"the dispatched Python must handle each native result: " .. output)
+		handle:deliver(0, "single_screen\n", "")
+	end)
+
 	helpers.it("publishes one terminal only after start commits", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
