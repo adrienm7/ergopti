@@ -645,7 +645,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						Storage.delete("hotstrings_section_" .. name .. "_" .. sec.name)
+						local keys = require("modules.keymap.section_keys")
+						keys.clear(Storage, name, sec.name)
 					end
 				end
 			end

@@ -986,17 +986,30 @@ local function defer_until_output_turn(generation, expected, since)
 	generation.output_turn_since = TimerScheduler.awake_time()
 	local probe
 	local probe_err
-	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token,
-		function(delivered, reason)
-			if probe == nil or generation.output_turn_probe ~= probe or generation.failed
-				or generation.awaiting ~= expected then return end
-			generation.output_turn_probe = nil
-			if not delivered then
-				Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
-					generation.token, tostring(reason))
-			end
-			fail_on_deadline(generation, expected, since, 0)
-		end)
+	local early_turn
+	local requesting = true
+	local function on_turn(delivered, reason)
+		if requesting then
+			early_turn = { delivered, reason }
+			return
+		end
+		if probe == nil or generation.output_turn_probe ~= probe or generation.failed
+			or generation.awaiting ~= expected then return end
+		generation.output_turn_probe = nil
+		if not delivered then
+			Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+				generation.token, tostring(reason))
+		end
+		fail_on_deadline(generation, expected, since, 0)
+	end
+	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token, on_turn)
+	requesting = false
+	-- An ACK may settle while request() crosses native task boundaries, before
+	-- this probe was published and therefore visible to the normal retirement.
+	if generation.failed or generation.awaiting ~= expected then
+		if probe then pcall(probe.cancel) end
+		return true
+	end
 	if not probe then
 		Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
 			generation.token, tostring(probe_err))
@@ -1004,6 +1017,10 @@ local function defer_until_output_turn(generation, expected, since)
 		return true
 	end
 	generation.output_turn_probe = probe
+	if early_turn ~= nil then
+		on_turn(early_turn[1], early_turn[2])
+		return true
+	end
 	Logger.debug(LOG,
 		"Karabiner lease %s: %s deadline passed on time; reading pending task output before judging the worker.",
 		generation.token, expected)

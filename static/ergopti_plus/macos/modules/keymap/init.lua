@@ -847,6 +847,7 @@ M.source_priority       = Registry.source_priority
 M.personal_file_scope_binding = Registry.personal_file_scope_binding
 M.capture_publication_owner = Registry.capture_publication_owner
 M.is_section_enabled    = Registry.is_section_enabled
+M.migrate_legacy_section_settings = Registry.migrate_legacy_section_settings
 M.disable_section       = preview_fenced_registry_mutation(Registry.disable_section, true)
 M.enable_section        = preview_fenced_registry_mutation(Registry.enable_section, true)
 -- Batch form. The menu toggles every section of a group at once, and routing that

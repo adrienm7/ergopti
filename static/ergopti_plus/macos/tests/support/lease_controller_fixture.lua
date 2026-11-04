@@ -108,6 +108,13 @@ local function load_controller(options)
 					if result == nil then result = true end
 					ctx.next_input_result = nil
 					if result then task.inputs[#task.inputs + 1] = data end
+					if result and task.executable == "/bin/cat" and ctx.output_probe_on_input then
+						ctx.output_probe_on_input()
+					end
+					if task.executable == "/bin/cat" and ctx.output_probe_input_refused then return false end
+					if result and task.executable == "/bin/cat" and ctx.output_probe_immediate_echo then
+						task.on_chunk(task, data, "")
+					end
 					local immediate_chunk = ctx.next_input_chunk
 					ctx.next_input_chunk = nil
 					if result and immediate_chunk and task.on_chunk then

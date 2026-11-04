@@ -281,7 +281,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 			Packs.discover(roots(true), real_io())
 			local path = Packs.route("distancesreduction", nil)
 			for section in pairs(reference.section_counts) do
-				helpers.assert_true(Storage.set("hotstrings_section_distancesreduction_" .. section, true))
+				helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("distancesreduction", section), true))
 			end
 			helpers.assert_true(Registry.load_toml("distancesreduction", path))
 			for _, row in ipairs(reference.entries) do
@@ -309,7 +309,7 @@ helpers.describe("Ergopti extension distance reduction", function()
 			for section, description in pairs(reference.meta.sections) do
 				helpers.assert_eq(metadata.sections[section].description, description, section .. " native description")
 			end
-			helpers.assert_true(Storage.set("hotstrings_section_distancesreduction_comma_j", false))
+			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("distancesreduction", "comma_j"), false))
 			helpers.assert_true(Registry.reload_toml("distancesreduction", path))
 			helpers.assert_eq(Registry.is_section_enabled("distancesreduction", "comma_j"), false)
 			for _, mapping in ipairs(state.mappings) do
@@ -343,7 +343,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			local path = Packs.route("french_distancesreduction", nil)
 			helpers.assert_true(type(path) == "string")
 			helpers.assert_true(path:find("/ergopti/hotstrings/suffixes_a.toml", 1, true) ~= nil)
-			helpers.assert_true(Storage.set("hotstrings_section_french_distancesreduction_suffixes_a", true))
+			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("french_distancesreduction", "suffixes_a"), true))
 			helpers.assert_true(Registry.load_toml("french_distancesreduction", path))
 			local expected = {
 	{ "à'", "ance" }, { "àa", "aire" }, { "àc", "ction" }, { "àd", "would" },
@@ -371,7 +371,7 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 			end
 			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.delay, 0.5)
 			helpers.assert_eq(state.groups.french_distancesreduction.delay_metadata.show_tooltip, false)
-			helpers.assert_true(Storage.set("hotstrings_section_french_distancesreduction_suffixes_a", false))
+			helpers.assert_true(Storage.set(require("modules.keymap.section_keys").current("french_distancesreduction", "suffixes_a"), false))
 			helpers.assert_true(Registry.reload_toml("french_distancesreduction", path))
 			for _, mapping in ipairs(state.mappings) do helpers.assert_true(mapping.group ~= "french_distancesreduction") end
 			local common = static_dir() .. "/ergopti_plus/_shared/modules/hotstrings/magickey.toml"

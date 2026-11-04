@@ -70,13 +70,13 @@ end
 helpers.describe("Registry zero-mapping warning", function()
 	helpers.it("stays silent for a file whose every section is disabled", function()
 		with_registry({ ["/virtual/off.toml"] = one_section("hiya") }, function(Registry, warnings, infos)
-			_G.hs.settings.set("ergopti.hotstrings_section_pack_off_greetings", false)
+			_G.hs.settings.set("ergopti." .. require("modules.keymap.section_keys").current("pack_off", "greetings"), false)
 			helpers.assert_eq(Registry.load_toml("pack_off", "/virtual/off.toml"), true)
 			helpers.assert_eq(count_matching(warnings, "ZERO mappings"), 0,
 				"a file whose sections are all disabled is not a path problem")
 			helpers.assert_eq(count_matching(infos, "section(s) are disabled"), 1,
 				"the empty registration must still be explained once")
-			_G.hs.settings.set("ergopti.hotstrings_section_pack_off_greetings", nil)
+			_G.hs.settings.set("ergopti." .. require("modules.keymap.section_keys").current("pack_off", "greetings"), nil)
 		end)
 	end)
 
@@ -86,10 +86,10 @@ helpers.describe("Registry zero-mapping warning", function()
 			["/virtual/off.toml"] = one_section("hiya"),
 		}, function(Registry, _, infos)
 			local Storage = require("adapters.storage")
-			Storage.set("hotstrings_section_zq_private_off_greetings", false)
+			Storage.set(require("modules.keymap.section_keys").current("zq_private_off", "greetings"), false)
 			helpers.assert_eq(Registry.load_toml("zq_private_main", "/virtual/main.toml"), true)
 			helpers.assert_eq(Registry.load_toml("zq_private_off", "/virtual/off.toml"), true)
-			Storage.set("hotstrings_section_zq_private_off_greetings", nil)
+			Storage.set(require("modules.keymap.section_keys").current("zq_private_off", "greetings"), nil)
 			helpers.assert_eq(count_matching(infos, "TOML mapping file #2 (bundled, '<name>') registered no mapping"),
 				1, "the disabled file must be told apart from the first one and called a shipped file")
 			for _, line in ipairs(infos) do

@@ -80,6 +80,31 @@ end
 -- ==================================================================
 
 helpers.describe("registry_index: a batched section toggle rebuilds the group once", function()
+	helpers.it("keeps colliding legacy identities separate and reads legacy choices (section-cache-identity)", function()
+		local RI, counts = load_with_counters()
+		local Storage = require("adapters.storage")
+		local legacy = RI.legacy_section_setting_key("a_b", "c")
+		helpers.assert_eq(legacy, RI.legacy_section_setting_key("a", "b_c"))
+		helpers.assert_true(Storage.set(legacy, false))
+		helpers.assert_eq(RI.is_section_enabled("a_b", "c"), true)
+		helpers.assert_eq(RI.is_section_enabled("a", "b_c"), true)
+		helpers.assert_true(Storage.set(RI.legacy_section_setting_key("other", "one"), false))
+		helpers.assert_eq(RI.is_section_enabled("other", "one"), false)
+		local first = RI.section_setting_key("a_b", "c")
+		local second = RI.section_setting_key("a", "b_c")
+		helpers.assert_true(first ~= second)
+		helpers.assert_true(Storage.set(first, false))
+		helpers.assert_eq(RI.is_section_enabled("a_b", "c"), false)
+		helpers.assert_eq(RI.is_section_enabled("a", "b_c"), true)
+		counts.restore()
+	end)
+
+	helpers.it("clears both formats during a reset (section-cache-identity)", function()
+		local keys = require("modules.keymap.section_keys")
+		local removed = {}
+		helpers.assert_true(keys.clear({ delete = function(key) removed[#removed + 1] = key; return true end }, "a_b", "c"))
+		helpers.assert_eq(removed, { keys.current("a_b", "c"), keys.legacy("a_b", "c") })
+	end)
 
 	helpers.it("enabling 24 sections tears the group down exactly once", function()
 		local RI, counts = load_with_counters()
@@ -135,7 +160,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		RI.enable_section(GROUP, "section_1")
 		counts.restore()
 
-		helpers.assert_eq(hs.settings.get(key), true,
+		helpers.assert_eq(hs.settings.get("ergopti." .. RI.section_setting_key(GROUP, "section_1")), true,
 			"enabling must persist an explicit true: an absent key means the shipped (disabled) default")
 		helpers.assert_true(RI.is_section_enabled(GROUP, "section_1"),
 			"the public reader must observe the section as enabled immediately")
@@ -155,7 +180,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		counts.restore()
 
 		for _, section_name in ipairs(names) do
-			local key = "ergopti.hotstrings_section_" .. GROUP .. "_" .. section_name
+			local key = "ergopti." .. RI.section_setting_key(GROUP, section_name)
 			helpers.assert_eq(hs.settings.get(key), true,
 				"batch enable must persist an explicit true for every section")
 			helpers.assert_true(RI.is_section_enabled(GROUP, section_name))
