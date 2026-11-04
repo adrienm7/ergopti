@@ -363,6 +363,15 @@ PersonalInfoMaskDeclaration() {
 	return _PIMaskDeclaration
 }
 
+; Only an explicit false flag permits display of a field. A malformed string
+; must not become permission merely because it is falsy in AutoHotkey.
+_PIMaskFieldIsMasked(Keys) {
+	if !(Keys is Map) || !Keys.Has("masked")
+		return true
+	Value := Keys["masked"]
+	return !(Value is Integer && Value == false)
+}
+
 ; Parse _shared/modules/personal_info/fields.toml into the shape above.
 ;
 ; ParseTomlFile flattens `[fields.iban]` to the section name "fields.iban", so
@@ -407,7 +416,7 @@ _PIMaskLoadDeclaration() {
 		if (Name == "") {
 			continue
 		}
-		Fields[Name] := (Keys is Map and Keys.Has("masked") and !Keys["masked"]) ? false : true
+		Fields[Name] := _PIMaskFieldIsMasked(Keys)
 	}
 	if (Fields.Count == 0) {
 		try LoggerWarn("PersonalInfoMask", "'{1}' declares no field at all — every value stays masked.", Path)
