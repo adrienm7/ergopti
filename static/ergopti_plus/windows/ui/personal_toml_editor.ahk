@@ -118,7 +118,7 @@ _GetSharedPersonalDefault() {
 ; Open the editor, optionally jumping to a specific section.
 ; DefaultSection — if set, the editor pre-selects that section.
 OpenPersonalEditor(DefaultSection := "") {
-	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch, _PersonalEditorEntryCohort
 
 	; Prefer the shared WebView2 frontend (identical to the macOS editor) when
@@ -154,8 +154,16 @@ OpenPersonalEditor(DefaultSection := "") {
 	if (TargetSection == "") {
 		TargetSection := _EditorPrefGet("default_section", "")
 	}
-	if (TargetSection == "" and _PersonalEditorData["sections_order"].Length > 0) {
-		TargetSection := _PersonalEditorData["sections_order"][1]
+	; A saved preference may outlive a removed section. Resolve one live model
+	; identity before the dropdown and entry list project that same selection.
+	if !_PersonalEditorData["sections"].Has(TargetSection) {
+		TargetSection := ""
+		for SectionName in _PersonalEditorData["sections_order"] {
+			if _PersonalEditorData["sections"].Has(SectionName) {
+				TargetSection := SectionName
+				break
+			}
+		}
 	}
 	_PersonalEditorSection := TargetSection
 
@@ -229,7 +237,6 @@ OpenPersonalEditor(DefaultSection := "") {
 	; starts blank (= inherit) and the cue banner shows the inherited default.
 	PrioEdit.Value := ""
 	_SetEditCueBanner(PrioEdit, _GetSharedPersonalDefault())
-	global _PersonalEditorPrioCtrl := PrioEdit
 
 	; ── Add button + checkbox aligned, before the separator ──
 	PrioEdit.GetPos(, &PrioY, , &PrioH)
@@ -283,15 +290,25 @@ OpenPersonalEditor(DefaultSection := "") {
 	W.OnEvent("Close", _PersonalEditorWindowClose.Bind(W, SessionEpoch))
 	W.OnEvent("Size", (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
-	if SessionEpoch != _PersonalEditorSessionEpoch {
+	OpeningAdmitted := false
+	PreviousCritical := Critical("On")
+	try {
+		if SessionEpoch == _PersonalEditorSessionEpoch {
+			OpeningSource["kind"] := "native"
+			OpeningSource["epoch"] := SessionEpoch
+			OpeningSource["window"] := W
+			; Pending native constructors keep every control private until this
+			; exact session can publish its complete presentation atomically.
+			_PersonalEditorPrioCtrl := PrioEdit
+			_PersonalEditorOpeningSource := OpeningSource
+			_PersonalEditorGui := W
+			OpeningAdmitted := true
+		}
+	} finally Critical(PreviousCritical)
+	if !OpeningAdmitted {
 		W.Destroy()
 		return
 	}
-	OpeningSource["kind"] := "native"
-	OpeningSource["epoch"] := SessionEpoch
-	OpeningSource["window"] := W
-	_PersonalEditorOpeningSource := OpeningSource
-	_PersonalEditorGui := W
 	W.Show("Center w900 h690")
 }
 
@@ -902,17 +919,23 @@ _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoEx
 
 ; Switch the open editor to a different section (called when reopening with a target).
 _SwitchEditorSection(SectionName) {
-	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection
-	if !IsObject(_PersonalEditorGui) {
-		return
-	}
-	_PersonalEditorSection := SectionName
-	; The ListView and dropdown are stored as named controls — rebuild via a fresh open
-	; is the simplest approach for AHK (no handle cache needed).
-	_PersonalEditorData := ReadPersonalToml()
-	ClosingWindow := _PersonalEditorGui
-	_OnEditorClose(ClosingWindow)
+	global _PersonalEditorGui, _PersonalEditorSessionEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(_PersonalEditorGui)
+			return
+		ClosingWindow := _PersonalEditorGui
+		ClosingEpoch := _PersonalEditorSessionEpoch
+		if !_OnEditorClose(ClosingWindow, ClosingEpoch)
+			return
+	} finally Critical(PreviousCritical)
+	; The fresh constructor already reads its own opening source. No old read
+	; may replace another session's model before this exact native retirement.
 	ClosingWindow.Destroy()
+	; Destroy can publish a successor through a real native callback. Only
+	; the epoch just retired above may admit this older request's fresh open.
+	if _PersonalEditorSessionEpoch != ClosingEpoch + 1 || IsObject(_PersonalEditorGui)
+		return
 	OpenPersonalEditor(SectionName)
 }
 
