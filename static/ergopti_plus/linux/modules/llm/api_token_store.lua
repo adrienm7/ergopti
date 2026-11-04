@@ -57,11 +57,12 @@ local _sequence = 0
 
 --- Reads a whole file and removes it.
 --- @param path string
+--- @param remove_owned function Cleanup bound to the created file.
 --- @return string|nil text Nil when the result cannot be read safely.
-local function take_file(path)
+local function take_file(path, remove_owned)
 	local text, status = require("toml_codec.writer").read_classified(path)
-	if status ~= "ok" then return nil end
-	if not os.remove(path) then return nil end
+	local called, removed = pcall(remove_owned)
+	if status ~= "ok" or not called or removed ~= true then return nil end
 	return text
 end
 
@@ -75,7 +76,27 @@ end
 local function run_tool(args, input)
 	local words = { ShellRunner.quote(_tool_override or TOOL) }
 	for _, arg in ipairs(args) do words[#words + 1] = ShellRunner.quote(arg) end
-	local err_path, status_path = os.tmpname(), os.tmpname()
+	local uv = require("luv")
+	local dir = uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-secret-tool-XXXXXX")
+	if not dir then return nil, "", "secret-tool result directory unavailable" end
+	local err_path, status_path = dir .. "/stderr", dir .. "/status"
+	local function reserve(path)
+		local opened, fh, _, _, remove = pcall(require("infra.regular_file_writer").open, path, "wx")
+		if not opened or not fh then return nil end
+		local closed, ack = pcall(fh.close, fh)
+		if not closed or ack ~= true or type(remove) ~= "function" then
+			if type(remove) == "function" then pcall(remove) end
+			return nil
+		end
+		return remove
+	end
+	local remove_err, remove_status = reserve(err_path), reserve(status_path)
+	if not remove_err or not remove_status then
+		if remove_err then pcall(remove_err) end
+		if remove_status then pcall(remove_status) end
+		uv.fs_rmdir(dir)
+		return nil, "", "secret-tool result files are unavailable"
+	end
 	local command = table.concat(words, " ")
 		.. (input and " >/dev/null" or "")
 		.. " 2>" .. ShellRunner.quote(err_path)
@@ -83,14 +104,22 @@ local function run_tool(args, input)
 	local output = ""
 	local pipe = io.popen(command, input and "w" or "r")
 	if not pipe then
-		os.remove(err_path)
-		os.remove(status_path)
+		pcall(remove_err)
+		pcall(remove_status)
+		uv.fs_rmdir(dir)
 		return nil, "", "the shell could not be started"
 	end
-	if input then pipe:write(input) else output = pipe:read("*a") or "" end
-	pipe:close()
-	local status_text, stderr = take_file(status_path), take_file(err_path)
-	if status_text == nil or stderr == nil then return nil, "", "secret-tool result files are unavailable" end
+	local exchanged, value
+	if input then exchanged, value = pcall(pipe.write, pipe, input)
+	else exchanged, value = pcall(pipe.read, pipe, "*a"); output = type(value) == "string" and value or "" end
+	local closed, close_ack = pcall(pipe.close, pipe)
+	local status_text, stderr = take_file(status_path, remove_status), take_file(err_path, remove_err)
+	local removed_dir = uv.fs_rmdir(dir)
+	local received = input and (value == true or value == pipe) or (not input and type(value) == "string")
+	if not exchanged or not received or not closed or close_ack ~= true
+		or status_text == nil or stderr == nil or removed_dir ~= true then
+		return nil, "", "secret-tool result files are unavailable"
+	end
 	return tonumber(status_text), output, stderr
 end
 
