@@ -346,15 +346,21 @@ function M.focus(session_id)
 	local session = _session
 	if not session or session.id ~= session_id or session.retired then return false end
 	local host = manager()
-	if not host or type(host.show) ~= "function" then return false end
+	if not host or host ~= session.host or type(host.show) ~= "function" then return false end
 	if type(host.is_visible) == "function" and host.is_visible(APP_NAME) == true then
-		if type(host.bring_to_front) == "function" then host.bring_to_front(APP_NAME) end
-		session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or type(host.bring_to_front) ~= "function"
+			or host.bring_to_front(APP_NAME) ~= true then return false end
+		local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+		if _session ~= session or session.retired or manager() ~= host then return false end
+		session.page_epoch = epoch
 		return true
 	end
+	if _session ~= session or session.retired or manager() ~= host then return false end
 	session.ready = false
 	if host.show(APP_NAME) ~= true then return false end
-	session.page_epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	local epoch = type(host.current_epoch) == "function" and host.current_epoch(APP_NAME) or nil
+	if _session ~= session or session.retired or manager() ~= host then return false end
+	session.page_epoch = epoch
 	return true
 end
 
