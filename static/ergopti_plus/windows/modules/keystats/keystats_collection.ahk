@@ -125,7 +125,9 @@ KL_ResetSession(FlushFn := 0, CloseFn := 0, WpmFn := 0) {
 		return false
 	}
 	if KLWatch.is_session_active {
-		LastTick := KLHook.last_tick
+		; Synthetic input retires the per-key delay clock; accepted session
+		; activity (including pointer input) still owns the closing boundary.
+		LastTick := Max(KLHook.last_tick, KLWatch.last_authorized_tick)
 		Closed := HasMethod(CloseFn, "Call")
 			? CloseFn.Call(LastTick, A_TickCount)
 			: _KL_Watchers_CloseSession(LastTick, A_TickCount)

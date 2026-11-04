@@ -219,17 +219,20 @@ _KCT_ResetClosesAnActiveSessionAfterFlushing() {
 	Body() {
 		PrevActive := KLWatch.is_session_active
 		PrevTick := KLHook.last_tick
+		PrevAuthorized := KLWatch.last_authorized_tick
 		Order := []
 		Seen := []
 		try {
 			KLWatch.is_session_active := true
 			KLHook.last_tick := 1234
+			KLWatch.last_authorized_tick := 1000
 			Applied := KL_ResetSession(() => (Order.Push("flush"), true),
 				(Last, Now) => (Order.Push("close"), Seen.Push(Last), true),
 				() => Order.Push("wpm"))
 		} finally {
 			KLWatch.is_session_active := PrevActive
 			KLHook.last_tick := PrevTick
+			KLWatch.last_authorized_tick := PrevAuthorized
 		}
 		Assert(Applied, "the reset is applied")
 		AssertEqual("flush,close,wpm", _KCT_Join(Order), "the text is stored, then the session closes, then the figures restart")
