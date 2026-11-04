@@ -343,7 +343,7 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 	expect(lines.length === 1 && lines[0].text.includes(DEV), 'the newer dev release is not listed');
 
 	// A failure: its reason, today's log and the Report button; no switch line
-	const LOG = '~/.local/state/ergopti_plus/logs/ErgoptiPlus_2026-09-29.log';
+	const LOG = '~/.local/state/ergopti/logs/ErgoptiPlus_2026-09-29.log';
 	receive({
 		type: 'state',
 		state: 'error',

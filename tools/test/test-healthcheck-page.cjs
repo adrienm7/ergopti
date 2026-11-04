@@ -210,7 +210,7 @@ function snapshot(detailed) {
 		detailed,
 		sections: {
 			paths: {
-				logs_dir: `${context.home}/.local/state/ergopti_plus/logs`,
+				logs_dir: `${context.home}/.local/state/ergopti/logs`,
 				diagnostics_dir: `${context.home}/x/diagnostics`
 			},
 			versions: { ergopti_version: '2.1.0', commit: 'f4d0bfd63 (git)' },
@@ -305,7 +305,7 @@ function init(page, detailed) {
 	if (!preview.includes('# ErgoptiPlus')) fail('the preview is not the Markdown report');
 	if (preview.includes('/home/jdoe') || preview.includes('abcdef123456'))
 		fail('the preview is not redacted');
-	if (preview.includes('~/.local/state/ergopti_plus/logs'))
+	if (preview.includes('~/.local/state/ergopti/logs'))
 		fail('the share preview leaked even a redacted path');
 	if (!page.elements.content.innerHTML.includes('<h2>')) fail('the page rendered no section');
 

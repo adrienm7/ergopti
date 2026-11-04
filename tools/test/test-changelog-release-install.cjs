@@ -204,12 +204,12 @@ function checkProgressFailureAndRetry() {
 		tag: 'v0.0.0-dev.139',
 		phase: 'failed',
 		reason_key: 'changelog_window.install_error_no_asset',
-		backup_path: '~/.config/ergopti_plus/backups/pre-install-x'
+		backup_path: '~/Library/Application Support/Ergopti/config/backups/pre-install-x'
 	});
 	const text = page.el('install-text').textContent;
 	expect(
 		text.includes(fill('changelog_window.install_error_no_asset', { tag: 'v0.0.0-dev.139' })) &&
-			text.includes('~/.config/ergopti_plus/backups/pre-install-x'),
+			text.includes('~/Library/Application Support/Ergopti/config/backups/pre-install-x'),
 		`a refusal must name its reason and the backup it kept (got ${text})`
 	);
 	expect(page.el('install-panel').className === 'failed', 'the failure is styled as one');

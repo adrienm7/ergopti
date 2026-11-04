@@ -326,15 +326,15 @@ function openWizard(extra, prepare) {
 			{
 				locale: 'en',
 				strings: locale('en'),
-				default_config_dir: '/Volumes/Fixture/me/.config/ergopti_plus/',
-				empty_config_dir: '/Volumes/Fixture/me/.config/ergopti_plus/',
+				default_config_dir: '/Volumes/Fixture/me/Library/Application Support/Ergopti/config/',
+				empty_config_dir: '/Volumes/Fixture/me/Library/Application Support/Ergopti/config/',
 				locales: [
 					{ code: 'en', flag: '', name: 'English' },
 					{ code: 'fr', flag: '', name: 'Français' }
 				],
 				config_dir: '',
 				current: {},
-				metrics_path: '/Volumes/Fixture/me/.config/ergopti_plus/metrics',
+				metrics_path: '/Volumes/Fixture/me/Library/Application Support/Ergopti/config/metrics',
 				platform: 'macos',
 				capabilities: HOST_CAPABILITIES[(extra && extra.platform) || 'macos']
 			},
@@ -1927,7 +1927,10 @@ function assertSeparated(row, where) {
 	page.click('btn-next');
 	const input = page.el('config-input');
 	assert.equal(input.value, '', 'the field starts empty over the default');
-	assert.equal(input.placeholder, '/Volumes/Fixture/me/.config/ergopti_plus/');
+	assert.equal(
+		input.placeholder,
+		'/Volumes/Fixture/me/Library/Application Support/Ergopti/config/'
+	);
 	page.messages.splice(0);
 
 	page.click('config-browse');
@@ -1996,7 +1999,10 @@ function advanceToMetrics(page) {
 	page.click('btn-next');
 	advanceToMetrics(page);
 	const warning = page.el('page-consent').textContent;
-	assert.ok(warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'), warning);
+	assert.ok(
+		warning.includes('/Volumes/Fixture/me/Library/Application Support/Ergopti/config/metrics'),
+		warning
+	);
 	assert.ok(!warning.includes('{1}'), 'the placeholder is filled');
 })();
 
@@ -2018,7 +2024,7 @@ function advanceToMetrics(page) {
 	const warning = page.el('page-consent').textContent;
 	assert.ok(warning.includes('/Volumes/Data/Ergopti/metrics'), warning);
 	assert.ok(
-		!warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'),
+		!warning.includes('/Volumes/Fixture/me/Library/Application Support/Ergopti/config/metrics'),
 		'the default store is no longer named'
 	);
 })();

@@ -133,9 +133,9 @@ const literalFixture = fs.readFileSync(
 	'utf8'
 );
 const literalPaths = [
-	'C:/plain/ergopti_plus/',
-	"C:/fixture/O'Brien/café/ergopti_plus/",
-	"C:\\notes\\O'Brien\\ergopti_plus\\"
+	'C:/plain/Ergopti/',
+	"C:/fixture/O'Brien/café/Ergopti/",
+	"C:\\notes\\O'Brien\\Ergopti\\"
 ];
 
 /** Decodes the authored fixture after the consumer's exact token substitution. */
