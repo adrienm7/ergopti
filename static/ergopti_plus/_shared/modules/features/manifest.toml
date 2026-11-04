@@ -2974,7 +2974,8 @@ description_key = "menu.caps_word.pointer.other_buttons"
 # scalable on macOS: their modes are "incremental", so a longer swipe moves
 # more tabs, in the slot's own direction (the axis action "tabs" would follow
 # the sign of the travel and send a left swipe to the previous tab). The
-# four-finger swipes stay one step per swipe ("x1").
+# three-finger vertical swipes (new tab, close tab) and the four-finger swipes
+# stay one step per swipe ("x1"): a long swipe opens or closes one tab.
 # Every slot stays reassignable on every OS, and the Gestures menu says to
 # remove the system assignment first to avoid a double action
 # (menu.gestures.recommended_note).
@@ -3529,7 +3530,8 @@ type = "enum"
 enum_values = ["x1", "incremental"]
 description_key = "menu.gestures.modes.swipe_2_right_up"
 
-# --- 3-finger (all incremental) ---
+# --- 3-finger (horizontal incremental; vertical one step per swipe, so a long
+# swipe opens or closes one tab, decision of 2026-11-04) ---
 [[features.gestures.modes]]
 id = "swipe_3_left"
 platforms = ["hs"]
@@ -3556,8 +3558,8 @@ description_key = "menu.gestures.modes.swipe_3_right"
 id = "swipe_3_up"
 platforms = ["hs"]
 requires = { macos = [] }
-default = "incremental"
-recommended = "incremental"
+default = "x1"
+recommended = "x1"
 family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
@@ -3567,8 +3569,8 @@ description_key = "menu.gestures.modes.swipe_3_up"
 id = "swipe_3_down"
 platforms = ["hs"]
 requires = { macos = [] }
-default = "incremental"
-recommended = "incremental"
+default = "x1"
+recommended = "x1"
 family = "setting"
 type = "enum"
 enum_values = ["x1", "incremental"]
