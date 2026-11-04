@@ -2126,7 +2126,7 @@ local function main()
 	-- 60-upvalue limit.
 	local function on_pointer_event(kind_of_event, code, value, source)
 		keystats.record_pointer(kind_of_event, code, value, source)
-		if kind_of_event == "frame" or kind_of_event == "reset" then return end
+		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
 	end

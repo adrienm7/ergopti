@@ -38,9 +38,11 @@ M.KIND_PRESS  = "press"
 M.KIND_MOTION = "motion"
 M.KIND_FRAME  = "frame"
 M.KIND_RESET  = "reset"
+M.KIND_DROPPED = "dropped"
 
 -- The kinds above, for validation
-local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true, [M.KIND_RESET] = true }
+local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = true,
+	[M.KIND_RESET] = true, [M.KIND_DROPPED] = true }
 
 
 
@@ -51,23 +53,32 @@ local KINDS = { [M.KIND_PRESS] = true, [M.KIND_MOTION] = true, [M.KIND_FRAME] = 
 -- ===============================
 -- ===============================
 
---- Creates a tracker of one pointer stream. It keeps the open frame's movement
---- until the frame's SYN_REPORT, so a movement is measured once, whole.
+--- Creates a tracker of pointer streams. Each device keeps its own open frame
+--- until SYN_REPORT; queue loss discards the frame through the next SYN_REPORT.
 --- @return table tracker { observe(kind, code, value) }
 function M.new()
 	local tracker = {}
-	local frames, default_source = {}, {}
+	local frames, dropping, default_source = {}, {}, {}
 
 	--- Observes one pointer report and returns what it adds to the metrics.
-	--- @param kind string "press" (a button pressed), "motion" (an EV_REL report) or "frame" (SYN_REPORT).
+	--- @param kind string "press", "motion", "frame", "dropped" or "reset".
 	--- @param code integer evdev code of the report.
 	--- @param value integer evdev value of the report.
 	--- @param source any|nil Identity of the pointer producing this frame.
 	--- @return table|nil delta { clicks, scrolls, distance } or nil when it adds nothing.
 	function tracker.observe(kind, code, value, source)
 		assert(KINDS[kind], "unknown pointer event kind: " .. tostring(kind))
+		local key = source or default_source
 		if kind == M.KIND_RESET then
-			frames[source or default_source] = nil
+			frames[key], dropping[key] = nil, nil
+			return nil
+		end
+		if kind == M.KIND_DROPPED then
+			frames[key], dropping[key] = nil, true
+			return nil
+		end
+		if dropping[key] then
+			if kind == M.KIND_FRAME then dropping[key] = nil end
 			return nil
 		end
 		if kind == M.KIND_PRESS then
@@ -78,14 +89,12 @@ function M.new()
 			if SCROLL_AXES[code] then return { clicks = 0, scrolls = 1, distance = 0 } end
 			assert(type(value) == "number", "a pointer motion report needs its evdev value")
 			if code == InputEvent.REL_X or code == InputEvent.REL_Y then
-				local key = source or default_source
 				local frame = frames[key] or { dx = 0, dy = 0 }
 				frames[key] = frame
 				if code == InputEvent.REL_X then frame.dx = frame.dx + value else frame.dy = frame.dy + value end
 			end
 			return nil
 		end
-		local key = source or default_source
 		local frame = frames[key]
 		frames[key] = nil
 		if not frame or (frame.dx == 0 and frame.dy == 0) then return nil end

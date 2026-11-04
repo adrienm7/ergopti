@@ -146,6 +146,14 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "frame", 0, 0, source },
 			{ "reset", nil, nil, source } })
 	end)
+
+	helpers.it("reports pointer queue loss to its observer", function()
+		local reports = {}
+		local _, _, source = drive("mouse", {}, { { EV_SYN, 3, 0, 3000 }, { EV_SYN, 0, 0, 4000 } },
+			function(kind, code, value, slot) reports[#reports + 1] = { kind, code, value, slot } end)
+		helpers.assert_eq(reports, { { "dropped", 3, 0, source }, { "frame", 0, 0, source },
+			{ "reset", nil, nil, source } })
+	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
 		local layer = wheel_layer()
 		local up = layer[InputEvent.wheel_layer_code("vertical", 1)]
