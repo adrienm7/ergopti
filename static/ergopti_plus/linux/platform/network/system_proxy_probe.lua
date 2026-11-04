@@ -54,9 +54,13 @@ end
 --- ones to the receipt), read from the policy file beside this helper's shared root.
 --- @return table|nil limits { max_selections, max_proxy_bytes }
 local function policy_limits()
-	local file = io.open(shared_root .. "/modules/network/proxy_policy.json", "rb")
-	local bytes = file and file:read(32769)
-	if file then file:close() end
+	local loaded, reader = pcall(require, "infra.regular_file_reader")
+	if not loaded or type(reader) ~= "table" or type(reader.open_source) ~= "function" then return nil end
+	local file = reader.open_source(shared_root .. "/modules/network/proxy_policy.json")
+	if not file then return nil end
+	local read_ok, bytes = pcall(file.read, file, 32769)
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or not close_ok or not closed then return nil end
 	local decoded, policy = pcall(Json.decode, bytes or "")
 	if not decoded or type(policy) ~= "table" then return nil end
 	for _, key in ipairs({ "max_selections", "max_proxy_bytes" }) do

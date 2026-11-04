@@ -48,6 +48,26 @@ local function root_with(policy)
 end
 
 helpers.describe("system proxy probe: selection limits come from the shared policy (proxy-policy-single-source)", function()
+	helpers.it("proxy-policy-single-source: a FIFO policy produces an immediate refusal", function()
+		local root = root_with("{}")
+		local path = root .. "/modules/network/proxy_policy.json"
+		os.remove(path)
+		local Shell = require("adapters.shell_runner")
+		local quote = Shell.quote
+		assert(os.execute("ln -s " .. quote(assert(Paths.shared_root()) .. "/lua") .. " " .. quote(root .. "/lua")))
+		assert(os.execute("mkfifo " .. quote(path)))
+		local executable = assert(require("luv").exepath())
+		local command = "printf '%s' " .. quote(Json.encode({ url = "https://corporate.invalid/private" }))
+			.. " | timeout 2 " .. quote(executable) .. " " .. quote(helper) .. " " .. quote(root)
+		local pipe = assert(io.popen(command, "r"))
+		local output = pipe:read("*a")
+		pipe:close()
+		os.execute("rm -rf " .. quote(root))
+		local ok, receipt = pcall(Json.decode, output)
+		helpers.assert_true(ok and type(receipt) == "table", "the helper must return a receipt without waiting on the FIFO")
+		helpers.assert_eq(receipt.error, "proxy-policy-unavailable")
+	end)
+
 	helpers.it("refuses to look up when the policy carries no valid limits", function()
 		for _, policy in ipairs({ "{}", '{"max_selections":0,"max_proxy_bytes":65536}', '{"max_selections":128}', "not json" }) do
 			local root = root_with(policy)
