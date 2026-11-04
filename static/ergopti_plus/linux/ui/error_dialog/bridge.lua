@@ -355,17 +355,23 @@ function M.on_message(payload, _state, context)
 			Logger.warn(LOG, "The error window asked for an error while none is pending.")
 			return nil
 		end
-		local ok, fields = pcall(build_report, _pending)
+		local record, previous = _pending, _session
+		local epoch = type(context) == "table" and context.epoch or nil
+		local function current()
+			return _pending == record and _session == previous
+				and (epoch == nil or require("ui.webview_manager").current_epoch(APP) == epoch)
+		end
+		local ok, fields = pcall(build_report, record)
+		if not current() then return nil end
 		if not ok then
 			Logger.error(LOG, "The error report could not be built: %s.", tostring(fields))
 			return nil
 		end
-		local previous = _session
 		local revision = cancel_action(previous)
-		if _session ~= previous or revision ~= _action_revision then return nil end
+		if not current() or revision ~= _action_revision then return nil end
 		_session = fields
 		_session.epoch = type(context) == "table" and context.epoch or nil
-		_session.record = _pending
+		_session.record = record
 		return init_message(_session)
 	end
 	if not _session then
