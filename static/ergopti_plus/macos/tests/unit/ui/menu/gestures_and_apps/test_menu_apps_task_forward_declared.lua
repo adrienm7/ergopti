@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- menu_apps.lua launches each bundle through TaskLifecycle. The exact native
 --- handle must be forward-declared for its callback, retained in M._active_tasks
---- before start, and released by either callback settlement or start refusal.
+--- before start, and released by settlement or proof that it never ran.
 --- An inline declaration captures the nil global and silently leaks the GC pin.
 ---
 --- These guards follow the current native/start ownership transaction instead
@@ -32,7 +32,7 @@ helpers.describe("menu_apps: app launch owns one exact native task", function()
 			"the exact candidate must have one native start admission")
 	end)
 
-	helpers.it("pins the exact handle before start and rolls back a refusal", function()
+	helpers.it("pins the exact handle before start and inspects a refusal", function()
 		local src = read_src()
 		local decl_pos = src:find("local task\n", 1, true)
 		local new_pos = src:find("task = TaskLifecycle.native", 1, true)
@@ -40,6 +40,8 @@ helpers.describe("menu_apps: app launch owns one exact native task", function()
 		local start_pos = src:find("TaskLifecycle.start(task, \"Bundled app launch\")",
 			pin_pos, true)
 		local rollback_pos = src:find("M._active_tasks[task] = nil", start_pos, true)
+		local probe_pos = src:find("task:isRunning()", start_pos, true)
+		local terminate_pos = src:find("TaskLifecycle.terminate(task", start_pos, true)
 		helpers.assert_true(decl_pos ~= nil, "app-launch task must be forward-declared as `local task`")
 		helpers.assert_true(new_pos ~= nil,
 			"app-launch task must be assigned via `task = TaskLifecycle.native`")
@@ -47,8 +49,8 @@ helpers.describe("menu_apps: app launch owns one exact native task", function()
 			"the launch transaction must expose pin, start, and refusal rollback")
 		helpers.assert_true(decl_pos < new_pos and new_pos < pin_pos and pin_pos < start_pos,
 			"the callback upvalue and GC pin must exist before native start")
-		helpers.assert_true(start_pos < rollback_pos,
-			"a refused native start must release its exact GC pin")
+		helpers.assert_true(probe_pos ~= nil and terminate_pos ~= nil and start_pos < probe_pos and probe_pos < rollback_pos,
+			"a refused start must inspect its exact handle before releasing or terminating it")
 	end)
 
 	helpers.it("the completion callback releases its captured exact handle", function()

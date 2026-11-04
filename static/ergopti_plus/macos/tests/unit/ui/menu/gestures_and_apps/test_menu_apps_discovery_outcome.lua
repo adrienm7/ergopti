@@ -21,7 +21,7 @@ local function with_apps(callback)
 				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.paths"] = {}
+			package.loaded["infra.paths"] = { shared = function() return "/virtual/locales" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.manifest_menu"] = { build = function(key, title, dynamic, on_click, ctx, providers)
 				if state.render_native then
@@ -29,7 +29,18 @@ local function with_apps(callback)
 				end
 				return providers.apps_installed()
 			end }
-			package.loaded["adapters.task_lifecycle"] = {}
+			package.loaded["adapters.task_lifecycle"] = {
+				native = function(_, _, callback)
+					local task = { isRunning = function()
+						if state.running == "throw" then error("probe failed") end
+						return state.running
+					end }
+					state.task, state.complete = task, callback
+					return task
+				end,
+				start = function() return state.start ~= false end,
+				terminate = function() state.terminations = (state.terminations or 0) + 1; return true end,
+			}
 			local module = helpers.load_with_stubs("ui.menu.menu_apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
 				execute = function(command)
@@ -77,6 +88,29 @@ local function with_apps(callback)
 end
 
 helpers.describe("Bundled app discovery outcome", function()
+	for _, probe in ipairs({ "running", "unknown", "throw" }) do
+		helpers.it("retains a refused launch until settlement when the probe is " .. probe, function()
+			with_apps(function(module, state, ctx)
+				state.output, state.start = "/virtual/First.app\0", false
+				state.running = probe == "running" and true or probe == "throw" and "throw" or nil
+				local rows = module.build(ctx).submenu
+				helpers.assert_eq(rows[1].action(), false)
+				helpers.assert_eq(module._active_tasks[state.task], true)
+				helpers.assert_eq(state.terminations, 1)
+				state.complete(1, "", "failed")
+				helpers.assert_nil(module._active_tasks[state.task])
+			end)
+		end)
+	end
+	helpers.it("releases a refused launch proved not running", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.start, state.running = "/virtual/First.app\0", false, false
+			local rows = module.build(ctx).submenu
+			helpers.assert_eq(rows[1].action(), false)
+			helpers.assert_nil(module._active_tasks[state.task])
+			helpers.assert_nil(state.terminations)
+		end)
+	end)
 	helpers.it("cleans up the icon canvas after rendering failure", function()
 		with_apps(function(module, state, ctx)
 			state.output, state.have_icon, state.fail_render = "/virtual/First.app\0", true, true
