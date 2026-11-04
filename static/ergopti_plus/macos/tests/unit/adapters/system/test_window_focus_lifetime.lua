@@ -41,11 +41,12 @@ local function with_windows(options, callback)
 			return win
 		end
 		local candidate = window(22, 202, options.behavior)
-		local healthy = window(33, 303)
+		local healthy = window(33, options.same_application and 202 or 303)
+		local alternate = window(44, 404)
 		local manager = helpers.load_with_stubs("adapters.window_manager", {
 			window = {
 				get = function(id) if id == 22 then return candidate end end,
-				orderedWindows = function() return { candidate, healthy } end,
+				orderedWindows = function() return { candidate, alternate, healthy } end,
 			},
 			application = {
 				frontmostApplication = function()
@@ -98,8 +99,24 @@ helpers.describe("window focus refuses a detached native window", function()
 	helpers.it("tries the next candidate after an inventoried application exits (window-focus-lifetime)", function()
 		with_windows({ behavior = "after_inventory" }, function(f)
 			helpers.assert_eq(f.switch(), true)
-			helpers.assert_eq(f.focused, { 33 },
+			helpers.assert_eq(f.focused, { 44 },
 				"a chainable no-op must not suppress the healthy fallback application")
+		end)
+	end)
+
+	helpers.it("tries another window of the same application before the next application", function()
+		with_windows({ behavior = "after_inventory", same_application = true }, function(f)
+			helpers.assert_eq(f.switch(), true)
+			helpers.assert_eq(f.focused, { 33 },
+				"an unusable front window must not discard the application")
+		end)
+	end)
+
+	helpers.it("preserves application recency when switching to the least recent", function()
+		with_windows({ same_application = true }, function(f)
+			helpers.assert_eq(f.switch(true), true)
+			helpers.assert_eq(f.focused, { 44 },
+				"the last window must not make its application the least recent")
 		end)
 	end)
 
