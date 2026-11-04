@@ -48,6 +48,59 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 		end)
 	end)
 
+	helpers.it("(remap-multisource) does not deliver an old press into a callback-restarted capture", function()
+		local restarted = false
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 and not restarted then
+				restarted = true
+				s.hook.stop()
+				assert(s.hook.set_remapper(s.engine))
+				s.hook.start(s.start_options)
+			end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_true(restarted and s.hook.isRunning())
+			helpers.assert_eq(s.rows, {}, "the old source cannot publish into its successor")
+			s.edge("b", 30, 1, 2); s.edge("b", 30, 0, 3)
+			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } })
+		end)
+	end)
+
+	helpers.it("(remap-multisource) does not stop a successor when the old callback raises", function()
+		local restarted = false
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 and not restarted then
+				restarted = true
+				s.hook.stop()
+				assert(s.hook.set_remapper(s.engine))
+				s.hook.start(s.start_options)
+				error("old callback failed")
+			end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_true(restarted and s.hook.isRunning(), "only the original capture may be retired")
+			helpers.assert_eq(s.rows, {}, "the old press cannot reach the successor")
+		end)
+	end)
+
+	helpers.it("(remap-multisource) does not stop a successor when the old consumer raises", function()
+		local restarted = false
+		Fixture.with_session({ on_consume = function(s)
+			if not restarted then
+				restarted = true
+				s.hook.stop()
+				assert(s.hook.set_remapper(s.engine))
+				s.hook.start(s.start_options)
+				error("old consumer failed")
+			end
+			return false
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_true(restarted and s.hook.isRunning())
+			helpers.assert_eq(s.rows, {})
+		end)
+	end)
+
 	helpers.it("(remap-multisource) does not emit a press after its consumer stops capture", function()
 		Fixture.with_session({ on_consume = function(s)
 			s.hook.stop()
