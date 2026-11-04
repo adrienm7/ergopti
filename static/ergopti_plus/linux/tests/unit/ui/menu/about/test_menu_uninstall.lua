@@ -103,3 +103,34 @@ helpers.describe("Linux menu uninstall", function()
 		helpers.assert_eq(log.commands[3], "command -v setsid >/dev/null 2>&1")
 	end)
 end)
+
+for _, fault in ipairs({ "read_throw", "read_nil", "close_false", "close_throw" }) do
+	helpers.it("uninstall refuses a failed proc identity " .. fault, function()
+		local opts, log = fixture()
+		opts.read = nil
+		local original_open, closes = io.open, 0
+		io.open = function(path, mode)
+			if path ~= "/proc/self/stat" then return original_open(path, mode) end
+			return {
+				read = function()
+					if fault == "read_throw" then error("injected read failure") end
+					if fault == "read_nil" then return nil, "injected read failure" end
+					return "123 (fixture) S " .. string.rep("0 ", 18) .. "987654"
+				end,
+				close = function()
+					closes = closes + 1
+					if fault == "close_throw" then error("injected close failure") end
+					return fault ~= "close_false"
+				end,
+			}
+		end
+		local called, result = pcall(Uninstall.run, opts)
+		io.open = original_open
+		helpers.assert_true(called, "identity I/O refusal must not escape the menu")
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(log.failures, 1)
+		helpers.assert_eq(log.quit, 0)
+		helpers.assert_eq(#log.commands, 1, "only the prerequisite check may run")
+		helpers.assert_eq(closes, 1, "every opened proc stream is closed")
+	end)
+end
