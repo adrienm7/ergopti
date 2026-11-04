@@ -106,6 +106,17 @@ helpers.describe("agent learning source admission", function()
 		end)
 	end)
 
+	helpers.it("keeps recency ordered after a large finite persisted counter", function()
+		local source = '{"version":1,"apps":{"A":{"used":9007199254740992,"thresholds":{}},"B":{"used":9007199254740992,"thresholds":{}}}}'
+		with_source(source, function(Learning, path, config)
+			Learning.record(config, "B", "calendar", true)
+			Learning.record(config, "A", "calendar", true)
+			helpers.assert_true(Learning.flush())
+			local apps = assert(Json.decode_lossless(read(path))).apps
+			helpers.assert_true(apps.A.used > apps.B.used, "the most recent app must remain newer")
+		end)
+	end)
+
 	helpers.it("(agent-learning-source) overflow LRU clocks cannot crash a later record", function()
 		local apps = {}
 		local limit = require("modules.llm.agent_learning").MAX_APPS

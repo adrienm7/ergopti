@@ -226,6 +226,21 @@ function M.threshold(config, app, intent)
 	return Store.threshold(_map, config, app, intent)
 end
 
+-- LuaJIT numbers stop distinguishing consecutive integers at 2^53. Rebase
+-- the persisted order before incrementing so the newest application cannot tie
+-- an older entry merely because a finite imported counter was very large.
+local function rebase_clock_if_needed()
+	if _map.clock < 9007199254740991 then return end
+	local entries = {}
+	for name, entry in pairs(_map.apps) do entries[#entries + 1] = { name = name, entry = entry } end
+	table.sort(entries, function(a, b)
+		if a.entry.used ~= b.entry.used then return a.entry.used < b.entry.used end
+		return a.name < b.name
+	end)
+	for rank, item in ipairs(entries) do item.entry.used = rank end
+	_map.clock = #entries
+end
+
 --- Records that the user accepted or dismissed an automatic suggestion.
 --- @param config table Decoded agent.json.
 --- @param app string|nil
@@ -237,6 +252,7 @@ function M.record(config, app, intent, accepted)
 	if _load_blocked then return config.system1.threshold end
 	if type(app) ~= "string" or app == "" then app = "?" end
 	-- Bounded by the store: the least recently used applications go first.
+	rebase_clock_if_needed()
 	local after, before = Store.record(_map, config, app, intent, accepted)
 	Logger.info(LOG, "Agent %s for '%s': threshold %.3f -> %.3f.", accepted and "accepted" or "dismissed",
 		intent, before, after)
