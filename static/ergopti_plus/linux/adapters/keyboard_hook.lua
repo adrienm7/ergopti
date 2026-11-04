@@ -1071,6 +1071,11 @@ local function _resynchronise(source, snapshot, cohort)
 		if pressed[key] then pressed[key] = nil
 		elseif cohort or key:match("^(.*):%d+$") == source then _remap_orphans[key] = nil end
 	end
+	for key in pairs(_source_recovery.native_handoff or {}) do
+		if not pressed[key] and (cohort or key:match("^(.*):%d+$") == source) then
+			_source_recovery.native_handoff[key] = nil
+		end
+	end
 
 	-- The engine's keys are released and its physically held keys consumed:
 	-- replaying a held CapsLock as itself would toggle the lock, where the user
@@ -1079,7 +1084,7 @@ local function _resynchronise(source, snapshot, cohort)
 		if _release_remapped() == false then return false, "combination key retirement refused" end
 		if _remapper.activate and _remapper:activate() ~= true then return false, "combination activation refused" end
 		for key, current in pairs(pressed) do
-			if _remapper:handles(current.code) then
+			if _remapper:handles(current.code) and not (_source_recovery.native_handoff and _source_recovery.native_handoff[key]) then
 				_remap_orphans[key] = true
 				pressed[key] = nil
 			end
@@ -2144,6 +2149,11 @@ local function _dispatch_event(ev, source)
 		if ev.value == InputEvent.VALUE_UP then _remap_orphans[owned_key] = nil end
 		return
 	end
+	if not ev.remapped and _source_recovery.native_handoff and _source_recovery.native_handoff[owned_key] then
+		if ev.value == InputEvent.VALUE_UP then _source_recovery.native_handoff[owned_key] = nil end
+		if _remapper and _remapper.activity then _remapper:activity() end
+		return _dispatch_post_remap(ev, source)
+	end
 	if _remapper and _intercept and not ev.remapped then
 		if _armed_input then
 			local armed = _armed_input
@@ -3068,6 +3078,9 @@ _release_forwarded_sources = function(paths)
 	-- descriptor that happens to reuse the same path.
 	for key in pairs(_remap_orphans) do
 		if retiring[key:match("^(.*):%d+$")] then _remap_orphans[key] = nil end
+	end
+	for key in pairs(_source_recovery.native_handoff or {}) do
+		if retiring[key:match("^(.*):%d+$")] then _source_recovery.native_handoff[key] = nil end
 	end
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
@@ -4164,6 +4177,7 @@ function M.stop()
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
 	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
@@ -4221,6 +4235,7 @@ function M.emergency_stop(reason)
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_source_recovery.native_handoff = {}
 	_remap_source_of = {}
 	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
@@ -4369,6 +4384,14 @@ end
 function M.set_remapper(engine, on_tap)
 	if _number_row.retire() ~= true then return false end
 	if _release_remapped() == false then return false end
+	-- A physical press already forwarded under the previous configuration must
+	-- keep its repeat and release on that same native output owner.
+	_source_recovery.native_handoff = _source_recovery.native_handoff or {}
+	for key, row in pairs(_forwarded_down) do
+		for _, path in ipairs(_devices) do
+			if key == source_key(path, row.code) then _source_recovery.native_handoff[key] = true end
+		end
+	end
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
 	_remap_owned = {}
 	_remap_source_of = {}
