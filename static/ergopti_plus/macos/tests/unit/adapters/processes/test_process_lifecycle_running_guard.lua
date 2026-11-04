@@ -113,6 +113,71 @@ local function load_adapter(options)
 end
 
 helpers.describe("process_lifecycle: native ownership is transactional", function()
+	helpers.it("defers subscribers registered during dispatch to the next event (process-event-subscription)", function()
+		for _, event in ipairs({
+			{ method = "onAppLaunch", code = 1 },
+			{ method = "onAppQuit", code = 2 },
+			{ method = "onAppActivate", code = 3 },
+			{ method = "onFocusChange", focus = true },
+		}) do
+			local adapter, ctx = load_adapter()
+			local registered, newcomer_calls = false, 0
+			adapter[event.method](function()
+				if not registered then
+					registered = true
+					adapter[event.method](function() newcomer_calls = newcomer_calls + 1 end)
+				end
+			end)
+			helpers.assert_true(adapter.start())
+			local function deliver()
+				if event.focus then
+					ctx.filter_callbacks[1]({ application = function() return nil end, title = function() return "" end })
+				else
+					ctx.callbacks[1]("App", event.code, {})
+				end
+			end
+			deliver()
+			helpers.assert_eq(newcomer_calls, 0, event.method .. " delivered an event predating subscription")
+			deliver()
+			helpers.assert_eq(newcomer_calls, 1, event.method .. " missed the next event")
+			helpers.assert_true(adapter.stop())
+		end
+	end)
+
+	helpers.it("stops dispatching a retired event after subscriber restart (process-event-reentry)", function()
+		for _, event in ipairs({
+			{ method = "onAppLaunch", code = 1 },
+			{ method = "onAppQuit", code = 2 },
+			{ method = "onAppActivate", code = 3 },
+			{ method = "onFocusChange", focus = true },
+		}) do
+			local adapter, ctx = load_adapter()
+			local restarted, sibling_calls = false, 0
+			adapter[event.method](function()
+				if not restarted then
+					restarted = true
+					helpers.assert_true(adapter.stop())
+					helpers.assert_true(adapter.start())
+				end
+			end)
+			adapter[event.method](function() sibling_calls = sibling_calls + 1 end)
+			helpers.assert_true(adapter.start())
+			local function deliver(index)
+				if event.focus then
+					ctx.filter_callbacks[index]({ application = function() return nil end, title = function() return "" end })
+				else
+					ctx.callbacks[index]("App", event.code, {})
+				end
+			end
+			deliver(1)
+			helpers.assert_eq(sibling_calls, 0, event.method .. " delivered a retired event")
+			deliver(2)
+			helpers.assert_eq(sibling_calls, 1, event.method .. " lost the successor event")
+			helpers.assert_true(adapter.stop())
+		end
+	end)
+
+
 	helpers.it("retries after a watcher start throw (process-lifecycle-start-retry)", function()
 		local adapter, ctx = load_adapter({ start_throws_once = true })
 
