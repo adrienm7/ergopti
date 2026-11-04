@@ -837,13 +837,17 @@ function M.on_message(payload, state, context)
 		if _session ~= previous or revision ~= _action_revision then return nil end
 		cancel_probes(previous)
 		if _session ~= previous or revision ~= _action_revision then return nil end
-		_session = {
+		local session = {
 			epoch    = epoch,
 			detailed = false,
 		}
-		_session.snapshot = M.build_snapshot(state, false)
-		local message = init_message(_session)
-		start_probes(_session, state)
+		_session = session
+		session.snapshot = M.build_snapshot(state, false)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		local message = init_message(session)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		start_probes(session, state)
+		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		return message
 	end
 	if not _session or _session.epoch ~= epoch then
