@@ -697,19 +697,24 @@ local function save_thinking_refused()
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
 	local text = Json.encode(_thinking_refused)
 	local temp = path .. ".tmp"
-	-- A temporary file a crash left behind would refuse the exclusive creation
-	if io.open(temp, "r") then os.remove(temp) end
-	local opened, fh, _, _, remove_owned = pcall(require("infra.regular_file_writer").open, temp, "wx")
-	if not opened or not fh or type(text) ~= "string" then
-		if opened and fh then pcall(fh.close, fh); remove_owned() end
+	-- An existing staging entry has no retained owner; exclusive creation
+	-- refuses it without opening or deleting an unrelated file.
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" or type(text) ~= "string" then
+		if opened and fh then
+			pcall(fh.close, fh)
+			if type(remove_owned) == "function" then pcall(remove_owned) end
+		end
 		return false
 	end
 	local wrote, written = pcall(fh.write, fh, text)
 	local closed, flushed = pcall(fh.close, fh)
-	if not wrote or not written or not closed or flushed ~= true then
+	if not wrote or (written ~= true and written ~= fh) or not closed or flushed ~= true then
 		remove_owned()
 		return false
 	end
+	local checked, current = pcall(current_image, text)
+	if not checked or current ~= true then return false end
 	local called, renamed = pcall(os.rename, temp, path)
 	if not called or renamed ~= true then
 		remove_owned()
