@@ -2518,6 +2518,12 @@ function LayerPointer.forward(ev, slot)
 end
 
 local function _dispatch_pointer(ev, slot)
+	-- A grabbed mouse may have lost a button release. Retire its output and
+	-- ungrab it before any untrustworthy reports can reach the desktop.
+	if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_DROPPED and slot ~= nil and LayerPointer.slots[slot] then
+		M.emergency_stop("grabbed pointer queue desynchronised")
+		return
+	end
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
 		-- A click while a tap-hold key is down makes it a chord (Shift+click),
 		-- and so does the release of one, as on Windows (hook_dispatcher's
@@ -4105,7 +4111,10 @@ function M.stop()
 		M.emergency_stop("combination key retirement refused during stop")
 		return false
 	end
-	local released, release_err = _release_forwarded_sources(_devices)
+	local sources = {}
+	for _, path in ipairs(_devices) do sources[#sources + 1] = path end
+	for _, path in ipairs(_pointer_devices) do sources[#sources + 1] = pointer_slot(path) end
+	local released, release_err = _release_forwarded_sources(sources)
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
 		return
