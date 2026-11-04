@@ -1,75 +1,15 @@
 {
-	"expected_count": 75,
+	"expected_count": 58,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "terminator-move key allocation:",
-			"expected_count": 4
+			"contains": "HotstringsConfig valid syntax persistence:",
+			"expected_count": 8
 		},
 		{
-			"contains": "hotstring exact terminator identity:",
-			"expected_count": 16
-		},
-		{
-			"contains": "terminator-move exact magic membership:",
-			"expected_count": 2
-		},
-		{
-			"contains": "terminator-move exact consumption:",
-			"expected_count": 4
-		},
-		{
-			"contains": "personal-native-sort-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-native-default-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-native-switch-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-native-constructor-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "usage-integer-domain",
-			"expected_count": 7
-		},
-		{
-			"contains": "_LLMRemoteExtractUsage:",
+			"contains": "HotstringsConfig source preservation:",
 			"expected_count": 5
-		},
-		{
-			"contains": "remote-trim-cancel",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-rebuild-guard-admission",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-rebuild-guard-caller",
-			"expected_count": 1
-		},
-		{
-			"contains": "sticky-native-modifier-flags",
-			"expected_count": 2
-		},
-		{
-			"contains": "sticky-native-nontext",
-			"expected_count": 3
-		},
-		{
-			"contains": "sticky-actions",
-			"expected_count": 2
-		},
-		{
-			"contains": "crash-native-path-receipt",
-			"expected_count": 3
 		},
 		{
 			"contains": "HotstringsConfig canonical legacy migration:",
@@ -77,15 +17,59 @@
 		},
 		{
 			"contains": "HotstringsConfig legacy runtime delay:",
+			"expected_count": 8
+		},
+		{
+			"contains": "HotstringsConfig delimiter retirement receipt:",
+			"expected_count": 4
+		},
+		{
+			"contains": "HotstringsConfig exact source UTF-8:",
+			"expected_count": 5
+		},
+		{
+			"contains": "magic-terminator-override-graph",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig persistent offset:",
 			"expected_count": 6
 		},
 		{
-			"contains": "send-key-native-scalar",
-			"expected_count": 3
+			"contains": "HotstringsConfig unlimited precedence:",
+			"expected_count": 4
 		},
 		{
-			"contains": "usage-integer-price",
+			"contains": "HotstringsConfig: _ParseOverrides reads a file-level",
 			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: _ParseOverrides keeps unlimited",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: override parser rejects numeric overflow",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings-delay-offsets",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstrings-override-lease-reentrant-writer",
+			"expected_count": 1
+		},
+		{
+			"contains": "thinking-regex-resource",
+			"expected_count": 4
+		},
+		{
+			"contains": "screenshot-stage-admission",
+			"expected_count": 2
+		},
+		{
+			"contains": "screenshot-stage-lease-compat",
+			"expected_count": 2
 		}
 	]
 }
