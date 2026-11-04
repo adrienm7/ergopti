@@ -207,6 +207,24 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
     end)
 
+    helpers.it("(hotstrings-reset-refusal) does not notify a successor page", function()
+      local s2, notices, clears, epoch = build_mock_state(), 0, 0, 1
+      local personal = require("hotstrings.personal_files").describe({ "independent.toml" }).id
+      s2.config.get_categories = function() return { [personal] = {} } end
+      s2.config.clear_override = function() clears = clears + 1; return true end
+      s2.notify_error = function() notices = notices + 1 end
+      local previous, logger = package.loaded["ui.webview_manager"], require("logger.shim")
+      local old_error = logger.error
+      package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end }
+      logger.error = function() epoch = 2 end
+      local ok, result = pcall(handler.on_message, { action = "reset_all" }, s2,
+        { app_name = "hotstrings_config_window", epoch = 1 })
+      logger.error, package.loaded["ui.webview_manager"] = old_error, previous
+      helpers.assert_true(ok, tostring(result))
+      helpers.assert_eq(result, { reset = false })
+      helpers.assert_eq({ notices, clears }, { 0, 0 })
+    end)
+
     helpers.it("'reset_all' clears every category's overrides", function()
       local cleared = {}
       local s2 = build_mock_state()

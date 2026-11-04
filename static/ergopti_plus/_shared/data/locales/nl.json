@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Woordscheidingstekens bijgewerkt.",
 	"hs_config.notify_reset_all": "Vertragingen en kleuren zijn gereset.",
 	"hs_config.override_active": "overschrijving actief",
+	"hs_config.reset_all_personal_unavailable": "Alles herstellen is niet beschikbaar zolang er persoonlijke tekstsnelkoppelingsbestanden zijn. Er zijn geen instellingen gewijzigd.",
 	"hs_config.section_prefix": "Sectie: ",
 	"hs_config.window_title": "Hotstring-vertragingen en kleuren",
 	"init.reload_files": "Bestanden gewijzigd — herladen…",

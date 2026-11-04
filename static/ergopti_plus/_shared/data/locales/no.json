@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Ordskilletegn oppdatert.",
 	"hs_config.notify_reset_all": "Forsinkelser og farger er tilbakestilt.",
 	"hs_config.override_active": "overstyring aktiv",
+	"hs_config.reset_all_personal_unavailable": "Tilbakestill alle er ikke tilgjengelig når personlige tekstsnarveifiler finnes. Ingen innstillinger ble endret.",
 	"hs_config.section_prefix": "Del: ",
 	"hs_config.window_title": "Hotstring-forsinkelser og farger",
 	"init.reload_files": "Filer endret — laster på nytt…",

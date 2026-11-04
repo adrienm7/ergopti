@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Delimitadores de palabras actualizados.",
 	"hs_config.notify_reset_all": "Retrasos y colores restablecidos.",
 	"hs_config.override_active": "override activo",
+	"hs_config.reset_all_personal_unavailable": "No se puede restablecer todo mientras existan archivos personales de abreviaturas. No se ha cambiado ningún ajuste.",
 	"hs_config.section_prefix": "Sección: ",
 	"hs_config.window_title": "Retrasos y colores de los hotstrings",
 	"init.reload_files": "Archivos modificados — recargando…",

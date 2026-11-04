@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Ordskilletegn opdateret.",
 	"hs_config.notify_reset_all": "Forsinkelser og farver er nulstillet.",
 	"hs_config.override_active": "tilsidesættelse aktiv",
+	"hs_config.reset_all_personal_unavailable": "Nulstil alle er ikke tilgængelig, når der findes personlige tekstgenvejsfiler. Ingen indstillinger blev ændret.",
 	"hs_config.section_prefix": "Afsnit: ",
 	"hs_config.window_title": "Hotstring-forsinkelser og farver",
 	"init.reload_files": "Filer ændret — genindlæser…",

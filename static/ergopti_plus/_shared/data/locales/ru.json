@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Разделители слов обновлены.",
 	"hs_config.notify_reset_all": "Задержки и цвета сброшены.",
 	"hs_config.override_active": "переопределение активно",
+	"hs_config.reset_all_personal_unavailable": "Сброс всех настроек недоступен при наличии личных файлов текстовых сокращений. Настройки не изменены.",
 	"hs_config.section_prefix": "Раздел: ",
 	"hs_config.window_title": "Задержки и цвета хотстрингов",
 	"init.reload_files": "Файлы изменены — перезагрузка…",

@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Delimitadores de palavras atualizados.",
 	"hs_config.notify_reset_all": "Atrasos e cores redefinidos.",
 	"hs_config.override_active": "substituição ativa",
+	"hs_config.reset_all_personal_unavailable": "Não é possível repor tudo enquanto existirem ficheiros pessoais de atalhos de texto. Nenhuma definição foi alterada.",
 	"hs_config.section_prefix": "Seção: ",
 	"hs_config.window_title": "Atrasos e cores de hotstring",
 	"init.reload_files": "Arquivos modificados — recarregando…",

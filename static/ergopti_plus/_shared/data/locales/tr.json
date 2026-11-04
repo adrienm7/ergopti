@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Sözcük sınırlayıcıları güncellendi.",
 	"hs_config.notify_reset_all": "Gecikmeler ve renkler sıfırlandı.",
 	"hs_config.override_active": "geçersiz kılma etkin",
+	"hs_config.reset_all_personal_unavailable": "Kişisel metin kısayolu dosyaları varken tüm ayarlar sıfırlanamaz. Hiçbir ayar değiştirilmedi.",
 	"hs_config.section_prefix": "Bölüm: ",
 	"hs_config.window_title": "Kısaltma gecikmeleri ve renkleri",
 	"init.reload_files": "Dosyalar değişti — yeniden yükleniyor…",

@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Worttrennzeichen aktualisiert.",
 	"hs_config.notify_reset_all": "Verzögerungen und Farben wurden zurückgesetzt.",
 	"hs_config.override_active": "Override aktiv",
+	"hs_config.reset_all_personal_unavailable": "Alles zurücksetzen ist bei vorhandenen persönlichen Textbausteindateien nicht verfügbar. Es wurden keine Einstellungen geändert.",
 	"hs_config.section_prefix": "Abschnitt: ",
 	"hs_config.window_title": "Hotstring-Verzögerungen und -Farben",
 	"init.reload_files": "Dateien geändert — neu laden…",

@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Oddělovače slov byly aktualizovány.",
 	"hs_config.notify_reset_all": "Zpoždění a barvy byly resetovány.",
 	"hs_config.override_active": "přepsání aktivní",
+	"hs_config.reset_all_personal_unavailable": "Obnovení všech nastavení není dostupné, pokud existují osobní soubory textových zkratek. Žádné nastavení nebylo změněno.",
 	"hs_config.section_prefix": "Sekce: ",
 	"hs_config.window_title": "Zpoždění a barvy hotstring",
 	"init.reload_files": "Soubory změny — znovu načítám…",

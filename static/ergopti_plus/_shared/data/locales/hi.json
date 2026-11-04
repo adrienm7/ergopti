@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "शब्द विभाजक अपडेट किए गए।",
 	"hs_config.notify_reset_all": "विलंब और रंग रीसेट किए गए.",
 	"hs_config.override_active": "ओवरराइड सक्रिय",
+	"hs_config.reset_all_personal_unavailable": "निजी टेक्स्ट शॉर्टकट फ़ाइलें होने पर सभी सेटिंग रीसेट करना उपलब्ध नहीं है। कोई सेटिंग नहीं बदली गई।",
 	"hs_config.section_prefix": "अनुभाग: ",
 	"hs_config.window_title": "Hotstring विलंब और रंग",
 	"init.reload_files": "फ़ाइलें बदली गईं — पुनः लोड हो रहा है…",

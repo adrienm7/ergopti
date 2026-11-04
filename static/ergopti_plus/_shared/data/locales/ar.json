@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "تم تحديث فواصل الكلمات.",
 	"hs_config.notify_reset_all": "تمت إعادة تعيين التأخيرات والألوان.",
 	"hs_config.override_active": "تجاوز نشط",
+	"hs_config.reset_all_personal_unavailable": "إعادة الضبط الشاملة غير متاحة عند وجود ملفات اختصارات نصية شخصية. لم يتم تغيير أي إعدادات.",
 	"hs_config.section_prefix": "القسم: ",
 	"hs_config.window_title": "تأخيرات وألوان السلاسل النصية",
 	"init.reload_files": "تم تعديل الملفات — جارٍ إعادة التحميل…",

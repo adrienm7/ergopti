@@ -956,6 +956,7 @@
 	"hs_config.notify_delimiters_saved": "Zaktualizowano separatory wyrazów.",
 	"hs_config.notify_reset_all": "Opóźnienia i kolory zostały zresetowane.",
 	"hs_config.override_active": "nadpisanie aktywne",
+	"hs_config.reset_all_personal_unavailable": "Resetowanie wszystkich ustawień jest niedostępne, gdy istnieją osobiste pliki skrótów tekstowych. Nie zmieniono żadnych ustawień.",
 	"hs_config.section_prefix": "Sekcja: ",
 	"hs_config.window_title": "Opóźnienia i kolory hotstring'ów",
 	"init.reload_files": "Pliki zmodyfikowane — ponowne ładowanie…",
