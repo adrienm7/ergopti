@@ -101,6 +101,38 @@ local function assert_refused(f, result, a, b)
 end
 
 helpers.describe("Layer editor source ownership (layer-editor-source-owner)", function()
+	helpers.it("(layer-commit-reload) applies a committed layer after its page is replaced", function()
+		with_editor(function(f)
+			f.open()
+			local publish = Writer.publish_if_unchanged
+			Writer.publish_if_unchanged = function(...)
+				local written, detail, receipt = publish(...)
+				if written then f.new_page() end
+				return written, detail, receipt
+			end
+			local result = f.save()
+			helpers.assert_eq(result.saved, true)
+			helpers.assert_eq(result.applied, true)
+			helpers.assert_eq({ f.reloads, f.closes, f.visible }, { 1, 0, true })
+			helpers.assert_eq(f.read("a"), f.text)
+		end)
+	end)
+
+	helpers.it("(layer-commit-reload) does not apply the old folder after the selected folder changes", function()
+		with_editor(function(f)
+			f.open()
+			local publish = Writer.publish_if_unchanged
+			Writer.publish_if_unchanged = function(...)
+				local written, detail, receipt = publish(...)
+				if written then f.selected = f.dirs.b; f.new_page() end
+				return written, detail, receipt
+			end
+			local result = f.save()
+			helpers.assert_eq({ result.saved, result.applied }, { true, false })
+			helpers.assert_eq({ f.reloads, f.closes, f.visible }, { 0, 0, true })
+			helpers.assert_eq(f.read("a"), f.text)
+		end)
+	end)
 	for _, identical in ipairs({ false, true }) do
 		helpers.it("refuses an open draft after changing to a " .. (identical and "byte-identical" or "distinct") .. " folder", function()
 			with_editor(function(f)
