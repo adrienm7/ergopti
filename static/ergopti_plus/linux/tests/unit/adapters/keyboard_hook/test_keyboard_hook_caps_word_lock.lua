@@ -15,6 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_reader = package.loaded["adapters.evdev_reader"]
 
 local KEY_CAPSLOCK = 58
 local XKB_OFFSET = 8
@@ -56,6 +57,9 @@ local function load(opts)
 		compose_reset = function() end,
 	})
 	assert(Capture.load("keymap", "C"))
+	-- A previous native-reader failure may retain descriptor debt. Each
+	-- controlled hook needs its own reader lifetime, not that earlier owner.
+	package.loaded["adapters.evdev_reader"] = nil
 	package.loaded["adapters.keyboard_hook"] = nil
 	local hook = require("adapters.keyboard_hook")
 	return hook, Capture, state
@@ -89,7 +93,7 @@ end
 --- @return table chars, table wire
 local function drive(hook, codes, on_char)
 	local chars, wire = {}, {}
-	hook._test_drive(stream(codes), {
+	local drained = hook._test_drive(stream(codes), {
 		liveXkb = true,
 		onEmitRaw = function(code, value) wire[#wire + 1] = code .. ":" .. value; return true end,
 		onChar = function(char)
@@ -97,6 +101,7 @@ local function drive(hook, codes, on_char)
 			if on_char then on_char(char, wire) end
 		end,
 	}, true)
+	helpers.assert_true(type(drained) == "number" and drained > 0, "the controlled input stream must actually run")
 	return chars, wire
 end
 
@@ -502,4 +507,5 @@ helpers.describe("keyboard_hook: the CapsLock a CapsWord session holds", functio
 	end)
 end)
 
+package.loaded["adapters.evdev_reader"] = saved_reader
 return true
