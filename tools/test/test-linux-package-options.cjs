@@ -24,10 +24,10 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-recipe-')
 process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 const BUILD = path.join(scratch, "build root '\n literal");
 const env = { ...process.env, ERGOPTI_BUILD_VERSION: '1.0.3', ERGOPTI_LINUX_BUILD_DIR: BUILD };
-function run(script, args = []) {
+function run(script, args = [], extraEnv = {}) {
 	return spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build', script), ...args], {
 		cwd: ROOT,
-		env,
+		env: { ...env, ...extraEnv },
 		encoding: 'utf8',
 		timeout: 120000,
 		maxBuffer: 4 * 1024 * 1024
@@ -75,7 +75,17 @@ for (const format of ['deb', 'rpm']) {
 		);
 		refusals++;
 	}
-	const valid = run(script, stagingArgs(format));
+	const missingProducer = path.join(scratch, `${format}-missing-producer.sh`);
+	const executable = format === 'deb' ? 'dpkg-deb' : 'rpmbuild';
+	fs.writeFileSync(
+		missingProducer,
+		`command() { if [ "$1" = -v ] && [ "$2" = ${executable} ]; then return 1; fi; builtin command "$@"; }\n`
+	);
+	const missing = run(script, [], { BASH_ENV: missingProducer });
+	assert.equal(missing.status, 69, `${script} must fail when ${executable} is unavailable`);
+	assert.match(missing.stderr, new RegExp(executable));
+	assert.equal(fs.statSync(marker).ino, before.ino, 'missing producer must not replace staging');
+	const valid = run(script, stagingArgs(format), { BASH_ENV: missingProducer });
 	assert.equal(valid.status, 0, valid.stderr || valid.stdout || valid.error?.message);
 	assert.ok(valid.stdout.includes(`Structure complete (${skip})`));
 	assert.equal(

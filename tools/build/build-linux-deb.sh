@@ -18,6 +18,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_DEB" && ! command -v dpkg-deb >/dev/null 2>&1; then
+  echo "[ERR] dpkg-deb is required to build a .deb; use --skip-deb for staging only." >&2
+  exit 69
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # The external hosts are declared once in _shared/data/identifiers.json.
@@ -232,15 +237,6 @@ if [ "$SKIP_DEB" = true ]; then
   echo "DEB root: $DEB_ROOT"
   echo "Files: $(find "$DEB_ROOT" -type f | wc -l)"
   print_packaging_command "To package:"
-  exit 0
-fi
-
-if ! command -v dpkg-deb &>/dev/null; then
-  echo ""
-  echo "=== Structure complete (dpkg-deb not available) ==="
-  echo "DEB root: $DEB_ROOT"
-  echo "Files: $(find "$DEB_ROOT" -type f | wc -l)"
-  print_packaging_command "Run on Linux to package:"
   exit 0
 fi
 
