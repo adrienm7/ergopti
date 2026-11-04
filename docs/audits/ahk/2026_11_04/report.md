@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **44 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **45 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -837,3 +837,17 @@ The ongoing register now contains **44 distinct new findings**. The requested ta
 ## Native LLM qualification checkpoints: 41908552045 and 41908674329
 
 At `36e7a60`, all **15 selected access-token/RawPost cases passed individually and reversed**, with complete production compile and the 15 SQLite controls. This qualifies AHK-042. At `944d513`, both native HTTP classification cases passed, including the actual HTTP400 provider message, qualifying AHK-043; the positive thinking retry also passed, while its cancellation sibling reproduced AHK-044. No aggregate green is claimed for that four-case mixed run. Both E2E families were explicitly outside these selections.
+
+## AHK-045: Queued key-combination chords replay input during native pause
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+KeyCombinationChordTick treats suspension as a reason to flush a waiting key, and KeyCombinationChordDrain sends its retained queue without pause admission. Neither batch retains lifecycle authority, so resume before delivery and reentrant successor callbacks also require fencing.
+
+Reproduction: Native run41908766133 atb4eff5c passes both unpaused controls. Suspending before real SetTimer delivery still emits the waiting key (expected0/observed1) or the queued scan (expected1/observed2). Both failures repeat individually and reversed.
+
+Consequence: The paused driver can inject a key it retained before pause. A retired callback can also act on a newly admitted waiting or queued batch after lifecycle teardown and resume.
+
+Regression: Four chord-native-pause cases deliver real native poll/drain timers around Suspend; production chord policy and engine remain genuine while keyboard transport is observed through its existing recorder. Two positive controls prove actual replay; two paused cases must discard unsent work and keep it retired after resume. No balancing-Up change or physical keyboard proof is claimed. Native fail-before measured; source correction and extended owner regressions are under review.
+
+The ongoing register now contains **45 distinct new findings**. The requested target of 1,000 remains unmet.
