@@ -176,6 +176,22 @@ local function with_canonical_locale_menu(callback)
 				return true
 			end,
 		}
+		-- This fixture controls persistence only; publish through the actual locale
+		-- owner's receipt protocol so its runtime and translator remain in sync.
+		package.loaded["infra.script_scope"] = {
+			retry_locale = function() return true end,
+			edit_locale = function(value)
+				if package.loaded["adapters.storage"].set("locale", value) ~= true then return false end
+				local native = require("infra.i18n")
+				local token = { pending = function() return false end }
+				assert(native.scope_acquire(token))
+				local receipt = assert(native.scope_capture(token))
+				local applied = native.scope_apply(token, receipt, value)
+				assert(native.scope_release(token))
+				assert(native.scope_forget(token, receipt))
+				return applied
+			end,
+		}
 		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }) do
 			package.loaded[name] = nil
 		end
