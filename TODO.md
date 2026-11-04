@@ -438,11 +438,15 @@ between workers) green alone. All live checks pass, typed by the harness.
     (`menu.global.karabiner_integration`, `menu.global.remove_from_karabiner`, `macos/ui/menu/remap_switch.lua`)
     deleted, one commit on branch `next/owned-karabiner-flip` stacked on this one. It turns tap-holds off on any Mac
     without the owned runtime, so it waits for WP8 and WP9.
-  - Next (WP8, in order): the `com.ergoptiplus.runtime.vhid` LaunchDaemon writer and the VirtualHIDDevice pkg install
-    in the helper; a `--request-owned-runtime-install` launcher role and its Lua port from the `owned_not_installed`
-    row; `RUNTIME_VERSION` `16.3.0-ergopti.3`, a signed Remap runtime build, its publication (maintainer go-ahead) and
-    pin; a hosted `sudo` install acceptance job. A hosted runner cannot approve the DriverKit extension, so typing
-    through the owned runtime is proven only by WP9 on a real Mac.
+  - Done 4 November (WP8, on `dev`): the helper loads `com.ergoptiplus.runtime.vhid` and installs pqrs' package when
+    no driver is installed; the `--request-owned-runtime-install` launcher role and its Lua port behind the Tap-Holds
+    row « Install Ergopti's remapping engine… »; the field run reports both jobs, the verified download and whether
+    the launcher can install; `RUNTIME_VERSION` `16.3.0-ergopti.3`; the hosted `sudo` install acceptance job.
+    Status of the `.3` build, publication and pin: see the handoff.
+  - Blocked, needs the maintainer: the developer app is signed ad hoc (field report 2026-11-04: `signing_identity`
+    `adhoc`), and the install role and the installed-source capture both require the launcher's stable certificate
+    leaf. The flip stays on `next/owned-karabiner-flip` until the developer app is signed with the stable
+    certificate (handoff, WP9).
   - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
     Done on 1 November: the per-OS feature requirements table
     (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
