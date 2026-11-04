@@ -4,12 +4,8 @@
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "managed-http-classification",
-			"expected_count": 2
-		},
-		{
-			"contains": "api-thinking-retry-owner",
-			"expected_count": 2
+			"contains": "chord-native-pause",
+			"expected_count": 4
 		}
 	]
 }

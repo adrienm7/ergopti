@@ -308,3 +308,71 @@ _KCCE_BudgetBody(World, Ports) {
 	Assert(Elapsed < 2000, "100000 criterion reads took " . Elapsed . " ms: the hot path budget is 20 us per key")
 }
 Test("key chord engine: plain typing stays inside the hot path budget (item2-budget)", _KCCE_PlainTypingBudget)
+
+; Deliver the actual poll/drain through native SetTimer after native Suspend.
+; The real engine/policy owns admission and queueing; only keyboard edges are observed.
+_KCCE_NativePauseDelivery(Queued, Pause) {
+	_KCCE_With(Map("space_then_tab", "copy"), false, _KCCE_NativePauseBody.Bind(Queued, Pause))
+}
+
+_KCCE_NativePauseBody(Queued, Pause, World, Ports) {
+	global _KeyCombinationChordQueue, _KeyCombinationChordWaiting, _KeyCombinationChordBusy
+	WasSuspended := A_IsSuspended, PreviousCritical := Critical("On")
+	Delivered := 0, Failure := 0, Before := 0
+	Deliver() {
+		try {
+			if Queued
+				KeyCombinationChordDrain(Ports)
+			else
+				KeyCombinationChordTick(Ports)
+		} catch as Err {
+			Failure := Err
+		} finally Delivered += 1
+	}
+	OriginalPoll := Ports["arm_poll"]
+	Poll(Armed) {
+		OriginalPoll.Call(Armed)
+		if !Queued
+			SetTimer(Deliver, Armed ? -1 : 0)
+	}
+	Ports["arm_poll"] := Poll
+	if Queued
+		Ports["arm_drain"] := () => SetTimer(Deliver, -1)
+	try {
+		Suspend(false)
+		AssertEqual("wait", _KCCE_Press(World, Ports, "space"), "the real policy must admit the first press")
+		if Queued {
+			KeyCombinationChordInterrupt(0x010, Ports)
+			AssertEqual(1, World.Sends.Length, "the originating Space precedes the queued letter before pause")
+		} else {
+			World.Held.Delete("space")
+			World.Now += 5
+		}
+		Before := World.Sends.Length
+		Suspend(Pause)
+		Critical("Off")
+		Started := A_TickCount
+		while Delivered == 0 && A_TickCount - Started < 3000
+			Sleep(5)
+		AssertEqual(1, Delivered, "one genuine native timer must deliver the production callback")
+		if IsObject(Failure)
+			throw Failure
+		AssertEqual(Before + (Pause ? 0 : 1), World.Sends.Length,
+			"a paused poll/drain must never inject; its unpaused control must genuinely replay")
+		AssertEqual(0, _KeyCombinationChordQueue.Length, "a retired queue must not replay after resume")
+		AssertEqual("", _KeyCombinationChordWaiting)
+		AssertFalse(_KeyCombinationChordBusy)
+		Suspend(false)
+		KeyCombinationChordDrain(Ports)
+		KeyCombinationChordTick(Ports)
+		AssertEqual(Before + (Pause ? 0 : 1), World.Sends.Length, "resume cannot revive the retired replay")
+	} finally {
+		SetTimer(Deliver, 0)
+		Suspend(WasSuspended)
+		Critical(PreviousCritical)
+	}
+}
+for _KCCE_QueuedNative in [false, true]
+	for _KCCE_PauseNative in [false, true]
+		Test("key chord lifecycle: native queued=" . _KCCE_QueuedNative . " paused=" . _KCCE_PauseNative . " fences replay (chord-native-pause)",
+			_KCCE_NativePauseDelivery.Bind(_KCCE_QueuedNative, _KCCE_PauseNative))
