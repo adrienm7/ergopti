@@ -372,11 +372,12 @@ function M.open(ctx)
 	local session = new_session(ctx.updater)
 	_session = session
 	if require("ui.webview_manager").show(APP) ~= true then
+		if _session == session then _session = nil end
 		session.retire()
-		_session = nil
 		Logger.error(LOG, "The update-check window could not open.")
 		return false
 	end
+	if _session ~= session then return false end
 	session.start()
 	Logger.success(LOG, "Update-check window opened.")
 	return true
