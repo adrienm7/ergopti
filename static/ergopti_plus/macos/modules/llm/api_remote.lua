@@ -1021,10 +1021,15 @@ local function refresh_access(provider_id, key, on_done)
 				Logger.error(LOG, "Access token of provider '%s' cannot be asked: transport state is unknown.", tostring(provider_id))
 				local waiters = slot.waiters
 				slot.waiters = {}
-				for _, waiter in ipairs(waiters) do invoke_token_callback(waiter, false, slot.failure) end
+				for _, waiter in ipairs(waiters) do
+					local notified = pcall(waiter, false, slot.failure)
+					if not notified then Logger.error(LOG, "Access token waiter failed.") end
+				end
 				return
 			end
-			if staged_received then return answer(staged) end
+			if staged_received and (dispatched == true or type(staged) ~= "table" or staged.status ~= 200) then
+				return answer(staged)
+			end
 			if not dispatched then
 				received = true
 				slot.failure = "the token exchange could not be sent"
