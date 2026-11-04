@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **48 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **49 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -901,3 +901,17 @@ Consequence: Changing a base delay or saving an unrelated colour silently change
 Regression: Six HotstringsConfig persistent offset cases use real TOML, the canonical typed decoder, production parser/projection/resolver, actual public colour and delay writers and fresh reload comparisons. The fix retains StoredOffset through projection and detached transaction clones; explicit delay edits replace it and clears retire it. Category and section paths are checked. Native fail-before measured; post-fix qualification pending. Shared Lua already preserves the offset in its rung and computes clamping only in projection.
 
 The ongoing register now contains **48 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-049: Finite hotstring offsets override an explicit unlimited delay
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+The Windows parser independently admits the two correctly typed leaves, then \_HotstringsRecordApplyBase consumes the pending finite offset after Delay has already been set to zero by the explicit unlimited flag. The shared Lua resolver explicitly prioritizes true unlimited. This occurs above the clamp and is distinct from AHK-048.
+
+Reproduction: Native run41910772341 atf7e7b2f passes unlimited-only and offset-only controls but fails both source orders containing delay_unlimited=true and delay_offset=-0.25 at base0.75. The actual valid TOML resolves finite instead of unlimited, individually and reversed.
+
+Consequence: A valid explicit unlimited setting silently acquires a finite activation deadline, so expansions can be refused contrary to the chosen configuration.
+
+Regression: Four HotstringsConfig unlimited precedence cases use real typed TOML, the actual parser/base projection/resolver and both category and section scope. Both leaf orders must be unlimited; single-leaf controls preserve finite and unlimited behavior. The fix clears finite projection state and returns when explicit unlimited has already been parsed. No format change. Native fail-before measured; post-fix pending.
+
+The ongoing register now contains **49 distinct new findings**. The requested target of 1,000 remains unmet.
