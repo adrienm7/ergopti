@@ -75,7 +75,10 @@ local function with_world(body)
 			return true
 		end }
 		package.loaded["adapters.clipboard"] = { write = function(text) world.clipboard[#world.clipboard + 1] = text; return true end }
-		package.loaded["modules.shortcuts.manager"] = { insert_text = function(text) world.typed[#world.typed + 1] = text; return true end }
+		package.loaded["modules.shortcuts.manager"] = {
+			capture_text_destination = function() return { current = function() return true end, cached = function() return true end } end,
+			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
+		}
 		package.loaded["adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
 		package.loaded["adapters.shell_runner"] = {
 			quote = require("text_utils").shell_quote,
@@ -144,6 +147,33 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 			helpers.assert_eq(world.notices, { "user_actions.command_failed_detail|6|curl: (6) s3cr3t host",
 				"user_actions.command_timeout|30", "user_actions.command_output_too_large|65536" })
 			assert_command_never_logged(world)
+		end)
+	end)
+
+	helpers.it("does not type asynchronous output into a later focused application", function()
+		with_world(function(User, world)
+			local focused = "original"
+			local manager = package.loaded["modules.shortcuts.manager"]
+			manager.capture_text_destination = function()
+				local captured = focused
+				return { current = function() return focused == captured end, cached = function() return focused == captured end }
+			end
+			manager.insert_text = function(text, publication)
+				if publication == nil or publication.current() then world.typed[#world.typed + 1] = text; return true end
+				return false
+			end
+			helpers.assert_true(User.run_command({ command = "echo test", mode = "hidden", output = "type" }, 500))
+			focused = "another application"
+			world.async[1].callback({ ok = true, stdout = "private result" })
+			helpers.assert_eq(world.typed, {})
+		end)
+	end)
+
+	helpers.it("does not start a typed-output command without an admitted destination", function()
+		with_world(function(User, world)
+			package.loaded["modules.shortcuts.manager"].capture_text_destination = function() return nil end
+			helpers.assert_eq(User.run_command({ command = "echo test", mode = "hidden", output = "type" }, 500), false)
+			helpers.assert_eq(#world.async, 0)
 		end)
 	end)
 
