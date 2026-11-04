@@ -245,11 +245,15 @@ helpers.describe("tap-hold exact-source publication", function()
 			local original = '[tap_hold.keys.caps_lock]\nfuture = "old"\n'
 			with_writer(original, function(writer, path, state)
 				local real_open, real_rename = io.open, os.rename
+				local FileWriter = require("infra.regular_file_writer")
+				local real_writer_open = FileWriter.open
 				local staged, publications = 0, 0
 				local external = '# newer editor bytes\n[tap_hold.keys.caps_lock]\nfuture = "new"\n'
-				io.open = function(candidate, mode, ...)
-					local file = real_open(candidate, mode, ...)
-					if candidate ~= path .. ".tmp" or mode ~= "w" or not file then return file end
+				FileWriter.open = function(candidate, mode, ...)
+					local file, detail, code, remove_owned, current_image = real_writer_open(candidate, mode, ...)
+					if candidate ~= path .. ".tmp" or mode ~= "wx" or not file then
+						return file, detail, code, remove_owned, current_image
+					end
 					staged = staged + 1
 					return {
 						write = function(self, content) assert(file:write(content)); return self end,
@@ -259,7 +263,7 @@ helpers.describe("tap-hold exact-source publication", function()
 							assert(editor:write(external)); assert(editor:close())
 							return true
 						end,
-					}
+					}, detail, code, remove_owned, current_image
 				end
 				os.rename = function(...)
 					publications = publications + 1
@@ -271,7 +275,7 @@ helpers.describe("tap-hold exact-source publication", function()
 					end
 					return writer.set_tap("caps_lock", "copy")
 				end)
-				io.open, os.rename = real_open, real_rename
+				FileWriter.open, os.rename = real_writer_open, real_rename
 				helpers.assert_eq(called, true)
 				helpers.assert_eq(accepted, false)
 				helpers.assert_eq(staged, 1, "the race follows an actual staged candidate")
