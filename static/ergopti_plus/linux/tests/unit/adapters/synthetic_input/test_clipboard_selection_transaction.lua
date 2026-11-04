@@ -85,6 +85,21 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps a new clipboard copy made while the replacement settles (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, _, _, emit)
+				local waits = 0
+				local ok = clipboard.transform_selection(string.upper, emit, function()
+					waits = waits + 1
+					if waits == 3 then shell.current = "new user copy" end
+					return true
+				end)
+				helpers.assert_true(ok)
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
 	helpers.it("uses wl-clipboard under Wayland", function()
 		with_session("wayland", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
 			local ok = clipboard.transform_selection(string.upper, emit, sleep_ms)

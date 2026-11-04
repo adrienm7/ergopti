@@ -666,8 +666,8 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return true
 	end)
-	local restored = restore()
-	if not restored then return false, "clipboard_restore_failed" end
+	-- A later copy owns the clipboard now; restoring our snapshot would erase it.
+	if holds_pasted_text(b, replacement) and not restore() then return false, "clipboard_restore_failed" end
 	if not current() then return false, "destination_changed" end
 	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
 	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
