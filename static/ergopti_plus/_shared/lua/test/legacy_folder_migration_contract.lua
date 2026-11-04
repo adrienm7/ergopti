@@ -12,6 +12,7 @@
 local M = {}
 local Migration = require("legacy_folder_migration")
 local Json = require("json")
+local NativePath = require("native_path")
 
 local function read(path)
 	local file = assert(io.open(path, "rb"))
@@ -114,11 +115,19 @@ function M.run(helpers, shared_root)
 
 		helpers.it("rewrites only the old default folders of paths.toml (legacy-folder-migration-paths)", function()
 			helpers.assert_eq(#corpus.paths_text, 4, "complete paths.toml vectors")
+			-- A Windows row spells backslash separators, a filename byte on POSIX;
+			-- the AutoHotkey replay holds it on Windows.
+			local backslash_separates = NativePath.separators():find("\\", 1, true) ~= nil
+			local replayed = 0
 			for _, row in ipairs(corpus.paths_text) do
-				local rewritten = Migration.rewrite_paths_text(row.text, row.rewrites)
-				local expected = type(row.expected) == "string" and row.expected or nil
-				helpers.assert_eq(rewritten, expected, row.name)
+				if row.os ~= "windows" or backslash_separates then
+					replayed = replayed + 1
+					local rewritten = Migration.rewrite_paths_text(row.text, row.rewrites)
+					local expected = type(row.expected) == "string" and row.expected or nil
+					helpers.assert_eq(rewritten, expected, row.name)
+				end
 			end
+			helpers.assert_true(replayed >= 3, "the POSIX paths.toml vectors replay")
 		end)
 
 		helpers.it("keeps the previous paths.toml text before rewriting it (legacy-folder-migration-backup)", function()

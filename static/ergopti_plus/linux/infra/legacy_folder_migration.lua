@@ -25,6 +25,7 @@ local M = {}
 
 local AppDirs = require("app_dirs")
 local Core = require("legacy_folder_migration")
+local quote = require("text_utils").shell_quote
 
 local LOG = "infra.legacy_folder_migration"
 
@@ -36,13 +37,6 @@ local LOG = "infra.legacy_folder_migration"
 -- ======= 1/ Native ports ========
 -- ================================
 -- ================================
-
---- Quotes one shell argument with the POSIX single-quote idiom.
---- @param value string
---- @return string
-local function quote(value)
-	return "'" .. value:gsub("'", "'\\''") .. "'"
-end
 
 --- Runs a shell command and reports whether it exited with status 0.
 --- @param command string
