@@ -21,6 +21,20 @@ local function listing(dir)
 end
 
 helpers.describe("keyboard layout build files (layout-build-files)", function()
+	helpers.it("refuses a dangling symlink without creating its target", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(os.execute("mkdir -p '" .. dir .. "'"))
+		local path, target = dir .. "/Rows.keylayout", dir .. "/foreign"
+		assert(os.execute("ln -s '" .. target .. "' '" .. path .. "'"))
+		local written = Files.write_new(path, "<keyboard/>")
+		local file = io.open(target, "rb")
+		if file then file:close() end
+		os.remove(path); os.remove(target); os.remove(dir)
+		helpers.assert_eq(written, false)
+		helpers.assert_eq(file, nil)
+	end)
+
 	helpers.it("writes a new build alone, refuses an existing one and removes it", function()
 		local dir = os.tmpname()
 		os.remove(dir)

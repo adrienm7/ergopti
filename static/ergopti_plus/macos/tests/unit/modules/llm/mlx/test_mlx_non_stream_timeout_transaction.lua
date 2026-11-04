@@ -101,3 +101,78 @@ helpers.describe("MLX inference error privacy", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+helpers.describe("MLX non-stream response schema", function()
+	helpers.it("reports failure for a scalar choice instead of abandoning the request", function()
+		package.loaded["modules.llm.api_mlx_inference"] = nil
+		local inference = helpers.load_with_stubs("modules.llm.api_mlx_inference")
+		local scheduler = assert(get_upvalue(inference.post_and_parse, "TimerScheduler"))
+		local client = assert(get_upvalue(inference.post_and_parse, "_infer_client"))
+		local codec = assert(get_upvalue(inference.post_and_parse, "JsonCodec"))
+		local after, cancel, post, decode = scheduler.after, scheduler.cancel, client.post, codec.decode
+		local callback, failed = nil, 0
+		scheduler.after = function() return {}, true end
+		scheduler.cancel = function() return true end
+		client.post = function(_, _, _, done) callback = done end
+		codec.decode = function(raw) return require("json").decode(raw), nil end
+		local ok, err = xpcall(function()
+			inference.init({ stream = {}, cancel_streaming = function() return true end,
+				completions_endpoint = function() return "http://fixture/completions" end,
+				chat_endpoint = function() return "http://fixture/chat" end,
+				read_active_model_arg = function() return "fixture/model" end,
+				server_model_id = function() return nil end, model_hf_path = function() return nil end })
+			inference.post_and_parse("fixture", "", "typed", "", 0.2, 8, 1, false,
+				function() error("unexpected success") end, function() failed = failed + 1 end, {}, false)
+			helpers.assert_eq(type(callback), "function")
+			local callback_ok = pcall(callback, { status = 200, body = '{"choices":[1]}' })
+			helpers.assert_true(callback_ok, "malformed provider data must not escape the callback")
+			helpers.assert_eq(failed, 1, "the caller must receive exactly one terminal failure")
+		end, debug.traceback)
+		scheduler.after, scheduler.cancel, client.post, codec.decode = after, cancel, post, decode
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("MLX non-stream provider errors", function()
+	helpers.it("does not publish text alongside a provider error", function()
+		package.loaded["modules.llm.api_mlx_inference"] = nil
+		local inference = helpers.load_with_stubs("modules.llm.api_mlx_inference")
+		local scheduler = assert(get_upvalue(inference.post_and_parse, "TimerScheduler"))
+		local client = assert(get_upvalue(inference.post_and_parse, "_infer_client"))
+		local codec = assert(get_upvalue(inference.post_and_parse, "JsonCodec"))
+		local after, cancel, post, decode = scheduler.after, scheduler.cancel, client.post, codec.decode
+		local callback, failed, raw = nil, 0, nil
+		scheduler.after = function() return {}, true end
+		scheduler.cancel = function() return true end
+		client.post = function(_, _, _, done) callback = done end
+		codec.decode = function(body)
+			local value = require("json").decode(body)
+			if body:find('"error":null', 1, true) then value.error = nil end
+			return value, nil
+		end
+		local ok, err = xpcall(function()
+			inference.init({ stream = {}, cancel_streaming = function() return true end,
+				completions_endpoint = function() return "http://fixture/completions" end,
+				chat_endpoint = function() return "http://fixture/chat" end,
+				read_active_model_arg = function() return "fixture/model" end,
+				server_model_id = function() return nil end, model_hf_path = function() return nil end })
+			for index, body in ipairs({
+				'{"error":{"message":"failed"},"choices":[{"message":{"content":"decoy"}}]}',
+				'{"error":null,"choices":[{"message":{"content":"decoy"}}]}',
+			}) do
+				inference.post_and_parse("fixture", "", "typed", "", 0.2, 8, 1, false,
+					function() error("unexpected success") end, function() failed = failed + 1 end, {}, false,
+					function(text) raw = text end, true)
+				callback({ status = 200, body = body })
+				if index == 1 then
+					helpers.assert_nil(raw, "an error object cannot deliver a model answer")
+				else
+					helpers.assert_eq(raw, "decoy", "a null error allows an otherwise valid answer")
+				end
+				helpers.assert_eq(failed, 1)
+			end
+		end, debug.traceback)
+		scheduler.after, scheduler.cancel, client.post, codec.decode = after, cancel, post, decode
+		if not ok then error(err, 0) end
+	end)
+end)

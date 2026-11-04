@@ -770,6 +770,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-token-literals.cjs"],
 			"repro": "node tools/test/test-hotstring-editor-token-literals.cjs"
+		},
+		{
+			"id": "js-editors-ime-keyboard",
+			"ordinal": 581,
+			"name": "editor keyboard shortcuts preserve input method composition",
+			"cmd": "node",
+			"args": ["tools/test/test-editors-ime-keyboard.cjs"],
+			"repro": "node tools/test/test-editors-ime-keyboard.cjs"
 		}
 	]
 }

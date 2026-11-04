@@ -140,8 +140,9 @@ helpers.describe("KeyboardHook restart — old onKey cleared when omitted on sec
 			onKey = function() keys = keys + 1 end }))
 		for _, text in ipairs({ "\t", "\r", "\127", utf8.char(0xF700) }) do fire_char(text) end
 		fire_char("é")
+		fire_char("")
 		helpers.assert_eq(keys, 4)
-		helpers.assert_eq(chars, { "é" })
+		helpers.assert_eq(chars, { "é", "" })
 		helpers.assert_true(hook.stop())
 	end)
 

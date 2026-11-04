@@ -463,6 +463,47 @@ helpers.describe("keymap start: exact native commitment", function()
 		helpers.assert_eq(calls, 1)
 	end)
 
+	helpers.it("keeps an already committed keymap live on a duplicate start (keymap-partial-start-fence)", function()
+		local fixture = load_fixture()
+		local synthetic = package.loaded["adapters.synthetic_input"]
+		local provenance = package.loaded["adapters.event_provenance"]
+		local entered = 0
+		synthetic.admission_open = function() return true end
+		synthetic.enter_callback = function() entered = entered + 1 end
+		synthetic.leave_callback = function(value) return value, {} end
+		provenance.classify_with_fence = function() return nil, "foreign" end
+		helpers.assert_true(fixture.keymap.start())
+		helpers.assert_true(fixture.keymap.start())
+		fixture.taps[1].callback({ getKeyCode = function() return 0 end,
+			getFlags = function() return {} end, getCharacters = function() return "a" end,
+			getProperty = function() return 0 end })
+		helpers.assert_eq(entered, 1, "a duplicate start must not close committed input")
+		helpers.assert_true(fixture.keymap.stop(true))
+	end)
+
+	helpers.it("fences the first partial start when replay debt refuses rollback (keymap-partial-start-fence)", function()
+		local fixture = load_fixture()
+		fixture.controls.tap_failure_ordinal = 2
+		fixture.controls.tap_failure_mode = "disabled"
+		fixture.controls.replay_pending = true
+		local synthetic = package.loaded["adapters.synthetic_input"]
+		local provenance = package.loaded["adapters.event_provenance"]
+		local entered = 0
+		synthetic.admission_open = function() return true end
+		synthetic.enter_callback = function() entered = entered + 1 end
+		synthetic.leave_callback = function(value) return value, {} end
+		provenance.classify_with_fence = function() return nil, "foreign" end
+		helpers.assert_eq(fixture.keymap.start(), false)
+		helpers.assert_true(fixture.taps[1].enabled, "rollback refusal retains the first live tap")
+		local consumed = fixture.taps[1].callback({ getKeyCode = function() return 0 end,
+			getFlags = function() return {} end, getCharacters = function() return "a" end,
+			getProperty = function() return 0 end })
+		helpers.assert_eq(consumed, false)
+		helpers.assert_eq(entered, 0, "an uncommitted engine must not receive the key")
+		fixture.controls.replay_pending = false
+		helpers.assert_true(fixture.keymap.stop(true))
+	end)
+
 	for ordinal = 1, 4 do
 		for _, mode in ipairs({ "throw", "disabled" }) do
 			helpers.it("rolls back tap " .. ordinal .. " after " .. mode .. " start", function()

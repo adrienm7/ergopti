@@ -208,18 +208,16 @@ function M.flush()
 		if ok then S.agg_batch.kc_hold[key] = nil end
 	end
 
-	-- Title-cap cleanup (DELETE ... NOT IN LIMIT N) must run against the FULL
-	-- set of app-day keys queued this tick, before any successful title row is
-	-- removed below — otherwise an app-day whose titles all inserted cleanly
-	-- would never get its cleanup DELETE and the table would grow unbounded.
-	local title_app_days_seen = {}
-	for key in pairs(S.agg_batch.titles) do
-		local s, e = key:find("\1")
-		local rest = key:sub(e + 1)
-		local s2, e2 = rest:find("\1")
-		local date_str = key:sub(1, s - 1)
-		local app = rest:sub(1, s2 - 1)
-		title_app_days_seen[date_str .. "\1" .. app] = { date = date_str, app = app }
+	-- Insert all deltas before pruning, so the limit and ranking include the
+	-- current batch. Keep every row until its app-day cleanup is acknowledged.
+	local title_app_days_seen, title_inserted = {}, {}
+	for key, row in pairs(S.agg_batch.titles) do
+		local ad_key = row.date .. "\1" .. row.app
+		title_app_days_seen[ad_key] = { date = row.date, app = row.app }
+		title_inserted[key] = exec(Queries.render("agg.title", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			title = tostring(row.title), c = i(row.c), ms = i(row.ms),
+		}))
 	end
 	local title_cleanup_ok = {}
 	for ad_key, ad in pairs(title_app_days_seen) do
@@ -229,15 +227,8 @@ function M.flush()
 		}))
 	end
 	for key, row in pairs(S.agg_batch.titles) do
-		local ok = exec(Queries.render("agg.title", "native", {
-			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
-			title = tostring(row.title), c = i(row.c), ms = i(row.ms),
-		}))
-		-- Only drop the row once BOTH the insert and this app-day's cleanup
-		-- DELETE succeeded — otherwise a failed cleanup would silently stop
-		-- enforcing the per-app-day title cap for this row's app-day forever.
 		local ad_key = row.date .. "\1" .. row.app
-		if ok and title_cleanup_ok[ad_key] then
+		if title_inserted[key] and title_cleanup_ok[ad_key] then
 			S.agg_batch.titles[key] = nil
 		end
 	end

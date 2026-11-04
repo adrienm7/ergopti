@@ -353,16 +353,27 @@ function checkAc() {
 // ================================
 // ================================
 
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
+
 var editorElement = document.getElementById('e-out');
 
 // Trigger dynamic token evaluation on text input
-editorElement.addEventListener('input', function () {
+editorElement.addEventListener('input', function (e) {
+	if (imeComposing || e.isComposing) return;
 	tryConvertToken(editorElement);
 	checkAc();
 	checkPlaceholder();
 });
 
 editorElement.addEventListener('keyup', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		acItems.length > 0 &&
 		['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(e.key) >=
@@ -378,6 +389,7 @@ editorElement.addEventListener('keyup', function (e) {
 editorElement.addEventListener('blur', hideAc);
 
 editorElement.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	// Handling Autocomplete navigation
 	if (acItems.length > 0) {
 		if (e.key === 'Tab') {
@@ -495,6 +507,7 @@ editorElement.addEventListener('paste', function (e) {
 
 // Cursor Ejector: Prevents the caret from getting stuck inside non-editable chips
 document.addEventListener('selectionchange', function () {
+	if (imeComposing) return;
 	var selection = window.getSelection();
 	if (!selection || !selection.rangeCount || !selection.isCollapsed) return;
 
@@ -611,6 +624,7 @@ function doSave() {
 
 // Global hotkey for cancellation
 document.addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') doCancel();
 });
 
