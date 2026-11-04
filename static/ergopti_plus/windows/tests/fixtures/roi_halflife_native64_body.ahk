@@ -204,6 +204,93 @@ _RHL_NonpositiveUsage() {
 		"All accepted fires count as usage without adding nonpositive savings.")
 }
 
+WPMWidget_Push(*) {
+	return true
+}
+
+_RHL_Public() => false
+_RHL_Private() => true
+_RHL_NoShortcut(*) => ""
+_RHL_NoErgo(*) => 0
+
+_RHL_Type(Text, Private := false) {
+	for Character in StrSplit(Text)
+		KL_Hook_OnChar(0, Character, Private ? _RHL_Private : _RHL_Public, A_TickCount, _RHL_NoErgo)
+}
+
+_RHL_Key(vk, Private := false) {
+	KL_Hook_OnKeyDown(0, vk, 0, Private ? _RHL_Private : _RHL_Public,
+		A_TickCount, _RHL_NoShortcut, _RHL_NoErgo)
+}
+
+_RHL_ClearWords() {
+	KLRoi.current_word := ""
+	KLRoi.word_overflowed := false
+	KLRoi.word_counts := Map()
+	KLRoi.word_counts_generation += 1
+}
+
+_RHL_Keys() {
+	global _RHL
+	Keystats.initialized := true
+	Keystats.session_app := "roi-keys-fixture.exe"
+	KLWatch.is_session_active := true
+	KLWatch.session_started_at := A_TickCount
+	KLWatch.last_authorized_tick := A_TickCount
+	KLHook.last_tick := A_TickCount
+	MetricsFilters.secure_field := false
+	MetricsFocusCache.state := {valid: true, process_name: Keystats.session_app,
+		title: "ROI keys fixture", class: "Fixture"}
+	for Separator in [0x0D, 0x09] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		_RHL_Key(Separator)
+		_RHL_Type("world ")
+		_RHL_Require(KLRoi.word_counts.Count == 2 && KLRoi.word_counts.Get("hello", 0) == 1
+			&& KLRoi.word_counts.Get("world", 0) == 1, "Enter and Tab must separate genuine hook words.")
+	}
+	for Suffix in ["x", Chr(0x1F600)] {
+		_RHL_ClearWords()
+		_RHL_Type("hello")
+		KL_Hook_OnChar(0, Suffix, _RHL_Public, A_TickCount, _RHL_NoErgo)
+		_RHL_Key(0x08)
+		_RHL_Type(" ")
+		_RHL_Require(KLRoi.word_counts.Count == 1 && KLRoi.word_counts.Get("hello", 0) == 1,
+			"Backspace must remove one entire Unicode codepoint through the real hook.")
+	}
+	_RHL_ClearWords()
+	_RHL_Key(0x08)
+	_RHL_Key(0x0D)
+	_RHL_Require(KLRoi.word_counts.Count == 0, "Empty backspace must remain neutral.")
+	Loop KLRoiConst.MAX_INPROGRESS_WORD_LEN + 1
+		_RHL_Type("x")
+	_RHL_Key(0x08)
+	_RHL_Type("hello")
+	_RHL_Key(0x0D)
+	_RHL_Require(KLRoi.word_counts.Count == 0 && !KLRoi.word_overflowed,
+		"A backspace must not turn an overflowed token into a fragment candidate.")
+	_RHL_Type("world ")
+	_RHL_Require(KLRoi.word_counts.Get("world", 0) == 1, "The next complete word must remain admissible.")
+	_RHL_ClearWords()
+	_RHL_Type("hello")
+	Keystats.synth_active := true
+	try {
+		_RHL_Key(0x08)
+		_RHL_Key(0x0D)
+		_RHL_Key(0x09)
+		_RHL_Type("x ")
+	} finally Keystats.synth_active := false
+	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
+		"Synthetic key and character intents must not modify public ROI.")
+	_RHL_Key(0x08, true)
+	_RHL_Key(0x0D, true)
+	_RHL_Key(0x09, true)
+	_RHL_Type("x ", true)
+	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
+		"Private key and character intents must not modify public ROI.")
+	_RHL_Require(_RHL.Errors == 0, "No swallowed hook dependency error may qualify the assertions.")
+}
+
 _RHL_Main() {
 	if A_Args.Length != 2
 		ExitApp(2)
@@ -215,8 +302,12 @@ _RHL_Main() {
 		Failure: 0, Errors: 0}
 	Primary := 0
 	try {
-		_RHL_Exercise()
-		_RHL_NonpositiveUsage()
+		if _RHL.Mode == "keys"
+			_RHL_Keys()
+		else {
+			_RHL_Exercise()
+			_RHL_NonpositiveUsage()
+		}
 	}
 	catch Any as Failure
 		Primary := Failure

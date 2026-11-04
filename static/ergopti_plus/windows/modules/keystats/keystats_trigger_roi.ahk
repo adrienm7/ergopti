@@ -240,6 +240,20 @@ KL_Roi_OnChar(c) {
 		KL_Roi_ProcessWord(word)
 }
 
+; Special keys arrive through OnKeyDown rather than the character callback.
+KL_Roi_OnKey(vk) {
+	if !KL_Roi_RequireInit("KL_Roi_OnKey")
+		return
+	switch vk {
+		case 0x08:
+			; An overflow lost its prefix; backspacing cannot reconstruct it.
+			if !KLRoi.word_overflowed
+				KLRoi.current_word := KLW_PopLast(KLRoi.current_word)
+		case 0x0D: KL_Roi_OnChar("`n")
+		case 0x09: KL_Roi_OnChar("`t")
+	}
+}
+
 KL_Roi_ProcessWord(word) {
 		global _TriggerSet
 		if (StrLen(word) < KLRoiConst.MIN_WORD_LEN)

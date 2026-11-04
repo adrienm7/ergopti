@@ -602,7 +602,8 @@ _KL_Hook_CommitInput(Intent) {
 		if Intent.kind = "char" {
 			try KL_Roi_OnChar(Intent.character)
 			try WPMWidget_Push(false, false)
-		}
+		} else
+			try KL_Roi_OnKey(Intent.vk)
 	}
 	return true
 }
