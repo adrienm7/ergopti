@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **39 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **40 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -722,9 +722,25 @@ source corrections and targeted native qualification. The requested 1,000 is
 still unmet and further candidates remain under investigation.
 
 The unregistered thinking-retry probe at `78a0050`, run `41898825207`, failed
-before reaching its intended business assertion. Its positive control did not
-reach the refusal log: the fixture said `thinking` while the shared parser
-requires the complete generic-leaf path `thinking.type`. A separate fixture
-cleanup also read a destroyed GUI object's handle. These are test-fixture defects,
-not evidence for the proposed production cancellation finding; the register
-count is unchanged while the fixture is repaired.
+before reaching its intended business assertion. Its positive control did not reach the refusal log. The proposed explanation
+that the response must name `thinking.type` was subsequently refuted: an added
+whole object can be named `thinking`. Both spellings are valid for that case.
+A separate fixture cleanup read a destroyed GUI object's handle and was repaired
+by retaining its native HWND. The later probe recorded a real HTTP400 response
+and an intercepted Integer.\_\_Item callback error before the intended cutpoint;
+its exact source is still under investigation. Neither failed probe proves the
+proposed production cancellation finding or increases the register count.
+
+## AHK-040: Refused native entry edits leave a ghost editor model and block retry
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+\_AddEntry, \_SaveEntry and \_DeleteEntry in ui/personal_toml_editor.ahk mutate \_PersonalEditorData before \_SaveData obtains the durable/live transaction receipt. Failure never restores model/ListView agreement. A simple rollback would lose overlapping DEFERRED snapshots, so complete detached candidates and exact completion ownership are required.
+
+Reproduction: Use the actual native personal editor and a real read-shared file handle denying write/delete. Click Add, Delete or Save through BM_CLICK. The native rename refuses, but the mutable editor model already contains the edit while the file and ListView retain their old values. Native run41900510051 at7306179ef66936fd43660b7382c65d702d0f1cc0 reproduces the exact unchanged-model failures for all three operations, alone and reversed, plus section/legacy variants.
+
+Consequence: An invisible non-durable added entry blocks its own retry as a duplicate. A refused deletion leaves old native row indices pointing into a different model, so a later retry can address another entry. Deferred and section publications must preserve their visible unsaved drafts without stale completion effects.
+
+Regression: Ten reachable personal-entry-receipts cases use real GUI controls, native button messages, a real sharing-denial handle and unlocked same-form retry. They also drive actual coalesced publication, terminal deferred failure and complete-snapshot recovery, dropdown/section changes and the legacy save entry point. The fix installs detached candidates only after immediate success or explicit DEFERRED admission, keeps RAM and rows coherent, and fences completions by source/cohort/sequence. Existing modal and live transaction controls remain; native post-fix qualification is pending.
+
+The ongoing register now contains **40 distinct new findings**. The requested target of 1,000 remains unmet.
