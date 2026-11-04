@@ -171,6 +171,22 @@ helpers.describe("file_digest: asynchronous sha256sum ownership", function()
 		helpers.assert_eq(callbacks, 1)
 		helpers.assert_true(not digest.isActive())
 	end)
+
+	for _, cause in ipairs({ "read", "oversize" }) do
+		helpers.it("linux-digest-signal-refusal: retains failed " .. cause .. " until exit", function()
+			local digest, state = fresh_digest({ kill_failure = true })
+			local failure, calls = nil, 0
+			helpers.assert_true(digest.sha256("/tmp/release.part", {}, function(_, err) failure, calls = err, calls + 1 end))
+			if cause == "read" then state.options.stdio[2].read_callback("EIO", nil)
+			else state.stdout(string.rep("x", 2048)) end
+			helpers.assert_true(digest.isActive())
+			helpers.assert_eq(calls, 0)
+			state.complete_request(1, nil, 0)
+			helpers.assert_eq(failure, cause == "read" and "EIO" or "sha256sum output exceeds limit")
+			helpers.assert_eq(calls, 1)
+			helpers.assert_true(not digest.isActive())
+		end)
+	end
 end)
 
 
