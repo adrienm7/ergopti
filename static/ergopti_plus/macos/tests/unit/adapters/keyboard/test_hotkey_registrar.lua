@@ -421,6 +421,22 @@ helpers.describe("hotkey_registrar: delivery guard", function()
 end)
 
 helpers.describe("hotkey_registrar: native factory claims", function()
+	helpers.it("detects same-owner logical and physical claims on the same chord (hotkey-same-owner-collision)", function()
+		local adapter, native = fresh()
+		local code = native.keycodes.map.a
+		helpers.assert_true(adapter.replace_physical_claims("keyboard", {
+			{ chord = "Ctrl+A", binding_id = "logical", action = "one" },
+			{ mods = { "ctrl" }, native_code = code, binding_id = "physical", action = "two" },
+		}))
+		helpers.assert_true(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "logical"))
+		helpers.assert_true(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "physical"),
+			"the logical assignment must not disappear behind its physical alias")
+		helpers.assert_true(adapter.replace_physical_claims("keyboard", {
+			{ chord = "Ctrl+A", binding_id = "logical" },
+		}))
+		helpers.assert_eq(adapter.has_physical_conflict({ "ctrl" }, code, "keyboard", "logical"), false,
+			"a single assignment must still exempt itself")
+	end)
 	helpers.it("does not bypass an unacknowledged disable after failed deletion (hotkey-delete-disable-refusal)", function()
 		for _, refusal in ipairs({ "nil", "false" }) do
 			local adapter, native = fresh()

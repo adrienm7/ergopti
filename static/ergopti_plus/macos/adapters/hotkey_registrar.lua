@@ -272,7 +272,15 @@ function M.replace_physical_claims(owner, rows)
 			mods, key = parsed.mods, parsed.key
 		end
 		local identity = M.physical_identity(mods, key)
-		if identity then claims[identity] = { action = row.action, binding_id = row.binding_id } end
+		if identity then
+			local existing = claims[identity]
+			if existing and (existing.binding_id == nil or row.binding_id == nil
+				or existing.binding_id ~= row.binding_id) then
+				existing.multiple = true
+			elseif not existing then
+				claims[identity] = { action = row.action, binding_id = row.binding_id }
+			end
+		end
 	end
 	local previous = _physical_claims[owner]
 	local suspended_before, touched = {}, {}
@@ -342,7 +350,8 @@ function M.has_physical_conflict(mods, native_code, owner, binding_id)
 	if identity == nil then return true end
 	for claimant, rows in pairs(_physical_claims) do
 		local row = rows[identity]
-		if row and (claimant ~= owner or row.binding_id ~= binding_id) then return true end
+		if row and (row.multiple == true or row.binding_id == nil or claimant ~= owner
+			or row.binding_id ~= binding_id) then return true end
 	end
 	for _, entry in pairs(_bindings) do
 		if entry.identity == identity and not entry.conditional and entry.native_deleted ~= true then return true end
