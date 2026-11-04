@@ -1,11 +1,15 @@
 {
-	"expected_count": 2,
+	"expected_count": 12,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
 			"contains": "api-thinking-retry-owner",
 			"expected_count": 2
+		},
+		{
+			"contains": "personal-entry-receipts",
+			"expected_count": 10
 		}
 	]
 }
