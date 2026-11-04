@@ -20,7 +20,7 @@ local shown = 0
 package.loaded["adapters.graphics_renderer"] = {
 	is_available = function() return true end,
 	show = function() shown = shown + 1; return true end,
-	hide = function() end,
+	hide = function() return true end,
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
 }
