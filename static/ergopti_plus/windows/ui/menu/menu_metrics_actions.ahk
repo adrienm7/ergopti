@@ -156,6 +156,7 @@ _ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
 OpenMetricsAppPicker(*) {
 	AppPicker_Show(Map(
 		"owner",    "metrics:disabled_apps",
+		"durable",  true,
 		"title",    t("dialog.metrics.exclude_title"),
 		"prompt",   t("dialog.metrics.exclude_prompt"),
 		"ok_label", t("dialog.metrics.exclude_ok"),
@@ -173,7 +174,11 @@ _MetricsSaveAppPickerAndReload(Selected, WriterFn := 0, NotifyFn := 0,
 	; The picker result is normalized into a detached Map by the owned builder;
 	; the live exclusion lookup remains unchanged while config.toml is written.
 	Committed := MF_CommitDisabledApps(Selected, WriterFn, NotifyFn, Receipt)
-	return _MetricsReloadAfterCommit(Committed, ReloadFn)
+	Applied := _MetricsReloadAfterCommit(Committed, ReloadFn)
+	Outcome := Receipt is Map && Receipt.Get("durable_mode", false) ? AppPicker_DurableResult(Receipt) : 0
+	if Outcome is Map
+		Outcome["applied"] := Applied
+	return Applied
 }
 
 _MetricsSetPreferenceAndReload(Prop, Target, WriterFn := 0, NotifyFn := 0,

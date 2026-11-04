@@ -458,12 +458,12 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 ; Reload publication, so consuming and releasing it inside _ConfigCommitOwned
 ; would reopen the exact interleaving window the barrier exists to close.
 ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
-		WriterFn := 0, NotifyFn := 0) {
+		WriterFn := 0, NotifyFn := 0, DurableOutcome := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates,
-			Context, WriterFn, NotifyFn)
+			Context, WriterFn, NotifyFn, DurableOutcome)
 		finally Critical(InheritedCritical)
 	}
 	if !_ConfigWriteLeaseOwns(OwnerToken, Path)
@@ -471,7 +471,7 @@ ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
 			"the borrowed configuration owner is stale or owns another path")
 	FailureDetail := ""
 	if !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-			"the borrowed configuration writer", &FailureDetail)
+			"the borrowed configuration writer", &FailureDetail, 0, 0, DurableOutcome)
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			FailureDetail)
 	return true
@@ -481,7 +481,10 @@ ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
 ; detached transaction plan. This closes the read/clone -> acquire window that
 ; otherwise lets a sibling publish between a stale snapshot and its later write.
 ; BuildFn returns { updates, publish?, finalize?, compensate?, cleanup?,
-; rollback_updates?, retain? }. A rollback batch is written through the same
+; rollback_updates?, retain?, durable_outcome? }. The optional Map records a
+; forward writer/noop acknowledgment before post-commit effects; it is used by
+; picker plans without rollback and does not replace the final Boolean result.
+; A rollback batch is written through the same
 ; writer while this exact lease is still held when primary finalization fails.
 ; ExistingOwner may borrow an exact live lease or terminal bundle. Its caller
 ; retains release responsibility through a subsequent WAL/reload handoff.
@@ -509,6 +512,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	StateUnchanged := true
 	PlanAdmission := 0
 	NoOpSourceAdmission := 0
+	DurableOutcome := 0
 	try {
 		if _ConfigSchemaEntrySelected(Path)
 			NoOpSourceAdmission := ConfigMigrateBoot(Path, "capture_noop")
@@ -525,6 +529,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			CompensateFn := _ConfigPlanGet(Plan, "compensate", 0)
 			RetainFn := _ConfigPlanGet(Plan, "retain", 0)
 			PlanAdmission := _ConfigPlanGet(Plan, "admission", 0)
+			DurableOutcome := _ConfigPlanGet(Plan, "durable_outcome", 0)
 			NoOp := !!_ConfigPlanGet(Plan, "noop", false)
 		}
 		if (FailureDetail == "" && !NoOp) {
@@ -546,7 +551,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			Transferred := true
 			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
 					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
-					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission)
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed, PlanAdmission, "commit", DurableOutcome)
 		}
 		NativePlanAdmission := () => _ConfigWriteLeaseOwns(OwnerToken, Path) && _FSNativeAdmissionAccepted(PlanAdmission)
 		if FailureDetail == "" && NoOp {
@@ -573,8 +578,11 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 				_ConfigWriteLeaseRelease(OwnerToken)
 		}
 	}
-	if NoOp
+	if NoOp {
+		if DurableOutcome is Map
+			DurableOutcome["status"] := "committed", DurableOutcome["committed"] := true
 		return true
+	}
 	return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail,
 		StateUnchanged)
 }
@@ -587,7 +595,7 @@ _ConfigPlanGet(Plan, Key, Default := 0) {
 
 _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
-		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit") {
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true, AdmissionFn := 0, Request := "commit", DurableOutcome := 0) {
 	static PublicationDebt := Map()
 	; Only these retained genuine producers may prove an already durable full-save
 	; obligation. No supplied collector, writer, snapshot or registration token
@@ -704,7 +712,7 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 				&FailureDetail, &StateUnchanged)
 			Failed := true
 		if !Failed && !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission) {
+				"the configuration writer", &FailureDetail, AdmissionFn, OwnerAdmission, DurableOutcome) {
 			Failed := true
 		}
 		if !Failed {
@@ -825,12 +833,41 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 	return true
 }
 
-_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0) {
+; Optional result observation never stores source bytes on a long-lived UI
+; receipt. The local snapshot only distinguishes a verified unchanged refusal
+; from an unknown writer outcome; acknowledged durability wins before apply.
+_ConfigDurableWriteStart(Outcome, Path) {
+	if !(Outcome is Map)
+		return 0
+	Outcome["status"] := "unknown"
+	try return FSReadWithStatus(Path)
+	catch
+		return 0
+}
+
+_ConfigDurableWriteEnd(Outcome, Path, Before, Committed) {
+	if !(Outcome is Map)
+		return
+	if Committed {
+		Outcome["status"] := "committed", Outcome["committed"] := true
+		return
+	}
+	Unchanged := false
+	if Before is Map && (Before["status"] == "ok" || Before["status"] == "absent") {
+		try Unchanged := _FSSourceIsUnchanged(Path, Before)
+		catch
+			Unchanged := false
+	}
+	Outcome["status"] := Unchanged ? "refused" : "unknown"
+}
+
+_ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, AdmissionFn := 0, OwnerAdmission := 0, DurableOutcome := 0) {
 	global ConfigurationFile
 	if FileReadActivityBusy(Path) {
 		FailureDetail .= (FailureDetail != "" ? "; " : "") . "an exact configuration read is still in progress"
 		return false
 	}
+	BeforeOutcome := 0, WriteEntered := false
 	try {
 		NativeAdmission := () => _FSNativeAdmissionAccepted(OwnerAdmission) && _FSNativeAdmissionAccepted(AdmissionFn)
 		Guarded := !((AdmissionFn is Integer) && AdmissionFn == 0)
@@ -845,6 +882,8 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, Admiss
 			&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
 		if IsConfiguration
 			Updates := _ConfigPrepareTypedUpdates(Updates)
+		BeforeOutcome := _ConfigDurableWriteStart(DurableOutcome, Path)
+		WriteEntered := true
 		if HasMethod(WriterFn, "Call") {
 			if Guarded {
 				if WriterFn != TOML_ConfigBatchWrite && WriterFn != TOML_BatchWrite
@@ -857,15 +896,19 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail, Admiss
 			Written := IsConfiguration ? TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)
 				: TOML_BatchWrite(Path, Updates, [], NativeAdmission)
 	} catch as Err {
+		if WriteEntered
+			_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, false)
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " failed: " . Err.Message
 		return false
 	}
 	if !((Written is Integer) && Written == 1) {
+		_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, false)
 		FailureDetail .= (FailureDetail != "" ? "; " : "")
 			. Stage . " refused or returned a malformed status"
 		return false
 	}
+	_ConfigDurableWriteEnd(DurableOutcome, Path, BeforeOutcome, true)
 	return true
 }
 

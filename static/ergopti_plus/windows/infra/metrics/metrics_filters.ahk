@@ -230,7 +230,7 @@ MF_CommitEncryptionToggle(WriterFn := 0, NotifyFn := 0, ApplyFn := 0,
 	return _MF_NotifyEncryptionUnavailable(NotifyFn)
 }
 
-_MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
+_MF_BuildDisabledAppsPlan(Selected, Receipt := 0, DurableOutcome := 0) {
 	if IsObject(Receipt)
 			&& !AppPicker_ClaimReceipt(Receipt, MF_DisabledList())
 		return false
@@ -243,11 +243,14 @@ _MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
 		Candidate[Key] := true
 		Persisted.Push(Key)
 	}
-	return {
+	Plan := {
 		updates: [{ Section: "metrics", Key: ConfigLeaf.DISABLED_APPS,
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}
+	if DurableOutcome is Map
+		Plan.durable_outcome := DurableOutcome
+	return Plan
 }
 
 _MF_PublishDisabledAppsCandidate(Candidate) {
@@ -256,8 +259,12 @@ _MF_PublishDisabledAppsCandidate(Candidate) {
 }
 
 MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
-	return MF_SaveBuiltToIni("the disabled metrics applications",
-		_MF_BuildDisabledAppsPlan.Bind(Selected, Receipt), WriterFn, NotifyFn)
+	Outcome := Receipt is Map && Receipt.Get("durable_mode", false) ? AppPicker_BeginDurableSave(Receipt) : 0
+	Committed := MF_SaveBuiltToIni("the disabled metrics applications",
+		_MF_BuildDisabledAppsPlan.Bind(Selected, Receipt, Outcome), WriterFn, NotifyFn)
+	if Outcome is Map
+		Outcome["applied"] := (Committed is Integer) && Committed == 1
+	return Committed
 }
 
 

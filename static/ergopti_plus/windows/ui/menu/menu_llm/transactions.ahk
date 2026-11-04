@@ -190,14 +190,14 @@ _LLM_Menu_ApplyStandardCommitted(*) {
 ; full collector and strict TOML writer.
 LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
 		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, CollectFn := 0,
-		PrepareFn := 0, PublishFn := 0) {
+		PrepareFn := 0, PublishFn := 0, DurableOutcome := 0) {
 	PreviousCritical := Critical("Off")
 	MutationStarted := _LLM_Menu_ObservationBegin("mutation-return")
 	MutationResult := "not-confirmed"
 	try {
 		MutationResult := _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
 			WriterFn, NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn,
-			PublishFn)
+			PublishFn, DurableOutcome)
 		return MutationResult
 	} finally {
 		try _LLM_Menu_ObservationEnd("mutation-return", MutationStarted, MutationResult)
@@ -206,7 +206,7 @@ LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
 }
 
 _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
-		NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn, PublishFn) {
+		NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn, PublishFn, DurableOutcome) {
 	global ConfigurationFile, Features, _LLM_Menu
 	AdmissionStarted := _LLM_Menu_ObservationBegin("schema-admission")
 	Admitted := ConfigFullStateCanPersist()
@@ -314,7 +314,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		}
 		DurableStarted := _LLM_Menu_ObservationBegin("durable-writer")
 		if !ConfigCommitBorrowedUpdates(OwnerToken, ConfigurationFile, Updates,
-				Context, WriterFn, NotifyFn) {
+				Context, WriterFn, NotifyFn, DurableOutcome) {
 			_LLM_Menu_ObservationEnd("durable-writer", DurableStarted, false)
 			return false
 		}
@@ -361,6 +361,8 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 					"config.toml is durable but live application was refused", false)
 			}
 		}
+		if DurableOutcome is Map
+			DurableOutcome["applied"] := true
 		return true
 	} finally {
 		if PreparedProfileOwner is Map && !ProfileOwnerCommitted
