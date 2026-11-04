@@ -380,6 +380,7 @@ helpers.describe("uinput_writer: emission", function()
 		end
 		local failed = U.emit(30, 1)
 		local after_failure = #rec.writes
+		local false_reopen = U.open()
 		local successor = U.emit(31, 1)
 		local after_successor = #rec.writes
 		local retired, reopened = U.close(), nil
@@ -387,6 +388,7 @@ helpers.describe("uinput_writer: emission", function()
 		local after_reopen = reopened and U.emit(31, 1)
 		U._reset_backend()
 		helpers.assert_eq(failed, false)
+		helpers.assert_eq(false_reopen, false, "an existing failed channel is not reopened")
 		helpers.assert_eq(successor, false)
 		helpers.assert_eq(after_successor, after_failure, "later SYN must not publish a possibly buffered key")
 		helpers.assert_true(retired and reopened and after_reopen, "a recreated device can emit normally")

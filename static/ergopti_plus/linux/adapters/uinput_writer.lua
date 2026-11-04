@@ -723,7 +723,7 @@ end
 --- @return boolean True when the device is ready to accept events.
 function M.open()
 	if _busy or _debt then return false end
-	if _fd then return true end
+	if _fd then return not _legacy_failed end
 	-- Reserve before lazy FFI loading: even require/cdef can reenter the writer.
 	_busy = true
 	local backend, descriptor = _backend, nil
