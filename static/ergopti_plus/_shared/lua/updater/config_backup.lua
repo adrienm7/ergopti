@@ -309,14 +309,33 @@ function M.new(options)
 			Logger.error(LOG, "Configuration backup refused: cannot create %s: %s.", folder, tostring(make_err))
 			return nil, "cannot create " .. folder
 		end
-		-- Two backups within one second get distinct folders: the manifest's
-		-- create-only write refuses an existing one.
-		local base, suffix, path = id, 1, join(folder, id)
-		while io_port.read(join(path, rules.manifest)) ~= nil or (io_port.list(path)) ~= nil do
-			suffix = suffix + 1
-			id = base .. "-" .. suffix
-			path = join(folder, id)
+		-- Keep collision suffixes monotonic even when an older backup was removed.
+		local base = id
+		local siblings, list_err = io_port.list(folder)
+		if not siblings then
+			Logger.error(LOG, "Configuration backup refused: cannot list its backup folder.")
+			return nil, "cannot list " .. folder .. ": " .. tostring(list_err)
 		end
+		local highest
+		for _, sibling in ipairs(siblings) do
+			local name = sibling.name
+			local suffix = type(name) == "string" and name:sub(1, #base + 1) == base .. "-"
+				and name:sub(#base + 2):match("^[1-9]%d*$") or nil
+			if name == base then suffix = "1" end
+			if suffix and (not highest or #suffix > #highest or (#suffix == #highest and suffix > highest)) then
+				highest = suffix
+			end
+		end
+		if highest then
+			local carry, digits = 1, {}
+			for index = #highest, 1, -1 do
+				local digit = tonumber(highest:sub(index, index)) + carry
+				if digit >= 10 then digit, carry = digit - 10, 1 else carry = 0 end
+				digits[index] = tostring(digit)
+			end
+			id = base .. "-" .. (carry == 1 and "1" or "") .. table.concat(digits)
+		end
+		local path = join(folder, id)
 		local manifest_files = {}
 		for _, entry in ipairs(entries) do
 			local copy = join(path, entry.root .. "/" .. entry.path)
@@ -394,6 +413,20 @@ function M.new(options)
 		return record, nil
 	end
 
+	--- Compare collision suffixes as decimal strings, without integer overflow.
+	local function newer(left, right)
+		if left.created_at ~= right.created_at then return left.created_at > right.created_at end
+		if left.tag == right.tag then
+			local left_base, left_suffix = left.id:match("^(.*)%-([1-9]%d*)$")
+			local right_base, right_suffix = right.id:match("^(.*)%-([1-9]%d*)$")
+			if left_base and left_base == right_base then
+				if #left_suffix ~= #right_suffix then return #left_suffix > #right_suffix end
+				return left_suffix > right_suffix
+			end
+		end
+		return left.id > right.id
+	end
+
 	--- The newest complete backup of one kind, or nil when there is none.
 	--- @param kind string
 	--- @return table|nil record
@@ -407,9 +440,7 @@ function M.new(options)
 			local name = entry.name
 			if entry.kind == "dir" and type(name) == "string" and name:sub(1, #prefix + 1) == prefix .. "-" then
 				local record = load(name)
-				if record and record.kind == kind
-					and (best == nil or tostring(record.created_at) > tostring(best.created_at)
-						or (record.created_at == best.created_at and record.id > best.id)) then
+				if record and record.kind == kind and (best == nil or newer(record, best)) then
 					best = record
 				end
 			end

@@ -4,14 +4,13 @@
 --- MODULE: Keyboard Layout Build Files
 --- DESCRIPTION:
 --- Writes and removes the number-row layout builds in ~/Library/Keyboard Layouts
---- (modules/keymap/layout_rows_build.lua). The file system adapter's atomic
---- write keeps a cooperative lock file beside its target, which would stay in
---- the user's layouts folder after every build and every field run.
+--- (modules/keymap/layout_rows_build.lua). Create-only publication uses the
+--- file system adapter's lock outside the user's layouts folder.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A build is always a new file under a new name, and the system reads it only
----    once the build is registered, after this write returned: a plain create is
----    safe, and an existing path is refused rather than overwritten.
+---    once the build is registered, after this write returned. Create-only
+---    publication refuses occupied paths, including dangling symbolic links.
 --- 2. Only a regular file is removed; anything else at the path is left and named.
 --- ==============================================================================
 
@@ -31,16 +30,10 @@ function M.write_new(path, text)
 	if type(path) ~= "string" or not path:match("^/.+%.keylayout$") or type(text) ~= "string" then
 		return false, "a build is an absolute .keylayout path and its text"
 	end
-	if FileSystem.exists(path) then return false, path .. " already exists" end
-	local handle, open_err = io.open(path, "wb")
-	if not handle then return false, tostring(open_err) end
-	local wrote = handle:write(text) ~= nil
-	local closed = handle:close() == true
-	if not (wrote and closed) then
-		os.remove(path)
-		return false, "the build could not be written in full"
-	end
-	return true, nil
+	local created, status, detail = FileSystem.create_if_absent(path, text)
+	if created == true then return true, nil end
+	if status == "exists" then return false, path .. " already exists" end
+	return false, tostring(detail or "the build could not be created")
 end
 
 --- Removes a build file; an absent one is already removed.

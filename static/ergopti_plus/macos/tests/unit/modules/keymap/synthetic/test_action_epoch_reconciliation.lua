@@ -319,6 +319,33 @@ end
 
 
 helpers.describe("keymap action epochs", function()
+	helpers.it("keeps a retained keydown tap inert after native stop refusal (keymap-stop-retained-tap)", function()
+		local fixture = load_fixture()
+		local old_stops = {}
+		for _, index in ipairs({ 1, 2, 3, 4 }) do
+			local tap = fixture.taps[index]
+			old_stops[index] = tap.stop
+			tap.stop = function() return false end
+		end
+		helpers.assert_eq(fixture.keymap.stop(), false)
+		helpers.assert_eq(fixture.state.buffer, "")
+		helpers.assert_eq(fixture.physical_letter("x"), false)
+		helpers.assert_eq(fixture.state.buffer, "", "the stopped keymap must not process a retained native tap")
+		local sentinel = fixture.taps[1].callback({ getKeyCode = function() return 90 end,
+			getFlags = function() return {} end, getProperty = function() return 0 end })
+		helpers.assert_true(sentinel, "a retained tap must still swallow the reserved sentinel")
+		local sentinel_up = fixture.taps[2].callback({ getKeyCode = function() return 90 end,
+			getFlags = function() return {} end, getProperty = function() return 0 end })
+		helpers.assert_true(sentinel_up, "the matching reserved release must remain swallowed")
+		fixture.taps[3].callback({ getKeyCode = function() return 56 end,
+			getFlags = function() return { shift = true } end })
+		helpers.assert_nil(fixture.keymap.get_shift_side(), "a retained flags tap cannot mutate stopped state")
+		fixture.state.buffer = "guard"
+		fixture.taps[4].callback({})
+		helpers.assert_eq(fixture.state.buffer, "guard", "a retained mouse tap cannot mutate stopped state")
+		for index, stop in pairs(old_stops) do fixture.taps[index].stop = stop end
+		helpers.assert_true(fixture.keymap.stop())
+	end)
 	helpers.it("drops Shift attribution when the tap stops across an unseen release (shift-side-stop-reset)", function()
 		local fixture = load_fixture()
 		fixture.taps[3].callback({ getKeyCode = function() return 56 end,

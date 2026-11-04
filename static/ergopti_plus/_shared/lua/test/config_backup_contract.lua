@@ -222,6 +222,51 @@ function M.register(helpers, env)
 			helpers.assert_eq(second.id, "pre-install-20260930-101500-2")
 		end)
 
+		helpers.it("selects the twelfth backup created in the same second", function()
+			local owner = fixture()
+			local newest
+			for _ = 1, 12 do newest = assert(owner.create("pre_install", { tag = "v1" })) end
+			local latest = owner.latest("pre_install")
+			helpers.assert_eq(latest and latest.id, newest.id, "numeric suffixes must follow creation order")
+		end)
+
+		helpers.it("does not reuse an earlier backup suffix after it is deleted", function()
+			local owner, fs = fixture()
+			assert(owner.create("pre_install", { tag = "v1" }))
+			local removed = assert(owner.create("pre_install", { tag = "v1" }))
+			assert(owner.create("pre_install", { tag = "v1" }))
+			for path in pairs(fs.files) do
+				if path:sub(1, #removed.path + 1) == removed.path .. "/" then fs.files[path] = nil end
+			end
+			for path in pairs(fs.dirs) do
+				if path == removed.path or path:sub(1, #removed.path + 1) == removed.path .. "/" then fs.dirs[path] = nil end
+			end
+			local newest = assert(owner.create("pre_install", { tag = "v1" }))
+			helpers.assert_eq(newest.id, "pre-install-20260930-101500-v1-4")
+			helpers.assert_eq(owner.latest("pre_install").id, newest.id)
+		end)
+
+		helpers.it("refuses a backup when its collision inventory is unavailable", function()
+			local owner, fs = fixture()
+			local list = fs.io.list
+			fs.io.list = function(path)
+				if path == "/cfg/backups" then return nil, "permission denied" end
+				return list(path)
+			end
+			local writes = #fs.writes
+			local record = owner.create("pre_install", { tag = "v1" })
+			helpers.assert_nil(record)
+			helpers.assert_eq(#fs.writes, writes)
+		end)
+
+		helpers.it("increments a large reserved backup suffix without integer overflow", function()
+			local owner, fs = fixture()
+			local base = "/cfg/backups/pre-install-20260930-101500-v1"
+			fs.add_dir(base .. "-999999999999999999999999999999")
+			local created = assert(owner.create("pre_install", { tag = "v1" }))
+			helpers.assert_eq(created.id, "pre-install-20260930-101500-v1-1000000000000000000000000000000")
+		end)
+
 		helpers.it("offers the newest complete backup of a kind", function()
 			local owner = fixture({ times = { "20260930-101500", "20260930-111500", "20260930-121500" } })
 			assert(owner.create("pre_install", { tag = "v1" }))

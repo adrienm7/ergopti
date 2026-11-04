@@ -1544,6 +1544,15 @@ window.addEventListener(
 	true
 );
 
+// Selection and input events may omit isComposing while an IME owns the DOM.
+let imeComposing = false;
+document.addEventListener('compositionstart', () => {
+	imeComposing = true;
+});
+document.addEventListener('compositionend', () => {
+	imeComposing = false;
+});
+
 document.querySelectorAll('.overlay').forEach((el) => {
 	el.addEventListener('click', (e) => {
 		if (e.target === el) closeModal(el.id);
@@ -1551,10 +1560,12 @@ document.querySelectorAll('.overlay').forEach((el) => {
 });
 
 document.getElementById('msg-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter' || e.key === 'Escape') closeModal('msg-modal');
 });
 
 document.getElementById('confirm-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') {
 		_confirmCb = null;
 		closeModal('confirm-modal');
@@ -1587,6 +1598,7 @@ function runConfirm() {
 }
 
 document.getElementById('sec-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Enter') {
 		e.preventDefault();
 		saveSec();
@@ -1595,6 +1607,7 @@ document.getElementById('sec-modal').addEventListener('keydown', (e) => {
 });
 
 document.getElementById('entry-modal').addEventListener('keydown', (e) => {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (e.key === 'Escape') closeModal('entry-modal');
 });
 
@@ -1609,6 +1622,7 @@ document.getElementById('sec-id').addEventListener('input', function () {
 });
 
 document.getElementById('sec-id').addEventListener('keydown', function (e) {
+	if (imeComposing || e.isComposing || e.keyCode === 229) return;
 	if (
 		[
 			'Backspace',
@@ -1629,7 +1643,9 @@ document.getElementById('sec-id').addEventListener('keydown', function (e) {
 	if (!/^[a-z0-9_]$/i.test(e.key)) e.preventDefault();
 });
 
-document.addEventListener('selectionchange', ejectFromChip);
+document.addEventListener('selectionchange', function () {
+	if (!imeComposing) ejectFromChip();
+});
 
 // Trigger Editor logic
 (function () {
@@ -1637,6 +1653,7 @@ document.addEventListener('selectionchange', ejectFromChip);
 	te.addEventListener('input', () => clearFieldError('e-trig', 'trig-err'));
 
 	te.addEventListener('keydown', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (e.key === 'Enter' || e.key === 'Tab') {
 			e.preventDefault();
 			document.getElementById('e-out').focus();
@@ -1759,6 +1776,7 @@ document.addEventListener('selectionchange', ejectFromChip);
 	ed.addEventListener('input', () => clearFieldError('e-out', 'out-err'));
 
 	ed.addEventListener('keydown', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (acItems.length > 0) {
 			if (e.key === 'Tab') {
 				e.preventDefault();
@@ -1872,13 +1890,15 @@ document.addEventListener('selectionchange', ejectFromChip);
 		}
 	});
 
-	ed.addEventListener('input', function () {
+	ed.addEventListener('input', function (e) {
+		if (imeComposing || e.isComposing) return;
 		tryConvertToken(ed);
 		checkAc();
 		checkPh();
 	});
 
 	ed.addEventListener('keyup', function (e) {
+		if (imeComposing || e.isComposing || e.keyCode === 229) return;
 		if (
 			acItems.length > 0 &&
 			['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape', 'Enter'].indexOf(

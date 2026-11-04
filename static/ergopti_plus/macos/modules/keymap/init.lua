@@ -184,6 +184,7 @@ local loopback_keyup_tap = nil
 local eventtap_is_enabled
 local start_eventtap
 local _started = false
+local _callbacks_retired = false
 local _user_hotstring_lifecycle = {}
 local _user_hotstring_input = {}
 local _user_hotstring_elapsed = 0
@@ -2107,12 +2108,17 @@ local function onKeyDown(e)
 			fence_consumes_original = fence_or_nil.consume_original == true
 		end
 		if provenance_status == EventProvenance.STATUS_FOREIGN and replay_or_nil ~= true then
-			physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
+			if not _callbacks_retired then
+				physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
+			else
+				local key_ok, code = pcall(e.getKeyCode, e)
+				if key_ok then physical_keycode = code end
+			end
 			stale = event_lateness_ms ~= nil
 				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
 			-- First delivery only: the application has not received this key yet, so
 			-- a tap-hold's Cmd+C is checked against the clipboard as it was before.
-			if _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open()
+			if not _callbacks_retired and _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open()
 				and _tap_copy:watching() then
 				pcall(_tap_copy.key_down, _tap_copy, e, event_stamp, event_lateness_ms)
 			end
@@ -2134,6 +2140,15 @@ local function onKeyDown(e)
 	if fence_consumes_original then
 		HotPath.log_if_slow("keydown", t0_hot)
 		return true, fence_events
+	end
+	if _callbacks_retired then
+		-- A refused native stop can leave this tap installed. Retain only the
+		-- control-key fence; ordinary input must not enter the stopped engine.
+		local consume = (provenance and (provenance.loopback or provenance.stale_loopback or provenance.selftest == true))
+			or (provenance == nil and provenance_status == EventProvenance.STATUS_FOREIGN
+				and ControlSentinels.is_sentinel(physical_keycode))
+		HotPath.log_if_slow("keydown", t0_hot)
+		return consume == true, fence_events
 	end
 	-- A field-run selftest key is the driver's own output, typed to prove this
 	-- very path. It is decoded as typing only while the field run's scratch
@@ -2247,7 +2262,7 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	local provenance, status, fence, replay = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
 	local observed_keycode = nil
-	if status == EventProvenance.STATUS_FOREIGN and replay ~= true then
+	if not _callbacks_retired and status == EventProvenance.STATUS_FOREIGN and replay ~= true then
 		observed_keycode = observe_key_health(e, "up", event_lateness_ms, event_stamp)
 	end
 	local fence_events = fence and fence.events or nil
@@ -2325,6 +2340,7 @@ shift_tap = eventtap.new(
 			provenance, provenance_status = nil, EventProvenance.STATUS_FOREIGN
 		end
 		if provenance then return false end
+		if _callbacks_retired then return false, fence_events end
 		_user_hotstring_input = {}
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			_shift_left_down = false
@@ -2412,6 +2428,7 @@ mouse_tap = eventtap.new(
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance then return false end
+		if _callbacks_retired then return false, fence_events end
 		-- ScriptControl leaves the physical tap installed so the click itself still
 		-- passes through, but PAUSE owns every keymap mutation and deferred reset.
 		-- Claim any older synthetic fence above, then stop before touching context.
@@ -2738,6 +2755,9 @@ function M.start()
 	then
 		return true
 	end
+	-- No event from a partial acquisition may enter the engine until every
+	-- native owner has committed, even when rollback itself cannot finish.
+	_callbacks_retired = true
 	if _started or _action_listener_registered or _watchdog_timer
 		or _diagnostic_mailbox_started or diagnostic_mailbox_is_running()
 		or eventtap_is_enabled("keyDown", tap)
@@ -2830,6 +2850,7 @@ function M.start()
 		return false
 	end
 
+	_callbacks_retired = false
 	_started = true
 	Logger.success(LOG, "Keymap engine started.")
 	notify_editor_source_changed()
@@ -2855,6 +2876,7 @@ function M.stop(teardown)
 	end
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
+	_callbacks_retired = true
 	reset_shift_side()
 	if _one_shot_shift then _one_shot_shift.reset() end
 	if _tap_copy then _tap_copy:stop() end
