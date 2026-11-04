@@ -130,25 +130,29 @@ branch for `.2`), and the downloaded-back asset must match the pin's digest and 
 
 ### WP9: the real-Mac acceptance (maintainer checklist)
 
-No copy-paste on the Mac. Install the signed dev build CI publishes (once the maintainer authorizes that dev CI run),
-then, in the clone, one command per pass:
+One command, typed in the clone; nothing else needs a click:
 
 ```sh
 git switch dev && git pull && bash tools/dev/collect-macos-field-report.sh --installed
 ```
 
-1. Open the installed ErgoptiPlus. It offers « Install Ergopti's remapping engine » once by itself: confirm, type the
-   administrator password once.
-2. macOS opens Login Items & Extensions > Extensions: allow the Karabiner driver. Ergopti reloads by itself once it is
-   allowed. If macOS asks, allow Input Monitoring for ErgoptiPlus.
-3. Click Debug > the owned runtime field check, then run the command: the report's `owned_runtime` step lists both
-   jobs loaded, the driver `[activated enabled]`, the verified `16.3.0-ergopti.3` download, the app's signing
-   authority and `console parent: ErgoptiPlus`.
-4. By hand: tap-holds, chords and the navigation layer on the internal keyboard with fn/globe, autorepeat, sleep and
-   wake; a reload returns the keyboard to native input.
+It installs or updates `/Applications/ErgoptiPlus.app` from the newest signed dev prerelease (size and SHA-256 from
+the release's `macos-publication.json`, strict deep signature, the CI certificate leaf the runtime manifest pins;
+`tools/dev/install-macos-dev-prerelease.sh`), quits the old copy, opens the new one with this clone as its field-run
+root (`open --env ERGOPTI_FIELD_RUN_ROOT=…`, admitted by the launcher only for a folder of this user holding the
+declaration), and runs the whole field run in it:
 
-When these hold, start the shared-mode deletion (the `karabiner.json` migration and uninstall checks of the list
-above ride on the same passes).
+1. `field_owned_install`: the owned runtime is installed with no click of Ergopti's. Type the administrator password
+   when macOS asks (the terminal says so).
+2. If System Settings opens Login Items & Extensions, switch on the Karabiner driver; the step waits up to 14
+   minutes, then `owned_install_reload` reloads so the owner admits the runtime.
+3. Every Debug field check follows, `field_owned_runtime`, `field_owned_start` and `field_owned_pause` included,
+   then the logs, the analysis and the push of the `field/mac-…` branch.
+
+Refused, said in the report's `not_automated.txt` instead of faked: typing through the owned runtime (Karabiner
+captures the keyboards below the event system, so synthetic key events never reach it), and sleep and wake (waking
+needs a pmset power schedule, a system setting the collector never writes). Those stay a person's checks: tap-holds,
+chords and the navigation layer on the internal keyboard with fn/globe, autorepeat, sleep and wake.
 
 ### Proof
 

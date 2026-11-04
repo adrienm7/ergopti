@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# tools/dev/install-macos-dev-prerelease.sh
+
+# ==============================================================================
+# MODULE: macOS signed dev prerelease installer (field reports)
+# DESCRIPTION:
+# Installs or updates /Applications/ErgoptiPlus.app from the newest signed dev
+# prerelease on GitHub, verified, then quits the running copy and opens the new
+# one with this clone as its field-run root, so
+# tools/dev/collect-macos-field-report.sh --installed can drive every field
+# check with no click.
+#
+# USAGE:
+#   bash tools/dev/install-macos-dev-prerelease.sh
+#
+# Verification: the archive's size and SHA-256 must match the release's own
+# macos-publication.json, and the unpacked app must pass a strict deep code
+# signature check whose designated requirement names the certificate leaf the
+# owned runtime manifest pins (the CI certificate). Anything else refuses and
+# changes nothing. It never writes a system preference and never asks for an
+# administrator password: /Applications must be writable by this account.
+# ==============================================================================
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "$PWD")"
+REPO_ROOT="${REPO_ROOT%.}"
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+
+fail() { printf '[dev-prerelease] REFUSED: %s\n' "$*" >&2; exit 1; }
+log() { printf '[dev-prerelease] %s\n' "$*"; }
+
+[ "$(uname -s)" = Darwin ] || fail "a Mac is required."
+APP="/Applications/$ERGOPTI_APP_BUNDLE"
+API="https://${ERGOPTI_HOST_GITHUB_API}/repos/adrienm7/ergopti/releases?per_page=30"
+MANIFEST="$REPO_ROOT/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
+work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-dev-prerelease.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+
+# The newest dev prerelease (v0.0.0-dev.N), and its two macOS assets.
+curl -fsSL --proto =https "$API" -o "$work/releases.json" || fail "GitHub's release list could not be read."
+release="$(/usr/bin/python3 - "$work/releases.json" <<'PY'
+import json, sys
+for release in json.load(open(sys.argv[1])):
+    if release.get("prerelease") and release.get("tag_name", "").startswith("v0.0.0-dev."):
+        assets = {a["name"]: a["browser_download_url"] for a in release.get("assets", [])}
+        if "macos-publication.json" in assets and "ErgoptiPlus.app.zip" in assets:
+            print(release["tag_name"], assets["macos-publication.json"], assets["ErgoptiPlus.app.zip"])
+            break
+PY
+)" || fail "the release list could not be parsed."
+[ -n "$release" ] || fail "no dev prerelease with a macOS archive is published."
+read -r tag publication_url archive_url <<<"$release"
+log "Newest signed dev prerelease: $tag."
+
+installed="$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [ "v$installed" = "$tag" ] && [ "${ERGOPTI_REINSTALL:-0}" != 1 ]; then
+	log "$APP is already $tag."
+else
+	curl -fsSL --proto =https "$publication_url" -o "$work/publication.json" || fail "macos-publication.json could not be downloaded."
+	curl -fL --proto =https --progress-bar "$archive_url" -o "$work/app.zip" || fail "the macOS archive could not be downloaded."
+	expected="$(/usr/bin/python3 -c 'import json,sys
+for a in json.load(open(sys.argv[1]))["archives"]:
+    if a["name"] == "ErgoptiPlus.app.zip": print(a["size"], a["sha256"])' "$work/publication.json")" \
+		|| fail "macos-publication.json names no ErgoptiPlus.app.zip."
+	read -r size sha256 <<<"$expected"
+	[ "$(stat -f %z "$work/app.zip")" = "$size" ] || fail "the archive is not the size the release publishes."
+	[ "$(shasum -a 256 "$work/app.zip" | cut -d' ' -f1)" = "$sha256" ] || fail "the archive is not the one the release publishes."
+	ditto -x -k "$work/app.zip" "$work/unpacked" || fail "the archive could not be unpacked."
+	new="$work/unpacked/$ERGOPTI_APP_BUNDLE"
+	[ -d "$new" ] || fail "the archive holds no $ERGOPTI_APP_BUNDLE."
+	codesign --verify --deep --strict "$new" || fail "the downloaded app's signature does not verify."
+	leaf="$(/usr/bin/python3 -c 'import json,re,sys
+print(re.search(r"certificate leaf = H\"([0-9a-f]{40})\"", json.load(open(sys.argv[1]))["capture"]["requirement"]).group(1))' "$MANIFEST")" \
+		|| fail "the runtime manifest pins no certificate leaf."
+	requirement="$(codesign -d -r- "$new" 2>&1)"
+	printf '%s\n' "$requirement" | grep -q "identifier \"$ERGOPTI_BUNDLE_ID_LAUNCHER\"" \
+		|| fail "the downloaded app is not $ERGOPTI_BUNDLE_ID_LAUNCHER."
+	printf '%s\n' "$requirement" | grep -qi "certificate leaf = H\"$leaf\"" \
+		|| fail "the downloaded app is not signed with the CI certificate the owned runtime trusts."
+	[ -w /Applications ] || fail "/Applications is not writable by this account; install $tag by hand once."
+	log "Verified $tag: size, SHA-256 and the CI certificate."
+fi
+
+# Quit the running copy the way its menu does, then the guardian launchd keeps alive.
+if pgrep -f "/$ERGOPTI_APP_BUNDLE/Contents/" >/dev/null 2>&1; then
+	log "Quitting the running $ERGOPTI_APP_NAME..."
+	osascript -e "tell application id \"$ERGOPTI_BUNDLE_ID_LAUNCHER\" to quit" >/dev/null 2>&1 || true
+	launchctl bootout "gui/$(id -u)/$ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN" >/dev/null 2>&1 || true
+	for _ in $(seq 1 20); do pgrep -f "/$ERGOPTI_APP_BUNDLE/Contents/" >/dev/null 2>&1 || break; sleep 1; done
+	pgrep -f "/$ERGOPTI_APP_BUNDLE/Contents/" >/dev/null 2>&1 \
+		&& fail "$ERGOPTI_APP_NAME did not quit within 20 s; quit it from its menu and run this again."
+fi
+
+if [ -n "${new:-}" ]; then
+	rm -rf "/Applications/.$ERGOPTI_APP_BUNDLE.new"
+	ditto "$new" "/Applications/.$ERGOPTI_APP_BUNDLE.new"
+	rm -rf "$APP"
+	mv "/Applications/.$ERGOPTI_APP_BUNDLE.new" "$APP"
+	log "Installed $tag in $APP."
+fi
+
+# The launcher hands this clone to its Lua only after proving it (fieldRunRoot in main.swift).
+open --env "${ERGOPTI_FIELD_REPORT_ENVIRONMENT}=$REPO_ROOT" "$APP" || fail "$APP could not be opened."
+log "Opened $APP with this clone as its field-run root."
