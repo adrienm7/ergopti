@@ -50,6 +50,15 @@ function createTypingConsumer(root, manifest) {
 	});
 	// data.js draws its colours through ThemeTokens, as the page loads it first.
 	require(path.join(root, 'tools/test/support/theme-tokens.cjs')).installThemeTokens(context);
+	// The page loads the shared manifest codec before the typing data owner.
+	vm.runInContext(
+		fs.readFileSync(
+			path.join(root, 'static/ergopti_plus/_shared/ui/metrics_manifest_keys.js'),
+			'utf8'
+		),
+		context,
+		{ filename: 'metrics_manifest_keys.js' }
+	);
 	// The complete data owner brings its real helper closure, never policy stubs.
 	vm.runInContext(
 		fs.readFileSync(
