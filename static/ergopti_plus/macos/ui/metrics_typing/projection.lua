@@ -214,7 +214,9 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- @param start_date string|nil Inclusive lower bound.
 	--- @param end_date string|nil Inclusive upper bound.
 	--- @param apps table|nil Requested apps.
-	--- @param held_serial integer|nil Serial of the history the page holds.
+	--- @param held_serial integer|false|nil Serial of the history the page holds;
+	---     false for a payload saved to disk, which must name no serial: serials
+	---     restart with the process, so a saved one could name another history.
 	--- @return string json Encoded { historical, today }, plus `"incomplete":true`
 	---     when a read missed rows. A cached history carries `historical_serial`;
 	---     when it equals `held_serial`, `"historical_reused":true` replaces it.
@@ -279,6 +281,7 @@ function M.session(reader, sqlite_path, today, pacer)
 		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
 		local range_complete = history_complete == true and today_complete == true
 		local historical_member
+		if held_serial == false then serial = nil end
 		if serial ~= nil and serial == held_serial then
 			-- The page holds this exact history: resending it each live update
 			-- held the main thread about 250 ms (field report 2026-11-03).

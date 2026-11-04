@@ -517,7 +517,8 @@ local function compute_full(pacer)
 	-- Initial range pre-fetch (first_date → today).
 	local initial_data_json = "null"
 	if session and first_date then
-		initial_data_json, range_complete = session.range(first_date, today, all_apps_list)
+		-- Saved as the next open's snapshot: a serial must not outlive this process
+		initial_data_json, range_complete = session.range(first_date, today, all_apps_list, false)
 	end
 
 	return {
