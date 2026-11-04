@@ -167,8 +167,11 @@ function createArchives(application, output, options = {}) {
 	const app = directory(application);
 	const destination = directory(output);
 	const basename = path.basename(app);
-	if (!basename.endsWith('.app'))
-		throw new Error('The archive source must be an application bundle.');
+	if (
+		!basename.endsWith('.app') ||
+		archives.some((archive) => archive.name !== basename + FORMATS.get(archive.format))
+	)
+		throw new Error('The archive source must match the declared application bundle.');
 	for (const archive of archives) absent(path.join(destination, archive.name));
 	const run = options.execute ?? execute;
 	const before = snapshot(app);

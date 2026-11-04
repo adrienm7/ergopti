@@ -165,8 +165,13 @@ function M.app_window(step)
 		error("app_switch.app_window: step must be 1 or -1, got " .. tostring(step), 2)
 	end
 	local front_pid = WindowManager.frontmost_pid()
-	if front_pid == nil then
+	if type(front_pid) ~= "number" then
 		Logger.info(LOG, "No frontmost application — no window to cycle.")
+		return false
+	end
+	local own_pid = WindowManager.own_pid()
+	if type(own_pid) ~= "number" or front_pid == own_pid then
+		Logger.info(LOG, "The frontmost application cannot be cycled safely.")
 		return false
 	end
 	local windows = {}

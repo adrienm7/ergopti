@@ -182,6 +182,22 @@ helpers.describe("previous application switches directly (app-switch-direct)", f
 			end)
 		end)
 
+	it("(app-switch-direct) window cycling never targets the driver itself", function(fresh_actions)
+		with_desk({ front = OWN, focused = 91, cursor_screen = LEFT_SCREEN,
+			windows = { window(91, OWN, LEFT_SCREEN), window(92, OWN, LEFT_SCREEN) } }, function(focused)
+			tap(fresh_actions, "win_app_next")
+			helpers.assert_eq(focused, {}, "the runtime is not an application-switch target")
+		end)
+	end)
+
+	it("(app-switch-direct) window cycling refuses an unknown driver identity", function(fresh_actions)
+		with_desk(app_windows_desk(52), function(focused)
+			package.loaded["adapters.window_manager"].own_pid = function() return nil end
+			tap(fresh_actions, "win_app_next")
+			helpers.assert_eq(focused, {}, "the runtime must be excluded before cycling")
+		end)
+	end)
+
 	it("(app-switch-direct) a keyboard slot runs the switch under the shortcut parent",
 		function(fresh_actions)
 			with_desk(two_screen_desk(LEFT_SCREEN), function(focused)

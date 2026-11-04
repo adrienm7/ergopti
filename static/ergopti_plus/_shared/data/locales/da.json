@@ -1740,6 +1740,7 @@
 	"menu.layout.install_launcher_required": "Åbn ErgoptiPlus, og prøv at installere tastaturlayoutet igen.",
 	"menu.layout.install_other_scope": "Der er et layout i den anden Keyboard Layouts-mappe. Fjern det manuelt, og prøv igen.",
 	"menu.layout.install_other_scope_unverified": "Den anden Keyboard Layouts-mappe kunne ikke kontrolleres. Kontrollér den manuelt, før du prøver igen.",
+	"menu.layout.install_system_unavailable": "Systeminstallation er utilgængelig, fordi launcheren ikke kan kontrolleres sikkert efter godkendelse. Brug brugerinstallation, og fjern først eventuelle gamle systemkopier.",
 	"menu.layout.active_layouts": "Inputkilder",
 	"menu.layout.header_any": "Alle layouts",
 	"menu.layout.header_custom": "Brugerdefineret layout",
