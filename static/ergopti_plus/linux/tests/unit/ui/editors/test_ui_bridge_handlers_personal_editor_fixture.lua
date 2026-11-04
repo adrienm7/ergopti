@@ -163,6 +163,29 @@ helpers.describe("personal editor opening-source admission", function()
 			end)
 		end)
 	end
+	helpers.it("(personal-save-serialization) rejects a reentrant save while the committed model reloads", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local nested, stale
+			f.state.config.reload = function()
+				f.seen.reloads = f.seen.reloads + 1
+				if not nested then
+					nested = {}
+					stale = f.save("stale edit", {})
+					nested = f.save("second edit")
+				end
+				return 0, true
+			end
+			local first = f.save("first edit")
+			helpers.assert_eq(first.saved, true)
+			helpers.assert_eq(stale, { saved = false, busy = true })
+			helpers.assert_eq(nested, { saved = false, busy = true })
+			helpers.assert_contains(f.read(), "first edit")
+			helpers.assert_true(not f.read():find("second edit", 1, true))
+			helpers.assert_eq(f.seen.writes, 1)
+			helpers.assert_eq(f.seen.reloads, 1)
+		end)
+	end)
 
 	helpers.it("refuses a foreign section added after the actual displayed model", function()
 		with_opening_file(function(f)
