@@ -396,6 +396,89 @@ local run_contract = function(helpers,load_manager,load_host)
     end)
    end)
   end
+  helpers.it('(native-window-owner) retains close debt when release replaces its gate',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+    local original=m.get_daemon_state();local foreign_calls=0
+    local foreign={release=function()foreign_calls=foreign_calls+1;return true end}
+    c.on_release=function(owner)c.on_release=nil;owner.set_daemon_state({input_capture_gate=foreign})end
+    helpers.assert_eq(m.hide('metrics_typing',epoch),false,'A gate replacement cannot acknowledge the old page')
+    helpers.assert_eq(m.current_epoch('metrics_typing'),epoch);helpers.assert_eq(#c.closed,0)
+    helpers.assert_eq(foreign_calls,0,'The replacement gate must not receive the old release')
+    m.set_daemon_state(original)
+    helpers.assert_eq(m.hide('metrics_typing',epoch),true);helpers.assert_eq(c.closed,{epoch})
+   end)
+  end)
+  helpers.it('(native-window-owner) blocks old page messages while its gate is replaced',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+    local original=m.get_daemon_state();local calls=0
+    c.message=function()calls=calls+1;return true end
+    m.set_daemon_state({input_capture_gate={release=function()return true end}})
+    helpers.assert_eq(m.page_current('metrics_typing',epoch),false)
+    helpers.assert_eq(m.route_message('metrics_typing','metrics_typing_bridge',{action='ready'},epoch),nil)
+    helpers.assert_eq(calls,0)
+    m.set_daemon_state(original)
+    helpers.assert_eq(m.page_current('metrics_typing',epoch),true)
+    helpers.assert_eq(m.hide('metrics_typing',epoch),true)
+   end)
+  end)
+  helpers.it('(native-window-owner) refuses a foreign gate installed during native destroy',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+    local original=m.get_daemon_state();local foreign_calls=0
+    local foreign={release=function()foreign_calls=foreign_calls+1;return true end}
+    local window=c.windows[1];local destroy=window.destroy
+    window.destroy=function(self)m.set_daemon_state({input_capture_gate=foreign});return destroy(self)end
+    helpers.assert_eq(m.hide('metrics_typing',epoch),false)
+    helpers.assert_eq(m.current_epoch('metrics_typing'),epoch);helpers.assert_eq(#c.closed,0)
+    helpers.assert_eq(foreign_calls,0,'A replacement gate cannot receive an old page release')
+    m.set_daemon_state(original)
+    helpers.assert_eq(m.hide('metrics_typing',epoch),true);helpers.assert_eq(c.closed,{epoch})
+   end)
+  end)
+  helpers.it('(native-window-owner) retains close debt when release method is replaced',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+    local gate=m.get_daemon_state().input_capture_gate;local release=gate.release;local foreign_calls=0
+    c.on_release=function()c.on_release=nil;gate.release=function()foreign_calls=foreign_calls+1;return true end end
+    helpers.assert_eq(m.hide('metrics_typing',epoch),false);helpers.assert_eq(m.current_epoch('metrics_typing'),epoch)
+    helpers.assert_eq(#c.closed,0);helpers.assert_eq(foreign_calls,0)
+    gate.release=release
+    helpers.assert_eq(m.hide('metrics_typing',epoch),true);helpers.assert_eq(c.closed,{epoch})
+   end)
+  end)
+  helpers.it('(native-window-owner) retains the shutdown gate through a reentrant replacement',function()
+   fixture(function(m)
+    local original=m.get_daemon_state();local gate=original.input_capture_gate
+    local calls,foreign_calls=0,0;local swap=true
+    gate.release_all=function()
+     calls=calls+1
+     if swap then swap=false;m.set_daemon_state({input_capture_gate={release_all=function()foreign_calls=foreign_calls+1;return true end}})end
+     return true
+    end
+    helpers.assert_eq(m.shutdown(),false,'A replacement gate cannot acknowledge prior shutdown ownership')
+    helpers.assert_eq(foreign_calls,0)
+    m.set_daemon_state(original)
+    helpers.assert_eq(m.shutdown(),true);helpers.assert_eq(calls,2);helpers.assert_eq(foreign_calls,0)
+   end)
+  end)
+  helpers.it('(native-window-owner) rejects a substituted shutdown release callback',function()
+   fixture(function(m)
+    local gate=m.get_daemon_state().input_capture_gate;local calls,foreign_calls=0,0
+    local original
+    original=function()
+     calls=calls+1
+     if calls==1 then gate.release_all=function()foreign_calls=foreign_calls+1;return true end end
+     return true
+    end
+    gate.release_all=original
+    helpers.assert_eq(m.shutdown(),false);helpers.assert_eq(foreign_calls,0)
+    helpers.assert_eq(m.shutdown(),false);helpers.assert_eq(foreign_calls,0)
+    gate.release_all=original
+    helpers.assert_eq(m.shutdown(),true);helpers.assert_eq(calls,2)
+   end)
+  end)
   helpers.it('(native-window-owner) release callback cannot reacquire retiring page',function()
    fixture(function(m,c)
     helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
