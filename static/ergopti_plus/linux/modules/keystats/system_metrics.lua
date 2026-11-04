@@ -111,13 +111,17 @@ end
 local function read_wireless_interface()
 	local fh = io.open(_wireless_path, "r")
 	if not fh then return nil end
-	local line = nil
-	for _ = 1, 3 do
-		line = fh:read("*l")
-		if not line then break end
-	end
-	fh:close()
-	return line and line:match("^%s*(%S+)") or nil
+	local read_ok, line = pcall(function()
+		local current
+		for _ = 1, 3 do
+			current = fh:read("*l")
+			if not current then break end
+		end
+		return current
+	end)
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or not close_ok or closed ~= true or type(line) ~= "string" then return nil end
+	return line:match("^%s*(%S+)")
 end
 
 --- The network the machine is on.
