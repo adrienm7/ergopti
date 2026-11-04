@@ -37,8 +37,8 @@ local LOG = "infra.reload_restart"
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.restart) == "function", "the reload owner needs its restart")
 	local timing = opts.timing or require("infra.reload_timing")
-	local in_flight = false
-	local function perform(trigger)
+	local in_flight, starting = false, false
+	local function perform_inner(trigger)
 		if in_flight then
 			Logger.info(LOG, "Reload requested by %s joins the restart already in flight.", trigger)
 			return true
@@ -64,8 +64,19 @@ function M.new(opts)
 		in_flight = true
 		return true
 	end
+	local function perform(trigger)
+		-- Cleanup and restart ports may reenter through callbacks before the
+		-- restart receipt exists. Such a request cannot join an unconfirmed one.
+		if starting then return false, "postponed" end
+		starting = true
+		local called, started, reason = pcall(perform_inner, trigger)
+		starting = false
+		if not called then error(started, 0) end
+		return started, reason
+	end
 	--- Cancels the restart in flight; the daemon then keeps running, or quits on the caller's request.
 	local function abandon()
+		if starting then return false, "restart admission in progress" end
 		if not in_flight then return true end
 		assert(type(opts.cancel) == "function", "the reload owner needs its cancel to abandon a restart")
 		local cancelled, detail = opts.cancel()
@@ -79,7 +90,7 @@ function M.new(opts)
 			.. "the restart may still start a new daemon after this one exits.", tostring(detail))
 		return false, detail
 	end
-	return perform, function() return in_flight end, abandon
+	return perform, function() return in_flight or starting end, abandon
 end
 
 return M

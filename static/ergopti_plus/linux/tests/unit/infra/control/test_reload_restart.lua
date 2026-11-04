@@ -20,6 +20,34 @@ local function gestures(windows_ok, programs_ok)
 end
 
 helpers.describe("Linux Reload is a daemon restart (reload-is-a-restart-2026-10-24)", function()
+	helpers.it("postpones a reentrant reload while restart admission is running (reload-reentrant)", function()
+		local calls, nested, perform, in_flight, abandon = 0, nil, nil, nil, nil
+		local timing = { mark = function() end, clear = function() end }
+		perform, in_flight, abandon = ReloadRestart.new({ timing = timing, restart = function()
+			calls = calls + 1
+			if calls == 1 then
+				nested = { perform("nested") }
+				helpers.assert_true(in_flight(), "quit must see admission in progress")
+				helpers.assert_eq({ abandon() }, { false, "restart admission in progress" })
+			end
+			return true
+		end })
+		helpers.assert_eq(perform("outer"), true)
+		helpers.assert_eq(calls, 1, "reentrant admission must not launch a second restart")
+		helpers.assert_eq(nested, { false, "postponed" })
+	end)
+
+	helpers.it("clears reload admission after cleanup raises (reload-reentrant)", function()
+		local first = true
+		local perform = ReloadRestart.new({ timing = { mark = function() end, clear = function() end },
+			gestures = { stop_window_switches = function()
+				if first then first = false; error("cleanup failed") end
+				return true
+			end, stop_programs = function() return true end }, restart = function() return true end })
+		helpers.assert_eq(pcall(perform, "first"), false)
+		helpers.assert_eq(perform("retry"), true, "a raised cleanup must not strand admission")
+	end)
+
 	helpers.it("requests one restart and joins a later request", function()
 		local reasons = {}
 		local perform = ReloadRestart.new({ gestures = gestures(true, true),
