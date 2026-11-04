@@ -56,6 +56,19 @@ local function with_probe(callback)
 end
 
 helpers.describe("task output turn probe", function()
+	helpers.it("closes the child when callback error formatting fails (output-turn-error-object)", function()
+		with_probe(function()
+			local Probe, spawns = load_probe()
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			local calls = 0
+			helpers.assert_not_nil(Probe.request("test", function() calls = calls + 1; error(hostile) end))
+			helpers.assert_true(pcall(spawns[1].on_chunk, nil, "turn\n", ""))
+			helpers.assert_true(spawns[1].closed, "callback diagnostics must not strand the echo child")
+			spawns[1].on_done(0, "", "")
+			helpers.assert_eq(calls, 1)
+		end)
+	end)
+
 	helpers.it("terminates the echo child if closing its input fails (output-turn-close-refusal)", function()
 		for _, options in ipairs({ { close_result = false }, { close_raises = true } }) do
 			with_probe(function()

@@ -2658,6 +2658,8 @@ local function build_tap_copy()
 	})
 	watch = TapCopy.new({
 		change_count = function() return (Clipboard._change_count()) end,
+		capture_destination = km_utils.capture_text_destination,
+		destination_current = km_utils.owns_text_destination,
 		duration_ms = EventClock.duration_ms,
 		defer = SyntheticInput.defer_after_callback,
 		event_flags = function(event) return event:getFlags() end,

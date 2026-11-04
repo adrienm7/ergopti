@@ -21,6 +21,26 @@ local seed_family = Seeds.seed_family
 local seed_inactive_family = Seeds.seed_inactive_family
 
 helpers.describe("HS-033 exact LLM shortcut transactions", function()
+	helpers.it("refuses malformed saved shortcuts when arming without removing an owner", function()
+		with_trigger_fixture({}, function(fixture)
+			local slot = seed_family(fixture, "profile")
+			local old_handle = slot.get_handle()
+			fixture.reset_observations()
+			for _, malformed in ipairs({{mods = {"ctrl"}}, false, "invalid"}) do
+				fixture.state.llm_profile_shortcuts = {user_p = malformed}
+				helpers.assert_eq(fixture.orchestrator.arm_shortcuts(), false)
+				helpers.assert_true(slot.get_handle() == old_handle)
+				helpers.assert_true(fixture.state.llm_profile_shortcuts.user_p == malformed)
+			end
+			fixture.state.llm_profile_shortcuts = false
+			helpers.assert_eq(fixture.orchestrator.arm_shortcuts(), false)
+			helpers.assert_true(slot.get_handle() == old_handle)
+			helpers.assert_eq(fixture.get_save_count(), 0)
+			fixture.fire(old_handle)
+			helpers.assert_eq(fixture.get_prediction_count(), 1)
+		end)
+	end)
+
 	helpers.it("rejects a malformed shortcut collection without deleting existing bindings", function()
 		with_trigger_fixture({}, function(fixture)
 			local slot = seed_family(fixture, "profile")

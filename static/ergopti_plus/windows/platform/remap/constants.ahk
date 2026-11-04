@@ -1466,17 +1466,41 @@ global _TapCopyGeneration := 0
 ; Seams for the test suite: the counter, the timer and the notice.
 global _TapCopyCounterFn := () => CB_GetSequenceNumber()
 global _TapCopyTimerFn := (Callback, DelayMs) => TimerAfter(DelayMs / 1000, Callback)
+global _TapCopyFocusFn := () => WIGetFocusedControlToken()
+global _TapCopyPhysicalTickFn := () => (A_TickCount - A_TimeIdlePhysical) & 0xFFFFFFFF
 global _TapCopyWarnFn := () => NotifierSend(t("notify.tap_hold.copy_failed"), Map("level", "warning"))
 
 ; Sends one tap-hold copy and starts its check.
 ; @param KeyId {String} The tap-hold key that tapped, for the log.
 ; @param SendFn {Func} Sends the copy keystroke; returns the sender's verdict.
 ;   The retry calls it again.
+; A missing focus or physical-input timestamp cannot establish a safe retry.
+_TapCopyContext() {
+	global _TapCopyFocusFn, _TapCopyPhysicalTickFn
+	try {
+		Focus := _TapCopyFocusFn.Call()
+		Tick := _TapCopyPhysicalTickFn.Call()
+		if !(Focus is Integer) or Focus == 0 or !(Tick is Integer)
+			return 0
+		return Map("focus", Focus, "tick", Tick)
+	} catch {
+		return 0
+	}
+}
+
+_TapCopySameContext(First, Second) {
+	return IsObject(First) and IsObject(Second)
+		and First["focus"] == Second["focus"] and First["tick"] == Second["tick"]
+}
+
 TapCopySend(KeyId, SendFn) {
 	global _TapCopyCounterFn
 	Baseline := _TapCopyCounterFn.Call()
+	Context := _TapCopyContext()
 	Sent := SendFn.Call()
-	TapCopyCheckStart(Baseline, KeyId, SendFn)
+	if !_TapCopySameContext(Context, _TapCopyContext())
+		Context := 0
+	TapCopyCheckStart(Baseline, KeyId, SendFn, Context)
 	return Sent
 }
 
@@ -1485,7 +1509,7 @@ TapCopySend(KeyId, SendFn) {
 ; @param Source {String} What sent the copy, for the log.
 ; @param SendFn {Func} Sends the copy keystroke again for the retry.
 ; @return {Boolean} Whether a check is now pending.
-TapCopyCheckStart(Baseline, Source, SendFn) {
+TapCopyCheckStart(Baseline, Source, SendFn, Context := 0) {
 	global _TapCopyPending, _TapCopyGeneration, _TapCopyTimerFn, TAP_COPY_VERIFY_MS
 	if IsObject(_TapCopyPending)
 		try LoggerDebug("TapHoldCopy", "Tap-hold copy check from {1} superseded by a newer copy.", _TapCopyPending["source"])
@@ -1498,7 +1522,7 @@ TapCopyCheckStart(Baseline, Source, SendFn) {
 		return false
 	}
 	_TapCopyPending := Map("baseline", Baseline, "attempts", 1, "source", Source,
-		"generation", _TapCopyGeneration, "send", SendFn)
+		"generation", _TapCopyGeneration, "send", SendFn, "context", Context)
 	Generation := _TapCopyGeneration
 	_TapCopyTimerFn.Call(() => _TapCopyCheckTick(Generation), TAP_COPY_VERIFY_MS)
 	return true
@@ -1525,6 +1549,8 @@ _TapCopyCheckTick(Generation) {
 		return
 	}
 	Counter := _TapCopyCounterFn.Call()
+	if !IsObject(_TapCopyPending) or _TapCopyPending["generation"] != Generation
+		return
 	WaitedMs := Pending["attempts"] * TAP_COPY_VERIFY_MS
 	if !(Counter is Integer) or Counter == 0 {
 		_TapCopyPending := 0
@@ -1546,6 +1572,14 @@ _TapCopyCheckTick(Generation) {
 		_TapCopyWarnUser()
 		return
 	}
+	Context := _TapCopyContext()
+	if !IsObject(_TapCopyPending) or _TapCopyPending["generation"] != Generation
+		return
+	if !_TapCopySameContext(Pending["context"], Context) {
+		_TapCopyPending := 0
+		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} could not be retried because its original context is no longer proven.", Pending["source"])
+		return
+	}
 	Pending["attempts"] += 1
 	Pending["baseline"] := Counter
 	Refusal := ""
@@ -1555,6 +1589,8 @@ _TapCopyCheckTick(Generation) {
 	} catch as Err {
 		Refusal := Err.Message
 	}
+	if !IsObject(_TapCopyPending) or _TapCopyPending["generation"] != Generation
+		return
 	if (Refusal != "") {
 		_TapCopyPending := 0
 		try LoggerWarn("TapHoldCopy", "Tap-hold copy from {1} never reached the clipboard (retry_refused after {2} ms: {3}); the user is warned.", Pending["source"], WaitedMs, Refusal)

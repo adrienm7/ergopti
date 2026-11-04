@@ -56,6 +56,27 @@ return function(helpers, CopyCheck)
 	end
 
 	helpers.describe("tap-hold copy check (tap-copy-verified)", function()
+		helpers.it("never retries after the original context is lost (tap-copy-context)", function()
+			for _, guard in ipairs({ function() return false end, function() error("focus unreadable") end }) do
+				local w = world()
+				w.checker:start(w.counter, "left_shift", guard)
+				w.advance(250)
+				helpers.assert_eq(w.sends, 0)
+				helpers.assert_eq(w.reports[1].outcome, CopyCheck.CONTEXT_CHANGED)
+				helpers.assert_eq(CopyCheck.is_failure(w.reports[1].outcome), false)
+			end
+		end)
+
+		helpers.it("does not retry a superseded check after its guard re-enters (tap-copy-context)", function()
+			local w = world()
+			w.checker:start(w.counter, "old", function()
+				w.checker:start(w.counter, "new")
+				return true
+			end)
+			w.advance(250)
+			helpers.assert_eq(w.sends, 0)
+			helpers.assert_eq(w.reports[1].outcome, CopyCheck.SUPERSEDED)
+		end)
 		helpers.it("a copy that moved the counter is verified without a retry (tap-copy-verified)", function()
 			local w = world()
 			helpers.assert_eq(w.checker:start(w.counter, "left_shift"), true)

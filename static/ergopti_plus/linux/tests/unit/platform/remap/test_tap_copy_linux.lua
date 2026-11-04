@@ -15,12 +15,17 @@ local TapCopy = require("platform.remap.tap_copy")
 --- @param options table|nil { reason = string, copies = { [n] = true }, copy_on_send = boolean }
 local function world(options)
 	options = options or {}
-	local w = { counter = 1000, sends = 0, warnings = 0, logs = {}, timers = {}, now = 0 }
+	local w = { counter = 1000, sends = 0, warnings = 0, logs = {}, timers = {}, now = 0, focus = "field-a" }
 	w.owner = TapCopy.new({
 		verify_ms = 300,
 		read_counter = function()
 			if options.reason then return nil, options.reason end
 			return w.counter
+		end,
+		capture_destination = function() return w.focus end,
+		destination_current = function(destination)
+			if w.reenter then w.owner:activity() end
+			return destination == w.focus
 		end,
 		send_copy = function()
 			w.sends = w.sends + 1
@@ -55,6 +60,22 @@ local function world(options)
 end
 
 helpers.describe("Linux tap-hold copy (tap-copy-verified)", function()
+	helpers.it("does not retry after focus or physical activity changes (tap-copy-context)", function()
+		for _, change in ipairs({
+			function(w) w.focus = "field-b" end,
+			function(w) w.owner:activity() end,
+			function(w) w.reenter = true end,
+			function(w) w.focus = nil end,
+		}) do
+			local w = world()
+			w.tap()
+			change(w)
+			w.advance(300)
+			helpers.assert_eq(w.sends, 0)
+			helpers.assert_eq(w.warnings, 0)
+			helpers.assert_true(w.logs[1].text:find("original context is no longer proven", 1, true) ~= nil)
+		end
+	end)
 	helpers.it("a Ctrl+C that moved the counter is verified (tap-copy-verified)", function()
 		local w = world({ copy_on_send = true })
 		w.tap()

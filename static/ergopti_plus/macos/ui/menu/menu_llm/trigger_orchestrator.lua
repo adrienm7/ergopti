@@ -887,14 +887,24 @@ function M.new(ctx)
 			Logger.error(LOG, "AI profile shortcuts cannot be armed while the AI is off.")
 			return false
 		end
-		local shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
+		if state.llm_profile_shortcuts ~= nil and type(state.llm_profile_shortcuts) ~= "table" then
+			Logger.warn(LOG, "Cannot arm malformed profile shortcut collection.")
+			return false
+		end
+		local shortcuts = state.llm_profile_shortcuts or {}
 		local valid = valid_profile_ids()
 		local ids = {}
+		local settled = true
 		for profile_id, shortcut in pairs(shortcuts) do
-			if valid[profile_id] and type(shortcut) == "table" then ids[#ids + 1] = profile_id end
+			if valid[profile_id] then
+				if type(shortcut) == "table" and type(shortcut.key) == "string" and shortcut.key ~= "" then
+					ids[#ids + 1] = profile_id
+				else
+					settled = false
+				end
+			end
 		end
 		table.sort(ids)
-		local settled = true
 		local armed = 0
 		for _, profile_id in ipairs(ids) do
 			local shortcut = shortcuts[profile_id]
