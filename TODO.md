@@ -384,6 +384,13 @@ between workers) green alone. All live checks pass, typed by the harness.
 
 ### macOS
 
+- **Field report 2026-11-03 (`mac-2026-11-03_102716`), branch `fix/macos-field-2026-11-03`.** Done: ai_local no
+  longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
+  dashboard no longer resends an unchanged history each live update (250 ms holds, +73 MB heap per minute). Already on
+  dev: blob Range redirect (e6942d05c2), diagnostics phase A (e76a5443f8), post-wake AX hold (1f2884f13c), owned
+  Ollama Go test enrolment (627bfad0af). Next: Karabiner regeneration is synchronous (merge 170 ms, layout actions
+  230 ms cold: event_taps `runloop_late_ms` 294); keystats start runs `ioreg -d2` (151 ms) on the main thread at
+  boot+1 s; the first menu build forks two `find` (44 ms; three menu_apps tests are built on find output).
 - **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** Today the driver still uses
   the installed one and the owned runtime is dormant. Publish the runtime, write its pin, then WP8, WP9 and the real-Mac
   acceptance below, and make `runtime = "owned"` the default.
