@@ -118,6 +118,46 @@ enum OwnedRuntimeDownloadedHelper {
 		return locate(configDir: configDir, home: home)
 	}
 
+	/// pqrs' pinned driver package as the Lua driver fetch keeps it (runtime_vhid_update.lua `home_for`):
+	/// its path, pinned digest and Developer ID Installer team. The administrator shell checks both again.
+	struct DriverPackage: Equatable {
+		let path: String
+		let sha256: String
+		let team: String
+	}
+
+	/// The kept, verified driver package of one manifest and one home folder.
+	/// - Returns: The package, or nil when it is not pinned or not downloaded.
+	static func driverPackage(manifest: Data, home: String) -> DriverPackage? {
+		guard home.hasPrefix("/"), !home.contains("\0"), !home.contains("\n"),
+			let root = (try? JSONSerialization.jsonObject(with: manifest)) as? [String: Any],
+			let pin = root["virtual_hid_device"] as? [String: Any],
+			let version = pin["version"] as? String, validVersion(version),
+			let name = pin["file_name"] as? String, validVersion(name), name.hasSuffix(".pkg"),
+			let sha256 = pin["sha256"] as? String, validDigest(sha256),
+			let team = pin["team_identifier"] as? String, team.utf8.count == 10,
+			team.unicodeScalars.allSatisfy({ $0.isASCII && CharacterSet.alphanumerics.contains($0) }) else { return nil }
+		let path = URL(fileURLWithPath: home, isDirectory: true).appendingPathComponent(artifactHomeRelative, isDirectory: true)
+			.appendingPathComponent("VirtualHIDDevice", isDirectory: true).appendingPathComponent(version, isDirectory: true)
+			.appendingPathComponent(name).path
+		var info = stat()
+		guard lstat(path, &info) == 0, info.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG) else { return nil }
+		return DriverPackage(path: path, sha256: sha256, team: team)
+	}
+
+	/// The kept driver package of this launcher's manifest and account.
+	static func currentDriverPackage() -> DriverPackage? {
+		let selection = LuaSourceSelection.resolve(
+			infoDictionary: Bundle.main.infoDictionary,
+			bundlePath: Bundle.main.bundlePath,
+			fileExists: { FileManager.default.fileExists(atPath: $0) }
+		)
+		guard let configDir = selection.configDir, let home = accountHome(),
+			let bytes = try? Data(contentsOf: URL(fileURLWithPath: configDir, isDirectory: true).appendingPathComponent(manifestRelative))
+		else { return nil }
+		return driverPackage(manifest: bytes, home: home)
+	}
+
 	/// The same version shape runtime_artifact_fetch.lua admits, minus the dot-only names that
 	/// would leave the RemapRuntime folder.
 	private static func validVersion(_ version: String) -> Bool {

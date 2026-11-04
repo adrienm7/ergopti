@@ -1,36 +1,13 @@
 // Tests/ErgoptiPlusTests/OwnedRuntimeVirtualHIDProvisionOwnerTests.swift
-// The VirtualHIDDevice daemon job is pqrs' plist under Ergopti's label; the package chain must be pqrs' own.
+// The VirtualHIDDevice daemon job is pqrs' plist keys under Ergopti's label; the role installs only the pinned package.
 import Foundation
 import XCTest
 @testable import ErgoptiPlus
 
 final class OwnedRuntimeVirtualHIDProvisionOwnerTests: XCTestCase {
-	/// The daemon plist of pqrs-org/Karabiner-DriverKit-VirtualHIDDevice v8.5.0 (files/LaunchDaemons).
-	private let pqrs = Data("""
-	<?xml version="1.0" encoding="UTF-8"?>
-	<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-	<plist version="1.0">
-	  <dict>
-	    <key>Label</key>
-	    <string>org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon</string>
-	    <key>KeepAlive</key>
-	    <true/>
-	    <key>ProcessType</key>
-	    <string>Interactive</string>
-	    <key>ProgramArguments</key>
-	    <array>
-	      <string>/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon</string>
-	    </array>
-	  </dict>
-	</plist>
-	""".utf8)
-
-	private func fields(_ data: Data) throws -> [String: Any] {
-		try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
-	}
-
 	func testTheJobKeepsPqrsKeysUnderErgoptisLabel() throws {
-		let job = try fields(OwnedRuntimeVirtualHIDProvisionOwner.jobBytes(pqrs: pqrs))
+		let job = try XCTUnwrap(PropertyListSerialization.propertyList(
+			from: OwnedRuntimeVirtualHIDProvisionOwner.jobBytes(), format: nil) as? [String: Any])
 		XCTAssertEqual(job["Label"] as? String, Identifiers.ServiceLabels.macosVirtualHid)
 		XCTAssertEqual(job["ProgramArguments"] as? [String], [OwnedVirtualHIDDaemonReportReference.daemonExecutable])
 		XCTAssertEqual(job["KeepAlive"] as? Bool, true)
@@ -38,30 +15,31 @@ final class OwnedRuntimeVirtualHIDProvisionOwnerTests: XCTestCase {
 		XCTAssertEqual(Set(job.keys), ["Label", "KeepAlive", "ProcessType", "ProgramArguments"])
 	}
 
-	func testAnotherProgramOrLabelIsRefused() throws {
-		var other = try fields(pqrs)
-		other["ProgramArguments"] = ["/tmp/daemon"]
-		XCTAssertThrowsError(try OwnedRuntimeVirtualHIDProvisionOwner.jobBytes(
-			pqrs: PropertyListSerialization.data(fromPropertyList: other, format: .xml, options: 0)))
-		other = try fields(pqrs)
-		other["Label"] = Identifiers.ServiceLabels.macosVirtualHid
-		XCTAssertThrowsError(try OwnedRuntimeVirtualHIDProvisionOwner.jobBytes(
-			pqrs: PropertyListSerialization.data(fromPropertyList: other, format: .xml, options: 0)))
+	func testTheKeptDriverPackageIsReadFromThePinOnly() throws {
+		let home = FileManager.default.temporaryDirectory.appendingPathComponent("vhid-pin-" + UUID().uuidString)
+		defer { try? FileManager.default.removeItem(at: home) }
+		let folder = home.appendingPathComponent("Library/Application Support/ErgoptiPlus/RemapRuntime/VirtualHIDDevice/8.5.0")
+		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+		let digest = String(repeating: "a", count: 64)
+		func manifest(team: String = "G43BCU2T37", name: String = "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg") throws -> Data {
+			try JSONSerialization.data(withJSONObject: ["virtual_hid_device": [
+				"version": "8.5.0", "file_name": name, "sha256": digest, "team_identifier": team]])
+		}
+		XCTAssertNil(OwnedRuntimeDownloadedHelper.driverPackage(manifest: try manifest(), home: home.path), "not downloaded yet")
+		try Data("pkg".utf8).write(to: folder.appendingPathComponent("Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg"))
+		let package = try XCTUnwrap(OwnedRuntimeDownloadedHelper.driverPackage(manifest: try manifest(), home: home.path))
+		XCTAssertEqual(package.sha256, digest)
+		XCTAssertEqual(package.team, "G43BCU2T37")
+		XCTAssertTrue(package.path.hasSuffix("/VirtualHIDDevice/8.5.0/Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg"))
+		XCTAssertNil(OwnedRuntimeDownloadedHelper.driverPackage(manifest: try manifest(team: "G43BCU2T3'"), home: home.path))
+		XCTAssertNil(OwnedRuntimeDownloadedHelper.driverPackage(manifest: try manifest(name: "../x.pkg"), home: home.path))
 	}
 
-	func testOnlyPqrsDeveloperIDInstallerChainIsAccepted() {
-		let signed = """
-		Package "Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg":
-		   Status: signed by a developer certificate issued by Apple for distribution
-		   Notarization: trusted by the Apple notary service
-		   Signed with a trusted timestamp on: 2026-01-01 00:00:00 +0000
-		   Certificate Chain:
-		    1. Developer ID Installer: Fumihiko Takayama (G43BCU2T37)
-		    2. Developer ID Certification Authority
-		    3. Apple Root CA
-		"""
-		XCTAssertTrue(OwnedRuntimeVirtualHIDProvisionOwner.signedByPqrs(Data(signed.utf8)))
-		XCTAssertFalse(OwnedRuntimeVirtualHIDProvisionOwner.signedByPqrs(Data(signed.replacingOccurrences(of: "G43BCU2T37", with: "AAAAAAAAAA").utf8)))
-		XCTAssertFalse(OwnedRuntimeVirtualHIDProvisionOwner.signedByPqrs(Data(signed.replacingOccurrences(of: "   Status: signed by a developer certificate issued by Apple for distribution\n", with: "   Status: no signature\n").utf8)))
+	func testTheDriverStepChecksDigestAndPqrsTeamBeforeTheInstaller() {
+		let program = OwnedRuntimeInstallMainOperation.driverProgram(.init(path: "/Users/a/k.pkg", sha256: String(repeating: "b", count: 64), team: "G43BCU2T37"))
+		let digest = program.range(of: "shasum -a 256")!, team = program.range(of: "(G43BCU2T37\\)$")!, install = program.range(of: "/usr/sbin/installer -pkg")!
+		XCTAssertLessThan(digest.lowerBound, install.lowerBound)
+		XCTAssertLessThan(team.lowerBound, install.lowerBound)
+		XCTAssertTrue(program.contains("exit 78") && program.contains("exit 79"))
 	}
 }

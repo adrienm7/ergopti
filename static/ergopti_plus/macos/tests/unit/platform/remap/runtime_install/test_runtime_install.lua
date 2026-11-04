@@ -32,7 +32,14 @@ local function fake(answer, overrides)
 	local world = { commands = {} }
 	local installer = Install.new({
 		launcher = overrides.launcher or function() return LAUNCHER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = LAUNCHER } end,
-		exists = function() return overrides.manager_present ~= false end,
+		exists = function(path)
+			if path == Install.DAEMON then return overrides.daemon_present ~= false end
+			return overrides.manager_present ~= false
+		end,
+		fetch_driver = function(callback)
+			world.fetches = (world.fetches or 0) + 1
+			callback(overrides.fetch_ok ~= false, overrides.fetch_ok == false and "vhid_update_download_failed" or nil, "offline")
+		end,
 		exec = function(executable, args, timeout, callback, environment)
 			world.commands[#world.commands + 1] = { executable = executable, args = args, timeout = timeout,
 				environment = environment }
@@ -102,12 +109,31 @@ helpers.describe("owned runtime first install", function()
 		helpers.assert_eq(install((fake(success, { manager_code = 1 }))).reason, "install_activation_failed")
 	end)
 
+	helpers.it("downloads pqrs' driver first when none is installed, and stops when it cannot", function()
+		-- The live helper carries no driver payload: the role installs the verified download.
+		local success = function() return 0, "OWNED_RUNTIME_INSTALL|1|files-published-services-observed-staging-retired\n" end
+		local installer, world = fake(success, { daemon_present = false })
+		helpers.assert_eq(install(installer).ok, true)
+		helpers.assert_eq(world.fetches, 1)
+		helpers.assert_eq(world.commands[1].executable, LAUNCHER, "the role runs after the download")
+		local refused, refused_world = fake(function() error("unreachable") end, { daemon_present = false, fetch_ok = false })
+		local result = install(refused)
+		helpers.assert_eq(result.reason, "install_driver_failed")
+		helpers.assert_eq(#refused_world.commands, 0, "no administrator prompt without the verified package")
+		local present, present_world = fake(success)
+		install(present)
+		helpers.assert_nil(present_world.fetches, "an installed driver is not downloaded again")
+		local digest = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|78\n" end)))
+		helpers.assert_eq(digest.reason, "install_driver_failed")
+	end)
+
 	helpers.it("lets a second caller wait for the running install", function()
 		local pending
 		package.loaded["platform.remap.runtime_install"] = nil
 		local installer = require("platform.remap.runtime_install").new({
 			launcher = function() return LAUNCHER end,
 			exists = function() return true end,
+			fetch_driver = function() error("the driver is installed: nothing to fetch") end,
 			exec = function(executable, _, _, callback)
 				if executable == LAUNCHER then pending = callback else callback(0, "", "") end
 			end,

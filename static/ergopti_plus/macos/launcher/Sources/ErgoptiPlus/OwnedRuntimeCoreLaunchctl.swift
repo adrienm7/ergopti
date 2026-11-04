@@ -21,14 +21,6 @@ enum OwnedRuntimeCoreLaunchctl {
 		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		return Observation(status: result.status, bytes: result.bytes)
 	}
-	/// One Apple-signed system tool other than launchctl, for an owner that closes its own argument list
-	/// (the driver package's pkgutil and installer calls). Output is returned, never exported.
-	static func systemTool(path: String, arguments: [String], timeout: TimeInterval) throws -> Observation {
-		guard path == "/usr/sbin/pkgutil" || path == "/usr/sbin/installer" else { throw OwnedRuntimeInstallFailure.source }
-		let result = try child(path: path, arguments: arguments, timeout: timeout)
-		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
-		return Observation(status: result.status, bytes: result.bytes)
-	}
 	private static func ownedDescriptor(_ original: Int32) throws -> Int32 {
 		guard original >= 0 else { throw OwnedRuntimeInstallFailure.source }
 		let result = fcntl(original, F_DUPFD_CLOEXEC, STDERR_FILENO + 1)
