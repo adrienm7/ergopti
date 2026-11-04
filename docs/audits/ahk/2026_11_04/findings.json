@@ -488,6 +488,17 @@
 			"root_cause": "The Menu API test supplies callbacks and a request kind to Generate without its supported CurrentFn authority. CancelAsync(original) cannot find a retry that has not yet been reserved, so the retry sender is admitted after the progress owner is gone.",
 			"silent_failure": "Clicking Cancel can still send another prompt to the provider after the native progress window closes and the auxiliary test owner is retired.",
 			"regression_test": "Two api-thinking-retry-owner cases drive the actual native Menu progress GUI, genuine Generate/managed HTTP and an owned loopback peer. A real logger sink cancels exactly between original retirement and retry admission; the positive control must issue two requests and settle successfully, while cancellation must leave one request, no retry link and no retired UI publication. The fix binds the exact progress owner through the existing Generate CurrentFn argument. Native fail-before measured; post-fix qualification pending."
+		},
+		{
+			"id": "AHK-045",
+			"title": "Queued key-combination chords replay input during native pause",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run41908766133 atb4eff5c passes both unpaused controls. Suspending before real SetTimer delivery still emits the waiting key (expected0/observed1) or the queued scan (expected1/observed2). Both failures repeat individually and reversed.",
+			"root_cause": "KeyCombinationChordTick treats suspension as a reason to flush a waiting key, and KeyCombinationChordDrain sends its retained queue without pause admission. Neither batch retains lifecycle authority, so resume before delivery and reentrant successor callbacks also require fencing.",
+			"silent_failure": "The paused driver can inject a key it retained before pause. A retired callback can also act on a newly admitted waiting or queued batch after lifecycle teardown and resume.",
+			"regression_test": "Four chord-native-pause cases deliver real native poll/drain timers around Suspend; production chord policy and engine remain genuine while keyboard transport is observed through its existing recorder. Two positive controls prove actual replay; two paused cases must discard unsent work and keep it retired after resume. No balancing-Up change or physical keyboard proof is claimed. Native fail-before measured; source correction and extended owner regressions are under review."
 		}
 	]
 }
