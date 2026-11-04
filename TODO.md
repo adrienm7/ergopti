@@ -568,28 +568,19 @@ between workers) green alone. All live checks pass, typed by the harness.
     next rebuild (item 31). The managed Ollama runtime moved inside the root (`%LOCALAPPDATA%\Ergopti\ollama`,
     maintainer decision, 4 November).
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
-  branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
-  - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
-    `ad1541f8…2de8e`, 12176523 bytes) and pinned in `macos/vendor/remap-runtime/manifest.json`; shared-rule migration,
-    Tap-Holds block rows and notice; WP8 step 1: the live helper's first install also provisions and starts the idle
-    Core service (`OwnedRuntimeIdleServiceEntry`), compiled unsigned for both architectures on a hosted Mac (Remap
-    runtime build run 41813372448).
-  - In progress (ready, not merged): the `RUNTIME_DEFAULT = "owned"` flip with the two Configuration rows
-    (`menu.global.karabiner_integration`, `menu.global.remove_from_karabiner`, `macos/ui/menu/remap_switch.lua`)
-    deleted, one commit on branch `next/owned-karabiner-flip` stacked on this one. It turns tap-holds off on any Mac
-    without the owned runtime, so it waits for WP8 and WP9.
-  - Done 4 November (WP8, on `dev`): the helper loads `com.ergoptiplus.runtime.vhid` and installs pqrs' package when
-    no driver is installed; the `--request-owned-runtime-install` launcher role and its Lua port behind the Tap-Holds
-    row « Install Ergopti's remapping engine… »; the field run reports both jobs, the verified download and whether
-    the launcher can install; `RUNTIME_VERSION` `16.3.0-ergopti.3`; the hosted `sudo` install acceptance job.
-    Status of the `.3` build, publication and pin: see the handoff.
-  - Decided 4 November: the owned runtime is field-tested on the CI-signed dev build (`--installed` collector mode),
-    never on the ad hoc developer app; no Developer ID for now. The `.3` artifact's Core lacked its idle admission
-    key (every hosted install stopped after the files); fixed in the producer, rebuilt, then published and pinned
-    once the hosted install acceptance passes (handoff).
-  - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
-    Done on 1 November: the per-OS feature requirements table
-    (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
+  [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
+  - Done: the owned runtime is the default (`RUNTIME_DEFAULT = "owned"`, the two Configuration rows and
+    `remap_switch.lua` gone). Runtime `16.3.0-ergopti.3` published (prerelease `remap-runtime-v16.3.0-ergopti.3`,
+    downloaded back: sha256 `eced1bfd…dc4567`, 12351916 bytes) and pinned; its hosted sudo install acceptance passed on
+    macos-15, macos-15-intel and macos-26 (Remap runtime build run 41895547018: files, Core and VirtualHIDDevice jobs
+    loaded, pqrs' package installed in the same shell, stage retired). The install is offered once by itself (one
+    confirmation, one administrator prompt), the driver approval pane opens and is watched, the Tap-Holds row retries;
+    the field run and the collector (`--installed`) report every install fact.
+  - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
+    below).
+  - Next: the maintainer's WP9 pass (handoff checklist) once a signed dev build is authorized, then the shared-mode
+    deletion. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
+    the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
   install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
   helper), Login Items lists them as separate « unidentified developer » rows, and the driver approval names pqrs'
