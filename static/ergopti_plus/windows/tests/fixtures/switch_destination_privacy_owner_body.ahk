@@ -171,11 +171,22 @@ _KSD_Exercise() {
 		MetricsFilters.disabled_apps[_KSD.B.App] := true
 	if _KSD.Mode == "outgoing-private"
 		MetricsFilters.disabled_apps[_KSD.A.App] := true
+	if _KSD.Mode == "outgoing-title-private" {
+		_KSD.A.Title := "Fixture A (Private Browsing)"
+		_KSD_Acquire(_KSD.A)
+		_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == _KSD.HistoryRows,
+			"Entering a private title must update context without adding a private transition.")
+	}
 	_KSD.Destination := _KSD_Acquire(_KSD.B)
+	if _KSD.Mode == "outgoing-title-private" {
+		_KSD_NativeLogAppSwitch(_KSD.A.App, _KSD.B.App, 1000, _KSD.A.Title)
+		_KSD_Require(Keystats._pending_entries.Length == _KSD.HistoryRows,
+			"The actual app-switch sink must independently refuse the private retained source title.")
+	}
 	PrivateDestination := MF_ShouldFilterFor(_KSD.B.App, _KSD.B.Title)
 	_KSD_Require(PrivateDestination == (_KSD.AppPrivate || _KSD.TitlePrivate),
 		"The genuine explicit predicate must authenticate the configured destination privacy.")
-	_KSD_Require(MF_ShouldFilterFor(_KSD.A.App, _KSD.A.Title) == (_KSD.Mode == "outgoing-private"),
+	_KSD_Require(MF_ShouldFilterFor(_KSD.A.App, _KSD.A.Title) == (_KSD.Mode == "outgoing-private" || _KSD.Mode == "outgoing-title-private"),
 		"The independent outgoing predicate must authenticate the chosen public or excluded A.")
 	_KSD_Require(Keystats.buffer_events.Length == 0 && Keystats._retry_snapshots.Length == 0
 		&& !Keystats._flush_in_progress && Keystats.session_clicks == 0 && Keystats.session_scrolls == 0,
@@ -191,7 +202,7 @@ _KSD_Exercise() {
 	Observed := _KSD_Observe("old-return")
 	_KSD_Require(Observed[1] == 0, "A captured excluded next_app must never enter the canonical switch queue.")
 	_KSD_Require(Observed[2] == 0, "A captured private next_title must never enter the canonical switch queue.")
-	if _KSD.Mode == "outgoing-private" {
+	if _KSD.Mode == "outgoing-private" || _KSD.Mode == "outgoing-title-private" {
 		for Index, Row in Keystats._pending_entries {
 			if Index > _KSD.HistoryRows
 				_KSD_Require(Row["type"] != "app_switch" && Row["type"] != "window_switch",

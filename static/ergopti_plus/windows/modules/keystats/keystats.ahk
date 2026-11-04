@@ -794,7 +794,17 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 ; ===================================================
 ; ===================================================
 
-KL_LogAppSwitch(prev_app, next_app, duration_ms := 0) {
+KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "") {
+    ; The outgoing title classifies private browsing without persisting that
+    ; title in an app-switch record. Live focus already names the destination.
+    Filtered := true
+    try Filtered := MF_ShouldFilterFor(prev_app, prev_title)
+    catch as Err
+        try LoggerWarn("Keystats", "Outgoing app-switch privacy could not be classified: {1}.", Err.Message)
+    if Filtered {
+        KL_RecordPrivacyHit()
+        return false
+    }
     KL_AppendLog(Map(
         "type",        "app_switch",
         "prev_app",    prev_app,
