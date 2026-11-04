@@ -103,6 +103,8 @@ local _run_active = false   -- Retained until run() retires its owned handles.
 local _stop_generation = 0  -- Revokes detached callback batches at stop().
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
+local _close_acks = {}      -- Owned handles retained until libuv calls their close callbacks.
+local _external_closes = {} -- A handle invalidated during startup has another close owner.
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
 local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield_idle().
@@ -210,23 +212,42 @@ end
 local function _cleanup_luv()
 	local function retire(handle, stop)
 		if not handle then return true end
+		if _close_acks[handle] ~= nil then return _close_acks[handle] end
 		if type(luv.is_closing) == "function" then
 			local inspected, closing = pcall(luv.is_closing, handle)
 			if not inspected then return false end
-			if closing then return true end
+			if closing then
+				if type(luv.walk) ~= "function" then return false end
+				_close_acks[handle], _external_closes[handle] = false, true
+				return false
+			end
 		end
 		local called, ack, detail = pcall(stop, handle)
 		if not called or ack == nil or ack == false or detail ~= nil then return false end
-		called, ack, detail = pcall(luv.close, handle)
-		if not called or ack == false or detail ~= nil then return false end
-		if type(luv.is_closing) == "function" then
-			local inspected, closing = pcall(luv.is_closing, handle)
-			return inspected and closing == true
-		end
-		return true
+		_close_acks[handle] = false
+		called, ack, detail = pcall(luv.close, handle, function() _close_acks[handle] = true end)
+		if not called or ack == false or detail ~= nil then _close_acks[handle] = nil; return false end
+		return _close_acks[handle]
 	end
-	if retire(_idle_handle, luv.idle_stop) then _idle_handle = nil end
-	if retire(_timer_handle, luv.timer_stop) then _timer_handle = nil end
+	retire(_idle_handle, luv.idle_stop)
+	retire(_timer_handle, luv.timer_stop)
+	-- A close is asynchronous. Pump one nonblocking turn so libuv delivers the
+	-- close callbacks before the last references can be collected at exit.
+	if (_idle_handle and _close_acks[_idle_handle] == false)
+		or (_timer_handle and _close_acks[_timer_handle] == false) then
+		pcall(luv.run, "nowait")
+	end
+	if next(_external_closes) then
+		local seen = {}
+		local walked = pcall(luv.walk, function(handle) seen[handle] = true end)
+		if walked then
+			for handle in pairs(_external_closes) do
+				if not seen[handle] then _external_closes[handle], _close_acks[handle] = nil, true end
+			end
+		end
+	end
+	if _idle_handle and _close_acks[_idle_handle] then _close_acks[_idle_handle] = nil; _idle_handle = nil end
+	if _timer_handle and _close_acks[_timer_handle] then _close_acks[_timer_handle] = nil; _timer_handle = nil end
 	return _idle_handle == nil and _timer_handle == nil
 end
 
@@ -394,10 +415,11 @@ function M.run(opts)
 
 	-- A prior failed native cleanup still owns these exact handles. Retry it
 	-- before a new run can replace their references.
+	_run_active = true
 	if luv and (_idle_handle or _timer_handle) and not _cleanup_luv() then
+		_run_active = false
 		error("Event loop native cleanup remains pending", 0)
 	end
-	_run_active = true
 	_running = true
 	_idle_wait = options.idleWait
 	local ran, run_error
