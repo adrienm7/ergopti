@@ -309,7 +309,7 @@ local function read_override(path)
 	if type(path) ~= "string" or path == "" then return nil end
 	local text = read_file(path)
 	if not text then
-		Logger.warn(LOG, "Keymap override '%s' is not readable — ignoring it.", path)
+		Logger.error(LOG, "Keymap override '%s' is not readable.", path)
 		return nil
 	end
 	return text
@@ -414,6 +414,7 @@ function M.refresh(override_path)
 	Logger.start(LOG, "Resolving the active keyboard layout…")
 
 	local text, source = read_override(override_path), "override"
+	if not text and type(override_path) == "string" and override_path ~= "" then return false end
 	if not text then text, source = dump_keymap() end
 
 	if not text then
