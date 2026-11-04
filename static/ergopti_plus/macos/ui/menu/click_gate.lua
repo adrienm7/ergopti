@@ -106,7 +106,7 @@ function M.new(deps)
 
 	local function report_lost(labels)
 		if #labels == 0 then return end
-		Logger.warn(LOG, "Menu click(s) on %s not applied: the current menu has no such row.",
+		Logger.warn(LOG, "Menu click(s) on %s could not be applied.",
 			table.concat(labels, ", "))
 		local ok, err = pcall(deps.notify_lost)
 		if not ok then Logger.error(LOG, "Lost menu click notice failed: %s.", tostring(err)) end
@@ -280,7 +280,14 @@ function M.new(deps)
 		local now = deps.now()
 		local record = { schema = REPLAY_SCHEMA, at = now, clicks = {} }
 		local read, previous = pcall(store.get, M.REPLAY_KEY, nil)
-		if read and type(previous) == "string" then
+		if not read then
+			Logger.error(LOG, "The existing reload hand-off could not be read; it is not overwritten: %s.", tostring(previous))
+			local labels = {}
+			for _, click in ipairs(clicks) do labels[#labels + 1] = ClickIntent.describe(click.path) end
+			report_lost(labels)
+			return
+		end
+		if type(previous) == "string" then
 			local decoded, earlier = pcall(json.decode, previous)
 			local valid = decoded and type(earlier) == "table" and earlier.schema == REPLAY_SCHEMA
 				and type(earlier.at) == "number" and earlier.at <= now and now - earlier.at <= REPLAY_TTL_SEC
@@ -309,6 +316,9 @@ function M.new(deps)
 		end
 		Logger.error(LOG, "%d held menu click(s) could not be handed to the reloaded menu: %s.",
 			#clicks, tostring(encoded and committed or text))
+		local labels = {}
+		for _, click in ipairs(clicks) do labels[#labels + 1] = ClickIntent.describe(click.path) end
+		report_lost(labels)
 	end
 
 	--- Hands clicks to the successor of a reload, or reports them dropped on a quit.

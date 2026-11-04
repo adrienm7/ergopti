@@ -32,6 +32,14 @@ helpers.describe("physical clock (hs274)", function()
 		helpers.assert_eq(convert("3"), 125)
 	end)
 
+	helpers.it("checks the converted boundary after scaling unsigned ticks (physical-clock-scaled-boundary)", function()
+		local near_half = Clock.new(information(2147483647, 4294967295))
+		helpers.assert_eq(near_half("18446744073709551615"), 9223372034707292159)
+		local slightly_above_one = Clock.new(information(4294967295, 4294967294))
+		helpers.assert_eq(slightly_above_one("9223372034707292159"), math.maxinteger)
+		rejects(function() slightly_above_one("9223372034707292160") end)
+	end)
+
 	helpers.it("rejects absent or incompatible native timebase information", function()
 		for _, receipt in ipairs({ {}, information(0, 1), information(1, 0), information(1.5, 1),
 			information(1, 4294967296), information(false, 1), information(1, false),
