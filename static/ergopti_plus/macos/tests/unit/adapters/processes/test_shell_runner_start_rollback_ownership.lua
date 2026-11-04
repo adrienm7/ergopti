@@ -105,6 +105,22 @@ local function with_runner(callback)
 end
 
 helpers.describe("ShellRunner exact start-refusal rollback ownership", function()
+	helpers.it("delivers all settlement observers after opaque callback errors (shell-opaque-settlement)", function()
+		with_runner(function(runner, native)
+			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })
+			local handle = runner.spawn("/fixture/live", {}, function() error(hostile) end)
+			helpers.assert_true(handle.start())
+			local notified = 0
+			helpers.assert_true(handle.onSettled(function() error(hostile) end))
+			helpers.assert_true(handle.onSettled(function() notified = notified + 1 end))
+			helpers.assert_true(pcall(function() native.tasks[1]:complete(0, "", "") end))
+			helpers.assert_true(handle.isSettled())
+			helpers.assert_eq(notified, 1, "one failing observer must not strand another owner")
+			helpers.assert_true(handle.onSettled(function() error(hostile) end),
+				"an immediate observer failure must remain contained")
+		end)
+	end)
+
 	for _, start_mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("fences synchronous and late chunks after " .. start_mode
 			.. " start refusal", function()

@@ -23,7 +23,7 @@ local function load_subject(open_url, alert)
 		error = function(_tag, message) errors[#errors + 1] = message end,
 	}
 	package.loaded["infra.dialog_util"] = {
-		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... } end,
+		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... }; return "OK" end,
 	}
 	package.loaded["adapters.application_notifier"] = {
 		send = function(...) notifications[#notifications + 1] = { ... } end,
@@ -94,6 +94,17 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(#errors, 1)
 		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("falls back when the modal returns no button", function()
+		for _, answer in ipairs({ false, "" }) do
+			local subject, _, _, notifications = load_subject(function() return false end, function() return answer end)
+			helpers.assert_eq(subject.request_check("main"), false)
+			helpers.assert_eq(#notifications, 1, "a refused modal must not hide the check failure")
+		end
+		local subject, _, _, notifications = load_subject(function() return false end, function() return nil end)
+		helpers.assert_eq(subject.request_check("main"), false)
+		helpers.assert_eq(#notifications, 1, "a modal without a result must fall back")
 	end)
 
 	helpers.it("falls back to a notification when the modal boundary throws", function()

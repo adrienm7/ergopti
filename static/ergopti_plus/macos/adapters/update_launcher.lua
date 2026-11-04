@@ -68,8 +68,8 @@ function M.request_check(channel)
 	local title = i18n.get("common.error_title")
 	-- Only the request failed: nothing was downloaded or installed yet.
 	local message = i18n.get("updater.check_request_failed")
-	local dialog_ok = pcall(dialog.block_alert, title, message, i18n.get("button.ok"))
-	if not dialog_ok then
+	local dialog_ok, button = pcall(dialog.block_alert, title, message, i18n.get("button.ok"))
+	if not dialog_ok or type(button) ~= "string" or button == "" then
 		Notifier.send(title, { body = message, kind = "error" })
 	end
 	return false

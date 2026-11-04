@@ -19,8 +19,8 @@
 ---    re-exec; the shutdown handler reads it to decide. The sentinel is cleared
 ---    once at boot, so it can only ever be set because a reload was initiated
 ---    inside the live session.
---- 3. Boundary-clean: persistence goes through the Storage adapter and time
----    through os.time, so this lib stays free of direct Hammerspoon API calls.
+--- 3. Boundary-clean: persistence goes through Storage and the current-session
+---    freshness budget uses TimerScheduler's monotonic clock.
 --- 4. The reload's own duration: the caller records when the reload call ran
 ---    (wall clock milliseconds, from its own clock) and the next boot takes it
 ---    back once, so it can name and judge the reload against [budgets]
@@ -32,6 +32,7 @@ local M = {}
 local Logger  = require("infra.logger")
 local LOG     = "reload_guard"
 local Storage = require("adapters.storage")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 
 
@@ -46,14 +47,14 @@ local Storage = require("adapters.storage")
 --- Persistent-store key holding the reload sentinel timestamp.
 local SENTINEL_KEY = "reload_in_progress"
 
---- Maximum age (seconds) for which a sentinel is honoured. A reload re-execs the
---- Lua VM almost immediately, so this is a generous ceiling whose only job is to
---- let a stale sentinel — left by a crash mid-reload — expire, so a later genuine
---- quit is never mistaken for a reload.
+--- Maximum age (seconds) for a locally marked sentinel. Stale values from an
+--- earlier session have no local owner and are never treated as a reload.
 local SENTINEL_TTL_SEC = 60
 
 --- Persistent-store key holding the wall clock milliseconds of the reload call.
 local STARTED_KEY = "reload_started_epoch_ms"
+local _marked_wall = nil
+local _marked_monotonic = nil
 
 
 
@@ -68,7 +69,12 @@ local STARTED_KEY = "reload_started_epoch_ms"
 --- Records that a controlled reload call is about to run. Read by the shutdown
 --- handler in the SAME session, before the VM re-execs.
 function M.mark_reload()
-	Storage.set(SENTINEL_KEY, os.time())
+	_marked_wall, _marked_monotonic = nil, nil
+	local timestamp = os.time()
+	if Storage.set(SENTINEL_KEY, timestamp) == true then
+		_marked_wall = timestamp
+		_marked_monotonic = TimerScheduler.now_ns()
+	end
 	Logger.debug(LOG, "Reload sentinel set.")
 end
 
@@ -88,7 +94,9 @@ function M.take_started()
 end
 
 local function clear_sentinel(log_completion)
-	Storage.delete(SENTINEL_KEY)
+	if Storage.delete(SENTINEL_KEY) == true then
+		_marked_wall, _marked_monotonic = nil, nil
+	end
 	if log_completion then Logger.debug(LOG, "Reload sentinel cleared.") end
 end
 
@@ -108,8 +116,11 @@ end
 --- @return boolean True when a reload is in progress, false on a genuine quit.
 function M.is_reloading()
 	local ts = Storage.get(SENTINEL_KEY, nil)
-	if type(ts) ~= "number" then return false end
-	return (os.time() - ts) <= SENTINEL_TTL_SEC
+	if _marked_wall == nil or ts ~= _marked_wall or type(_marked_monotonic) ~= "number" then return false end
+	local now = TimerScheduler.now_ns()
+	if type(now) ~= "number" then return false end
+	local age = (now - _marked_monotonic) / 1e9
+	return age >= 0 and age <= SENTINEL_TTL_SEC
 end
 
 return M

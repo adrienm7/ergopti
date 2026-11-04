@@ -34,6 +34,7 @@ local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 local RuntimeLog = require("diagnostics.runtime_log")
 local TableUtil = require("table_util")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.shell_runner"
 
@@ -350,7 +351,7 @@ local function refused_handle(private)
 		if type(observer) ~= "function" then return false end
 		local ok, err = xpcall(observer, debug.traceback)
 		if not ok then
-			Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+			Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 		end
 		return true
 	end
@@ -418,7 +419,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		for _, observer in ipairs(observers) do
 			local ok, err = xpcall(observer, debug.traceback)
 			if not ok then
-				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 			end
 		end
 		return true
@@ -623,9 +624,9 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	--- @param label string Identifies which callback threw, for the log line.
 	--- @param err any The error value captured by xpcall.
 	local function report_callback_throw(label, err)
-		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
+		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), ErrorDescription.describe(err))
 		if private ~= true and type(_G.ergopti_report_crash) == "function" then
-			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
+			local report_ctx = "shell_runner." .. label .. ": " .. ErrorDescription.describe(err)
 			DeferredWork.after(0,
 				function() pcall(_G.ergopti_report_crash, report_ctx) end,
 				"shell_runner.crash_report")
@@ -820,7 +821,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		if handle.isSettled() then
 			local ok, err = xpcall(observer, debug.traceback)
 			if not ok then
-				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", ErrorDescription.describe(err))
 			end
 			return true
 		end
@@ -868,7 +869,7 @@ local function invoke_guarded(label, fn, ...)
 	local args = table.pack(...)
 	local ok, err = xpcall(function() return fn(table.unpack(args, 1, args.n)) end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s callback threw: %s", tostring(label), tostring(err))
+		Logger.error(LOG, "%s callback threw: %s", tostring(label), ErrorDescription.describe(err))
 	end
 end
 
