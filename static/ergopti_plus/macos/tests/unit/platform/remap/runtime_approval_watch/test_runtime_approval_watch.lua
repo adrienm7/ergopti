@@ -42,7 +42,7 @@ helpers.describe("owned runtime driver approval watch", function()
 	helpers.it("opens the extension pane once and reloads when the driver is allowed", function()
 		local watch, world = fake({ line("activated waiting for user"), line("activated enabled") })
 		helpers.assert_eq(watch.start(), true)
-		helpers.assert_eq(world.opened, { require("platform.remap.runtime_vhid").SETTINGS_URL })
+		helpers.assert_eq(world.opened, { require("platform.remap.ke_paths").EXTENSIONS_SETTINGS_URL })
 		helpers.assert_eq(world.reloads, 0, "no reload while macOS still waits")
 		world.pending()
 		helpers.assert_eq(world.reloads, 1)
@@ -54,7 +54,7 @@ helpers.describe("owned runtime driver approval watch", function()
 	helpers.it("gives up at its deadline without a reload", function()
 		local watch, world, Watch = fake({ line("activated waiting for user") })
 		watch.start()
-		for _ = 1, Watch.TIMEOUT_SEC / Watch.POLL_SEC do
+		for _ = 1, Watch.APPROVAL_TIMEOUT_SEC / Watch.APPROVAL_POLL_SEC do
 			if not world.pending then break end
 			local next_look = world.pending
 			world.pending = nil

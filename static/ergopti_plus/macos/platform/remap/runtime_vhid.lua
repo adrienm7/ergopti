@@ -34,10 +34,6 @@ M.REASON_NOT_ACTIVE = "virtual_hid_not_active"
 M.REASON_INCOMPATIBLE = "virtual_hid_incompatible"
 M.REASON_UNREADABLE = "virtual_hid_unreadable"
 
---- The System Settings pane where macOS asks to allow a driver extension
---- (Login Items & Extensions, Extensions section).
-M.SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
-
 local ACTIVE_STATE = "activated_enabled"
 local EXTENSION_PATTERN = (M.EXTENSION_ID:gsub("%p", "%%%0"))
 

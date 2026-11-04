@@ -97,6 +97,11 @@ M.OWNED = {
 	CLOSED_OTHER_MARKER = "~/Library/Application Support/ErgoptiPlus/karabiner/closed-other-karabiner",
 }
 
+--- The System Settings pane where macOS asks to allow a driver extension
+--- (Login Items & Extensions, Extensions section): the onboarding of the
+--- shared runtime and the owned runtime's approval watch open it.
+M.EXTENSIONS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
+
 --- Rejects a runtime name that is not one of the two.
 --- @param runtime any Candidate runtime name.
 --- @return string runtime The same name.

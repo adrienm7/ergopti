@@ -97,7 +97,7 @@ local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 -- Karabiner-Elements v16+ relies on Accessibility (per the v16.0.0 release
 -- notes); pre-v16 versions rely on Input Monitoring instead. Both panes are
 -- exposed so the wizard can route the user to the right one.
-local URL_SYSTEM_EXTENSIONS = require("platform.remap.runtime_vhid").SETTINGS_URL
+local URL_SYSTEM_EXTENSIONS = KePaths.EXTENSIONS_SETTINGS_URL
 
 -- Re-poll cadence after the user takes a wizard action, so the next step
 -- pops automatically once macOS reflects the change. Capped to avoid leaking
