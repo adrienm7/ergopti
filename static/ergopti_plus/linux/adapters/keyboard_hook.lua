@@ -2651,7 +2651,7 @@ end
 --- Called from the daemon's idle callback. Nothing here blocks: the descriptor is
 --- O_NONBLOCK and the merge is globally bounded, so the tray, periodic tick and
 --- file watchers advance even under an autorepeat backlog.
-function M.pump()
+function LayerPointer.pump_once()
 	if not _running then return end
 	if _source_reconciliation then return end
 	Perf.count("input.pump_calls")
@@ -2725,6 +2725,14 @@ function M.pump()
 		local now_ms = _event_clock_now_ms()
 		if now_ms then _tick_remapper(now_ms) end
 	end
+end
+
+function M.pump()
+	if LayerPointer.pumping then return end
+	LayerPointer.pumping = true
+	local ok, err = pcall(LayerPointer.pump_once)
+	LayerPointer.pumping = false
+	if not ok then error(err, 0) end
 end
 
 --- Sleeps the idle loop until an input source has data, at most `timeout_ms`.

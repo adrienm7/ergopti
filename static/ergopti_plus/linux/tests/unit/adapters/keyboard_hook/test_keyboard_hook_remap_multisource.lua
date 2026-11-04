@@ -23,6 +23,20 @@ local function roster_session(s, initial)
 end
 
 helpers.describe("source-owned simultaneous standalone remap holds", function()
+	helpers.it("(remap-multisource) defers a nested pump until the current press is forwarded", function()
+		local injected = false
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 and not injected then
+				injected = true
+				s.edge("a", 30, 0, 2)
+			end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_true(injected)
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } })
+		end)
+	end)
 	for _, order in ipairs({ { "a", "b" }, { "b", "a" } }) do
 		local first, last = order[1], order[2]
 		helpers.it("(remap-multisource) keeps Ctrl until last UP in order " .. first .. last, function()
