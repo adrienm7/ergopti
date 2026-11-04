@@ -40,7 +40,7 @@ function M.new(ports)
 	for _, name in ipairs({ "read_counter", "send_copy", "after", "cancel", "log", "warn_user" }) do
 		assert(type(ports[name]) == "function", "tap_copy.new: port '" .. name .. "' must be a function")
 	end
-	local self = setmetatable({ ports = ports, unsupported_reported = false }, Owner)
+	local self = setmetatable({ ports = ports, unsupported_reported = false, activity_generation = 0 }, Owner)
 	self.checker = CopyCheck.new({
 		verify_ms = ports.verify_ms,
 		read_counter = function() return (ports.read_counter()) end,
@@ -57,6 +57,12 @@ end
 --- @param send function Sends the copy keystroke; raises on failure.
 function Owner:run(source, send)
 	local baseline, reason = self.ports.read_counter()
+	local generation = self.activity_generation
+	local destination = nil
+	if type(self.ports.capture_destination) == "function" then
+		local ok, value = pcall(self.ports.capture_destination)
+		if ok then destination = value end
+	end
 	send()
 	if baseline == nil and reason == "unsupported" then
 		if not self.unsupported_reported then
@@ -66,7 +72,17 @@ function Owner:run(source, send)
 		end
 		return
 	end
-	self.checker:start(baseline, source)
+	self.checker:start(baseline, source, function()
+		if generation ~= self.activity_generation or destination == nil
+			or type(self.ports.destination_current) ~= "function" then return false end
+		local current = self.ports.destination_current(destination)
+		return current == true and generation == self.activity_generation
+	end)
+end
+
+--- Invalidates a retry after observed physical activity.
+function Owner:activity()
+	self.activity_generation = self.activity_generation + 1
 end
 
 --- Abandons a pending check (pause, stop, a new engine).

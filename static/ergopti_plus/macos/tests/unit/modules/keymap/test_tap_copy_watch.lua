@@ -23,7 +23,8 @@ local LEFT_SHIFT, COMMAND, OPTION = 56, 55, 58
 --- @return table world
 local function world(options)
 	options = options or {}
-	local w = { counter = 7, counter_reads = 0, sends = 0, warnings = 0, logs = {}, deferred = {}, timers = {}, now = 0 }
+	local w = { counter = 7, counter_reads = 0, sends = 0, warnings = 0, logs = {}, deferred = {}, timers = {}, now = 0,
+		focus = "field-a" }
 	local function log(level, fmt, ...) w.logs[#w.logs + 1] = { level = level, text = string.format(fmt, ...) } end
 	local checker = CopyCheck.new({
 		verify_ms = 300,
@@ -42,6 +43,11 @@ local function world(options)
 	})
 	w.watch = TapCopy.new({
 		change_count = function() w.counter_reads = w.counter_reads + 1; return w.counter end,
+		capture_destination = function() return w.focus end,
+		destination_current = function(target)
+			if w.reenter then w.watch:activity() end
+			return target == w.focus
+		end,
 		duration_ms = function(earlier, later) return later - earlier end,
 		defer = function(_, fn) w.deferred[#w.deferred + 1] = fn; return true end,
 		event_flags = function(event) return event.flags end,
@@ -86,6 +92,32 @@ local function world(options)
 end
 
 helpers.describe("tap-hold copy watch (tap-copy-verified)", function()
+	helpers.it("does not retry after focus or physical input changes (tap-copy-context)", function()
+		for _, change in ipairs({
+			function(w) w.focus = "field-b" end,
+			function(w) w.watch:activity() end,
+			function(w) w.reenter = true end,
+			function(w) w.watch:key_down({ flags = {}, chars = "x" }, 95, 0) end,
+		}) do
+			local w = world()
+			w.shift(0, 90)
+			w.cmd_c(91)
+			w.flush()
+			change(w)
+			w.advance(300)
+			helpers.assert_eq(w.sends, 0)
+			helpers.assert_eq(w.warnings, 0)
+			helpers.assert_true(w.log_matching("original context is no longer proven") ~= nil)
+		end
+		local missing = world()
+		missing.focus = nil
+		missing.shift(0, 90)
+		missing.cmd_c(91)
+		missing.flush()
+		missing.advance(300)
+		helpers.assert_eq(missing.sends, 0)
+		helpers.assert_eq(missing.warnings, 0)
+	end)
 	helpers.it("reads the counter before the app has the Cmd+C and verifies the copy (tap-copy-verified)", function()
 		local w = world()
 		w.shift(1000, 1120)

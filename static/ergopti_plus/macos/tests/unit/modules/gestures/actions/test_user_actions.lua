@@ -113,9 +113,14 @@ local function with_world(body)
 				temp_count = temp_count + 1
 				local path = "/tmp/lua_test_" .. temp_count
 				world.files[path] = ""
+				if world.before_temp_return then world.before_temp_return() end
 				return path
 			end,
-			write = function(path, content) world.files[path] = content; return true end,
+			write = function(path, content)
+				world.files[path] = content
+				if world.before_temp_write_return then world.before_temp_write_return() end
+				return true
+			end,
 			read = function(path) return world.files[path] end,
 			read_bounded = function(path, limit)
 				local content = world.files[path]
@@ -124,7 +129,14 @@ local function with_world(body)
 				if #content > limit then return nil, "too_large" end
 				return content, "ok"
 			end,
-			remove_exact = function(path) world.removed[#world.removed + 1] = path; world.files[path] = nil; return true end,
+			remove_exact = function(path)
+				if world.refuse_remove then return false, "refused" end
+				world.removed[#world.removed + 1] = path; world.files[path] = nil; return true
+			end,
+			classify_no_follow = function(path)
+				if world.files[path] == nil then return nil, "absent" end
+				return { mode = "file" }, "ok"
+			end,
 		}
 		package.loaded["adapters.clipboard"] = { write = function(text)
 			world.clipboard[#world.clipboard + 1] = text
@@ -577,6 +589,49 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			world.listeners.run_apple_shortcut("gestures")
 			helpers.assert_eq(outcome, { false, "cancelled" })
 			helpers.assert_eq(world.Shortcut.busy(), false)
+		end)
+	end)
+
+	helpers.it("removes a temporary output acquired during a reentrant pause", function()
+		with_world(function(world)
+			world.before_temp_return = function()
+				world.listeners.run_apple_shortcut("gestures")
+				world.successor = world.Shortcut.run(shortcut(), "shortcut_bindings", 500)
+			end
+			local accepted = world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(world.successor, false, "the in-flight allocation must still own admission")
+			helpers.assert_eq(world.Shortcut.busy(), false)
+			helpers.assert_nil(next(world.files), "the late temporary file must be removed")
+			helpers.assert_eq(#world.spawned, 0, "a cancelled run must not start a library query")
+		end)
+	end)
+
+	helpers.it("removes a temporary input written during a reentrant pause", function()
+		with_world(function(world)
+			world.selection = "private text"
+			world.before_temp_write_return = function() world.listeners.run_apple_shortcut("gestures") end
+			world.Shortcut.run(shortcut({ input = "selection" }), "gestures", 500)
+			helpers.assert_nil(next(world.files), "the file must remain owned until the write returns")
+			helpers.assert_eq(world.Shortcut.busy(), false)
+			helpers.assert_eq(#world.spawned, 0)
+		end)
+	end)
+
+	helpers.it("retains a failed cleanup and retries it before admitting another run", function()
+		with_world(function(world)
+			world.before_temp_return = function()
+				world.refuse_remove = true
+				world.listeners.run_apple_shortcut("gestures")
+			end
+			helpers.assert_eq(world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500), false)
+			helpers.assert_eq(world.Shortcut.busy(), true)
+			helpers.assert_eq(world.Shortcut.run(shortcut(), "shortcut_bindings", 500), false)
+			helpers.assert_eq(#world.spawned, 0)
+			world.refuse_remove = false
+			world.before_temp_return = nil
+			helpers.assert_eq(world.Shortcut.run(shortcut(), "shortcut_bindings", 500), true)
+			helpers.assert_nil(next(world.files))
 		end)
 	end)
 end)

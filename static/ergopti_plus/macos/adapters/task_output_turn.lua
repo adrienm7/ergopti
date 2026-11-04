@@ -29,6 +29,7 @@ local M = {}
 
 local ShellRunner = require("adapters.shell_runner")
 local Logger      = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "task_output_turn"
 
@@ -54,7 +55,7 @@ local PROBE_LINE = "turn\n"
 --- @return string|nil err Why no probe started.
 function M.request(label, on_turn)
 	if type(on_turn) ~= "function" then
-		Logger.error(LOG, "request(): the turn callback for %s is not a function.", tostring(label))
+		Logger.error(LOG, "request(): the turn callback for %s is not a function.", ErrorDescription.describe(label))
 		return nil, "turn callback missing"
 	end
 	local settled = false
@@ -72,12 +73,13 @@ function M.request(label, on_turn)
 		settled = true
 		local ok, err = xpcall(on_turn, debug.traceback, delivered, reason)
 		if not ok then
-			Logger.error(LOG, "The output turn callback for %s raised: %s", tostring(label), tostring(err))
+			Logger.error(LOG, "The output turn callback for %s raised: %s",
+				ErrorDescription.describe(label), ErrorDescription.describe(err))
 		end
 	end
 
 	handle = ShellRunner.spawn(M.ECHO_EXECUTABLE, {}, function(exit_code)
-		settle(false, "the output probe exited (exit " .. tostring(exit_code) .. ") before its echo")
+		settle(false, "the output probe exited (exit " .. ErrorDescription.describe(exit_code) .. ") before its echo")
 	end, function(_task, stdout_chunk)
 		if settled then return true end
 		if type(stdout_chunk) == "string" and stdout_chunk:find("\n", 1, true) then
