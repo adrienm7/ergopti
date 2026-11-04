@@ -1,11 +1,163 @@
 {
-	"expected_count": 4,
+	"expected_count": 44,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "hotstrings cache source inventory:",
-			"expected_count": 4
+			"contains": "input hooks: overlapping suppressive owners stop and unregister exactly (suppressive-inputhook-ownership)",
+			"expected_count": 1
+		},
+		{
+			"contains": "input hooks: exclusive suppressive state machines serialize across owner names",
+			"expected_count": 1
+		},
+		{
+			"contains": "input hooks: refused terminal Stop retains the exact owner for retry (AHK-169)",
+			"expected_count": 1
+		},
+		{
+			"contains": "input hooks: partial Start rollback refusal remains lifecycle-owned (AHK-169)",
+			"expected_count": 1
+		},
+		{
+			"contains": "input hooks: refused one-shot preserves a different owner's disabled latch (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot text keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot end-key keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot timeout keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stopped-resumed keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot completed-revoked keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stop-reentrant keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stop-refusal keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot a (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot AB (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot surrogate (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot punctuation keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot open-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot close-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot enter keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot backspace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot delete keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot pair-B keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot disabled-surrogate preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot disabled-magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot invalid-low never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot invalid-high-BMP never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot partial-timeout never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot control-after-high never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: natural preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-letter preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-special preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-disabled preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: paused-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: revoked-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: successor-disabled-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: activation-revoked preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: activation-successor preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "token-rawpost-owner",
+			"expected_count": 6
 		}
 	]
 }
