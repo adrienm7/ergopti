@@ -218,10 +218,11 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = io.open(path, "r")
+	local fh = require("infra.regular_file_reader").open_source(path)
 	if not fh then return nil end
 	local text = fh:read("*a")
-	fh:close()
+	local closed = fh:close()
+	if type(text) ~= "string" or not closed then return nil end
 	return text
 end
 
@@ -306,13 +307,11 @@ end
 --- @return string|nil
 local function read_override(path)
 	if type(path) ~= "string" or path == "" then return nil end
-	local fh = io.open(path, "r")
-	if not fh then
+	local text = read_file(path)
+	if not text then
 		Logger.warn(LOG, "Keymap override '%s' is not readable — ignoring it.", path)
 		return nil
 	end
-	local text = fh:read("*a")
-	fh:close()
 	return text
 end
 

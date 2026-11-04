@@ -91,10 +91,11 @@ local function native()
 		feed_url = function()
 			local Paths = require("infra.paths")
 			local Json = require("json")
-			local handle = io.open(Paths.shared("modules/updater/defaults.json"), "rb")
+			local handle = require("infra.regular_file_reader").open_source(Paths.shared("modules/updater/defaults.json"))
 			if not handle then return nil end
 			local raw = handle:read("*a")
-			handle:close()
+			local closed = handle:close()
+			if type(raw) ~= "string" or not closed then return nil end
 			local ok, defaults = pcall(Json.decode, raw)
 			if not ok then return nil end
 			local sources = require("updater.release_sources").resolve(defaults)
