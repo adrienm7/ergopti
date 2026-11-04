@@ -98,6 +98,32 @@ helpers.describe("download fresh presentation preserves original operation conse
 		end)
 	end)
 
+	helpers.it("focus reports refusal when the existing native window cannot be presented", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			local manager, original = document.manager, document.manager.bring_to_front
+			manager.bring_to_front = function() return false end
+			local focused = bridge.focus(world.id)
+			manager.bring_to_front = original
+			helpers.assert_eq(focused, false)
+		end)
+	end)
+
+	helpers.it("focus refuses an old session replaced while presenting", function()
+		with_session(function(bridge, document, world)
+			world.ready()
+			local manager, original, successor = document.manager, document.manager.bring_to_front, nil
+			manager.bring_to_front = function()
+				manager.bring_to_front = original
+				helpers.assert_true(bridge.complete(world.id, true, "done"))
+				successor = assert(world.show("successor"))
+				return true
+			end
+			helpers.assert_eq(bridge.focus(world.id), false)
+			helpers.assert_true(bridge.update(successor, 33, "successor progress"))
+		end)
+	end)
+
 	helpers.it("reopened real document displays retained terminal data under its own lease", function()
 		with_session(function(bridge, document, world)
 			helpers.assert_true(world.ready().pushed)
