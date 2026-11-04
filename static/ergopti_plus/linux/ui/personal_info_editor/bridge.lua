@@ -145,7 +145,9 @@ function M.on_message(payload, state, context)
 				if current() then notify_refused(state) end
 				return { saved = false, reloaded = false, closed = false }
 			end
+			if owner.saving then return { saved = false, reloaded = false, closed = false, busy = true } end
 			receipt = owner.receipt
+			owner.saving = true
 		end
 		if type(payload.values) == "table" and dynamic and type(dynamic.save_info) == "function" then
 			local ok_save, committed, next_receipt = pcall(dynamic.save_info, payload.values, receipt, current)
@@ -154,26 +156,35 @@ function M.on_message(payload, state, context)
 			if not ok_save then Logger.error(LOG, "Personal-info persistence raised; details withheld.") end
 		end
 		if not saved then
+			if owner then owner.saving = false end
 			Logger.error(LOG, "Personal information was not committed; editor remains open.")
 			if not current or current() then notify_refused(state) end
 			return { saved = false, reloaded = false, closed = false }
 		end
-		if current and not current() then return { saved = true, reloaded = false, closed = false } end
+		if current and not current() then
+			owner.saving = false
+			return { saved = true, reloaded = false, closed = false }
+		end
 		local ok_reload, _mapping_count, reload_committed = false, nil, false
 		if state.config and type(state.config.reload) == "function" then
 			ok_reload, _mapping_count, reload_committed = pcall(state.config.reload)
 		end
 		local reloaded = ok_reload and reload_committed == true
 		if not reloaded then
+			if owner then owner.saving = false end
 			Logger.error(LOG, "Personal information was saved but the hotstring catalogue did not reload.")
 			return { saved = true, reloaded = false, closed = false }
 		end
 		if type(state.on_config_changed) == "function" then pcall(state.on_config_changed) end
+		if owner then owner.saving = false end
 		local closed = (not current or current()) and close_page(state, context)
 		if not closed then Logger.error(LOG, "Personal-info editor close was refused after save.") end
 		return { saved = true, reloaded = true, closed = closed }
 	end
 	if action == "cancel" then
+		if _opening and _opening.saving and opening_current(_opening, state, context) then
+			return { cancelled = false, closed = false, busy = true }
+		end
 		return { cancelled = true, closed = close_page(state, context) }
 	end
 
