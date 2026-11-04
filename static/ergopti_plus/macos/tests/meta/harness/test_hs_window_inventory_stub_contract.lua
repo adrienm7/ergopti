@@ -1,3 +1,4 @@
+--- static/ergopti_plus/macos/tests/meta/harness/test_hs_window_inventory_stub_contract.lua
 --- Verifies that the central window stub models native visible inventories.
 local helpers = require("tests.helpers")
 
