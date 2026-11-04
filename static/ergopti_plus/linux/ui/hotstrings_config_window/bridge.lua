@@ -12,6 +12,7 @@ local TableUtil = require("table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("logger.shim")
+local NumberPolicy = require("number_policy")
 local Extensions = require("hotstrings.extensions")
 local LOG = "bridge.hotstrings_config"
 
@@ -418,8 +419,8 @@ function M.on_message(payload, state, context)
 		-- Milliseconds on the wire, seconds in the store: the cascade, the TOMLs
 		-- and the engine all speak seconds, and the conversion belongs at this
 		-- boundary rather than in the resolver.
-		local ms = tonumber(payload.ms)
-		if not ms or ms < 0 then
+		local ms = (type(payload.ms) == "number" or type(payload.ms) == "string") and tonumber(payload.ms) or nil
+		if not NumberPolicy.is_finite(ms) or ms < 0 then
 			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
 				tostring(payload.ms), tostring(payload.category))
 			return push_state(state, context)
@@ -456,7 +457,11 @@ function M.on_message(payload, state, context)
 		-- and a string "false" is truthy in Lua — which would turn the preview on
 		-- for a user who had just turned it off.
 		local value = payload.show_tooltip
-		if type(value) == "string" then value = (value == "true") end
+		if value == "true" then value = true elseif value == "false" then value = false end
+		if type(value) ~= "boolean" then
+			Logger.warn(LOG, "Refusing a non-boolean tooltip setting.")
+			return push_state(state, context)
+		end
 		set_override(state, payload.category, section_of(payload), "show_tooltip", value == true, context)
 		return push_state(state, context)
 	end
@@ -471,8 +476,9 @@ function M.on_message(payload, state, context)
 	-- daemon has, and a priority outside the tier range silently reorders every
 	-- source against every other.
 	if action == "set_priority" and payload.category then
-		local value = tonumber(payload.priority)
-		if not value or value < PRIORITY_MIN or value > PRIORITY_MAX then
+		local value = (type(payload.priority) == "number" or type(payload.priority) == "string")
+			and tonumber(payload.priority) or nil
+		if not NumberPolicy.is_finite(value) or value < PRIORITY_MIN or value > PRIORITY_MAX then
 			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
 				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
 			return push_state(state, context)

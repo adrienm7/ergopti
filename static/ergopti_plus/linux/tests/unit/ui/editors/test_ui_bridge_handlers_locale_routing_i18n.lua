@@ -134,6 +134,22 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_message({ action = "set_priority", category = "accents", priority = 500 }, s2)
       helpers.assert_eq(#seen, 1, "an out-of-range priority must be refused, not clamped")
     end)
+
+		helpers.it("(hotstring-config-input) refuses non-finite numbers and malformed tooltip values", function()
+			local seen, s2 = {}, build_mock_state()
+			s2.config.set_override = function(...) seen[#seen + 1] = { ... }; return true end
+			for _, value in ipairs({ "nan", "1e999", "-1e999", true, {} }) do
+				handler.on_message({ action = "set_priority", category = "accents", priority = value }, s2)
+				handler.on_message({ action = "set_delay", category = "accents", ms = value }, s2)
+			end
+			for _, value in ipairs({ "yes", 1, {} }) do
+				handler.on_message({ action = "set_tooltip", category = "accents", show_tooltip = value }, s2)
+			end
+			helpers.assert_eq(#seen, 0)
+			handler.on_message({ action = "set_tooltip", category = "accents", show_tooltip = false }, s2)
+			helpers.assert_eq(#seen, 1)
+			helpers.assert_eq(seen[1][4], false)
+		end)
     helpers.it("'clear_priority' removes the override rather than writing a default", function()
       local seen = {}
       local s2 = build_mock_state()
