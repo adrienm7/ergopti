@@ -145,6 +145,34 @@ try {
 		);
 		fs.appendFileSync(unit, 'ExecStart=/other/installation --tray\n');
 		assert.equal(run('status').stdout.trim(), 'other', 'a second ExecStart cannot grant ownership');
+		if (process.platform === 'linux') {
+			const accountHome = path.join(sandbox, 'manual-account');
+			const otherHome = path.join(sandbox, 'different-account');
+			fs.mkdirSync(accountHome);
+			fs.mkdirSync(path.join(otherHome, '.local'), { recursive: true });
+			fs.symlinkSync(path.resolve(installed, '../../../..'), path.join(accountHome, '.local'));
+			fs.writeFileSync(path.join(stubs, 'id'), '#!/bin/bash\n[ "$1" = -u ] && echo 1001\n', {
+				mode: 0o755
+			});
+			fs.writeFileSync(
+				path.join(stubs, 'getent'),
+				'#!/bin/bash\n[ "${TEST_LOOKUP_FAIL:-0}" != 1 ] || exit 1\n[ "$1" = passwd ] && printf "account:x:%s:1001::%s:/bin/bash\\n" "${TEST_ACCOUNT_UID:-1001}" "$TEST_ACCOUNT_HOME"\n',
+				{ mode: 0o755 }
+			);
+			fs.writeFileSync(unit, '[Service]\nExecStart=%h/.local/bin/ergopti-hotstrings --tray\n');
+			assert.equal(run('status', { TEST_ACCOUNT_HOME: accountHome }).stdout.trim(), 'disabled');
+			assert.equal(run('status', { TEST_ACCOUNT_HOME: otherHome }).stdout.trim(), 'other');
+			assert.equal(
+				run('status', { TEST_ACCOUNT_HOME: accountHome, TEST_ACCOUNT_UID: '1002' }).stdout.trim(),
+				'other'
+			);
+			assert.equal(
+				run('status', { TEST_ACCOUNT_HOME: accountHome, TEST_LOOKUP_FAIL: '1' }).stdout.trim(),
+				'other'
+			);
+			fs.unlinkSync(path.join(stubs, 'id'));
+			fs.unlinkSync(path.join(stubs, 'getent'));
+		}
 		fs.unlinkSync(unit);
 	}
 	assert.doesNotMatch(
