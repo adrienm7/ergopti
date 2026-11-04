@@ -127,3 +127,13 @@ TestWPMConfigValidatesSavedPositionAgainstEveryMonitor() {
 }
 Test("WPM config: saved surfaces remain reachable after monitor changes (AHK-104)",
 	TestWPMConfigValidatesSavedPositionAgainstEveryMonitor)
+
+; A single negative-one coordinate is a real screen position, not the sentinel.
+TestWPMAutoPositionRequiresBothCoordinates() {
+	AssertTrue(_WPMWidget_IsAutoPosition(-1, -1), "the legacy sentinel selects the default")
+	AssertFalse(_WPMWidget_IsAutoPosition(-1, 100), "a left-edge position must survive")
+	AssertFalse(_WPMWidget_IsAutoPosition(100, -1), "a top-edge position must survive")
+	AssertFalse(_WPMWidget_IsAutoPosition(100, 100), "a saved position must survive")
+}
+Test("WPM config: one negative-one coordinate is a position (wpm-anchor-sentinel)",
+	TestWPMAutoPositionRequiresBothCoordinates)
