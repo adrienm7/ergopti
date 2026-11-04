@@ -94,6 +94,19 @@ local function load_bridge(controls)
 			end,
 			set = function(key, value) context.stored[key] = value; return true end,
 		},
+		["infra.script_scope"] = {
+			retry_edit = function() return true end,
+			edit_setting = function(key, value)
+				context.stored[key] = value
+				local bridge = require("ui.error_dialog.bridge")
+				local token = { pending = function() return false end, edit_key = key }
+				assert(bridge.scope_acquire(token))
+				local receipt = assert(bridge.scope_capture(token))
+				local applied = bridge.scope_apply(token, receipt, value)
+				assert(bridge.scope_release(token)); assert(bridge.scope_forget(token, receipt))
+				return applied
+			end,
+		},
 		["infra.manifest_reader"] = {
 			default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 		},

@@ -74,14 +74,14 @@ end
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "script scope requires its pause owner")
 	local transaction
-	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
+	local token = { pending = function() return transaction ~= nil and transaction.pending() end, edit_key = options.edit_key }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
 		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
 		only = options.only, allow_invalid_source = options.allow_invalid_source, storage_backup_path = function() return options.storage_backup_path end })
 	transaction = Transaction.new({ path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = runtime.manifest,
 		prepare_batch = options.prepare_batch, preserve_unchanged = options.preserve_unchanged,
-		validate_update = options.validate_update,
+		validate_update = options.validate_update, allow_boolean = options.allow_boolean,
 		capture = function(source, _, updates) return runtime.capture(updates, source) end,
 		apply = runtime.apply, restore = runtime.restore })
 	local owner
@@ -134,7 +134,7 @@ function M.edit_setting(key, value)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
 		storage_backup_path = require("infra.config_paths").config_home() .. "/ergopti_plus/storage.edit-" .. timestamp .. ".bak",
-		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true,
+		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
 		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
 		prepare_batch = prepare, preserve_unchanged = true,
 		validate_update = function(scope, row)

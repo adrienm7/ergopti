@@ -126,15 +126,10 @@ end
 --- @param enabled boolean
 --- @return boolean saved
 function M.set_enabled(enabled)
-	if not _scope.admit_change() then return false end
-	-- config.toml's [script] show_error_dialog wins at start: rewrite it first.
-	if type(enabled) == "boolean" and not require("infra.script_scope").rewrite_configured(SETTING, enabled) then
-		return false
-	end
-	if not DialogCore.save_enabled(Logger, LOG, function() return require("adapters.storage") end, SETTING, enabled) then
-		return false
-	end
-	_enabled = enabled
+	if type(enabled) ~= "boolean" then return false end
+	local script_scope = require("infra.script_scope")
+	if not script_scope.retry_edit(SETTING) or not _scope.admit_change() then return false end
+	if not script_scope.edit_setting(SETTING, enabled) then return false end
 	if not enabled and _scheduled ~= nil then
 		_scheduled = nil
 		_busy, _folded, _pending = false, 0, nil
@@ -449,7 +444,10 @@ function M._reset()
 	settle()
 end
 
-local function scope_ready()
+local function scope_ready(owner)
+	if type(owner) == "table" and owner.edit_key == SETTING then
+		return _enabled == nil or type(_enabled) == "boolean"
+	end
 	return (_enabled == nil or type(_enabled) == "boolean") and _busy == false
 		and _scheduled == nil and _session == nil and _folded == 0 and _pending == nil
 end

@@ -259,7 +259,7 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths", "infra.script_settings" }
+		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths", "infra.script_settings", "ui.error_dialog.bridge" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -288,6 +288,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil
 			package.loaded["infra.script_settings"] = nil
+			package.loaded["ui.error_dialog.bridge"] = nil
 			package.loaded["infra.i18n"] = nil
 			local i18n = require("infra.i18n")
 			i18n.init()
@@ -322,6 +323,67 @@ helpers.describe("i18n explicit wizard persistence", function()
 		local raw = assert(fh:read("*a")); assert(fh:close())
 		return raw
 	end
+
+	helpers.it("(error-dialog-atomic) keeps source and state on storage refusal", function()
+		local initial = '[script]\nshow_error_dialog = true\n'
+		local observed = with_owned_store({ config = initial, rename = "false" }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local before = dialog.is_enabled()
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, before = before, active = dialog.is_enabled(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed, { accepted = false, before = true, active = true, config = initial })
+	end)
+
+	helpers.it("(error-dialog-atomic) disables an already scheduled report", function()
+		local observed = with_owned_store({}, function()
+			local dialog = require("ui.error_dialog.bridge")
+			local scheduled
+			dialog.defer = function(fn) scheduled = fn; return true end
+			assert(dialog.init())
+			dialog.on_error("fixture", "failure", "failure")
+			local had_schedule = type(scheduled) == "function"
+			local accepted = dialog.set_enabled(false)
+			if scheduled then scheduled() end
+			return { scheduled = had_schedule, accepted = accepted, enabled = dialog.is_enabled() }
+		end)
+		helpers.assert_eq(observed, { scheduled = true, accepted = true, enabled = false })
+	end)
+
+	helpers.it("(error-dialog-atomic) retains and settles a refused inverse", function()
+		local initial, published = '[script]\nshow_error_dialog = true\n', nil
+		local once = true
+		local observed = with_owned_store({ config = initial, after_publish = function(config, path)
+			if not once then return end
+			once = false
+			published = read(path)
+			local cf = assert(io.open(config, "wb")); assert(cf:write(initial .. "# concurrent\n")); assert(cf:close())
+			local sf = assert(io.open(path, "wb")); assert(sf:write('{"script.show_error_dialog":true}')); assert(sf:close())
+		end }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local accepted = dialog.set_enabled(false)
+			local pending = require("infra.scope_registry").pending()
+			local config = read(require("infra.config_paths").config("config.toml"))
+			local sf = assert(io.open(path, "wb")); assert(sf:write(published)); assert(sf:close())
+			local recovered = dialog.set_enabled(false)
+			return { accepted = accepted, pending = pending, config = config, recovered = recovered,
+				still_pending = require("infra.scope_registry").pending() }
+		end)
+		helpers.assert_eq(observed, { accepted = false, pending = true, config = initial .. "# concurrent\n",
+			recovered = true, still_pending = false })
+	end)
+
+	helpers.it("(error-dialog-atomic) publishes configured and stored state together", function()
+		local initial = '[script]\nshow_error_dialog = true\n'
+		local observed = with_owned_store({ config = initial }, function(_, path)
+			local dialog = require("ui.error_dialog.bridge")
+			local accepted = dialog.set_enabled(false)
+			return { accepted = accepted, active = dialog.is_enabled(),
+				config = read(require("infra.config_paths").config("config.toml")), stored = require("json").decode(read(path))["script.show_error_dialog"] }
+		end)
+		helpers.assert_eq(observed, { accepted = true, active = false, config = '[script]\nshow_error_dialog = false\n', stored = false })
+	end)
 
 	helpers.it("(log-level-atomic) leaves the source and logger unchanged on storage refusal", function()
 		local initial = '[script]\nlog_level = "INFO"\n'

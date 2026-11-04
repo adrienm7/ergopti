@@ -60,6 +60,7 @@ function M.new(options)
 		"scope transactions require serialized conditional publication")
 	assert(options.prepare_batch == nil or type(options.prepare_batch) == "function", "invalid scope preparation owner")
 	assert(options.preserve_unchanged == nil or type(options.preserve_unchanged) == "boolean", "invalid unchanged-source policy")
+	assert(options.allow_boolean == nil or type(options.allow_boolean) == "boolean", "invalid edit value policy")
 	assert(options.select == nil or type(options.select) == "function", "invalid scope row selection")
 	assert(options.presets == nil or type(options.presets) == "table", "invalid scope preset owners")
 	for id, port in pairs(options.presets or {}) do check_preset(id, port, options) end
@@ -286,7 +287,8 @@ function M.new(options)
 			if type(row.section) ~= "string" or row.section == "" or type(row.key) ~= "string" or row.key == ""
 				or (row.delete ~= nil and row.delete ~= true)
 				or (row.delete == true and row.value ~= nil)
-				or (row.delete ~= true and type(row.value) ~= "string") then return false, "invalid edit row value" end
+				or (row.delete ~= true and type(row.value) ~= "string"
+					and not (options.allow_boolean == true and type(row.value) == "boolean")) then return false, "invalid edit row value" end
 			local intentional, valid = pcall(require("shortcuts.assignment").is_intentional, row)
 			if not intentional then return false, "invalid assignment intent" end
 			local path = row.section .. "." .. row.key

@@ -126,7 +126,7 @@ function M.new(options)
 	---   rawequal, the others with ==; only published fields may change);
 	---   accept(value) -> table of the published fields' next values, or nil to refuse;
 	---   publish(target) writes target's published values, raising on refusal;
-	---   ready() optional, checked before a transaction may acquire;
+	---   ready(owner) optional, checked before a transaction may acquire;
 	---   live() optional, checked at every step (a replaced backend refuses).
 	function scope.install(spec)
 		assert(not installed, "scope owner: " .. name .. " installed its scope methods twice")
@@ -208,7 +208,7 @@ function M.new(options)
 		local function acquire(owner)
 			if type(owner) ~= "table" or type(owner.pending) ~= "function" or holder ~= nil
 				or not current_module() then return false end
-			if not ready() or not live() or not current_module() then return false end
+			if not ready(owner) or not live() or not current_module() then return false end
 			holder = owner
 			return true
 		end
