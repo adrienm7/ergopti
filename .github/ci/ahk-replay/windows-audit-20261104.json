@@ -1,11 +1,47 @@
 {
-	"expected_count": 2,
+	"expected_count": 15,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "managed-http-classification",
-			"expected_count": 2
+			"contains": "token-rawpost-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "Token exchange: waiters share one exchange and the token is cached",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a token in its refresh margin is sent while it is refreshed",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a resolved entry carries the access token, never the stored key",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a prediction waits for its token and fails with the refusal",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a cancelled prediction leaves the shared exchange running",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a settled token resumes the waiting dispatch",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: the first screen reading waits for its token, then captures and sends it",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a screen reading whose exchange is refused captures nothing",
+			"expected_count": 1
+		},
+		{
+			"contains": "Token exchange: a screen reading with a fresh token does not wait",
+			"expected_count": 1
 		}
 	]
 }
