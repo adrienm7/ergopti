@@ -36,6 +36,25 @@ enum OwnedRuntimeInstallMainOperation {
 	}
 	private static func hex(_ bytes: some Sequence<UInt8>) -> String { bytes.map { String(format: "%02x", $0) }.joined() }
 
+	/// Exit statuses of the driver step's own checks (runtime_vhid_update.lua EXIT_DIGEST and EXIT_SIGNATURE).
+	static let driverDigestStatus = 78, driverSignatureStatus = 79
+
+	/// Root-owned copy of the kept package, its pinned digest and pqrs' Developer ID Installer team checked on that
+	/// copy, then /usr/sbin/installer; the same checks as the driver-only update's administrator shell.
+	static func driverProgram(_ package: OwnedRuntimeDownloadedHelper.DriverPackage) -> String {
+		let quote = OwnedVirtualHIDDaemonReportMainOperation.quote
+		return "task_work=$(/usr/bin/mktemp -d /private/tmp/ergoptiplus-vhid.XXXXXX); "
+			+ "/bin/cp -X " + quote(package.path) + " \"$task_work/driver.pkg\"; "
+			+ "task_sum=$(/usr/bin/shasum -a 256 \"$task_work/driver.pkg\"); task_sum=${task_sum%% *}; "
+			+ "[ \"$task_sum\" = " + quote(package.sha256) + " ] || { /bin/rm -rf \"$task_work\"; exit \(driverDigestStatus); }; "
+			+ "task_sig=$(/usr/sbin/pkgutil --check-signature \"$task_work/driver.pkg\") || { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -q '^ *Status: signed by a developer certificate issued by Apple' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "printf '%s\\n' \"$task_sig\" | /usr/bin/grep -Eq '^ *1\\. Developer ID Installer: .*\\(" + package.team + "\\)$' "
+			+ "|| { /bin/rm -rf \"$task_work\"; exit \(driverSignatureStatus); }; "
+			+ "/usr/sbin/installer -pkg \"$task_work/driver.pkg\" -target / >/dev/null; /bin/rm -rf \"$task_work\"; "
+	}
+
 	/// Deliberate signed Main CLI request, off the main thread (the AppleScript prompt runs here).
 	static func run(arguments: [String]) -> Int32 {
 		guard handles(arguments: arguments), !Thread.isMainThread, getuid() != 0, getuid() == geteuid() else { return 64 }
@@ -47,6 +66,15 @@ enum OwnedRuntimeInstallMainOperation {
 		switch OwnedRuntimeDownloadedHelper.current() {
 		case .success(let located): helper = located
 		case .failure(let refusal): return refuse(refusal.rawValue, refusal.explanation)
+		}
+		// pqrs' driver package, when no pqrs daemon is installed yet: the Lua install port downloaded and
+		// verified it (runtime_vhid_update.lua fetch), and this same shell checks it again before the helper.
+		var driverStep = ""
+		if !OwnedRuntimeVirtualHIDProvisionOwner.daemonInstalled() {
+			guard let package = OwnedRuntimeDownloadedHelper.currentDriverPackage() else {
+				return refuse("driver_package_absent", "no verified VirtualHIDDevice package is kept for the driver install")
+			}
+			driverStep = Self.driverProgram(package)
 		}
 		let program: String
 		do {
@@ -74,7 +102,7 @@ enum OwnedRuntimeInstallMainOperation {
 			program = OwnedVirtualHIDDaemonReportMainOperation.stagedHelperProgram(source: helper.path, stage: stage,
 				requirement: requirement, digest: hex(SHA256.hash(data: bytes))) { executable in
 				// The helper retires its own stage on success; any other exit leaves a copy only this shell can remove.
-				"task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
+				driverStep + "task_status=0; task_line=$(/usr/bin/env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin "
 					+ OwnedVirtualHIDDaemonReportMainOperation.quote(executable) + " --owned-install-first) || task_status=$?; "
 					+ "if [ -d \(directory) ] && [ ! -L \(directory) ]; then /bin/rm -rf \(directory); fi; "
 					+ "printf '%s\\n' \"$task_line\"; exit \"$task_status\""
