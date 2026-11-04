@@ -76,6 +76,17 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 		package.loaded["ui.tooltip.llm"] = nil
 	end)
 
+	helpers.it("(llm-overlay-draw-failure) creates no cleanup debt when no renderer can draw", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
+		assert(overlay.init({ style = {}, renderer = {} }))
+		helpers.assert_eq(overlay.show({ { to_type = "hello" } }, {}), false)
+		helpers.assert_eq(overlay.is_showing(), false)
+		helpers.assert_true(overlay.init({ style = {}, renderer = { show = function() return true end } }))
+		helpers.assert_true(overlay.show({ { to_type = "hello" } }, {}))
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
 	helpers.it("(llm-overlay-draw-failure) keeps the rendering owner through reentrant lifecycle calls", function()
 		package.loaded["ui.tooltip.llm"] = nil
 		local overlay, destroyed = require("ui.tooltip.llm"), 0
@@ -88,7 +99,10 @@ helpers.describe("AI overlay: one window shared with the hotstring preview", fun
 			hide = function() return true end,
 			destroy = function() destroyed = destroyed + 1 end,
 		}
-		assert(overlay.init({ style = {}, renderer = renderer }))
+		assert(overlay.init({ style = {}, renderer = renderer, anchor_provider = function()
+			helpers.assert_eq(overlay.init({ style = {}, renderer = {} }), false)
+			helpers.assert_eq(overlay.destroy(), false)
+		end }))
 		helpers.assert_true(overlay.show({ { to_type = "hello" } }, {}))
 		helpers.assert_true(overlay.is_showing())
 		helpers.assert_eq(destroyed, 0)
