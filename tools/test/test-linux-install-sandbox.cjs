@@ -457,6 +457,38 @@ for (const viaAlias of [false, true]) {
 	}
 }
 
+// A linked bin or lib directory redirects publication outside the admitted
+// prefix and cannot later pass the uninstaller's physical-path checks.
+for (const [linked, dangling] of ['bin', 'lib'].flatMap((name) => [
+	[name, false],
+	[name, true]
+])) {
+	const run = runInstaller({
+		desktopProvided: true,
+		noService: true,
+		seed(home) {
+			const prefix = path.join(home, '.local');
+			const foreign = path.join(home, `foreign-${linked}`);
+			fs.mkdirSync(prefix);
+			fs.mkdirSync(foreign);
+			fs.symlinkSync(foreign, path.join(prefix, linked));
+			if (dangling) fs.rmdirSync(foreign);
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `linked ${linked} must be refused`);
+		const foreign = path.join(run.home, `foreign-${linked}`);
+		if (dangling) assert.equal(fs.existsSync(foreign), false);
+		else assert.deepEqual(fs.readdirSync(foreign), []);
+		assert.equal(
+			run.calls.some((call) => call.startsWith('sudo ')),
+			false
+		);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // A refused scan cannot certify that replacing an existing tree is safe.
 {
 	const run = runInstaller({
