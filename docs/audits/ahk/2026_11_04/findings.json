@@ -1,0 +1,97 @@
+{
+	"schema_version": 1,
+	"scope": "ahk",
+	"audited_sha": "9154723b34ee0599433cbf749a4aca839bd54b53",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/ahk/2026_11_04/report.md",
+	"findings": [
+		{
+			"id": "AHK-001",
+			"title": "Zero-net scroll retains the previous burst clock",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Scroll +1 at1000, -1 at1100, flush1500, then +1 at5000 and flush5400.",
+			"root_cause": "KL_Mouse_FlushScroll in static/ergopti_plus/windows/modules/keystats/keystats_mouse.ahk: The empty-delta return precedes clearing scroll_start and scroll_last.",
+			"silent_failure": "The next burst duration is4400 instead of400; the empty fixture starts with zero timestamps.",
+			"regression_test": "Assert timestamp retirement and the next burst duration through actual accumulate/flush ports."
+		},
+		{
+			"id": "AHK-002",
+			"title": "ROI word candidates miss special keys",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Type hello, Enter, world and space; separately type hellox, Backspace and space.",
+			"root_cause": "_KL_Hook_CommitInput in static/ergopti_plus/windows/modules/keystats/keystats_hook.ahk: Only char intents reach ROI; Enter, Tab and Backspace are key intents.",
+			"silent_failure": "ROI records helloworld or hellox while typing-buffer tests cover only actual text.",
+			"regression_test": "Drive actual key/char owners and assert separate and corrected ROI candidates; exclude synthetic and private input."
+		},
+		{
+			"id": "AHK-003",
+			"title": "Zero-saving hotstring fires are absent from usage history",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Fire an initialized public trigger with net_saved0 after an older positive-saving use.",
+			"root_cause": "KL_Roi_OnHotstring in static/ergopti_plus/windows/modules/keystats/keystats_trigger_roi.ahk: A nonpositive-savings guard suppresses independent fired-count and last-use bookkeeping.",
+			"silent_failure": "The active trigger retains an old last-use timestamp and can be reported stale.",
+			"regression_test": "Assert zero and negative savings fires update usage but add no positive savings; keep private trigger exclusion."
+		},
+		{
+			"id": "AHK-004",
+			"title": "Selected composition removal publishes duplicate results",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Remove the selected composition; after invokes its refusal callback and returns false.",
+			"root_cause": "_LayoutComposer_Remove in static/ergopti_plus/windows/ui/layout_manager/composer.ahk: Unlike the save sibling, removal lacks a terminal Completed guard.",
+			"silent_failure": "Each callback and the fallback publish composerResult and updateState.",
+			"regression_test": "Inject duplicate refusal callbacks plus a false return and require exactly one result and one state push."
+		},
+		{
+			"id": "AHK-005",
+			"title": "Old layout operations publish into a replacement window",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Start installation in session A; close A and open B; deliver the failure callback from A.",
+			"root_cause": "_LayMgrWeb_OnDone in static/ergopti_plus/windows/ui/layout_manager/init.ahk: Callbacks capture dependencies but no session epoch, and push targets the current global WebView.",
+			"silent_failure": "The old result overwrites the replacement session result and displays there.",
+			"regression_test": "Retain callback A, replace the session, complete A and assert no stale UI/result publication while durable work completes."
+		},
+		{
+			"id": "AHK-006",
+			"title": "Replacing the click watcher can strand an existing held button",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Hold left click, request right hold by touch, and refuse construction or start of the replacement keyboard watcher.",
+			"root_cause": "GestureStartKeyboardWatcher in static/ergopti_plus/windows/modules/gestures/click.ahk: The active shared watcher is stopped before the replacement is acquired; rollback preserves the first held button.",
+			"silent_failure": "The next key has no observer to release the synthetic held button.",
+			"regression_test": "Retain an active watcher across overlapping holds; test both button orders and failed cleanup ownership."
+		},
+		{
+			"id": "AHK-007",
+			"title": "Output-only API usage has a zero total",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Parse usage prompt_tokens0 completion_tokens10 without total_tokens; repeat Anthropic and Gemini equivalents.",
+			"root_cause": "_LLMRemoteExtractUsageRoot in static/ergopti_plus/windows/modules/llm/api_remote.ahk: Fallback summation requires positive input tokens.",
+			"silent_failure": "Completion tokens are present but total_tokens is0 and downstream totals omit them.",
+			"regression_test": "Expect total10 for all three formats with zero input and positive output."
+		},
+		{
+			"id": "AHK-008",
+			"title": "UTF-16 BOM alone is accepted as a valid PAC script",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Judge HTTP200 body FF FE, FE FF or FF FE0000.",
+			"root_cause": "NetworkCheck_JudgePac in static/ergopti_plus/windows/ui/field_check/network_check.ahk: The UTF-16 BOM branch returns success without decoding or checking the PAC function.",
+			"silent_failure": "Diagnostics claim a valid PAC and FindProxyForURL despite absent script; the Lua sibling shares this defect.",
+			"regression_test": "Accept real UTF-16LE/BE PAC scripts; reject BOM-only, odd byte counts, invalid Unicode and content without the function."
+		}
+	]
+}
