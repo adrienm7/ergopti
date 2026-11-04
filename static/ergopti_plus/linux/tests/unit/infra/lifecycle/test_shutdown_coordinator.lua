@@ -85,6 +85,29 @@ helpers.describe("actual Main startup capture admission", function()
 			helpers.assert_eq(expected, #started, child .. " must expect every signal handle Main installs")
 		end
 	end)
+	helpers.it("(signal-callback-isolation) a raising signal callback does not escape or disable later signals", function()
+		local callbacks, handled = {}, 0
+		local fake_luv = {
+			new_signal = function() return {} end,
+			signal_start = function(_, name, callback) callbacks[name] = callback; return 0 end,
+			signal_stop = function() return 0 end,
+			is_closing = function() return false end,
+			close = function(_, on_closed) on_closed() end,
+		}
+		local saved_luv, saved_signals = package.loaded.luv, package.loaded["infra.signal_handlers"]
+		package.loaded.luv, package.loaded["infra.signal_handlers"] = fake_luv, nil
+		local ok, err = pcall(function()
+			local signals = require("infra.signal_handlers")
+			helpers.assert_true(signals.start({ on_term = function() error("controlled signal callback failure") end,
+				on_hup = function(number) helpers.assert_eq(number, 1); handled = handled + 1 end }))
+			helpers.assert_true(pcall(callbacks.sigterm), "the native loop must not receive the exception")
+			callbacks.sighup()
+			helpers.assert_eq(handled, 1)
+			helpers.assert_true(signals.stop())
+		end)
+		package.loaded.luv, package.loaded["infra.signal_handlers"] = saved_luv, saved_signals
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("(startup-late-grab) preserves the onboarding capture gate through the first pump", function()
 		local state = MainStartup.run()
 		helpers.assert_true(state.ok, tostring(state.error))
