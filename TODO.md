@@ -385,22 +385,33 @@ between workers) green alone. All live checks pass, typed by the harness.
 ### macOS
 
 - **Next release after 1.0.9, maintainer priority: switch the driver to the owned Karabiner.** Today the driver still uses
-  the installed one and the owned runtime is dormant. Publish the runtime, write its pin, then WP8, WP9 and the real-Mac
-  acceptance below, and make `runtime = "owned"` the default.
+  the installed one and the owned runtime is dormant. The runtime is published and pinned; WP8, WP9 and the real-Mac
+  acceptance of item 31 below come next, then `runtime = "owned"` becomes the default.
 - **One folder name for Ergopti on the three OS (maintainer, 3 November).** macOS has three folders in Application
   Support: `ErgoptiPlus` (paths.toml, runtime, locks, karabiner.json), `Ergopti` (managed Ollama, embedded Python, MLX)
   and `ergopti_plus` (the local reload control); Windows mixes `%LOCALAPPDATA%ergopti_plus` and `Ergoptiundle`, and the
   config, logs and caches use other spellings. Decided: `Ergopti` on macOS and
   Windows, `ergopti` under XDG on Linux, no "Plus" in folder names; put each driver's data under one root, name it once in the shared identifiers,
   and migrate the old folders once at boot with a backup.
-- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md)). WP3, WP6
-  and WP7 are built and dormant behind `[karabiner] runtime = "owned"`. Left: a green hosted runtime build of the
-  installer shape is done (dev run 41276215019, artifact `owned-remap-runtime`): the maintainer publishes
-  `ErgoptiPlus-Remap-Runtime-16.3.0-ergopti.2.tar.gz` (sha256 `ad1541f8…de8e`, 12176523 bytes) under the tag
-  `remap-runtime-v16.3.0-ergopti.2`, then runs `python3 tools/build/remap_runtime_publish.py apply runtime-pin.json`
-  to write the `runtime.*` pin; WP8 native and WP9 real-Mac acceptance; then the
-  `RUNTIME_DEFAULT` flip and the shared-mode deletion. Done on 1 November: the per-OS feature requirements table
-  (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
+- **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
+  branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
+  - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
+    `ad1541f8…2de8e`, 12176523 bytes) and pinned in `macos/vendor/remap-runtime/manifest.json`; shared-rule migration,
+    Tap-Holds block rows and notice; WP8 step 1: the live helper's first install also provisions and starts the idle
+    Core service (`OwnedRuntimeIdleServiceEntry`), compiled unsigned for both architectures on a hosted Mac (Remap
+    runtime build run 41813372448).
+  - In progress (ready, not merged): the `RUNTIME_DEFAULT = "owned"` flip with the two Configuration rows
+    (`menu.global.karabiner_integration`, `menu.global.remove_from_karabiner`, `macos/ui/menu/remap_switch.lua`)
+    deleted, one commit on branch `next/owned-karabiner-flip` stacked on this one. It turns tap-holds off on any Mac
+    without the owned runtime, so it waits for WP8 and WP9.
+  - Next (WP8, in order): the `com.ergoptiplus.runtime.vhid` LaunchDaemon writer and the VirtualHIDDevice pkg install
+    in the helper; a `--request-owned-runtime-install` launcher role and its Lua port from the `owned_not_installed`
+    row; `RUNTIME_VERSION` `16.3.0-ergopti.3`, a signed Remap runtime build, its publication (maintainer go-ahead) and
+    pin; a hosted `sudo` install acceptance job. A hosted runner cannot approve the DriverKit extension, so typing
+    through the owned runtime is proven only by WP9 on a real Mac.
+  - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
+    Done on 1 November: the per-OS feature requirements table
+    (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
   `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared
