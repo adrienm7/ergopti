@@ -235,6 +235,17 @@
 			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats_hook.ahk:_KL_Hook_CommitInput does not revalidate its arrival after ErgoFn.Call before dispatching the ROI sink.",
 			"silent_failure": "An arrival revoked during the ergonomic callout still clears the current ROI word and increments its candidate count.",
 			"regression_test": "Use the genuine hook and ROI owners in the isolated keys fixture; revoke through the official ergonomic callback port and require the ROI seed and WPM count to remain unchanged. This qualifies the explicit callout boundary, not atomicity of the whole ROI pipeline."
+		},
+		{
+			"id": "AHK-022",
+			"title": "Multi-character InputHook payloads bypass ROI boundaries and bounds",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Through the genuine hook, append native documented dead-key payload ^z after 63 a characters, then a space. Separately deliver ^.world followed by a space in one callback after hello.",
+			"root_cause": "static/ergopti_plus/windows/modules/keystats/keystats_trigger_roi.ahk:KL_Roi_OnChar treats its complete callback payload as one character. InputHook.OnChar can deliver multiple characters after an unsuccessful dead-key composition, and a Unicode codepoint can occupy two UTF-16 units.",
+			"silent_failure": "A candidate exceeds the 64-unit storage bound, or delimiters inside the callback are embedded in a combined word rather than separating words.",
+			"regression_test": "Use genuine hook and ROI owners to reject a 63-unit prefix plus a two-unit payload or surrogate pair, then assert separate candidates for a callback with an internal delimiter. Native payload shape is documented by AutoHotkey InputHook.OnChar; Windows execution remains pending."
 		}
 	]
 }

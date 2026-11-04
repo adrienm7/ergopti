@@ -294,6 +294,22 @@ _RHL_Keys() {
 	} finally Keystats.synth_active := false
 	_RHL_Require(KLRoi.current_word == "hello" && KLRoi.word_counts.Count == 0,
 		"Synthetic key and character intents must not modify public ROI.")
+	for Payload in ["^z", Chr(0x1F600)] {
+		_RHL_ClearWords()
+		Loop KLRoiConst.MAX_INPROGRESS_WORD_LEN - 1
+			_RHL_Type("a")
+		KL_Hook_OnChar(0, Payload, _RHL_Public, A_TickCount, _RHL_NoErgo)
+		_RHL_Require(KLRoi.word_overflowed && StrLen(KLRoi.current_word) <= KLRoiConst.MAX_INPROGRESS_WORD_LEN,
+			"A native multi-unit callback must respect the exact storage bound before publication.")
+		_RHL_Type(" ")
+		_RHL_Require(KLRoi.word_counts.Count == 0, "Overflow inside one callback must discard the entire word.")
+	}
+	_RHL_ClearWords()
+	_RHL_Type("hello")
+	KL_Hook_OnChar(0, "^.world ", _RHL_Public, A_TickCount, _RHL_NoErgo)
+	_RHL_Require(KLRoi.word_counts.Count == 2 && KLRoi.word_counts.Get("hello^", 0) == 1
+		&& KLRoi.word_counts.Get("world", 0) == 1,
+		"Boundaries inside a single callback must split the candidate stream in order.")
 	for Mode in ["pause", "capture", "focus"] {
 		_RHL_ClearWords()
 		_RHL_Type("hello")
