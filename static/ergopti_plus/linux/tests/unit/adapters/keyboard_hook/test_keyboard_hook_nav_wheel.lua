@@ -166,6 +166,17 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "press", BTN_LEFT, 1, source },
 			{ "reset", nil, nil, source } })
 	end)
+
+	helpers.it("remaps the wheel without optional pointer observers (wheel-no-observers)", function()
+		local emitted, grabs, _, running, _, opened = drive("mouse", HOLD, {
+			{ EV_REL, REL_WHEEL, 1, 3000 },
+		}, nil, nil, nil, nil, nil, true)
+		helpers.assert_true(running)
+		helpers.assert_true(opened, "a wheel remapper needs a pointer source")
+		helpers.assert_true(grabs.on > 0)
+		helpers.assert_true(has(emitted, "key:" .. VOLUME_UP .. ":1"))
+		helpers.assert_true(has(emitted, "key:" .. VOLUME_UP .. ":0"))
+	end)
 	helpers.it("identifies the pointer on each motion and frame report", function()
 		local reports = {}
 		local _, _, _, _, source = drive("mouse", {}, {
