@@ -631,6 +631,35 @@ const errors = [];
 	}
 }
 
+// Refuse foreign or linked startup entries before replacing the payload.
+for (const kind of ['unit', 'desktop', 'linked-unit', 'linked-desktop']) {
+	const relative = kind.endsWith('unit')
+		? 'systemd/user/ergopti-hotstrings.service'
+		: 'autostart/ergopti-hotstrings.desktop';
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home, configRoot) {
+			const entry = path.join(configRoot, relative);
+			fs.mkdirSync(path.dirname(entry), { recursive: true });
+			if (kind.startsWith('linked-')) {
+				fs.writeFileSync(path.join(home, 'foreign-target'), 'keep target\n');
+				fs.symlinkSync(path.join(home, 'foreign-target'), entry);
+			} else fs.writeFileSync(entry, 'foreign startup\n');
+		}
+	});
+	try {
+		assert.notEqual(run.status, 0, `${kind} must be refused`);
+		const entry = path.join(run.configRoot, relative);
+		if (kind.startsWith('linked-')) {
+			assert.ok(fs.lstatSync(entry).isSymbolicLink());
+			assert.equal(fs.readFileSync(path.join(run.home, 'foreign-target'), 'utf8'), 'keep target\n');
+		} else assert.equal(fs.readFileSync(entry, 'utf8'), 'foreign startup\n');
+		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
+	} finally {
+		run.cleanup();
+	}
+}
+
 // An update must preserve a choice already made through the startup menu.
 {
 	const run = runInstaller({
