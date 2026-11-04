@@ -363,9 +363,11 @@ local function open_ics(config, action, on_done, frame)
 	if _stopping then return false end
 	local path = dir .. "/" .. (action.type == "calendar" and "event" or "task") .. ".ics"
 	if _stopping then return false end
-	pending.path = path
+	-- The native writer owns no path until its exclusive-open receipt arrives.
+	-- Test boundaries retain their original path-based cleanup contract.
+	if _deps.write_file ~= DEFAULT_DEPS.write_file then pending.path = path end
 	local written, remove_owned, current_image, owned = _deps.write_file(path, content)
-	if owned == false then pending.path = nil end
+	if owned == true then pending.path = path elseif owned == false then pending.path = nil end
 	if type(remove_owned) == "function" then pending.remove_owned = remove_owned end
 	if _stopping then return false end
 	if written and type(current_image) == "function" then
