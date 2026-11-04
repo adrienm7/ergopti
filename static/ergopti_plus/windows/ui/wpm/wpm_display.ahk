@@ -590,6 +590,58 @@ WPMWidget_Hide() {
 ; =========================================
 ; =========================================
 
+; Retire only the exact failed surface; a replacement owns its own references.
+_WPMWidget_DiscardSurface(Candidate, Graph) {
+    PreviousCritical := Critical("On")
+    try {
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current == Candidate {
+            if Graph
+                WPMWidget._graph_gui := false
+            else {
+                WPMWidget._gui := false
+                WPMWidget._lbl_wpm := false
+                WPMWidget._lbl_unit := false
+                WPMWidget._lbl_strip := false
+            }
+        }
+    } finally Critical(PreviousCritical)
+    if Candidate
+        try Candidate.Destroy()
+}
+
+; A missing surface remains retryable until both construction and geometry succeed.
+; This does not reset the admitted rolling samples or start another display timer.
+_WPMWidget_RebuildSurface() {
+    if !WPMWidget.visible || A_IsSuspended
+        return false
+    Graph := WPMWidget.show_graph
+    Existing := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if Existing
+        return true
+    Candidate := 0
+    try {
+        Candidate := Graph ? WPMWidget_BuildGraph() : WPMWidget_BuildCompact()
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if !Candidate || Current != Candidate || Graph != WPMWidget.show_graph
+                || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        _WPMWidget_ApplySurfaceGeometry(Candidate)
+        Current := Graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if Current != Candidate || Graph != WPMWidget.show_graph || !WPMWidget.visible || A_IsSuspended {
+            _WPMWidget_DiscardSurface(Candidate, Graph)
+            return false
+        }
+        return true
+    } catch as Err {
+        _WPMWidget_DiscardSurface(Candidate, Graph)
+        try LoggerError("WPMWidget", "Surface reconstruction failed; a later display tick will retry: {1}.", Err.Message)
+        return false
+    }
+}
+
 WPMWidget_Tick() {
     if !WPMWidget.visible
         return
@@ -640,12 +692,15 @@ WPMWidget_Tick() {
     should_show   := _WPMWidget_TooltipUp()
         || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-    if !gui_ref
-        return
-
     if !should_show {
-        try _WPMWidget_HideSurface(gui_ref)
+        if gui_ref
+            try _WPMWidget_HideSurface(gui_ref)
         return
+    }
+    if !gui_ref {
+        if !_WPMWidget_RebuildSurface()
+            return
+        gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     }
 
     is_idle := false
@@ -669,13 +724,8 @@ WPMWidget_Tick() {
             ; to say a render had thrown — the two branches of the same tick
             ; behaved differently for no reason anyone chose.
             try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._graph_gui := false
-            try WPMWidget_BuildGraph()
-            ; The builder only constructs. Without the geometry the rebuilt Gui
-            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
-            ; tick and the "recovery" leaves the widget exactly as dead as the bare
-            ; catch it replaced — just with one ERROR line to show for it.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
+            _WPMWidget_DiscardSurface(gui_ref, true)
+            _WPMWidget_RebuildSurface()
         }
     } else {
         bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
@@ -696,15 +746,8 @@ WPMWidget_Tick() {
                 WPMWidget._lbl_unit.SetFont("c" . txt_col)
         } catch as _e {
             try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
-            WPMWidget._gui       := false
-            WPMWidget._lbl_wpm   := false
-            WPMWidget._lbl_unit  := false
-            WPMWidget._lbl_strip := false
-            try WPMWidget_BuildCompact()
-            ; Same reason as the graph sibling above: the next tick reveals this
-            ; window with a bare Show("NoActivate"), which would put the rebuilt
-            ; widget at the OS default position instead of the user's corner.
-            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
+            _WPMWidget_DiscardSurface(gui_ref, false)
+            _WPMWidget_RebuildSurface()
         }
     }
     WPMWidget._last_wpm := wpm

@@ -44,9 +44,13 @@ _WRSS_RebuildBranchesReapplyGeometry() {
 		At := InStr(Body, Marker)
 		Assert(At > 0, "prerequisite: the '" . Marker . "' recovery branch must still exist and log")
 		Window := SubStr(Body, At, 500)
-		Assert(InStr(Window, "_WPMWidget_ApplySurfaceGeometry") > 0,
+		Assert(InStr(Window, "_WPMWidget_RebuildSurface") > 0,
 			"the '" . Marker . "' branch rebuilds the widget Gui but never re-applies its geometry. A freshly constructed, never-Shown Gui has a 0x0 client rect: GR_DrawBitmap returns at its `if (W <= 0 or H <= 0)` guard, the layered graph never receives another UpdateLayeredWindow, and the widget silently paints nothing until the user toggles the mode by hand or restarts")
 	}
+	Recovery := _DriverFuncBody("_WPMWidget_RebuildSurface")
+	Assert(Recovery != "" && InStr(Recovery, "_WPMWidget_ApplySurfaceGeometry") > 0,
+		"retryable reconstruction must include geometry before declaring its surface ready")
+
 }
 Test("meta wpm-rebuilt-surface-is-sized: both tick recovery branches re-apply the geometry",
 	_WRSS_RebuildBranchesReapplyGeometry)
