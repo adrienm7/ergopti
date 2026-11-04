@@ -160,19 +160,19 @@ end)
 
 helpers.describe("menu_apps discovery cache", function()
 	helpers.it("scans the apps/ directory at most once across repeated menu opens", function()
-		local find_calls = 0
-		-- Count `find … -name '*.app'` invocations; everything else is a no-op.
-		local exec = function(cmd)
-			if type(cmd) == "string" and cmd:find("-name '*.app'", 1, true) then
-				find_calls = find_calls + 1
-			end
-			return "", true, "exit", 0
-		end
-		local apps = helpers.load_with_stubs("ui.menu.menu_apps", { execute = exec })
-		local ctx  = { base_dir = "/tmp/ergopti-no-apps/", paused = false }
-		apps.build(ctx)
-		apps.build(ctx)
-		helpers.assert_true(find_calls <= 1,
-			"apps/ must be scanned at most once across opens, got " .. tostring(find_calls))
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.fs_dir" }, function()
+			local scans = 0
+			package.loaded["infra.fs_dir"] = { try_entries_quiet = function()
+				scans = scans + 1
+				return {}, true
+			end }
+			local apps = helpers.load_with_stubs("ui.menu.menu_apps", {
+				fs = { attributes = function() return { mode = "directory" } end },
+			})
+			local ctx = { base_dir = "/tmp/ergopti-no-apps/", paused = false }
+			apps.build(ctx)
+			apps.build(ctx)
+			helpers.assert_eq(scans, 1, "one authoritative scan is cached across opens")
+		end)
 	end)
 end)
