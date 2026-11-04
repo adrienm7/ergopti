@@ -36,9 +36,17 @@ local function migrate(answers)
 			if answers.refuse and command:find(answers.refuse, 1, true) then status = 7 end
 		end
 		return {
-			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			read = function()
+				if (answers.key_read_throw and command:find("SELECT DISTINCT hex(token)", 1, true))
+					or (answers.version_read_throw and command:find("key='ngram_token_encoding'", 1, true)) then error("injected read failure") end
+				return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n"
+			end,
 			lines = function() return content:gmatch("([^\n]*)\n") end,
-			close = function() return true end,
+			close = function()
+				if (answers.key_close_false and command:find("SELECT DISTINCT hex(token)", 1, true))
+					or (answers.version_close_false and command:find("key='ngram_token_encoding'", 1, true)) then return false end
+				return true
+			end,
 		}
 	end
 	local uv = require("luv")
@@ -119,6 +127,23 @@ helpers.describe("keystats sqlite writer: n-gram token encoding", function()
 		helpers.assert_eq(result, false)
 		helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
 	end)
+
+	for _, fault in ipairs({ "version_read_throw", "version_close_false" }) do
+		helpers.it("token-encoding refuses unknown migration version " .. fault, function()
+			local result, commands = migrate({ version = "2", keys = { ngram_chars = "5B\n" }, [fault] = true })
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(#commands, 0, "failed version read must not reinterpret migrated keys")
+		end)
+	end
+
+	for _, fault in ipairs({ "key_read_throw", "key_close_false" }) do
+		helpers.it("token-encoding refuses incomplete key query " .. fault, function()
+			local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, [fault] = true })
+			helpers.assert_eq(result, false)
+			helpers.assert_nil(position(commands, "VACUUM INTO"))
+			helpers.assert_nil(position(commands, "UPDATE OR ROLLBACK"))
+		end)
+	end
 
 	helpers.it("token-encoding: a refused backup rewrites nothing", function()
 		local result, commands = migrate({ keys = { ngram_chars = "5B\n" }, refuse = "VACUUM INTO" })
