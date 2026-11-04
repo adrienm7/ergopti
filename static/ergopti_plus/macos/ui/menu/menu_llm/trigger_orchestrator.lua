@@ -648,6 +648,10 @@ function M.new(ctx)
 	--- @return boolean restored
 	function inst.restore_shortcuts(snapshot)
 		if type(snapshot) ~= "table" then return false end
+		if snapshot.llm_profile_shortcuts ~= nil and type(snapshot.llm_profile_shortcuts) ~= "table" then
+			Logger.warn(LOG, "Profile shortcut snapshot refused malformed shortcut collection.")
+			return false
+		end
 		if restore_fence > 0 then
 			Logger.debug(LOG,
 				"Shortcut snapshot restoration deferred to the active exact transaction owner.")
