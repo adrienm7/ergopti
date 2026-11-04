@@ -511,3 +511,17 @@ The next replay selects those three failed cases, the eleven token-status
 regressions, six buffered-log owner cases and three existing log-opener controls.
 That later selection has not yet produced a native verdict at this checkpoint.
 The registry remains at **33 distinct new findings**, not 1,000.
+
+## AHK-034: Deferred tap-copy retries survive suspend and can overwrite successor ownership
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+TapCopyCheckStop in static/ergopti_plus/windows/platform/remap/constants.ahk was never reached by production cleanup. The timer checked only the instantaneous suspended flag. Producer and timer continuations also mutated the global pending record after counter, sender or logger callouts without revalidating their exact generation.
+
+Reproduction: Start a tap-copy check, enter native Suspend and the production remap teardown, resume before the retained 300 ms callback, then deliver that old callback with an unchanged clipboard counter. Also start a newer copy inside the counter or retry sender of an older check.
+
+Consequence: An old Ctrl+C may be injected into the resumed context, or an obsolete check may clear a newer copy and issue its stale failure notification.
+
+Regression: Seven reachable tap-copy-owner cases invoke the genuine suspend-owned remap drain with private empty modifier ledgers, native Suspend/resume and retained timer delivery; producer/counter/retry/logger callouts revoke or replace ownership and assert zero stale sends/notices plus successor timer preservation. Counter/timer/send/notice are explicit passive ports. Existing five copy verification controls remain. Native Windows execution is pending; pre-fix failure is source-derived.
+
+The ongoing register now contains **34 distinct new findings**. The requested target of 1,000 remains unmet.
