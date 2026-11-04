@@ -583,68 +583,13 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 	return false, reason
 end
 
---- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
---- administrator privileges. Triggers a macOS password prompt. The system
---- A bundle in the user scope must be removed manually before replacement.
---- @param bundles_dir string Absolute path of the source bundles directory.
---- @param bundle_name string Basename of the bundle to install.
---- @return boolean true on success.
-local function install_system_unlocked(bundles_dir, bundle_name)
-	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
-	local occupied = other_scope_occupied(USER_LAYOUTS_DIR)
-	if occupied == nil then
-		Logger.error(LOG, "System install refused: the user layout directory could not be checked.")
-		return false, "other_scope_unverified"
-	end
-	if occupied then
-		Logger.warn(LOG, "System install refused: another keyboard bundle remains in the user scope.")
-		return false, "other_scope_occupied"
-	end
-	local shell_cmd, command_detail, reason = build_install_transaction(
-		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name)
-	if not shell_cmd then
-		Logger.error(LOG, "System install failed: %s.", tostring(command_detail))
-		return false, reason
-	end
-	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
-	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
-	-- the single quote — so a `\` or a `"` anywhere in bundles_dir, bundle_name or
-	-- SYSTEM_LAYOUTS_DIR passed through untouched into this AppleScript literal.
-	-- The backslash was then eaten (the privileged cp -R targeting a different
-	-- path) or the quote terminated the literal outright.
-	local script = text_utils.applescript_format(
-		"do shell script \"%s\" with administrator privileges",
-		shell_cmd
-	)
-	local call_ok, native_ok, _, diagnostic = false, false, nil, nil
-	if hs.osascript and type(hs.osascript.applescript) == "function" then
-		call_ok, native_ok, _, diagnostic = pcall(hs.osascript.applescript, script)
-	end
-	if call_ok and native_ok == true then
-		local clear, check_reason = warn_other_scope(USER_LAYOUTS_DIR)
-		if not clear then
-			Logger.warn(LOG, "System bundle was installed, but input-source changes are deferred.")
-			return false, check_reason
-		end
-		Logger.success(LOG, "System install done — %s.", bundle_name)
-		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
-		return true
-	end
-	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
-	-- AppleScript returns a failed shell's stderr as a native diagnostic. Expose
-	-- only the owned backup path, never the rest of the native error text.
-	local prefix = SYSTEM_LAYOUTS_DIR .. ".ergopti-install."
-	local reported = false
-	if type(diagnostic) == "string" then
-		local start = diagnostic:find(prefix, 1, true)
-		local suffix = start and diagnostic:sub(start + #prefix):match("^([%w][%w][%w][%w][%w][%w]/backup)")
-		if suffix then
-			Logger.error(LOG, "Keyboard layout backups retained at %s%s.", prefix, suffix)
-			reported = true
-		end
-	end
-	if not reported then Logger.error(LOG, "If rollback was interrupted, inspect %s*/backup for retained bundles.", prefix) end
-	return false
+--- Refuses privileged installation until a native owner can bind execution to
+--- the already verified launcher across the authorization boundary.
+--- @return boolean committed Always false while this operation is unavailable.
+--- @return string reason Closed reason shown by the menu.
+local function install_system_unlocked()
+	Logger.warn(LOG, "System keyboard layout installation is unavailable; use the user scope.")
+	return false, "system_install_unavailable"
 end
 
 --- Runs one bundle install while owning both destination scopes exclusively.

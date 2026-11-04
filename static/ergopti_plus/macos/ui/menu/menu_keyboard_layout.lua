@@ -183,6 +183,7 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 	local called, ok, reason = pcall(install_fn)
 	if not called or ok ~= true then
 		local key = reason == "launcher_unavailable" and "menu.layout.install_launcher_required"
+			or reason == "system_install_unavailable" and "menu.layout.install_system_unavailable"
 			or reason == "other_scope_occupied" and "menu.layout.install_other_scope"
 			or reason == "other_scope_unverified" and "menu.layout.install_other_scope_unverified" or "menu.layout.install_failed"
 		pcall(notifications.notify, i18n.get(key), nil, "error")

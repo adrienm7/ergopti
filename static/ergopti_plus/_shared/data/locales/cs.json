@@ -1740,6 +1740,7 @@
 	"menu.layout.install_launcher_required": "Otevřete ErgoptiPlus a zkuste rozložení klávesnice nainstalovat znovu.",
 	"menu.layout.install_other_scope": "V druhé složce Keyboard Layouts je rozložení. Odstraňte jej ručně a zkuste to znovu.",
 	"menu.layout.install_other_scope_unverified": "Druhou složku Keyboard Layouts nelze ověřit. Před dalším pokusem ji zkontrolujte ručně.",
+	"menu.layout.install_system_unavailable": "Systémová instalace není dostupná, protože spouštěč nelze po autorizaci bezpečně ověřit. Použijte uživatelskou instalaci; nejprve odstraňte staré systémové kopie.",
 	"menu.layout.active_layouts": "Vstupní zdroje",
 	"menu.layout.header_any": "Všechna rozložení",
 	"menu.layout.header_custom": "Vlastní rozložení",

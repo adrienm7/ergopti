@@ -1740,6 +1740,7 @@
 	"menu.layout.install_launcher_required": "ErgoptiPlus खोलें और कीबोर्ड लेआउट फिर से इंस्टॉल करें।",
 	"menu.layout.install_other_scope": "दूसरे Keyboard Layouts फ़ोल्डर में एक लेआउट है। उसे स्वयं हटाएँ और फिर प्रयास करें।",
 	"menu.layout.install_other_scope_unverified": "दूसरे Keyboard Layouts फ़ोल्डर की जाँच नहीं हो सकी। फिर प्रयास करने से पहले उसे स्वयं जाँचें।",
+	"menu.layout.install_system_unavailable": "सिस्टम इंस्टॉलेशन उपलब्ध नहीं है क्योंकि अनुमति के बाद लॉन्चर की सुरक्षित जाँच नहीं हो सकती। उपयोगकर्ता इंस्टॉलेशन चुनें और पुरानी सिस्टम प्रति हो तो पहले हटाएँ।",
 	"menu.layout.active_layouts": "इनपुट स्रोत",
 	"menu.layout.header_any": "सभी लेआउट",
 	"menu.layout.header_custom": "कस्टम लेआउट",

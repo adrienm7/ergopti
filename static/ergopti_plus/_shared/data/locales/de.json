@@ -1740,6 +1740,7 @@
 	"menu.layout.install_launcher_required": "Öffne ErgoptiPlus und installiere das Tastaturlayout erneut.",
 	"menu.layout.install_other_scope": "Im anderen Ordner „Keyboard Layouts“ liegt ein Tastaturlayout. Entferne es manuell und versuche es erneut.",
 	"menu.layout.install_other_scope_unverified": "Der andere Ordner „Keyboard Layouts“ konnte nicht geprüft werden. Prüfe ihn manuell, bevor du es erneut versuchst.",
+	"menu.layout.install_system_unavailable": "Die Systeminstallation ist nicht verfügbar, da der Launcher nach der Autorisierung nicht sicher geprüft werden kann. Nutze die Benutzerinstallation; entferne vorher alte Systemkopien.",
 	"menu.layout.active_layouts": "Eingabequellen",
 	"menu.layout.header_any": "Alle Layouts",
 	"menu.layout.header_custom": "Benutzerdefiniertes Layout",

@@ -29,7 +29,10 @@ helpers.describe("Layout owns install-state choices, bundle truth and every froz
 	helpers.it("reports failed installs from the actual menu action (layout-install-visible-failure)", function()
 		local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
 		local labels = assert(require("json").decode(assert(file:read("*a")))); assert(file:close())
+		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("verified safely", 1, true) ~= nil)
+		helpers.assert_true(labels["menu.layout.install_system_unavailable"]:find("old system copy", 1, true) ~= nil)
 		for _, case in ipairs({ { "launcher_unavailable", "menu.layout.install_launcher_required" },
+			{ "system_install_unavailable", "menu.layout.install_system_unavailable" },
 			{ "other_scope_occupied", "menu.layout.install_other_scope" },
 			{ "other_scope_unverified", "menu.layout.install_other_scope_unverified" },
 			{ "other", "menu.layout.install_failed" }, { "throw", "menu.layout.install_failed" } }) do

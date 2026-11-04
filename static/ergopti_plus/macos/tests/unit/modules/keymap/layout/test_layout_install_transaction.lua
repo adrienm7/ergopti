@@ -93,6 +93,34 @@ end
 
 
 helpers.describe("layout_install: transactional replacement", function()
+	helpers.it("refuses reentrant installs while a user replacement is running", function()
+		local install, calls, nested_user, nested_system
+		calls = 0
+		install = helpers.load_with_stubs("modules.keymap.layout_install", {
+			execute = function()
+				calls = calls + 1
+				nested_user = install.install_user("/tmp/source", "Ergopti_v2.0.0.bundle")
+				nested_system = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+				return "", true
+			end,
+		})
+		helpers.assert_eq(install.install_user("/tmp/source", "Ergopti_v2.0.0.bundle"), true)
+		helpers.assert_eq(nested_user, false); helpers.assert_eq(nested_system, false)
+		helpers.assert_eq(calls, 1)
+	end)
+
+	helpers.it("refuses system installation before authorization (layout-system-unavailable)", function()
+		local calls = 0
+		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+			execute = function() calls = calls + 1; return "", true end,
+			osascript = { applescript = function() calls = calls + 1; return true end },
+		})
+		local installed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+		helpers.assert_eq(installed, false)
+		helpers.assert_eq(reason, "system_install_unavailable")
+		helpers.assert_eq(calls, 0, "no privileged or filesystem command may start")
+	end)
+
 	helpers.it("refuses an unreadable other scope before mutation (layout-other-scope-unverified)", function()
 		local old_dir, old_fs = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
 		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
@@ -103,7 +131,7 @@ helpers.describe("layout_install: transactional replacement", function()
 				execute = function() calls = calls + 1; return "", true end,
 				osascript = { applescript = function() calls = calls + 1; return true end },
 			})
-			local committed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+			local committed, reason = install.install_user("/tmp/source", "Ergopti_v2.0.0.bundle")
 			helpers.assert_eq(committed, false); helpers.assert_eq(reason, "other_scope_unverified")
 			helpers.assert_eq(calls, 0, "unverified scope cannot authorize mutation")
 		end, debug.traceback)
@@ -116,15 +144,15 @@ helpers.describe("layout_install: transactional replacement", function()
 			package.loaded["infra.notifications"]
 		local reads, notices = 0, {}
 		package.loaded["infra.fs_dir"] = { try_entries = function()
-			reads = reads + 1; return {}, reads == 1
+			reads = reads + 1; return {}, reads <= 2
 		end }
 		package.loaded["adapters.file_system"] = { classify_no_follow = function() return nil, "error" end }
 		package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 		local ok, err = xpcall(function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-				osascript = { applescript = function() return true end },
+				execute = function() return "", true end,
 			})
-			local committed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
+			local committed, reason = install.install_user("/tmp/source", "Ergopti_v2.0.0.bundle")
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(reason, "other_scope_unverified")
 			helpers.assert_eq(notices, {}, "a partial publication must not claim success")
@@ -133,25 +161,7 @@ helpers.describe("layout_install: transactional replacement", function()
 			old_dir, old_fs, old_notify
 		if not ok then error(err, 0) end
 	end)
-	helpers.it("refuses standalone installation before authorization (layout-install-native-role)", function()
-		local getenv = os.getenv
-		os.getenv = function(name) if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return nil end; return getenv(name) end
-		local ok, err = xpcall(function()
-			local prompts = 0
-			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-				osascript = { applescript = function() prompts = prompts + 1; return true end },
-			})
-			local installed, reason = install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle")
-			helpers.assert_eq(installed, false)
-			helpers.assert_eq(reason, "launcher_unavailable")
-			helpers.assert_eq(prompts, 0)
-		end, debug.traceback)
-		os.getenv = getenv
-		if not ok then error(err, 0) end
-	end)
-
-
-	helpers.it("refuses an unverified launcher before administrator authorization", function()
+	helpers.it("refuses an unverified launcher before user installation", function()
 		local previous = package.loaded["platform.remap.lease_helper"]
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil, "identity mismatch" end }
 		local ok, err = xpcall(function()
@@ -159,32 +169,15 @@ helpers.describe("layout_install: transactional replacement", function()
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
 				osascript = { applescript = function() prompts = prompts + 1; return true end },
 			})
-			local installed, reason = install.install_system("/tmp/source", "Ergopti_v2.2.0.bundle")
+			local installed, reason = install.install_user("/tmp/source", "Ergopti_v2.2.0.bundle")
 			helpers.assert_eq(installed, false)
 			helpers.assert_eq(reason, "launcher_unavailable")
-			helpers.assert_eq(prompts, 0, "an unverified executable must never reach the administrator prompt")
+			helpers.assert_eq(prompts, 0, "an unverified executable must never start installation")
 		end, debug.traceback)
 		package.loaded["platform.remap.lease_helper"] = previous
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("reports only the retained backup path from an AppleScript failure", function()
-		local previous = package.loaded["infra.logger"]
-		local logger, messages = helpers.make_logger_stub(), {}
-		logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"] = logger
-		local ok, err = xpcall(function()
-			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-				osascript = { applescript = function() return false, nil,
-					"native private text /Library/Keyboard Layouts/.ergopti-install.Abc123/backup. ignored" end },
-			})
-			helpers.assert_eq(install.install_system("/tmp/source", "Ergopti_v2.0.0.bundle"), false)
-			helpers.assert_eq(messages[#messages],
-				"Keyboard layout backups retained at /Library/Keyboard Layouts/.ergopti-install.Abc123/backup.")
-		end, debug.traceback)
-		package.loaded["infra.logger"] = previous
-		if not ok then error(err, 0) end
-	end)
 	helpers.it("retains the backup when a concurrent bundle occupies rollback (layout-rollback-exclusive)", function()
 		local quote = require("text_utils").shell_quote
 		local root = os.tmpname()
@@ -279,44 +272,6 @@ helpers.describe("layout_install: transactional replacement", function()
 		end)
 	end)
 
-	helpers.it("does not remove the user copy before administrator approval", function()
-		local execute_calls = {}
-		local scripts = {}
-		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-			execute = function(command)
-				execute_calls[#execute_calls + 1] = command
-				return "", true, "exit", 0
-			end,
-			osascript = {
-				applescript = function(script)
-					scripts[#scripts + 1] = script
-					return false, nil, "cancelled"
-				end,
-			},
-		})
-
-		helpers.assert_eq(
-			install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
-			false)
-		helpers.assert_eq(#scripts, 1, "system install must request authorization once")
-		helpers.assert_eq(#execute_calls, 0,
-			"a cancelled privileged transaction must leave the user copy untouched")
-		assert_copy_precedes_replacement(scripts[1], "system install")
-	end)
-
-	helpers.it("refuses an existing other-scope bundle before asking for authorization", function()
-		with_fake_bundle_listing("Ergopti_v1.0.0.bundle", function()
-			local prompts = 0
-			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-				osascript = { applescript = function() prompts = prompts + 1; return true end },
-			})
-			local committed, reason = install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle")
-			helpers.assert_eq(committed, false)
-			helpers.assert_eq(reason, "other_scope_occupied")
-			helpers.assert_eq(prompts, 0)
-		end)
-	end)
-
 	helpers.it("does not remove the other scope after the new user bundle commits", function()
 		local commands = {}
 		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -331,30 +286,6 @@ helpers.describe("layout_install: transactional replacement", function()
 			true)
 		helpers.assert_eq(#commands, 1)
 		assert_copy_precedes_replacement(commands[1], "user install")
-	end)
-
-	helpers.it("does not remove the user scope after the system transaction commits", function()
-		local events = {}
-		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
-			execute = function(command)
-				events[#events + 1] = { kind = "cleanup", payload = command }
-				return "", true, "exit", 0
-			end,
-			osascript = {
-				applescript = function(script)
-					events[#events + 1] = { kind = "privileged", payload = script }
-					return true, nil, ""
-				end,
-			},
-		})
-
-		helpers.assert_eq(
-			install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
-			true)
-		helpers.assert_eq(#events, 1)
-		helpers.assert_eq(events[1].kind, "privileged",
-			"the privileged copy transaction must commit before user cleanup")
-		assert_copy_precedes_replacement(events[1].payload, "system install")
 	end)
 
 	helpers.it("preserves and reports an other-scope bundle that appears during installation", function()
@@ -381,56 +312,6 @@ helpers.describe("layout_install: transactional replacement", function()
 		end)
 	end)
 
-	helpers.it("refuses reentrant installs across both bundle scopes", function()
-		local execute_calls = 0
-		local privileged_calls = 0
-		local nested_system_result
-		local nested_user_result
-		local install
-		install = helpers.load_with_stubs("modules.keymap.layout_install", {
-			execute = function()
-				execute_calls = execute_calls + 1
-				return "", true, "exit", 0
-			end,
-			osascript = {
-				applescript = function()
-					privileged_calls = privileged_calls + 1
-					if privileged_calls == 1 then
-						nested_system_result = install.install_system(
-							"/tmp/layout source/", "Ergopti_v2.0.0.bundle")
-						nested_user_result = install.install_user(
-							"/tmp/layout source/", "Ergopti_v2.0.0.bundle")
-					end
-					return false, nil, "cancelled"
-				end,
-			},
-		})
-
-		helpers.assert_eq(
-			install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
-			false)
-		helpers.assert_eq(privileged_calls, 1,
-			"a reentrant system install must not open a second administrator prompt")
-		helpers.assert_eq(execute_calls, 0,
-			"a reentrant user install must not mutate either shared layout directory")
-		helpers.assert_eq(nested_system_result, false)
-		helpers.assert_eq(nested_user_result, false)
-
-		helpers.assert_eq(
-			install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
-			true,
-			"the install owner must be released after the first attempt returns")
-		helpers.assert_eq(execute_calls, 1,
-			"the admitted user install must run one replacement")
-	end)
-end)
-
-os.getenv = original_getenv
-
-
--- The macOS 26 TIS probe showed that the same bundle in both folders makes macOS load both copies
--- and renumber one; a user install must not write the second copy.
-helpers.describe("layout_install: one copy per bundle (composer-macos26)", function()
 	helpers.it("checks the user scope before accepting an existing system copy", function()
 		local old_dir, old_fs, old_popen = package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"], io.popen
 		local readable = true

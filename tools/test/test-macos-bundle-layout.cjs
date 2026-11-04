@@ -304,6 +304,22 @@ function verifyArchiveProducerContracts(fs, Archives) {
 			}
 			return { stdout: '', stderr: '' };
 		};
+		const wrongApp = path.join(scratch, 'Renamed.app');
+		fs.cpSync(app, wrongApp, { recursive: true, verbatimSymlinks: true });
+		const wrongOutput = path.join(scratch, 'wrong-bundle');
+		fs.mkdirSync(wrongOutput);
+		assert.throws(
+			() =>
+				Archives.createArchives(wrongApp, wrongOutput, {
+					defaults,
+					execute: () => {
+						throw new Error('native process must not start');
+					}
+				}),
+			/match the declared application bundle/
+		);
+		assert.deepEqual(fs.readdirSync(wrongOutput), []);
+
 		const output = path.join(scratch, 'valid');
 		fs.mkdirSync(output);
 		const events = [];

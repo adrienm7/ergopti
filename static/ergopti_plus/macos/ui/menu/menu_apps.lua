@@ -43,6 +43,25 @@ M._active_tasks = {}
 -- HotCounter._ext_meta_cache. Nil until the first discovery.
 local _apps_cache = nil
 local _scan_failures = {}
+local _icon_canvas = nil
+local _icon_canvas_busy = false
+
+--- Releases a retained icon canvas before any successor is allocated.
+--- @return boolean settled
+local function release_icon_canvas()
+	if _icon_canvas_busy then return false end
+	if not _icon_canvas then return true end
+	local canvas = _icon_canvas
+	_icon_canvas_busy = true
+	local ok = pcall(function() canvas:delete() end)
+	_icon_canvas_busy = false
+	if not ok then
+		Logger.warn(LOG, "Application icon canvas cleanup failed; exact canvas retained.")
+		return false
+	end
+	if _icon_canvas == canvas then _icon_canvas = nil end
+	return true
+end
 
 --- Enumerates sorted paths only after the shell command commits successfully.
 --- @param directory string Directory to inspect.
@@ -122,15 +141,22 @@ end
 --- @param img userdata An hs.image object.
 --- @return userdata A new 16×16 hs.image.
 local function resize_to_menu_icon(img)
+	if not release_icon_canvas() then return nil end
 	local c = hs.canvas.new({ x = 0, y = 0, w = 16, h = 16 })
-	c:appendElements({
-		type         = "image",
-		image        = img,
-		frame        = { x = 0, y = 0, w = 16, h = 16 },
-		imageScaling = "scaleToFit",
-	})
-	local out = c:imageFromCanvas()
-	c:delete()
+	if not c then return nil end
+	_icon_canvas = c
+	_icon_canvas_busy = true
+	local ok, out = pcall(function()
+		c:appendElements({
+			type         = "image",
+			image        = img,
+			frame        = { x = 0, y = 0, w = 16, h = 16 },
+			imageScaling = "scaleToFit",
+		})
+		return c:imageFromCanvas()
+	end)
+	_icon_canvas_busy = false
+	if not release_icon_canvas() or not ok then return nil end
 	return out
 end
 
@@ -304,6 +330,7 @@ end
 --- @param ctx table The global UI context.
 --- @return table The menu item representing the Applications submenu.
 function M.build(ctx)
+	release_icon_canvas()
 	local source = apps_source()
 	if source == nil then return nil end
 	Logger.trace(LOG, "Building applications submenu…")

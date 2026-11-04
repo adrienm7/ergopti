@@ -45,7 +45,19 @@ local function with_apps(callback)
 				application = { infoForBundlePath = function() return {} end },
 				image = { imageFromPath = function(path)
 					state.images[#state.images + 1] = path
+					if state.have_icon then return {} end
 					return nil
+				end },
+				canvas = { new = function()
+					state.created = (state.created or 0) + 1
+					return {
+						appendElements = function() if state.fail_render then error("render failed") end end,
+						imageFromCanvas = function() return {} end,
+						delete = function()
+							if state.fail_delete then error("delete failed") end
+							state.deleted = (state.deleted or 0) + 1
+						end,
+					}
 				end },
 			})
 			-- Keep the discovery fixture's direct provider view, while forwarding its
@@ -65,6 +77,29 @@ local function with_apps(callback)
 end
 
 helpers.describe("Bundled app discovery outcome", function()
+	helpers.it("cleans up the icon canvas after rendering failure", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.have_icon, state.fail_render = "/virtual/First.app\0", true, true
+			local rows = module.build(ctx).submenu
+			helpers.assert_eq(#rows, 1)
+			helpers.assert_eq(state.created, 1)
+			helpers.assert_eq(state.deleted, 1)
+		end)
+	end)
+	helpers.it("retains a refused icon canvas until cleanup succeeds", function()
+		with_apps(function(module, state, ctx)
+			state.output, state.have_icon, state.fail_delete = "/virtual/First.app\0/virtual/Second.app\0", true, true
+			module.build(ctx)
+			helpers.assert_eq(state.created, 1, "a retained canvas blocks another allocation")
+			state.fail_delete = false
+			module.build(ctx)
+			helpers.assert_eq(state.deleted, 1, "a cached menu retries the retained cleanup")
+			module._invalidate_apps_cache()
+			module.build(ctx)
+			helpers.assert_eq(state.created, 3)
+			helpers.assert_eq(state.deleted, 3)
+		end)
+	end)
 	for _, mode in ipairs({ "exit", "signal", "throw", "invalid" }) do
 		helpers.it("(apps-discovery-outcome) retries after " .. mode .. " without caching partial output", function()
 			with_apps(function(module, state, ctx)

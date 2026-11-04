@@ -1740,6 +1740,7 @@
 	"menu.layout.install_launcher_required": "Abre ErgoptiPlus y vuelve a instalar la distribución de teclado.",
 	"menu.layout.install_other_scope": "Hay una distribución en la otra carpeta Keyboard Layouts. Elimínala manualmente y vuelve a intentarlo.",
 	"menu.layout.install_other_scope_unverified": "No se pudo comprobar la otra carpeta Keyboard Layouts. Compruébala manualmente antes de reintentar.",
+	"menu.layout.install_system_unavailable": "La instalación del sistema no está disponible porque no se puede verificar el lanzador de forma segura tras la autorización. Usa la instalación de usuario; elimina antes cualquier copia antigua del sistema.",
 	"menu.layout.active_layouts": "Fuentes de entrada",
 	"menu.layout.header_any": "Todas las distribuciones",
 	"menu.layout.header_custom": "Distribución personalizada",
