@@ -107,7 +107,7 @@ local function with_world(body)
 		package.loaded["adapters.file_system"] = {
 			path_status = function(path)
 				local status = world.status[path] or "present"
-				return status, status == "present" and { size = #(world.files[path] or "") } or nil
+				return status, status == "present" and { size = world.reported_size or #(world.files[path] or "") } or nil
 			end,
 			create_secure_temp_file = function()
 				temp_count = temp_count + 1
@@ -117,6 +117,12 @@ local function with_world(body)
 			end,
 			write = function(path, content) world.files[path] = content; return true end,
 			read = function(path) return world.files[path] end,
+			read_bounded = function(path, limit)
+				local content = world.files[path]
+				if content == nil then return nil, "absent" end
+				if #content > limit then return nil, "too_large" end
+				return content, "ok"
+			end,
 			remove_exact = function(path) world.removed[#world.removed + 1] = path; world.files[path] = nil; return true end,
 		}
 		package.loaded["adapters.clipboard"] = { write = function(text)
@@ -420,6 +426,17 @@ helpers.describe("run_apple_shortcut runs a library shortcut through its owner (
 			world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500)
 			helpers.assert_eq(world.clipboard, {})
 			helpers.assert_eq(world.notices[2], "user_actions.output_not_text")
+		end)
+	end)
+
+	helpers.it("refuses output that grows after its size was inspected", function()
+		with_world(function(world)
+			world.library = { { id = SHORTCUT_ID, name = "Resize Image" } }
+			world.run_output = string.rep("x", world.Shortcut.MAX_OUTPUT_BYTES + 1)
+			world.reported_size = 1
+			world.Shortcut.run(shortcut({ output = "copy" }), "gestures", 500)
+			helpers.assert_eq(world.clipboard, {}, "the bytes read, not just the earlier stat, must fit")
+			helpers.assert_eq(world.notices, { "user_actions.command_output_too_large|65536" })
 		end)
 	end)
 
