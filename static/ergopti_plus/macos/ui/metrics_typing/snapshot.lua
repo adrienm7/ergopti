@@ -150,7 +150,9 @@ end
 --- @return boolean saved
 function M.save(payload, generated_at)
 	if type(payload) ~= "string" or payload:sub(1, #PAYLOAD_PREFIX) ~= PAYLOAD_PREFIX
-		or type(generated_at) ~= "number" or generated_at <= 0 then
+		or payload:sub(-1) ~= "}" or type(generated_at) ~= "number" or generated_at ~= generated_at
+		or generated_at < 1 or generated_at == math.huge
+		or math.tointeger(math.floor(generated_at)) == nil then
 		report_snapshot_save_failure("validation")
 		return false
 	end

@@ -181,9 +181,15 @@ class NativeHTTPResponse:
     """
 
     def __init__(self, url, headers, method="GET", timeout=None, idle_timeout=None, direct=False):
-        if timeout is not None and not _positive_timeout(timeout):
+        if timeout is not None and (
+            not _positive_timeout(timeout) or timeout > ((1 << 31) - 1) / 1000
+        ):
             raise NativeHTTPError("protocol")
-        if not _positive_timeout(idle_timeout) or type(direct) is not bool:
+        if (
+            not _positive_timeout(idle_timeout)
+            or idle_timeout > ((1 << 31) - 1) / 1000
+            or type(direct) is not bool
+        ):
             raise NativeHTTPError("protocol")
         if method not in ("GET", "HEAD") or not isinstance(url, str):
             raise NativeHTTPError("protocol")
@@ -461,6 +467,13 @@ class NativeHTTPResponse:
             for pair in metadata["headers"]
         ):
             raise NativeHTTPError("protocol")
+        for name, value in metadata["headers"]:
+            if not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name) or any(
+                char in value for char in "\r\n\x00"
+            ):
+                raise NativeHTTPError("protocol")
+            if name.lower() == "content-encoding" and value.lower() != "identity":
+                raise NativeHTTPError("content_encoding")
         self.status = metadata["status"]
         self.headers = metadata["headers"]
 
@@ -603,6 +616,11 @@ class NativeHTTPResponse:
             failure = NativeHTTPError("protocol")
             self._close_for_failure(failure, source)
             raise failure from None
+        except BaseException as failure:
+            # Progress cancellation and other caller exceptions still own the
+            # native child until its pipes are closed and the process is reaped.
+            self._close_for_failure(failure)
+            raise
 
     def _close_for_failure(self, failure, source=None):
         """Retire through the original owner before projecting fixed observations."""

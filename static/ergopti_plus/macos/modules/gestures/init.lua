@@ -1558,7 +1558,7 @@ function M.start()
 	local wake_start_ok, wake_start_result = xpcall(function()
 		return sleep_watcher:start()
 	end, debug.traceback)
-	if not wake_start_ok or wake_start_result == false then
+	if not wake_start_ok or wake_start_result ~= wake_or_err then
 		return reject_attempt("wake watcher start failed: " .. tostring(wake_start_result))
 	end
 	if not gesture_start_is_current(start_attempt) then

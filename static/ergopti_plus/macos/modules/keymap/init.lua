@@ -131,11 +131,9 @@ M.DEFAULT_STATE = {
 -- who go an extraordinarily long time between resets.
 local BUFFER_MAX_CHARS = 500
 
--- Byte-length gate for the trim path. A UTF-8 codepoint is at most 4 bytes,
--- so when the raw byte length stays under this threshold the codepoint count
--- is guaranteed to be under BUFFER_MAX_CHARS and we can skip the utf8.offset
--- scan entirely. This keeps the fast path to a single integer compare.
-local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
+-- Every UTF-8 codepoint occupies at least one byte, so at or below this byte
+-- count the codepoint cap cannot be exceeded. Above it, check the actual tail.
+local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS
 
 -- Complex-keystroke delay multiplier. Shift- or Alt-held keystrokes take
 -- longer finger-path time than a bare letter, so the expansion window widens
@@ -1905,17 +1903,17 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
 		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
-		-- The private mark loses the same head, so it keeps describing the buffer.
-		LLMBridge.private_context_trimmed(CoreState.buffer, (ok and off) and off - 1 or #CoreState.buffer)
-		-- Fall back to empty on a failed offset (malformed UTF-8) rather than
-		-- keeping the full overgrown buffer — losing ≤500 chars of history is
-		-- acceptable, unbounded growth is not.
-		CoreState.buffer = (ok and off) and CoreState.buffer:sub(off) or ""
-		-- The trimmed buffer's start no longer corresponds to a known word
-		-- boundary on screen — flip the flag so word-boundary-required
-		-- triggers do not fire flush against the new (mid-screen) start.
-		CoreState.start_is_word_boundary = false
-		CoreState.start_is_line_start = false
+		-- nil is normal when multibyte text has fewer than 500 codepoints.
+		-- Only a raised offset error proves the tail is malformed.
+		local removed = not ok and #CoreState.buffer or (off and off - 1 or 0)
+		if removed > 0 then
+			-- The private mark loses the same head as the visible buffer.
+			LLMBridge.private_context_trimmed(CoreState.buffer, removed)
+			CoreState.buffer = CoreState.buffer:sub(removed + 1)
+			-- A trimmed start is no longer a known word boundary on screen.
+			CoreState.start_is_word_boundary = false
+			CoreState.start_is_line_start = false
+		end
 	end
 
 	-- 9. Run expansion trigger checks. The LLM preview used to be refreshed

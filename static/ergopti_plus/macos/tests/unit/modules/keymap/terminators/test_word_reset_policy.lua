@@ -128,6 +128,27 @@ local function mid_word(fixture, pause)
 	fixture.state.last_key_time = fixture.now() - pause
 end
 
+helpers.describe("hotstring Unicode buffer cap (hotstring-buffer-codepoints)", function()
+	helpers.it("keeps at most 500 codepoints without dropping shorter multibyte text", function()
+		with_keymap(function(f)
+			local bridge, removed = require("modules.keymap.llm_bridge"), {}
+			bridge.private_context_trimmed = function(_, bytes) removed[#removed + 1] = bytes end
+			f.state.buffer = ""
+			f.type_char(string.rep("a", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("a", 500), "ASCII is capped by characters, not bytes")
+			helpers.assert_eq(f.state.start_is_word_boundary, false)
+			f.state.buffer, f.state.start_is_word_boundary = "", true
+			f.type_char(string.rep("é", 300))
+			helpers.assert_eq(f.state.buffer, string.rep("é", 300), "300 multibyte characters fit")
+			helpers.assert_eq(f.state.start_is_word_boundary, true, "an untrimmed boundary remains valid")
+			f.state.buffer = ""
+			f.type_char(string.rep("😀", 501))
+			helpers.assert_eq(f.state.buffer, string.rep("😀", 500), "emoji count as codepoints")
+			helpers.assert_eq(removed, { 1, 4 }, "privacy mark advances by removed bytes only")
+		end)
+	end)
+end)
+
 helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", function()
 	helpers.it("ships 3 s and a click that starts a word, from the manifest", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.idle_reset_seconds"), 3)

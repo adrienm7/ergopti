@@ -353,6 +353,31 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 			helpers.assert_eq(press("ab"), true, "two ASCII scalars in one event must match the final b bucket")
 			helpers.assert_eq(effects.emitted, { "TWO_ASCII_AUTO" })
 			reset_context()
+			local consumed, events = press("zab")
+			helpers.assert_eq(consumed, true, "a trigger at the end of one composite event must fire")
+			local text = {}
+			for _, event in ipairs(events or {}) do
+				if event.isDown and event.unicode then text[#text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(text), "zTWO_ASCII_AUTO", "returned Quartz events must preserve the prefix")
+			helpers.assert_eq(effects.emitted, { "zTWO_ASCII_AUTO" }, "the event prefix must not be lost")
+			reset_context()
+			local accented, accented_events = press("éab")
+			helpers.assert_eq(accented, true)
+			local accented_text = {}
+			for _, event in ipairs(accented_events or {}) do
+				if event.isDown and event.unicode then accented_text[#accented_text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(accented_text), "éTWO_ASCII_AUTO", "UTF-8 prefix must survive verbatim")
+			reset_context()
+			local literal, literal_events = press("{Tab}ab")
+			helpers.assert_eq(literal, true)
+			local literal_text = {}
+			for _, event in ipairs(literal_events or {}) do
+				if event.isDown and event.unicode then literal_text[#literal_text + 1] = event.unicode end
+			end
+			helpers.assert_eq(table.concat(literal_text), "{Tab}TWO_ASCII_AUTO", "event text is never parsed as a token")
+			reset_context()
 			helpers.assert_eq(press("é"), true, "one two-byte Unicode scalar remains one character")
 			helpers.assert_eq(effects.emitted, { "TWO_BYTE_SCALAR" })
 			reset_context()

@@ -268,6 +268,22 @@ class BootstrapDownloadTests(unittest.TestCase):
                 self.assertIsNotNone(observed[0].poll())
                 self.assertTrue(observed[0].stdout.closed)
 
+    def test_uv_output_limit_is_enforced_before_the_child_exits(self):
+        command = "import sys,time; sys.stdout.buffer.write(b'x' * (16 * 1024 * 1024 + 1)); sys.stdout.flush(); time.sleep(30)"
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 2)
+        self.assertEqual(caught.exception.reason, "dependency")
+
+    def test_uv_collects_output_and_waits_for_child_after_stdout_eof(self):
+        command = "import sys; sys.stdout.buffer.write(b'hello')"
+        self.assertEqual(
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 2), b"hello"
+        )
+        command = "import os,time; os.close(1); time.sleep(30)"
+        with self.assertRaises(BOOTSTRAP.BootstrapFailure) as caught:
+            BOOTSTRAP._run_uv([sys.executable, "-c", command], time.monotonic() + 0.2)
+        self.assertEqual(caught.exception.reason, "deadline")
+
     def test_managed_interpreter_uses_pinned_cache_and_offline_uv_extraction(self):
         captures = []
         downloads = []
