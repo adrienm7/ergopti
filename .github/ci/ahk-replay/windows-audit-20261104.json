@@ -1,75 +1,79 @@
 {
-	"expected_count": 58,
+	"expected_count": 60,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "HotstringsConfig valid syntax persistence:",
-			"expected_count": 8
+			"contains": "send-key-native-scalar",
+			"expected_count": 3
 		},
 		{
-			"contains": "HotstringsConfig source preservation:",
-			"expected_count": 5
-		},
-		{
-			"contains": "HotstringsConfig canonical legacy migration:",
+			"contains": "send-input-actions",
 			"expected_count": 4
 		},
 		{
-			"contains": "HotstringsConfig legacy runtime delay:",
-			"expected_count": 8
+			"contains": "crash-native-path-receipt",
+			"expected_count": 3
 		},
 		{
-			"contains": "HotstringsConfig delimiter retirement receipt:",
-			"expected_count": 4
-		},
-		{
-			"contains": "HotstringsConfig exact source UTF-8:",
-			"expected_count": 5
-		},
-		{
-			"contains": "magic-terminator-override-graph",
+			"contains": "crash-json-control-native",
 			"expected_count": 1
 		},
 		{
-			"contains": "HotstringsConfig persistent offset:",
+			"contains": "usage-integer-price",
+			"expected_count": 1
+		},
+		{
+			"contains": "_LLMRemoteExtractUsage:",
+			"expected_count": 5
+		},
+		{
+			"contains": "usage-finite-cost",
+			"expected_count": 2
+		},
+		{
+			"contains": "anthropic-temperature-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "token-wait-request-budget",
+			"expected_count": 4
+		},
+		{
+			"contains": "HotstringsConfig external source ownership:",
 			"expected_count": 6
 		},
 		{
-			"contains": "HotstringsConfig unlimited precedence:",
-			"expected_count": 4
+			"contains": "HotstringsConfig staged source ownership:",
+			"expected_count": 2
 		},
 		{
-			"contains": "HotstringsConfig: _ParseOverrides reads a file-level",
-			"expected_count": 1
+			"contains": "layout-row-native-flags",
+			"expected_count": 3
 		},
 		{
-			"contains": "HotstringsConfig: _ParseOverrides keeps unlimited",
-			"expected_count": 1
-		},
-		{
-			"contains": "HotstringsConfig: override parser rejects numeric overflow",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstrings-delay-offsets",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstrings-override-lease-reentrant-writer",
-			"expected_count": 1
-		},
-		{
-			"contains": "thinking-regex-resource",
-			"expected_count": 4
-		},
-		{
-			"contains": "screenshot-stage-admission",
+			"contains": "personal-native-constructor-owner",
 			"expected_count": 2
 		},
 		{
 			"contains": "screenshot-stage-lease-compat",
-			"expected_count": 2
+			"expected_count": 3
+		},
+		{
+			"contains": "HotstringsConfig exact source UTF-8: empty-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-020 app picker:",
+			"expected_count": 7
+		},
+		{
+			"contains": "app-picker-native-refusal-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "agent-app-picker-tail",
+			"expected_count": 6
 		}
 	]
 }

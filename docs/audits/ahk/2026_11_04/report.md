@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **68 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **71 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1189,3 +1189,47 @@ Consequence: An unrelated acknowledged settings edit can permanently erase an ex
 Regression: Thirteen native file/public-save probes establish fail-before and controls. The fix projects canonical typed leaves, refuses source shapes the serializer cannot preserve, and requires an exact durable migration receipt before retiring nonempty legacy delimiter strings. Additional tests cover four canonical legacy spellings, eight legacy-delay states, four retirement receipts and a functional real-decoder owner check. Raw LegacyDelay survives pre-boot saves; ordinary runtime adoption preserves finite delay intent, while pending \_global default migration refuses runtime reload. Native post-fix qualification pending. These related projection/preservation variants are one finding, not one count per syntax or field.
 
 The ongoing register contains68 distinct findings. The requested1,000 target remains unmet.
+
+## AHK-069: An accepted supplementary character key emits no native input
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+\_SendInputAhkKey forwards a literal surrogate pair to TextPressKey, which braces it as an AutoHotkey key name. A braced unknown two-unit name is ignored; supplementary Unicode requires the explicit U+codepoint syntax.
+
+Reproduction: Native run41926489533 at69c71ef: actual SendInputParse/Emit and TextPressKey accept the shared corpus emoji, execute the real Critical synthetic transaction and default prefix finalizer, but the receiving owned Edit obtains0 UTF-16 units instead of2. ASCII and BMP controls pass; reverse repeats the astral failure.
+
+Consequence: The action reports accepted input and commits its synthetic context while the requested character never reaches the application.
+
+Regression: Three owned native receiver cases test ASCII, BMP and astral output through the actual transaction. The adapter now converts only well-formed supplementary pairs to U+codepoint; named/BMP/braces remain unchanged. Four extra action assertions cover U+10000, U+1F44B, U+10FFFF and a modified supplementary key. Native post-fix pending.
+
+## AHK-070: Crash worker output corrupts acknowledged Unicode report paths
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+PowerShell5.1 Write-Output encodes its console receipt using an OEM code page, while the parent native runner reads the staged bytes as ANSI CP0 without a byte-order mark. Native Unicode paths therefore cross incompatible codecs.
+
+Reproduction: Native run41926489533 at69c71ef: after correcting the independent8.3 input alias fixture, ASCII passes exact_path1 with a physical artifact. Primary and fallback workers both create the Unicode artifact but their returned path does not exist; expected UTF-16 unit233 is decoded as8218 under CP0. Same reverse failures. Initial run41924556519 had an additional fixture alias mismatch and did not alone establish the codec defect.
+
+Consequence: A report can be written successfully while its acknowledged filename is unusable, preventing the driver from locating or opening that report.
+
+Regression: Three genuine worker/mapping/file controls independently locate and inspect the physical report before comparing the raw acknowledged path. Both writers now emit explicit UTF-8 bytes with BOM on stdout; FileRead autodetects the encoding without changing ShellRunner or OK:path semantics. Native post-fix pending.
+
+## AHK-071: Failed screenshot cleanup adopts and deletes a stage created by another owner
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The stage path is derived from process ID and epoch without acquiring file ownership. WorkerDone calls \_GestureScreenshotCaptureStage even after pre-write failure; that routine creates its cleanup authority by observing whatever file is now present at the path.
+
+Reproduction: Native run41927538467 at09e8ea2: the public GestureCaptureRegion owner and genuine deferred worker receive a pixel-I/O refusal before any write. A pre-existing file acquired independently by CREATE_NEW at the deterministic stage path disappears; terminal count1 and jobs0 prove cleanup completed. The no-stage control passes. No screen pixels or clipboard content are captured.
+
+Consequence: A failed capture may delete an unowned existing temporary file, including an artifact left by an earlier process with a recycled ID.
+
+Regression: Two public-owner/native filesystem cases prove pre-write failure must preserve the exact independently created stage identity and bytes. A synthetic one-pixel GDI compatibility probe separately refutes the proposed zero-access metadata lease: DeleteFile succeeds, so that proposal cannot be used as a fix. Qualification of a real read lease is pending. No production ownership correction is integrated yet; this finding is confirmed but is not counted as fixed.
+
+## Native qualification at 69c71ef and 09e8ea2
+
+Run41926489533 executes75 cases:64 pass,10 assertions fail and one constructor-successor case times out without a terminal receipt. The inverse completes65 passes and the same10 assertions. The constructor has the corrected priority identity before the timeout, and passes in reverse; its independent timeout diagnosis remains open. All26 terminator identity/migration cases, personal sort/default/switch, counter-domain controls, cancelled eviction, real rebuild guard and sticky flags pass. Integer-price arithmetic and supplementary key/Unicode report-path defects are retained for correction. Six legacy source tests fail on this earlier snapshot before AHK-068.
+
+Run41927538467 at09e8ea2 executes58 cases in each order:55 pass and3 fail. All selected AHK-068 business cases pass; one empty-file fixture fails before the reader and is corrected separately. Screenshot pre-write failure deletes an independently owned file; its no-stage control passes. The proposed zero-access metadata lease is experimentally rejected because it does not block native deletion. All4 bounded PCRE cases pass; no Windows PCRE resource defect is established at the measured sizes. Both runs compile the complete production entry and pass90/90 native hotstring E2E; HTTP E2E is not selected.
+
+The register contains71 distinct findings. AHK-071 is confirmed with regressions but its production correction is still pending native lease qualification; no claim of71 completed fixes is made. The requested1,000 target remains unmet.
