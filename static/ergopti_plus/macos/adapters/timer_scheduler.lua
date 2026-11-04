@@ -417,7 +417,8 @@ end
 --- @return number Seconds since epoch as a floating-point value.
 function M.now()
 	local ok, t = pcall(hs.timer.secondsSinceEpoch)
-	return ok and t or os.time()
+	if ok and type(t) == "number" and t == t and t ~= math.huge and t ~= -math.huge then return t end
+	return os.time()
 end
 
 --- Returns a high-resolution monotonic timestamp in nanoseconds. Wraps
