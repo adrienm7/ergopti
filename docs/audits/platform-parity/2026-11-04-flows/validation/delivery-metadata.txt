@@ -1,0 +1,2 @@
+PASS: 12 scopes, 26 unique OS/flow IDs, 18 classified behavior entries, schema/TODO/shared-root/evidence/Markdown references.
+Metadata and pinned revision only; no native or runtime parity certification.
