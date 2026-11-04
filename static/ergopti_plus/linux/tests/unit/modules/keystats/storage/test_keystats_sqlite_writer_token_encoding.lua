@@ -29,7 +29,7 @@ local function migrate(answers)
 	io.popen = function(command)
 		local content, status = "", 0
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
-			content = require("tests.support.modules.keystats.storage.current_device_schema")
+			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
 		elseif command:find("key='ngram_token_encoding'", 1, true) then
 			if answers.version ~= nil then
 				local hex = answers.version:gsub(".", function(ch) return string.format("%02X", ch:byte()) end)

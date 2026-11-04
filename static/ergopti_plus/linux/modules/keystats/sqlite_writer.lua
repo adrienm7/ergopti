@@ -316,36 +316,6 @@ local function _ensure_media_schema()
 	return true
 end
 
--- Exact current registries emitted by the shipped schema and by the Linux
--- migration below. A substring elsewhere in DDL cannot prove Linux admission.
-local CURRENT_DEVICE_SCHEMAS = {
-	[ [==[CREATE TABLE devices (
-	device_id                  TEXT PRIMARY KEY,
-	name                       TEXT NOT NULL,
-	os                         TEXT NOT NULL CHECK (os IN ('darwin','windows','linux')),
-	os_version                 TEXT,
-	host_signature             TEXT NOT NULL,
-	created_at                 TEXT NOT NULL,
-	updated_at                 TEXT NOT NULL,
-	-- Watermark of the data.sql file under by_device/<device_id>/ that the
-	-- LOCAL db.sqlite has already ingested. Tracked per device because the
-	-- local sqlite cumulates events from every device's data.sql.
-	imported_data_sql_size     INTEGER NOT NULL DEFAULT 0,
-	imported_data_sql_sha256   TEXT
-)]==] .. "\n" ] = true,
-	[ [==[CREATE TABLE devices (
-  device_id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  os TEXT NOT NULL CHECK (os IN ('darwin','windows','linux')),
-  os_version TEXT,
-  host_signature TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  imported_data_sql_size INTEGER NOT NULL DEFAULT 0,
-  imported_data_sql_sha256 TEXT
-)]==] .. "\n" ] = true,
-}
-
 -- Exact SQL emitted into sqlite_master by the shipped pre-Linux schema, plus
 -- the equivalent legacy registry used by the native migration fixture.
 -- A whitelist avoids guessing which unrecognized CHECK or column constraint
@@ -385,7 +355,7 @@ local function _ensure_linux_device_schema()
 		Logger.error(LOG, "Cannot inspect the existing device registry schema.")
 		return false
 	end
-	if CURRENT_DEVICE_SCHEMAS[current_sql] then return true end
+	if current_sql:find("linux", 1, true) then return true end
 	if not LEGACY_DEVICE_SCHEMAS[current_sql] then
 		Logger.error(LOG, "Cannot safely upgrade an unrecognized legacy device registry schema.")
 		return false
