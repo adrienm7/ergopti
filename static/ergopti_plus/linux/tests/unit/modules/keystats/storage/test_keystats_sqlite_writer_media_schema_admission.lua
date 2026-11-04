@@ -714,3 +714,30 @@ helpers.describe("linux-sqlite-raw-batch-transactions", function()
 	end
 end)
 
+
+it("SQLite device migration refuses an unreadable schema instead of rebuilding", function()
+	local command = require("modules.keystats.sqlite_command")
+	local build, execute, popen = command.build, os.execute, io.popen
+	local path = os.tmpname()
+	local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())
+	local statements, current = {}, nil
+	command.build = function(selected, sql, options)
+		current = sql; statements[#statements + 1] = sql
+		return build(selected, sql, options)
+	end
+	os.execute = function() return 0 end
+	io.popen = function()
+		local status = current:find("SELECT sql FROM sqlite_master", 1, true) and 7 or 0
+		return { read = function() return "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,
+			close = function() return true end }
+	end
+	local Writer = helpers.load_module("modules.keystats.sqlite_writer")
+	local called, opened = pcall(Writer.open_db, path)
+	command.build, os.execute, io.popen = build, execute, popen
+	Writer.close_db(); os.remove(path)
+	helpers.assert_true(called)
+	helpers.assert_eq(opened, false, "unknown schema must not be treated as an old schema")
+	for _, sql in ipairs(statements) do
+		helpers.assert_nil(sql:find("ALTER TABLE devices RENAME", 1, true), "failed schema inspection must not rebuild devices")
+	end
+end)
