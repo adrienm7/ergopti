@@ -641,12 +641,30 @@ def owned_idle_receiver(source):
 
 
 def owned_idle_core_project(source):
-    """Bind the signed idle-service revision to the actual gate-applied Core build."""
+    """Bind the signed idle-service revision to the actual gate-applied Core build.
+
+    Xcode turns INFOPLIST_KEY_ settings into Info.plist keys only for Apple's
+    own keys, and the Core's Info.plist comes from Resources/Info.plist.in, so
+    a build phase adds the custom key to the built Info.plist before signing
+    (the 16.3.0-ergopti.3 helper refused every hosted install without it).
+    """
     if source.count("PRODUCT_BUNDLE_IDENTIFIER: com.ergoptiplus.remap.core") != 1:
         raise RuntimeError("Expected exact owned Core project identity")
-    return replace_once(
+    source = replace_once(
         source,
         "      CODE_SIGN_ENTITLEMENTS: ''\n",
-        "      INFOPLIST_KEY_ErgoptiOwnedCoreIdleAdmissionRevision: '1'\n"
-        "      CODE_SIGN_ENTITLEMENTS: ''\n",
+        "      ERGOPTI_OWNED_CORE_IDLE_ADMISSION_REVISION: '1'\n      CODE_SIGN_ENTITLEMENTS: ''\n",
+    )
+    return replace_once(
+        source,
+        "    type: application\n",
+        "    postBuildScripts:\n"
+        "      - name: Ergopti idle admission revision\n"
+        "        basedOnDependencyAnalysis: false\n"
+        "        outputFiles:\n"
+        "          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)\n"
+        "        script: |\n"
+        '          /usr/libexec/PlistBuddy -c "Add :ErgoptiOwnedCoreIdleAdmissionRevision string'
+        ' ${ERGOPTI_OWNED_CORE_IDLE_ADMISSION_REVISION}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"\n'
+        "    type: application\n",
     )

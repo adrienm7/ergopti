@@ -46,7 +46,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_producer.py",
-        "d922651cf9d867b856ad59fd484f6144d91ff4a0e0fbe39537dfb20d8bf4f1fb",
+        "d5ceb49075eb1940c50477bf1b929cec8dcb7415f34a0efe437500f31077bb6a",
     ),
     (
         "tools/build/remap_runtime_queue_fence.hpp",
