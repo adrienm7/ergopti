@@ -845,3 +845,58 @@ _CRWT_ProcessorSockets() {
 	}
 }
 Test("crash report: logical processors include every physical socket", _CRWT_ProcessorSockets)
+
+
+; Observe the actual completion decoder's thread setting; the child does not
+; get a replacement encoder or a simulated native receipt.
+_CRWT_ReceiptDone(State, ExitCode, Stdout, Stderr) {
+	State["read_encoding"] := A_FileEncoding
+	_CRWT_RecordDone(State, ExitCode, Stdout, Stderr)
+}
+
+_CRWT_UnicodeArtifactReceipt(UnicodePath, Fallback) {
+	global _ConfigDir, _CRWT_FallbackSpawnState, _CRWT_TIMEOUT_MS
+	SavedConfigDir := _ConfigDir
+	SavedSpawnState := _CRWT_FallbackSpawnState
+	Scope := _CRWF_Fixture("receipt-codepage")
+	Failure := 0
+	try {
+		_ConfigDir := Scope.Directory . "\"
+		Reports := Scope.Directory . "\" . (UnicodePath ? "reports-é-報告" : "reports-ascii") . "\"
+		Snapshot := _CrashReport_CheapSnapshot(Error("receipt encoding control"))
+		Snapshot["_transport_reports_dir"] := Reports
+		State := Map("called", false, "exit_code", -1, "stdout", "", "stderr", "", "read_encoding", "")
+		_CRWT_FallbackSpawnState := Map("calls", 0)
+		Spawn := Fallback ? _CRWT_FallbackSpawn : _CrashReportWorkerSpawnOwned
+		Owner := Scope.Start(_CrashReport_ToWorkerJson(Snapshot), _CRWT_ReceiptDone.Bind(State),
+			Spawn, , Map("faults", "os,cpu,git"))
+		AssertTrue(Owner is Map)
+		AssertTrue(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS))
+		AssertEqual(0, State["exit_code"], "the real selected writer must finish successfully")
+		AssertEqual(Fallback ? "fallback" : "primary", Owner["phase"])
+		Actual := _CRWT_FirstJson(Reports)
+		AssertTrue(Actual != "", "an independently enumerated native report must exist before checking its receipt")
+		Report := JsonParse(FileRead(Actual, "UTF-8"))
+		AssertEqual("receipt encoding control", Report["error_msg"])
+		AssertTrue(RegExMatch(State["stdout"], "m)^OK:(.+)$", &Match))
+		Received := Trim(Match[1])
+		_TestPrint("# CRASH_NATIVE_RECEIPT " . KL_JsonEncode(Map("unicode_path", UnicodePath,
+			"fallback", Fallback, "read_encoding", State["read_encoding"], "exact_path", Received == Actual,
+			"physical_artifact", Actual != "", "received_exists", FileExist(Received) != "")))
+		_CRWT_AssertCodeUnits(Actual, Received, "the real worker's acknowledged artifact path")
+		AssertTrue(FileExist(Received), "the acknowledged report path must select the physical report")
+	} catch Error as Caught {
+		Failure := Caught
+		throw Caught
+	} finally {
+		_ConfigDir := SavedConfigDir
+		_CRWT_FallbackSpawnState := SavedSpawnState
+		Scope.Finish(Failure)
+	}
+}
+Test("crash worker: ASCII artifact receipt control (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(false, false))
+Test("crash worker: primary Unicode artifact receipt is exact (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(true, false))
+Test("crash worker: fallback Unicode artifact receipt is exact (crash-native-path-receipt)",
+	_CRWT_UnicodeArtifactReceipt.Bind(true, true))

@@ -316,3 +316,174 @@ _APG_CallbackContractAcceptsCallableObjects() {
 Test("AHK-020 app picker: callback contract accepts every callable object "
 	. "(ahk020-callable)",
 	_APG_CallbackContractAcceptsCallableObjects)
+
+
+_APD_NativeOpen(State, Window, Receipt) {
+	State.Hwnd := Window.Hwnd, State.Receipt := Receipt
+	return true
+}
+
+_APD_NativeNotify(State, Message, Options) {
+	State.Notifications += 1
+	return true
+}
+
+_APD_NativeCommit(State, Selected, Receipt) {
+	State.Calls += 1
+	Committed := MF_CommitDisabledApps(Selected, 0, _APD_NativeNotify.Bind(State), Receipt)
+	State.Results.Push(Committed)
+	return Committed
+}
+
+_APD_NativeButton(State, *) {
+	State.ButtonEntries += 1
+	return
+}
+
+_APD_NativeRefusedPicker(Mode) {
+	global ConfigurationFile, _SaveFullConfigReady, MetricsFilters
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	SavedOwners := _APG_SaveOwnerState()
+	Saved := {Path: ConfigurationFile, Apps: MetricsFilters.disabled_apps,
+		Critical: A_IsCritical, Suspended: A_IsSuspended}
+	HadReady := IsSet(_SaveFullConfigReady), SavedReady := HadReady ? _SaveFullConfigReady : unset
+	Fixture := _ScopeOwnerFixture('[metrics]`ndisabled_apps = ["private_keep.exe", "private_remove.exe"]`n')
+	State := {Hwnd: 0, Receipt: 0, Calls: 0, Results: [], ButtonEntries: 0, Notifications: 0}
+	Window := 0, Lease := 0, Lock := 0, Primary := 0, CleanupFailure := 0
+	try {
+		Critical("Off"), Suspend(false)
+		_APG_ResetOwners()
+		ConfigurationFile := Fixture.path, _SaveFullConfigReady := true
+		MetricsFilters.disabled_apps := Map("private_keep.exe", true, "private_remove.exe", true)
+		Receipt := AppPicker_Show(Map("owner", "metrics:disabled_apps",
+			"title", t("dialog.metrics.exclude_title"), "prompt", t("dialog.metrics.exclude_prompt"),
+			"ok_label", t("dialog.metrics.exclude_ok"), "initial", MF_DisabledList(),
+			"on_open", _APD_NativeOpen.Bind(State), "on_save", _APD_NativeCommit.Bind(State)))
+		AssertTrue(Receipt is Map && Receipt == State.Receipt && Receipt["state"] == "open")
+		Window := GuiFromHwnd(State.Hwnd)
+		AssertTrue(Window is Gui && DllCall("User32\IsWindowVisible", "Ptr", State.Hwnd, "Int"))
+		List := 0, Button := 0
+		for Control in Window {
+			if Control.Type == "ListView"
+				List := Control
+			if Control.Type == "Button" && Control.Text == t("dialog.metrics.exclude_ok")
+				Button := Control
+		}
+		AssertTrue(IsObject(List) && IsObject(Button))
+		RemovedRow := 0
+		loop List.GetCount()
+			if List.GetText(A_Index, 2) == "private_remove.exe"
+				RemovedRow := A_Index
+		AssertTrue(RemovedRow > 0)
+		; Arrange an ordinary checkbox selection on the real production list.
+		; Only the original native OK producer and its durable writer are SUTs.
+		List.Modify(RemovedRow, "-Check")
+		Selected := Map(), Row := 0
+		loop {
+			Row := List.GetNext(Row, "Checked")
+			if !Row
+				break
+			Selected[List.GetText(Row, 2)] := true
+		}
+		AssertEqual(1, Selected.Count)
+		AssertTrue(Selected.Has("private_keep.exe"))
+		ButtonHwnd := Button.Hwnd
+		Button.OnEvent("Click", _APD_NativeButton.Bind(State), -1)
+		if Mode == "lease" {
+			Lease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "app-picker-refusal-fixture")
+			AssertTrue(Lease is Object, "The independent genuine configuration owner must hold this exact path")
+		} else {
+			; Reads remain allowed; writes and atomic replacement are genuinely
+			; denied. This refusal occurs after the candidate claimed its receipt.
+			Lock := FileOpen(ConfigurationFile, "r-wd", "UTF-8")
+			AssertTrue(IsObject(Lock))
+		}
+		AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source))
+		DllCall("User32\SendMessageW", "Ptr", ButtonHwnd, "UInt", 0xF5,
+			"Ptr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while State.Results.Length == 0 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertEqual(1, State.ButtonEntries)
+		AssertEqual(1, State.Calls, "The actual callback must reach the genuine durable metrics producer")
+		AssertEqual(1, State.Results.Length)
+		AssertFalse(State.Results[1], "The real lease/sharing actor must refuse the write")
+		AssertTrue(State.Notifications >= 1, "The genuine persistence refusal must be explained through its presentation port")
+		AssertTrue(FSUtf8ExactMatches(ConfigurationFile, Fixture.source))
+		AssertTrue(MetricsFilters.disabled_apps.Has("private_remove.exe"))
+		_TestPrint("# app-picker-native-refusal mode=" . Mode . " callbacks=" . State.Calls
+			. " committed=" . State.Results[1] . " source_unchanged=" . FSUtf8ExactMatches(ConfigurationFile, Fixture.source)
+			. " window_retained=" . DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int") . " receipt=" . Receipt["state"])
+		AssertTrue(DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"),
+			"A real refused write must preserve the native checkbox selection for retry")
+		RetainedCount := 0, Row := 0
+		loop {
+			Row := List.GetNext(Row, "Checked")
+			if !Row
+				break
+			RetainedCount += 1
+			AssertEqual("private_keep.exe", List.GetText(Row, 2), "The retained check must still name the user's original choice")
+		}
+		AssertEqual(1, RetainedCount, "The complete visible checked set must survive the refusal")
+		if Lease is Object
+			_ConfigWriteLeaseRelease(Lease), Lease := 0
+		if IsObject(Lock)
+			Lock.Close(), Lock := 0
+		Sleep(30)
+		AssertEqual(1, State.Calls, "Release cannot replay a refused picker command")
+		DllCall("User32\SendMessageW", "Ptr", ButtonHwnd, "UInt", 0xF5,
+			"Ptr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while State.Results.Length < 2 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertEqual(2, State.ButtonEntries)
+		AssertEqual(2, State.Calls)
+		AssertEqual(2, State.Results.Length)
+		AssertTrue(State.Results[2], "A fresh click of the same retained picker must really commit after release")
+		AssertFalse(DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int"))
+		Fresh := ParseTomlFile(ConfigurationFile), Apps := IniCacheGet(Fresh, "metrics", "disabled_apps")
+		AssertTrue(Apps is Array && Apps.Length == 1 && Apps[1] == "private_keep.exe")
+		AssertEqual(1, MetricsFilters.disabled_apps.Count)
+		AssertTrue(MetricsFilters.disabled_apps.Has("private_keep.exe"))
+	} catch as Failure {
+		Primary := Failure
+	} finally {
+		Suspend(false)
+		if Lease is Object
+			_ConfigWriteLeaseRelease(Lease)
+		if IsObject(Lock)
+			Lock.Close()
+		try {
+			if IsObject(Window) && DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int") {
+				AssertTrue(DllCall("User32\PostMessageW", "Ptr", State.Hwnd, "UInt", 0x10,
+					"Ptr", 0, "Ptr", 0, "Int"))
+				Started := A_TickCount
+				while DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int") && TickElapsed(Started) < 3000
+					Sleep(5)
+				if DllCall("User32\IsWindow", "Ptr", State.Hwnd, "Int")
+					throw Error("The actual private picker must retire through its own native Close")
+			}
+		} catch as Failure {
+			CleanupFailure := Failure
+			if IsObject(Window)
+				Window.Destroy()
+		}
+		if State.Receipt is Map
+			AppPicker_RetireReceipt(State.Receipt)
+		MetricsFilters.disabled_apps := Saved.Apps, ConfigurationFile := Saved.Path
+		_SaveFullConfigReady := HadReady ? SavedReady : unset
+		_APG_RestoreOwnerState(SavedOwners)
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache]
+			if Store.Has(Fixture.path)
+				Store.Delete(Fixture.path)
+		_ScopeOwnerCleanup(Fixture)
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+	if IsObject(Primary)
+		throw Primary
+	if IsObject(CleanupFailure)
+		throw CleanupFailure
+}
+for _APD_Mode in ["lease", "sharing"]
+	Test("App picker native refusal: " . _APD_Mode . " preserves checkbox state and a fresh durable retry (app-picker-native-refusal-owner)",
+		_APD_NativeRefusedPicker.Bind(_APD_Mode))
