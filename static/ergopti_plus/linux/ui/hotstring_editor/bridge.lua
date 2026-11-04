@@ -535,18 +535,38 @@ end
 --- that reaches only the log is a failure the user never learns about.
 --- @param message string Already translated.
 --- @return boolean
-function M.show_alert(message)
+function M.show_alert(message, context)
 	local ok_json, json_mod = pcall(require, "json")
 	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
 	if not ok_json or not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "%s", tostring(message))
 		return false
 	end
+	local epoch = type(context) == "table" and context.epoch or nil
+	local current_epoch = Manager.current_epoch
+	local page_current = Manager.page_current
+	local function current()
+		if epoch == nil then return true end
+		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
+			or type(page_current) ~= "function" or Manager.current_epoch ~= current_epoch
+			or Manager.page_current ~= page_current or package.loaded["ui.webview_manager"] ~= Manager then return false end
+		local ok, observed = pcall(current_epoch, APP_NAME)
+		if not ok or observed ~= epoch then return false end
+		local checked, live = pcall(page_current, APP_NAME, epoch)
+		if not checked or live ~= true or Manager.page_current ~= page_current
+			or Manager.current_epoch ~= current_epoch then return false end
+		local reread, final = pcall(current_epoch, APP_NAME)
+		return reread and final == epoch and package.loaded["ui.webview_manager"] == Manager
+			and Manager.current_epoch == current_epoch
+			and Manager.page_current == page_current
+	end
+	if not current() then return false end
 	local ok_enc, encoded = pcall(json_mod.encode, tostring(message))
 	if not ok_enc then
 		Logger.error(LOG, "%s", tostring(message))
 		return false
 	end
+	if not current() then return false end
 	return Manager.eval_js(APP_NAME, "if(window.showAlert)showAlert(" .. encoded .. ")")
 end
 
@@ -650,7 +670,7 @@ function M.on_message(payload, state, context)
 			-- with a confirmation on screen saying otherwise. macOS raises a native
 			-- notification here; this driver's channel into the page is the alert
 			-- the shared script already defines.
-			M.show_alert(i18n_label("editor.hotstrings.save_error"))
+			M.show_alert(i18n_label("editor.hotstrings.save_error"), context)
 		end
 		return { saved = saved }
 	end

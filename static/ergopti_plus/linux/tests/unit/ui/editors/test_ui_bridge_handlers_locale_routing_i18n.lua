@@ -438,6 +438,45 @@ helpers.describe("ui.bridge_handlers", function()
     local handler = helpers.load_module("ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
+		helpers.it("(hotstring-save-alert-owner) does not send a stale save error to the replacement page", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 42 end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 0)
+		end)
+
+		helpers.it("(hotstring-save-alert-owner) does not send an error to a page with native cleanup debt", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+				page_current = function() return false end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 0)
+		end)
+
+		helpers.it("(hotstring-save-alert-owner) still alerts the live requesting page", function()
+			local original, pushed = package.loaded["ui.webview_manager"], {}
+			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+				page_current = function() return true end,
+				eval_js = function(_, js) pushed[#pushed + 1] = js; return true end }
+			local ok, result = pcall(handler.on_message, { action = "save", data = { sections = {} } }, state,
+				{ app_name = "hotstring_editor", epoch = 41 })
+			package.loaded["ui.webview_manager"] = original
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#pushed, 1)
+			helpers.assert_contains(pushed[1], "showAlert")
+		end)
+
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsEditor")
     end)
