@@ -1,0 +1,37 @@
+2026-11-04 01:29:30:245 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 302 answered HEARTBEAT_FAILED 302 after 1.57 s (deadline 2.50 s).
+2026-11-04 01:29:30:258 [WARNING] [karabiner.lease] Karabiner lease 8a6356806b544a8aa4b96945680e0a25 heartbeat 302 had no clean local CLI transport.
+2026-11-04 09:06:26:857 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 600 answered HEARTBEAT_FAILED 600 after 1.84 s (deadline 2.50 s).
+2026-11-04 09:06:26:888 [WARNING] [karabiner.lease] Karabiner lease 8a6356806b544a8aa4b96945680e0a25 heartbeat 600 had no clean local CLI transport.
+2026-11-04 09:26:13:427 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-11-04 09:26:25:443 [WARNING] [keymap.utils] Secure-field focus watcher setup failed: Accessibility application element is unavailable
+stack traceback:
+	[C]: in function 'error'
+	...ic/ergopti_plus/macos/adapters/secure_field_detector.lua:203: in function <...ic/ergopti_plus/macos/adapters/secure_field_detector.lua:194>
+	[C]: in function 'xpcall'
+	...ic/ergopti_plus/macos/adapters/secure_field_detector.lua:194: in function 'adapters.secure_field_detector.watchFocusedElementChanges'
+	...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1322: in upvalue 'ensure_ignored_win_context_watchers'
+	...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1508: in function <...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1420>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1579: in function <...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:2035: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:2027>.
+2026-11-04 09:26:25:443 [WARNING] [keymap.utils] Slow ignored-window probe 2847 ms (watchers=0 focused_window=12 application=0 app_name=0 title=12 context_watchers=2821 ms).
+2026-11-04 09:31:09:404 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).
+2026-11-04 09:32:01:354 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-11-04 09:36:24:859 [WARNING] [keymap.utils] Slow ignored-window probe 357 ms (watchers=0 focused_window=5 application=0 app_name=0 title=0 context_watchers=0 secure_field=10 destination=340 ms).
+2026-11-04 09:38:23:033 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:376) held the main thread for 1290 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 43->43 MB.
+2026-11-04 09:41:07:988 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-11-04 09:42:23:860 [WARNING] [HotPath] Slow preview.rebuild: 8.00 ms own, 8.00 ms total, parent keydown (0 similar since the last line).
+2026-11-04 09:42:28:174 [WARNING] [tooltip_llm] Over budget: prediction.display took 3424 ms (budget 2000 ms).
+2026-11-04 09:42:28:190 [WARNING] [HotPath] Slow tooltip.show_predictions: 16.39 ms own, 16.39 ms total, parent none (0 similar since the last line).
+2026-11-04 09:46:21:282 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: cancelled.
+2026-11-04 09:48:27:543 [WARNING] [HotPath] Slow preview.rebuild: 7.95 ms own, 7.95 ms total, parent keydown (0 similar since the last line).
+2026-11-04 09:48:45:728 [WARNING] [HotPath] Slow preview.rebuild: 11.78 ms own, 11.78 ms total, parent keydown (0 similar since the last line).
+2026-11-04 09:48:48:503 [WARNING] [key_event_health] A character key stayed down 3.2 s with no further event: its key-up was lost before the keymap taps; session totals: 64 key-down(s), 63 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-04 09:49:48:550 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-11-04 09:49:49:551 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-11-04 09:49:49:551 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.

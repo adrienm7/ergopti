@@ -1,0 +1,3240 @@
+{
+ "continuations": 337,
+ "counters": {
+  "counter:menu.refresh_requested": 3,
+  "counter:runtime.timer_hold_over_1000ms": 1,
+  "counter:runtime.timer_hold_over_250ms": 5
+ },
+ "error_keys": [
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+  "WARNING|HotPath|Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line).",
+  "WARNING|karabiner.lease|Lease watchdog <*> stderr: lease worker: HEARTBEAT <*> <*> answered HEARTBEAT_FAILED <*> after <*> s (deadline <*> s).",
+  "WARNING|karabiner.lease|Karabiner lease <*> heartbeat <*> had no clean local CLI transport.",
+  "WARNING|keymap.utils|Secure-field focus watcher setup failed: Accessibility application element is unavailable",
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> ms).",
+  "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms).",
+  "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+  "WARNING|adapters.field_check_ports|PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+  "WARNING|tooltip_llm|Over budget: prediction.display took <*> ms (budget <*> ms).",
+  "WARNING|HotPath|Slow tooltip.show_predictions: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+  "WARNING|managed_ollama_daemon|Managed Ollama daemon exited (status=<*>): Managed Ollama daemon admission refused: cancelled.",
+  "WARNING|key_event_health|A character key stayed down <*> s with no further event: its key-up was lost before the keymap taps; session totals: <*> key-down(s), <*> key-up(s), <*> key-up(s) without key-down, <*> key-down(s) without key-up, <*> key(s) stuck over <*> s, <*> character key(s) held <*> ms or more (<*> across a rule switch), <*> key-down(s) and <*> key-up(s) seen <*> ms or more late (max <*> ms), <*> late key event(s) passed untouched, <*> key(s) held across a sleep (<*> released after it), <*> Karabiner lease failure(s).",
+  "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+  "WARNING|adapters.hotkey_registrar|bind(): the OS refused '<*>' — nil.",
+  "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried."
+ ],
+ "errors": [
+  {
+   "count": 3,
+   "example": "2026-11-04 09:26:13:427 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).",
+   "first": "2026-11-04 09:26:13:427",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms).",
+   "last": "2026-11-04 09:32:01:354",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": true,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms)."
+  },
+  {
+   "count": 3,
+   "example": "2026-11-04 09:42:23:860 [WARNING] [HotPath] Slow preview.rebuild: 8.00 ms own, 8.00 ms total, parent keydown (0 similar since the last line).",
+   "first": "2026-11-04 09:42:23:860",
+   "key": "WARNING|HotPath|Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line).",
+   "last": "2026-11-04 09:48:45:728",
+   "level": "WARNING",
+   "module": "HotPath",
+   "new": false,
+   "perf": true,
+   "template": "Slow preview.rebuild: <*> ms own, <*> ms total, parent keydown (<*> similar since the last line)."
+  },
+  {
+   "count": 2,
+   "example": "2026-11-04 01:29:30:245 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 302 answered HEARTBEAT_FAILED 302 after 1.57 s (deadline 2.50 s).",
+   "first": "2026-11-04 01:29:30:245",
+   "key": "WARNING|karabiner.lease|Lease watchdog <*> stderr: lease worker: HEARTBEAT <*> <*> answered HEARTBEAT_FAILED <*> after <*> s (deadline <*> s).",
+   "last": "2026-11-04 09:06:26:857",
+   "level": "WARNING",
+   "module": "karabiner.lease",
+   "new": true,
+   "perf": false,
+   "template": "Lease watchdog <*> stderr: lease worker: HEARTBEAT <*> <*> answered HEARTBEAT_FAILED <*> after <*> s (deadline <*> s)."
+  },
+  {
+   "count": 2,
+   "example": "2026-11-04 01:29:30:258 [WARNING] [karabiner.lease] Karabiner lease 8a6356806b544a8aa4b96945680e0a25 heartbeat 302 had no clean local CLI transport.",
+   "first": "2026-11-04 01:29:30:258",
+   "key": "WARNING|karabiner.lease|Karabiner lease <*> heartbeat <*> had no clean local CLI transport.",
+   "last": "2026-11-04 09:06:26:888",
+   "level": "WARNING",
+   "module": "karabiner.lease",
+   "new": true,
+   "perf": false,
+   "template": "Karabiner lease <*> heartbeat <*> had no clean local CLI transport."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:26:25:443 [WARNING] [keymap.utils] Secure-field focus watcher setup failed: Accessibility application element is unavailable",
+   "first": "2026-11-04 09:26:25:443",
+   "key": "WARNING|keymap.utils|Secure-field focus watcher setup failed: Accessibility application element is unavailable",
+   "last": "2026-11-04 09:26:25:443",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": true,
+   "perf": false,
+   "template": "Secure-field focus watcher setup failed: Accessibility application element is unavailable"
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:26:25:443 [WARNING] [keymap.utils] Slow ignored-window probe 2847 ms (watchers=0 focused_window=12 application=0 app_name=0 title=12 context_watchers=2821 ms).",
+   "first": "2026-11-04 09:26:25:443",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> ms).",
+   "last": "2026-11-04 09:26:25:443",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": true,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:36:24:859 [WARNING] [keymap.utils] Slow ignored-window probe 357 ms (watchers=0 focused_window=5 application=0 app_name=0 title=0 context_watchers=0 secure_field=10 destination=340 ms).",
+   "first": "2026-11-04 09:36:24:859",
+   "key": "WARNING|keymap.utils|Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms).",
+   "last": "2026-11-04 09:36:24:859",
+   "level": "WARNING",
+   "module": "keymap.utils",
+   "new": true,
+   "perf": false,
+   "template": "Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> application=<*> app_name=<*> title=<*> context_watchers=<*> secure_field=<*> destination=<*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:38:23:033 [WARNING] [runtime] An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:376) held the main thread for 1290 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap 43->43 MB.",
+   "first": "2026-11-04 09:38:23:033",
+   "key": "WARNING|runtime|An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB.",
+   "last": "2026-11-04 09:38:23:033",
+   "level": "WARNING",
+   "module": "runtime",
+   "new": false,
+   "perf": true,
+   "template": "An hs.timer.new callback (.../static/ergopti_plus/macos/modules/keystats/watchers.lua:<*>) held the main thread for <*> ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Lua heap <*>-><*> MB."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:41:07:988 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+   "first": "2026-11-04 09:41:07:988",
+   "key": "WARNING|adapters.field_check_ports|PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+   "last": "2026-11-04 09:41:07:988",
+   "level": "WARNING",
+   "module": "adapters.field_check_ports",
+   "new": false,
+   "perf": false,
+   "template": "PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:42:28:174 [WARNING] [tooltip_llm] Over budget: prediction.display took 3424 ms (budget 2000 ms).",
+   "first": "2026-11-04 09:42:28:174",
+   "key": "WARNING|tooltip_llm|Over budget: prediction.display took <*> ms (budget <*> ms).",
+   "last": "2026-11-04 09:42:28:174",
+   "level": "WARNING",
+   "module": "tooltip_llm",
+   "new": true,
+   "perf": true,
+   "template": "Over budget: prediction.display took <*> ms (budget <*> ms)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:42:28:190 [WARNING] [HotPath] Slow tooltip.show_predictions: 16.39 ms own, 16.39 ms total, parent none (0 similar since the last line).",
+   "first": "2026-11-04 09:42:28:190",
+   "key": "WARNING|HotPath|Slow tooltip.show_predictions: <*> ms own, <*> ms total, parent none (<*> similar since the last line).",
+   "last": "2026-11-04 09:42:28:190",
+   "level": "WARNING",
+   "module": "HotPath",
+   "new": true,
+   "perf": true,
+   "template": "Slow tooltip.show_predictions: <*> ms own, <*> ms total, parent none (<*> similar since the last line)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:46:21:282 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: cancelled.",
+   "first": "2026-11-04 09:46:21:282",
+   "key": "WARNING|managed_ollama_daemon|Managed Ollama daemon exited (status=<*>): Managed Ollama daemon admission refused: cancelled.",
+   "last": "2026-11-04 09:46:21:282",
+   "level": "WARNING",
+   "module": "managed_ollama_daemon",
+   "new": true,
+   "perf": false,
+   "template": "Managed Ollama daemon exited (status=<*>): Managed Ollama daemon admission refused: cancelled."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:48:48:503 [WARNING] [key_event_health] A character key stayed down 3.2 s with no further event: its key-up was lost before the keymap taps; session totals: 64 key-down(s), 63 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character …",
+   "first": "2026-11-04 09:48:48:503",
+   "key": "WARNING|key_event_health|A character key stayed down <*> s with no further event: its key-up was lost before the keymap taps; session totals: <*> key-down(s), <*> key-up(s), <*> key-up(s) without key-down, <*> key-down(s) without key-up, <*> key(s) stuck over <*> s, <*> character key(s) held <*> ms or more (<*> across a rule switch), <*> key-down(s) and <*> key-up(s) seen <*> ms or more late (max <*> ms), <*> late key event(s) passed untouched, <*> key(s) held across a sleep (<*> released after it), <*> Karabiner lease failure(s).",
+   "last": "2026-11-04 09:48:48:503",
+   "level": "WARNING",
+   "module": "key_event_health",
+   "new": true,
+   "perf": false,
+   "template": "A character key stayed down <*> s with no further event: its key-up was lost before the keymap taps; session totals: <*> key-down(s), <*> key-up(s), <*> key-up(s) without key-down, <*> key-down(s) without key-up, <*> key(s) stuck over <*> s, <*> character key(s) held <*> ms or more (<*> across a rule switch), <*> key-down(s) and <*> key-up(s) seen <*> ms or more late (max <*> ms), <*> late key event(s) passed untouched, <*> key(s) held across a sleep (<*> released after it), <*> Karabiner lease failure(s)."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:49:48:550 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+   "first": "2026-11-04 09:49:48:550",
+   "key": "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried.",
+   "last": "2026-11-04 09:49:48:550",
+   "level": "WARNING",
+   "module": "shortcuts.keyboard_shortcuts",
+   "new": false,
+   "perf": false,
+   "template": "Shortcut Ctrl+. (slot '<*>') could not be registered (key '<*>' is not in the active keyboard layout); the other shortcuts stay active and it is retried."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:49:49:551 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.",
+   "first": "2026-11-04 09:49:49:551",
+   "key": "WARNING|adapters.hotkey_registrar|bind(): the OS refused '<*>' — nil.",
+   "last": "2026-11-04 09:49:49:551",
+   "level": "WARNING",
+   "module": "adapters.hotkey_registrar",
+   "new": true,
+   "perf": false,
+   "template": "bind(): the OS refused '<*>' — nil."
+  },
+  {
+   "count": 1,
+   "example": "2026-11-04 09:49:49:551 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.",
+   "first": "2026-11-04 09:49:49:551",
+   "key": "WARNING|shortcuts.keyboard_shortcuts|Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.",
+   "last": "2026-11-04 09:49:49:551",
+   "level": "WARNING",
+   "module": "shortcuts.keyboard_shortcuts",
+   "new": true,
+   "perf": false,
+   "template": "Shortcut Ctrl+. (slot '<*>') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried."
+  }
+ ],
+ "field_checks": {
+  "counts": {
+   "fail": 2,
+   "info": 1,
+   "pass": 32
+  },
+  "items": [
+   {
+    "failures": 0,
+    "id": "lease",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:07:869",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_runtime",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:07:969",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_start",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:07:972",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "network",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:09:327",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "toolchain",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:10:549",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "login_items",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:30:688",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "composer",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:31:996",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "boot_cost",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:41:32:002",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "idle_cost",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:02:072",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "layout_rows",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:05:493",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "permissions",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:05:651",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "event_taps",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:06:394",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "input_sources",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:06:478",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "storage",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:11:211",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "launcher_roles",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:11:308",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "network_hosts",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:13:216",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "ollama_blob_host",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:17:107",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "typing_selftest",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:23:115",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "capslock_chord",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:23:119",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "gesture_frames",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:23:123",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "hotstring_roundtrip",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:25:217",
+    "verdict": "pass"
+   },
+   {
+    "failures": 1,
+    "id": "prediction_tooltip",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:25:225",
+    "verdict": "fail"
+   },
+   {
+    "failures": 0,
+    "id": "menu_build",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:42:25:426",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "pac_fallback",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:17:163",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "ai_local",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:17:267",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "slow_lines",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:17:311",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "fifo_safety",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:18:409",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "local_servers",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:18:576",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "app_health",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:20:523",
+    "verdict": "pass"
+   },
+   {
+    "failures": 1,
+    "id": "tap_hold_thresholds",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:20:691",
+    "verdict": "fail"
+   },
+   {
+    "failures": 0,
+    "id": "tap_copy",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:20:699",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "apple_shortcuts",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:20:742",
+    "verdict": "pass"
+   },
+   {
+    "failures": 0,
+    "id": "owned_pause",
+    "runs": 1,
+    "source": "log",
+    "time": "2026-11-04 09:46:20:745",
+    "verdict": "pass"
+   },
+   {
+    "id": "privacy_pane_urls",
+    "source": "privacy_pane_urls",
+    "verdict": "info"
+   },
+   {
+    "id": "system_bash",
+    "source": "system_bash",
+    "verdict": "pass"
+   }
+  ]
+ },
+ "lifecycle": {
+  "karabiner_lease_failure": {
+   "count": 2,
+   "events": [
+    {
+     "line": "2026-11-04 01:29:30:245 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 302 answered HEARTBEAT_FAILED 302 after 1.57 s (deadline 2.50 s).",
+     "time": "2026-11-04 01:29:30:245"
+    },
+    {
+     "line": "2026-11-04 09:06:26:857 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 600 answered HEARTBEAT_FAILED 600 after 1.84 s (deadline 2.50 s).",
+     "time": "2026-11-04 09:06:26:857"
+    }
+   ],
+   "first": "2026-11-04 01:29:30:245",
+   "last": "2026-11-04 09:06:26:857"
+  },
+  "network_failure": {
+   "count": 1,
+   "events": [
+    {
+     "line": "2026-11-04 09:41:07:988 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+     "time": "2026-11-04 09:41:07:988"
+    }
+   ],
+   "first": "2026-11-04 09:41:07:988",
+   "last": "2026-11-04 09:41:07:988"
+  },
+  "reload": {
+   "count": 2,
+   "events": [
+    {
+     "line": "2026-11-04 09:38:45:499 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: hammerspoon_reload).",
+     "time": "2026-11-04 09:38:45:499"
+    },
+    {
+     "line": "2026-11-04 09:46:20:760 [INFO] [infra.termination_coordinator] Controlled reload requested (reason: field_run_timed_reload).",
+     "time": "2026-11-04 09:46:20:760"
+    }
+   ],
+   "first": "2026-11-04 09:38:45:499",
+   "last": "2026-11-04 09:46:20:760"
+  },
+  "sleep_wake": {
+   "count": 3,
+   "events": [
+    {
+     "line": "2026-11-04 09:26:09:236 [INFO] [gestures] Wake-from-sleep detected (event=0) — recycling watchers",
+     "time": "2026-11-04 09:26:09:236"
+    },
+    {
+     "line": "2026-11-04 09:31:10:739 [INFO] [gestures] Wake-from-sleep detected (event=11) — recycling watchers",
+     "time": "2026-11-04 09:31:10:739"
+    },
+    {
+     "line": "2026-11-04 09:38:23:820 [INFO] [gestures] Wake-from-sleep detected (event=11) — recycling watchers",
+     "time": "2026-11-04 09:38:23:820"
+    }
+   ],
+   "first": "2026-11-04 09:26:09:236",
+   "last": "2026-11-04 09:38:23:820"
+  },
+  "start": {
+   "count": 3,
+   "events": [
+    {
+     "line": "===== 2026-11-04 09:38:46:624 — ErgoptiPlus session opened =====",
+     "time": "2026-11-04 09:38:46:624"
+    },
+    {
+     "line": "===== 2026-11-04 09:41:04:167 — ErgoptiPlus session opened =====",
+     "time": "2026-11-04 09:41:04:167"
+    },
+    {
+     "line": "===== 2026-11-04 09:46:21:851 — ErgoptiPlus session opened =====",
+     "time": "2026-11-04 09:46:21:851"
+    }
+   ],
+   "first": "2026-11-04 09:38:46:624",
+   "last": "2026-11-04 09:46:21:851"
+  },
+  "stop": {
+   "count": 2,
+   "events": [
+    {
+     "line": "2026-11-04 09:38:45:976 [INFO] [init] Hammerspoon local teardown started (reload).",
+     "time": "2026-11-04 09:38:45:976"
+    },
+    {
+     "line": "2026-11-04 09:46:21:233 [INFO] [init] Hammerspoon local teardown started (reload).",
+     "time": "2026-11-04 09:46:21:233"
+    }
+   ],
+   "first": "2026-11-04 09:38:45:976",
+   "last": "2026-11-04 09:46:21:233"
+  }
+ },
+ "lines": 4502,
+ "logs": [
+  "ErgoptiPlus_2026-11-04.log"
+ ],
+ "performance": [
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 2000.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 3424.0,
+   "mean": 3424.0,
+   "metric": "llm.ttft",
+   "over": 1,
+   "p50": 3424.0,
+   "p95": 3424.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:28:174",
+     "value": 3424.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": true,
+    "source": "static/ergopti_plus/macos/infra/main_thread_hold.lua",
+    "value": 250.0
+   },
+   "count": 8,
+   "kind": "occurrences",
+   "max": 1290.0,
+   "mean": 527.375,
+   "metric": "main_thread.hold",
+   "over": 8,
+   "p50": 412.0,
+   "p95": 1290.0,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keystats/watchers.lua:376",
+     "time": "2026-11-04 09:38:23:033",
+     "value": 1290.0
+    },
+    {
+     "context": "...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567",
+     "time": "2026-11-04 09:26:13:428",
+     "value": 501.0
+    },
+    {
+     "context": "...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1567",
+     "time": "2026-11-04 09:31:09:405",
+     "value": 501.0
+    },
+    {
+     "context": ".../static/ergopti_plus/macos/modules/keystats/watchers.lua:376",
+     "time": "2026-11-04 09:31:09:908",
+     "value": 501.0
+    },
+    {
+     "context": "...perso/ergopti/static/ergopti_plus/macos/ui/menu/init.lua:1801",
+     "time": "2026-11-04 09:41:07:558",
+     "value": 412.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 5.0
+   },
+   "count": 1,
+   "kind": "occurrences",
+   "max": 16.39,
+   "mean": 16.39,
+   "metric": "hotpath:tooltip.show_predictions",
+   "over": 1,
+   "p50": 16.39,
+   "p95": 16.39,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:28:190",
+     "value": 16.39
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 5.0
+   },
+   "count": 3,
+   "kind": "occurrences",
+   "max": 11.78,
+   "mean": 9.243333333333334,
+   "metric": "hotpath:preview.rebuild",
+   "over": 3,
+   "p50": 8.0,
+   "p95": 11.78,
+   "verdict": "over",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:48:45:728",
+     "value": 11.78
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:23:860",
+     "value": 8.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:48:27:543",
+     "value": 7.95
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 2500.0
+   },
+   "count": 3,
+   "kind": "occurrences",
+   "max": 1355.0,
+   "mean": 1316.0,
+   "metric": "boot.total",
+   "over": 0,
+   "p50": 1340.0,
+   "p95": 1355.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:124",
+     "value": 1355.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:598",
+     "value": 1340.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:741",
+     "value": 1253.0
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 250.0
+   },
+   "count": 6,
+   "kind": "occurrences",
+   "max": 204.3,
+   "mean": 132.9,
+   "metric": "menu.rebuild",
+   "over": 0,
+   "p50": 107.1,
+   "p95": 204.3,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 204.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 162.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 114.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:49:897",
+     "value": 107.1
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:16:003",
+     "value": 105.4
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 2,
+   "kind": "occurrences",
+   "max": 2098.999999994703,
+   "mean": 2039.9999999972351,
+   "metric": "reload.request_to_boot",
+   "over": 0,
+   "p50": 1980.9999999997672,
+   "p95": 2098.999999994703,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:45:499",
+     "value": 2098.999999994703
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:20:760",
+     "value": 1980.9999999997672
+    }
+   ]
+  },
+  {
+   "budget": {
+    "inclusive": false,
+    "source": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+    "value": 4000.0
+   },
+   "count": 2,
+   "kind": "occurrences",
+   "max": 1624.0,
+   "mean": 1567.5,
+   "metric": "reload.total",
+   "over": 0,
+   "p50": 1511.0,
+   "p95": 1624.0,
+   "verdict": "within",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:598",
+     "value": 1624.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:741",
+     "value": 1511.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 835.0,
+   "mean": 796.6666666666666,
+   "metric": "boot.cpu",
+   "over": 0,
+   "p50": 806.0,
+   "p95": 835.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:124",
+     "value": 835.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:598",
+     "value": 806.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:741",
+     "value": 749.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 234.4,
+   "mean": 223.63333333333333,
+   "metric": "boot.stage:Hotstring groups registered (personal + dynamic + common)",
+   "over": 0,
+   "p50": 221.5,
+   "p95": 234.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:284",
+     "value": 234.4
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:822",
+     "value": 221.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:473",
+     "value": 215.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 200.2,
+   "mean": 190.29999999999998,
+   "metric": "boot.stage:Config-dependent module requires",
+   "over": 0,
+   "p50": 193.7,
+   "p95": 200.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:837",
+     "value": 200.2
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:374",
+     "value": 193.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:038",
+     "value": 177.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 186.2,
+   "mean": 158.6,
+   "metric": "boot.stage:UI: menu.start (menubar + state sync + engines + LLM handler)",
+   "over": 0,
+   "p50": 145.1,
+   "p95": 186.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:586",
+     "value": 186.2
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:114",
+     "value": 145.1
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:732",
+     "value": 144.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 161.6,
+   "mean": 155.26666666666665,
+   "metric": "boot.stage:Shortcuts pre-start",
+   "over": 0,
+   "p50": 161.2,
+   "p95": 161.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:231",
+     "value": 161.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:577",
+     "value": 161.2
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:014",
+     "value": 143.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 90.1,
+   "mean": 85.06666666666666,
+   "metric": "boot.stage:UI: karabiner.init",
+   "over": 0,
+   "p50": 83.8,
+   "p95": 90.1,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:968",
+     "value": 90.1
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:587",
+     "value": 83.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:399",
+     "value": 81.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 48.3,
+   "mean": 32.36666666666667,
+   "metric": "boot.stage:Keymap engine started",
+   "over": 0,
+   "p50": 25.9,
+   "p95": 48.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:878",
+     "value": 48.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:318",
+     "value": 25.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:503",
+     "value": 22.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 29.4,
+   "mean": 28.233333333333334,
+   "metric": "boot.stage:Config schema migration",
+   "over": 0,
+   "p50": 28.8,
+   "p95": 29.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:867",
+     "value": 29.4
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:403",
+     "value": 28.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:065",
+     "value": 26.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 18.6,
+   "mean": 16.533333333333335,
+   "metric": "boot.stage:TOML discovery + ordering",
+   "over": 0,
+   "p50": 16.3,
+   "p95": 18.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:049",
+     "value": 18.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:258",
+     "value": 16.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:600",
+     "value": 14.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 14.4,
+   "mean": 9.466666666666667,
+   "metric": "boot.stage:MLX server cleanup started asynchronously",
+   "over": 0,
+   "p50": 7.7,
+   "p95": 14.4,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:029",
+     "value": 14.4
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:240",
+     "value": 7.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:585",
+     "value": 6.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 8.6,
+   "mean": 6.7,
+   "metric": "boot.stage:Path: native asynchronous logger transport committed",
+   "over": 0,
+   "p50": 6.3,
+   "p95": 8.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:177",
+     "value": 8.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:632",
+     "value": 6.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:21:857",
+     "value": 5.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 7.8,
+   "mean": 2.966666666666667,
+   "metric": "boot.stage:Accessibility permission",
+   "over": 0,
+   "p50": 0.6,
+   "p95": 7.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:415",
+     "value": 7.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:870",
+     "value": 0.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:069",
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 7.0,
+   "mean": 6.666666666666667,
+   "metric": "boot.stage:Final mapping sort + tail-index rebuild",
+   "over": 0,
+   "p50": 6.9,
+   "p95": 7.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:292",
+     "value": 7.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:829",
+     "value": 6.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:480",
+     "value": 6.1
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 7.0,
+   "mean": 6.1000000000000005,
+   "metric": "boot.stage:File watchers armed",
+   "over": 0,
+   "p50": 6.4,
+   "p95": 7.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:594",
+     "value": 7.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:122",
+     "value": 6.4
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:738",
+     "value": 4.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 3.9,
+   "mean": 2.9333333333333336,
+   "metric": "boot.stage:First-launch guard (onboarding check)",
+   "over": 0,
+   "p50": 2.5,
+   "p95": 3.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:407",
+     "value": 3.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:068",
+     "value": 2.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:869",
+     "value": 2.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 2.2,
+   "mean": 2.033333333333333,
+   "metric": "boot.stage:Path: log file open (retention purge deferred)",
+   "over": 0,
+   "p50": 2.0,
+   "p95": 2.2,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:625",
+     "value": 2.2
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:168",
+     "value": 2.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:21:852",
+     "value": 1.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 1.8,
+   "mean": 1.5,
+   "metric": "boot.stage:Factory-reset recovery reconciled",
+   "over": 0,
+   "p50": 1.5,
+   "p95": 1.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:635",
+     "value": 1.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:21:860",
+     "value": 1.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:179",
+     "value": 1.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 1.3,
+   "mean": 1.0333333333333334,
+   "metric": "boot.stage:TOML hotstring cache wired",
+   "over": 0,
+   "p50": 0.9,
+   "p95": 1.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:636",
+     "value": 1.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:180",
+     "value": 0.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:21:861",
+     "value": 0.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 1.0,
+   "mean": 0.9,
+   "metric": "boot.stage:Boot complete (post-init deferrals scheduled)",
+   "over": 0,
+   "p50": 1.0,
+   "p95": 1.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:596",
+     "value": 1.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:740",
+     "value": 1.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:123",
+     "value": 0.7
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 0.8,
+   "mean": 0.6333333333333333,
+   "metric": "boot.stage:Script control engine started (panic-button eventtap)",
+   "over": 0,
+   "p50": 0.6,
+   "p95": 0.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:578",
+     "value": 0.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:014",
+     "value": 0.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:232",
+     "value": 0.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 0.8,
+   "mean": 0.43333333333333335,
+   "metric": "boot.stage:LLM backend bootstrap",
+   "over": 0,
+   "p50": 0.3,
+   "p95": 0.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:030",
+     "value": 0.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:241",
+     "value": 0.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:585",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 0.8,
+   "mean": 0.7000000000000001,
+   "metric": "boot.stage:UI: menu ready",
+   "over": 0,
+   "p50": 0.7,
+   "p95": 0.8,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:22:733",
+     "value": 0.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:47:587",
+     "value": 0.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:05:115",
+     "value": 0.6
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "occurrences",
+   "max": 0.3,
+   "mean": 0.2333333333333333,
+   "metric": "boot.stage:Path: runtime error capture installed",
+   "over": 0,
+   "p50": 0.2,
+   "p95": 0.3,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:46:633",
+     "value": 0.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:04:177",
+     "value": 0.2
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:21:858",
+     "value": 0.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 3422.0,
+   "mean": 3422.0,
+   "metric": "llm.stream",
+   "over": 0,
+   "p50": 3422.0,
+   "p95": 3422.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:28:190",
+     "value": 3422.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "occurrences",
+   "max": 3421.0,
+   "mean": 3421.0,
+   "metric": "llm.parsed:remote",
+   "over": 0,
+   "p50": 3421.0,
+   "p95": 3421.0,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:28:173",
+     "value": 3421.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 162.0,
+   "mean": 116.44399999999999,
+   "metric": "phase:menu.rebuild",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 162.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "occurrences",
+   "max": 128.5,
+   "mean": 48.13333333333333,
+   "metric": "menu.submenu:keyboard_layout",
+   "over": 0,
+   "p50": 13.3,
+   "p95": 128.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 128.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 79.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:16:003",
+     "value": 42.4
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:25:065",
+     "value": 13.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 13.1
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 79.56,
+   "mean": 30.948,
+   "metric": "phase:menu_item.keyboard_layout",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 79.56
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 69.27,
+   "mean": 14.411999999999997,
+   "metric": "phase:menu_keyboard_layout.sources",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 69.27
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 53.44,
+   "mean": 41.048,
+   "metric": "phase:menu_item.shortcuts",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 53.44
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "occurrences",
+   "max": 51.1,
+   "mean": 37.85,
+   "metric": "menu.submenu:shortcuts",
+   "over": 0,
+   "p50": 30.7,
+   "p95": 51.1,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 51.1
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 46.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:25:065",
+     "value": 43.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 30.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:49:897",
+     "value": 30.2
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 38.19,
+   "mean": 15.477999999999998,
+   "metric": "phase:menu_keyboard_layout.rows",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 38.19
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "occurrences",
+   "max": 25.7,
+   "mean": 14.799999999999999,
+   "metric": "menu.submenu:metrics",
+   "over": 0,
+   "p50": 3.9,
+   "p95": 25.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:49:897",
+     "value": 25.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 3.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "occurrences",
+   "max": 22.9,
+   "mean": 5.133333333333333,
+   "metric": "menu.app_exclusions",
+   "over": 0,
+   "p50": 1.1,
+   "p95": 22.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:38:49:842",
+     "value": 22.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:523",
+     "value": 3.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:15:947",
+     "value": 1.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:372",
+     "value": 1.1
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:498",
+     "value": 1.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 15.9,
+   "mean": 9.774,
+   "metric": "phase:menu_item.llm",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 15.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "occurrences",
+   "max": 10.5,
+   "mean": 8.383333333333333,
+   "metric": "menu.submenu:llm",
+   "over": 0,
+   "p50": 8.0,
+   "p95": 10.5,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 10.5
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 8.8
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:16:003",
+     "value": 8.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:25:065",
+     "value": 8.0
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 7.9
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 8.71,
+   "mean": 4.7780000000000005,
+   "metric": "phase:menu_keyboard_layout.number_row",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 8.71
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 6,
+   "kind": "occurrences",
+   "max": 8.7,
+   "mean": 7.6000000000000005,
+   "metric": "menu.submenu:gestures",
+   "over": 0,
+   "p50": 7.3,
+   "p95": 8.7,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:16:003",
+     "value": 8.7
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 7.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:49:47:584",
+     "value": 7.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:25:065",
+     "value": 7.3
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 7.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 8.66,
+   "mean": 7.731999999999999,
+   "metric": "phase:menu_item.gestures",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 8.66
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "occurrences",
+   "max": 6.9,
+   "mean": 6.7,
+   "metric": "menu.submenu:about",
+   "over": 0,
+   "p50": 6.5,
+   "p95": 6.9,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:46:25:065",
+     "value": 6.9
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:41:07:556",
+     "value": 6.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 6.55,
+   "mean": 3.5140000000000002,
+   "metric": "phase:menu_item.about",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 6.55
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 4.4,
+   "mean": 1.81,
+   "metric": "phase:menu_item.metrics",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 4.4
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 4.34,
+   "mean": 1.8,
+   "metric": "phase:menu_item.tap_holds",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 4.34
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 3.86,
+   "mean": 3.592,
+   "metric": "phase:menu_item.hotstrings",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 3.86
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "occurrences",
+   "max": 3.6,
+   "mean": 3.55,
+   "metric": "menu.submenu:hotstrings",
+   "over": 0,
+   "p50": 3.5,
+   "p95": 3.6,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "",
+     "time": "2026-11-04 09:26:16:003",
+     "value": 3.6
+    },
+    {
+     "context": "",
+     "time": "2026-11-04 09:42:25:426",
+     "value": 3.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 3.41,
+   "mean": 0.8460000000000001,
+   "metric": "phase:menu_keyboard_layout.magic_key",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 3.41
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 3.25,
+   "mean": 0.874,
+   "metric": "phase:menu_item.debug",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 3.25
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 1.27,
+   "mean": 0.398,
+   "metric": "phase:menu_item.apps",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 1.27
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.89,
+   "mean": 0.21400000000000002,
+   "metric": "phase:menu_item.language",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.89
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.77,
+   "mean": 0.328,
+   "metric": "phase:menu_keyboard_layout.variants",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 0.77
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.76,
+   "mean": 0.22800000000000004,
+   "metric": "phase:menu_keyboard_layout.bundles",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 0.76
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.51,
+   "mean": 0.23399999999999999,
+   "metric": "phase:menu_item.configuration",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.51
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.01,
+   "mean": 0.01,
+   "metric": "phase:menu_item.reload",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.01
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 5,
+   "kind": "summaries",
+   "max": 0.01,
+   "mean": 0.01,
+   "metric": "phase:menu_item.quit",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.01
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 20007.13,
+   "mean": 20007.13,
+   "metric": "phase:process.sfltool",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 20007.13
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 4717.5,
+   "mean": 4717.5,
+   "metric": "phase:process.sqlite3",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 4717.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 19,
+   "kind": "summaries",
+   "max": 3865.93,
+   "mean": 449.77,
+   "metric": "phase:process.python3",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 3865.93
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 244,
+   "kind": "summaries",
+   "max": 1542.42,
+   "mean": 42.737500000000004,
+   "metric": "phase:process.defaults",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 1542.42
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 24,
+   "kind": "summaries",
+   "max": 1537.38,
+   "mean": 218.92458333333335,
+   "metric": "phase:process.ErgoptiPlus",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:697",
+     "value": 1537.38
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 766.57,
+   "mean": 766.57,
+   "metric": "phase:process.sh",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 766.57
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 24,
+   "kind": "summaries",
+   "max": 385.39,
+   "mean": 56.02,
+   "metric": "phase:boot.stage",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 385.39
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 16,
+   "kind": "summaries",
+   "max": 381.53,
+   "mean": 40.38,
+   "metric": "phase:boot.requires",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 381.53
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 372.73,
+   "mean": 372.73,
+   "metric": "phase:process.spctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 372.73
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 364.57,
+   "mean": 242.95374999999999,
+   "metric": "phase:karabiner.deploy",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:695",
+     "value": 364.57
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 362.82,
+   "mean": 227.3,
+   "metric": "phase:karabiner.merge",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:695",
+     "value": 362.82
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 243.93,
+   "mean": 58.35375,
+   "metric": "phase:karabiner.layout_actions",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:30:09:695",
+     "value": 243.93
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 24,
+   "kind": "summaries",
+   "max": 231.81,
+   "mean": 34.5,
+   "metric": "phase:boot.stage_cpu",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 231.81
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 179.87,
+   "mean": 92.64,
+   "metric": "phase:process.codesign",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 179.87
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 162.41,
+   "mean": 162.41,
+   "metric": "phase:process.brew",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 162.41
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 128.08,
+   "mean": 99.95,
+   "metric": "phase:process.shortcuts",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 128.08
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "summaries",
+   "max": 122.86,
+   "mean": 40.33,
+   "metric": "phase:process.pgrep",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 122.86
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 92.43,
+   "mean": 92.43,
+   "metric": "phase:karabiner.write",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 92.43
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 91.44,
+   "mean": 91.44,
+   "metric": "phase:shell.systemextensionsctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 91.44
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 18,
+   "kind": "summaries",
+   "max": 89.25,
+   "mean": 43.94,
+   "metric": "phase:shell.ls",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 89.25
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 71.17,
+   "mean": 71.17,
+   "metric": "phase:shell.other",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 71.17
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 68.97,
+   "mean": 47.32,
+   "metric": "phase:process.mkdir",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 68.97
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 3,
+   "kind": "summaries",
+   "max": 68.94,
+   "mean": 47.29999999999999,
+   "metric": "phase:shell.mkdir",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 68.94
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 59.99,
+   "mean": 59.99,
+   "metric": "phase:shell.sw_vers",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 59.99
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 55.71,
+   "mean": 55.71,
+   "metric": "phase:shell.ioreg",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 55.71
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 55.15,
+   "mean": 55.15,
+   "metric": "phase:process.Application",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 55.15
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 53.66,
+   "mean": 53.66,
+   "metric": "phase:shell.find",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 53.66
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 47.5,
+   "mean": 29.917499999999997,
+   "metric": "phase:karabiner.inputs",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:35:19:763",
+     "value": 47.5
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 41.12,
+   "mean": 34.73125,
+   "metric": "phase:karabiner.build",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 41.12
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 34.14,
+   "mean": 34.14,
+   "metric": "phase:process.systemextensionsctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 34.14
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 32.88,
+   "mean": 32.88,
+   "metric": "phase:process.memory_pressure",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 32.88
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 31.37,
+   "mean": 22.38,
+   "metric": "phase:process.ps",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 31.37
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 23.51,
+   "mean": 18.59,
+   "metric": "phase:process.grep",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 23.51
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 21.68,
+   "mean": 21.68,
+   "metric": "phase:karabiner.encode",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 21.68
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 8,
+   "kind": "summaries",
+   "max": 20.86,
+   "mean": 4.77,
+   "metric": "phase:process.xmllint",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 20.86
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 2,
+   "kind": "summaries",
+   "max": 16.63,
+   "mean": 14.47,
+   "metric": "phase:hotstring_load.common_file",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 16.63
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 16.39,
+   "mean": 16.39,
+   "metric": "phase:hotpath.tooltip.show_predictions",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 16.39
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 4,
+   "kind": "summaries",
+   "max": 9.04,
+   "mean": 5.28,
+   "metric": "phase:process.plutil",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 9.04
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 25,
+   "kind": "summaries",
+   "max": 8.57,
+   "mean": 1.0672,
+   "metric": "phase:hotpath.keydown",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 8.57
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 19,
+   "kind": "summaries",
+   "max": 8.0,
+   "mean": 0.8563157894736841,
+   "metric": "phase:hotpath.preview.rebuild",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 8.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 26,
+   "kind": "summaries",
+   "max": 8.0,
+   "mean": 0.7550000000000001,
+   "metric": "phase:preview.total",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 8.0
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 29,
+   "kind": "summaries",
+   "max": 7.43,
+   "mean": 1.8,
+   "metric": "phase:toml.parse",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 7.43
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 6.3,
+   "mean": 6.3,
+   "metric": "phase:process.scutil",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 6.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 4.71,
+   "mean": 4.71,
+   "metric": "phase:process.launchctl",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 4.71
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 1.73,
+   "mean": 1.73,
+   "metric": "phase:process.id",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 1.73
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 20,
+   "kind": "summaries",
+   "max": 1.18,
+   "mean": 0.1125,
+   "metric": "phase:hotpath.hotstring.match",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 1.18
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 26,
+   "kind": "summaries",
+   "max": 0.3,
+   "mean": 0.1,
+   "metric": "phase:preview.providers",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.3
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 26,
+   "kind": "summaries",
+   "max": 0.27,
+   "mean": 0.06307692307692309,
+   "metric": "phase:preview.resolve",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.27
+    }
+   ]
+  },
+  {
+   "budget": null,
+   "count": 1,
+   "kind": "summaries",
+   "max": 0.22,
+   "mean": 0.22,
+   "metric": "phase:hotpath.hotstring.expand",
+   "over": 0,
+   "p50": null,
+   "p95": null,
+   "verdict": "no_budget",
+   "worst": [
+    {
+     "context": "window maximum",
+     "time": "2026-11-04 09:46:05:124",
+     "value": 0.22
+    }
+   ]
+  }
+ ],
+ "previous": "mac-2026-11-03_102716",
+ "records": 4159,
+ "schema": 1,
+ "span": {
+  "first": "2026-11-04 00:10:31:943",
+  "last": "2026-11-04 09:49:52:354"
+ },
+ "top_fixes": [
+  {
+   "count": 8,
+   "detail": "max 1290 ms at 2026-11-04 09:38:23:033",
+   "kind": "slow",
+   "score": 24,
+   "what": "main_thread.hold over its 250 ms budget"
+  },
+  {
+   "count": 3,
+   "detail": "max 11.78 ms at 2026-11-04 09:48:45:728",
+   "kind": "slow",
+   "score": 9,
+   "what": "hotpath:preview.rebuild over its 5 ms budget"
+  },
+  {
+   "count": 3,
+   "detail": "2026-11-04 09:26:13:427 [WARNING] [keymap.utils] Slow ignored-window probe 501 ms (watchers=0 focused_window=501 ms).",
+   "kind": "warning",
+   "score": 3,
+   "what": "[keymap.utils] Slow ignored-window probe <*> ms (watchers=<*> focused_window=<*> ms)."
+  },
+  {
+   "count": 1,
+   "detail": "max 16.39 ms at 2026-11-04 09:42:28:190",
+   "kind": "slow",
+   "score": 3,
+   "what": "hotpath:tooltip.show_predictions over its 5 ms budget"
+  },
+  {
+   "count": 1,
+   "detail": "max 3424 ms at 2026-11-04 09:42:28:174",
+   "kind": "slow",
+   "score": 3,
+   "what": "llm.ttft over its 2000 ms budget"
+  },
+  {
+   "count": 2,
+   "detail": "2026-11-04 01:29:30:258 [WARNING] [karabiner.lease] Karabiner lease 8a6356806b544a8aa4b96945680e0a25 heartbeat 302 had no clean local CLI transport.",
+   "kind": "warning",
+   "score": 2,
+   "what": "[karabiner.lease] Karabiner lease <*> heartbeat <*> had no clean local CLI transport."
+  },
+  {
+   "count": 2,
+   "detail": "2026-11-04 01:29:30:245 [WARNING] [karabiner.lease] Lease watchdog 8a6356806b544a8aa4b96945680e0a25 stderr: lease worker: HEARTBEAT 1 302 answered HEARTBEAT_FAILED 302 after 1.57 s (deadline 2.50 s).",
+   "kind": "warning",
+   "score": 2,
+   "what": "[karabiner.lease] Lease watchdog <*> stderr: lease worker: HEARTBEAT <*> <*> answered HEARTBEAT_FAILED <*> after <*> s (deadline <*> s)."
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-04 09:41:07:988 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.",
+   "kind": "warning",
+   "score": 1,
+   "what": "[adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found."
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-04 09:49:49:551 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.",
+   "kind": "warning",
+   "score": 1,
+   "what": "[adapters.hotkey_registrar] bind(): the OS refused '<*>' — nil."
+  },
+  {
+   "count": 1,
+   "detail": "2026-11-04 09:48:48:503 [WARNING] [key_event_health] A character key stayed down 3.2 s with no further event: its key-up was lost before the keymap taps; session totals: 64 key-down(s), 63 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character …",
+   "kind": "warning",
+   "score": 1,
+   "what": "[key_event_health] A character key stayed down <*> s with no further event: its key-up was lost before the keymap taps; session totals: <*> key-down(s), <*> key-up(s), <*> key-up(s) without key-down, <*> key-down(s) without key-up, <*> key(s) stuck over <*> s, <*> character key(s) held <*> ms or more (<*> across a rule switch), <*> key-down(s) and <*> key-up(s) seen <*> ms or more late (max <*> ms), <*> late key event(s) passed untouched, <*> key(s) held across a sleep (<*> released after it), <*> Karabiner lease failure(s)."
+  }
+ ]
+}
