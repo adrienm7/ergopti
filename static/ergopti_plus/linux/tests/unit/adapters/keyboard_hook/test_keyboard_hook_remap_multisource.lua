@@ -37,6 +37,27 @@ helpers.describe("source-owned simultaneous standalone remap holds", function()
 			helpers.assert_eq(s.rows, { { 30, 1 }, { 30, 0 } })
 		end)
 	end)
+
+	helpers.it("(remap-multisource) does not emit a press after its physical callback stops capture", function()
+		Fixture.with_session({ on_physical = function(s, code, _, _, value)
+			if code == 30 and value == 1 then s.hook.stop() end
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, {}, "a stopped session cannot create an unowned virtual press")
+		end)
+	end)
+
+	helpers.it("(remap-multisource) does not emit a press after its consumer stops capture", function()
+		Fixture.with_session({ on_consume = function(s)
+			s.hook.stop()
+			return false
+		end }, function(s)
+			s.edge("a", 30, 1, 1)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.rows, {}, "a stopped consumer cannot authorize output")
+		end)
+	end)
 	for _, order in ipairs({ { "a", "b" }, { "b", "a" } }) do
 		local first, last = order[1], order[2]
 		helpers.it("(remap-multisource) keeps Ctrl until last UP in order " .. first .. last, function()
