@@ -24,10 +24,11 @@ local LOG = "ui.menu.uninstall"
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local file = io.open(path, "rb")
-	if not file then return nil end
-	local value = file:read("*a")
-	file:close()
+	local opened, file = pcall(io.open, path, "rb")
+	if not opened or not file then return nil end
+	local read_ok, value = pcall(file.read, file, "*a")
+	local close_ok, closed = pcall(file.close, file)
+	if not read_ok or type(value) ~= "string" or not close_ok or closed ~= true then return nil end
 	return value
 end
 
