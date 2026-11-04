@@ -61,13 +61,16 @@ function M.on_message(payload, state, context)
 	if owner.epoch ~= epoch then return nil end
 	local accepted_close = type(payload) == "table" and payload.action == "close"
 		and (payload.session == "" or (owner.token ~= nil and payload.session == owner.token))
-	local result = owner.session:handle(payload)
-	if active ~= owner or manager.current_epoch(APP) ~= epoch then return nil end
 	if accepted_close then
-		retire(owner)
-		if type(context.close_owned_window) == "function" then context.close_owned_window() end
+		if type(context.close_owned_window) == "function" and context.close_owned_window() == true then
+			retire(owner)
+		else
+			Logger.warn(LOG, "Configuration cleanup window close was refused; its session is retained.")
+		end
 		return nil
 	end
+	local result = owner.session:handle(payload)
+	if active ~= owner or manager.current_epoch(APP) ~= epoch then return nil end
 	if type(result) == "table" then
 		owner.token = result.session
 		local encoded = Json.encode(result)
