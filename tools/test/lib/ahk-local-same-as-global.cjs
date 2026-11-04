@@ -82,6 +82,26 @@ const STATEMENTS = new Set(
 	)
 );
 
+// One word of continuation options: option names written back to back, the
+// last of them possibly a Join with its separator text.
+const SECTION_OPTION_WORD = /^(?:LTrim0?|RTrim0?|Comments|Com|C|`)*(?:Join\S*)?$/i;
+
+/**
+ * Tells whether a line opens a continuation section: "(" then only options.
+ * The words are checked one by one, so a long line costs linear time.
+ * @param {string} line One source line, possibly ending in "\r".
+ * @returns {boolean}
+ */
+function isContinuationSectionStart(line) {
+	const open = /^\s*\(/.exec(line);
+	if (!open) return false;
+	const options = line.slice(open[0].length);
+	const words = options.split(/\s+/).filter((word) => word !== '');
+	// A bare "(" may only be followed by the line's own "\r".
+	if (words.length === 0) return options === '' || options === '\r';
+	return words.every((word) => SECTION_OPTION_WORD.test(word));
+}
+
 /**
  * Masks comments, quoted strings and continuation sections with spaces.
  * Newlines are kept, so offsets and line numbers still match the source.
@@ -121,7 +141,7 @@ function mask(source) {
 			if (!/\*\/\s*\r?$/.test(line)) inBlock = true;
 			continue;
 		}
-		if (/^\s*\((?:\s*(?:Join\S*|LTrim0?|RTrim0?|Comments|Com|C|`)\s*)*\r?$/i.test(line)) {
+		if (isContinuationSectionStart(line)) {
 			inSection = true;
 			blank(start, start + line.length);
 			continue;
