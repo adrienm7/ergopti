@@ -24,6 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -1161,7 +1162,7 @@ if (
 // the toolbar itself is capped, and every preformatted box it holds scrolls in
 // its own bounded box.
 const cssRule = (selector) =>
-	new RegExp(`(?:^|\\n)${selector.replace(/[.#]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(pageCss);
+	new RegExp(`(?:^|\\n)${escapeRegExp(selector)}\\s*\\{([^}]*)\\}`).exec(pageCss);
 const isBounded = (rule) =>
 	Boolean(rule) && /max-height:/.test(rule[1]) && /overflow-y:\s*auto/.test(rule[1]);
 if (!isBounded(cssRule('.toolbar')))

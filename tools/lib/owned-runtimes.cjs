@@ -24,6 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { escapeTableCell } = require('./text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DATA_PATH = path.join(ROOT, 'static/ergopti_plus/_shared/data/owned_runtimes.json');
@@ -109,13 +110,13 @@ function load() {
 }
 
 /**
- * Renders an aligned Markdown table; a `|` inside a cell is escaped.
+ * Renders an aligned Markdown table; every cell is escaped.
  * @param {string[]} header
  * @param {string[][]} rows
  * @returns {string[]}
  */
 function markdownTable(header, rows) {
-	const escaped = rows.map((row) => row.map((cell) => cell.replace(/\|/g, '\\|')));
+	const escaped = rows.map((row) => row.map(escapeTableCell));
 	const widths = header.map((title, col) =>
 		Math.max(3, title.length, ...escaped.map((row) => row[col].length))
 	);

@@ -30,6 +30,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { escapeRegExp } = require('../lib/text-escape.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BASE = path.join(ROOT, 'static', 'ergopti_plus');
@@ -409,7 +410,7 @@ function census() {
 				// Catalogue call sites: one statement each, identified by the quoted
 				// catalogue name, whatever helper wraps the render call.
 				const callSite = new RegExp(
-					`["'](${CATALOGUE_NAMES.map((n) => n.replace(/\./g, '\\.')).join('|')})["']`,
+					`["'](${CATALOGUE_NAMES.map(escapeRegExp).join('|')})["']`,
 					'g'
 				);
 				let match;

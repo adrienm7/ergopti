@@ -625,6 +625,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-key-names-single-source.cjs"],
 			"repro": "npm run test:key-names-single-source"
+		},
+		{
+			"id": "js-text-escape",
+			"ordinal": 572,
+			"name": "the shared text escapes keep a spliced literal exact in a regular expression and inside one Markdown table cell",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-text-escape.cjs"],
+			"repro": "npm run test:text-escape"
 		}
 	]
 }
