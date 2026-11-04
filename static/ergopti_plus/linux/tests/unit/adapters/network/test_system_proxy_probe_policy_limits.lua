@@ -48,6 +48,13 @@ local function root_with(policy)
 end
 
 helpers.describe("system proxy probe: selection limits come from the shared policy (proxy-policy-single-source)", function()
+	helpers.it("proxy-policy-single-source: refuses a valid prefix of an oversized policy", function()
+		local prefix = '{"max_selections":128,"max_proxy_bytes":65536}'
+		local root = root_with(prefix .. string.rep(" ", 32769 - #prefix) .. "not-json")
+		local receipt = run(root)
+		os.execute("rm -rf '" .. root .. "'")
+		helpers.assert_eq(receipt.error, "proxy-policy-unavailable", "a truncated prefix cannot admit a corrupt policy")
+	end)
 	helpers.it("proxy-policy-single-source: a FIFO policy produces an immediate refusal", function()
 		local root = root_with("{}")
 		local path = root .. "/modules/network/proxy_policy.json"
