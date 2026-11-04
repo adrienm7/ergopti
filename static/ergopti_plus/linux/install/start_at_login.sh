@@ -27,6 +27,32 @@ else
 	exit 78
 fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
+USER_UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
+
+# A same-named user unit can belong to a second installation. Never disable it
+# merely because systemd lists the name; only admit an unambiguous launcher.
+startup_user_unit_compatible() {
+	local expected line count=0
+	if [ ! -e "$USER_UNIT" ] && [ ! -L "$USER_UNIT" ]; then return 0; fi
+	[ -f "$USER_UNIT" ] && [ ! -L "$USER_UNIT" ] || return 1
+	expected="$(ergopti_systemd_exec "$LAUNCHER")" || return 1
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+			ExecStart=*)
+				count=$((count + 1))
+				case "$line" in
+					"$expected"|"ExecStart=$LAUNCHER --tray"|"ExecStart=$LAUNCHER --service --tray") ;;
+					*) return 1 ;;
+				esac ;;
+		esac
+	done < "$USER_UNIT"
+	[ "$count" -eq 1 ]
+}
+if ! startup_user_unit_compatible; then
+	if [ "$ACTION" = status ]; then printf 'other\n'; exit 0; fi
+	printf '[startup] code=foreign-unit path=%q\n' "$USER_UNIT" >&2
+	exit 78
+fi
 
 if [ "$ACTION" = status ]; then
 	# Report a real conflicting command without acquiring it for replacement.
