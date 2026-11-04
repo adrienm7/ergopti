@@ -38,6 +38,7 @@
 
 local M = {}
 
+local NativePath = require("native_path")
 
 
 
@@ -72,7 +73,7 @@ end
 --- @return string|nil reason Why it was not moved.
 --- @return string|nil detail The rename error.
 local function rename_into(from, to, ports)
-	local parent = to:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(to)
 	if parent and parent ~= "" and not ports.make_dir(parent) then return false, "parent_unavailable" end
 	local moved, why = ports.rename(from, to)
 	if not moved then return false, "rename_failed", why end
@@ -167,12 +168,12 @@ end
 -- =====================================
 -- =====================================
 
---- Compares two folder spellings, ignoring trailing slashes.
+--- Compares two folder spellings, ignoring trailing separators (a backslash is one only on Windows).
 --- @param a string
 --- @param b string
 --- @return boolean
 local function same_folder(a, b)
-	return (a:gsub("[/\\]+$", "")) == (b:gsub("[/\\]+$", ""))
+	return NativePath.without_trailing_separators(a) == NativePath.without_trailing_separators(b)
 end
 
 --- Rewrites the paths.toml keys that name an old default folder.
@@ -193,8 +194,8 @@ function M.rewrite_paths_text(text, rewrites)
 			if rule.key == key then
 				for _, old in ipairs(rule.old) do
 					if value ~= "" and same_folder(value, old) then
-						local trailing = value:match("[/\\]+$") or ""
-						local new = (rule.new:gsub("[/\\]+$", "")) .. trailing
+						local trailing = value:sub(#NativePath.without_trailing_separators(value) + 1)
+						local new = NativePath.without_trailing_separators(rule.new) .. trailing
 						if new ~= value then
 							changed = true
 							return indent .. key .. spacing .. '"' .. new .. '"' .. rest

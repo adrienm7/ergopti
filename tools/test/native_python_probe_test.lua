@@ -3,6 +3,8 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = assert(source:match("^(.*)/tools/test/native_python_probe_test%.lua$"))
 local repository = arg[1] or root
+-- The provider names its folders through the generated app_dirs table.
+package.path = root .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path
 package.loaded["infra.logger"] = { error = function() end }
 local Parser = assert(loadfile(repository .. "/static/ergopti_plus/macos/adapters/python_interpreter.lua"))()
 local locator = assert(loadfile(root .. "/static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua"))()
