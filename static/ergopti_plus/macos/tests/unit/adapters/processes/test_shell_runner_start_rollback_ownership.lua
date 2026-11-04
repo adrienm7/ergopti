@@ -105,6 +105,26 @@ local function with_runner(callback)
 end
 
 helpers.describe("ShellRunner exact start-refusal rollback ownership", function()
+	helpers.it("settles native children when the diagnostic clock fails (shell-diagnostic-clock)", function()
+		for _, mode in ipairs({ "throw", "nil", "text", "nan", "infinity" }) do
+			with_runner(function(runner, native)
+				_G.hs.timer.absoluteTime = function()
+					if mode == "throw" then error("clock unavailable") end
+					if mode == "nil" then return nil end
+					if mode == "text" then return "invalid" end
+					if mode == "nan" then return 0 / 0 end
+					return math.huge
+				end
+				local completions = 0
+				local handle = runner.spawn("/fixture/live", {}, function() completions = completions + 1 end)
+				helpers.assert_true(handle.start(), "diagnostic clock must not prevent native start")
+				native.tasks[1]:complete(0, "", "")
+				helpers.assert_eq(completions, 1)
+				helpers.assert_true(handle.isSettled(), "diagnostic clock must not strand task ownership")
+			end)
+		end
+	end)
+
 	helpers.it("returns native failures without invoking opaque formatters (shell-native-error-object)", function()
 		with_runner(function(runner, native)
 			local hostile = setmetatable({}, { __tostring = function() error("formatter failed") end })

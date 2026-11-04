@@ -1,8 +1,8 @@
 # macOS audit: 100 distinct defects goal
 
-This ledger starts with the explicit request for at least 100 bugs. Earlier fixes are excluded until their individual evidence is reviewed. A shared root cause counts once even when it affects several actions or platforms. Passing focused tests does not establish native macOS validation or a complete CI pass.
+This ledger starts with the explicit request for at least 100 bugs. Earlier fixes are included only after their individual evidence is reviewed. A shared root cause counts once even when it affects several actions or platforms. Passing focused tests does not establish native macOS validation or a complete CI pass.
 
-Confirmed and regression-tested: **13 / 100**.
+Confirmed and regression-tested: **79 / 100**.
 
 | ID  | Reproduced failure                                                                                        | Fix commit | Focused regression module                                          |
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
@@ -23,3 +23,7 @@ Confirmed and regression-tested: **13 / 100**.
 The listed modules were rerun after integration: 6 + 50 + 15 + 18 + 19 + 33 + 35 + 10 + 9 = 195 passing cases, plus 2 cleanup and 31 navigation-rule cases for defect 009. Native Hammerspoon, Swift and Windows execution remain outstanding. Two independent findings of defect 001 were deduplicated. Defect 006 affects two actions but is counted once.
 
 Follow-up verification: 15 screenshot ownership cases for defect 006 (5e16f70); 34 process rollback cases for the native error variant of defect 005 (43a8732). These variants do not increase the distinct count. The modules for 010–013 passed with 7, 10, 15 and 10 cases respectively.
+
+Historical evidence review adds 66 distinct defects (IDs 014–079), with commits, scenarios and focused results in [the historical inventory](macos-2026-11-04-history.json). Runtime entries additionally reproduce the failure by loading the pre-fix module into the current focused tests. Other entries have reviewed regression scenarios and passing current modules; their original pre-fix runs were not repeated in this inventory pass. Menu reason improvements and overlapping causes were excluded.
+
+Installation history groups nested discovery-cache invalidations, malformed version suffixes and version numeric precision variants. An additional protected diagnostic-clock variant (53c4359) passes 35 ShellRunner tests; it is not counted separately from historical invalid-clock handling.
