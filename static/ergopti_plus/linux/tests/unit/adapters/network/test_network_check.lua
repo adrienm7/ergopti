@@ -301,6 +301,8 @@ helpers.describe("network field check: the Linux ports", function()
 			{ result = { ok = false, status = 0, failure_receipt = { stage = "proxy_resolve" } }, tls = "skip", token = "proxy_resolve" },
 			{ result = { ok = false, status = 0, failure_receipt = { stage = "connect" } }, tls = "skip", token = "connect" },
 			{ result = { ok = false, status = 503, failure_receipt = { stage = "http", http_status = 503 } }, tls = "skip", token = "http_503" },
+			{ result = { ok = false, status = 0, failure_receipt = { stage = "http", http_status = "503" } }, tls = "skip", token = "http_503" },
+			{ result = { ok = false, status = "502" }, tls = "skip", token = "http_502" },
 			{ result = { ok = false, status = 0, error = "timeout" }, tls = "skip", token = "timeout" },
 			{ result = { ok = false, status = 0, error = "curl exited with code 6 for a private.example host" }, tls = "skip", token = "failed" },
 		}

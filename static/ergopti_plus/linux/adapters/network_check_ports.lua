@@ -159,12 +159,14 @@ function M.failure_token(result)
 		if receipt.stage == "proxy_resolve" then return "proxy_resolve" end
 		if receipt.stage == "proxy_connect" then return "proxy_connect" end
 		if receipt.stage == "connect" then return "connect" end
-		if receipt.stage == "http" and tonumber(receipt.http_status) and receipt.http_status > 0 then
-			return "http_" .. tostring(math.floor(receipt.http_status))
+		local status = tonumber(receipt.http_status)
+		if receipt.stage == "http" and status and status > 0 then
+			return "http_" .. tostring(math.floor(status))
 		end
 	end
-	if type(result) == "table" and tonumber(result.status) and result.status > 0 then
-		return "http_" .. tostring(math.floor(result.status))
+	local status = type(result) == "table" and tonumber(result.status) or nil
+	if status and status > 0 then
+		return "http_" .. tostring(math.floor(status))
 	end
 	if type(result) == "table" and result.error == "timeout" then return "timeout" end
 	return "failed"
