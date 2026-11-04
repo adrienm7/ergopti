@@ -177,6 +177,12 @@ helpers.describe("the mouse button read (click-drag-selection)", function()
 			helpers.assert_eq(MouseControl.any_button_down(), false)
 			_G.hs.eventtap.checkMouseButtons = function() return { left = true, [1] = true } end
 			helpers.assert_eq(MouseControl.any_button_down(), true)
+			_G.hs.eventtap.checkMouseButtons = function() error("button read unavailable") end
+			helpers.assert_eq(MouseControl.any_button_down(), true, "unknown button state must suppress gestures")
+			_G.hs.eventtap.checkMouseButtons = function() return nil end
+			helpers.assert_eq(MouseControl.any_button_down(), true, "missing button state must suppress gestures")
+			_G.hs.eventtap.checkMouseButtons = function() return {} end
+			helpers.assert_eq(MouseControl.any_button_down(), false, "a later healthy read restores gestures")
 		end, debug.traceback)
 		package.loaded["adapters.mouse_control"] = saved
 		if not ok then error(err, 0) end

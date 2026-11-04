@@ -183,10 +183,12 @@ local _button_read_failure_logged = false
 --- Tells whether any mouse button is physically held at this instant. Not part
 --- of the MouseControl port: the gesture engine reads it on every trackpad
 --- frame, because the contacts of a click-drag are never a gesture.
---- @return boolean down True while at least one button is held.
+--- @return boolean down True while at least one button is held or the read fails.
 function M.any_button_down()
 	local ok, result = pcall(function()
-		for _, pressed in pairs(hs.eventtap.checkMouseButtons() or {}) do
+		local buttons = hs.eventtap.checkMouseButtons()
+		if type(buttons) ~= "table" then error("mouse button state unavailable") end
+		for _, pressed in pairs(buttons) do
 			if pressed == true then return true end
 		end
 		return false
@@ -196,8 +198,9 @@ function M.any_button_down()
 			_button_read_failure_logged = true
 			Logger.error(LOG, "any_button_down(): the mouse buttons cannot be read — %s", tostring(result))
 		end
-		return false
+		return true
 	end
+	_button_read_failure_logged = false
 	return result
 end
 

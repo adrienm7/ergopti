@@ -362,4 +362,14 @@ helpers.describe("Ctrl+H interactive screenshot: verified clipboard result", fun
 			assert_clipboard_failure(f)
 		end)
 	end)
+
+	helpers.it("does not treat a regressing pasteboard count as a capture (capture-count-regression)", function()
+		with_pixel(nil, function(subject, f)
+			f.pasteboard.image = { source = "older image" }
+			subject.interactive_screenshot()
+			f.pasteboard.count = f.pasteboard.count - 1
+			f.tasks[1].callback(0, "", "")
+			assert_clipboard_failure(f)
+		end)
+	end)
 end)

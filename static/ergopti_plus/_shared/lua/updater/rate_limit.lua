@@ -29,7 +29,8 @@ function M.exhausted_detail(status, remaining, reset)
 	local epoch = tonumber(reset)
 	local when = ""
 	if epoch and epoch >= 0 and epoch % 1 == 0 then
-		when = ", it resets at " .. os.date("!%Y-%m-%d %H:%M:%S UTC", epoch)
+		local ok, formatted = pcall(os.date, "!%Y-%m-%d %H:%M:%S UTC", epoch)
+		if ok and type(formatted) == "string" then when = ", it resets at " .. formatted end
 	end
 	return string.format("HTTP %d: the GitHub API rate limit is exhausted%s", status, when)
 end
