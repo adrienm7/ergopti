@@ -11,6 +11,8 @@
  *
  * Keep keys byte-identical to the French in the components (including the
  * typographic apostrophe ’). Placeholders like `{
+	'Options indisponibles dans le menu': 'Unavailable menu options',
+	Option: 'Option',
 	'Inventaire des actions configurables': 'Bindable actions inventory',
 	Action: 'Action',
 	'Trois systèmes, un projet.': 'Three systems, one project.',

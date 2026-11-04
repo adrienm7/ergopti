@@ -10,13 +10,15 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ## Cross-platform feature inventory
 
-- [ ] **macOS:** review parity for resetting a word on tap-holds and automatically switching the prompt profile with the selected model (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). The manifest reason describes the current alternatives and constraints.
-- [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions (`platform_reason.inline_autotype_is_windows`); both currently show a bubble and insert on acceptance.
-- [ ] **Windows and Linux:** evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement, whereas the other drivers receive or execute discrete gestures (`platform_reason.gesture_modes_and_steps_are_macos`).
-- [ ] **Windows:** evaluate a notification-area WPM readout; the manifest documents the floating widget as the current alternative (`platform_reason.wpm_readout_needs_a_menubar`).
-- [ ] **Linux:** evaluate remapping shortcut chords on accented keys for layouts where those keys are not shortcut letters; the manifest records a Windows implementation and no Linux equivalent (`platform_reason.accented_shortcuts_are_windows`).
-- [ ] Triage every OS-specific manifest entry in the generated [feature inventory](docs/feature-inventory.md): confirm equivalent behavior, intentional platform differences, or a real missing capability before implementing a parity change. The queue covers configuration entries, not unregistered product features; audit those separately.
-- [ ] Triage every OS-specific bindable action in the generated inventory using its recorded reason and equivalent. Audit capabilities outside the configuration and action catalogues (including macOS bundled App Cloner and Encryptor and their possible equivalents on Windows and Linux, as well as platform-specific implementations) and add independently evidenced gaps to this TODO. A declaration or an existing source file alone does not prove runtime behavior.
+- [ ] **Windows:** implement the physical shortcuts editor (`physical_shortcuts.windows_unavailable`) and validate token-by-token prediction display (`platform_reason.token_streaming_unvalidated_on_windows`).
+- [ ] **macOS:** review the tap-hold word-reset option and automatic model-to-prompt-profile switching (`hotstrings.tap_hold_resets_word`, `llm.profiles.auto_profile_for_model`). Provide shortcut-only restore/clear if feasible; the configuration menu currently restores Karabiner settings together with other settings.
+- [ ] **macOS and Linux:** evaluate direct streaming insertion of AI predictions; both currently show a bubble and insert on acceptance (`platform_reason.inline_autotype_is_windows`).
+- [ ] **Windows and Linux:** evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement while the other drivers handle discrete gestures (`platform_reason.gesture_modes_and_steps_are_macos`).
+- [ ] **Windows:** evaluate a notification-area WPM readout; the floating widget is the current alternative (`platform_reason.wpm_readout_needs_a_menubar`).
+- [ ] **Linux:** evaluate accented-key shortcut remapping on layouts where those keys are not shortcut letters (`platform_reason.accented_shortcuts_are_windows`).
+- [ ] **Linux:** evaluate X11 implementations of pointer centering, pointer teleportation and mouse spotlight; Wayland restricts these operations (`sg_actions.center_mouse`, `teleport_mouse`, `spotlight_mouse`). Evaluate file-manager-specific implementations of open-terminal-here and new-text-file-here.
+- [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
+- [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
 ## Handoff, 2026-11-03 late evening (read first if the session was lost)
 
