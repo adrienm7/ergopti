@@ -1,14 +1,142 @@
 {
-	"expected_count": 4,
+	"expected_count": 34,
 	"native_http_client_e2e": false,
 	"filters": [
 		{
-			"contains": "synthetic-owner-dispatch",
-			"expected_count": 2
+			"contains": "tap-holds AHK-03: synthetic ownership uses short transactional Critical spans",
+			"expected_count": 1
 		},
 		{
-			"contains": "raced-repress-release-debt",
-			"expected_count": 2
+			"contains": "tap-hold roll: the keys struck around a roll tap do not cancel it (tap-hold-roll-is-a-tap-2026-10-01)",
+			"expected_count": 1
+		},
+		{
+			"contains": "tap-hold: actual dispatch logger cannot emit or forget a resumed press (synthetic-owner-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "tap-hold: actual dispatch logger keeps an admitted tap working (synthetic-owner-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: a tap-hold's AltGr survives an expansion (kana-altgr-lift-owner-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: the AltGr layer's output is lifted out of a tap-hold's AltGr (qwerty-altgr-layer-under-alt-2026-09-26)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: an AltGr nobody holds is not lifted, a stuck one is (kana-altgr-lift-idle-2026-09-26)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: a hold released during the output is not pressed again (kana-altgr-lift-owner-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: an AltGr the user holds survives an expansion (kana-altgr-user-hold-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: an AltGr the user releases during the output is not pressed again (kana-altgr-user-hold-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: a release racing the re-press is undone (kana-altgr-user-hold-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: a suppressed AltGr press is not pressed back (kana-altgr-user-hold-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: keyboard paths lift AltGr and native output preserves its owner (kana-altgr-lift-owner-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: the script chord cleanup leaves an owned AltGr (kana-altgr-lift-owner-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: the script chord cleanup leaves the AltGr the user holds (kana-altgr-chord-user-hold)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: no raw AltGr release bypasses the owner (kana-altgr-lift-owner-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: refused raced release remains repairable by lifecycle cleanup (raced-repress-release-debt)",
+			"expected_count": 1
+		},
+		{
+			"contains": "kana altgr lift: a fresh acquisition repairs refused raced release before arming (raced-repress-release-debt)",
+			"expected_count": 1
+		},
+		{
+			"contains": "tap-holds AHK-03: synthetic key-Up is not injected while the driver is suspended",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic-refcount: a combo hold keeps LCtrl down when an overlapping single hold releases",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic-refcount: two resolutions of the same combination share their counts",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic-refcount: the scalar refcount still balances",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic-refcount: an untracked combo release balances every key of the combination",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: failed combo Down rolls back before publishing counts",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: failed combo rollback remains release-pending",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: failed final Up remains pending through bounded cleanup retries",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: failed combo Up retains every emitted key",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: physical early release preserves an unrelated synthetic owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold synthetic transaction AHK-03: shutdown preserves a failed release owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "fatal startup input cleanup: tracked LShift and Caps modes are retired before exit (fatal-startup-synthetic-modifier-latch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic: a Kana alt_gr hold presses and releases the layout's AltGr (kana-altgr-hold-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic: a lone synthetic Alt or Win is masked before its release (lone-modifier-mask-2026-09-25)",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic: the lifecycle teardown masks a lone Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+			"expected_count": 1
+		},
+		{
+			"contains": "taphold-synthetic: the error net masks a stuck Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+			"expected_count": 1
 		}
 	]
 }
