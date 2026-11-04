@@ -64,14 +64,24 @@ end
 --- @param entries table
 --- @return boolean written
 local function write_entries(entries)
+	local expected = nil
+	local written
 	if next(entries) == nil then
-		local removed = _deps.storage.delete(M.STORAGE_KEY)
-		if removed == false then Logger.error(LOG, "The empty pending-layout record could not be removed.") end
-		return removed ~= false
+		written = _deps.storage.delete(M.STORAGE_KEY)
+	else
+		expected = _deps.encode_json({ schema = 1, layouts = entries })
+		if type(expected) ~= "string" then
+			Logger.error(LOG, "The pending-layout record could not be encoded.")
+			return false
+		end
+		written = _deps.storage.set(M.STORAGE_KEY, expected)
 	end
-	local written = _deps.storage.set(M.STORAGE_KEY, _deps.encode_json({ schema = 1, layouts = entries }))
-	if not written then Logger.error(LOG, "The pending-layout record could not be written.") end
-	return written == true
+	local read_ok, actual = _deps.storage.read_exact(M.STORAGE_KEY)
+	if written ~= true or read_ok ~= true or actual ~= expected then
+		Logger.error(LOG, "The pending-layout record did not reach its requested state.")
+		return false
+	end
+	return true
 end
 
 --- Takes the collaborators. Called once, at boot.
@@ -114,9 +124,11 @@ function M.record(id, keyboard_name)
 		select = previous ~= nil and previous.select == true,
 		recorded_at = _deps.now(),
 	}
+	-- Fence an earlier selection before storage can re-enter or return an
+	-- unreadable receipt: the write may have committed even when proof failed.
+	changed(id)
 	local written = write_entries(entries)
 	if written then
-		changed(id)
 		Logger.info(LOG, "The '%s' layout waits for the next login: macOS turns it on then.", tostring(id))
 	end
 	return written
@@ -134,9 +146,9 @@ function M.request_select(id)
 		return false
 	end
 	entries[id].select = true
+	changed(id)
 	local written = write_entries(entries)
 	if written then
-		changed(id)
 		Logger.info(LOG, "The '%s' layout will be selected after the next login.", tostring(id))
 	end
 	return written
@@ -154,9 +166,9 @@ function M.forget(id)
 	end
 	if entries[id] == nil then return true end
 	entries[id] = nil
+	changed(id)
 	local written = write_entries(entries)
 	if written then
-		changed(id)
 		Logger.debug(LOG, "The '%s' layout is no longer pending.", tostring(id))
 	end
 	return written
