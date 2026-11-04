@@ -32,7 +32,7 @@ local LOG = "adapters.tcp_probe"
 --- @param luv table|nil Native backend (tests pass the real one explicitly).
 --- @return table|nil child { cancel, is_settled, on_settled }, string|nil err
 function M.probe(host, port, timeout_ms, callback, luv)
-	if type(host) ~= "string" or host == "" or type(port) ~= "number" or port < 1 or port > 65535
+	if type(host) ~= "string" or host == "" or host:find("\0", 1, true) or type(port) ~= "number" or port < 1 or port > 65535
 		or port % 1 ~= 0 or type(timeout_ms) ~= "number" or timeout_ms <= 0 or type(callback) ~= "function" then
 		return nil, "tcp probe arguments are invalid"
 	end
