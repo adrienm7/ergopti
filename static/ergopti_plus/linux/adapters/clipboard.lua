@@ -577,6 +577,12 @@ function M.read_selection(emit_combo, sleep_ms)
 	local snapshot_ok, saved, snapshot_error = read_restorable_snapshot(b)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	if copied then
+		-- A later copy must not be replaced with the old snapshot.
+		local read_ok, current = read_backend_checked(b)
+		if not read_ok then return false, "", "clipboard_ownership_unknown" end
+		if current ~= selected then return true, selected, nil end
+	end
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not copied then return false, "", selected end
 	Logger.debug(LOG, "Read a %d-byte selection via %s.", #selected, b.name)

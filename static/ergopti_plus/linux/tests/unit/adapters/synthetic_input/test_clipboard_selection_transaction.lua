@@ -243,6 +243,39 @@ helpers.describe("clipboard selection transaction", function()
 		end)
 	end)
 
+	for _, kind in ipairs({ "x11", "wayland" }) do
+		helpers.it("keeps another copy made after reading the selection (" .. kind .. ")", function()
+			with_session(kind, "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+				local original, reads = shell.exec_checked, 0
+				shell.exec_checked = function(command)
+					reads = reads + 1
+					local ok, text, reason = original(command)
+					if reads == 2 then shell.current = "new user copy" end
+					return ok, text, reason
+				end
+				local ok, text = clipboard.read_selection(emit, sleep_ms)
+				helpers.assert_true(ok)
+				helpers.assert_eq(text, "selected")
+				helpers.assert_eq(shell.current, "new user copy")
+			end)
+		end)
+	end
+
+	helpers.it("does not restore a selection when the ownership check is unreadable", function()
+		with_session("x11", "selected", function(clipboard, shell, _, _, emit, sleep_ms)
+			local original, reads = shell.exec_checked, 0
+			shell.exec_checked = function(command)
+				reads = reads + 1
+				if reads == 3 then return false, "", "reader failed" end
+				return original(command)
+			end
+			local ok, _, reason = clipboard.read_selection(emit, sleep_ms)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(reason, "clipboard_ownership_unknown")
+			helpers.assert_eq(shell.current, "selected")
+		end)
+	end)
+
 	helpers.it("reports no selection from the read probe and restores the clipboard", function()
 		with_session("wayland", nil, function(clipboard, shell, _, _, emit, sleep_ms)
 			local ok, text, reason = clipboard.read_selection(emit, sleep_ms)
