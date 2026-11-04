@@ -20,6 +20,8 @@
 ; ==============================================================================
 
 
+#Include ../adapters/diagnostics_control.ahk
+
 
 
 
@@ -411,7 +413,7 @@ DiagSnapshot_NativeArchitecture(QueryFn := unset) {
 	if IsSet(QueryFn)
 		QueryFn.Call(Info)
 	else
-		DllCall("Kernel32\GetNativeSystemInfo", "Ptr", Info)
+		HealthCheck_NativeSystemInfo(Info)
 	Architecture := NumGet(Info, 0, "UShort")
 	switch Architecture {
 		case 0: return "x86"
