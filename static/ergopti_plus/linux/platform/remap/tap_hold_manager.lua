@@ -441,23 +441,28 @@ end
 --- Installs or removes the engine to match the current state.
 local function _apply()
 	_generation = _generation + 1
+	local function install(engine, on_tap)
+		local result = _hook.set_remapper(engine, on_tap)
+		if result ~= false then _installed_engine = engine end
+		return result
+	end
 	if _combinations and not managed_owner_current(_loaded,_combinations) then return false end
 	if _engine and _combinations and _combinations.has_bindings() and not _engine.has_combinations then
-		if _hook.set_remapper(nil) == false then return false end
+		if install(nil) == false then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
 		_engine = CombinationEngine.new(_engine, configured, _buffered_ports(), projection)
 	end
 	if _engine and _engine.has_combinations then
-		if _hook.set_remapper(nil) ~= true then return false end
+		if install(nil) ~= true then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
 		if _engine:configure(configured, _buffered_ports(), projection) ~= true then return false end
 		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
 	end
 	if _active() then
-		local installed = _hook.set_remapper(_engine, _run_tap)
+		local installed = install(_engine, _run_tap)
 		if installed == false or _engine.has_combinations and installed ~= true then return false end
 	else
-		if _hook.set_remapper(nil) == false then return false end
+		if install(nil) == false then return false end
 	end
 	_installed_engine = _active() and _engine or nil
 	for _,record in pairs(managed_options) do
@@ -692,12 +697,21 @@ end
 --- @return boolean True when the new configuration is in force.
 function M.reload()
 	_require_init()
+	local previous = { _loaded, _one_shot, _engine, _combinations }
 	local ok, err = pcall(_load)
 	if not ok then
 		Logger.error(LOG, "Tap-hold reload failed, the previous configuration stays: %s.", tostring(err))
 		return false
 	end
-	return _apply()
+	local candidate = _engine
+	if _apply() then return true end
+	-- A refused hook operation can leave the previous engine installed, or it
+	-- can have removed it before a later operation failed. Keep the effective
+	-- configuration, while _installed_engine records which case actually held.
+	if _engine == candidate then
+		_loaded, _one_shot, _engine, _combinations = previous[1], previous[2], previous[3], previous[4]
+	end
+	return false
 end
 
 --- Captures the configuration in force, for a scope transaction's inverse.
