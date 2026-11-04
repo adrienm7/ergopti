@@ -160,7 +160,7 @@ helpers.describe("linux-sqlite-writer-receipts", function()
 					read = function(_, mode)
 						if mode == "*l" then return "CREATE TABLE devices (os CHECK (os IN ('linux')))" end
 						local body = command:find("SELECT sql FROM sqlite_master", 1, true)
-							and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
+							and require("tests.support.modules.keystats.storage.current_device_schema") or ""
 						return command:find("ERGOPTI_SQL_EXIT_STATUS=", 1, true)
 							and (body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. terminal_status .. "\n") or ""
 					end,
@@ -312,7 +312,7 @@ helpers.describe("sqlite_writer", function()
             end
             -- Mirror the reservation SELECT and the actual terminal status.
             local body = command:find("SELECT sql FROM sqlite_master", 1, true)
-              and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n"
+              and require("tests.support.modules.keystats.storage.current_device_schema")
               or (command:find("SELECT CAST(value AS INTEGER)", 1, true) and "1\n" or "")
             return body .. "\nERGOPTI_SQL_EXIT_STATUS=0\n"
           end,
@@ -688,7 +688,7 @@ helpers.describe("linux-sqlite-raw-batch-transactions", function()
 					captured[#captured + 1] = sql
 					body, code = "", 0
 					if sql:find("SELECT sql FROM sqlite_master", 1, true) then
-						body = "CREATE TABLE devices(os CHECK(os IN ('linux')));\n"
+						body = require("tests.support.modules.keystats.storage.current_device_schema")
 					elseif sql:find("SELECT CAST(value AS INTEGER)", 1, true) then body = "1\n"
 					elseif sql:find("INSERT OR IGNORE INTO " .. fixture.table_name, 1, true) then code = status end
 					return previous_build(selected, sql, options)
@@ -768,7 +768,7 @@ for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 		os.execute = function() return 0 end
 		io.popen = function(command)
 			local content = command:find("SELECT sql FROM sqlite_master", 1, true)
-				and "CREATE TABLE devices (os CHECK (os IN ('linux')));\n" or ""
+				and require("tests.support.modules.keystats.storage.current_device_schema") or ""
 			return { read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=0\n" end, close = function() return true end }
 		end
 		local Writer = helpers.load_module("modules.keystats.sqlite_writer")
@@ -784,7 +784,7 @@ for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 	end)
 end
 
-for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
+for _, receipt in ipairs({ "0", "1", "error", "extra_check", "linux_in_extra_check", "linux_in_comment" }) do
 	it("SQLite legacy device migration preserves dependent schema " .. receipt, function()
 		local command = require("modules.keystats.sqlite_command")
 		local build, execute, popen = command.build, os.execute, io.popen
@@ -806,6 +806,8 @@ for _, receipt in ipairs({ "0", "1", "error", "extra_check" }) do
  imported_data_sql_size INTEGER NOT NULL DEFAULT 0, imported_data_sql_sha256 TEXT
 )]] .. "\n"
 				if receipt == "extra_check" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL CHECK(length(name)>0)") end
+				if receipt == "linux_in_extra_check" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL CHECK(name <> 'linux')") end
+				if receipt == "linux_in_comment" then body = body:gsub("name TEXT NOT NULL", "name TEXT NOT NULL /* linux */") end
 			elseif current:find("pragma_foreign_key_list", 1, true) then
 				if receipt == "error" then status = 7
 				elseif receipt == "1" then body = "1\n" else body = "0\n" end
