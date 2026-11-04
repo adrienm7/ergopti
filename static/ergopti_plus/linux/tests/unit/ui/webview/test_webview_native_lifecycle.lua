@@ -554,6 +554,18 @@ local run_contract = function(helpers,load_manager,load_host)
     c.windows[1].on_delete_event();c.windows[1].on_destroy();helpers.assert_eq(m.current_epoch('metrics_typing'),current);helpers.assert_eq(c.windows[2].alive,true);helpers.assert_eq(c.closed,{old})
    end)
   end)
+  helpers.it('(webview-delete-refusal) retains native ownership when delete cleanup refuses',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+    c.view_destroy='no_ack'
+    helpers.assert_eq(c.windows[1].on_delete_event(),true,'GTK must not destroy a window whose cleanup is still owed')
+    helpers.assert_eq(m.current_epoch('metrics_typing'),epoch);helpers.assert_eq(c.windows[1].alive,true)
+    c.view_destroy=nil
+    helpers.assert_eq(c.windows[1].on_delete_event(),true)
+    helpers.assert_eq(m.current_epoch('metrics_typing'),nil);helpers.assert_eq(c.windows[1].alive,false)
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
  end)
 end
 
