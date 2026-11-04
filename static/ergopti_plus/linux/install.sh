@@ -120,6 +120,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--prefix)
+			[ "$#" -ge 2 ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
 			PREFIX="$2"
 			shift 2
 			;;
