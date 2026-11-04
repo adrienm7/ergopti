@@ -64,6 +64,8 @@ end
 function M.under_unit(cgroup)
 	if cgroup == nil then cgroup = read_file("/proc/self/cgroup") end
 	if type(cgroup) ~= "string" then return nil end
+	if cgroup:sub(1, 1) == "\n" or cgroup:find("\n\n", 1, true)
+		or cgroup:gsub("\n", ""):find("%c") then return nil end
 	-- A similarly named scope or service cannot restart this process. Match an
 	-- exact ancestor in either hierarchy format, including delegated subgroups.
 	local seen, matched = false, false
