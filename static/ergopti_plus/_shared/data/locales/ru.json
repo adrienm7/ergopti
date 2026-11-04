@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(группы не загружены)",
 	"menu.llm.ollama_start_hint": "(запустите Ollama на порту 11434)",
 	"menu.metrics.migration_progress": "Миграция: %d/%d строк — нажмите, чтобы остановить",
+	"dialog.metrics.storage_unavailable": "Сбор метрик приостановлен: хранилище SQLite недоступно или не прошло проверку. Ваша настройка не изменена.",
 	"menu.metrics.unavailable": "(метрики недоступны)",
 	"menu.hotstrings.unavailable": "(настройка автозамен недоступна)",
 	"menu.llm.unavailable": "ИИ недоступен",

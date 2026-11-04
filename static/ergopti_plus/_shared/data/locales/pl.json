@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(nie wczytano grupy)",
 	"menu.llm.ollama_start_hint": "(uruchom Ollama na porcie 11434)",
 	"menu.metrics.migration_progress": "Migracja: %d/%d wiersz(y) — kliknij, aby zatrzymać",
+	"dialog.metrics.storage_unavailable": "Zbieranie metryk wstrzymano, ponieważ magazyn SQLite jest niedostępny lub nie przeszedł weryfikacji. Twoje ustawienie nie zostało zmienione.",
 	"menu.metrics.unavailable": "(metryki niedostępne)",
 	"menu.hotstrings.unavailable": "(konfiguracja hotstringów niedostępna)",
 	"menu.llm.unavailable": "SI niedostępna",

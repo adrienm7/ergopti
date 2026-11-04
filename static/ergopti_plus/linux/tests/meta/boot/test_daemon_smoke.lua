@@ -915,9 +915,9 @@ for _, result in ipairs({ true, false }) do
   end)
 end
 
-helpers.it("metrics storage warning explains blocked collection in English and French", function()
+helpers.it("metrics storage warning explains blocked collection in every locale", function()
   local json = require("json")
-  for _, lang in ipairs({ "en", "fr" }) do
+  for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
     local path = assert(require("infra.paths").shared("data/locales/" .. lang .. ".json"))
     local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
     local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]

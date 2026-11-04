@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(ingen grupp inläst)",
 	"menu.llm.ollama_start_hint": "(starta Ollama på port 11434)",
 	"menu.metrics.migration_progress": "Migrering: %d/%d rad(er) — klicka för att stoppa",
+	"dialog.metrics.storage_unavailable": "Insamlingen av mätvärden har pausats eftersom SQLite-lagringen inte är tillgänglig eller inte kunde verifieras. Din inställning har inte ändrats.",
 	"menu.metrics.unavailable": "(mätvärden ej tillgängliga)",
 	"menu.hotstrings.unavailable": "(hotstring-konfiguration otillgänglig)",
 	"menu.llm.unavailable": "AI otillgängligt",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(geen groep geladen)",
 	"menu.llm.ollama_start_hint": "(start Ollama op poort 11434)",
 	"menu.metrics.migration_progress": "Migratie: %d/%d rij(en) — klik om te stoppen",
+	"dialog.metrics.storage_unavailable": "Het verzamelen van statistieken is gepauzeerd omdat de SQLite-opslag niet beschikbaar is of de controle is mislukt. Je voorkeur is niet gewijzigd.",
 	"menu.metrics.unavailable": "(statistieken niet beschikbaar)",
 	"menu.hotstrings.unavailable": "(hotstring-configuratie niet beschikbaar)",
 	"menu.llm.unavailable": "AI niet beschikbaar",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(لم يتم تحميل أي مجموعة)",
 	"menu.llm.ollama_start_hint": "(شغّل Ollama على المنفذ 11434)",
 	"menu.metrics.migration_progress": "الترحيل: %d/%d صف — انقر للإيقاف",
+	"dialog.metrics.storage_unavailable": "تم إيقاف جمع المقاييس مؤقتًا لأن تخزين SQLite غير متاح أو تعذر التحقق منه. لم يتغير إعدادك.",
 	"menu.metrics.unavailable": "(المقاييس غير متاحة)",
 	"menu.hotstrings.unavailable": "(إعدادات الاختصارات النصية غير متاحة)",
 	"menu.llm.unavailable": "الذكاء الاصطناعي غير متاح",

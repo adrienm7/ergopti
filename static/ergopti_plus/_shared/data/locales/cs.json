@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(žádná skupina není načtena)",
 	"menu.llm.ollama_start_hint": "(spusťte Ollama na portu 11434)",
 	"menu.metrics.migration_progress": "Migrace: %d/%d řádků — kliknutím zastavíte",
+	"dialog.metrics.storage_unavailable": "Sběr metrik je pozastaven, protože úložiště SQLite není dostupné nebo neprošlo ověřením. Vaše nastavení se nezměnilo.",
 	"menu.metrics.unavailable": "(metriky nedostupné)",
 	"menu.hotstrings.unavailable": "(konfigurace hotstringů není dostupná)",
 	"menu.llm.unavailable": "AI není dostupná",
