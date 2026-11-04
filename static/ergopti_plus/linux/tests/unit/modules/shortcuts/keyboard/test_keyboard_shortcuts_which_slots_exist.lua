@@ -361,16 +361,22 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
-		local action = shortcuts.get_action("meta_space")
-		local super_slots = shortcuts.assigned_slots("meta_")
-		local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
+		local previous_engine = package.loaded["modules.llm.prediction_engine"]
+		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return true end }
+		local ok, detail = xpcall(function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
+			local action = shortcuts.get_action("meta_space")
+			local super_slots = shortcuts.assigned_slots("meta_")
+			local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
+			helpers.assert_eq(action, "llm_generate_prediction",
+				"an explicit saved action remains effective")
+			helpers.assert_eq(#super_slots, 1)
+			helpers.assert_eq(fired, true)
+			helpers.assert_eq(slot, "meta_space")
+		end, debug.traceback)
 		drop_config()
-		helpers.assert_eq(action, "llm_generate_prediction",
-			"an explicit saved action remains effective")
-		helpers.assert_eq(#super_slots, 1)
-		helpers.assert_eq(fired, true)
-		helpers.assert_eq(slot, "meta_space")
+		package.loaded["modules.llm.prediction_engine"] = previous_engine
+		if not ok then error(detail, 0) end
 	end)
 
 	helpers.it("offers a Super group in the menu", function()
