@@ -1397,6 +1397,7 @@ TapHoldTapProvenance() {
 ; @return {Boolean} True when TapFn ran, false when the tap was suppressed.
 TapHoldDispatchTap(KeyId, TapFn) {
 	global TapHold, _TapHoldTapInDispatch
+	Owner := TapHoldNewOwner()
 	try {
 		if A_IsSuspended {
 			try LoggerDebug("TapHoldDispatch", "Dispatch blocked for '{1}' because script is suspended.", KeyId)
@@ -1406,6 +1407,8 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		if (LimitMs < 250)
 			LimitMs := 250
 		CancelReason := TapHoldShouldCancelTap(KeyId, LimitMs)
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; The keys struck around the tap of a typing key are text, not a chord:
 		; only a click or the wheel makes its press something else than a tap.
 		if (CancelReason == TAPHOLD_CANCEL_BY_OTHER_KEY && TapHoldRollTapIsRunning(KeyId))
@@ -1427,17 +1430,23 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
 		if _TapHoldTapEndsCapsWord(KeyId)
 			DisableCapsWord()
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; A command tap (paste, a window switch…) starts a new word, or leaves
 		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
 		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
 		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
 			HS_ApplyEventWordReset(ConfigLeaf.TAP_HOLD_RESETS_WORD, "tap of " . KeyId)
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		; A tap that types Enter or Tab goes out through the driver's own send, which
 		; the watcher never sees: it completes a hotstring here, as Space does.
 		EndChar := HotstringEndCharOfTap(KeyId)
 		if (EndChar != "" and HotstringCompleteEndKey(EndChar,
 				TapHoldRollTapIsRunning(KeyId) ? TapHoldRollTapDownTick() : 0))
 			return true
+		if !TapHoldOwnerCurrent(Owner) || A_IsSuspended
+			return false
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()
@@ -1445,7 +1454,9 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		return true
 	}
 	finally {
-		TapHoldForgetTrackedKey(KeyId)
+		; A retired dispatch must not erase the resumed physical press.
+		if TapHoldOwnerCurrent(Owner)
+			TapHoldForgetTrackedKey(KeyId)
 	}
 }
 
