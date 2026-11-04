@@ -204,3 +204,19 @@ _PIMV_MaskingDoesNotMutateTheValue() {
 }
 Test("personal-info mask: masking a value leaves the value it will type untouched (preview-masking-cross-driver)",
 	_PIMV_MaskingDoesNotMutateTheValue)
+
+
+_PIMV_MalformedFieldStaysMasked() {
+	Policy := Map("mask_char", "•", "reveal_head", 0, "reveal_tail", 0,
+		"min_length_to_reveal", 12, "preserve_separators", true)
+	for Keys in [Map(), Map("masked", ""), Map("masked", "0"), Map("masked", true)] {
+		Declaration := { Policy: Policy, Fields: Map("secret", _PIMaskFieldIsMasked(Keys)) }
+		AssertEqual("••••••", PersonalInfoMaskFieldWith("SECRET", "secret", Declaration),
+			"a malformed or true flag must not reveal a value")
+	}
+	Declaration := { Policy: Policy, Fields: Map("public", _PIMaskFieldIsMasked(Map("masked", false))) }
+	AssertEqual("PUBLIC", PersonalInfoMaskFieldWith("PUBLIC", "public", Declaration),
+		"an explicitly false flag keeps a public field visible")
+}
+Test("personal-info mask: malformed field flags remain private (personal-mask-field-type)",
+	_PIMV_MalformedFieldStaysMasked)
