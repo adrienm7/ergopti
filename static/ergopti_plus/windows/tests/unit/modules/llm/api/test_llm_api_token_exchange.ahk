@@ -252,7 +252,7 @@ _LTE_Refusal() {
 		_LTE_Pump()
 		_LTE_Answer(Posts[1], "", 400)
 		AssertEqual("the token exchange answered HTTP 400", Results[1]["refusal"])
-		AssertTrue(Results[1]["key_refused"], "a 4xx is the key's fault")
+		AssertTrue(Results[1]["key_refused"], "the OAuth invalid-grant HTTP 400 identifies a refused credential")
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		AssertEqual(2, Results.Length, "during the pause the refusal answers at once")
 		_LTE_Pump()
@@ -265,6 +265,69 @@ _LTE_Refusal() {
 	}
 }
 Test("Token exchange: a refused key pauses the next attempt", _LTE_Refusal)
+
+_LTE_StatusClassification(Status, KeyRefused := false) {
+	_LTE_Run(_Body)
+	_Body(Posts, Lines) {
+		Results := []
+		Auth := LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"]
+		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
+		_LTE_Pump()
+		AssertEqual(1, Posts.Length)
+		Posts[1]["answer"].Call(Map("status", Status, "body",
+			KeyRefused ? '{"error":"invalid_grant"}' : '{"error":"temporarily_unavailable"}'))
+		AssertEqual(1, Results.Length)
+		AssertEqual(Status, Results[1]["status"], "The actual exchange status must survive settlement")
+		AssertEqual(KeyRefused, Results[1]["key_refused"], "Only an explicit authentication status may classify the key as refused")
+		Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+		AssertTrue(Slot["retry_at"] > _LLM_TokenExchange_Now(), "The existing bounded retry pause must remain active")
+		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
+		_LTE_Pump()
+		AssertEqual(2, Results.Length)
+		AssertEqual(Status, Results[2]["status"])
+		AssertEqual(KeyRefused, Results[2]["key_refused"])
+		AssertEqual(1, Posts.Length, "A second waiter must not bypass the shared retry pause")
+		_LTE_AssertNoSecret(Lines)
+	}
+}
+for _LTE_TransientStatus in [404, 405, 408, 413, 429, 503]
+	Test("Token exchange: HTTP " . _LTE_TransientStatus . " preserves a non-authentication refusal (token-status-classification)",
+		_LTE_StatusClassification.Bind(_LTE_TransientStatus))
+
+for _LTE_AuthStatus in [400, 401, 403]
+	Test("Token exchange: HTTP " . _LTE_AuthStatus . " retains explicit authentication refusal (token-status-authentication)",
+		_LTE_StatusClassification.Bind(_LTE_AuthStatus, true))
+
+_LTE_NonAuthReadiness(Status) {
+	_LTE_Run(_Body)
+	_Body(Posts, Lines) {
+		global LLM_REMOTE_READY_PING_DEADLINE_MS
+		SavedDeadline := LLM_REMOTE_READY_PING_DEADLINE_MS
+		Owner := 0
+		LLM_REMOTE_READY_PING_DEADLINE_MS := 30000
+		try {
+			Results := []
+			Owner := LLM_RemoteIsReady_Async(_LTE_Entry(), (Value) => Results.Push(Value))
+			_LTE_Pump()
+			AssertEqual(1, Posts.Length)
+			Posts[1]["answer"].Call(Map("status", Status, "body", '{"error":"temporarily_unavailable"}'))
+			AssertEqual(1, Results.Length)
+			AssertEqual(false, Results[1])
+			AssertEqual(Status, Owner["http_status"], "Validation must not rewrite the actual transient status to HTTP 401")
+			AssertEqual("menu.llm.api_unreachable_", _LLM_Menu_ApiValidationFailurePrefix(Owner),
+				"Validation must report service availability rather than accuse the stored key")
+			_LTE_AssertNoSecret(Lines)
+		} finally {
+			if Owner is Map
+				LLM_AuxFinish(Owner)
+			LLM_REMOTE_READY_PING_DEADLINE_MS := SavedDeadline
+		}
+	}
+}
+for _LTE_ReadyStatus in [408, 429]
+	Test("Token exchange: validation retains HTTP " . _LTE_ReadyStatus . " without key refusal (token-status-readiness)",
+		_LTE_NonAuthReadiness.Bind(_LTE_ReadyStatus))
+
 
 _LTE_RefreshMargin() {
 	_LTE_Run(_Body)

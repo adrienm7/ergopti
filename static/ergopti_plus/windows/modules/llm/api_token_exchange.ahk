@@ -514,7 +514,9 @@ _LLM_TokenExchange_OnAnswer(Slot, ProviderId, Auth, Answer) {
 		return
 	}
 	LoggerError("LLM.remote", "Access token of provider '{1}' refused: {2}.", ProviderId, Refusal)
-	Failure := Map("refusal", Refusal, "status", Status, "key_refused", Status >= 400 && Status < 500)
+	; OAuth invalid-grant responses use 400; 401/403 also deny credentials.
+	; Other client statuses can describe throttling, timeouts or endpoint faults.
+	Failure := Map("refusal", Refusal, "status", Status, "key_refused", Status == 400 || Status == 401 || Status == 403)
 	if Answer.Has("network_report")
 		Failure["network_report"] := Answer["network_report"]
 	_LLM_TokenExchange_Settle(Slot, Failure)
