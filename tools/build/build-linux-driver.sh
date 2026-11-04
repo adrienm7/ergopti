@@ -88,8 +88,22 @@ while [[ "$RESOLVED_BUILD" != / && "$RESOLVED_BUILD" == */ ]]; do RESOLVED_BUILD
 if [ -e "$RESOLVED_BUILD/.git" ] || [ -L "$RESOLVED_BUILD/.git" ]; then
   echo "[ERR] Refusing a Git checkout as build output: $BUILD_DIR" >&2; exit 1
 fi
-# A sibling checkout can be nested inside its own source tree too. Preserve
-# native path bytes while removing Git's one output-record newline.
+# Check physical ancestors directly: a failed Git query cannot establish that
+# an existing directory is outside a sibling checkout.
+BUILD_ANCESTOR="$BUILD_GIT_PROBE"
+while :; do
+  if [ -e "${BUILD_ANCESTOR%/}/.git" ] || [ -L "${BUILD_ANCESTOR%/}/.git" ]; then
+    if [ "$BUILD_ANCESTOR" != "$REPO_ROOT" ]; then
+      echo "[ERR] Linux build output belongs to another Git checkout: $BUILD_DIR" >&2; exit 1
+    fi
+    break
+  fi
+  [ "$BUILD_ANCESTOR" = / ] && break
+  BUILD_ANCESTOR="${BUILD_ANCESTOR%/*}"
+  [ -n "$BUILD_ANCESTOR" ] || BUILD_ANCESTOR=/
+done
+# Also retain Git's discovery for nonstandard layouts when it is available;
+# refusal of that query never overrides the direct ancestor checks above.
 if IFS= read -r -d '' BUILD_GIT_ROOT < <(git -C "$BUILD_GIT_PROBE" rev-parse --show-toplevel 2>/dev/null && printf '\0'); then
   BUILD_GIT_ROOT="${BUILD_GIT_ROOT%$'\n'}"
   if [ "$BUILD_GIT_ROOT" != "$REPO_ROOT" ]; then
