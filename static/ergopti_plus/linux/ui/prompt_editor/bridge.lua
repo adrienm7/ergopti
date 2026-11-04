@@ -246,12 +246,14 @@ function M.on_message(payload, state, context)
 	if session.settled then
 		return { closed = close_session(session, state, context) }
 	end
+	if session.saving then
+		if action == "cancel" then return { cancelled = false, closed = false, busy = true } end
+		return { saved = false, closed = false }
+	end
 	if action == "cancel" then
 		session.settled = true
 		return { cancelled = true, closed = close_session(session, state, context) }
 	end
-	if session.saving then return { saved = false, closed = false } end
-
 	local name = trim(payload.name)
 	local prompt = trim(payload.prompt)
 	if not name or name == "" or not prompt or prompt == ""

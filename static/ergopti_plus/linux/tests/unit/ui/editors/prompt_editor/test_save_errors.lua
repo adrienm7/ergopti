@@ -93,6 +93,20 @@ helpers.describe("prompt editor save error ownership", function()
 		logger.error = original
 		if not ok then error(err, 0) end
 	end)
+	helpers.it("(prompt-save-owner) refuses reentrant cancellation while a save is committing", function()
+		with_editor(function(f)
+			local payload, context, cancelled
+			payload, context = f.open(function(candidate)
+				cancelled = f.bridge.on_message({ action = "cancel", edit_id = payload.edit_id, epoch = payload.epoch }, f.state, context)
+				return f.persist(candidate)
+			end)
+			local result = f.save(payload, context)
+			helpers.assert_eq(cancelled, { cancelled = false, closed = false, busy = true })
+			helpers.assert_eq(result, { saved = true, closed = true })
+			helpers.assert_eq(f.seen.closes, 1)
+		end)
+	end)
+
 	helpers.it("reports a real outdated profile registry without changing its bytes", function()
 		with_editor(function(f)
 			local original = "[llm]\nuser_profiles = []\n"
