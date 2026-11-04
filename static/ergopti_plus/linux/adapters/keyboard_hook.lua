@@ -2584,6 +2584,7 @@ function LayerPointer.forward(ev, slot)
 end
 
 local function _dispatch_pointer(ev, slot)
+	local session = _capture_session
 	-- A grabbed mouse may have lost a button release. Retire its output and
 	-- ungrab it before any untrustworthy reports can reach the desktop.
 	if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_DROPPED and slot ~= nil and LayerPointer.slots[slot] then
@@ -2604,6 +2605,7 @@ local function _dispatch_pointer(ev, slot)
 		-- caret all the same, so the password-field verdict and the typing
 		-- buffer must be dropped as on a click.
 		if ev.value == InputEvent.VALUE_DOWN then
+			if not _running or _capture_session ~= session then return end
 			_call_callback("pointer callback", _on_click, ev.code)
 		end
 	elseif ev.type == InputEvent.EV_REL and InputEvent.REL_WHEEL_AXES[ev.code] and _remapper then
@@ -2613,10 +2615,13 @@ local function _dispatch_pointer(ev, slot)
 		_remapper:activity()
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
+	if not _running or _capture_session ~= session then return end
 	if slot ~= nil and LayerPointer.slots[slot] then
 		LayerPointer.forward(ev, slot)
+		if not _running or _capture_session ~= session then return end
 		LayerPointer.sync()
 	end
+	if not _running or _capture_session ~= session then return end
 	if _on_pointer_event then
 		-- The value and the frame's SYN_REPORT let the metrics measure a movement.
 		if ev.type == InputEvent.EV_REL then
