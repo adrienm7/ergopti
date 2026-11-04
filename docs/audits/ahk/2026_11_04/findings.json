@@ -455,6 +455,17 @@
 			"root_cause": "infra/hotstrings/hotstrings_cache.ahk treats later TSV timestamps as source identity, skips missing dependencies, and derives cache paths from an effective resolver that can point at extensions. The TSV has no record of the canonical index image actually consumed, source paths/presence or content hashes. The initial rebuilt RAM projection also needs admission after the writer and its yielding diagnostics.",
 			"silent_failure": "Removed or replaced rules become active native triggers on a cold load. A cache can silently retain extension data after its source is gone, or bless older parsed content with a newer publication timestamp.",
 			"regression_test": "Four native fail-before cases use real temporary canonical sources, the actual index memo, real extension scan/routing and actual HSE registration. The single-file TSV fix records consumed index/source provenance plus closed row/count/payload proof and validates the exact parsed candidate. Physical bundled resolution is separate from adopted extension routes. Two additional initial-publication cases use real stage sharing denial and the genuine logger sink to edit a category or index after BuildRows. Rebuilt RAM snapshots are checked after writer callouts, retried at most twice and otherwise refused with cleared maps. Valid TOML loading still works when cache writes fail. Three existing freshness owners now publish genuine source-backed fixtures. Native post-fix qualification is pending; no cold-load performance measurement or filesystem-wide external CAS is claimed."
+		},
+		{
+			"id": "AHK-042",
+			"title": "Raw body retries bypass current access-token preparation",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Prepare an original resolved record through the genuine cached-access owner, then renew or expire its token slot before calling RawPost. Native run41904156246 ate26726d4ca7ea2d98dd2370648ca15f1dcc5dbf0 passes the fresh control but publishes Bearer old-token instead of the actual renewed new-token. Four expired-slot variants also reach a transport before starting exchange. All failures reproduce individually and reversed.",
+			"root_cause": "LLM_RemotePostBody_Async in modules/llm/api_remote.ahk reserves its request then dispatches the retained Resolved.Token directly. Generate calls _LLMRemote_NeedsAccess and _LLMRemote_WithAccess, but thinking retries and screen-reading bodies using RawPost omit that preparation. NeedsAccess must be called even when it returns false because it refreshes the retained Token from the current slot.",
+			"silent_failure": "A later body can carry an expired or superseded credential and receive an avoidable authentication refusal despite a valid current cached access token or available refresh.",
+			"regression_test": "Six token-rawpost-owner cases run the actual resolver, original access preparation, token engine, RawPost reservation, managed facade and transport.json serializer. Only exchange HTTP and process spawning use existing explicitly controlled I/O ports; this is no native wire-success claim. The actual published header must use current access; expired slots await exchange under the same id, clock and deadline. Cancellation, elapsed deadline and native pause must prevent dispatch. The optional final TransportPort defaults to zero and forwards the preexisting downstream test boundary without changing current callers. Native fail-before proof is measured; native post-fix qualification is pending."
 		}
 	]
 }

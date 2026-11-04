@@ -258,6 +258,14 @@ LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs 
         _LLMRemote_DeleteOwned(req_id, reservation)
         return req_id
     }
+    ; Re-read the access slot even when it is already usable: NeedsAccess also
+    ; replaces a stale token retained by a thinking retry or screen-reading body.
+    if Resolved.Has("StoredKey") && _LLMRemote_NeedsAccess(Resolved) {
+        _LLMRemote_WithAccess(Resolved, _LLMRemote_ResumeAfterAccess.Bind(req_id, reservation, on_fail,
+            _LLMRemote_DispatchCurl.Bind(req_id, Resolved, Url, Payload, on_success, on_fail,
+                timeout_ms, TransportPort, reservation)))
+        return req_id
+    }
     if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
             on_fail, timeout_ms, TransportPort, reservation))
         return req_id
