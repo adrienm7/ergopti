@@ -672,3 +672,14 @@ helpers.describe("release_installer: explicit native script observation", functi
 		if not ok then error(err, 0) end
 	end)
 end)
+
+helpers.describe("updater version comparison parity", function()
+	helpers.it("replays the shared version vectors, including malformed suffixes", function()
+		local raw = assert(read(helpers.shared("modules/updater/version_vectors.json")))
+		local vectors = require("json").decode(raw).vectors
+		local version = require("updater.version")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(version.compare_versions(vector.a, vector.b), vector.expect, vector.id)
+		end
+	end)
+end)
