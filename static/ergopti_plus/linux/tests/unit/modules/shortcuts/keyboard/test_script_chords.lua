@@ -36,8 +36,9 @@ local PRESETS = {
 --- @return table chords, table log
 local function fresh(source)
 	local log = { deferred = {}, executed = {}, paused = false }
+	local names = { "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
 	local previous = {}
-	for _, name in ipairs({ "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }) do
+	for _, name in ipairs(names) do
 		previous[name] = package.loaded[name]
 	end
 	local path = os.tmpname()
@@ -64,7 +65,7 @@ local function fresh(source)
 		for _, fn in ipairs(queued) do fn() end
 	end
 	log.restore = function()
-		for name, value in pairs(previous) do package.loaded[name] = value end
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		os.remove(path)
 		os.remove(path .. ".tmp")
 	end
@@ -77,6 +78,27 @@ local function with_chords(source, body)
 	local ok, err = pcall(body, Chords, log)
 	log.restore()
 	helpers.assert_true(ok, tostring(err))
+end
+
+for _, initial in ipairs({ "absent", "false" }) do
+	helpers.it("script-chord fixture restores " .. initial .. " cached dependencies", function()
+		local names = { "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.script_chords" }
+		local previous = {}
+		for _, name in ipairs(names) do
+			previous[name] = package.loaded[name]
+			if initial == "false" then package.loaded[name] = false else package.loaded[name] = nil end
+		end
+		local ok, detail = pcall(function()
+			local _, log = fresh(nil)
+			log.restore()
+			for _, name in ipairs(names) do
+				if initial == "false" then helpers.assert_eq(package.loaded[name], false, name)
+				else helpers.assert_nil(package.loaded[name], name) end
+			end
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(detail, 0) end
+	end)
 end
 
 helpers.describe("Linux script-management chords (script-chords-three-os-2026-09-30)", function()
