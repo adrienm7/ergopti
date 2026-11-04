@@ -364,6 +364,49 @@ os.remove(user_path)
 		helpers.assert_nil(installed_after_retry)
 	end)
 
+	for _, fault in ipairs({ "refusal", "exception" }) do
+		helpers.it("preserves effective state after candidate installation " .. fault .. " (candidate-apply-refusal)", function()
+			local Manager, hook, _, user_path = manager()
+			local original, install = hook.engine, hook.set_remapper
+			hook.set_remapper = function()
+				if fault == "exception" then error("controlled failure") end
+				return false
+			end
+			local called, result = pcall(Manager.apply_configuration, { tap_hold = { enabled = false } })
+			local file_enabled, installed = Manager.file_enabled(), hook.engine
+			hook.set_remapper = install
+			local retried = Manager.apply_configuration({ tap_hold = { enabled = false } })
+			Manager._reset_for_test()
+			os.remove(user_path)
+			helpers.assert_true(called, "installation errors are reported as refusal")
+			helpers.assert_eq(result, false)
+			helpers.assert_true(file_enabled, "the refused candidate is not effective")
+			helpers.assert_true(installed == original)
+			helpers.assert_true(retried)
+		end)
+	end
+
+	helpers.it("keeps the current configuration when snapshot restoration is refused (snapshot-apply-refusal)", function()
+		local Manager, hook, _, user_path = manager()
+		local enabled = Manager.configuration_snapshot()
+		helpers.assert_true(Manager.apply_configuration({ tap_hold = { enabled = false } }))
+		local disabled = Manager.configuration_snapshot()
+		helpers.assert_true(Manager.restore_configuration(enabled))
+		local original, install = hook.engine, hook.set_remapper
+		hook.set_remapper = function() return false end
+		local result = Manager.restore_configuration(disabled)
+		local file_enabled, installed, active = Manager.file_enabled(), hook.engine, Manager.is_active()
+		hook.set_remapper = install
+		local retried = Manager.restore_configuration(disabled)
+		Manager._reset_for_test()
+		os.remove(user_path)
+		helpers.assert_eq(result, false)
+		helpers.assert_true(file_enabled)
+		helpers.assert_true(installed == original)
+		helpers.assert_true(active)
+		helpers.assert_true(retried)
+	end)
+
 	helpers.it("keeps the running engine when a reload cannot read the defaults", function()
 		local Manager, hook, _, user_path = manager()
 		local running = hook.engine
