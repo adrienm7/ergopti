@@ -1097,7 +1097,7 @@ _LATRT_Case(Cancel) {
 }
 
 _LATRT_Run(Cancel) {
-    _ManagedRemoteFixtureWithLlmTimings(_LTO_WithoutListingFetch.Bind(_LATRT_Case.Bind(Cancel)))
+    _ManagedRemoteFixtureWithLlmTimings(_LATHTTP_HostScope.Bind(_LTO_WithoutListingFetch.Bind(_LATRT_Case.Bind(Cancel))))
 }
 
 Test("llm API native thinking retry: positive control (api-thinking-retry-owner)",
