@@ -127,6 +127,12 @@ local function handle(payload, state, request)
 	-- agg_app_day and the dashboard groups by it, so the effect was a control
 	-- that looked like it worked and silently discarded its input.
 	if action == "edit" then
+		if (payload.app ~= nil and type(payload.app) ~= "string")
+			or (payload.cat ~= nil and type(payload.cat) ~= "string")
+			or (payload.score ~= nil and not require("keystats.app_category_store").score_valid(payload.score)) then
+			Logger.warn(LOG, "Application category edit refused invalid input.")
+			return with_payload({ saved = false })
+		end
 		local app_name = tostring(payload.app or "")
 		local category = tostring(payload.cat or "")
 		if state.keystats and type(state.keystats.set_app_category) == "function" then
