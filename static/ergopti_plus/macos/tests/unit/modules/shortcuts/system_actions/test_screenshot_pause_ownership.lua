@@ -116,6 +116,10 @@ local function fresh_screenshot()
 		end,
 		remove_exact = function(path) fixture.files[path] = nil; return true end,
 		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
+		read_with_status = function()
+			if fixture.on_read then fixture.on_read() end
+			return "\137PNG\r\n\26\n" .. string.rep("\0", 4) .. "IHDR" .. string.pack(">I4I4", 10, 10), "ok"
+		end,
 	}
 	package.loaded["adapters.screen_capture"] = {
 		permission_state = function() return true end,
@@ -124,6 +128,10 @@ local function fresh_screenshot()
 		clipboard_change_count = function() return 1 end,
 		clipboard_has_image = function() return true end,
 		copy_image_file_to_clipboard = function() return true end,
+		encode_base64 = function()
+			if fixture.on_encode then fixture.on_encode() end
+			return "encoded"
+		end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {
@@ -162,6 +170,20 @@ end
 
 
 helpers.describe("shared screenshot owner: positive controls", function()
+	for _, boundary in ipairs({ "on_read", "on_encode" }) do
+		helpers.it("does not deliver a screen image after pause during " .. boundary, function()
+			local f = fresh_screenshot()
+			local delivered = 0
+			local pause_result = "not called"
+			f[boundary] = function() pause_result = f.subject.pause_screenshot_actions("gestures") end
+			helpers.assert_eq(f.subject.capture_image({}, "gestures", 100, function() delivered = delivered + 1 end), true)
+			f.tasks[1]:deliver(0, "", "")
+			helpers.assert_eq(pause_result, false, "the running native boundary must remain owned")
+			helpers.assert_eq(delivered, 0)
+			helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), false)
+			helpers.assert_eq(next(f.files), nil)
+		end)
+	end
 	for _, action in ipairs({ "capture", "capture_image" }) do
 		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
 			local f = fresh_screenshot()

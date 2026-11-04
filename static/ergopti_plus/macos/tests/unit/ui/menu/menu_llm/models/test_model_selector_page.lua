@@ -260,6 +260,28 @@ helpers.describe("model selector page owner", function()
 		end)
 	end)
 
+	for _, mode in ipairs({ "refuses", "throws" }) do
+	helpers.it("retries a runtime recheck after the timer scheduler " .. mode, function()
+		local opts = { ollama = { installed = false, pending = true } }
+		with_page(opts, function(Page, ctx, _, collected, p)
+			local attempts, pending = 0, nil
+			package.loaded["infra.deferred_work"].after = function(_, callback)
+				attempts = attempts + 1
+				if attempts == 1 then
+					if mode == "throws" then error("timer unavailable") end
+					return false
+				end
+				pending = callback
+				return true
+			end
+			Page.build_payload(ctx, p, collected)
+			Page.build_payload(ctx, p, collected)
+			helpers.assert_eq(attempts, 2, "a refused timer must not block a later retry")
+			helpers.assert_type(pending, "function")
+		end)
+	end)
+	end
+
 	helpers.it("(model-selector-install-refusal) a paused driver names the pause on the install button", function()
 		local opts = { paused = true, ollama = { installed = false } }
 		with_page(opts, function(Page, ctx, _, collected, p)

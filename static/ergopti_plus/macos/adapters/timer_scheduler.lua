@@ -34,6 +34,10 @@ local NumberPolicy = require("number_policy")
 
 local LOG = "adapters.timer_scheduler"
 
+-- hs.timer.new(0) creates a one-shot, while every() promises repetition.
+-- Match the Linux adapter's one-millisecond minimum repeating interval.
+local MIN_REPEAT_INTERVAL_SEC = 0.001
+
 
 -- =========================================
 -- =========================================
@@ -282,6 +286,7 @@ function M.every(intervalSec, fn)
 		settle_handle(handle)
 		return handle, false
 	end
+	intervalSec = math.max(intervalSec, MIN_REPEAT_INTERVAL_SEC)
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	M.retryCleanup()

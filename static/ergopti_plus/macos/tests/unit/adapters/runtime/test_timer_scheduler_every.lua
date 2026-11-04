@@ -19,6 +19,34 @@ local owned_registry_count = Fixture.owned_registry_count
 
 
 helpers.describe("TimerScheduler adapter — every()", function()
+	helpers.it("keeps zero and negative intervals repeating (timer-zero-repeat)", function()
+		for _, interval in ipairs({ 0, -1 }) do
+			local timer_stub = make_timer_stub()
+			local native_callback, native_interval, running
+			timer_stub.new = function(seconds, callback)
+				native_interval, native_callback = seconds, callback
+				local timer = {}
+				function timer:start() running = true; return self end
+				function timer:stop() running = false; return self end
+				return timer
+			end
+			local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+			local calls = 0
+			local handle, committed = TS.every(interval, function() calls = calls + 1 end)
+			helpers.assert_true(committed)
+			local function fire()
+				if not running then return end
+				-- Hammerspoon creates a one-shot when the native interval is zero.
+				if native_interval == 0 then running = false end
+				native_callback()
+			end
+			fire(); fire()
+			helpers.assert_eq(calls, 2, "every() must remain repeating for a clamped interval")
+			helpers.assert_true(native_interval >= 0.001, "the native repeating interval must be bounded")
+			helpers.assert_true(TS.cancel(handle))
+		end
+	end)
+
 	helpers.it("rejects invalid callbacks without arming either timer type (timer-invalid-callback)", function()
 		local invalid_callbacks = { false, "not a callback", {} }
 		for _, method in ipairs({ "after", "every" }) do
