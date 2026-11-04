@@ -214,12 +214,16 @@ helpers.describe("other Karabiner: the closer", function()
 		helpers.assert_eq(polls, 39, "the wait is bounded: 40 looks, one of them before any timer")
 	end)
 
-	helpers.it("fails when the wait cannot be scheduled", function()
+	helpers.it("records an accepted quit even when exit polling cannot be scheduled (karabiner-close-poll-refusal)", function()
 		local port = load_port(function(executable)
 			if executable == "/usr/bin/pgrep" then return 0, "42\n" end
 			return 0, ""
 		end, function(w) w.timer_commits = false end)
-		helpers.assert_eq(answer(port.close), false)
+		local marked = false
+		local close = require("platform.remap.runtime_activation").remembering_close(port.close,
+			{ set = function() marked = true; return true end })
+		helpers.assert_eq(answer(close), true)
+		helpers.assert_true(marked, "the core agents were already unregistered and must remain restorable")
 	end)
 end)
 

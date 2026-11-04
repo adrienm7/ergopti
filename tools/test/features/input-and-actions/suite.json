@@ -746,6 +746,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-personal-editor-initialization.cjs"],
 			"repro": "node tools/test/test-personal-editor-initialization.cjs"
+		},
+		{
+			"id": "js-token-prompt-focus",
+			"ordinal": 578,
+			"name": "token prompt focus retries preserve typing and user focus",
+			"cmd": "node",
+			"args": ["tools/test/test-token-prompt-focus.cjs"],
+			"repro": "node tools/test/test-token-prompt-focus.cjs"
 		}
 	]
 }

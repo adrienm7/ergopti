@@ -299,6 +299,27 @@ end)
 -- ===================================
 
 helpers.describe("owned runtime owner: stop", function()
+	helpers.it("waits for an in-flight close before restoring Karabiner on pause (owned-close-pause-race)", function()
+		local owner, world = Fixture.load_owner(), Fixture.new_world()
+		world.others = 1
+		local marker, restores, finish_close = false, 0, nil
+		local Activation = require("platform.remap.runtime_activation")
+		world.ports.coexistence.close = Activation.remembering_close(function(done) finish_close = done end,
+			{ set = function() marker = true; return true end })
+		owner.init(world.ports)
+		local activation = Activation.new({
+			owner = owner, restore = function(done) restores = restores + 1; done(true) end,
+			marker = { get = function() return marker end, clear = function() marker = false; return true end },
+			reload = function() end, close_other_instances = function() return true end,
+		})
+		activation.reconcile(true)
+		helpers.assert_true(type(finish_close) == "function")
+		activation.reconcile(false)
+		helpers.assert_eq(restores, 0)
+		finish_close(true)
+		helpers.assert_eq(restores, 1, "a close completing after pause must still be restored")
+		helpers.assert_eq(marker, false)
+	end)
 	helpers.it("waits for capture retirement when resuming during stop (owned-resume-during-stop)", function()
 		local owner, world = Fixture.load_owner(), Fixture.new_world()
 		world.capture_settles_sync = false
