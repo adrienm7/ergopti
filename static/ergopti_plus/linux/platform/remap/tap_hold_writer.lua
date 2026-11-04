@@ -534,7 +534,7 @@ end
 --- @return boolean
 function M.set_threshold(key_id, seconds, guard)
 	if not valid_key(key_id, "set_threshold") then return false end
-	if seconds ~= nil and (type(seconds) ~= "number" or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS) then
+	if seconds ~= nil and (type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS) then
 		Logger.error(LOG, "set_threshold: %s s is outside 0..%d s — nothing written.",
 			tostring(seconds), MAX_THRESHOLD_SECONDS)
 		return false
