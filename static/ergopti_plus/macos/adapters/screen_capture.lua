@@ -158,7 +158,7 @@ end
 --- @param path string Absolute path of a PNG produced by screencapture.
 --- @return boolean copied True only when the image is readable back.
 --- @return string|nil detail Exact failure otherwise.
-function M.copy_image_file_to_clipboard(path)
+function M.copy_image_file_to_clipboard(path, authorized)
 	if type(path) ~= "string" or path == "" then return false, "path must be a non-empty string" end
 	local load, load_missing = native("image", "imageFromPath")
 	if not load then return false, load_missing end
@@ -171,6 +171,10 @@ function M.copy_image_file_to_clipboard(path)
 
 	local before, count_err = M.clipboard_change_count()
 	if before == nil then return false, count_err end
+	if authorized ~= nil then
+		local checked, allowed = pcall(authorized)
+		if not checked or allowed ~= true then return false, "capture no longer authorized" end
+	end
 	local write_ok, written = pcall(write, image)
 	if not write_ok then return false, "writeObjects raised: " .. tostring(written) end
 	if written ~= true then return false, "writeObjects returned " .. tostring(written) end

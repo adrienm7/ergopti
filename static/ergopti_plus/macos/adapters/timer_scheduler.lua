@@ -431,7 +431,7 @@ end
 --- hs.timer.secondsSinceEpoch() so callers have no direct hs.timer dependency.
 --- @return number Seconds since epoch as a floating-point value.
 function M.now()
-	local ok, t = pcall(hs.timer.secondsSinceEpoch)
+	local ok, t = pcall(function() return hs.timer.secondsSinceEpoch() end)
 	if ok and type(t) == "number" and t == t and t ~= math.huge and t ~= -math.huge then return t end
 	return os.time()
 end

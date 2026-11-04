@@ -831,8 +831,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				channel = channel_owner.get,
 				is_paused = function()
 					local shortcuts_mod = core_mods.shortcuts_mod
-					return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
-						and shortcuts_mod.is_paused() == true
+					if type(shortcuts_mod) ~= "table" or type(shortcuts_mod.is_paused) ~= "function" then return nil end
+					return shortcuts_mod.is_paused()
 				end,
 				on_available = function(release)
 					local accepted = AutoCheck.announce(release)

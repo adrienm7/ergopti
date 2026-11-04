@@ -249,6 +249,31 @@ local function with_offer(scenario)
 end
 
 helpers.describe("The offer lists what the real sweep found (unreachable-backend-dialog)", function()
+	helpers.it("ignores a late sweep callback after a refused start already showed the offer", function()
+		with_offer(function(Offer, world, api)
+			local callback
+			api.detect_local_servers = function(fn) callback = fn; return false end
+			world.pick = nil
+			helpers.assert_true(Offer.offer(world.request))
+			helpers.assert_eq(#world.dialogs, 1)
+			callback()
+			helpers.assert_eq(#world.dialogs, 1, "a refused sweep cannot present the same offer twice")
+		end)
+	end)
+	helpers.it("does not let an old sweep callback present a newer offer", function()
+		with_offer(function(Offer, world, api)
+			local callbacks = {}
+			api.detect_local_servers = function(fn) callbacks[#callbacks + 1] = fn; return true end
+			world.pick = nil
+			helpers.assert_true(Offer.offer(world.request))
+			callbacks[1]()
+			helpers.assert_true(Offer.offer(world.request))
+			callbacks[1]()
+			helpers.assert_eq(#world.dialogs, 1)
+			callbacks[2]()
+			helpers.assert_eq(#world.dialogs, 2)
+		end)
+	end)
 	helpers.it("a server that answers is a button with its first model and its address (unreachable-backend-dialog)",
 		function()
 			with_offer(function(Offer, world)

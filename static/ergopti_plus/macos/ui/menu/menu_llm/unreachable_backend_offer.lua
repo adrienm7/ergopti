@@ -48,7 +48,7 @@ local function remote() return require("modules.llm").api_remote end
 
 -- The dialog is modal: a second failure while it is open, or while its
 -- servers are swept, asks nothing more
-local _asking = false
+local _asking = nil
 
 -- The notification of a background failure is posted once until clicked
 local _notified = false
@@ -162,9 +162,11 @@ end
 --- Asks, then runs the chosen fix once the dialog no longer counts as open:
 --- a fix that fails at once may offer again.
 --- @param request table A validated request.
-local function present(request)
+local function present(request, owner)
+	if _asking ~= owner or owner.presenting then return end
+	owner.presenting = true
 	local ok, label, fix = xpcall(ask, debug.traceback, request)
-	_asking = false
+	if _asking == owner then _asking = nil end
 	if not ok then
 		Logger.error(LOG, "The unreachable-backend dialog failed: %s.", tostring(label))
 		return
@@ -225,20 +227,21 @@ function M.offer(request)
 		Logger.info(LOG, "%s does not answer; its dialog is already open.", BACKEND_LABEL)
 		return false
 	end
-	_asking = true
+	local owner = {}
+	_asking = owner
 	-- A newer sweep carries this one's callback, so the dialog always opens
-	local ok, started = pcall(remote().detect_local_servers, function() present(request) end)
+	local ok, started = pcall(remote().detect_local_servers, function() present(request, owner) end)
 	if not ok or started ~= true then
 		Logger.error(LOG, "The local servers could not be swept (%s); offering the last sweep's servers.",
 			tostring(started))
-		present(request)
+		present(request, owner)
 	end
 	return true
 end
 
 --- Forgets the open dialog and the posted notification, for tests.
 function M.reset()
-	_asking, _notified = false, false
+	_asking, _notified = nil, false
 end
 
 return M

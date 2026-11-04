@@ -143,6 +143,21 @@ local function remove_range(lines, range)
 	for index = range.last, range.first, -1 do table.remove(lines, index) end
 end
 
+--- Preserves a trailing comment outside strings when replacing an assignment.
+local function trailing_comment(lines, range)
+	local depth, quote, comment = 0, nil, nil
+	for index = range.first, range.last do
+		local raw = lines[index].text
+		local offset
+		depth, quote, offset = Scanner.advance(raw, depth, quote)
+		if index == range.last and offset then
+			local before = raw:sub(1, offset - 1)
+			comment = (before:match("[ \t]*$") or "") .. raw:sub(offset)
+		end
+	end
+	return comment or ""
+end
+
 local function section_has_value(lines, header_line)
 	local depth = 0
 	local multiline_quote = nil
@@ -185,6 +200,7 @@ function M.patch_table_field(source, target_header, field, encoded_value, option
 		local first = ranges[1]
 		if new_line then
 			local replacement_eol = lines[first.last].eol
+			new_line = new_line .. trailing_comment(lines, first)
 			for index = first.last, first.first + 1, -1 do table.remove(lines, index) end
 			lines[first.first] = { text = new_line, eol = replacement_eol }
 		else

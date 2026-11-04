@@ -115,7 +115,10 @@ local function fresh_screenshot()
 			return path
 		end,
 		remove_exact = function(path) fixture.files[path] = nil; return true end,
-		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
+		classify_no_follow = function()
+			if fixture.on_classify then fixture.on_classify() end
+			return { mode = "file", size = 64 }, "ok"
+		end,
 		read_with_status = function()
 			if fixture.on_read then fixture.on_read() end
 			return "\137PNG\r\n\26\n" .. string.rep("\0", 4) .. "IHDR" .. string.pack(">I4I4", 10, 10), "ok"
@@ -127,7 +130,7 @@ local function fresh_screenshot()
 		open_permission_settings = function() return true end,
 		clipboard_change_count = function() return 1 end,
 		clipboard_has_image = function() return true end,
-		copy_image_file_to_clipboard = function() return true end,
+		copy_image_file_to_clipboard = function() fixture.clipboard_copies = (fixture.clipboard_copies or 0) + 1; return true end,
 		encode_base64 = function()
 			if fixture.on_encode then fixture.on_encode() end
 			return "encoded"
@@ -184,6 +187,20 @@ helpers.describe("shared screenshot owner: positive controls", function()
 			helpers.assert_eq(next(f.files), nil)
 		end)
 	end
+	helpers.it("does not copy a screenshot after pause during file inspection", function()
+		local f = fresh_screenshot()
+		local pause_result
+		f.on_classify = function()
+			f.on_classify = nil
+			pause_result = f.subject.pause_screenshot_actions("gestures")
+		end
+		helpers.assert_eq(f.subject.capture({}, "gestures"), true)
+		f.tasks[1]:deliver(0, "", "")
+		helpers.assert_eq(pause_result, false)
+		helpers.assert_eq(f.clipboard_copies or 0, 0)
+		helpers.assert_eq(#f.notifications, 0)
+		helpers.assert_eq(next(f.files), nil)
+	end)
 	for _, action in ipairs({ "capture", "capture_image" }) do
 		helpers.it(action .. " retains a file acquired during a reentrant pause", function()
 			local f = fresh_screenshot()

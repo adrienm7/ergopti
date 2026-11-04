@@ -539,7 +539,12 @@ function M.new(opts)
 			return arm(Schedule.delay_until(due_at, now, timing))
 		end
 		if not arm(timing.reevaluate_sec) then return false end
-		if opts.is_paused() == true then
+		local pause_ok, paused = pcall(opts.is_paused)
+		if not pause_ok or type(paused) ~= "boolean" then
+			Logger.warn(LOG, "Update check deferred: the driver pause state is unavailable.")
+			return true
+		end
+		if paused then
 			Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
 			return true
 		end

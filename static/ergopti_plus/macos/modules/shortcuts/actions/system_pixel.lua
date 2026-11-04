@@ -667,7 +667,9 @@ function M.interactive_screenshot(parent)
 				stderr = stderr,
 				interactive = true,
 				destination = "clipboard",
+				authorized = function() return operation_is_authorized(operation) end,
 			})
+			if not operation_is_authorized(operation) then return false end
 			if outcome == CaptureFlow.OUTCOME_COPIED then
 				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
 				Logger.done(LOG, "Interactive screenshot copied to the clipboard.")

@@ -215,6 +215,22 @@ helpers.describe("TimerScheduler adapter — every()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — monotonic clock", function()
+	helpers.it("falls back when the native timer namespace is unavailable (timer-missing-namespace)", function()
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = make_timer_stub() })
+		local native_timer = _G.hs.timer
+		_G.hs.timer = nil
+		local ok, err = pcall(function()
+			local before = os.time()
+			local wall = TS.now()
+			local awake = TS.awake_time()
+			local after = os.time()
+			helpers.assert_true(wall >= before and wall <= after)
+			helpers.assert_true(awake >= before and awake <= after)
+		end)
+		_G.hs.timer = native_timer
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("uses the fallback when a native wall-clock sample is invalid (timer-invalid-wall-clock)", function()
 		for _, sample in ipairs({ false, "invalid", 0 / 0, math.huge, -math.huge }) do
 			local timer_stub = make_timer_stub()
