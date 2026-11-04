@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **41 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **42 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -775,3 +775,29 @@ Consequence: Removed or replaced rules become active native triggers on a cold l
 Regression: Four native fail-before cases use real temporary canonical sources, the actual index memo, real extension scan/routing and actual HSE registration. The single-file TSV fix records consumed index/source provenance plus closed row/count/payload proof and validates the exact parsed candidate. Physical bundled resolution is separate from adopted extension routes. Two additional initial-publication cases use real stage sharing denial and the genuine logger sink to edit a category or index after BuildRows. Rebuilt RAM snapshots are checked after writer callouts, retried at most twice and otherwise refused with cleared maps. Valid TOML loading still works when cache writes fail. Three existing freshness owners now publish genuine source-backed fixtures. Native post-fix qualification is pending; no cold-load performance measurement or filesystem-wide external CAS is claimed.
 
 The ongoing register now contains **41 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-042: Raw body retries bypass current access-token preparation
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+LLM_RemotePostBody_Async in modules/llm/api_remote.ahk reserves its request then dispatches the retained Resolved.Token directly. Generate calls \_LLMRemote_NeedsAccess and \_LLMRemote_WithAccess, but thinking retries and screen-reading bodies using RawPost omit that preparation. NeedsAccess must be called even when it returns false because it refreshes the retained Token from the current slot.
+
+Reproduction: Prepare an original resolved record through the genuine cached-access owner, then renew or expire its token slot before calling RawPost. Native run41904156246 ate26726d4ca7ea2d98dd2370648ca15f1dcc5dbf0 passes the fresh control but publishes Bearer old-token instead of the actual renewed new-token. Four expired-slot variants also reach a transport before starting exchange. All failures reproduce individually and reversed.
+
+Consequence: A later body can carry an expired or superseded credential and receive an avoidable authentication refusal despite a valid current cached access token or available refresh.
+
+Regression: Six token-rawpost-owner cases run the actual resolver, original access preparation, token engine, RawPost reservation, managed facade and transport.json serializer. Only exchange HTTP and process spawning use existing explicitly controlled I/O ports; this is no native wire-success claim. The actual published header must use current access; expired slots await exchange under the same id, clock and deadline. Cancellation, elapsed deadline and native pause must prevent dispatch. The optional final TransportPort defaults to zero and forwards the preexisting downstream test boundary without changing current callers. Native fail-before proof is measured; native post-fix qualification is pending.
+
+The ongoing register now contains **42 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## Native partial qualification checkpoint: 41904156246
+
+At `e26726d`, all **38 selected OneShot/capture cases passed individually and
+in reverse**, including the two previously failing activation variants and both
+updated extracted-child families. This qualifies the additional AHK-036 sibling.
+The fresh RawPost control also passed; the five remaining RawPost variants failed
+at the measured stale-header or premature-transport assertion recorded in AHK-042.
+The earlier six RawPost failures at `afc1dd3` only exposed a fixture setup omission:
+resolver output intentionally starts without an access token, so the setup now
+performs the same genuine initial access preparation as Generate.
+No aggregate green verdict is claimed for this mixed 44-case discovery run.
