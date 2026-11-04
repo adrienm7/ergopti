@@ -272,8 +272,7 @@ function M.on_message(payload, state, context)
 	local ok_save, accepted = pcall(session.on_save, candidate)
 	session.saving = false
 	if not ok_save or accepted ~= true then
-		Logger.error(LOG, "Prompt editor save was refused; session remains retryable: %s.",
-			tostring(accepted))
+		Logger.error(LOG, "Prompt editor save was refused; session remains retryable.")
 		notify_save_refused(session, state)
 		return { saved = false, closed = false }
 	end

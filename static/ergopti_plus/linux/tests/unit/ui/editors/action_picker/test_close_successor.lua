@@ -47,6 +47,22 @@ local function with_picker(body)
 end
 
 helpers.describe("Action picker exact close successor", function()
+	helpers.it("(picker-private-exception) withholds callback data from the log", function()
+		local logger, lines = require("logger.shim"), {}
+		local original = logger.error
+		logger.error = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(function()
+			with_picker(function(f)
+				helpers.assert_true(f.bridge.open({ title = "Picker", current = "none", items = {} },
+					function() error("failed secret-canary") end))
+				f.message("confirm", "tab_new")
+				helpers.assert_true(#lines > 0)
+				helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
+			end)
+		end)
+		logger.error = original
+		if not ok then error(err, 0) end
+	end)
 	for _, action in ipairs({ "confirm", "cancel" }) do
 		helpers.it("(picker-close-successor) keeps the replacement opened during " .. action, function()
 			with_picker(function(f)

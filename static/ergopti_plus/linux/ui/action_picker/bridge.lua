@@ -358,7 +358,7 @@ local function _handle_table(data, state, context)
 			local ok_callback, accepted = pcall(session.on_confirm, id, state, parameter)
 			session.settling = false
 			if not ok_callback then
-				Logger.error(LOG, "Action picker confirmation callback failed: %s", tostring(accepted))
+				Logger.error(LOG, "Action picker confirmation callback failed; details withheld.")
 				return nil
 			end
 			if accepted == false then
