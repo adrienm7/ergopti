@@ -644,7 +644,8 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	local function fail(reason)
 		if owned ~= nil then
 			local ok, content = read_backend_checked(b)
-			if ok and content ~= owned and content ~= previous_owned then return false, reason end
+			if not ok then return false, "clipboard_ownership_unknown" end
+			if content ~= owned and content ~= previous_owned then return false, reason end
 		end
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
@@ -678,8 +679,10 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return true
 	end)
-	-- A later copy owns the clipboard now; restoring our snapshot would erase it.
-	if holds_pasted_text(b, replacement) and not restore() then return false, "clipboard_restore_failed" end
+	-- Restore only while the replacement is still identifiable as ours.
+	local read_ok, content = read_backend_checked(b)
+	if not read_ok then return false, "clipboard_ownership_unknown" end
+	if content == replacement and not restore() then return false, "clipboard_restore_failed" end
 	if not current() then return false, "destination_changed" end
 	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
 	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
