@@ -13,6 +13,16 @@ local Editor = require("infra.toml.record_editor")
 local Codec = require("infra.toml.codec")
 
 helpers.describe("TOML record editor preserves bytes outside the mutation", function()
+	helpers.it("recognizes quoted and spaced spellings of the same section", function()
+		for _, header in ipairs({'[ "_meta" ]', "[ '_meta' ]"}) do
+			local source = header .. " # retained\ndelay = 250\nother = true\n"
+			local patched = assert(Editor.patch_table_field(source, "[_meta]", "delay", "750"))
+			helpers.assert_eq(patched, header .. " # retained\ndelay = 750\nother = true\n")
+			local decoded = assert(Codec.decode(patched))
+			helpers.assert_eq(decoded._meta.delay, 750)
+		end
+	end)
+
 	helpers.it("updates a section whose comment touches its closing bracket", function()
 		local source = "[_meta]# keep this comment\ndelay = 250\nother = true\n"
 		local patched = assert(Editor.patch_table_field(source, "[_meta]", "delay", "750"))

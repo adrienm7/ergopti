@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local Scanner = require("toml_codec.record_scanner")
+local KeyPath = require("toml_codec.key_path")
 local TextUtils = require("text_utils")
 
 local M = {}
@@ -80,9 +81,13 @@ local function local_eol(records, pivot)
 end
 
 local function starts_target_header(trimmed, target_header)
-	if trimmed:sub(1, #target_header) ~= target_header then return false end
-	local suffix = trimmed:sub(#target_header + 1)
-	return suffix == "" or suffix:match("^%s*#") ~= nil
+	local actual, target = KeyPath.header(trimmed), KeyPath.header(target_header)
+	if actual.array or target.array or type(actual.segments) ~= "table"
+		or type(target.segments) ~= "table" or #actual.segments ~= #target.segments then return false end
+	for index, segment in ipairs(target.segments) do
+		if actual.segments[index] ~= segment then return false end
+	end
+	return true
 end
 
 local function escape_pattern(value)

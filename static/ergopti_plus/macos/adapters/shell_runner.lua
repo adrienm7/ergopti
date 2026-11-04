@@ -45,7 +45,9 @@ local LOG = "adapters.shell_runner"
 local function now_ms()
 	local timer = hs and hs.timer
 	if timer and type(timer.absoluteTime) == "function" then
-		return timer.absoluteTime() / 1e6
+		local ok, sample = pcall(timer.absoluteTime)
+		if ok and type(sample) == "number" and sample == sample
+			and sample >= 0 and sample < math.huge then return sample / 1e6 end
 	end
 	return os.time() * 1000
 end
