@@ -753,3 +753,81 @@ _WSGT20260813_GuillemetsBody(Path) {
 }
 Test("wrap symbols: the spaced guillemets toggle, group and global actions commit (wrap-guillemets-length)",
 	() => _WSGT20260813_WithControls(_WSGT20260813_GuillemetsBody))
+
+; Independent semantic decode accepts TOML comments. The owner's legacy ';'
+; full-line banner is translated only for this independent test oracle; this is
+; not the production reader and does not implement another string parser.
+_WSIC_Document(Text) {
+	Lines := []
+	loop parse, Text, "`n", "`r" {
+		Line := A_LoopField
+		if RegExMatch(Line, "^[ `t]*;")
+			Line := RegExReplace(Line, ";", "#", , 1)
+		Lines.Push(Line)
+	}
+	return TOML_ParseDocument(ArrayJoin(Lines, "`n"))
+}
+_WSIC_HasPair(Custom, Left, Right) {
+	for Pair in Custom
+		if Pair["left"] == Left && Pair["right"] == Right
+			return true
+	return false
+}
+_WSIC_DiskDisabled(Document, Character) {
+	if !Document.Has("disabled")
+		return false
+	for Entry in Document["disabled"]
+		if Entry.Has("char") && Entry["char"] == Character
+			return true
+	return false
+}
+_WSIC_CommentRoundTrip(Mode) {
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed, _WS_StateEpoch
+	global _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS
+	Saved := {path: _WS_Config_Path, disabled: _WS_Disabled, custom: _WS_Custom,
+		failed: _WS_LoadFailed, epoch: _WS_StateEpoch, active: _WS_ACTIVE_PAIRS,
+		builtins: _WS_BUILTIN_PAIRS, groups: _WS_BUILTIN_GROUPS}
+	Root := A_Temp . "\ergopti_wrap_comments_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Path := Root . "\wrap_symbols.toml"
+	try {
+		AssertFalse(A_IsSuspended)
+		Left := Mode == "quoted-hash-control" ? "#" : (Mode == "escaped-quote-control" ? Chr(34)
+			: (Mode == "legacy-semicolon-control" ? ";" : "a"))
+		Right := Mode == "escaped-quote-control" ? "#" : "b"
+		HeaderTail := Mode == "header-comment" ? ' # annotation "quoted"' : ""
+		DisabledTail := Mode == "disabled-field-comment" ? ' # annotation "quoted"' : ""
+		CustomTail := Mode == "custom-field-comment" ? ' # annotation "quoted"' : ""
+		Source := (Mode == "legacy-semicolon-control" ? "; supported legacy full-line comment`n" : "")
+			. "[[disabled]]" . HeaderTail . "`nchar = " . TOML_RenderString("(") . DisabledTail . "`n"
+			. "[[custom]]" . HeaderTail . "`nleft = " . TOML_RenderString(Left) . "`n"
+			. "right = " . TOML_RenderString(Right) . CustomTail . "`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Independent := _WSIC_Document(FSReadStrict(Path))
+		AssertTrue(_WSIC_DiskDisabled(Independent, "("), "the authored source really disables its one-character builtin")
+		AssertTrue(_WSIC_HasPair(Independent["custom"], Left, Right), "the independent semantic decoder must admit the original pair")
+		AssertTrue(WrapSymbols_Init(Root . "\"), "the real public initializer must accept the private source")
+		BeforeHadPair := _WSIC_HasPair(_WS_Custom, Left, Right)
+		BeforeDisabled := _WS_Disabled.Has("(")
+		Committed := WrapSymbols_AddCustom("c", "d")
+		AssertTrue(Committed, "a valid annotated source must allow the actual public writer to persist an unrelated new pair")
+		Disk := _WSIC_Document(FSReadStrict(Path))
+		AssertTrue(_WSIC_HasPair(Disk["custom"], "c", "d"), "the unrelated new pair must genuinely reach disk")
+		AssertTrue(_WSIC_HasPair(Disk["custom"], Left, Right), "the acknowledged unrelated save must not delete the original annotated pair")
+		AssertTrue(_WSIC_DiskDisabled(Disk, "("), "the writer must not serialize comment text in place of the original disabled symbol")
+		AssertTrue(WrapSymbols_Init(Root . "\"), "reload must use the actual persisted file")
+		AssertTrue(_WSIC_HasPair(_WS_Custom, Left, Right))
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		AssertFalse(WrapSymbols_IsEnabled("("), "the same builtin must remain disabled after an actual save and reload")
+		AssertTrue(BeforeHadPair)
+		AssertTrue(BeforeDisabled)
+	} finally {
+		_WS_Config_Path := Saved.path, _WS_Disabled := Saved.disabled, _WS_Custom := Saved.custom
+		_WS_LoadFailed := Saved.failed, _WS_StateEpoch := Saved.epoch, _WS_ACTIVE_PAIRS := Saved.active
+		_WS_BUILTIN_PAIRS := Saved.builtins, _WS_BUILTIN_GROUPS := Saved.groups
+		DirDelete(Root, true)
+	}
+}
+for _WSIC_Mode in ["canonical-control", "header-comment", "disabled-field-comment", "custom-field-comment",
+	"quoted-hash-control", "escaped-quote-control", "legacy-semicolon-control"]
+	Test("wrap symbols TOML inline comments: " . _WSIC_Mode, _WSIC_CommentRoundTrip.Bind(_WSIC_Mode))

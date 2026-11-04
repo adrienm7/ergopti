@@ -58,3 +58,74 @@ _SNA_Navigation() {
 	}
 }
 Test("navigation actions: the emitted rows are offered on Windows (sticky-actions)", _SNA_Navigation)
+
+_SNA_NativeChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
+	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
+	Code .= "#Include " . Owner . "`n"
+	for Name in ["StickyModifierNames", "StickyModifier"] {
+		Body := _DriverFuncBody(Name)
+		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
+		Code .= Body . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_nontext_probe_body.ahk")
+}
+_SNA_NativeCase(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_sticky_native_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Root)
+	Script := Root . "\subject.ahk"
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNA_NativeChildSource()))
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false
+	PreviousCritical := Critical("Off")
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-sendevent", Mode], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine sticky child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned sticky child must settle once.")
+		_TestPrint("# sticky-native " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native sticky capture failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS sticky-nontext " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired
+			RetirementDebt := Handle
+		else if !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _SNA_NativeMode in ["letter", "enter", "backspace"]
+	Test("Sticky native capture: " . _SNA_NativeMode . " suppresses the original before replay (sticky-native-nontext)",
+		_SNA_NativeCase.Bind(_SNA_NativeMode))

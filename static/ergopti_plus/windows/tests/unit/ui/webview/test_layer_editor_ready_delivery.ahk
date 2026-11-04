@@ -141,6 +141,6 @@ _LRDT_Case(Mode) {
 		throw ExportFailure
 }
 
-for _LRDT_Mode in ["current", "paused-dispatch", "retired-epoch"]
+for _LRDT_Mode in ["current", "paused-dispatch", "retired-epoch", "source-stale"]
 	Test("Layer editor readiness: " . _LRDT_Mode . " retains only its admitted initialization (layer-editor-ready-delivery-owner)",
 		_LRDT_Case.Bind(_LRDT_Mode))

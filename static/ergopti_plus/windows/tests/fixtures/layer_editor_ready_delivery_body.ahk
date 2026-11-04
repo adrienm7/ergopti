@@ -186,8 +186,104 @@ _LRDS_Resume() {
 		"The real resume/menu service graph must execute; an absent service cannot create a false stranded init.")
 }
 
+
+class _LRDS_SourceArgs {
+	__New(Text) {
+		this.Text := Text
+	}
+	TryGetWebMessageAsString() => this.Text
+}
+
+_LRDS_RefuseApply() {
+	global _LRDS
+	_LRDS.ApplyCalls += 1
+	return false
+}
+
+_LRDS_SaveMessage(Host, Payload) {
+	global _LRDS
+	_LRDS.SaveEntered += 1
+	try _LayerEditor_OnMessage(Host, Payload, _LRDS_RefuseApply)
+	finally _LRDS.SaveReturned += 1
+}
+
+_LRDS_StaleSource(Record) {
+	global _LRDS, _SharedDir
+	_LRDS_Pump(Record, 1, 1)
+	_LRDS_Require(Record.View.Init.Length == 1, "The old page must genuinely receive its original file before another editor publishes.")
+	Original := Record.View.Init[1]["text"]
+	_LRDS_Require(Original == _LRDS.LayerText, "The candidate comes from the actual original init projection.")
+	; The canonical corpus round-trips byte-identically through the genuine
+	; LayerModel.readLayerFile/serialize used by the shared page's Save button.
+	; A no-edit save is an ordinary reachable producer, without invented fields.
+	External := StrReplace(Original, '"KeyS" = "arrow_up"', '"KeyS" = "arrow_down"', , &Changed)
+	_LRDS_Require(Changed == 1 && External != Original, "The independent edit changes an actual navigation binding.")
+	Ctx := KeymapLayers_LoadContext(_SharedDir)
+	_LRDS_Require(LayerEditor_Validate(External, Ctx).Length == 0, "The newer durable configuration must be valid on every OS.")
+	_LRDS_Require(FSWriteDurable(_LRDS.LayerPath, External), "The independent editor must really publish the changed binding.")
+	Record.Host.Opts["OnMessage"] := _LRDS_SaveMessage
+	Message := '{"action":"save","text":' . JsonStringLiteral(Original) . '}'
+	_LRDS_Require(Record.View.Callbacks.Has("message"), "The live SDK retains the genuine host bridge.")
+	Callback := Record.View.Callbacks["message"]
+	Callback.Call(Record.View, _LRDS_SourceArgs(Message))
+	Started := A_TickCount
+	while _LRDS.SaveReturned == 0 && !IsObject(_LRDS.Failure) && TickElapsed(Started) < 3000
+		Sleep(5)
+	if IsObject(_LRDS.Failure)
+		throw _LRDS.Failure
+	FileAppend("RECEIPT layer-source save_entered=" . _LRDS.SaveEntered . " save_returned=" . _LRDS.SaveReturned
+		. " apply_calls=" . _LRDS.ApplyCalls . " newer_bytes_preserved=" . FSUtf8ExactMatches(_LRDS.LayerPath, External) . "`n", "*", "UTF-8")
+	_LRDS_Require(_LRDS.SaveEntered == 1 && _LRDS.SaveReturned == 1, "Exactly one actual deferred message must settle.")
+	_LRDS_Require(FSUtf8ExactMatches(_LRDS.LayerPath, External), "A stale layer page must not erase another editor's newer navigation binding.")
+	_LRDS_Require(_LRDS.ApplyCalls == 0, "Refused stale source cannot request applying stale content.")
+	Prefix := "if(window.saveResult)window.saveResult("
+	Found := 0
+	for Script in Record.View.Scripts {
+		if SubStr(Script, 1, StrLen(Prefix)) != Prefix
+			continue
+		Found += 1
+		Result := JsonParse(SubStr(Script, StrLen(Prefix) + 1, StrLen(Script) - StrLen(Prefix) - 1))
+		_LRDS_Require(!Result["saved"] && !Result["applied"] && Result["errors"].Length > 0,
+			"The same live page must receive an explained failure rather than a false durable receipt.")
+	}
+	_LRDS_Require(Found == 1 && Record.Controller.Closed == 0 && !Record.Host.ResetDone,
+		"One refusal must preserve the actual editor for recovery.")
+	; A fresh public host must admit this same physical file. This positive
+	; control proves a source conflict, rather than a broken writer or path.
+	Record.Host.Close()
+	_LRDS.LayerText := External
+	Fresh := _LRDS_Open()
+	_LRDS_ReadyEvent(Fresh)
+	_LRDS_Pump(Fresh, 1, 1)
+	Fresh.Host.Opts["OnMessage"] := _LRDS_SaveMessage
+	Message := '{"action":"save","text":' . JsonStringLiteral(External) . '}'
+	Callback := Fresh.View.Callbacks["message"]
+	Callback.Call(Fresh.View, _LRDS_SourceArgs(Message))
+	Started := A_TickCount
+	while _LRDS.SaveReturned < 2 && !IsObject(_LRDS.Failure) && TickElapsed(Started) < 3000
+		Sleep(5)
+	if IsObject(_LRDS.Failure)
+		throw _LRDS.Failure
+	_LRDS_Require(_LRDS.SaveEntered == 2 && _LRDS.SaveReturned == 2 && _LRDS.ApplyCalls == 1,
+		"The fresh real source must publish through the actual writer and reach the isolated postcommit apply port once.")
+	Found := 0
+	for Script in Fresh.View.Scripts {
+		if SubStr(Script, 1, StrLen(Prefix)) != Prefix
+			continue
+		Found += 1
+		Result := JsonParse(SubStr(Script, StrLen(Prefix) + 1, StrLen(Script) - StrLen(Prefix) - 1))
+		_LRDS_Require(Result["saved"] && !Result["applied"] && Result["errors"].Length == 0,
+			"Only the fresh positive-control source may receive a real durable receipt.")
+	}
+	_LRDS_Require(Found == 1 && FSUtf8ExactMatches(_LRDS.LayerPath, External),
+		"The positive control must preserve the exact newer binding without stage debris.")
+	return Fresh
+}
+
 _LRDS_Log(Line) {
 	global _LRDS
+	if _LRDS.Mode == "source-stale"
+		return
 	if InStr(Line, "[ERROR]") && !IsObject(_LRDS.Failure)
 		_LRDS.Failure := Error("The actual host/data/resume path emitted an error before its business oracle.")
 }
@@ -222,7 +318,8 @@ _LRDS_Main() {
 		ExitApp(2)
 	Persistent(true)
 	_LRDS := {Mode: A_Args[1], Windows: [], Controllers: [], Records: [], Failure: 0,
-		Environments: 0, PublicCalls: 0, NavigationEvents: 0, Resumes: 0, LayerText: "", LayerPath: ""}
+		Environments: 0, PublicCalls: 0, NavigationEvents: 0, Resumes: 0, LayerText: "", LayerPath: "",
+		SaveEntered: 0, SaveReturned: 0, ApplyCalls: 0}
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_LRDS_OnError)
 	LoggerSetTestSink(_LRDS_Log)
@@ -266,7 +363,7 @@ _LRDS_Main() {
 				_LRDS_ReadyEvent(Successor)
 			}
 		} finally Critical(HeldCritical)
-		_LRDS_Pump(Record, 1, _LRDS.Mode == "current" ? 1 : 0)
+		_LRDS_Pump(Record, 1, (_LRDS.Mode == "current" || _LRDS.Mode == "source-stale") ? 1 : 0)
 		_LRDS_Require(Record.Calls >= 1 && Record.Settled == Record.Calls && !Record.InFlight
 			&& Record.LastEpoch == Record.Epoch,
 			"The real SUT native timer must be observed through its complete captured epoch dispatch.")
@@ -283,6 +380,8 @@ _LRDS_Main() {
 		}
 		if _LRDS.Mode == "retired-epoch"
 			_LRDS_Pump(Successor, 1, 1)
+		if _LRDS.Mode == "source-stale"
+			Record := _LRDS_StaleSource(Record)
 		_LRDS_Report(Record), Observed := true
 		if IsObject(_LRDS.Failure)
 			throw _LRDS.Failure
