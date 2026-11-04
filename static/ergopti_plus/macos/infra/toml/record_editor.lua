@@ -218,7 +218,7 @@ function M.patch_table_field(source, target_header, field, encoded_value, option
 		}
 	end
 
-	if not new_line and scan.header_line
+	if not new_line and #ranges > 0 and scan.header_line
 		and options and options.remove_empty_section == true
 		and not section_has_value(lines, scan.header_line)
 		-- A header can carry user-authored context. Retaining a harmless empty

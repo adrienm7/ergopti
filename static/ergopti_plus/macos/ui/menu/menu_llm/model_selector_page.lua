@@ -61,7 +61,7 @@ local _installing = {}
 local _install_refused = {}
 
 -- Whether a refresh is scheduled for a runtime probe still in flight.
-local _recheck_armed = false
+local _recheck_armed = nil
 
 
 
@@ -383,11 +383,17 @@ function M.build_payload(ctx, probes, collected)
 			-- probe's end: the page asks again until it has settled.
 			backends[index].reason_key = nil
 			if not _recheck_armed then
-				_recheck_armed = true
-				DeferredWork.after(Timings.sec("ui", "webview_ready_safety_flush_ms"), function()
-					_recheck_armed = false
+				local owner = {}
+				_recheck_armed = owner
+				local ok, accepted = pcall(DeferredWork.after, Timings.sec("ui", "webview_ready_safety_flush_ms"), function()
+					if _recheck_armed ~= owner then return end
+					_recheck_armed = nil
 					M.refresh()
 				end, "model_selector_page.runtime_probe")
+				if not ok or accepted ~= true then
+					if _recheck_armed == owner then _recheck_armed = nil end
+					Logger.error(LOG, "Runtime probe refresh could not be scheduled.")
+				end
 			end
 		end
 	end

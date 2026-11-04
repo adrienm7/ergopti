@@ -650,10 +650,13 @@ function M.capture_image(flags, parent, max_edge, on_image)
 	--- Hands the capture to the caller.
 	--- @param data string|nil The file bytes already read, nil to read the file now.
 	local function deliver(data)
+		if not operation_is_authorized(operation) then return false end
 		local detail = nil
 		if data == nil then data, detail = read_capture(target) end
+		if not operation_is_authorized(operation) then return false end
 		local encoded = nil
 		if data ~= nil then encoded, detail = encode_capture(data) end
+		if not operation_is_authorized(operation) then return false end
 		if not encoded then
 			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(detail))
 			on_image("failed", detail)
@@ -679,6 +682,7 @@ function M.capture_image(flags, parent, max_edge, on_image)
 			interactive = CaptureFlow.is_interactive(flags),
 			destination = "file",
 		})
+		if not operation_is_authorized(operation) then return false end
 		if outcome == CaptureFlow.OUTCOME_CANCELLED then
 			Logger.info(LOG, "Screen reading capture cancelled by the user.")
 			on_image("cancelled")
@@ -690,6 +694,7 @@ function M.capture_image(flags, parent, max_edge, on_image)
 			return false
 		end
 		local data, read_error = read_capture(target)
+		if not operation_is_authorized(operation) then return false end
 		if not data then
 			Logger.error(LOG, "Screen reading capture unusable: %s.", tostring(read_error))
 			on_image("failed", read_error)
