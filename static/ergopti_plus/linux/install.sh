@@ -150,6 +150,23 @@ _standalone_prefix_allowed() {
 	while [[ "$candidate" != / && "$candidate" == */ ]]; do candidate="${candidate%/}"; done
 	case "$candidate" in /|/usr|/usr/local|/app|/nix|/nix/*) return 1 ;; esac
 }
+_standalone_prefix_outside_checkout() {
+	local probe="$1" physical
+	# Resolve the nearest existing directory without creating the new prefix.
+	while [ ! -d "$probe" ]; do
+		case "$probe" in
+			*/*) probe="${probe%/*}"; [ -n "$probe" ] || probe=/ ;;
+			*) probe=. ;;
+		esac
+	done
+	IFS= read -r -d '' physical < <(CDPATH= cd -Pe -- "$probe" && printf '%s\0' "$PWD") || return 1
+	while :; do
+		if [ -e "${physical%/}/.git" ] || [ -L "${physical%/}/.git" ]; then return 1; fi
+		[ "$physical" = / ] && break
+		physical="${physical%/*}"
+		[ -n "$physical" ] || physical=/
+	done
+}
 if ! $SETUP_PERMS_ONLY; then
 	[ -n "$PREFIX" ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
 	# Permission setup always rejects system accounts. Detect an invalid target
@@ -161,9 +178,11 @@ if ! $SETUP_PERMS_ONLY; then
 		exit 1
 	fi
 	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
+	_standalone_prefix_outside_checkout "$PREFIX" || { printf '[install] code=source-checkout path=%q\n' "$PREFIX" >&2; exit 1; }
 	mkdir -p -- "$PREFIX"
 	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
 	_standalone_prefix_allowed "$PREFIX" || { ergopti_msg uninstall.system_prefix >&2; exit 1; }
+	_standalone_prefix_outside_checkout "$PREFIX" || { printf '[install] code=source-checkout path=%q\n' "$PREFIX" >&2; exit 1; }
 	# Lua's module search path treats semicolons as separators and every
 	# question mark as a module-name placeholder. Neither can be escaped in
 	# LUA_PATH or LUA_CPATH, so such a prefix cannot load the installed driver.
