@@ -47,6 +47,21 @@ helpers.it("local server settings refuse a FIFO without waiting for its writer",
 	helpers.assert_eq(content, nil, "a FIFO must not be treated as local server settings")
 end)
 
+helpers.it("local server settings reject oversized files instead of decoding a valid prefix", function()
+	local uv = require("luv")
+	local scanner = require("modules.llm.local_server_ports")
+	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-settings-limit-XXXXXX"))
+	local path = dir .. "/settings.json"
+	local prefix = '{"port":1234}'
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(prefix .. string.rep(" ", 1048576 - #prefix) .. "invalid"))
+	assert(file:close())
+	local content = scanner._read_file(path)
+	os.remove(path)
+	os.remove(dir)
+	helpers.assert_nil(content, "a truncated valid prefix must not be used as the complete settings")
+end)
+
 helpers.describe("Linux local server port scan from /proc (local-server-ports)", function()
 	local uv = require("luv")
 
