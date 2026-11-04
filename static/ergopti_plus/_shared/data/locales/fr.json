@@ -1731,6 +1731,8 @@
 	"menu.gestures.reading_off": "Lecture libinput : inactive",
 	"menu.keyboard_layout.add_ergopti": "➕ Ajouter Ergopti v%s à la liste des dispositions",
 	"menu.keyboard_layout.open_system_prefs": "Ouvrir Préférences Système → Clavier",
+	"menu.layout.install_failed": "Impossible d’installer la disposition de clavier. Consultez les journaux pour les détails et les sauvegardes conservées.",
+	"menu.layout.install_launcher_required": "Ouvrez ErgoptiPlus puis réessayez d’installer la disposition de clavier.",
 	"menu.layout.active_layouts": "Sources de saisie",
 	"menu.layout.header_any": "Toutes dispositions",
 	"menu.layout.header_custom": "Disposition personnalisée",

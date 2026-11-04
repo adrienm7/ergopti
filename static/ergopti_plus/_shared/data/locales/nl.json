@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput-lezen: uit",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s toevoegen aan indelingslijst",
 	"menu.keyboard_layout.open_system_prefs": "Systeemvoorkeuren → Toetsenbord openen",
+	"menu.layout.install_failed": "De toetsenbordindeling kon niet worden geïnstalleerd. Bekijk de logs en bewaarde back-ups.",
+	"menu.layout.install_launcher_required": "Open ErgoptiPlus en probeer de toetsenbordindeling opnieuw te installeren.",
 	"menu.layout.active_layouts": "Invoerbronnen",
 	"menu.layout.header_any": "Alle indelingen",
 	"menu.layout.header_custom": "Aangepaste indeling",

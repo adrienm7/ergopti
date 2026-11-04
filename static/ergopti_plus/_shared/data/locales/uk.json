@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "Читання libinput: вимкнено",
 	"menu.keyboard_layout.add_ergopti": "➕ Додати Ergopti v%s до списку розкладок",
 	"menu.keyboard_layout.open_system_prefs": "Відкрити Системні налаштування → Клавіатура",
+	"menu.layout.install_failed": "Не вдалося встановити розкладку клавіатури. Перевірте журнали та збережені резервні копії.",
+	"menu.layout.install_launcher_required": "Відкрийте ErgoptiPlus і повторіть установлення розкладки клавіатури.",
 	"menu.layout.active_layouts": "Джерела введення",
 	"menu.layout.header_any": "Усі розкладки",
 	"menu.layout.header_custom": "Користувацька розкладка",

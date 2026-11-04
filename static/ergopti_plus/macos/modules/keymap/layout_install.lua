@@ -445,6 +445,10 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		or not bundle_name:match("^Ergopti_v[%d%.]+%.bundle$") then
 		return nil, "bundle name is invalid"
 	end
+	local launcher = os.getenv("ERGOPTI_LAUNCHER_EXECUTABLE")
+	if type(launcher) ~= "string" or launcher:sub(1, 1) ~= "/" then
+		return nil, "native exclusive rename unavailable; launch ErgoptiPlus to install keyboard layouts", "launcher_unavailable"
+	end
 
 	local target = target_dir:gsub("/+$", "")
 	local source_dir = bundles_dir:match("/$") and bundles_dir or (bundles_dir .. "/")
@@ -453,6 +457,10 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		"target=" .. sq(target) .. ";",
 		"source=" .. sq(source_dir .. bundle_name) .. ";",
 		"name=" .. sq(bundle_name) .. ";",
+		"launcher=" .. sq(launcher) .. ";",
+		'case "$launcher" in /*) ;; *) echo "Native rename role unavailable."; exit 1 ;; esac;',
+		'receipt=$("$launcher" --release-rename probe && printf .) || exit 1;',
+		'[ "$receipt" = "$(printf \'%s\\n.\' --release-rename)" ] || exit 1;',
 		'mkdir -p "$target" || exit 1;',
 		'work="$(mktemp -d "$target/.ergopti-install.XXXXXX")" || exit 1;',
 		'stage="$work/$name";',
@@ -465,11 +473,13 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 			'if [ "$committed" -eq 0 ]; then',
 				'restore_ok=1;',
 				'for prior in "$backup"/Ergopti_v*.bundle; do',
-					'[ -e "$prior" ] || continue;',
-					'mv "$prior" "$target/" || restore_ok=0;',
+					'[ -e "$prior" ] || [ -L "$prior" ] || continue;',
+					'"$launcher" --release-rename move "$prior" "$target/${prior##*/}" || restore_ok=0;',
 				'done;',
 				'if [ "$restore_ok" -eq 1 ]; then',
 					'rm -rf "$work";',
+				'else',
+					'echo "Keyboard layout backups retained at $backup." >&2;',
 				'fi;',
 				'return;',
 			'fi;',
@@ -478,11 +488,10 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		'trap restore_install 0;',
 		"trap 'exit 1' 1 2 15;",
 		'for prior in "$target"/Ergopti_v*.bundle; do',
-			'[ -e "$prior" ] || continue;',
-			'mv "$prior" "$backup/" || exit 1;',
+			'[ -e "$prior" ] || [ -L "$prior" ] || continue;',
+			'"$launcher" --release-rename move "$prior" "$backup/${prior##*/}" || exit 1;',
 		'done;',
-		'[ ! -e "$target/$name" ] || exit 1;',
-		'mv "$stage" "$target/$name" || exit 1;',
+		'"$launcher" --release-rename move "$stage" "$target/$name" || exit 1;',
 		'committed=1;',
 		'rm -rf "$backup" || true;',
 		'trap - 0 1 2 15;',
@@ -498,8 +507,8 @@ end
 --- @return boolean committed Whether the replacement committed.
 --- @return any detail Native output or validation/exception detail.
 local function execute_install_transaction(target_dir, bundles_dir, bundle_name)
-	local command, detail = build_install_transaction(target_dir, bundles_dir, bundle_name)
-	if not command then return false, detail end
+	local command, detail, reason = build_install_transaction(target_dir, bundles_dir, bundle_name)
+	if not command then return false, detail, reason end
 	local call_ok, output, native_ok = pcall(hs.execute, command)
 	invalidate_bundle_caches()
 	if not call_ok then return false, output end
@@ -571,7 +580,7 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 		return true
 	end
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
-	local committed, detail = execute_install_transaction(
+	local committed, detail, reason = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
 	if committed then
 		cleanup_other_scope(SYSTEM_LAYOUTS_DIR, "system scope")
@@ -580,7 +589,7 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 		return true
 	end
 	Logger.error(LOG, "User install failed: %s.", tostring(detail))
-	return false
+	return false, reason
 end
 
 --- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
@@ -591,11 +600,11 @@ end
 --- @return boolean true on success.
 local function install_system_unlocked(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
-	local shell_cmd, command_detail = build_install_transaction(
+	local shell_cmd, command_detail, reason = build_install_transaction(
 		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name)
 	if not shell_cmd then
 		Logger.error(LOG, "System install failed: %s.", tostring(command_detail))
-		return false
+		return false, reason
 	end
 	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
 	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
@@ -607,9 +616,9 @@ local function install_system_unlocked(bundles_dir, bundle_name)
 		"do shell script \"%s\" with administrator privileges",
 		shell_cmd
 	)
-	local call_ok, native_ok = false, false
+	local call_ok, native_ok, _, diagnostic = false, false, nil, nil
 	if hs.osascript and type(hs.osascript.applescript) == "function" then
-		call_ok, native_ok = pcall(hs.osascript.applescript, script)
+		call_ok, native_ok, _, diagnostic = pcall(hs.osascript.applescript, script)
 	end
 	invalidate_bundle_caches()
 	if call_ok and native_ok == true then
@@ -619,6 +628,19 @@ local function install_system_unlocked(bundles_dir, bundle_name)
 		return true
 	end
 	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
+	-- AppleScript returns a failed shell's stderr as a native diagnostic. Expose
+	-- only the owned backup path, never the rest of the native error text.
+	local prefix = SYSTEM_LAYOUTS_DIR .. ".ergopti-install."
+	local reported = false
+	if type(diagnostic) == "string" then
+		local start = diagnostic:find(prefix, 1, true)
+		local suffix = start and diagnostic:sub(start + #prefix):match("^([%w][%w][%w][%w][%w][%w]/backup)")
+		if suffix then
+			Logger.error(LOG, "Keyboard layout backups retained at %s%s.", prefix, suffix)
+			reported = true
+		end
+	end
+	if not reported then Logger.error(LOG, "If rollback was interrupted, inspect %s*/backup for retained bundles.", prefix) end
 	return false
 end
 
@@ -637,7 +659,7 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 		return false
 	end
 	_install_in_flight = true
-	local call_ok, committed_or_err = xpcall(function()
+	local call_ok, committed_or_err, reason = xpcall(function()
 		return install_fn(bundles_dir, bundle_name)
 	end, debug.traceback)
 	_install_in_flight = false
@@ -646,7 +668,7 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 			scope_label, tostring(committed_or_err))
 		return false
 	end
-	return committed_or_err == true
+	return committed_or_err == true, reason
 end
 
 local function install_user(bundles_dir, bundle_name)

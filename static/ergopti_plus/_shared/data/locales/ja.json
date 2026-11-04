@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput 読み取り：オフ",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s をレイアウトリストに追加",
 	"menu.keyboard_layout.open_system_prefs": "システム環境設定 → キーボードを開く",
+	"menu.layout.install_failed": "キーボード配列をインストールできませんでした。詳細と保持されたバックアップはログを確認してください。",
+	"menu.layout.install_launcher_required": "ErgoptiPlusを開き、キーボード配列のインストールを再試行してください。",
 	"menu.layout.active_layouts": "入力ソース",
 	"menu.layout.header_any": "すべての配列",
 	"menu.layout.header_custom": "カスタム配列",

@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "קריאת libinput: כבויה",
 	"menu.keyboard_layout.add_ergopti": "➕ הוסף את Ergopti v%s לרשימת הפריסות",
 	"menu.keyboard_layout.open_system_prefs": "פתח העדפות מערכת ← מקלדת",
+	"menu.layout.install_failed": "לא ניתן להתקין את פריסת המקלדת. יש לבדוק את היומנים ואת הגיבויים שנשמרו.",
+	"menu.layout.install_launcher_required": "יש לפתוח את ErgoptiPlus ולנסות להתקין שוב את פריסת המקלדת.",
 	"menu.layout.active_layouts": "מקורות קלט",
 	"menu.layout.header_any": "כל הפריסות",
 	"menu.layout.header_custom": "פריסה מותאמת אישית",

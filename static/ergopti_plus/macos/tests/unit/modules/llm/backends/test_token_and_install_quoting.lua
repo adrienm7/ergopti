@@ -73,7 +73,14 @@ helpers.describe("layout_install: the privileged install is POSIX-quoted", funct
 		local source_dir = "/tmp/O'Brien/$cache/`layout`/"
 		local bundle_name = "Ergopti_v2.0.0.bundle"
 
-		install.install_system(source_dir, bundle_name)
+		local getenv = os.getenv
+		os.getenv = function(name)
+			if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end
+			return getenv(name)
+		end
+		local ok, err = pcall(install.install_system, source_dir, bundle_name)
+		os.getenv = getenv
+		if not ok then error(err, 0) end
 		helpers.assert_true(type(dispatched_script) == "string" and dispatched_script ~= "",
 			"install_system must dispatch the production AppleScript transaction")
 

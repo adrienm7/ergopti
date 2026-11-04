@@ -1736,6 +1736,8 @@
 	"menu.gestures.reading_off": "libinput-lesing: av",
 	"menu.keyboard_layout.add_ergopti": "➕ Legg til Ergopti v%s i oppsettsliste",
 	"menu.keyboard_layout.open_system_prefs": "Åpne Systeminnstillinger → Tastatur",
+	"menu.layout.install_failed": "Tastaturoppsettet kunne ikke installeres. Se loggene og de bevarte sikkerhetskopiene.",
+	"menu.layout.install_launcher_required": "Åpne ErgoptiPlus og prøv å installere tastaturoppsettet igjen.",
 	"menu.layout.active_layouts": "Inndatakilder",
 	"menu.layout.header_any": "Alle oppsett",
 	"menu.layout.header_custom": "Egendefinert tastaturoppsett",
