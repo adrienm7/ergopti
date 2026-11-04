@@ -37,6 +37,7 @@ M.REASON = {
 	download = "changelog_window.install_error_download",
 	verify = "changelog_window.install_error_verify",
 	install = "changelog_window.install_error_install",
+	previous_backup = "changelog_window.install_error_previous_backup",
 	unknown_release = "changelog_window.install_error_unknown_release",
 	-- A feed-only list: no driver verifies a download without the API's digest
 	-- or checksum asset. The macOS window hands the channel's newest release to

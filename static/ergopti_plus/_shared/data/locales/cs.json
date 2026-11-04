@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Stažení {tag} selhalo: nic nebylo nainstalováno. Zkontrolujte připojení a zkuste to znovu.",
 	"changelog_window.install_error_handoff": "Vestavěný aktualizátor nebyl dostupný: nic nebylo nainstalováno. Podrobnosti jsou v dnešním protokolu.",
 	"changelog_window.install_error_install": "Instalace {tag} selhala. Podrobnosti jsou v dnešním protokolu.",
+	"changelog_window.install_error_previous_backup": "Stále existuje starší záloha. Před dalším pokusem přesuňte ErgoptiPlus.app.previous ze složky aplikace.",
 	"changelog_window.install_error_no_asset": "Verze {tag} neobsahuje instalační soubor pro tento systém: nic nebylo nainstalováno.",
 	"changelog_window.install_error_no_details": "GitHub vrátil jen kanál verzí, který neuvádí soubory ke stažení: nic nebylo nainstalováno. Zkuste to znovu za několik minut.",
 	"changelog_window.install_error_unexpected": "Instalace se zastavila kvůli neočekávané chybě. Podrobnosti jsou v dnešním protokolu.",

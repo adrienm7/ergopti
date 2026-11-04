@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Downloading {tag} failed: nothing was installed. Check your connection and try again.",
 	"changelog_window.install_error_handoff": "The built-in updater could not be reached: nothing was installed. Details are in today’s log.",
 	"changelog_window.install_error_install": "Installing {tag} failed. The details are in today’s log.",
+	"changelog_window.install_error_previous_backup": "An earlier app backup still exists. Move ErgoptiPlus.app.previous out of the application folder before retrying.",
 	"changelog_window.install_error_no_asset": "Version {tag} has no installation file for this system: nothing was installed.",
 	"changelog_window.install_error_no_details": "GitHub only returned the release feed, which does not list the files to download: nothing was installed. Try again in a few minutes.",
 	"changelog_window.install_error_unexpected": "The installation stopped on an unexpected error. The details are in today’s log.",

@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Pobieranie {tag} nie powiodło się: nic nie zostało zainstalowane. Sprawdź połączenie i spróbuj ponownie.",
 	"changelog_window.install_error_handoff": "Nie udało się połączyć z wbudowanym aktualizatorem: nic nie zostało zainstalowane. Szczegóły są w dzisiejszym dzienniku.",
 	"changelog_window.install_error_install": "Instalacja {tag} nie powiodła się. Szczegóły są w dzisiejszym dzienniku.",
+	"changelog_window.install_error_previous_backup": "Nadal istnieje wcześniejsza kopia aplikacji. Przed ponowną próbą przenieś ErgoptiPlus.app.previous znajdujący się obok aplikacji.",
 	"changelog_window.install_error_no_asset": "Wersja {tag} nie zawiera pliku instalacyjnego dla tego systemu: nic nie zostało zainstalowane.",
 	"changelog_window.install_error_no_details": "GitHub zwrócił tylko kanał wersji, który nie wymienia plików do pobrania: nic nie zostało zainstalowane. Spróbuj ponownie za kilka minut.",
 	"changelog_window.install_error_unexpected": "Instalacja przerwana przez nieoczekiwany błąd. Szczegóły są w dzisiejszym dzienniku.",

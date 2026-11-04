@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "Hentningen af {tag} mislykkedes: intet blev installeret. Kontrollér forbindelsen, og prøv igen.",
 	"changelog_window.install_error_handoff": "Den indbyggede opdatering kunne ikke nås: intet blev installeret. Detaljer findes i dagens log.",
 	"changelog_window.install_error_install": "Installationen af {tag} mislykkedes. Detaljerne står i dagens log.",
+	"changelog_window.install_error_previous_backup": "En tidligere sikkerhedskopi findes stadig. Flyt ErgoptiPlus.app.previous ud af appens mappe, før du prøver igen.",
 	"changelog_window.install_error_no_asset": "Version {tag} har ingen installationsfil til dette system: intet blev installeret.",
 	"changelog_window.install_error_no_details": "GitHub returnerede kun versionsfeedet, som ikke viser filerne, der skal hentes: intet blev installeret. Prøv igen om et par minutter.",
 	"changelog_window.install_error_unexpected": "Installationen stoppede på grund af en uventet fejl. Detaljerne står i dagens log.",

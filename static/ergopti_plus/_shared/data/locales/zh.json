@@ -180,6 +180,7 @@
 	"changelog_window.install_error_download": "下载 {tag} 失败：未安装任何内容。请检查网络连接后重试。",
 	"changelog_window.install_error_handoff": "无法连接内置更新程序：未安装任何内容。详细信息见今天的日志。",
 	"changelog_window.install_error_install": "安装 {tag} 失败。详细信息见今天的日志。",
+	"changelog_window.install_error_previous_backup": "仍存在旧的应用备份。请先移走应用旁边的 ErgoptiPlus.app.previous，然后重试。",
 	"changelog_window.install_error_no_asset": "版本 {tag} 没有适用于此系统的安装文件：未安装任何内容。",
 	"changelog_window.install_error_no_details": "GitHub 只返回了版本订阅源，其中没有列出要下载的文件：未安装任何内容。请几分钟后重试。",
 	"changelog_window.install_error_unexpected": "安装因意外错误而中止。详细信息见今天的日志。",
