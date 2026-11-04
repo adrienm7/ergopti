@@ -277,3 +277,17 @@ order, surrogate pairs, malformed inputs, NUL, raw byte boundaries and normalize
 UTF-8 expansion beyond the limit. This is not a native AHK or full cross-driver
 suite pass. AHK-005, AHK-013 and AHK-019 also have source fixes and regression
 coverage committed; their native execution remains pending.
+
+## AHK-021: Revoked input still updates ROI after ergonomic publication
+
+Severity: medium. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+static/ergopti_plus/windows/modules/keystats/keystats_hook.ahk:\_KL_Hook_CommitInput does not revalidate its arrival after ErgoFn.Call before dispatching the ROI sink.
+
+Reproduction: Type hello, then deliver a space through the genuine hook with its ergonomic callback pausing capture, invalidating the capture generation or changing the focus generation.
+
+Consequence: An arrival revoked during the ergonomic callout still clears the current ROI word and increments its candidate count.
+
+Regression: Use the genuine hook and ROI owners in the isolated keys fixture; revoke through the official ergonomic callback port and require the ROI seed and WPM count to remain unchanged. This qualifies the explicit callout boundary, not atomicity of the whole ROI pipeline.
+
+The ongoing register now contains **21 distinct new findings**. The requested target of 1,000 remains unmet.
