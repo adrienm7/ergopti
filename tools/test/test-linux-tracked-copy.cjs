@@ -23,6 +23,36 @@ function git(...args) {
 }
 
 try {
+	if (process.platform === 'linux') {
+		// An output selector that names the checkout, its ancestor, or its source
+		// tree must never authorize deleting that data.
+		for (const kind of ['checkout', 'ancestor', 'source', 'alias']) {
+			const parent = path.join(scratch, `builder-guard-${kind}`);
+			const checkout = path.join(parent, 'checkout');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			const target =
+				kind === 'checkout'
+					? checkout
+					: kind === 'ancestor'
+						? parent
+						: kind === 'alias'
+							? path.join(parent, 'alias')
+							: path.join(checkout, 'static');
+			if (kind === 'alias') fs.symlinkSync(checkout, target);
+			fs.mkdirSync(target, { recursive: true });
+			const sentinel = path.join(target, 'preserve-user-file');
+			fs.writeFileSync(sentinel, 'keep\n');
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, ERGOPTI_LINUX_BUILD_DIR: target }
+			});
+			assert.notEqual(result.status, 0, `${kind} must be refused`);
+			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep\n', `${kind} must remain intact`);
+		}
+	}
 	git('init', '--quiet');
 	const names = ['space name.txt', 'caf\u00e9.txt', '-leading.txt'];
 	for (let index = 0; index < 120; index++) names.push(`nested/part-${index}.bin`);
