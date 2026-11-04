@@ -587,6 +587,17 @@
 			"root_cause": "StickyModifier creates a text-suppressive InputHook but leaves VisibleNonText at its native true default. Ending nontext keys such as Backspace can reach the foreground application before the one-shot owner replays them with its chosen modifiers.",
 			"silent_failure": "An application receives an unmodified editing/navigation action in addition to the requested sticky shortcut. The raw edit can already change text even if the modified output later refuses, or can make the combined shortcut remove more text than intended.",
 			"regression_test": "Three sticky-native-nontext cases extract the actual StickyModifier/Names owner and include genuine SIHO. Actual SendEvent input is explicitly opted in and confined to a verified child-owned foreground Edit; TextPressKey alone is passive. Native WM_KEYDOWN, edit content, exact modified output and cleanup must agree. Letter and Enter are native controls, not claimed failing variants; Backspace proves the defect. Setting VisibleNonText=false retains standard modifier visibility under the native InputHook policy. Native fail-before measured; post-fix pending."
+		},
+		{
+			"id": "AHK-054",
+			"title": "A stale navigation-layer editor can overwrite a newer configuration",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41912869071 ate4e5e62 opens the actual layer host with sourceA, independently writes valid sourceB, then delivers the old page save through the real SDK bridge and host dispatch. Its receipt records save_entered1, save_returned1, apply_calls1 and newer_bytes_preserved0, individually and reversed. The three adjacent ready-delivery controls pass.",
+			"root_cause": "The Windows layer editor reads text for the page but retains no source receipt bound to its exact host, epoch, folders and target. GUI Save then uses an explicit unconditional writer, so it can adopt and replace later bytes from another editor.",
+			"silent_failure": "Saving an unchanged older page erases a newer navigation binding and requests applying that stale content. A retired host must also lose authority to request apply after a successful durable save.",
+			"regression_test": "The real LRDT host/native GUI, SDK callback, host timer dispatch and canonical corpus drive source-stale plus a fresh-host successful save. The fix captures the offered source once per host and uses the existing lease and admitted unchanged-source publisher; explicit non-GUI Save retains its existing contract. Exact host/epoch/folders/target admission persists through publication and is checked again after success logging before apply. A separate real WM_CLOSE-at-success-log probe observes saved=true/applied=false with zero apply calls. FakeHost save cases become explicitly inert rather than manufacturing consent. Native stale-source fail-before measured; post-fix pending. Linux already retains this opening receipt; the macOS sibling remains outside this Windows correction."
 		}
 	]
 }

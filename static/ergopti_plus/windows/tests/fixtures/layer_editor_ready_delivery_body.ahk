@@ -280,9 +280,76 @@ _LRDS_StaleSource(Record) {
 	return Fresh
 }
 
+
+; Pure result observation is inserted immediately before the actual complete
+; save-and-apply owner's final return in this isolated child only.
+_LRDS_ObserveLayerResult(Result) {
+	global _LRDS
+	_LRDS.ResultProbeCalls += 1
+	_LRDS.ResultProbe := Result.Clone()
+}
+
+_LRDS_CloseAtSuccess() {
+	global _LRDS
+	Record := _LRDS.CloseRecord
+	_LRDS_Require(FSUtf8ExactMatches(_LRDS.LayerPath, _LRDS.Candidate),
+		"The real successful-save logger must run only after the candidate is durable.")
+	_LRDS.CloseHwnd := Record.Window.Hwnd
+	_LRDS_Require(DllCall("User32\PostMessageW", "Ptr", _LRDS.CloseHwnd, "UInt", 0x10,
+		"Ptr", 0, "Ptr", 0, "Int"), "Only a genuine WM_CLOSE may retire the actual public window.")
+	Started := A_TickCount
+	while !Record.Host.ResetDone && TickElapsed(Started) < 3000
+		Sleep(5)
+	_LRDS_Require(Record.Host.ResetDone && Record.Host.Epoch > Record.Epoch
+		&& Record.Controller.Closed == 1 && Record.Controller.ActiveAtClose == 0
+		&& !DllCall("User32\IsWindow", "Ptr", _LRDS.CloseHwnd, "Int"),
+		"The real Close event must revoke the exact GUI epoch and retire its native resources during the logger callout.")
+}
+
+_LRDS_CloseAfterSave(Record) {
+	global _LRDS
+	_LRDS_Pump(Record, 1, 1)
+	_LRDS_Require(Record.View.Init.Length == 1, "The actual page must have its original source before saving.")
+	Original := Record.View.Init[1]["text"]
+	_LRDS.Candidate := StrReplace(Original, '"KeyS" = "arrow_up"', '"KeyS" = "arrow_down"', , &Changed)
+	_LRDS_Require(Changed == 1, "The candidate is a real change to one navigation binding.")
+	_LRDS.CloseRecord := Record
+	Record.Host.Opts["OnMessage"] := _LRDS_SaveMessage
+	Message := '{"action":"save","text":' . JsonStringLiteral(_LRDS.Candidate) . '}'
+	Callback := Record.View.Callbacks["message"]
+	Callback.Call(Record.View, _LRDS_SourceArgs(Message))
+	Started := A_TickCount
+	while _LRDS.SaveReturned == 0 && !IsObject(_LRDS.Failure) && TickElapsed(Started) < 5000
+		Sleep(5)
+	if IsObject(_LRDS.Failure)
+		throw _LRDS.Failure
+	_LRDS_Require(_LRDS.SaveEntered == 1 && _LRDS.SaveReturned == 1 && _LRDS.ResultProbeCalls == 1,
+		"Exactly one genuine save handler and observed terminal return must settle.")
+	_LRDS_Require(_LRDS.Revoked && _LRDS.SuccessLogs == 1 && IsObject(_LRDS.ResultProbe),
+		"A real success log must trigger exactly one native Close before the save-and-apply owner returns.")
+	Result := _LRDS.ResultProbe
+	FileAppend("RECEIPT layer-apply-retirement saved=" . Result["saved"] . " applied=" . Result["applied"]
+		. " apply_calls=" . _LRDS.ApplyCalls . " native_closed=" . Record.Controller.Closed . "`n", "*", "UTF-8")
+	_LRDS_Require(Result["saved"] && !Result["applied"] && Result["errors"].Length == 0,
+		"Native Close after the durable receipt cannot undo the save or claim an apply.")
+	_LRDS_Require(_LRDS.ApplyCalls == 0, "A retired GUI cannot admit apply after its successful-save logger yields.")
+	_LRDS_Require(FSUtf8ExactMatches(_LRDS.LayerPath, _LRDS.Candidate)
+		&& !FileExist(_LRDS.LayerPath . ".tmp"), "The accepted durable candidate remains intact after retirement.")
+	_LRDS_Require(Record.Controller.Closed == 1 && Record.View.Scripts.Length == 1,
+		"The retired page must receive neither another native Close nor a late save-result script.")
+}
+
 _LRDS_Log(Line) {
 	global _LRDS
-	if _LRDS.Mode == "source-stale"
+	if _LRDS.Mode == "source-close-after-save" && !_LRDS.Revoked && InStr(Line, "Navigation layer saved to '") {
+		_LRDS.Revoked := true, _LRDS.SuccessLogs += 1
+		try _LRDS_CloseAtSuccess()
+		catch as Failure {
+			if !IsObject(_LRDS.Failure)
+				_LRDS.Failure := Failure
+		}
+	}
+	if _LRDS.Mode == "source-stale" || _LRDS.Mode == "source-close-after-save"
 		return
 	if InStr(Line, "[ERROR]") && !IsObject(_LRDS.Failure)
 		_LRDS.Failure := Error("The actual host/data/resume path emitted an error before its business oracle.")
@@ -319,7 +386,8 @@ _LRDS_Main() {
 	Persistent(true)
 	_LRDS := {Mode: A_Args[1], Windows: [], Controllers: [], Records: [], Failure: 0,
 		Environments: 0, PublicCalls: 0, NavigationEvents: 0, Resumes: 0, LayerText: "", LayerPath: "",
-		SaveEntered: 0, SaveReturned: 0, ApplyCalls: 0}
+		SaveEntered: 0, SaveReturned: 0, ApplyCalls: 0, ResultProbe: 0, ResultProbeCalls: 0,
+		Revoked: false, SuccessLogs: 0, CloseRecord: 0, CloseHwnd: 0, Candidate: ""}
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_LRDS_OnError)
 	LoggerSetTestSink(_LRDS_Log)
@@ -363,7 +431,7 @@ _LRDS_Main() {
 				_LRDS_ReadyEvent(Successor)
 			}
 		} finally Critical(HeldCritical)
-		_LRDS_Pump(Record, 1, (_LRDS.Mode == "current" || _LRDS.Mode == "source-stale") ? 1 : 0)
+		_LRDS_Pump(Record, 1, (_LRDS.Mode == "current" || _LRDS.Mode == "source-stale" || _LRDS.Mode == "source-close-after-save") ? 1 : 0)
 		_LRDS_Require(Record.Calls >= 1 && Record.Settled == Record.Calls && !Record.InFlight
 			&& Record.LastEpoch == Record.Epoch,
 			"The real SUT native timer must be observed through its complete captured epoch dispatch.")
@@ -382,10 +450,15 @@ _LRDS_Main() {
 			_LRDS_Pump(Successor, 1, 1)
 		if _LRDS.Mode == "source-stale"
 			Record := _LRDS_StaleSource(Record)
+		if _LRDS.Mode == "source-close-after-save"
+			_LRDS_CloseAfterSave(Record)
 		_LRDS_Report(Record), Observed := true
 		if IsObject(_LRDS.Failure)
 			throw _LRDS.Failure
-		if _LRDS.Mode == "retired-epoch" {
+		if _LRDS.Mode == "source-close-after-save" {
+			_LRDS_Require(Record.View.Init.Length == 1 && Record.Controller.Closed == 1 && Record.Host.ResetDone,
+				"The successful-save callout must leave exactly the retired public source owner.")
+		} else if _LRDS.Mode == "retired-epoch" {
 			_LRDS_Require(Record.View.Init.Length == 0 && Record.Controller.Closed == 1
 				&& Successor.View.Init.Length == 1 && Successor.Calls >= 1 && Successor.Settled == Successor.Calls,
 				"The old epoch must remain inert while only the new public host initializes once.")
