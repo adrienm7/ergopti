@@ -108,13 +108,9 @@ end
 function M.catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared(CATALOGUE_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("script_chords: cannot read " .. tostring(path)) end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-		error("script_chords: cannot complete read of " .. tostring(path))
-	end
+	local body, status
+	if path then body, status = require("toml_codec.writer").read_classified(path) end
+	if status ~= "ok" then error("script_chords: cannot read " .. tostring(path)) end
 	local ok, parsed = pcall(require("json").decode, body)
 	if not ok or type(parsed) ~= "table" then
 		error("script_chords: " .. tostring(path) .. " is malformed")
