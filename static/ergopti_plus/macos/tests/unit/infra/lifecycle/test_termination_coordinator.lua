@@ -948,7 +948,8 @@ helpers.describe("controlled termination coordinator", function()
 	end)
 
 	helpers.it("refuses reload before fencing if its deadline cannot be armed (reload-deadline-unavailable)", function()
-		for _, options in ipairs({ { reload_timer_raises = true }, { reload_timer_refused = true } }) do
+		for _, options in ipairs({ { reload_timer_raises = true }, { reload_timer_refused = true },
+			{ reload_timer = true }, { reload_timer = {} } }) do
 			local aborts = 0
 			options.capture_publication_admission = function()
 				return { current = function() return true end, abort = function() aborts = aborts + 1; return true end }
