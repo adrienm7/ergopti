@@ -74,6 +74,30 @@ try {
 			assert.notEqual(result.status, 0);
 			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'other checkout\n');
 		}
+		for (const markerKind of ['directory', 'file']) {
+			const parent = path.join(scratch, `unavailable-git-${markerKind}`);
+			const checkout = path.join(parent, 'builder-checkout');
+			const sibling = path.join(parent, 'other-checkout');
+			const builder = path.join(checkout, 'tools/build/build-linux-driver.sh');
+			const target = path.join(sibling, 'source');
+			const bin = path.join(parent, 'bin');
+			fs.mkdirSync(path.dirname(builder), { recursive: true });
+			fs.writeFileSync(builder, subject);
+			fs.mkdirSync(target, { recursive: true });
+			if (markerKind === 'directory') fs.mkdirSync(path.join(sibling, '.git'));
+			else fs.writeFileSync(path.join(sibling, '.git'), 'gitdir: elsewhere\n');
+			fs.mkdirSync(bin);
+			fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexit 128\n', { mode: 0o755 });
+			const sentinel = path.join(target, 'keep');
+			fs.writeFileSync(sentinel, 'other checkout\n');
+			const result = spawnSync('/bin/bash', [builder, '--skip-smoke'], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, PATH: `${bin}:/usr/bin:/bin`, ERGOPTI_LINUX_BUILD_DIR: target }
+			});
+			assert.notEqual(result.status, 0);
+			assert.equal(fs.readFileSync(sentinel, 'utf8'), 'other checkout\n');
+		}
 		for (const kind of ['own-source', 'shared-build', 'other-checkout', 'other-alias']) {
 			const parent = path.join(scratch, `missing-output-${kind}`);
 			const checkout = path.join(parent, 'builder-checkout');
