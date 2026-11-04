@@ -31,7 +31,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
+# NUL framing retains a newline at the end of the checkout directory name.
+IFS= read -r -d '' REPO_ROOT < <(CDPATH= cd -Pe -- "${SCRIPT_DIR}/../.." && printf '%s\0' "$PWD")
 
 # ----------------------------------------------------------------------------
 # Copy only repository-owned files, with optional root-relative exclusions.
