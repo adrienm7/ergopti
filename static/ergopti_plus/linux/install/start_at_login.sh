@@ -147,9 +147,23 @@ if "$receipt_present"; then
 	cp -p -- "$manifest" "$receipt_previous"
 	receipt_tmp="$(mktemp "$manifest.XXXXXX")"
 	cp -p -- "$receipt_previous" "$receipt_tmp"
+	declare -A receipt_seen=()
+	receipt_count=0
 	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
+		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
+		case "$relative" in
+			linux/*|_shared/*|bin/ergopti-hotstrings|@wrapper|@unit|@autostart) ;;
+			*) startup_record invalid-receipt receipt "$manifest"; exit 78 ;;
+		esac
+		case "/$relative/" in
+			*/../*|*/./*|*//*|*\\*|*$'\r'*|*$'\t'*) startup_record invalid-receipt receipt "$manifest"; exit 78 ;;
+		esac
+		[ -z "${receipt_seen[$relative]:-}" ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
+		receipt_seen["$relative"]=1
+		((receipt_count += 1))
 		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi
 	done < "$receipt_previous" > "$receipt_tmp"
+	[ "$receipt_count" -gt 0 ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
 	digest="$(sha256sum < "$desktop_tmp")"
 	printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
 	mv -f -- "$receipt_tmp" "$manifest"
