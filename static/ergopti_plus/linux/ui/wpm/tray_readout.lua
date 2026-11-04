@@ -374,8 +374,13 @@ function M.tick(stats, now_s)
 	local Tray = tray()
 	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
 		if _state.handle and Tray then
+			local hidden = clone(_state.presentation or {})
+			hidden.active = false
 			local called, updated = pcall(Tray.update_item, _state.handle, { active = false })
-			if not called or updated ~= true then return nil end
+			if not called or updated ~= true then
+				_state.pending = { presentation = hidden, key = nil, flip = _state.flip }
+				return nil
+			end
 			if _state.presentation then _state.presentation.active = false end
 		end
 		_state.last_key = nil

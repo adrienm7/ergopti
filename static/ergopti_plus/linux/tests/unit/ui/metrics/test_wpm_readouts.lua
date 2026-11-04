@@ -690,6 +690,24 @@ helpers.describe("wpm readouts: the tray readout", function()
 		return Readout, tray, painted
 	end
 
+	helpers.it("(wpm-tray-hide-refusal) restores a visible frame after a partially refused hide", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			local original = tray.update_item
+			tray.update_item = function(handle, options)
+				if options.active == false then handle.active = false; tray.update_item = original; return false end
+				return original(handle, options)
+			end
+			Readout.tick(stats(0), 20)
+			helpers.assert_nil(Readout.configuration_snapshot(), "an ambiguous hide must not become a stable snapshot")
+			helpers.assert_eq(tray.items[1].active, false, "the refused native update may have hidden it")
+			Readout.tick(stats(10), 30)
+			helpers.assert_eq(tray.items[1].active, true, "the visible frame must be republished")
+		end)
+	end)
+
 	helpers.it("(wpm-icon-paint-refusal) never repaints the icon still displayed", function()
 		with_storage({}, function()
 			local Readout, tray = setup()
