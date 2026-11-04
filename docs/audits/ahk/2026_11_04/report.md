@@ -646,3 +646,18 @@ The next replay at `1cd88b3` selects 34 cases including those four probes,
 existing Kana lift / restore, synthetic transactions and dispatch controls.
 Post-fix qualification of those two later changes remains pending here.
 The register contains **37 distinct new findings**; the goal of 1,000 remains unmet.
+
+## Native qualification checkpoint: 41896237104
+
+At `1cd88b3`, all **34 selected cases passed individually and 34/34 in
+reverse order**. Complete production-entry compilation and the native hotstring
+E2E corpus passed **90/90**. The SQL preparation step also passed 15 native SQLite
+and public CLI regressions. Evidence: [replay artifact](https://github.com/adrienm7/ergopti/actions/runs/41896237104/artifacts/13356801602)
+and [production parse / E2E artifact](https://github.com/adrienm7/ergopti/actions/runs/41896237104/artifacts/13357295795).
+
+This qualifies the actual-logger sibling of AHK-036 and both AHK-037 repair
+paths after their documented native failures. The registered 37 findings now
+have targeted native qualification for their source fixes. It does not qualify
+the entire OS suite or promise the absence of other bugs. The next unregistered
+probe tests literal control characters through genuine keystats producers and
+SQLite; it adds no finding count before confirmation.
