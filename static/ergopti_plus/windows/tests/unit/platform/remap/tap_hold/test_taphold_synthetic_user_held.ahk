@@ -127,3 +127,41 @@ _TSUH_CapsLockHasNoCtrlWrapper() {
 }
 Test("taphold-synthetic: the CapsLock tap no longer wraps itself in Ctrl (synthetic-user-held-2026-09-25)",
 	_TSUH_CapsLockHasNoCtrlWrapper)
+
+
+_TSUH_RetiredOwnerPreservesSuccessor() {
+	global _TH_SyntheticHeldKeys
+	_TSUH_Begin(Map(), Map())
+	WasSuspended := A_IsSuspended
+	Ticks := 0
+	Now() {
+		Ticks += 1
+		return Ticks == 1 ? 1000 : 1100
+	}
+	WaitRelease(*) {
+		Suspend(true)
+		try AssertTrue(TapHoldReleaseSyntheticKeys(), "The genuine teardown must acknowledge A's release")
+		finally Suspend(false)
+		AssertTrue(TapHoldSyntheticKeyDown("LCtrl"), "A fresh post-resume acquisition B must reach the actual ledger")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+		return true
+	}
+	try {
+		Suspend(false)
+		Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", "LCtrl", 0.2,
+			WaitRelease, (*) => false, Now, 0, 0, (*) => "")
+		AssertTrue(_TH_SyntheticHeldKeys.Has("LCtrl"), "Unwinding retired A must preserve the current B ownership")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "An old release must not consume B's reference")
+		AssertEqual(1, _TSUH_Count("{LCtrl Up}"), "Only the actual teardown may have emitted an Up before B ends")
+		AssertFalse(Result["tap"], "A revoked gesture must not become a tap after resume")
+		AssertTrue(TapHoldSyntheticKeyUp("LCtrl"))
+		AssertEqual(2, _TSUH_Count("{LCtrl Up}"), "B must retain its own independently balanced final release")
+	} finally {
+		if _TH_SyntheticHeldKeys.Has("LCtrl")
+			TapHoldSyntheticKeyUp("LCtrl")
+		Suspend(WasSuspended)
+		_TSUH_End()
+	}
+}
+Test("taphold-synthetic: a retired modifier owner preserves a post-resume acquisition (synthetic-owner-epoch)",
+	_TSUH_RetiredOwnerPreservesSuccessor)
