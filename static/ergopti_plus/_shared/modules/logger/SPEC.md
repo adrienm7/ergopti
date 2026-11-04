@@ -369,14 +369,14 @@ for every driver; each driver has one resolver that consumers ask at call time
 
 Default logs folder:
 
-- macOS: `~/Library/Logs/ergopti_plus/` (also holds the launcher's `launcher.log`)
-- Windows: `%LOCALAPPDATA%\ergopti_plus\logs\`
-- Linux: `${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs/`
+- macOS: `~/Library/Logs/Ergopti/` (also holds the launcher's `launcher.log`)
+- Windows: `%LOCALAPPDATA%\Ergopti\logs\`
+- Linux: `${XDG_STATE_HOME:-~/.local/state}/ergopti/logs/`
 
 `LogsDirPath` (paths.toml on macOS and Windows, bootstrap storage on Linux)
-moves the folder; a folder that is neither the default nor named
-`ergopti_plus` gets an `ergopti_plus` subfolder, so retention never deletes in
-a folder the user merely picked. Every resolver names the folder the lines
+moves the folder; a folder that is neither the default nor named after the OS
+folder name of `app_dirs.toml` (`Ergopti`, `ergopti` on Linux) gets that
+subfolder, so retention never deletes in a folder the user merely picked. Every resolver names the folder the lines
 actually reach, never a saved override the sink has not moved to yet: a new
 `LogsDirPath` takes effect with the next session on macOS (the native worker
 refuses a folder change inside a session) and on Windows (the paths editor

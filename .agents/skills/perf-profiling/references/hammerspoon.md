@@ -3,7 +3,7 @@
 ## Measurement sources
 
 Resolve the logs folder: `LogsDirPath` in the launcher-managed paths.toml, else
-`~/Library/Logs/ergopti_plus/` (before 2026-09, `<ConfigDir>/hammerspoon/logs/`).
+`~/Library/Logs/Ergopti/` (before 2026-09, `<ConfigDir>/hammerspoon/logs/`).
 Use the unified file log rather than the Hammerspoon console, and date events
 from line timestamps rather than the process-start date in the filename.
 

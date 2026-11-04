@@ -30,7 +30,7 @@ source run (`Updater_IsLocalSource()`) derives the root from its own folder: the
 driver folder minus `\static\ergopti_plus\windows`. `DevSource_DeriveRoot`
 accepts it only when that root holds a `.git` folder (a clone) or `.git` file
 (a linked worktree) and `static\ergopti_plus\_shared\data\identifiers.json`.
-The run then takes the same path: `%APPDATA%\Ergopti\paths.toml`, the watcher,
+The run then takes the same path: `%LOCALAPPDATA%\Ergopti\paths.toml`, the watcher,
 and the updater and uninstall off with their reasons.
 The startup line names the origin: "Developer source mode; the driver runs from
 … (clone root from the script location)", or "(clone root from the developer
@@ -116,7 +116,7 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 | Driver, menus, hotstrings, layers, tap-holds, metrics, AI features                                                           | works: the same `.ahk` the exe embeds, interpreted by AutoHotkey v2                                                                                                                                                    |
 | Native helpers (`ergopti_nav_owner.dll`, `ergopti_network_pac.exe`, `sqlite3.dll`, `WebView2Loader.dll`, PowerShell workers) | works: tracked in `vendor\`, the same files the exe extracts                                                                                                                                                           |
 | Bundle extraction                                                                                                            | works: not needed, `_StaticDir` is the clone (`infra/bundle.ahk` is a no-op)                                                                                                                                           |
-| Config (`paths.toml`)                                                                                                        | fixed by 47cdd2fdb8: a source run read `windows\_generated\paths.toml`; a developer run now reads `%APPDATA%\Ergopti\paths.toml`, as the exe                                                                           |
+| Config (`paths.toml`)                                                                                                        | fixed by 47cdd2fdb8: a source run read `windows\_generated\paths.toml`; a developer run now reads `%LOCALAPPDATA%\Ergopti\paths.toml`, as the exe                                                                      |
 | Saved-source auto-reload                                                                                                     | fixed by 47cdd2fdb8: `infra/dev_source.ahk` polls the driver's `.ahk` in a developer run only                                                                                                                          |
 | Worker processes (metrics projection, UIA probe, keystats prefetch)                                                          | works: started with `A_AhkPath` and the script, the source-mode form of the same command                                                                                                                               |
 | Reload successor                                                                                                             | works: `LifecycleLaunchSuccessor` relaunches the interpreter with the script; the developer variable is inherited, or the root is derived again                                                                        |

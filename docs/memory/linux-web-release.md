@@ -639,8 +639,8 @@ the accepting Alt was still held (every injection now releases Ctrl/Alt/Super
 after an F24 mask tap, never restoring them), a double space from the parser
 spacing against the word-rebuilt tail, and curl argv exposing keys and typed
 text (headers, body and URL now go through `--config -`). Remote API keys
-live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
-possibly-synced config folder. Action: keep both live steps green for any
+live in `~/.config/ergopti/api_keys.json` (`config_paths.default_config_dir()`),
+mode 0600, outside a picked, possibly-synced config folder. Action: keep both live steps green for any
 change to the injector, the engine, the parser or the HTTP client.
 
 ### project-xcompose-sequences-name-the-keysym-the-key-sends

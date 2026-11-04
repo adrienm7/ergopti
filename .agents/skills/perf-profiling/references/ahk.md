@@ -2,8 +2,8 @@
 
 ## Measurement sources
 
-Resolve `LogsDirPath` in `%APPDATA%\Ergopti\paths.toml`; empty means
-`%LOCALAPPDATA%\ergopti_plus\logs\`. Logs written before 2026-09 are under the
+Resolve `LogsDirPath` in `%LOCALAPPDATA%\Ergopti\paths.toml`; empty means
+`%LOCALAPPDATA%\Ergopti\logs\`. Logs written before 2026-09 are under the
 old `<ConfigDir>\autohotkey\logs\`. Derive the folder; do not treat an example
 as configuration.
 

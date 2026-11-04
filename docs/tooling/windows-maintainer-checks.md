@@ -95,7 +95,7 @@ single-owner mutex.
 ## What stays manual
 
 Press, look for, and bring back the lines named. The driver logs are in
-`%LOCALAPPDATA%\ergopti_plus\logs` (`ErgoptiPlus_<date>.log`; `today.log` holds
+`%LOCALAPPDATA%\Ergopti\logs` (`ErgoptiPlus_<date>.log`; `today.log` holds
 the typed-keys ledger).
 
 1. **Win+S, what leaves the driver.** In Notepad type each text, select it,
