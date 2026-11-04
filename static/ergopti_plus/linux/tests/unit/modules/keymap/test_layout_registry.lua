@@ -393,6 +393,34 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("reserves distinct private Python stages and refuses a competing destination", function()
+		local uv = require("luv")
+		local parent = assert(uv.fs_mkdtemp("/tmp/ergopti-python-stage-XXXXXX"))
+		local Registry = require("modules.keymap.layout_registry")
+		local previous = package.loaded["modules.keymap.managed_python"]
+		package.loaded["modules.keymap.managed_python"] = { ensure = function(deps, done)
+			local root = parent .. "/python"
+			local first, first_current = deps.create_stage(root)
+			local second, second_current = deps.create_stage(root)
+			helpers.assert_type(first, "string"); helpers.assert_type(second, "string")
+			helpers.assert_true(first ~= second)
+			helpers.assert_true(first_current()); helpers.assert_true(second_current())
+			assert(uv.fs_rename(first, first .. ".other"))
+			assert(uv.fs_mkdir(first, 448))
+			helpers.assert_eq(first_current(), false, "a replacement directory cannot inherit cleanup authority")
+			assert(uv.fs_mkdir(root, 448))
+			local marker = assert(io.open(root .. "/owned", "wb")); assert(marker:write("foreign")); assert(marker:close())
+			helpers.assert_eq(deps.rename(second, root), false, "a concurrent installation cannot be replaced")
+			local retained = assert(io.open(root .. "/owned", "rb")); helpers.assert_eq(retained:read("*a"), "foreign"); retained:close()
+			helpers.assert_true(second_current())
+			done(true)
+		end }
+		local ok, err = pcall(function() Registry._managed_python_for_probe()(function() end) end)
+		package.loaded["modules.keymap.managed_python"] = previous
+		os.execute("rm -rf '" .. parent .. "'")
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("settles a refused Python download even if the cleanup runner has stopped", function()
 		local Registry = require("modules.keymap.layout_registry")
 		local Managed = require("modules.keymap.managed_python")
@@ -401,6 +429,8 @@ helpers.describe("layout manager (Linux): installing", function()
 		local Paths = require("infra.config_paths")
 		local saved = { download = Http.download, run = Process.run, settled = Process.is_settled,
 			shell = Shell.run, exists = Files.exists, data = Paths.data }
+		local root = assert(require("luv").fs_mkdtemp("/tmp/ergopti-python-registry-XXXXXX"))
+		assert(os.execute("mkdir -p '" .. root .. "/runtime/python'" ) == 0)
 		local calls = 0
 		local operation = { started = false }
 		function operation:is_settled() return true end
@@ -409,21 +439,21 @@ helpers.describe("layout manager (Linux): installing", function()
 		Http.download = function() return false, operation end
 		Process.run = function(_, _, _, callback)
 			calls = calls + 1
-			if calls == 1 then callback({ exit_code = 0 }); return true end
 			return false
 		end
 		Process.is_settled = function() return true end
-		Shell.run, Files.exists, Paths.data = function() return true end, function() return false end, function() return "/tmp/python-fixture" end
+		Shell.run, Files.exists, Paths.data = function() return true end, function() return false end, function() return root end
 		Managed._reset_for_test()
 		local ok, err = pcall(function()
 			local result
 			Registry._managed_python_for_probe(function() return true end)(function(accepted, code) result = { accepted, code } end)
 			helpers.assert_eq(result, { false, Managed.FAILURE_DOWNLOAD })
-			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(calls, 1)
 		end)
 		Managed._reset_for_test()
 		Http.download, Process.run, Process.is_settled = saved.download, saved.run, saved.settled
 		Shell.run, Files.exists, Paths.data = saved.shell, saved.exists, saved.data
+		os.execute("rm -rf '" .. root .. "'")
 		if not ok then error(err, 0) end
 	end)
 

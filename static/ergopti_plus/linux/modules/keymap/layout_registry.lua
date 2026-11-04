@@ -390,13 +390,30 @@ local function managed_python(confirm)
 			managed_process("tar", { "-xzf", archive, "-C", into, "--no-same-owner" },
 				function(result) callback(result.exit_code == 0 and result.error == nil, result.error or result.stderr) end)
 		end,
-		ensure_dir = ensure_dir,
+		create_stage = function(root)
+			local parent = NativePath.dirname(root)
+			if not parent or not ensure_dir(parent) or type(native.fs_mkdtemp) ~= "function"
+				or type(native.fs_lstat) ~= "function" then return nil end
+			local stage = native.fs_mkdtemp(root .. ".staging.XXXXXX")
+			if type(stage) ~= "string" then return nil end
+			local identity = native.fs_lstat(stage)
+			local function exact_integer(value)
+				return type(value) == "number" and value >= 0 and value < 2 ^ 53 and value % 1 == 0
+			end
+			if type(identity) ~= "table" or identity.type ~= "directory"
+				or not exact_integer(identity.dev) or not exact_integer(identity.ino) then return nil end
+			local dev, ino = identity.dev, identity.ino
+			return stage, function()
+				local now = native.fs_lstat(stage)
+				return type(now) == "table" and now.type == "directory" and now.dev == dev and now.ino == ino
+			end
+		end,
 		remove_tree = function(path, callback)
 			managed_process("rm", { "-rf", "--", path },
 				function(result) callback(result.exit_code == 0 and result.error == nil) end)
 		end,
 		delete = FileSystem.delete,
-		rename = os.rename,
+		rename = require("infra.no_replace_move").move,
 	}
 	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
 end

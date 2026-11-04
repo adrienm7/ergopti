@@ -69,7 +69,10 @@ local function machine(options)
 			if options.interpreter ~= false then world.files[into .. "/python/bin/python3"] = true end
 			callback(true)
 		end,
-		ensure_dir = function() return true end,
+		create_stage = function(root)
+			local path = root .. ".staging.fixture"
+			return path, function() return true end
+		end,
 		remove_tree = function(path, callback)
 			world.removed[#world.removed + 1] = path
 			for file in pairs(world.files) do
@@ -129,9 +132,32 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		h.assert_eq(world.offered, archive.bytes)
 		h.assert_eq(world.downloads[1].url, archive.url)
 		h.assert_eq(world.downloads[1].bytes, archive.bytes, "the download is capped at the pinned size")
-		h.assert_eq(world.renamed[1], { from = ROOT_GNU .. ".staging", to = ROOT_GNU })
+		h.assert_eq(world.renamed[1], { from = ROOT_GNU .. ".staging.fixture", to = ROOT_GNU })
 		h.assert_true(world.files[ROOT_GNU .. "/python/bin/python3"])
 		h.assert_nil(world.files[ROOT_GNU .. "/archive.tar.gz"], "the archive is not published")
+	end)
+
+	h.it("preserves a pre-existing staging directory owned by another installation", function()
+		local deps, world = machine()
+		local marker = ROOT_GNU .. ".staging/another-owner"
+		world.files[marker] = true
+		local result = ensure(deps)
+		h.assert_true(result.ok)
+		h.assert_true(world.files[marker], "an existing staging directory must never be removed")
+	end)
+
+	h.it("does not remove or publish a staging directory replaced during download", function()
+		local deps, world = machine({ hold = true })
+		local retained = true
+		deps.create_stage = function(root) return root .. ".staging.fixture", function() return retained end end
+		local result, Managed = ensure(deps)
+		retained = false
+		world.pending()
+		h.assert_eq(result.calls, 1)
+		h.assert_eq(result.ok, false)
+		h.assert_eq(result.value, Managed.FAILURE_PUBLISH)
+		h.assert_eq(#world.removed, 0)
+		h.assert_eq(#world.renamed, 0)
 	end)
 
 	h.it("(managed-python) an installed interpreter is answered without a question or a download", function()
@@ -183,7 +209,7 @@ h.describe("Ergopti's own Python (managed-python)", function()
 			h.assert_eq(result.ok, false)
 			h.assert_eq(result.value, Managed[case[3]])
 			h.assert_nil(world.files[ROOT_GNU .. "/python/bin/python3"], "no unverified interpreter is published")
-			h.assert_eq(world.removed[#world.removed], ROOT_GNU .. ".staging")
+			h.assert_eq(world.removed[#world.removed], ROOT_GNU .. ".staging.fixture")
 		end)
 	end
 
@@ -228,13 +254,13 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
 		Managed.ensure(deps, function(ok, value) outcomes[#outcomes + 1] = { ok, value } end)
 		h.assert_eq(#outcomes, 0, "refusal does not acknowledge native retirement")
-		h.assert_eq(#world.removed, 1, "staging must remain until the transport closes")
+		h.assert_eq(#world.removed, 0, "staging must remain until the transport closes")
 		operation.closed = true
 		for _, listener in ipairs(operation.listeners) do listener() end
 		h.assert_eq(#outcomes, 2)
 		h.assert_eq(outcomes[1], { false, Managed.FAILURE_DOWNLOAD })
 		h.assert_eq(outcomes[2], outcomes[1])
-		h.assert_eq(#world.removed, 2)
+		h.assert_eq(#world.removed, 1)
 	end)
 
 	h.it("answers an already settled refused download without a logical callback", function()
@@ -271,10 +297,10 @@ h.describe("Ergopti's own Python (managed-python)", function()
 		deps.download = function() return false, operation end
 		local result, Managed = ensure(deps)
 		h.assert_eq(result.calls, 0)
-		h.assert_eq(#world.removed, 1)
+		h.assert_eq(#world.removed, 0)
 		operation.listener()
 		h.assert_eq(result.calls, 0, "a refused subscription cannot later authorize cleanup")
-		h.assert_eq(#world.removed, 1)
+		h.assert_eq(#world.removed, 0)
 		Managed._reset_for_test()
 	end)
 
