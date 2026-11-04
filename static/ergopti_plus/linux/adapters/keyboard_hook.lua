@@ -1065,6 +1065,12 @@ local function _resynchronise(source, snapshot, cohort)
 	for code in pairs(source_keys) do
 		pressed[source_key(source, code)] = { source = source, code = code, held_origin = held_receipt }
 	end
+	-- An orphan is owed only while its original physical key remains down.
+	-- Queue loss may have swallowed its UP; a held orphan must not be replayed.
+	for key in pairs(_remap_orphans) do
+		if pressed[key] then pressed[key] = nil
+		elseif cohort or key:match("^(.*):%d+$") == source then _remap_orphans[key] = nil end
+	end
 
 	-- The engine's keys are released and its physically held keys consumed:
 	-- replaying a held CapsLock as itself would toggle the lock, where the user
