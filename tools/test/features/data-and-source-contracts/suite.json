@@ -633,6 +633,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-text-escape.cjs"],
 			"repro": "npm run test:text-escape"
+		},
+		{
+			"id": "js-html-scan",
+			"ordinal": 573,
+			"name": "the harness HTML scan reads tags in any case, every end-tag and comment form, and refuses an unclosed comment",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-html-scan.cjs"],
+			"repro": "npm run test:html-scan"
 		}
 	]
 }

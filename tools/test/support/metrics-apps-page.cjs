@@ -14,6 +14,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const uiRoot = path.resolve(__dirname, '../../../static/ergopti_plus/_shared/ui');
 const { themeProperties } = require('./theme-tokens.cjs');
+const { scriptElements } = require('../lib/html-scan.cjs');
 
 /**
  * Loads the real page declarations; timers, network and canvas remain browser ports.
@@ -161,10 +162,10 @@ function loadMetricsPage(app, host, afterScript) {
 		};
 	const scripts = [];
 	const html = fs.readFileSync(page, 'utf8');
-	for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-		const src = /\bsrc="([^"]+)"/.exec(match[1]);
+	for (const element of scriptElements(html)) {
+		const src = /\bsrc="([^"]+)"/.exec(element.attributes);
 		const filename = src ? path.resolve(path.dirname(page), src[1]) : `${page}#inline`;
-		const code = src ? fs.readFileSync(filename, 'utf8') : match[2];
+		const code = src ? fs.readFileSync(filename, 'utf8') : element.body;
 		scripts.push(src ? src[1] : '#inline');
 		vm.runInContext(code, context, { filename, timeout: 1000 });
 		if (afterScript) afterScript(scripts[scripts.length - 1], context);
