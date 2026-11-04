@@ -180,3 +180,186 @@ for _GSSC_Owner in ["direct", "region"]
 	for _GSSC_Mode in ["ordinary", "retry", "replacement", "start-terminal", "callback-replacement"]
 		Test("screenshot stage cleanup: " . _GSSC_Owner . " " . _GSSC_Mode . " retains exact physical ownership (screenshot-stage-cleanup-debt)",
 			_GSSC_Run.Bind(_GSSC_Owner, _GSSC_Mode))
+
+; A capture can fail before it writes any pixels (for example GetDC/GDI+
+; startup refusal). Keep the real deferred worker, public owner, file identity
+; capture and cleanup, while replacing only that failing pixel I/O boundary.
+_GSAC_RefuseCapture(*) {
+	throw Error("owned fixture capture refused before any stage write")
+}
+
+_GSAC_SpawnRefusal(Capture, Done) {
+	return _GestureScreenshotSpawnNative(_GSAC_RefuseCapture, Done)
+}
+
+_GSAC_Run(Preexisting) {
+	global DriverPid, _GestureDirectCaptureEpoch, _GSWO_Terminals
+	WasCritical := Critical("On"), WasSuspended := A_IsSuspended
+	Old := _GSWO_Install()
+	Root := A_Temp . "\ergopti_stage_admission_probe_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Stage := "", Original := 0, Writer := -1, Primary := 0
+	try {
+		AssertEqual(0, Old["jobs"].Count, "the admission fixture cannot borrow a live worker or cleanup debt")
+		if A_IsSuspended
+			Suspend(false)
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created, "the fixture must acquire its private destination directory exclusively")
+		; A high fresh epoch avoids interacting with another run's stage. Seed
+		; exactly the public production owner's next deterministic path.
+		_GestureDirectCaptureEpoch := Random(1000000, 999999999)
+		Epoch := _GestureDirectCaptureEpoch + 1
+		Stage := A_Temp . "\ergopti_screenshot_direct_" . DriverPid . "_" . Epoch . ".png"
+		AssertFalse(FSStrictExists(Stage), "the fixture must never reuse an unowned real stage")
+		Witness := Root . "\foreign-stage.bin"
+		Bytes := Buffer(37, 0xA7)
+		_GSFP_Write(Witness, Bytes)
+		if Preexisting {
+			; CREATE_NEW, not FileOpen('w'), owns this fixture's foreign file.
+			Writer := DllCall("Kernel32\CreateFileW", "Str", Stage, "UInt", 0x40000000,
+				"UInt", 0, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Writer != -1, "the foreign-stage fixture must acquire the exact path with CREATE_NEW")
+			Written := 0
+			try AssertTrue(_FSNativeWrite(Writer, Bytes, Bytes.Size, &Written) && Written == Bytes.Size)
+			finally {
+				DllCall("Kernel32\CloseHandle", "Ptr", Writer)
+				Writer := -1
+			}
+			Original := _GSFP_Snapshot(Stage)
+			AssertTrue(FSSameBytes(Stage, Witness), "the independently owned stage must exist before capture admission")
+		}
+		GestureScreenshotWorkerState.spawn_fn := _GSAC_SpawnRefusal
+		GestureScreenshotWorkerState.file_exists_fn := 0
+		GestureScreenshotWorkerState.publish_file_fn := 0
+		GestureScreenshotWorkerState.cleanup_stage_fn := 0
+		GestureScreenshotWorkerState.rollback_file_fn := 0
+		Accepted := GestureCaptureRegion(0, 0, 1, 1, "save", Root . "\published.png", _GSWO_RecordTerminal)
+		; Real SetTimer-driven _NativeRun catches the pixel I/O refusal, then
+		; delivers through the actual worker registry and direct owner.
+		Critical("Off")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while (_GSWO_Terminals.Length == 0 || GestureScreenshotWorkerState.jobs.Count)
+				&& DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 2500
+			Sleep(5)
+		Sleep(150)
+		Critical("On")
+		FileAppend("OBSERVATION screenshot-stage-admission preexisting=" . Preexisting
+			. " accepted=" . Accepted . " terminals=" . _GSWO_Terminals.Length
+			. " jobs=" . GestureScreenshotWorkerState.jobs.Count . " stage_exists=" . FSStrictExists(Stage)
+			. " destination_exists=" . FSStrictExists(Root . "\published.png") . "`n", "*")
+		AssertEqual(1, _GSWO_Terminals.Length, "capture admission or its real worker must finish exactly once")
+		AssertFalse(_GSWO_Terminals[1]["ok"], "a pre-write capture failure cannot report success")
+		AssertEqual(0, GestureScreenshotWorkerState.jobs.Count, "the failed owner must retire all of its own cleanup debt")
+		AssertFalse(FSStrictExists(Root . "\published.png"), "no failed capture may publish a destination")
+		if Preexisting {
+			AssertTrue(FSStrictExists(Stage), "a capture that never wrote its stage must preserve the pre-existing foreign file")
+			Observed := _GSFP_Snapshot(Stage)
+			for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+				AssertEqual(Original[Key], Observed[Key], "capture cleanup cannot adopt a pre-existing native file identity")
+			AssertTrue(FSSameBytes(Stage, Witness), "capture cleanup must preserve the original foreign bytes")
+		} else
+			AssertFalse(FSStrictExists(Stage), "the no-stage control must leave no stage behind")
+	} catch as Err {
+		Primary := Err
+	} finally {
+		Critical("On")
+		if Writer != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Writer)
+		try {
+			GestureScreenshotCancelAll("admission fixture cleanup")
+			_GestureScreenshotRetryCleanup()
+			AssertEqual(0, GestureScreenshotWorkerState.jobs.Count, "the fixture must retire its workers before restoring the incoming registry")
+			if Old["jobs"].Count == 0
+				TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		try {
+			; Only the identity created with CREATE_NEW above is ours to remove.
+			if Original is Map && FSStrictExists(Stage)
+				AssertTrue(FSDeleteVerified(Stage, _GestureScreenshotSnapshotMatches.Bind(Original)))
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		_GSWO_Restore(Old)
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		Critical(WasCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+for _GSAC_Preexisting in [false, true]
+	Test("screenshot stage admission: pre-write failure " . (_GSAC_Preexisting ? "preserves foreign stage" : "without a stage") . " (screenshot-stage-admission)",
+		_GSAC_Run.Bind(_GSAC_Preexisting))
+
+; Qualify a tiny synthetic bitmap against GDI+'s real file encoder. The
+; optional metadata-only CREATE_NEW lease denies path replacement, while
+; allowing GDI+ to reopen the same exact file for writing.
+_GSGL_WritePixel(Stage) {
+	global GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB, GESTURE_SCREENSHOT_PNG_ENCODER
+	Pixels := Buffer(4, 0)
+	NumPut("UInt", 0xFF00FF00, Pixels)
+	Image := 0
+	_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipCreateBitmapFromScan0",
+		"Int", 1, "Int", 1, "Int", 4, "Int", GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB,
+		"Ptr", Pixels, "Ptr*", &Image, "Int"), "GdipCreateBitmapFromScan0")
+	try _GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, 0)
+	finally _GestureScreenshotGdipDispose(Image)
+}
+
+_GSGL_Run(HoldLease) {
+	global DriverPid
+	Root := A_Temp . "\ergopti_stage_gdi_lease_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := -1
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Stage := Root . "\pixel.png"
+		; Zero access deliberately retains only metadata, not a writer which
+		; could conflict with the encoder's own sharing mode.
+		Handle := DllCall("Kernel32\CreateFileW", "Str", Stage, "UInt", 0,
+			"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Handle != -1, "metadata-only CREATE_NEW must acquire the empty stage exclusively")
+		Original := FSHandleSnapshot(Handle)
+		AssertTrue(Original.Get("ok", false) && Original["size"] == 0)
+		if HoldLease {
+			Deleted := DllCall("Kernel32\DeleteFileW", "Str", Stage, "Int")
+			DeleteError := A_LastError
+			AssertEqual(0, Deleted, "the metadata lease must prohibit replacement or deletion")
+			AssertEqual(32, DeleteError, "the lease must establish a real native DELETE sharing refusal")
+		} else {
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0)
+			Handle := -1
+		}
+		_GestureScreenshotWithGdiplus(_GSGL_WritePixel.Bind(Stage))
+		Observed := HoldLease ? FSHandleSnapshot(Handle) : _GSFP_Snapshot(Stage)
+		FileAppend("OBSERVATION screenshot-stage-gdi-lease held=" . HoldLease . " png_bytes=" . Observed["size"]
+			. " same_identity=" . (Original["volume"] == Observed["volume"]
+				&& Original["index_high"] == Observed["index_high"] && Original["index_low"] == Observed["index_low"]) . "`n", "*")
+		AssertTrue(Observed.Get("ok", false) && Observed["size"] > 8, "the native PNG encoder must produce real bytes")
+		if HoldLease
+			for Key in ["volume", "index_high", "index_low"]
+				AssertEqual(Original[Key], Observed[Key], "native encoding must retain the exclusively acquired file identity")
+		Reader := FSOpenStrict(Stage, "r-wd", "UTF-8-RAW")
+		try {
+			Header := Buffer(8, 0)
+			AssertEqual(8, Reader.RawRead(Header, 8))
+			AssertEqual(0x474E5089, NumGet(Header, 0, "UInt"), "the encoder must emit the actual PNG signature")
+			AssertEqual(0x0A1A0A0D, NumGet(Header, 4, "UInt"))
+		} finally Reader.Close()
+	} finally {
+		if Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+
+for _GSGL_HoldLease in [false, true]
+	Test("screenshot stage GDI lease: " . (_GSGL_HoldLease ? "metadata lease excludes replacement" : "unleased existing-file control") . " (screenshot-stage-lease-compat)",
+		_GSGL_Run.Bind(_GSGL_HoldLease))

@@ -247,3 +247,64 @@ TestLLMParser_ResourcePolicy() {
 		"TAIL_CORRECTED: hello`nNEXT_WORDS: world", 1, 15) is Map, "ordinary continuation remains functional")
 }
 Test("LLM parser: shared byte and diff work limits refuse oversized model words", TestLLMParser_ResourcePolicy)
+
+
+_LTPS_Repeat(Text, Count) {
+    Out := ""
+    loop Count
+        Out .= Text
+    return Out
+}
+
+_LTPS_Observe(Name, Fn, Expected, SourceUnits, Count) {
+    Failure := 0, Value := 0
+    Started := BootClockWallMs()
+    try Value := Fn.Call()
+    catch Any as ErrorObject
+        Failure := ErrorObject
+    Elapsed := BootClockWallMs() - Started
+    Row := Map("stage", Name, "count", Count, "source_units", SourceUnits,
+        "elapsed_ms", Elapsed, "threw", IsObject(Failure),
+        "error_type", IsObject(Failure) ? Type(Failure) : "",
+        "error_message", IsObject(Failure) ? SubStr(Failure.Message, 1, 200) : "")
+    if Value is String {
+        Row["output_units"] := StrLen(Value)
+        Row["matches_expected"] := Value == Expected
+    } else if Value is Array {
+        Row["slots"] := Value.Length
+        Row["matches_expected"] := Expected == "" ? Value.Length == 0 : (Value.Length == 1 && Value[1] == Expected)
+    } else
+        Row["matches_expected"] := false
+    return Row
+}
+
+_LTPS_Run(Kind, Closed) {
+    Open := "<" . Kind . ">", Close := "</" . Kind . ">"
+    Rows := []
+    ; These sizes characterize native PCRE's actual optimization and exception
+    ; behavior. They are well inside the existing HTTP response byte limit.
+    for Count in [2000, 4000, 8000] {
+        Raw := _LTPS_Repeat(Closed ? Open . "p" . Close : Open, Count) . (Closed ? "answer" : "")
+        Expected := Closed ? "answer" : ""
+        Pattern := "si)" . Open . ".*?" . Close . "\s*"
+        ; The isolated first pass shows whether this PCRE build quickly rejects
+        ; an absent closing literal or instead revisits every possible opener.
+        Rows.Push(_LTPS_Observe("closed-block-regex", RegExReplace.Bind(Raw, Pattern, ""),
+            Closed ? "answer" : Raw, StrLen(Raw), Count))
+        Rows.Push(_LTPS_Observe("strip-thinking", LLM_Parser_StripThinking.Bind(Raw), Expected, StrLen(Raw), Count))
+        Rows.Push(_LTPS_Observe("parse-response", LLM_Parser_ParseResponse.Bind(Raw, "", "", 1, 0, false, 1),
+            Expected, StrLen(Raw), Count))
+    }
+    _TestPrint("# THINKING_REGEX " . KL_JsonEncode(Map("kind", Kind, "closed", Closed,
+        "runtime", A_AhkVersion, "rows", Rows)))
+    ; Collect every observation before asserting, so a failing first pass does
+    ; not hide the other sizes or the actual full parser's behavior.
+    for Row in Rows {
+        AssertFalse(Row["threw"], "real thinking processing must not throw on bounded model output: " . Row["stage"])
+        AssertTrue(Row["matches_expected"], "complete blocks preserve the answer and unfinished private blocks stay absent: " . Row["stage"])
+    }
+}
+for _LTPS_Kind in ["think", "thinking"] {
+    Test("LLM thinking PCRE: closed " . _LTPS_Kind . " control (thinking-regex-resource)", _LTPS_Run.Bind(_LTPS_Kind, true))
+    Test("LLM thinking PCRE: repeated unclosed " . _LTPS_Kind . " (thinking-regex-resource)", _LTPS_Run.Bind(_LTPS_Kind, false))
+}
