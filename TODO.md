@@ -532,8 +532,8 @@ between workers) green alone. All live checks pass, typed by the harness.
   - In progress: CI on the branch (Swift and the full Lua suites only run there).
   - Next: merge into dev after a green CI and the maintainer's go-ahead; the maintainer checks his machines (handoff
     list); delete the migration once they are moved; rename the owned Karabiner runtime folder (`ErgoptiPlus`) with its
-    next rebuild (item 31). Maintainer question: keep the managed Ollama sibling `%LOCALAPPDATA%\Ergopti-ollama`, or
-    let `ollama_managed_files.ps1` admit a folder inside the root?
+    next rebuild (item 31). The managed Ollama runtime moved inside the root (`%LOCALAPPDATA%\Ergopti\ollama`,
+    maintainer decision, 4 November).
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   branch `next/owned-karabiner`, [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November:
   - Done: runtime `16.3.0-ergopti.2` published (prerelease `remap-runtime-v16.3.0-ergopti.2`, downloaded back: sha256
