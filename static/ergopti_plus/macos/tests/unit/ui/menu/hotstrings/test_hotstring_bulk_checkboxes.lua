@@ -269,6 +269,17 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
 			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
 			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+			local deferred = require("infra.deferred_work")
+			local original = deferred.after
+			deferred.after = function() return false end
+			local called, receipt = pcall(file.menu[3].fn)
+			deferred.after = function() return true end
+			local accepted, success = pcall(file.menu[3].fn)
+			deferred.after = original
+			helpers.assert_true(called)
+			helpers.assert_eq(receipt, false, "the personal file row reports scheduling refusal")
+			helpers.assert_true(accepted)
+			helpers.assert_eq(success, true, "the personal file row reports accepted scheduling")
 			helpers.assert_eq(file.menu[4].title, "-")
 			helpers.assert_eq(file.menu[5].title, "one")
 			helpers.assert_eq(file.menu[1].fn(), true)

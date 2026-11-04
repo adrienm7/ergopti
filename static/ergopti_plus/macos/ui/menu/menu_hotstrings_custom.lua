@@ -268,8 +268,8 @@ function M.all_sections_row(ctx, group_names, set_fn)
 end
 
 local function open_toml_path(path)
-	if type(path) ~= "string" or path == "" then return end
-	DeferredWork.after(0, function()
+	if type(path) ~= "string" or path == "" then return false end
+	return DeferredWork.after(0, function()
 		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 	end, "menu_hotstrings_custom.open_toml")
 end
@@ -613,7 +613,7 @@ function M.build_custom(ctx, counts)
 		{ personal_default_caption = function() return cat_menu end })
 	if type(default_parent) ~= "table" or #default_parent ~= 1 then return nil end
 	local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-		[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
+		[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(toml_path_for_group(ctx, "personal")) end,
 		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 	}, {
 		["hotstring_file_ready"] = function() return not paused end,
@@ -651,7 +651,7 @@ function M.build_custom(ctx, counts)
 	local function file_menu_for_group(gname, rows, check, readonly)
 		local path = toml_path_for_group(ctx, gname)
 		local file_rows = ManifestMenu.template_rows("hotstring_personal_file_frame", {
-			[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(path) end,
+			[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() return open_toml_path(path) end,
 		}, {
 			["hotstring_file_ready"] = function() return true end,
 			["personal_file_open_present"] = function() return path ~= nil end,
