@@ -671,6 +671,9 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 		return false
 	if MetricsFocusCache.event_mode
 		return true
+	; Retire failed cleanup before creating another callback generation.
+	if MetricsFocusCache.hooks.Length && !_MF_StopFocusWinEvents()
+		return false
 	Callback := 0
 	try Callback := CallbackCreate(_MF_FocusWinEvent, "F", 7)
 	catch as Err {
@@ -685,7 +688,10 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
 		if !Hook {
 			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
-			_MF_ReleaseFocusHooks(Hooks, Callback)
+			if !_MF_ReleaseFocusHooks(Hooks, Callback, , , &Remaining) {
+				MetricsFocusCache.hooks := Remaining
+				MetricsFocusCache.event_callback := Callback
+			}
 			return false
 		}
 		Hooks.Push(Hook)
@@ -703,7 +709,7 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 
 ; Removes the hooks. A hook that refuses to unhook keeps its callback allocated: freeing
 ; a callback the system can still invoke would crash the driver.
-_MF_StopFocusWinEvents() {
+_MF_StopFocusWinEvents(RemoveFn := 0, FreeFn := 0) {
 	PreviousCritical := Critical("On")
 	try {
 		Hooks := MetricsFocusCache.hooks
@@ -715,17 +721,25 @@ _MF_StopFocusWinEvents() {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	return _MF_ReleaseFocusHooks(Hooks, Callback)
+	Removed := _MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn, FreeFn, &Remaining)
+	if !Removed {
+		MetricsFocusCache.hooks := Remaining
+		MetricsFocusCache.event_callback := Callback
+	}
+	return Removed
 }
 
 ; Partial installation and normal teardown obey the same callback ownership rule.
-_MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn := 0, FreeFn := 0) {
+_MF_ReleaseFocusHooks(Hooks, Callback, RemoveFn := 0, FreeFn := 0, &Remaining := unset) {
+	Remaining := []
 	AllRemoved := true
 	for Hook in Hooks {
 		Removed := false
 		try Removed := IsObject(RemoveFn) ? RemoveFn.Call(Hook) : WIRemoveEventHook(Hook)
 		catch as Err
 			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
+		if !Removed
+			Remaining.Push(Hook)
 		AllRemoved := AllRemoved && Removed
 	}
 	if !AllRemoved
