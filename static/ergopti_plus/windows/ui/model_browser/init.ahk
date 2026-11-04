@@ -314,13 +314,18 @@ _LLM_ModelBrowser_GetInstalledTags() {
  * exactly like a click in the flat menu. Closes the browser on success.
  */
 _LLM_ModelBrowser_PickRow(LV, RowNumber) {
+	global _LLM_ModelBrowser_Gui
+	Window := LV.Gui
 	if (!RowNumber or RowNumber < 1)
 		return
 	name := LV.GetText(RowNumber, 1)
 	if (name == "")
 		return
-	LLM_Menu_SetModel(name)
-	_LLM_ModelBrowser_OnClose()
+	Applied := LLM_Menu_SetModel(name)
+	if (Applied is Integer) && Applied == 1 && IsSet(_LLM_ModelBrowser_Gui)
+			&& _LLM_ModelBrowser_Gui == Window
+		_LLM_ModelBrowser_OnClose()
+	return Applied
 }
 
 _LLM_ModelBrowser_OnClose(*) {
