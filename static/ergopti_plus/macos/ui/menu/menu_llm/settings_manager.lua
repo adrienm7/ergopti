@@ -753,7 +753,20 @@ function M.new(deps)
 		local current_mods = Storage.get(key)
 		-- Fail closed on a non-table (corrupt/AHK-migrated plist): table.concat on a
 		-- string would raise and blank the submenu (same class as format_shortcut_title).
-		if type(current_mods) ~= "table" then current_mods = default_mods end
+		local valid = type(current_mods) == "table"
+		if valid then
+			local count, length = 0, #current_mods
+			for index, value in pairs(current_mods) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
+					or type(value) ~= "string" then valid = false; break end
+				count = count + 1
+			end
+			valid = valid and count == length
+		end
+		if not valid then
+			if current_mods ~= nil then Logger.warn(LOG, "Invalid modifier array for '%s'; using the menu default.", key) end
+			current_mods = default_mods
+		end
 		local current_str = table.concat(current_mods, "+")
 		local paused = is_paused(deps, "Modifier menu pause-state read")
 
