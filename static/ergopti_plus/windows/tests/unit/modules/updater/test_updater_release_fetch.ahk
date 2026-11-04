@@ -196,6 +196,8 @@ _UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
 		"javascript:alert(1)",
 		"audit-canary://noop",
 		"https://example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		RepoRoot . "/../other", RepoRoot . "/%2e%2e/other", RepoRoot . "/%2e%2e%2fother",
+		RepoRoot . "/%5c../other", RepoRoot . "/%00other",
 		RepoRoot . ".invalid/releases",
 		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
 	] {

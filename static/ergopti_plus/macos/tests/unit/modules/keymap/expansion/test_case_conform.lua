@@ -265,6 +265,41 @@ helpers.describe("Expander — fire-time case conform", function()
 		helpers.assert_eq(buffer, "output")
 	end)
 
+	helpers.it("expands a folded magic trigger after the magic key changes", function()
+		local state, R, E = fresh_engine()
+		R.add("abc★", "output", { auto_expand = true, is_case_sensitive = true })
+		R.sort_mappings()
+		helpers.assert_true(R.update_trigger_char("!"))
+		state.buffer = "ABC!"
+		state.start_is_word_boundary = true
+		local fired = E.try_auto_expand(state.mappings[1], 1, false)
+		helpers.assert_true(fired, "the renamed trigger must still match")
+		helpers.assert_eq(state.buffer, "output")
+	end)
+
+	helpers.it("matches every simple-folded Greek sigma and sharp S without changing case conformance", function()
+		for _, pair in ipairs({ { "σ", "ς" }, { "ς", "Σ" }, { "ß", "ẞ" }, { "s", "ſ" } }) do
+			local state, R, E = fresh_engine()
+			local fired, buffer = fire(R, E, state, pair[1], "output", pair[2],
+				{ auto_expand = true, is_case_sensitive = true })
+			helpers.assert_true(fired, "simple-fold equivalence must reach the matching bucket")
+			helpers.assert_eq(buffer, "output")
+		end
+	end)
+
+
+	helpers.it("keeps strict matching and case conformance distinct from simple folding", function()
+		for _, item in ipairs({
+			{ "σ", "ς", { auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true } },
+			{ "σ", "ς", { auto_expand = true } },
+			{ "ß", "ss", { auto_expand = true, is_case_sensitive = true } },
+		}) do
+			local state, R, E = fresh_engine()
+			local fired = fire(R, E, state, item[1], "output", item[2], item[3])
+			helpers.assert_true(not fired)
+		end
+	end)
+
 	helpers.it("conforms default non-French accented and Greek triggers (hotstring-unicode-fold)", function()
 		for _, pair in ipairs({ { "á", "Á" }, { "σ", "Σ" } }) do
 			local state, R, E = fresh_engine()

@@ -560,6 +560,19 @@ function M.trig_lower(s)
 	end))
 end
 
+--- Folds each trigger scalar using Unicode's locale-independent simple fold.
+--- Unlike lowercasing this equates final sigma and sigma without changing the
+--- number of scalars consumed by either driver's hotstring matcher.
+--- @param s string Trigger or typed text.
+--- @return string folded
+function M.trig_fold(s)
+	if type(s) ~= "string" then return "" end
+	if not s:find(NON_ASCII_BYTE) then return s:lower() end
+	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
+		return unicode_case_data.simple_fold[c] or c
+	end))
+end
+
 -- Memoization caches: both trig_upper and trig_title are pure functions of
 -- their input. At startup, M.add() calls trig_upper/trig_title on ~3.3k
 -- lowercase triggers and many short rests share identical values across

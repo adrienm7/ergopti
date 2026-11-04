@@ -36,6 +36,15 @@
 		} catch (error) {
 			return false;
 		}
+		var decodedPath;
+		try {
+			decodedPath = decodeURIComponent(parsed.pathname);
+		} catch (error) {
+			return false;
+		}
+		if (/[\\\x00-\x1f\x7f]/.test(decodedPath) || decodedPath.split('/').indexOf('..') !== -1) {
+			return false;
+		}
 		var root = '/' + owner + '/' + repo;
 		return (
 			parsed.protocol === 'https:' &&

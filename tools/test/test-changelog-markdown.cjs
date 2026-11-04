@@ -73,6 +73,22 @@ const BODY = [
 
 function checkRendering() {
 	const { sandbox, document, posted } = runPage();
+	for (const suffix of [
+		'/../other',
+		'/%2e%2e/other',
+		'/%2e%2e%2fother',
+		'/%5c../other',
+		'/%00other'
+	]) {
+		expect(
+			!sandbox.isRepositoryUrl(
+				'https://github.com/adrienm7/ergopti' + suffix,
+				'adrienm7',
+				'ergopti'
+			),
+			'a repository link must not contain a traversal or decoded control: ' + suffix
+		);
+	}
 	sandbox.injectReleases(
 		[
 			{
