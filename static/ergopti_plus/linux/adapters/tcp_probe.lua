@@ -175,8 +175,9 @@ end
 --- @return string|nil host, integer|nil port
 function M.relay_address(relay)
 	if type(relay) ~= "string" then return nil, nil end
-	local scheme, authority = relay:match("^(%l[%l%d]*)://([^/]+)$")
+	local scheme, authority = relay:match("^(%a[%w+%.%-]*)://([^/]+)$")
 	if not authority then return nil, nil end
+	scheme = scheme:lower()
 	authority = authority:gsub("^.*@", "")
 	-- IPv4-mapped IPv6 addresses may contain a dotted decimal suffix.
 	local host, port = authority:match("^%[([%x:%.]+)%]:(%d+)$")

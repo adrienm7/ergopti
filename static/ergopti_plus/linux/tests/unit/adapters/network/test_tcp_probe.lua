@@ -236,6 +236,7 @@ it("reads the relay address of every relay form the policy admits", function()
 		{ "http://[::ffff:127.0.0.1]:8080", "::ffff:127.0.0.1", 8080 },
 		{ "http://proxy.example", "proxy.example", 1080 },
 		{ "https://proxy.example", "proxy.example", 443 },
+		{ "HTTPS://proxy.example", "proxy.example", 443 },
 		{ "socks5h://user:secret@[::1]", "::1", 1080 },
 	}
 	for _, case in ipairs(cases) do
