@@ -863,6 +863,12 @@ _CRWT_UnicodeArtifactReceipt(UnicodePath, Fallback) {
 	try {
 		_ConfigDir := Scope.Directory . "\"
 		Reports := Scope.Directory . "\" . (UnicodePath ? "reports-é-報告" : "reports-ascii") . "\"
+		; Loop Files reports a long path, while A_Temp may use an 8.3 account
+		; alias. Normalize the input directory before the worker ever receives it;
+		; the actual receipt below must still survive unchanged, code unit for unit.
+		DirCreate(Reports)
+		OriginalReports := Reports
+		Reports := FSResolveDirectoryPath(Reports) . "\"
 		Snapshot := _CrashReport_CheapSnapshot(Error("receipt encoding control"))
 		Snapshot["_transport_reports_dir"] := Reports
 		State := Map("called", false, "exit_code", -1, "stdout", "", "stderr", "", "read_encoding", "")
@@ -882,6 +888,8 @@ _CRWT_UnicodeArtifactReceipt(UnicodePath, Fallback) {
 		Received := Trim(Match[1])
 		_TestPrint("# CRASH_NATIVE_RECEIPT " . KL_JsonEncode(Map("unicode_path", UnicodePath,
 			"fallback", Fallback, "read_encoding", State["read_encoding"], "exact_path", Received == Actual,
+			"reports_path_canonicalized", OriginalReports != Reports,
+			"reports_length_delta", StrLen(Reports) - StrLen(OriginalReports),
 			"physical_artifact", Actual != "", "received_exists", FileExist(Received) != "")))
 		_CRWT_AssertCodeUnits(Actual, Received, "the real worker's acknowledged artifact path")
 		AssertTrue(FileExist(Received), "the acknowledged report path must select the physical report")
