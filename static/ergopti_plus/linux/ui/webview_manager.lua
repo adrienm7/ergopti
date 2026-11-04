@@ -961,13 +961,10 @@ local function _read_app_geometry(app_name)
 	-- indistinguishable from a lucky guess.
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local manifest_path = ok_paths and Paths.shared("ui/apps.manifest.json") or nil
-	local fh = manifest_path and io.open(manifest_path, "r") or nil
-	if not fh then return defaults end
-	local raw = fh:read("*a")
-	fh:close()
+	local raw = manifest_path and require("infra.regular_file_reader").read_source(manifest_path) or nil
 	if not raw or raw == "" then return defaults end
-	local manifest = Json.decode(raw)
-	if type(manifest) ~= "table" or type(manifest.apps) ~= "table" then return defaults end
+	local decoded, manifest = pcall(Json.decode, raw)
+	if not decoded or type(manifest) ~= "table" or type(manifest.apps) ~= "table" then return defaults end
 	local app = manifest.apps[app_name]
 	if app then
 		return {

@@ -13,6 +13,17 @@ helpers.describe("shared UI catalogue sources", function()
 		helpers.assert_true(result == true or result == 0, "native source classification must finish with real FIFOs")
 	end)
 
+	helpers.it("(webview-asset-source) refuses real special assets without blocking", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_webview_asset_sources.py"
+		local result = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime) .. " --driver " .. quote(root))
+		helpers.assert_true(result == true or result == 0, "native WebView asset classification must not block")
+	end)
+
 	for _, mode in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
 		helpers.it("(ui-catalogue-source) rejects " .. mode .. " and closes the acquired stream", function()
 			local reader = require("infra.regular_file_reader")
