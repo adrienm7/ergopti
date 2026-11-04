@@ -48,13 +48,15 @@ implemented today.
   own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
   the capture port (`adapters/runtime_capture_port.lua` over
   `adapters/installed_physical_source.lua`). The artifact comes from
-  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.2`, the
+  `vendor/remap-runtime/manifest.json`, which pins `16.3.0-ergopti.3`, the
   hosted `runtime-artifact` job's digest (`tools/build/remap_runtime_publish.py
 apply`); `runtime_artifact_fetch.lua` downloads and verifies it into
   `~/Library/Application Support/Ergopti/RemapRuntime/` on the first
-  admission and reuses it after. That helper publishes the runtime files only:
-  nothing installs it or writes the Core and VirtualHIDDevice jobs yet, so an
-  opted-in boot stops at `runtime_not_installed`. The artifact is the signed privileged
+  admission and reuses it after. A missing runtime is offered once by itself:
+  the launcher's install role (`platform/remap/runtime_install.lua`) runs that
+  helper behind one administrator prompt, which publishes the files, starts the
+  Core service and loads the VirtualHIDDevice job (installing pqrs' pinned
+  package first when no driver is installed). The artifact is the signed privileged
   helper `ErgoptiPlus-Runtime-Installer.app` with the runtime products sealed in its
   `Contents/Resources/OwnedRuntime/` (the `runtime-artifact` job runs
   `remap_runtime_build.py --package-owned`); the launcher's administrator install

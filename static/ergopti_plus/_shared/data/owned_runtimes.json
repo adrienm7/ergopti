@@ -122,7 +122,7 @@
 			"tool": "Karabiner owned runtime (fork 16.3.0 + `ergoptiplus_remap_cli`)",
 			"programs": ["ergoptiplus_remap_cli"],
 			"used_for": "Same, as Ergopti's own background runtime reading its own configuration (`macos/platform/remap/runtime_owner.lua`, `macos/vendor/remap-runtime/manifest.json`)",
-			"today": "Dormant behind `[karabiner] runtime = \"owned\"`; artifact `16.3.0-ergopti.2` pinned, its helper publishes the files only (no Core or VirtualHIDDevice job yet), so an opted-in boot reports `runtime_not_installed`",
+			"today": "Dormant behind `[karabiner] runtime = \"owned\"`; artifact `16.3.0-ergopti.3` pinned; its helper, run by the install role behind one administrator prompt, publishes the files, starts the Core service and loads the VirtualHIDDevice job (hosted sudo acceptance, Remap runtime build run 41895547018)",
 			"current_class": "PIN",
 			"version_needed": "16.3.0 fork, rev `9312593e`",
 			"if_missing": "Tap-holds unavailable",
