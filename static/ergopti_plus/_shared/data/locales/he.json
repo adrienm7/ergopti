@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(לא נטענה קבוצה)",
 	"menu.llm.ollama_start_hint": "(הפעל את Ollama ביציאה 11434)",
 	"menu.metrics.migration_progress": "העברה: %d/%d שורות — לחץ לעצירה",
+	"dialog.metrics.storage_unavailable": "איסוף המדדים הושהה משום שאחסון SQLite אינו זמין או שלא עבר אימות. ההעדפה שלך לא השתנתה.",
 	"menu.metrics.unavailable": "(מדדים אינם זמינים)",
 	"menu.hotstrings.unavailable": "(תצורת ההרחבות אינה זמינה)",
 	"menu.llm.unavailable": "בינה מלאכותית אינה זמינה",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(불러온 그룹 없음)",
 	"menu.llm.ollama_start_hint": "(포트 11434에서 Ollama 실행)",
 	"menu.metrics.migration_progress": "마이그레이션: %d/%d행 — 클릭하면 중지",
+	"dialog.metrics.storage_unavailable": "SQLite 저장소를 사용할 수 없거나 검증에 실패하여 지표 수집이 일시 중지되었습니다. 설정은 변경되지 않았습니다.",
 	"menu.metrics.unavailable": "(측정값 없음)",
 	"menu.hotstrings.unavailable": "(핫스트링 설정을 사용할 수 없음)",
 	"menu.llm.unavailable": "AI 사용 불가",

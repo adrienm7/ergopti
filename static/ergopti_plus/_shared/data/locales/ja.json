@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(グループが読み込まれていません)",
 	"menu.llm.ollama_start_hint": "(ポート 11434 で Ollama を起動)",
 	"menu.metrics.migration_progress": "移行: %d/%d 行 — クリックで停止",
+	"dialog.metrics.storage_unavailable": "SQLite ストレージを利用できないか検証に失敗したため、メトリクスの収集を一時停止しました。設定は変更されていません。",
 	"menu.metrics.unavailable": "(統計は利用できません)",
 	"menu.hotstrings.unavailable": "（ホットストリングの設定は利用できません）",
 	"menu.llm.unavailable": "AI は利用できません",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(ningún grupo cargado)",
 	"menu.llm.ollama_start_hint": "(inicie Ollama en el puerto 11434)",
 	"menu.metrics.migration_progress": "Migración: %d/%d fila(s) — clic para detener",
+	"dialog.metrics.storage_unavailable": "La recopilación de métricas está pausada porque el almacenamiento SQLite no está disponible o no superó la validación. Tu preferencia no ha cambiado.",
 	"menu.metrics.unavailable": "(métricas no disponibles)",
 	"menu.hotstrings.unavailable": "(configuración de hotstrings no disponible)",
 	"menu.llm.unavailable": "IA no disponible",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(keine Gruppe geladen)",
 	"menu.llm.ollama_start_hint": "(Ollama auf Port 11434 starten)",
 	"menu.metrics.migration_progress": "Migration: %d/%d Zeile(n) — zum Stoppen klicken",
+	"dialog.metrics.storage_unavailable": "Die Erfassung von Metriken ist pausiert, weil der SQLite-Speicher nicht verfügbar ist oder die Prüfung fehlgeschlagen ist. Ihre Einstellung bleibt unverändert.",
 	"menu.metrics.unavailable": "(Metriken nicht verfügbar)",
 	"menu.hotstrings.unavailable": "(Hotstring-Konfiguration nicht verfügbar)",
 	"menu.llm.unavailable": "KI nicht verfügbar",

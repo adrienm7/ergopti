@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(कोई समूह लोड नहीं)",
 	"menu.llm.ollama_start_hint": "(पोर्ट 11434 पर Ollama चालू करें)",
 	"menu.metrics.migration_progress": "माइग्रेशन: %d/%d पंक्ति — रोकने के लिए क्लिक करें",
+	"dialog.metrics.storage_unavailable": "SQLite संग्रहण अनुपलब्ध है या उसका सत्यापन विफल हुआ है, इसलिए मेट्रिक्स संग्रह रुका हुआ है। आपकी प्राथमिकता नहीं बदली है।",
 	"menu.metrics.unavailable": "(मेट्रिक्स अनुपलब्ध)",
 	"menu.hotstrings.unavailable": "(हॉटस्ट्रिंग कॉन्फ़िगरेशन उपलब्ध नहीं)",
 	"menu.llm.unavailable": "AI उपलब्ध नहीं",

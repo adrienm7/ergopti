@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "（未加载任何分组）",
 	"menu.llm.ollama_start_hint": "（请在端口 11434 启动 Ollama）",
 	"menu.metrics.migration_progress": "迁移：%d/%d 行 — 点击停止",
+	"dialog.metrics.storage_unavailable": "由于 SQLite 存储不可用或未通过验证，指标收集已暂停。您的偏好设置未更改。",
 	"menu.metrics.unavailable": "（统计数据不可用）",
 	"menu.hotstrings.unavailable": "（热字串配置不可用）",
 	"menu.llm.unavailable": "AI 不可用",

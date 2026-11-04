@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(ingen gruppe indlæst)",
 	"menu.llm.ollama_start_hint": "(start Ollama på port 11434)",
 	"menu.metrics.migration_progress": "Migrering: %d/%d række(r) — klik for at stoppe",
+	"dialog.metrics.storage_unavailable": "Indsamling af målinger er sat på pause, fordi SQLite-lageret er utilgængeligt eller ikke kunne valideres. Din indstilling er ikke ændret.",
 	"menu.metrics.unavailable": "(målinger utilgængelige)",
 	"menu.hotstrings.unavailable": "(hotstring-konfiguration utilgængelig)",
 	"menu.llm.unavailable": "AI utilgængelig",

@@ -1460,6 +1460,7 @@
 	"menu.hotstrings.no_group_loaded": "(grup yüklenmedi)",
 	"menu.llm.ollama_start_hint": "(Ollama'yı 11434 portunda başlatın)",
 	"menu.metrics.migration_progress": "Taşıma: %d/%d satır — durdurmak için tıklayın",
+	"dialog.metrics.storage_unavailable": "SQLite depolaması kullanılamadığı veya doğrulama başarısız olduğu için metrik toplama duraklatıldı. Tercihiniz değiştirilmedi.",
 	"menu.metrics.unavailable": "(ölçümler kullanılamıyor)",
 	"menu.hotstrings.unavailable": "(hotstring yapılandırması kullanılamıyor)",
 	"menu.llm.unavailable": "YZ kullanılamıyor",
