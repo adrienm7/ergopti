@@ -69,7 +69,12 @@ local function with_widget(callback, position)
 				phase("show")
 				return self
 			end
-			function canvas:delete() self.deleted = true; return self end
+			function canvas:delete()
+				if state.refuse_canvas_delete then error("canvas deletion refused") end
+				self.deleted = true
+				phase("delete")
+				return self
+			end
 			function canvas:frame(next_frame)
 				helpers.assert_eq(self.deleted, false, "retired canvas cannot be repositioned")
 				if next_frame then self.current_frame = next_frame end
@@ -107,6 +112,36 @@ local function with_widget(callback, position)
 end
 
 helpers.describe("WPM widget render lifecycle", function()
+	helpers.it("retains a canvas after deletion failure and retries on stop", function()
+		with_widget(function(widget, state)
+			helpers.assert_true(widget.start(false))
+			state.refuse_canvas_delete = true
+			helpers.assert_eq(widget.stop(), false)
+			helpers.assert_eq(state.canvases[1].deleted, false)
+			helpers.assert_eq(widget.start(false), false, "unsettled canvas blocks restart")
+			helpers.assert_eq(#state.canvases, 1)
+			state.refuse_canvas_delete = false
+			helpers.assert_true(widget.stop())
+			helpers.assert_true(state.canvases[1].deleted)
+		end)
+	end)
+	helpers.it("refuses a reentrant start while the previous canvas is being deleted", function()
+		with_widget(function(widget, state)
+			helpers.assert_true(widget.start(false))
+			local attempted = false
+			state.on_phase = function(name)
+				if name ~= "delete" then return end
+				state.on_phase = nil
+				attempted = true
+				helpers.assert_eq(widget.start(false), false)
+			end
+			helpers.assert_true(widget.stop())
+			helpers.assert_true(attempted)
+			helpers.assert_true(widget.start(false))
+			helpers.assert_eq(#state.canvases, 2)
+			helpers.assert_true(widget.stop())
+		end)
+	end)
 	helpers.it("(wpm-menubar-stop-owner) timer failure logging preserves a restarted native item", function()
 		with_menubar(function(menubar, state)
 			helpers.assert_eq(menubar.start(), true)

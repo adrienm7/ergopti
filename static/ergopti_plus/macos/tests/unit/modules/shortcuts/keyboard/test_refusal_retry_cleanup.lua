@@ -49,4 +49,36 @@ helpers.describe("shortcut retry timer cleanup", function()
 			end)
 		end)
 	end
+
+	for _, boundary in ipairs({ "start", "fire" }) do
+		helpers.it("retains native cleanup debt after a timer " .. boundary .. " refusal", function()
+			helpers.with_fresh_modules({ "modules.shortcuts.refusal_retry", "adapters.timer_scheduler",
+				"infra.logger" }, function()
+				local handles, calls, may_stop = {}, {}, false
+				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["adapters.timer_scheduler"] = {
+					after = function(_, callback)
+						local handle = { callback = callback, timer = {} }
+						handles[#handles + 1] = handle
+						return handle, boundary ~= "start"
+					end,
+					cancel = function(handle)
+						calls[#calls + 1] = handle
+						if not may_stop then return false end
+						handle.timer = nil
+						return true
+					end,
+				}
+				local series = require("modules.shortcuts.refusal_retry").new("test", function() return true end)
+				helpers.assert_eq(series.schedule(), boundary ~= "start")
+				if boundary == "fire" then handles[1].callback() end
+				helpers.assert_eq(series.cancel(), false)
+				helpers.assert_eq(series.schedule(), false)
+				helpers.assert_eq(#handles, 1, "no successor while native cleanup is unproved")
+				may_stop = true
+				helpers.assert_eq(series.cancel(), true)
+				helpers.assert_eq(calls[#calls], handles[1], "the exact timer remains retryable")
+			end)
+		end)
+	end
 end)

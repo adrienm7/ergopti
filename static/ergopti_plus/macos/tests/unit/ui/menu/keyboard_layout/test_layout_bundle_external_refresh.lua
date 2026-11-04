@@ -71,6 +71,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				local system_dir = "/Library/Keyboard Layouts/"
 				local available = { "Ergopti_v2.2.2.bundle" }
 				local installed_user = { "Ergopti_v2.2.1.bundle" }
+				local plist_present = true
 				local revisions = { bundles = 1, user = 1, system = 1 }
 				local scans = { bundles = 0, user = 0, system = 0 }
 
@@ -96,7 +97,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					end
 					for _, name in ipairs(installed_user) do
 						if path == user_dir .. name .. "/Contents/Info.plist" then
-							return { mode = "file" }
+							return plist_present and { mode = "file" } or nil
 						end
 					end
 					return nil
@@ -212,6 +213,16 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				helpers.assert_eq(row.label, "user update v2.2.2 to v2.2.3")
 				helpers.assert_eq(scans, scans_before)
 				helpers.assert_eq(install.pick_latest_bundle(bundles_dir), "Ergopti_v2.2.3.bundle")
+
+				-- Mutating a bundle's contents does not change its parent's revision.
+				-- The cached names must still be checked against the current plist.
+				plist_present = false
+				hs_stub.execute = function() return "", false end
+				helpers.assert_eq(install.highest_installed(user_dir), nil)
+				plist_present = true
+				helpers.assert_eq(install.highest_installed(user_dir).name, "Ergopti_v2.2.2.bundle")
+				helpers.assert_eq(scans.user, scans_before.user,
+					"nested plist changes must not require another parent listing")
 			end)
 		end, debug.traceback)
 		_G.hs = saved_hs
