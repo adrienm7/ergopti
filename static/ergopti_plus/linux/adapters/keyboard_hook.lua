@@ -2515,6 +2515,7 @@ end
 --- not and no forwarded key is still down. A touchpad or a device with switches
 --- is never taken: their absolute or switch reports cannot be forwarded.
 function LayerPointer.sync()
+	local session = _capture_session
 	local wanted, held = LayerPointer.wanted(), next(LayerPointer.slots) ~= nil
 	if wanted then
 		local grabbed = false
@@ -2524,11 +2525,23 @@ function LayerPointer.sync()
 			if mask and LayerPointer.has_type(mask, LayerPointer.EV_REL_BIT)
 				and not LayerPointer.has_type(mask, LayerPointer.EV_ABS_BIT)
 				and not LayerPointer.has_type(mask, LayerPointer.EV_SW_BIT) then
-				if EvdevReader.grab(slot) then
-					LayerPointer.slots[slot] = path
-					grabbed = true
-				else
-					Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+				local keys = EvdevReader.pressed_keys(slot, KEY_MAX)
+				if not _running or _capture_session ~= session then return end
+				if keys and next(keys) == nil then
+					if EvdevReader.grab(slot) then
+						if not _running or _capture_session ~= session then return end
+						local after = EvdevReader.pressed_keys(slot, KEY_MAX)
+						if not _running or _capture_session ~= session then return end
+						if after and next(after) == nil then
+							LayerPointer.slots[slot] = path
+							grabbed = true
+						elseif EvdevReader.ungrab(slot) ~= true then
+							M.emergency_stop("navigation layer could not release pointer " .. path)
+							return
+						end
+					else
+						Logger.warn(LOG, "The navigation layer cannot take %s: its wheel keeps scrolling.", path)
+					end
 				end
 			end
 		end
@@ -2806,6 +2819,8 @@ function LayerPointer.pump_once()
 			-- only keep the events' clock fresh here.
 			if _remapper and _intercept then _event_time_ms(selected_event) end
 			_dispatch_pointer(selected_event, selected.slot)
+			if not _running or _capture_session ~= session then return end
+			LayerPointer.sync()
 		end
 		if not _running or _capture_session ~= session then return end
 		_pending_events[selected.slot] = _read_source(selected)

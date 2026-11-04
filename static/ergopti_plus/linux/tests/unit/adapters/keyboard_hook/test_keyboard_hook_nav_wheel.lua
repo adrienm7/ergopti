@@ -59,7 +59,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click, omit_click)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click, omit_click, snapshot)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -84,6 +84,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		process = function() return nil, nil, nil end,
 		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
 	}
+	local pressed = { [pointer] = type(snapshot) == "table" and snapshot or {} }
 	local reader = helpers.load_module("adapters.evdev_reader")
 	reader._set_backend({
 		read_event_bits = function(fd) return fd == pointer and MASKS[pointer_kind] or fd == second and MASKS.mouse or MASKS.keyboard end,
@@ -99,6 +100,18 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			local event = table.remove(queues[fd] or {}, 1)
 			if event == nil and fd == pointer and fatal_pointer then return nil, "fatal", "controlled removal" end
 			return event
+		end,
+		read_bits = function(fd, _, count)
+			if fd == pointer and type(snapshot) == "function" then pressed[fd] = snapshot(queues, pointer) end
+			if pressed[fd] == false then return nil, "snapshot unavailable" end
+			local bytes = {}
+			for index = 1, count do bytes[index] = 0 end
+			for code in pairs(pressed[fd] or {}) do
+				local index = math.floor(code / 8) + 1
+				if index <= count then bytes[index] = bytes[index] + 2 ^ (code % 8) end
+			end
+			for index = 1, count do bytes[index] = string.char(bytes[index]) end
+			return table.concat(bytes)
 		end,
 		poll = function() return false end,
 		close = function() end,
@@ -155,6 +168,49 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("does not grab a pointer while a previously delivered button is held (pointer-held-before-grab)", function()
+		local _, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {
+			{ EV_KEY, BTN_LEFT, 1, 1000 },
+		}, nil, nil, nil, nil, nil, nil, { [BTN_LEFT] = true })
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 0, "the physical device must deliver the matching release")
+	end)
+
+	helpers.it("takes the wheel after the pre-existing physical button is released (pointer-held-before-grab)", function()
+		local queried = false
+		local emitted, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {
+			{ EV_KEY, BTN_LEFT, 1, 1000 },
+		}, nil, nil, nil, nil, nil, nil, function(queues, pointer)
+			if not queried then
+				queried = true
+				queues[pointer][#queues[pointer] + 1] = InputEvent.encode(EV_KEY, BTN_LEFT, 0, nil, 3000)
+				return { [BTN_LEFT] = true }
+			end
+			return {}
+		end)
+		helpers.assert_true(running and queried)
+		helpers.assert_eq(grabs.on, 1, "acquisition is retried after the physical release")
+		helpers.assert_true(not has(emitted, "key:" .. BTN_LEFT .. ":0"), "the physical release is not moved to the virtual device")
+	end)
+
+	helpers.it("does not take a pointer whose pressed state cannot be read (pointer-held-before-grab)", function()
+		local _, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {},
+			nil, nil, nil, nil, nil, nil, function() return false end)
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 0)
+	end)
+
+	helpers.it("releases a pointer if a button appears during acquisition (pointer-held-before-grab)", function()
+		local calls = 0
+		local _, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {},
+			nil, nil, nil, nil, nil, nil, function()
+				calls = calls + 1
+				return calls == 1 and {} or { [BTN_LEFT] = true }
+			end)
+		helpers.assert_true(running)
+		helpers.assert_eq(grabs.on, 1)
+		helpers.assert_eq(grabs.off, 1)
+	end)
 	helpers.it("leaves composite pointer switches with the desktop (mouse-switch-no-grab)", function()
 		local _, grabs, _, running = drive("mouse_with_switch", HOLD, {
 			{ 5, 0, 1, 3000 }, -- EV_SW / SW_LID
