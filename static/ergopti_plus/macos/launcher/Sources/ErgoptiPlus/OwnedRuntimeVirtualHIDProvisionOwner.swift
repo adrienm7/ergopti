@@ -35,10 +35,10 @@ enum OwnedRuntimeVirtualHIDProvisionOwner {
 		var driver = Driver.present
 		if !daemonInstalled() {
 			let package = payloadURL.appendingPathComponent(packages[0])
-			let signature = try OwnedRuntimeCoreLaunchctl.packageSignature(package)
+			let signature = try packageSignature(package)
 			guard signature.status == 0, signedByPqrs(signature.bytes) else { throw OwnedRuntimeInstallFailure.signature }
 			try payload.verify(); try core.verifyForPlistCustody()
-			let installed = try OwnedRuntimeCoreLaunchctl.installPackage(package)
+			let installed = try installPackage(package)
 			guard installed.status == 0, daemonInstalled() else { throw OwnedRuntimeInstallFailure.copy }
 			driver = .installed
 		}
@@ -58,6 +58,24 @@ enum OwnedRuntimeVirtualHIDProvisionOwner {
 			throw OwnedRuntimeInstallFailure.cleanupPending
 		}
 		return driver
+	}
+
+	/// pqrs' package is checked and installed only from this helper's own sealed payload.
+	private static func payloadPackage(_ package: URL) throws -> String {
+		guard let resources = Bundle.main.resourceURL,
+			package.standardizedFileURL.deletingLastPathComponent().path == resources.appendingPathComponent(payloadDirectory, isDirectory: true).standardizedFileURL.path,
+			package.pathExtension == "pkg" else { throw OwnedRuntimeInstallFailure.source }
+		return package.standardizedFileURL.path
+	}
+	/// `pkgutil --check-signature` of the payload package; signedByPqrs judges the printed chain.
+	private static func packageSignature(_ package: URL) throws -> OwnedRuntimeCoreLaunchctl.Observation {
+		try OwnedRuntimeCoreLaunchctl.systemTool(path: "/usr/sbin/pkgutil", arguments: ["--check-signature", try payloadPackage(package)],
+			timeout: LauncherTimings.ownedRuntimeVhidSignatureCheck.seconds)
+	}
+	/// `installer -pkg` of the payload package onto the boot volume.
+	private static func installPackage(_ package: URL) throws -> OwnedRuntimeCoreLaunchctl.Observation {
+		try OwnedRuntimeCoreLaunchctl.systemTool(path: "/usr/sbin/installer", arguments: ["-pkg", try payloadPackage(package), "-target", "/"],
+			timeout: LauncherTimings.ownedRuntimeVhidPackageInstall.seconds)
 	}
 
 	/// The owned job is pqrs' plist under Ergopti's label, refused when pqrs' keys are not the expected ones.
