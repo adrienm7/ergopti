@@ -302,8 +302,12 @@ end
 local function perform(name, context)
 	if name == "close" then
 		local owned = type(context) == "table" and type(context.close_owned_window) == "function"
-		settle()
-		if owned then context.close_owned_window() end
+		local session = _session
+		if owned and context.close_owned_window() ~= true then
+			Logger.warn(LOG, "Error window close was refused; its report remains available.")
+			return nil
+		end
+		if _session == session then settle() end
 		Logger.info(LOG, "Error window closed.")
 		return nil
 	end
