@@ -951,6 +951,7 @@
 	"hs_config.notify_delimiters_saved": "Délimiteurs de mots mis à jour.",
 	"hs_config.notify_reset_all": "Délais et couleurs réinitialisés.",
 	"hs_config.override_active": "personnalisé",
+	"hs_config.reset_all_personal_unavailable": "La réinitialisation globale est indisponible en présence de fichiers de raccourcis personnels. Aucun réglage n’a été modifié.",
 	"hs_config.section_prefix": "Section : ",
 	"hs_config.window_title": "Délais et couleurs des hotstrings",
 	"init.reload_files": "Fichiers modifiés — rechargement…",

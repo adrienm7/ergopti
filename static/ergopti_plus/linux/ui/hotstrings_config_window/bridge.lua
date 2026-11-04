@@ -530,7 +530,21 @@ function M.on_message(payload, state, context)
 		-- by section, and that is the whole contract of this button.
 		if state.config and type(state.config.get_categories) == "function"
 			and type(state.config.clear_override) == "function" then
-			for id, category in pairs(state.config.get_categories()) do
+			local categories = state.config.get_categories()
+			if type(categories) ~= "table" then return { reset = false } end
+			-- Personal metadata has no atomic multi-field reset. Refuse the whole
+			-- operation before changing other categories instead of reporting a partial reset.
+			for id in pairs(categories) do
+				if PersonalFiles.components(id) then
+					Logger.error(LOG, "Reset all refused: personal-file metadata cannot be reset atomically.")
+					local manager = require("ui.webview_manager")
+					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
+						pcall(state.notify_error, "hs_config.reset_all_personal_unavailable")
+					end
+					return { reset = false }
+				end
+			end
+			for id, category in pairs(categories) do
 				state.config.clear_override(id, nil)
 				-- Sections too: a per-section delay left behind after "reset
 				-- everything" is a setting the user cannot see and did not keep.

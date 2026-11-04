@@ -637,6 +637,27 @@ helpers.describe("native adopted personal file gates", function()
 			helpers.assert_not_nil(f.match(selected.trigger))
 		end)
 	end)
+	helpers.it("(hotstrings-reset-refusal) preserves real personal metadata and reports unavailable reset", function()
+		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
+			helpers.assert_eq(select(2, f.config.load_all()), true)
+			local selected = f.definitions[2]
+			helpers.assert_eq(f.config.set_override(selected.id, nil, "color", "#112233"), true)
+			local before, settings = Choices.read(selected.path), f.read()
+			local previous = package.loaded["ui.hotstrings_config_window.bridge"]
+			package.loaded["ui.hotstrings_config_window.bridge"] = nil
+			local bridge = require("ui.hotstrings_config_window.bridge")
+			local notices = {}
+			local ok, result = pcall(bridge.on_message, { action = "reset_all" },
+				{ config = f.config, notify_error = function(key) notices[#notices + 1] = key end })
+			package.loaded["ui.hotstrings_config_window.bridge"] = previous
+			helpers.assert_true(ok, tostring(result))
+			helpers.assert_eq(result, { reset = false })
+			helpers.assert_eq(notices, { "hs_config.reset_all_personal_unavailable" })
+			helpers.assert_eq(Choices.read(selected.path), before)
+			helpers.assert_eq(f.read(), settings)
+		end)
+	end)
+
 	helpers.it("102 native refuses a held file owner after external source changes without settings publication", function()
 		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
