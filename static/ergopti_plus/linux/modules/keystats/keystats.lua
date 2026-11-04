@@ -683,7 +683,9 @@ function M.init(opts)
 	end
 	local sqlite_ready = registration_ok and registered == true
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
-	_storage_blocked = not sqlite_ready and not sqlite_unavailable
+	-- JSON is only a session summary and cannot retain raw SQLite events.
+	-- Stop capture whenever the durable store cannot be admitted.
+	_storage_blocked = not sqlite_ready
 	if sqlite_ready then
 		_sqlite_admitted = true
 		if SqliteReader then migrate_legacy_categories() end
@@ -715,10 +717,10 @@ function M.init(opts)
 			local closed, detail = pcall(SqliteWriter.close_db)
 			if not closed or detail == false then Logger.error(LOG, "SQLite cleanup after failed admission was refused.") end
 		end
-		if _storage_blocked then
-			Logger.error(LOG, "Metrics capture blocked: the SQLite store, migration or device registration was refused.")
+		if sqlite_unavailable then
+			Logger.error(LOG, "Metrics capture blocked: SQLite is unavailable and the JSON summary cannot retain events.")
 		else
-			Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+			Logger.error(LOG, "Metrics capture blocked: the SQLite store, migration or device registration was refused.")
 		end
 	end
 
