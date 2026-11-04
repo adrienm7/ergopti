@@ -13,6 +13,7 @@
  * typographic apostrophe ’). Placeholders like `{
 	'Options de menu propres à certains systèmes': 'Platform-specific menu options',
 	Option: 'Option',
+	'Touches tap-hold par système': 'Tap-hold keys by system',
 	'Inventaire des actions configurables': 'Bindable actions inventory',
 	Action: 'Action',
 	'Trois systèmes, un projet.': 'Three systems, one project.',
