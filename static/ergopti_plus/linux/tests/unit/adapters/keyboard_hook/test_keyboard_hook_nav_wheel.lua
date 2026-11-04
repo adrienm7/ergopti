@@ -58,7 +58,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click, omit_click)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -116,7 +116,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				if on_relative and on_relative(kh, keyboard, pointer, second, grabs, emitted) == false then return false end
 				return true
 			end,
-			onClick = function(code) if on_click then on_click(kh, code) end end,
+			onClick = not omit_click and function(code) if on_click then on_click(kh, code) end end or nil,
 			onPointerEvent = observer and function(kind, code, value, slot)
 				return observer(kind, code, value, slot, kh, start_options)
 			end or nil,
@@ -154,6 +154,18 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("observes pointer events when no click callback is registered (pointer-observer-only)", function()
+		local reports = {}
+		local _, _, _, running, source, opened = drive("mouse", {}, {
+			{ EV_REL, REL_X, 3, 3000 }, { EV_KEY, BTN_LEFT, 1, 4000 },
+		}, nil, function(kind, code, value, slot)
+			reports[#reports + 1] = { kind, code, value, slot }
+		end, nil, nil, nil, true)
+		helpers.assert_true(running)
+		helpers.assert_true(opened, "the registered pointer observer requires a live pointer source")
+		helpers.assert_eq(reports, { { "motion", REL_X, 3, source }, { "press", BTN_LEFT, 1, source },
+			{ "reset", nil, nil, source } })
+	end)
 	helpers.it("identifies the pointer on each motion and frame report", function()
 		local reports = {}
 		local _, _, _, _, source = drive("mouse", {}, {
