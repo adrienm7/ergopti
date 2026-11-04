@@ -77,6 +77,17 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.GLOBAL_DEFAULT_SECONDS)
 	end)
 
+	helpers.it("falls back to the global delay for a NaN key threshold", function()
+		local loaded = load('[tap_hold]\ntime_activation_seconds = 0.4\n[tap_hold.keys.left_shift]\ntime_activation_seconds = nan\n')
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, 0.4)
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
+			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end })
+		engine:process(Engine.KEY_CODES.left_shift, 1, 0)
+		local _, tap = engine:process(Engine.KEY_CODES.left_shift, 0, 100)
+		helpers.assert_eq(tap, "copy", "the fallback threshold must admit a short tap")
+	end)
+
 	helpers.it("disables a key with a field of the wrong type", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntap_action = 3\n')
 		helpers.assert_eq(loaded.keys.left_shift.enabled, false)
