@@ -693,16 +693,7 @@ function M.init(opts)
 	return installed
 end
 
---- Re-reads the configuration and swaps the engine in place.
---- @return boolean True when the new configuration is in force.
-function M.reload()
-	_require_init()
-	local previous = { _loaded, _one_shot, _engine, _combinations }
-	local ok, err = pcall(_load)
-	if not ok then
-		Logger.error(LOG, "Tap-hold reload failed, the previous configuration stays: %s.", tostring(err))
-		return false
-	end
+local function apply_candidate(previous)
 	local candidate = _engine
 	local applied, result = pcall(_apply)
 	if applied and result then return true end
@@ -718,6 +709,19 @@ function M.reload()
 		_loaded, _one_shot, _engine, _combinations = previous[1], previous[2], previous[3], previous[4]
 	end
 	return false
+end
+
+--- Re-reads the configuration and swaps the engine in place.
+--- @return boolean True when the new configuration is in force.
+function M.reload()
+	_require_init()
+	local previous = { _loaded, _one_shot, _engine, _combinations }
+	local ok, err = pcall(_load)
+	if not ok then
+		Logger.error(LOG, "Tap-hold reload failed, the previous configuration stays: %s.", tostring(err))
+		return false
+	end
+	return apply_candidate(previous)
 end
 
 --- Captures the configuration in force, for a scope transaction's inverse.
@@ -750,8 +754,9 @@ function M.apply_configuration(document, shapes)
 		Logger.error(LOG, "Tap-hold scope candidate refused, the previous configuration stays: %s.", tostring(loaded))
 		return false
 	end
+	local previous = { _loaded, _one_shot, _engine, _combinations }
 	_loaded, _one_shot, _engine, _combinations = loaded, one_shot, engine, combinations
-	return _apply()
+	return apply_candidate(previous)
 end
 
 --- Reinstalls a configuration captured by configuration_snapshot().
@@ -763,8 +768,9 @@ function M.restore_configuration(snapshot)
 		Logger.error(LOG, "Tap-hold configuration snapshot is invalid — nothing restored.")
 		return false
 	end
+	local previous = { _loaded, _one_shot, _engine, _combinations }
 	_loaded, _one_shot, _engine, _combinations = snapshot.loaded, snapshot.one_shot, snapshot.engine, snapshot.combinations
-	return _apply()
+	return apply_candidate(previous)
 end
 
 --- Whether the runtime feature switch is on.
