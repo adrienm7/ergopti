@@ -17,6 +17,28 @@ local helpers, DEFAULTS, fake_hook, write, manager =
 
 
 helpers.describe("tap-hold manager", function()
+	helpers.it("permits retry after the first engine installation is refused (init-apply-refusal)", function()
+		helpers.load_module("platform.remap.nav_layer")
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local user_path = os.tmpname()
+		write(user_path, "")
+		local hook = fake_hook()
+		local install = hook.set_remapper
+		hook.set_remapper = function() return false end
+		local opts = { keyboard_hook = hook, execute_action = function() end,
+			action_names = require("modules.gestures.manager").get_executable_action_names,
+			on_text_injected = function() end, defaults_path = DEFAULTS, user_path = user_path }
+		local first = Manager.init(opts)
+		hook.set_remapper = install
+		local called, retried = pcall(Manager.init, opts)
+		local installed = hook.engine ~= nil
+		Manager._reset_for_test()
+		os.remove(user_path)
+		helpers.assert_eq(first, false)
+		helpers.assert_true(called, "refused initialization must not make the manager permanently initialized")
+		helpers.assert_true(retried)
+		helpers.assert_true(installed)
+	end)
 	helpers.it("refuses a FIFO one-shot table without blocking a reload", function()
 		local uv = require("luv")
 		local Shell = require("adapters.shell_runner")
