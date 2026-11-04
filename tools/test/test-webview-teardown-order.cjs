@@ -65,7 +65,7 @@ const CLOSE_RE = /([\w.]+)\.Close\(\)/;
 // returns from add_WebMessageReceived / add_NavigationCompleted, so it always
 // carries "Sub" — `_OnbWeb_MsgSub`, `this.NavSub` — or lives in an
 // explicit retired owner's subscription field. Zero also releases an object.
-const RELEASE_RE = /((?:\w+\.)?(?:\w*Sub|subscription))\s*:=\s*(?:unset|0)\b/;
+const RELEASE_RE = /((?:\w+\.)?\w*Sub|\w+\.[Ss]ubscription)\s*:=\s*(?:unset|0)\b/;
 // A function or method definition, at any indentation: `Name(args) {`.
 const FUNC_DEF_RE = /^\s*\w+\([^)]*\)\s*\{/;
 
@@ -95,7 +95,11 @@ function walk(dir, acc = []) {
  * @returns {string} Prefix shared with its controller's name.
  */
 function subscriptionOwner(name) {
-	return name.replace(/(?:[A-Z]?[a-z]*Sub|subscription)$/, '');
+	return (
+		/subscription$/i.test(name)
+			? name.replace(/subscription$/i, '')
+			: name.replace(/[A-Z]?[a-z]*Sub$/, '')
+	).toLowerCase();
 }
 
 let total_pass = 0;
@@ -145,7 +149,7 @@ for (const abs of walk(WINDOWS_DIR)) {
 	// keystats's abort path closes a controller it was handed and subscribes to
 	// nothing.
 	const declaresSubs = lines.some(
-		(l) => !l.trim().startsWith(';') && /(?:\w*Sub|subscription)\s*:=/.test(l)
+		(l) => !l.trim().startsWith(';') && /(?:\w*Sub|\w+\.[Ss]ubscription)\s*:=/.test(l)
 	);
 	if (!declaresSubs) {
 		pass(`${rel} — closes a controller, stores no subscription handle`);
@@ -166,14 +170,14 @@ for (const abs of walk(WINDOWS_DIR)) {
 		// `_X_Controller`, a local `MsgSub` to a local `Controller`. A host can close a
 		// half-built local controller in its open path long before the teardown
 		// releases its globals, and that earlier Close says nothing about them.
-		const owner = close.name.replace(/controller$/i, '');
+		const owner = close.name.replace(/controller$/i, '').toLowerCase();
 		const own = releases.filter((r) => subscriptionOwner(r.name) === owner);
 		if (own.length === 0) {
 			const stores = lines.some(
 				(l, i) =>
 					i > firstFuncLine &&
 					!l.trim().startsWith(';') &&
-					[...l.matchAll(/(?<![\w.])((?:\w+\.)?(?:\w*Sub|subscription))\s*:=/g)].some(
+					[...l.matchAll(/(?<![\w.])((?:\w+\.)?\w*Sub|\w+\.[Ss]ubscription)\s*:=/g)].some(
 						(m) => subscriptionOwner(m[1]) === owner
 					)
 			);

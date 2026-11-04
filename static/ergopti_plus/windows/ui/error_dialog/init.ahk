@@ -75,6 +75,9 @@ global _ED_Gui         := unset
 global _ED_Controller  := unset
 global _ED_WebView     := unset
 global _ED_MsgSub      := unset
+; Pending factories and refused native cleanup retain the same exact host.
+global _ED_OpeningHost := 0
+global _ED_RetiredHosts := []
 global _ED_WindowEpoch := 0
 global _ED_ResetDone   := true
 
@@ -330,7 +333,7 @@ _ErrorDialog_NewWindow() {
 _ErrorDialog_Open(Record) {
 	global _VendorDir, _SharedDir, _I18nLocale, ED_WIDTH, ED_HEIGHT, ED_VHOST, ED_HOST_ACCESS_ALLOW
 	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
-	global _ED_PendingRecord
+	global _ED_PendingRecord, _ED_OpeningHost
 	PreviousCritical := A_IsCritical
 	Critical("On")
 	try {
@@ -341,7 +344,7 @@ _ErrorDialog_Open(Record) {
 		_ED_WindowEpoch += 1
 		Epoch := _ED_WindowEpoch
 	} finally Critical(PreviousCritical)
-	G := 0, WVC := 0, WV := 0, Subscription := 0, Committed := false, Primary := 0
+	G := 0, WVC := 0, WV := 0, Subscription := 0, Committed := false, Primary := 0, Host := 0
 	try {
 		LoggerStart("ErrorDialog", "Opening the error window…")
 		if !_ErrorDialog_IsCurrent(Epoch)
@@ -368,6 +371,8 @@ _ErrorDialog_Open(Record) {
 			return false
 		}
 		G := _ErrorDialog_NewWindow()
+		Host := {Window: G, Controller: 0, WebView: 0, Subscription: 0, Session: Fields,
+			Pending: 0, Building: true, Closing: false, Cancelled: false, Epoch: Epoch}
 		if !_ErrorDialog_IsCurrent(Epoch)
 			return false
 		G.MarginX := 0
@@ -399,6 +404,7 @@ _ErrorDialog_Open(Record) {
 				return false
 			_ED_Gui := G
 			_ED_Session := Fields
+			_ED_OpeningHost := Host
 		} finally Critical(PreviousCritical)
 		; Publish the host before Show can dispatch Close or Size.
 		G.Show("NoActivate w" . ED_WIDTH . " h" . ED_HEIGHT)
@@ -459,6 +465,7 @@ _ErrorDialog_Open(Record) {
 			_ED_Controller := WVC
 			_ED_WebView := WV
 			_ED_MsgSub := Subscription
+			Host.Controller := WVC, Host.WebView := WV, Host.Subscription := Subscription
 			Subscription := 0
 			Committed := true
 		} finally Critical(PreviousCritical)
@@ -474,25 +481,30 @@ _ErrorDialog_Open(Record) {
 		Primary := Err
 		throw Err
 	} finally {
-		if !Committed {
-			; Revoke only this owner, then release private COM outside the RAM transaction.
-			Retired := _ErrorDialog_ResetWindow(Epoch)
-			Subscription := 0
-			WV := 0
-			CleanupFailure := 0
-			if WVC {
-				try WVC.Close()
-				catch as Err {
-					CleanupFailure := Err
-					try LoggerError("ErrorDialog", "Retired browser cleanup failed: {1}.", Err.Message)
+		if !Committed
+			_ErrorDialog_ResetWindow(Epoch)
+		if IsObject(Host) {
+			PreviousCritical := Critical("On")
+			try {
+				; The cancelled opening still owns any controller returned after
+				; its Close event. Transfer it before releasing the factory frame.
+				Host.Controller := WVC
+				Host.WebView := WV
+				if Subscription
+					Host.Subscription := Subscription
+				Subscription := 0, WV := 0, WVC := 0
+				Host.Building := false
+				if !Committed || Host.Cancelled || !_ErrorDialog_IsCurrent(Epoch, G, Fields) {
+					Host.Cancelled := true
+					_ErrorDialog_QueueHost(Host)
 				}
-			}
-			; Native Close may already have destroyed this exact private host.
-			if G
-				try G.Destroy()
-			if IsObject(CleanupFailure) && !IsObject(Primary)
-				throw CleanupFailure
+				if _ED_OpeningHost == Host
+					_ED_OpeningHost := 0
+			} finally Critical(PreviousCritical)
+			if Host.Cancelled && Host.Window
+				try Host.Window.Hide()
 		}
+		_ErrorDialog_RetireHosts()
 	}
 }
 
@@ -537,34 +549,87 @@ _ErrorDialog_OnSize(Epoch, GuiObj, MinMax, Width, Height) {
 _ErrorDialog_CloseWindow(Epoch := unset, Window := 0) {
 	Retired := IsSet(Epoch) ? _ErrorDialog_ResetWindow(Epoch, Window) : _ErrorDialog_ResetWindow()
 	if !Retired
-		return
-	; Strong local references keep releases and native teardown outside Critical.
-	Retired.Subscription := 0
+		return false
 	if Retired.Window
-		Retired.Window.WVC := 0
-	if Retired.Controller
-		try Retired.Controller.Close()
-	Retired.WebView := 0
-	Retired.Controller := 0
-	if Retired.Window
-		try Retired.Window.Destroy()
+		try Retired.Window.Hide()
+	Accepted := _ErrorDialog_RetireHosts()
 	LoggerInfo("ErrorDialog", "Error window closed.")
+	return Accepted
+}
+
+; Called under Critical; resource disposal is owned exclusively by the drain.
+_ErrorDialog_QueueHost(Host) {
+	global _ED_RetiredHosts
+	for Existing in _ED_RetiredHosts
+		if Existing == Host
+			return
+	_ED_RetiredHosts.Push(Host)
+}
+
+_ErrorDialog_RetireHosts() {
+	global _ED_RetiredHosts
+	Accepted := true
+	for Host in _ED_RetiredHosts.Clone() {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.Building || Host.Closing {
+				Accepted := false
+				continue
+			}
+			Host.Closing := true
+		} finally Critical(PreviousCritical)
+		try {
+			Host.Subscription := 0
+			if Host.Window
+				Host.Window.WVC := 0
+			if Host.Controller {
+				Host.Controller.Close()
+				Host.Controller := 0
+			}
+			Host.WebView := 0
+			if Host.Window {
+				Host.Window.Destroy()
+				Host.Window := 0
+			}
+			PreviousCritical := Critical("On")
+			try {
+				for Index, Existing in _ED_RetiredHosts {
+					if Existing == Host {
+						_ED_RetiredHosts.RemoveAt(Index)
+						break
+					}
+				}
+			} finally Critical(PreviousCritical)
+		} catch as Err {
+			Accepted := false
+			LoggerWarn("ErrorDialog", "Retired host cleanup failed; exact ownership retained: {1}.", Err.Message)
+		} finally Host.Closing := false
+	}
+	return Accepted
 }
 
 ; Detach every old reference before any destructor, Close, Destroy or logger can pump.
 _ErrorDialog_ResetWindow(Epoch := unset, Window := 0) {
 	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
-	global _ED_Busy, _ED_Folded, _ED_PendingRecord
+	global _ED_Busy, _ED_Folded, _ED_PendingRecord, _ED_OpeningHost
 	PreviousCritical := A_IsCritical
 	Critical("On")
 	try {
 		if IsSet(Epoch) && !_ErrorDialog_IsCurrent(Epoch, Window)
 			return 0
-		Retired := {Window: IsSet(_ED_Gui) ? _ED_Gui : 0,
-			Controller: IsSet(_ED_Controller) ? _ED_Controller : 0,
-			WebView: IsSet(_ED_WebView) ? _ED_WebView : 0,
-			Subscription: IsSet(_ED_MsgSub) ? _ED_MsgSub : 0, Session: _ED_Session,
-			Pending: _ED_PendingRecord}
+		SavedWindow := IsSet(_ED_Gui) ? _ED_Gui : 0
+		if IsObject(_ED_OpeningHost) && _ED_OpeningHost.Window == SavedWindow
+				&& _ED_OpeningHost.Epoch == _ED_WindowEpoch {
+			Retired := _ED_OpeningHost
+			Retired.Cancelled := true
+			_ED_OpeningHost := 0
+		} else
+			Retired := {Window: SavedWindow,
+				Controller: IsSet(_ED_Controller) ? _ED_Controller : 0,
+				WebView: IsSet(_ED_WebView) ? _ED_WebView : 0,
+				Subscription: IsSet(_ED_MsgSub) ? _ED_MsgSub : 0, Session: _ED_Session,
+				Pending: _ED_PendingRecord, Building: false, Closing: false, Cancelled: true, Epoch: _ED_WindowEpoch}
+		_ErrorDialog_QueueHost(Retired)
 		_ED_ResetDone := true
 		_ED_WindowEpoch += 1
 		_ED_PendingRecord := 0
