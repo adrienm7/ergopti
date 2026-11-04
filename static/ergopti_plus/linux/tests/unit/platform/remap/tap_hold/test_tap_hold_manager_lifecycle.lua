@@ -244,8 +244,9 @@ os.remove(user_path)
 	helpers.it("gives the magic key its result before the character's own (one-shot-magic-first)", function()
 		local Manager, hook, _, user_path = manager()
 		hook.key_text = function(code) return code == 51 and "," or nil end
+		local names = { "modules.hotstrings.magic_key", "modules.hotstrings.injector" }
 		local saved = {}
-		for _, name in ipairs({ "modules.hotstrings.magic_key", "modules.hotstrings.injector" }) do
+		for _, name in ipairs(names) do
 			saved[name] = package.loaded[name]
 		end
 		local injected = {}
@@ -260,7 +261,7 @@ os.remove(user_path)
 			local _, tap = hook.engine:process(51, 1, 200)
 			helpers.assert_eq(tap, { type_text = "J" }, "a magic \",\" types the magic key's result, not \" ;\"")
 		end)
-		for name, module in pairs(saved) do package.loaded[name] = module end
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		Manager._reset_for_test()
 		os.remove(user_path)
 		if not ok then error(err, 0) end
