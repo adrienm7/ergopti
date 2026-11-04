@@ -59,6 +59,10 @@ function M.request(label, on_turn)
 	end
 	local settled = false
 	local handle
+	local function close_child()
+		local ok, closed = pcall(handle.close_input)
+		if not ok or closed ~= true then pcall(handle.terminate) end
+	end
 
 	--- Delivers the single outcome, logging a raising callback instead of losing it.
 	--- @param delivered boolean True when the echo arrived.
@@ -78,7 +82,7 @@ function M.request(label, on_turn)
 		if settled then return true end
 		if type(stdout_chunk) == "string" and stdout_chunk:find("\n", 1, true) then
 			settle(true, nil)
-			if handle then pcall(handle.close_input) end
+			if handle then close_child() end
 		end
 		return true
 	end)
@@ -102,8 +106,7 @@ function M.request(label, on_turn)
 	function probe.cancel()
 		if settled then return end
 		settled = true
-		local ok, closed = pcall(handle.close_input)
-		if not ok or closed ~= true then pcall(handle.terminate) end
+		close_child()
 	end
 
 	return probe, nil

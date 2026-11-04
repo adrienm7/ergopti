@@ -189,7 +189,7 @@ local function select_pending(id)
 		end
 	end)
 	if not started or start_error == false then
-		_selecting[id] = nil
+		if _selecting[id] == owner then _selecting[id] = nil end
 		Logger.error(LOG, "Selection of the '%s' layout could not start: %s.", id, tostring(start_error))
 	end
 end

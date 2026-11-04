@@ -32,6 +32,7 @@ local function load(live)
 		end,
 		select = function(id, on_done)
 			state.selected[#state.selected + 1] = id
+			if state.select_hook then return state.select_hook(id, on_done) end
 			if state.defer_selection then state.selection_done = on_done else on_done(true, { id = id }) end
 		end,
 		encode_json = Json.encode,
@@ -106,6 +107,26 @@ helpers.describe("pending layout activation (composer-macos26)", function()
 		state.selection_done(true)
 		helpers.assert_not_nil(Pending.pending("ergol"), "the newer request survives the old callback")
 	end)
+
+	for _, raises in ipairs({ false, true }) do
+	helpers.it("keeps a reentrant selection owner when the first start refuses (pending-layout-reentrant) " .. tostring(raises), function()
+		local Pending, state = load({ ["Ergo-L"] = true })
+		Pending.record("ergol", "Ergo-L")
+		Pending.request_select("ergol")
+		state.select_hook = function(_, on_done)
+			state.select_hook = function(_, next_done) state.selection_done = next_done; return true end
+			on_done(false, "refused")
+			Pending.resume()
+			if raises then error("first start failed") end
+			return false
+		end
+		Pending.resume()
+		Pending.resume()
+		helpers.assert_eq(#state.selected, 2, "the second request retains its in-flight owner")
+		state.selection_done(true)
+		helpers.assert_nil(Pending.pending("ergol"))
+	end)
+	end
 
 	helpers.it("keeps a layout whose live state cannot be read, and refuses to select an unrecorded one", function()
 		local Pending, state = load({})
