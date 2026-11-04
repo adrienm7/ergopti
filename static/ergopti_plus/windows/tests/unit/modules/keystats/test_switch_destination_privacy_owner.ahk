@@ -113,6 +113,6 @@ _KSD_Case(Mode) {
 		throw ExportFailure
 }
 
-for _KSD_Mode in ["app-third", "title-third", "app-live", "title-live", "outgoing-private", "public"]
+for _KSD_Mode in ["app-third", "title-third", "app-live", "title-live", "outgoing-private", "outgoing-title-private", "public"]
 	Test("Keystats switch destinations: " . _KSD_Mode . " respects captured privacy (switch-destination-privacy-owner)",
 		_KSD_Case.Bind(_KSD_Mode))

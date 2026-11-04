@@ -239,6 +239,7 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		; must be attributed to the app that actually owned prev_title, not
 		; the one the user switched into (F9 fix).
 		outgoing_app := KLHook.prev_app
+		outgoing_title := KLHook.prev_title
 
 		; Emit app_switch / window_switch the first time we observe a change.
 		; HS tracks app and title separately because a window-title-only change
@@ -260,7 +261,7 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 								try LoggerWarn("keystats_hook", "Captured app-switch destination could not be classified; its row was refused.")
 						}
 						if !DestinationFiltered
-								try KL_LogAppSwitch(KLHook.prev_app, NewApp, duration)
+								try KL_LogAppSwitch(outgoing_app, NewApp, duration, outgoing_title)
 				}
 				KLHook.prev_app := NewApp
 				KLHook.app_entered_at := Now
