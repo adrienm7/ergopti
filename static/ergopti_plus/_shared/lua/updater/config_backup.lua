@@ -372,6 +372,17 @@ function M.new(options)
 			or type(record.files) ~= "table" or rules.kinds[record.kind] == nil then
 			return nil, "unexpected manifest"
 		end
+		-- ipairs stops at the first hole and ignores object keys. A corrupt list
+		-- must not turn a partial restore into a reported success.
+		local count, highest = 0, 0
+		for index in next, record.files do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 then
+				return nil, "unexpected manifest file list"
+			end
+			count = count + 1
+			if index > highest then highest = index end
+		end
+		if count ~= highest then return nil, "unexpected manifest file list" end
 		for _, file in ipairs(record.files) do
 			if type(file) ~= "table" or not target(file.root, file.path) then
 				return nil, "manifest names a file outside the configuration"

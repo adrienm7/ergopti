@@ -289,6 +289,24 @@ function M.register(helpers, env)
 			helpers.assert_eq(#fs.writes, writes, "nothing is written for a manifest leaving its root")
 			helpers.assert_eq(owner.restore("../x"), false)
 		end)
+
+		helpers.it("refuses a non-array or sparse manifest file list before any write", function()
+			for _, files in ipairs({
+				{ unexpected = { root = "config", path = "config.toml" } },
+				{ [1] = { root = "config", path = "config.toml" },
+					[3] = { root = "config", path = "layers.toml" } },
+			}) do
+				local owner, fs, _, json = fixture()
+				local record = assert(owner.create("pre_install", {}))
+				fs.files[record.path .. "/backup.json"] = json.encode({ schema_version = 1, id = record.id,
+					kind = "pre_install", files = files })
+				local writes = #fs.writes
+				local restored, reason = owner.restore(record.id)
+				helpers.assert_eq(restored, false)
+				helpers.assert_eq(reason, "missing")
+				helpers.assert_eq(#fs.writes, writes, "a truncated manifest must not publish a restore")
+			end
+		end)
 	end)
 end
 
