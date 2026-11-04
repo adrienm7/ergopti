@@ -77,12 +77,6 @@ local _process_thread = nil
 -- =========================================
 -- =========================================
 
--- Joins the native window, application identity and title into one comparable key.
--- A control character rather than a printable one: a window title may legally
--- contain any punctuation, and a separator that can occur in the data makes two
--- different focus states compare equal.
-local FOCUS_KEY_SEPARATOR = "\1"
-
 --- Returns { appId, windowTitle } for the focused window, both "" when unknown.
 ---
 --- Delegates rather than asking X11 itself. This file used to carry a second,
@@ -95,7 +89,9 @@ local function _focused_identity()
 	local ok, info, native = pcall(WindowInfo.focused_snapshot)
 	if not ok or type(info) ~= "table" then return "", "", "" end
 	if type(native) ~= "string" then native = "" end
-	return info.appId or "", info.windowTitle or "", native
+	local app_id = type(info.appId) == "string" and info.appId or ""
+	local title = type(info.windowTitle) == "string" and info.windowTitle or ""
+	return app_id, title, native
 end
 
 --- A value that changes exactly when the focused window's identity changes.
@@ -107,7 +103,9 @@ end
 --- @param native string
 --- @return string
 local function _focus_key(app_id, title, native)
-	return native .. FOCUS_KEY_SEPARATOR .. app_id .. FOCUS_KEY_SEPARATOR .. title
+	-- Lengths distinguish field boundaries even when metadata contains control
+	-- bytes, so changing focus cannot collide with a previous concatenation.
+	return #native .. ":" .. native .. #app_id .. ":" .. app_id .. title
 end
 
 --- The kernel's process table. Tests point it at a fixture tree.

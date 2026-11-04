@@ -178,6 +178,26 @@ helpers.describe("linux-native-focus-identity", function()
 		helpers.assert_true(ok, tostring(failure))
 	end)
 
+	helpers.it("(linux-focus-separator-collision) distinguishes control bytes inside native metadata", function()
+		local original = package.loaded["adapters.window_info"]
+		local app, title = "editor\1child", "private"
+		package.loaded["adapters.window_info"] = {
+			focused_snapshot = function() return { appId = app, windowTitle = title }, "x11:1" end,
+		}
+		local events = {}
+		local ok, failure = pcall(function()
+			with_proc(AB, function(lifecycle)
+				lifecycle.onFocusChange(function(name, caption) events[#events + 1] = { name, caption } end)
+				lifecycle.start()
+				app, title = "editor", "child\1private"
+				lifecycle.tick(1)
+				helpers.assert_eq(events, { { app, title } }, "distinct metadata must invalidate the focus context")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
 	helpers.it("(linux-native-focus-identity) emits focus changes between identical metadata windows", function()
 		local original = package.loaded["adapters.window_info"]
 		local identity, title = "x11:1337:1", "Untitled"
