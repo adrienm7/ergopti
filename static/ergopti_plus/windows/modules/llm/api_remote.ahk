@@ -1384,7 +1384,7 @@ _LLMRemote_TrimAsyncRegistry() {
         ; Honour the async contract: exactly one of on_success / on_fail must
         ; fire. Without this the caller (e.g. the prediction engine slot state
         ; machine) hangs forever waiting for a callback that will never arrive.
-        if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
+        if !oldest_entry["cancelled"] and oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
             _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail",
                 _LLMRemote_FailInfo("trimmed"))
         return
