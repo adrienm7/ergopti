@@ -481,17 +481,30 @@ local OPEN_LOG = {
 ---
 --- `%s` is replaced with the destination path for the SAVE variants; the
 --- clipboard variants take no path.
+-- A pipeline reports the clipboard writer's status even if the capture tool
+-- failed. Stage the PNG privately so a failed or empty capture cannot erase the
+-- clipboard or stop the fallback cascade.
+local function screenshot_to_clipboard(capture, writer)
+	return '{ f=$(mktemp --suffix=.png) && { ' .. capture .. ' "$f" && [ -s "$f" ] && '
+		.. writer .. ' < "$f"; r=$?; rm -f "$f"; [ "$r" -eq 0 ]; }; }'
+end
+
 local SCREENSHOT_COMMANDS = {
 	["screenshot_fullscreen_clipboard"] =
-		"grim - | wl-copy || gnome-screenshot -c || spectacle -bnc || maim | xclip -selection clipboard -t image/png",
+		screenshot_to_clipboard("grim", "wl-copy --type image/png")
+		.. " || gnome-screenshot -c || spectacle -bnc || "
+		.. screenshot_to_clipboard("maim", "xclip -selection clipboard -t image/png"),
 	["screenshot_fullscreen_save"] =
 		"grim %s || gnome-screenshot -f %s || spectacle -bno %s || maim %s",
 	["screenshot_region_clipboard"] =
-		"grim -g \"$(slurp)\" - | wl-copy || gnome-screenshot -ac || spectacle -bnrc || maim -s | xclip -selection clipboard -t image/png",
+		screenshot_to_clipboard('grim -g "$(slurp)"', "wl-copy --type image/png")
+		.. " || gnome-screenshot -ac || spectacle -bnrc || "
+		.. screenshot_to_clipboard("maim -s", "xclip -selection clipboard -t image/png"),
 	["screenshot_region_save"] =
 		"grim -g \"$(slurp)\" %s || gnome-screenshot -af %s || spectacle -bnro %s || maim -s %s",
 	["screenshot_window_clipboard"] =
-		"gnome-screenshot -wc || spectacle -bnac || maim -i \"$(xdotool getactivewindow)\" | xclip -selection clipboard -t image/png",
+		"gnome-screenshot -wc || spectacle -bnac || "
+		.. screenshot_to_clipboard('maim -i "$(xdotool getactivewindow)"', "xclip -selection clipboard -t image/png"),
 	["screenshot_window_save"] =
 		"gnome-screenshot -wf %s || spectacle -bnao %s || maim -i \"$(xdotool getactivewindow)\" %s",
 }

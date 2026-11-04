@@ -402,6 +402,36 @@ helpers.describe("Linux system actions", function()
 		if not ok then error(err, 0) end
 	end)
 
+	for _, action in ipairs({ "screenshot_fullscreen_clipboard", "screenshot_region_clipboard" }) do
+		helpers.it("falls back without writing an empty clipboard when grim fails (" .. action .. ")", function()
+			local log, dir = run_with_stubs(backgrounded(Gestures, action), {
+				grim = "exit 1", slurp = 'echo "10,10 50x20"',
+				["wl-copy"] = 'cat > "$STUBS/clipboard"',
+				["gnome-screenshot"] = "exit 0", spectacle = "exit 1", maim = "exit 1",
+			})
+			helpers.assert_nil(io.open(dir .. "/clipboard", "r"), "failed grim cannot replace the clipboard: " .. log)
+			helpers.assert_true(log:find("gnome%-screenshot") ~= nil, "next capture tool must run: " .. log)
+		end)
+	end
+
+	for _, action in ipairs({ "screenshot_fullscreen_clipboard", "screenshot_region_clipboard" }) do
+		helpers.it("copies a successful PNG and cleans its private temporary file (" .. action .. ")", function()
+			local command = 'TMPDIR="$STUBS"; export TMPDIR; ' .. backgrounded(Gestures, action)
+			local log, dir = run_with_stubs(command, {
+				grim = 'for last; do :; done; printf PNG > "$last"',
+				slurp = 'echo "10,10 50x20"', ["wl-copy"] = 'cat > "$STUBS/clipboard"',
+				["gnome-screenshot"] = "exit 1", spectacle = "exit 1", maim = "exit 1",
+			})
+			local clip = assert(io.open(dir .. "/clipboard", "rb"))
+			helpers.assert_eq(clip:read("*a"), "PNG")
+			clip:close()
+			helpers.assert_true(not log:find("gnome%-screenshot"), "success stops the cascade")
+			local stream = assert(io.popen("find '" .. dir .. "' -name '*.png' -print"))
+			helpers.assert_eq(stream:read("*a"), "", "the staged PNG is removed")
+			stream:close()
+		end)
+	end
+
 	helpers.it("screen_capture_instant saves the active window like screenshot_window_save (action-parity-linux-system)",
 		function()
 			local instant = backgrounded(Gestures, "screen_capture_instant")
