@@ -134,6 +134,38 @@ helpers.describe("screen capture adapter: Screen Recording permission", function
 		end)
 	end)
 
+	helpers.it("retains a refused but unsettled TCC launch until its exact exit (tcc-reset-start-race)", function()
+		local saved = package.loaded["adapters.shell_runner"]
+		local observer, result = nil, nil
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function()
+				return {
+					start = function() return false end,
+					isSettled = function() return false end,
+					onSettled = function(fn) observer = fn; return true end,
+				}
+			end,
+		}
+		local ok, err = pcall(function()
+			with_native({ processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon" } }, function(adapter)
+				helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon",
+					function(done, detail) result = { done, detail } end), true)
+				helpers.assert_nil(result, "the reset can still revoke the grant")
+				helpers.assert_eq(type(observer), "function")
+				observer()
+				helpers.assert_eq(result[1], false)
+				helpers.assert_contains(result[2], "unsettled launch")
+				package.loaded["adapters.shell_runner"].spawn = function()
+					return { start = function() return false end, isSettled = function() return true end }
+				end
+				helpers.assert_eq(adapter.reset_permission("com.ergoptiplus.app.hammerspoon", function() end), false,
+					"a proven unlaunched task remains an immediate refusal")
+			end)
+		end)
+		package.loaded["adapters.shell_runner"] = saved
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("resets only this app's Screen Recording entry through tccutil (screen-recording-stale-reset)",
 		function()
 			local saved = package.loaded["adapters.shell_runner"]

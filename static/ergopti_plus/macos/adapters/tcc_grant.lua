@@ -74,7 +74,18 @@ function M.reset(service, bundle_id, on_done)
 					tostring(stderr ~= "" and stderr or stdout)))
 			end
 		end)
-	return handle.start() == true
+	if handle.start() == true then return true end
+	-- A refused start can still have launched the native process. ShellRunner
+	-- retains it until its exact exit; keep the caller's permission gate closed
+	-- until that settlement proves tccutil can no longer revoke the grant.
+	if handle.isSettled() then return false end
+	local registered = handle.onSettled(function()
+		on_done(false, "tccutil start was refused after an unsettled launch")
+	end)
+	if registered ~= true then
+		Logger.error(LOG, "Could not observe the unsettled tccutil process; retaining the permission gate.")
+	end
+	return true
 end
 
 return M
