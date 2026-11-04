@@ -214,8 +214,20 @@ function fetchThroughProxy(proxyPort, registry, target) {
 		socket.write('CONNECT registry.ollama.ai:443 HTTP/1.1\r\nHost: registry.ollama.ai:443\r\n\r\n');
 		socket.once('data', (head) => {
 			assert.match(String(head), / 200 /);
+			// The fake registry's own certificate is the only trust anchor, and the
+			// pin replaces the host-name check: its subject is not registry.ollama.ai.
+			const digestOf = (certificate) =>
+				crypto.createHash('sha256').update(certificate.raw).digest('hex');
 			const secure = tls.connect(
-				{ socket, rejectUnauthorized: false, servername: 'registry.ollama.ai' },
+				{
+					socket,
+					ca: registry.cert,
+					servername: 'registry.ollama.ai',
+					checkServerIdentity: (_, certificate) =>
+						digestOf(certificate) === registry.sha256
+							? undefined
+							: new Error('the registry certificate is not the pinned one')
+				},
 				() => {
 					const pin = crypto
 						.createHash('sha256')
