@@ -80,7 +80,7 @@ _KL_RolloverPrepare(Token, Date) {
 
 ; Called under journal ownership at startup and before a new writer is admitted.
 ; A missing file is recoverable only after a durable pending receipt exists.
-_KL_RolloverResume(Token) {
+_KL_RolloverResume(Token, BeforeDeleteFn := 0) {
 	_KL_JournalOwnerFor().Require(Token)
 	Receipt := _KL_RolloverPending()
 	if !Receipt
@@ -100,6 +100,9 @@ _KL_RolloverResume(Token) {
 			for Name in ["volume", "index_high", "index_low", "write_high", "write_low", "size"]
 				if Current[Name] != Expected[Name]
 					throw Error("Pending rollover journal identity changed.")
+			; Optional native-I/O cutpoint; production performs no callback.
+			if HasMethod(BeforeDeleteFn, "Call")
+				BeforeDeleteFn.Call()
 			FileDelete(Keystats.today_log_path)
 			Reader.Close()
 			Reader := 0
