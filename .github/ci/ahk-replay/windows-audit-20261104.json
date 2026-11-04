@@ -1,11 +1,23 @@
 {
-	"expected_count": 4,
+	"expected_count": 8,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "chord-native-pause",
-			"expected_count": 4
+			"contains": "clipboard-paste-native64",
+			"expected_count": 3
+		},
+		{
+			"contains": "token-ready-deadline",
+			"expected_count": 2
+		},
+		{
+			"contains": "api-thinking-retry-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "metrics-production-nul-range",
+			"expected_count": 1
 		}
 	]
 }
