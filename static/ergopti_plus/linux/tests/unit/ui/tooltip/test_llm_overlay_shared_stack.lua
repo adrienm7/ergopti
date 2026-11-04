@@ -49,6 +49,126 @@ end
 
 helpers.describe("AI overlay: one window shared with the hotstring preview", function()
 
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("(llm-overlay-draw-failure) retires an undisplayed suggestion after " .. mode, function()
+			package.loaded["ui.tooltip.llm"] = nil
+			local overlay = require("ui.tooltip.llm")
+			local window = { visible = false, hides = 0 }
+			local renderer = {
+				show = function() window.visible = true; if mode == "throw" then error("partial draw") end; return false end,
+				hide = function() window.visible = false; window.hides = window.hides + 1; return true end,
+			}
+			assert(overlay.init({ style = {}, renderer = renderer }))
+			local ok, result = pcall(overlay.show, { { to_type = "secret", deletes = 0 } }, {})
+			helpers.assert_true(ok); helpers.assert_eq(result, false)
+			helpers.assert_eq(overlay.is_showing(), false)
+			helpers.assert_eq(window.visible, false); helpers.assert_eq(window.hides, 1)
+			package.loaded["ui.tooltip.llm"] = nil
+		end)
+	end
+
+	helpers.it("(llm-overlay-draw-failure) revokes an offer when its anchor provider throws", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, draws = require("ui.tooltip.llm"), 0
+		assert(overlay.init({ style = {}, renderer = { show = function() draws = draws + 1; return true end },
+			anchor_provider = function() error("anchor failure") end }))
+		helpers.assert_eq(overlay.show({ { to_type = "hello" } }, {}), false)
+		helpers.assert_eq(overlay.is_showing(), false); helpers.assert_eq(draws, 0)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(llm-overlay-draw-failure) retains cleanup until the owner acknowledges it", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, draws, hides = require("ui.tooltip.llm"), 0, 0
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() draws = draws + 1; return draws > 1 end,
+			hide = function() hides = hides + 1; return hides >= 3 end,
+		} }))
+		local candidate = { { to_type = "hello", deletes = 0 } }
+		helpers.assert_eq(overlay.show(candidate, {}), false)
+		helpers.assert_eq(overlay.is_showing(), false)
+		helpers.assert_eq(overlay.show(candidate, {}), false)
+		helpers.assert_eq(draws, 1, "an unresolved native surface must not receive a new draw")
+		helpers.assert_true(overlay.show(candidate, {}))
+		helpers.assert_eq(draws, 2); helpers.assert_eq(hides, 3)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(llm-overlay-draw-failure) revokes the offer if selection redraw fails", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, draws, hides = require("ui.tooltip.llm"), 0, 0
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() draws = draws + 1; return draws == 1 end,
+			hide = function() hides = hides + 1; return true end,
+		} }))
+		assert(overlay.show({ { to_type = "first" }, { to_type = "second" } }, {}))
+		helpers.assert_eq(overlay.select(2), false)
+		helpers.assert_eq(overlay.is_showing(), false)
+		helpers.assert_eq(hides, 1)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(llm-overlay-draw-failure) retains the surface across refused cleanup and destruction", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, hides, destroyed = require("ui.tooltip.llm"), 0, 0
+		local renderer = {
+			show = function() return false end,
+			hide = function() hides = hides + 1; return hides >= 4 end,
+			destroy = function() destroyed = destroyed + 1 end,
+		}
+		assert(overlay.init({ style = {}, renderer = renderer }))
+		helpers.assert_eq(overlay.show({ { to_type = "hello", deletes = 0 } }, {}), false)
+		helpers.assert_eq(overlay.init({ style = {}, renderer = {} }), false)
+		helpers.assert_eq(overlay.destroy(), false)
+		helpers.assert_eq(destroyed, 0)
+		helpers.assert_true(overlay.destroy())
+		helpers.assert_eq(destroyed, 1)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(llm-overlay-draw-failure) preserves a replacement published during a failed draw", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay, draws, hides, owner = require("ui.tooltip.llm"), 0, 0, nil
+		local replacement = { { to_type = "replacement", deletes = 0 } }
+		assert(overlay.init({ style = {}, renderer = {
+			show = function()
+				draws = draws + 1
+				if draws == 1 then
+					helpers.assert_eq(overlay.is_showing(), false, "an unfinished draw is not an offer")
+					assert(overlay.show(replacement, {}))
+					owner = "stale"
+					return false
+				end
+				owner = "replacement"
+				return true
+			end,
+			hide = function() hides = hides + 1; return true end,
+		} }))
+		helpers.assert_eq(overlay.show({ { to_type = "old", deletes = 0 } }, {}), false)
+		helpers.assert_true(overlay.is_showing()); helpers.assert_eq(hides, 0)
+		helpers.assert_eq(owner, "replacement", "the stale native completion must not cover the replacement")
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+	helpers.it("(llm-overlay-draw-failure) restores the companion after a partial draw", function()
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
+		local window = { owner = "preview", redraws = 0, covered = 0 }
+		assert(overlay.init({ style = {}, renderer = {
+			show = function() window.owner = "partial"; return false end,
+			hide = function() window.owner = nil; return true end,
+		}, companion = {
+			rows = function() return nil end, showing = function() return true end,
+			covered = function() window.covered = window.covered + 1 end,
+			redraw = function() window.redraws = window.redraws + 1; window.owner = "preview"; return true end,
+		} }))
+		helpers.assert_eq(overlay.show({ { to_type = "secret", deletes = 0 } }, {}), false)
+		helpers.assert_eq(overlay.is_showing(), false)
+		helpers.assert_eq(window.owner, "preview"); helpers.assert_eq(window.redraws, 1); helpers.assert_eq(window.covered, 0)
+		package.loaded["ui.tooltip.llm"] = nil
+	end)
+
+
 	helpers.it("draws the suggestions under the preview rows when both are shown", function()
 		local preview = { rows = { { text = "by the way", label = "★" } }, both = true }
 		local overlay, window = overlay_with(preview)

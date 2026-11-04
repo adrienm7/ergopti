@@ -26,6 +26,11 @@ local _screen_provider = nil
 local _candidates = {}
 local _active_index = 1
 local _meta = {}
+local _cleanup_pending = nil
+local _cleanup_busy = false
+local _generation = 0
+local _presenting = nil
+local settle_cleanup
 -- The hotstring preview sharing the window: { rows = fn, showing = fn,
 -- covered = fn }. rows() answers the preview rows to draw above the
 -- suggestions (llm.trigger.while_hotstring_tooltip = "both"), nil otherwise.
@@ -121,6 +126,7 @@ end
 --- @param opts table { style, renderer?, anchor_provider?, screen_provider? }
 --- @return boolean
 function M.init(opts)
+	if _cleanup_pending and not settle_cleanup() then return false end
 	opts = type(opts) == "table" and opts or {}
 	_style = opts.style
 	_renderer = opts.renderer
@@ -158,27 +164,75 @@ local function companion_showing()
 	return ok and showing == true
 end
 
-local function draw()
+--- Settles a possibly partial draw through the surface owner captured with it.
+--- A visible companion must redraw itself; it must never be hidden for us.
+settle_cleanup = function()
+	local pending = _cleanup_pending
+	if not pending then return true end
+	if _cleanup_busy then return false end
+	_cleanup_busy = true
+	local called, settled = pcall(function()
+		local companion, renderer = pending.companion, pending.renderer
+		local showing = false
+		if companion and type(companion.showing) == "function" then
+			showing = companion.showing() == true
+		end
+		local callback = showing and companion.redraw or renderer and renderer.hide
+		return type(callback) == "function" and callback() == true
+	end)
+	_cleanup_busy = false
+	if not called or settled ~= true or _cleanup_pending ~= pending then return false end
+	_cleanup_pending = nil
+	return true
+end
+
+local function draw(generation)
 	if type(_renderer) ~= "table" or type(_renderer.show) ~= "function" then return false end
 	local rows = M.build_rows(_candidates, _active_index, _meta)
 	if #rows == 0 then M.hide(); return false end
 	local preview_rows = companion_rows()
+	local cover = not preview_rows and companion_showing()
 	if preview_rows then
-		-- One stack: the hotstring rows that can still expand, then the suggestions.
 		for index = #preview_rows, 1, -1 do table.insert(rows, 1, preview_rows[index]) end
-	elseif companion_showing() and _companion and type(_companion.covered) == "function" then
-		-- Drawn alone over the preview, which then no longer owns the window.
-		pcall(_companion.covered)
 	end
 	local anchor = type(_anchor_provider) == "function" and _anchor_provider() or nil
 	local screen = type(_screen_provider) == "function" and _screen_provider()
 		or { x = 0, y = 0, w = 1920, h = 1080 }
-	return _renderer.show(rows, {
-		style = _style,
-		accent = nil,
-		anchor = anchor,
-		screen = screen,
-	}) == true
+	if generation ~= _generation then return false end
+	local renderer, companion = _renderer, _companion
+	_presenting = generation
+	local called, drawn = pcall(renderer.show, rows, { style = _style, accent = nil, anchor = anchor, screen = screen })
+	if _presenting == generation then _presenting = nil end
+	if generation ~= _generation then
+		-- An older native call can finish after a reentrant replacement. Repair
+		-- the current owner rather than allowing that stale call to cover it.
+		if _cleanup_pending then settle_cleanup()
+		elseif #_candidates > 0 and _presenting == nil then M.redraw()
+		elseif #_candidates == 0 then
+			_cleanup_pending = { renderer = renderer, companion = companion }
+			settle_cleanup()
+		end
+		return false
+	end
+	if not called or drawn ~= true then
+		_candidates, _active_index, _meta = {}, 1, {}
+		_cleanup_pending = { renderer = renderer, companion = companion }
+		settle_cleanup()
+		return false
+	end
+	if cover and companion and type(companion.covered) == "function" then pcall(companion.covered) end
+	return generation == _generation
+end
+
+local function attempt_draw(generation)
+	local called, result = pcall(draw, generation)
+	if not called and generation == _generation then
+		_candidates, _active_index, _meta = {}, 1, {}
+		if _presenting == generation then _presenting = nil end
+		_cleanup_pending = { renderer = _renderer, companion = _companion }
+		settle_cleanup()
+	end
+	return called and result == true
 end
 
 --- Replaces the displayed candidates atomically.
@@ -186,11 +240,12 @@ end
 --- @param meta table|nil
 --- @return boolean
 function M.show(candidates, meta)
-	if type(candidates) ~= "table" then return false end
+	if type(candidates) ~= "table" or not settle_cleanup() then return false end
+	_generation = _generation + 1
 	_candidates = candidates
-	_active_index = math.min(math.max(1, tonumber(meta and meta.active_index) or 1), math.max(1, #candidates))
 	_meta = type(meta) == "table" and meta or {}
-	return draw()
+	_active_index = math.min(math.max(1, tonumber(_meta.active_index) or 1), math.max(1, #candidates))
+	return attempt_draw(_generation)
 end
 
 --- Selects one displayed candidate and redraws.
@@ -198,8 +253,9 @@ end
 --- @return boolean
 function M.select(index)
 	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #_candidates then return false end
+	_generation = _generation + 1
 	_active_index = index
-	return draw()
+	return attempt_draw(_generation)
 end
 
 --- Moves the active selection by one, wrapping around.
@@ -207,8 +263,9 @@ end
 --- @return boolean
 function M.move(delta)
 	if #_candidates < 2 or type(delta) ~= "number" then return false end
+	_generation = _generation + 1
 	_active_index = ((_active_index - 1 + delta) % #_candidates) + 1
-	return draw()
+	return attempt_draw(_generation)
 end
 
 --- Returns the active candidate index.
@@ -221,12 +278,15 @@ end
 --- they stand now. Does nothing while no candidate is shown.
 --- @return boolean drawn
 function M.redraw()
-	if #_candidates == 0 then return false end
-	return draw()
+	if #_candidates == 0 or not settle_cleanup() then return false end
+	_generation = _generation + 1
+	return attempt_draw(_generation)
 end
 
 --- Hides and forgets every candidate.
 function M.hide()
+	if not settle_cleanup() then return false end
+	_generation = _generation + 1
 	-- The preview drawn over the suggestions keeps the window; it hides itself.
 	if not companion_showing() and _renderer and type(_renderer.hide) == "function"
 		and _renderer.hide() ~= true then return false end
@@ -246,22 +306,23 @@ end
 --- answered by "is the window up" would type the digit meant to accept.
 --- @return boolean
 function M.is_showing()
-	return #_candidates > 0
+	return _presenting == nil and #_candidates > 0
 end
 
 --- @return boolean
 function M.is_visible()
-	return #_candidates > 0
+	return _presenting == nil and #_candidates > 0
 		and _renderer ~= nil and type(_renderer.is_visible) == "function"
 		and _renderer.is_visible() == true
 end
 
 --- Destroys the shared renderer surface.
 function M.destroy()
-	M.hide()
+	if M.hide() ~= true then return false end
 	if _renderer and type(_renderer.destroy) == "function" then _renderer.destroy() end
 	_renderer = nil
 	_style = nil
+	return true
 end
 
 return M
