@@ -576,6 +576,17 @@
 			"root_cause": "_KL_RolloverResume verifies the original consumed file through a reader that denies write sharing but permits deletion/rename. It then deletes by path, so the verified object and the deleted object can differ. Holding journal logical ownership does not pin an external filesystem replacement.",
 			"silent_failure": "A concurrent replacement journal containing new events can be deleted even though only its predecessor was consumed and committed, permanently losing those new events.",
 			"regression_test": "Two actual ingest/prepare/recovery cases use a narrow original I/O cutpoint, real native rename/replacement, actual journal owners, durable receipts and SQLite event verification. The fix clones the original consumed snapshot and uses FSDeleteVerified with a native receipt comparator; final removal marks the exact exclusively verified handle. A replacement must survive unchanged and retain pending recovery/offset; retry remains fenced without duplicate ingestion. The unchanged control must complete. Source-wiring tests retain EOF/prepare/save ordering and now require verified deletion with the original proof. Native fail-before measured; post-fix pending."
+		},
+		{
+			"id": "AHK-053",
+			"title": "Sticky modifier capture leaks the original nontext key before its modified replay",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41912869071 ate4e5e62 passes letter and Enter controls but fails Backspace individually and reversed. A real timer sends Backspace to a verified child-owned Edit while genuine StickyModifier/SIHO captures it: one original WM_KEYDOWN reaches the editor and removes its last character before the passive Ctrl replay is recorded.",
+			"root_cause": "StickyModifier creates a text-suppressive InputHook but leaves VisibleNonText at its native true default. Ending nontext keys such as Backspace can reach the foreground application before the one-shot owner replays them with its chosen modifiers.",
+			"silent_failure": "An application receives an unmodified editing/navigation action in addition to the requested sticky shortcut. The raw edit can already change text even if the modified output later refuses, or can make the combined shortcut remove more text than intended.",
+			"regression_test": "Three sticky-native-nontext cases extract the actual StickyModifier/Names owner and include genuine SIHO. Actual SendEvent input is explicitly opted in and confined to a verified child-owned foreground Edit; TextPressKey alone is passive. Native WM_KEYDOWN, edit content, exact modified output and cleanup must agree. Letter and Enter are native controls, not claimed failing variants; Backspace proves the defect. Setting VisibleNonText=false retains standard modifier visibility under the native InputHook policy. Native fail-before measured; post-fix pending."
 		}
 	]
 }

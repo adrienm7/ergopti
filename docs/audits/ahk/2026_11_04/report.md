@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **52 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **53 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -965,3 +965,17 @@ The ongoing register now contains **52 distinct new findings**. The requested ta
 ## Native partial qualification checkpoint: 41912869071
 
 At `e4e5e62`, **53 selected cases passed and seven probes failed**, with the same outcome individually and reversed. AHK-048 passed its six new plus ten adjacent override cases; AHK-049 passed all four precedence cases; AHK-050 passed both native GUI cases and its checkbox unit matrix; AHK-051 passed all five token cases and 14 adjacent managed-owner cases. Production compile passed, native hotstring E2E passed **90/90**, and HTTP adapter proxy-override E2E passed **11/11**, with no not-executed cases. The seven failing probes are assessed separately, including one gesture probe that needs its per-key setup adapted to native Max termination. No aggregate green or complete-suite qualification is claimed.
+
+## AHK-053: Sticky modifier capture leaks the original nontext key before its modified replay
+
+Severity: high. Confidence: high. Evidence: source-derived; native Windows execution pending.
+
+StickyModifier creates a text-suppressive InputHook but leaves VisibleNonText at its native true default. Ending nontext keys such as Backspace can reach the foreground application before the one-shot owner replays them with its chosen modifiers.
+
+Reproduction: Native run41912869071 ate4e5e62 passes letter and Enter controls but fails Backspace individually and reversed. A real timer sends Backspace to a verified child-owned Edit while genuine StickyModifier/SIHO captures it: one original WM_KEYDOWN reaches the editor and removes its last character before the passive Ctrl replay is recorded.
+
+Consequence: An application receives an unmodified editing/navigation action in addition to the requested sticky shortcut. The raw edit can already change text even if the modified output later refuses, or can make the combined shortcut remove more text than intended.
+
+Regression: Three sticky-native-nontext cases extract the actual StickyModifier/Names owner and include genuine SIHO. Actual SendEvent input is explicitly opted in and confined to a verified child-owned foreground Edit; TextPressKey alone is passive. Native WM_KEYDOWN, edit content, exact modified output and cleanup must agree. Letter and Enter are native controls, not claimed failing variants; Backspace proves the defect. Setting VisibleNonText=false retains standard modifier visibility under the native InputHook policy. Native fail-before measured; post-fix pending.
+
+The ongoing register now contains **53 distinct new findings**. The requested target of 1,000 remains unmet.
