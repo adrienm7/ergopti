@@ -35,6 +35,35 @@ helpers.describe("dynamic hotstrings manager", function()
 
   helpers.describe("init and rule registration", function()
 
+    helpers.it("personal info FIFO is refused without blocking dynamic initialization", function()
+      local uv = require("luv")
+      local shell = require("adapters.shell_runner")
+      local path = os.tmpname()
+      os.remove(path)
+      assert(shell.run("mkfifo -- " .. shell.quote(path)))
+      local code = string.format([[package.path = %q
+local manager = require("modules.dynamic_hotstrings.manager")
+assert(manager.init({ personal_info_path = %q }))
+assert(next(manager.get_info()) == nil)
+]], package.path, path)
+      local exited, expired, status, signal = false, false, nil, nil
+      local timer = assert(uv.new_timer())
+      local child
+      child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+        exited, status, signal = true, code, sig
+        uv.timer_stop(timer); uv.close(timer); uv.close(child)
+      end))
+      assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+        expired = true; child:kill("sigkill")
+      end))
+      while not exited do uv.run("once") end
+      uv.run("nowait")
+      os.remove(path)
+      helpers.assert_eq(expired, false, "initialization must never wait for a FIFO writer")
+      helpers.assert_eq(status, 0)
+      helpers.assert_eq(signal, 0)
+    end)
+
     helpers.it("init without personal_info.toml registers at least date rules", function()
       dh.init({ trigger_char = "\\" })
       local count = dh.get_rules_count()
