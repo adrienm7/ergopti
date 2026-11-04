@@ -25,6 +25,7 @@ local Logger     = require("logger.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
 local Labels     = require("menu.labels")
 local NativeDirectory = require("infra.native_directory")
+local RegularFileReader = require("infra.regular_file_reader")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -85,10 +86,11 @@ local function _load_order(data_dir)
 	if not ok_j or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil
 	end
-	local f = io.open(data_dir .. "/locale_order.json", "r")
+	local f = RegularFileReader.open_source(data_dir .. "/locale_order.json")
 	if not f then return nil end
-	local raw = f:read("*a")
-	f:close()
+	local read, raw = pcall(f.read, f, "*a")
+	local closed, accepted = pcall(f.close, f)
+	if not read or type(raw) ~= "string" or not closed or accepted ~= true then return nil end
 	local ok, doc = pcall(json_mod.decode, raw)
 	if not ok or type(doc) ~= "table" or type(doc.order) ~= "table" then return nil end
 	local rank = {}
