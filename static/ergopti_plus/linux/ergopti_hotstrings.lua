@@ -1351,8 +1351,8 @@ local function main()
 			if delay_sec and not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
 				key_is_complex, previous_key_was_complex, result.group) then
 				Logger.debug(LOG,
-					"Expired: '%s' waited %.2fs for its expander, its category allows %.2fs.",
-					tostring(result.trigger),
+					"Expired: trigger of %d byte(s) waited %.2fs for its expander, its category allows %.2fs.",
+					#(result.trigger or ""),
 					(tonumber(result.expander_gap_ms) or math.huge) / 1000, delay_sec)
 				return false
 			end

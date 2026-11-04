@@ -11,6 +11,44 @@ local helpers = require("tests.helpers")
 local fixture = require("tests.support.text_owner_fixture")
 
 helpers.describe("Main retains the ordinary expansion target", function()
+	helpers.it("does not log an expired private trigger (expired-trigger-privacy)", function()
+		fixture.with(function(guard, state)
+			local lines = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("debug")
+			logger.set_sink(function(line) lines[#lines + 1] = line end)
+			local environment = setmetatable({
+				secure_focus_guard = guard, script_actions = { is_paused = function() return false end },
+				keyboard_hook = { held_modifiers = function() return {} end },
+				Monotonic = { now_ms = function() return state.now end, resolution_ms = function() return 0 end },
+				_cached_app_id = "owned-editor", Logger = logger,
+				WordReset = { observe_key = function() return false end, apply_typed_newline = function() end,
+					cascade_max_arrows = function() return 0 end },
+				terminators_mod = { is_terminator = function() return false end },
+				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
+				hotstrings_config = { resolve = function() return { delay = 1 } end },
+				ExpansionDelay = { allows = function() return false end },
+				keystats = { is_unrecorded_app = function() return false end, suppress = function() end,
+					unsuppress = function() end, on_keydown = function() end },
+				engine = { on_char = function() return { trigger = "SECRET-TRIGGER", is_private = true,
+					replacement = "secret", expander_gap_ms = 2000 } end },
+				injector = { _is_injecting = function() return false end },
+			}, { __index = _G })
+			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+			local source = file:read("*a"); assert(file:close())
+			local first = assert(source:find("\tlocal function handle_char(", 1, true))
+			local last = assert(source:find("\n\ton_char = input_capture_gate.guard(handle_char)", first, true))
+			local body = source:sub(first, last - 1) .. "\nreturn handle_char"
+			local chunk
+			if loadstring then chunk = assert(loadstring(body)); setfenv(chunk, environment)
+			else chunk = assert(load(body, "actual Main expiry callback", "t", environment)) end
+			chunk()("x", 30)
+			local log = table.concat(lines, "\n")
+			helpers.assert_true(log:find("Expired:", 1, true) ~= nil, "the expiry must be logged")
+			helpers.assert_nil(log:find("SECRET-TRIGGER", 1, true), "the private trigger must not reach the log")
+		end)
+	end)
+
 	for _, moved in ipairs({ false, true }) do
 		helpers.it("passes the original fifth argument with " .. (moved and "a later focus change" or "stable focus"), function()
 			fixture.with(function(guard, state)
