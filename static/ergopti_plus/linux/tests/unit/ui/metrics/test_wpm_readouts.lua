@@ -490,6 +490,40 @@ helpers.describe("wpm readouts: the floating widget", function()
 		end)
 	end)
 
+	helpers.it("(wpm-draw-partial) hides a surface when drawing partially fails", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; return false end
+			Widget.tick(stats(42), 10)
+			helpers.assert_eq(surface.hidden, 1, "a failed draw may already have shown the window")
+			helpers.assert_true(not surface.visible)
+		end)
+	end)
+
+	helpers.it("(wpm-draw-partial) retries a refused hide after a failed draw", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			assert(Widget.start())
+			surface.draw = function() surface.visible = true; error("draw failed after show") end
+			local attempts = 0
+			surface.hide = function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				surface.visible = false
+				return true
+			end
+			Widget.tick(stats(42), 10)
+			Widget.tick(stats(0), 100)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_true(not surface.visible)
+		end)
+	end)
+
 	helpers.it("keeps the place the user drags it to, across a restart", function()
 		with_storage(compact(), function(store)
 			local Widget = require("ui.wpm.widget")
