@@ -16,6 +16,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Reproduce a process architecture that disagrees with the operating system.
+# Only this disposable worker inherits the misleading environment value.
+$env:PROCESSOR_ARCHITECTURE = if ([Environment]::Is64BitOperatingSystem) { "x86" } else { "AMD64" }
+
 function Get-CimInstance {
 	param([Parameter(Mandatory = $true, Position = 0)][string]$ClassName)
 	switch ($ClassName) {

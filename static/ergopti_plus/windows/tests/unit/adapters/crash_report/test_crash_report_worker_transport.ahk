@@ -397,6 +397,10 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault . ",git"),
 				Spawn, _CRWT_WaitUntil, A_ScriptDir . "\support\crash_cim_boundary.ps1")
 			Diagnostic := _CRWT_CimDiagnostic(Observation, Result, Fault, Scope.Tasks.Count - BeforeTasks)
+			AssertEqual(A_Is64bitOS ? "64 bits" : "32 bits", Result["report"]["os_arch"],
+				"OS architecture must ignore the worker process environment")
+			AssertEqual(Snapshot["ahk_bitness"], Result["report"]["ahk_bitness"],
+				"process bitness remains a separate snapshot field")
 			AssertEqual("primary", Result["owner"]["phase"],
 				"a fallback cannot prove that independent enrichment continued; " . Diagnostic)
 			AssertEqual(BeforeTasks + 1, Scope.Tasks.Count, "each case must run one primary worker")
