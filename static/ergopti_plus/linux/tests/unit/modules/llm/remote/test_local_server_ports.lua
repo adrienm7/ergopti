@@ -122,6 +122,13 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 	-- What busybox answers to procps-only flags: the old scan read it as no server
 	local BUSYBOX = { exit_code = 1, stdout = "", error = "pgrep: unrecognized option: a" }
 
+	helpers.it("truncated process arguments do not invent a port", function()
+		local limit = require("infra.timings").count("limits", "proc_cmdline_bytes")
+		local prefix = "/usr/bin/llama-server\0" .. string.rep("x", limit - #"/usr/bin/llama-server\0" - #"\0--port=8") .. "\0--port=8"
+		local results = scan_with({ [700] = prefix .. "181\0" })
+		helpers.assert_true(results.llamacpp.port ~= 8, "a truncated 8181 port must not become port 8")
+	end)
+
 	helpers.it("a final process slice that exceeds the deadline is not accepted", function()
 		local Timings = require("infra.timings")
 		local budget = Timings.ms("llm", "local_server_process_lookup_timeout_ms")
