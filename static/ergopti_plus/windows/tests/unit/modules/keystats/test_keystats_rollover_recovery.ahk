@@ -19,6 +19,13 @@ _KLRR_AfterProof(Root, Entry, Probe, Replace) {
 	AssertTrue(Probe["snapshot"].Get("ok", false), "the cutpoint observes a complete native source receipt")
 }
 
+; The deadline only aborts a faulty non-progressing drain; it never supplies
+; a journal result or changes the real reader's framing/EOF contract.
+_KLRR_DrainDeadline(Probe) {
+	Probe["expired"] := true
+	Keystats.initialized := false
+}
+
 _KLRR_StateRefusal(Mode := "prepare") {
 	Names := ["initialized", "_shutting_down", "rollover_in_progress", "today_log_path",
 		"today_log_offset", "today_log_date", "state_json_path", "data_sql_path",
@@ -68,6 +75,75 @@ _KLRR_StateRefusal(Mode := "prepare") {
 		KLW.ctx := Map("old-day", Map("word", "synthetic"))
 		AssertTrue(KL_SaveState())
 		Before := KLR_LedgerSnapshot(Keystats.today_log_path)
+		if Mode = "torn-drain" || Mode = "undelimited-drain" || Mode = "blank-batch-drain" {
+			AssertTrue(KL_CloseTodayFh())
+			Next := Entry.Clone()
+			Next["_event_id"] := 11
+			Fragment := Mode = "torn-drain" ? '{"type":"shortcut","_event_id":11' : KL_JsonEncode(Next)
+			if Mode = "blank-batch-drain" {
+				Blank := ""
+				Loop KeystatsConst.INGEST_BATCH_LINES + 1
+					Blank .= "`n"
+				Fragment := Blank . Fragment . "`n"
+			}
+			FileAppend(Fragment, Keystats.today_log_path, "UTF-8-RAW")
+			Pending := Entry.Clone()
+			Pending["_event_id"] := 12
+			Keystats._pending_entries := [Pending]
+			SourceBefore := FileRead(Keystats.today_log_path, "UTF-8-RAW")
+			ReceiptBefore := KLR_LedgerSnapshot(Keystats.today_log_path)
+			StateBefore := FileRead(Keystats.state_json_path, "UTF-8-RAW")
+			Probe := Map("expired", false)
+			Deadline := _KLRR_DrainDeadline.Bind(Probe)
+			try {
+				SetTimer(Deadline, Mode = "blank-batch-drain" ? -5000 : -1000)
+				Result := KL_DayRollover()
+			} finally SetTimer(Deadline, 0)
+			_TestPrint("# ROLLOVER_DRAIN_NATIVE_RETURN " . KL_JsonEncode(Map("mode", Mode,
+				"deadline_used", Probe["expired"], "ok", Result["ok"], "reason", Result["reason"],
+				"before_offset", Offset, "after_offset", Keystats.today_log_offset)))
+			if Mode != "blank-batch-drain"
+				AssertEqual(Offset, Keystats.today_log_offset, "the observed blocked reader must keep its original checkpoint")
+			AssertFalse(Probe["expired"], "the real drain required a lifecycle escape: reason=" . Result["reason"]
+				. ", checkpoint=" . Keystats.today_log_offset . ", original=" . Offset)
+			if Mode = "blank-batch-drain" {
+				AssertTrue(Result["ok"], "eventless bounded batches must keep draining when their byte checkpoint advances")
+				AssertFalse(FileExist(Keystats.today_log_path))
+				AssertEqual(0, Keystats._pending_entries.Length)
+				Db := _WJFM_OpenMemory()
+				AssertTrue(KLR_LoadSchema(Db))
+				AssertTrue(SQLite_Exec(Db, FileRead(Keystats.data_sql_path, "UTF-8")))
+				Rows := SQLite_Query(Db, "SELECT id FROM events_shortcut ORDER BY id;")
+				AssertEqual(3, Rows.Length)
+				AssertEqual(10, Rows[1]["id"])
+				AssertEqual(11, Rows[2]["id"])
+				AssertEqual(12, Rows[3]["id"])
+				return
+			}
+			AssertFalse(Result["ok"])
+			AssertEqual("journal_no_progress", Result["reason"])
+			AssertEqual(Offset, Keystats.today_log_offset)
+			AssertEqual("2000-01-01", Keystats.today_log_date)
+			AssertFalse(_KL_RolloverPending())
+			AssertEqual(1, Keystats._pending_entries.Length)
+			AssertTrue(Pending == Keystats._pending_entries[1])
+			AssertEqual(SourceBefore, FileRead(Keystats.today_log_path, "UTF-8-RAW"))
+			AssertTrue(KLR_LedgerSnapshotIsSame(ReceiptBefore, KLR_LedgerSnapshot(Keystats.today_log_path)))
+			AssertEqual(StateBefore, FileRead(Keystats.state_json_path, "UTF-8-RAW"))
+			; Once a delimiter really exists, ordinary retry still drains and rotates.
+			FileAppend("`n", Keystats.today_log_path, "UTF-8-RAW")
+			AssertTrue(KL_DayRollover()["ok"])
+			AssertFalse(FileExist(Keystats.today_log_path))
+			AssertEqual(0, Keystats._pending_entries.Length)
+			Db := _WJFM_OpenMemory()
+			AssertTrue(KLR_LoadSchema(Db))
+			AssertTrue(SQLite_Exec(Db, FileRead(Keystats.data_sql_path, "UTF-8")))
+			Rows := SQLite_Query(Db, "SELECT id FROM events_shortcut ORDER BY id;")
+			AssertEqual(Mode = "torn-drain" ? 2 : 3, Rows.Length)
+			AssertEqual(10, Rows[1]["id"])
+			AssertEqual(12, Rows[Rows.Length]["id"])
+			return
+		}
 		if Mode != "prepare" {
 			Scope := _KL_JournalEnter()
 			AssertTrue(IsObject(Scope))
@@ -206,6 +282,6 @@ _KLRR_StateRefusal(Mode := "prepare") {
 			DirDelete(Root, true)
 	}
 }
-for Mode in ["prepare", "delete", "final", "restore", "changed", "replaced", "malformed", "swap-after-proof", "same-after-proof"]
+for Mode in ["prepare", "delete", "final", "restore", "changed", "replaced", "malformed", "swap-after-proof", "same-after-proof", "torn-drain", "undelimited-drain", "blank-batch-drain"]
 	Test("keystats: recoverable day transition " . Mode . " (rollover-state-recovery)",
 		_KLRR_StateRefusal.Bind(Mode))

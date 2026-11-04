@@ -46,6 +46,8 @@ _GKO_Snapshot(Phase) {
 		"a", IsObject(_GKO.OwnerA) ? ObjPtr(_GKO.OwnerA) : 0,
 		"b", IsObject(_GKO.OwnerB) ? ObjPtr(_GKO.OwnerB) : 0,
 		"b_in_progress", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.InProgress : false,
+		"b_end_reason", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.EndReason : "",
+		"b_input", IsObject(_GKO.OwnerB) ? _GKO.OwnerB.Input : "", "refused", _GKO.Refused,
 		"stops", _GKO.Stops.Clone(), "events", _GKO.Events.Clone(), "suspended", A_IsSuspended,
 		"native_left_model", _GKO.NativeHeld["Left"], "native_right_model", _GKO.NativeHeld["Right"], "logs", _GKO.Logs.Clone())
 }
@@ -175,14 +177,26 @@ _GKO_NativeRetry() {
 		SendLevel(0)
 		SetKeyDelay(0, 0)
 		Keys := _GKO.Mode == "native-retry-three" ? "abc" : "a"
+		Typed := ""
 		for Key in StrSplit(Keys) {
 			Before := _GKO.Refused
 			AdmittedTarget()
 			SendEvent(Key)
+			Typed .= Key
 			Started := A_TickCount
-			while _GKO.Refused == Before && A_TickCount - Started < 1500
+			while _GKO.Refused == Before && _GKO.OwnerB.InProgress && A_TickCount - Started < 1500
 				Sleep(5)
-			_GKO_Require(_GKO.Refused > Before, "each real keyboard event must reach the actual release callback and refused mouse port")
+			; A native length completion can retire capture before its final
+			; OnKeyDown notification is posted. That is the candidate transition,
+			; not a missing acquisition prerequisite: witness the exact input and
+			; continue to the independent next-key recovery assertion below.
+			CompletedAtLimit := _GKO.Mode == "native-retry-three" && Typed == "abc"
+				&& !_GKO.OwnerB.InProgress && _GKO.OwnerB.EndReason == "Max" && _GKO.OwnerB.Input == Typed
+			_GKO.Logs.Push("typed=" . Typed . " refused_before=" . Before . " refused_after=" . _GKO.Refused
+				. " in_progress=" . _GKO.OwnerB.InProgress . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)
+			_GKO_Observe("native-key-observed-" . StrLen(Typed))
+			_GKO_Require(_GKO.Refused > Before || CompletedAtLimit,
+				"each sent key must reach its native notification or complete the exact three-character capture")
 		}
 		Retained := _GKO.OwnerB.InProgress
 		_GKO.Logs.Push("before-retry in_progress=" . Retained . " end_reason=" . _GKO.OwnerB.EndReason . " input=" . _GKO.OwnerB.Input)

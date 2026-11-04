@@ -4,8 +4,8 @@
 ; MODULE: Sticky and Navigation Actions
 ; DESCRIPTION:
 ; The catalogue rows Windows gained: Home, End, Page Up and Down, Alt+Escape and
-; the fourteen sticky combinations. The physical capture of a sticky key needs a
-; real key press and is not exercised here.
+; the fourteen sticky combinations. Catalogue checks stay pure; native capture
+; probes confine synthetic keyboard delivery to a child-owned verified Edit.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

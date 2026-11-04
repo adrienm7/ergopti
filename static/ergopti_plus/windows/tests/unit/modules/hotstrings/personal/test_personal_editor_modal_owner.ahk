@@ -680,3 +680,196 @@ _PEER_Case(Operation) {
 for _PEER_Mode in ["add", "delete", "save", "cohort", "cohort-failure", "cohort-section", "section-rename", "section-delete", "section-new", "legacy", "case-add", "case-uncheck"]
 	Test("Personal editor entry receipts: native " . _PEER_Mode . " preserves rows and retry (personal-entry-receipts)",
 		_PEER_Case.Bind(_PEER_Mode))
+
+
+; The actual native constructor owns every control and all of its handlers.
+_PESORT_Column(State, Control, Column) {
+	State.HeaderClicks += 1, State.HeaderColumn := Column
+	return
+}
+
+_PESORT_Selected(State, Control, Row, Selected) {
+	if Selected
+		State.Selections += 1
+	return
+}
+
+_PESORT_Click(Hwnd, X, Y) {
+	Point := (Y << 16) | (X & 0xFFFF)
+	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x201,
+		"Ptr", 1, "Ptr", Point, "Ptr")
+	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x202,
+		"Ptr", 0, "Ptr", Point, "Ptr")
+}
+
+_PESORT_Confirmed(State, Text, Title, Options) {
+	State.Confirmations += 1
+	State.Confirmation := Text
+	return "Yes"
+}
+
+_PESORT_ButtonEntered(State, *) {
+	State.Entered += 1
+	return
+}
+
+_PESORT_Case(Operation) {
+	global ScriptInformation, ConfigurationFile, Features, _ReadPersonalTomlCache
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
+	global _PersonalEditorGui, _PersonalEditorSessionEpoch, _PersonalEditorPrioCtrl
+	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
+	global _HS_GrandTotalCache, _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	Saved := {Path: ScriptInformation["PersonalTomlPath"], Config: ConfigurationFile,
+		Features: Features, Desired: MasterGateState()["features"], Cache: _ReadPersonalTomlCache,
+		Data: _PersonalEditorData, Section: _PersonalEditorSection, Source: _PersonalEditorOpeningSource,
+		Window: _PersonalEditorGui, Epoch: _PersonalEditorSessionEpoch, Priority: _PersonalEditorPrioCtrl,
+		Cohort: _PersonalEditorEntryCohort, Busy: _PersonalEditorEntryBusy,
+		Critical: A_IsCritical, Suspended: A_IsSuspended, Responder: TestMsgBoxResponder()}
+	HadTotal := IsSet(_HS_GrandTotalCache), SavedTotal := HadTotal ? _HS_GrandTotalCache : unset
+	Fixture := _ScopeOwnerFixture(), RegistryScope := 0, Window := 0, CloseHwnd := 0
+	Primary := 0, CleanupFailure := 0, WindowEpoch := 0
+	State := {HeaderClicks: 0, HeaderColumn: 0, Selections: 0, Confirmations: 0, Confirmation: "", Entered: 0}
+	Source := '[_meta]`ndescription = "Native sort owner fixture"`nsections_order = ["alpha"]`n'
+		. '[_meta.sections.alpha]`ndescription = "Alpha"`n'
+		. '[[alpha]]`n"zeta_native_sort" = { output = "Zeta unchanged", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		. '[[alpha]]`n"alpha_native_sort" = { output = "Alpha unchanged", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+	try {
+		Critical("Off"), Suspend(false)
+		AssertFalse(_HsEdWeb_Available(), "The delivered runner must take the genuine unavailable-WebView native fallback")
+		RegistryScope := _PECASE_RegistryScope()
+		ConfigurationFile := Fixture.path
+		ScriptInformation["PersonalTomlPath"] := Fixture.directory . "\personal.toml"
+		Features := _PersonalTomlCloneDetached(Saved.Features)
+		MasterGateState()["features"] := _PersonalTomlCloneDetached(Saved.Desired)
+		_PersonalEditorGui := "", _PersonalEditorOpeningSource := false
+		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
+		AssertTrue(FSWriteDurable(PersonalTomlPath(), Source))
+		OpenPersonalEditor("alpha")
+		Window := _PersonalEditorGui
+		CloseHwnd := Window.Hwnd, WindowEpoch := _PersonalEditorSessionEpoch
+		AssertTrue(Window is Gui && _PersonalEditorOpeningSource["window"] == Window,
+			"The production native constructor must publish its own actual source and controls")
+		List := 0, Edits := [], Button := 0, ButtonY := -1
+		Caption := t(Operation == "save" ? "editor.hotstrings.btn_edit" : "editor.hotstrings.btn_delete_entry")
+		for Control in Window {
+			if Control.Type == "ListView"
+				List := Control
+			if Control.Type == "Edit"
+				Edits.Push(Control)
+			if Control.Type == "Button" && Control.Text == Caption {
+				Control.GetPos(, &Y)
+				if Y > ButtonY
+					Button := Control, ButtonY := Y
+			}
+		}
+		AssertTrue(IsObject(List) && Edits.Length == 3 && IsObject(Button))
+		AssertEqual(2, List.GetCount())
+		AssertEqual("zeta_native_sort", List.GetText(1, 1), "The source order must really differ from lexical order")
+		AssertEqual("alpha_native_sort", List.GetText(2, 1))
+		ColumnObserver := _PESORT_Column.Bind(State), SelectionObserver := _PESORT_Selected.Bind(State)
+		ButtonObserver := _PESORT_ButtonEntered.Bind(State)
+		List.OnEvent("ColClick", ColumnObserver)
+		List.OnEvent("ItemSelect", SelectionObserver)
+		Button.OnEvent("Click", ButtonObserver, -1)
+		Header := DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", 0x101F,
+			"Ptr", 0, "Ptr", 0, "Ptr")
+		AssertTrue(Header != 0 && DllCall("User32\IsWindow", "Ptr", Header, "Int"))
+		Rect := Buffer(16, 0)
+		AssertTrue(DllCall("User32\SendMessageW", "Ptr", Header, "UInt", 0x1207,
+			"Ptr", 0, "Ptr", Rect.Ptr, "Ptr"))
+		_PESORT_Click(Header, (NumGet(Rect, 0, "Int") + NumGet(Rect, 8, "Int")) // 2,
+			(NumGet(Rect, 4, "Int") + NumGet(Rect, 12, "Int")) // 2)
+		Started := A_TickCount
+		while State.HeaderClicks == 0 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertEqual(1, State.HeaderClicks, "A genuine header click must reach the native ColClick producer")
+		AssertEqual(1, State.HeaderColumn)
+		Sleep(20)
+		Displayed := List.GetText(1, 1)
+		Other := Displayed == "zeta_native_sort" ? "alpha_native_sort" : "zeta_native_sort"
+		List.Modify(0, "-Select -Focus")
+		NumPut("Int", 0, Rect, 0)
+		AssertTrue(DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", 0x100E,
+			"Ptr", 0, "Ptr", Rect.Ptr, "Ptr"))
+		_PESORT_Click(List.Hwnd, NumGet(Rect, 0, "Int") + 20,
+			(NumGet(Rect, 4, "Int") + NumGet(Rect, 12, "Int")) // 2)
+		Started := A_TickCount
+		while State.Selections == 0 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertTrue(State.Selections >= 1, "A genuine native row click must invoke the production form projection")
+		AssertEqual(1, List.GetNext(0))
+		FormTrigger := Edits[1].Value
+		if Operation == "save"
+			Edits[2].Value := "Changed selected output"
+		TestMsgBoxResponder(_PESORT_Confirmed.Bind(State))
+		DllCall("User32\SendMessageW", "Ptr", Button.Hwnd, "UInt", 0xF5,
+			"Ptr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while State.Entered == 0 && TickElapsed(Started) < 3000
+			Sleep(5)
+		AssertEqual(1, State.Entered, "The real native button must enter its unchanged production callback chain once")
+		Fresh := ReadPersonalToml(true), Entries := Fresh["sections"]["alpha"]["entries"], Found := Map()
+		for Entry in Entries
+			Found[Entry["trigger"]] := Entry["output"]
+		_TestPrint("# personal-native-sort operation=" . Operation . " displayed=" . Displayed . " form=" . FormTrigger
+			. " header_clicks=" . State.HeaderClicks . " durable_entries=" . Entries.Length)
+		if Operation == "save" {
+			AssertEqual(2, Entries.Length)
+			AssertEqual("Changed selected output", Found[Displayed], "Save must update the visibly selected entry, never the old model index")
+			AssertEqual(Other == "zeta_native_sort" ? "Zeta unchanged" : "Alpha unchanged", Found[Other])
+		} else {
+			AssertEqual(1, State.Confirmations)
+			AssertEqual(1, Entries.Length)
+			AssertFalse(Found.Has(Displayed), "Delete must remove the visibly selected entry, never the old model index")
+			AssertTrue(Found.Has(Other), "The other original entry must remain durable")
+		}
+		AssertEqual(Displayed, FormTrigger, "The form must always describe its displayed selection")
+	} catch as Failure {
+		Primary := Failure
+	} finally {
+		TestMsgBoxResponder(Saved.Responder)
+		try {
+			if IsObject(Window) && DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int") {
+				AssertTrue(DllCall("User32\PostMessageW", "Ptr", CloseHwnd, "UInt", 0x10,
+					"Ptr", 0, "Ptr", 0, "Int"), "Cleanup must post Close to this exact native editor")
+				Started := A_TickCount
+				while DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int") && TickElapsed(Started) < 3000
+					Sleep(5)
+				if DllCall("User32\IsWindow", "Ptr", CloseHwnd, "Int")
+					throw Error("The private production editor did not retire through its native Close")
+			}
+		} catch as Failure {
+			CleanupFailure := Failure
+			; A cleanup failure remains a failed test. Retire only our owned
+			; native controls before restoring an unrelated parent UI scope.
+			if IsObject(Window) {
+				_OnEditorClose(Window, WindowEpoch)
+				Window.Destroy()
+			}
+		}
+		_PersonalEditorData := Saved.Data, _PersonalEditorSection := Saved.Section
+		_PersonalEditorOpeningSource := Saved.Source, _PersonalEditorGui := Saved.Window
+		_PersonalEditorSessionEpoch := Saved.Epoch, _PersonalEditorPrioCtrl := Saved.Priority
+		_PersonalEditorEntryCohort := Saved.Cohort, _PersonalEditorEntryBusy := Saved.Busy
+		ScriptInformation["PersonalTomlPath"] := Saved.Path, ConfigurationFile := Saved.Config
+		Features := Saved.Features, MasterGateState()["features"] := Saved.Desired
+		_PersonalTomlInvalidateCaches(Fixture.directory . "\personal.toml")
+		_ReadPersonalTomlCache := Saved.Cache
+		_HS_GrandTotalCache := HadTotal ? SavedTotal : unset
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache]
+			if Store.Has(Fixture.path)
+				Store.Delete(Fixture.path)
+		_ScopeOwnerCleanup(Fixture)
+		if IsObject(RegistryScope)
+			_PECASE_RegistryScope(RegistryScope)
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+	if IsObject(Primary)
+		throw Primary
+	if IsObject(CleanupFailure)
+		throw CleanupFailure
+}
+
+for _PESORT_Mode in ["save", "delete"]
+	Test("Personal editor native sort: " . _PESORT_Mode . " retains the visibly selected durable entry (personal-native-sort-owner)",
+		_PESORT_Case.Bind(_PESORT_Mode))
