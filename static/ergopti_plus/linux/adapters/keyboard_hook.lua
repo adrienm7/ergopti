@@ -2582,6 +2582,10 @@ local function _read_source(source)
 	if not source.keyboard and _on_pointer_event then
 		_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, source.slot)
 	end
+	if not source.keyboard and LayerPointer.slots[source.slot] then
+		M.emergency_stop("grabbed pointer reader failed")
+		return nil
+	end
 	if source.keyboard then
 		if _source_recovery.retire_remaps({ source.path }) ~= true then
 			M.emergency_stop("could not retire the failed source remapper")

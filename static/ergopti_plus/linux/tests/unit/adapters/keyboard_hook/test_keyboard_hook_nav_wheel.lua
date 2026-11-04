@@ -58,7 +58,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -93,7 +93,11 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			end
 			return true
 		end,
-		read = function(fd) return table.remove(queues[fd] or {}, 1) end,
+		read = function(fd)
+			local event = table.remove(queues[fd] or {}, 1)
+			if event == nil and fd == pointer and fatal_pointer then return nil, "fatal", "controlled removal" end
+			return event
+		end,
 		poll = function() return false end,
 		close = function() end,
 	})
@@ -227,6 +231,14 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 		})
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
 		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "stop must release the virtual button")
+	end)
+
+	helpers.it("releases a grabbed mouse button when its reader fails", function()
+		local _, _, emitted = drive("mouse", HOLD, {
+			{ EV_KEY, BTN_LEFT, 1, 3000 },
+		}, nil, nil, true)
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":1"))
+		helpers.assert_true(has(emitted, "key:" .. BTN_LEFT .. ":0"), "reader failure must release the virtual button immediately")
 	end)
 
 	helpers.it("releases a grabbed mouse button when that pointer disappears", function()
