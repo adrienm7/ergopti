@@ -420,7 +420,8 @@ function M.on_error(module_name, template, message)
 	if verdict == "folded" then
 		_folded = _folded + 1
 		if _session then
-			M.defer(function() push({ type = "more", count = _folded }) end, 0)
+			local session = _session
+			M.defer(function() push({ type = "more", count = _folded }, session) end, 0)
 		end
 	elseif verdict == "show" then
 		schedule(DialogCore.error_record(module_name, message))
