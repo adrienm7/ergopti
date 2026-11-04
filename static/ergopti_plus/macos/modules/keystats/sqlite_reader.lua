@@ -752,6 +752,9 @@ end
 --- @param pacer table|nil Pacer from `infra.paced_job`.
 --- @return table into
 function M.merge_ngrams(into, from, pacer)
+	if pacer ~= nil and (type(pacer) ~= "table" or type(pacer.pause) ~= "function") then
+		error("sqlite_reader.merge_ngrams: the pacer must come from infra.paced_job", 2)
+	end
 	for code, tokens in pairs(from) do
 		local bucket = into[code]
 		if not bucket then bucket = {}; into[code] = bucket end
