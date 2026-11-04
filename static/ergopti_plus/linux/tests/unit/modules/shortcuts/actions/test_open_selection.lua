@@ -205,6 +205,47 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		end)
 	end
 
+	helpers.it("refuses the copy chord if focus leaves the file manager during preparation", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local app, emitted, written = "nautilus", 0, 0
+		Subject._set_deps_for_test({
+			focused_app = function() return app end,
+			read_uri_list = function(admitted)
+				app = "gnome-terminal-server"
+				helpers.assert_type(admitted, "function")
+				if admitted() then emitted = emitted + 1 end
+				return false, "", "copy_chord_failed"
+			end,
+			write_clipboard = function() written = written + 1; return true end,
+		})
+		local ran = Subject.copy_selected_path(function() return "" end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(ran, false)
+		helpers.assert_eq(emitted, 0)
+		helpers.assert_eq(written, 0)
+	end)
+
+	helpers.it("the real URI adapter guards the actual Ctrl+C emitter", function()
+		local Subject = require("modules.shortcuts.open_selection")
+		local names = { "adapters.clipboard", "modules.gestures.combo_emitter", "adapters.event_loop" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local app, emitted = "nautilus", 0
+		package.loaded[names[1]] = { read_selection_uri_list = function(press)
+			app = "gnome-terminal-server"
+			helpers.assert_eq(press("ctrl+c"), false)
+			return false, "", "copy_chord_failed"
+		end }
+		package.loaded[names[2]] = { press = function() emitted = emitted + 1; return true end }
+		package.loaded[names[3]] = { sleep_ms = function() return true end }
+		Subject._set_deps_for_test({ focused_app = function() return app end })
+		local ok, err = pcall(function() helpers.assert_eq(Subject.copy_selected_path(function() return "" end), false) end)
+		Subject._set_deps_for_test(nil)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+		helpers.assert_eq(emitted, 0)
+	end)
+
 	helpers.it("(linux-copy-path-file-manager) sends no Ctrl+C outside a file manager", function()
 		for _, app in ipairs({ "gnome-terminal-server", "firefox", "" }) do
 			local world, Subject, primary = record_in(app, { ok = true, uri_list = "file:///tmp/a\n" })

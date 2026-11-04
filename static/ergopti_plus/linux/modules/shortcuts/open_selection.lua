@@ -67,9 +67,13 @@ local DEFAULT_DEPS = {
 		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
 		return snapshot and snapshot.app_id or nil
 	end,
-	read_uri_list = function()
+	read_uri_list = function(admitted)
+		local function guarded_press(combo)
+			if admitted() ~= true then return false end
+			return require("modules.gestures.combo_emitter").press(combo)
+		end
 		return require("adapters.clipboard").read_selection_uri_list(
-			require("modules.gestures.combo_emitter").press, require("adapters.event_loop").sleep_ms)
+			guarded_press, require("adapters.event_loop").sleep_ms)
 	end,
 	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
 	notify_success = function(message)
@@ -140,8 +144,8 @@ end
 --- Copies the file manager's selected paths to the clipboard.
 --- @return boolean|nil copied True when copied, false when refused, nil when
 ---   no file is selected (the caller then opens the primary selection).
-local function copy_file_selection()
-	local ok, uri_list, reason = deps.read_uri_list()
+local function copy_file_selection(admitted)
+	local ok, uri_list, reason = deps.read_uri_list(admitted)
 	if not ok then
 		if reason == "no_file_selection" then return nil end
 		Logger.error(LOG, "copy_selected_path: the file manager's selection could not be read (%s).", tostring(reason))
@@ -222,7 +226,11 @@ function M.copy_selected_path(read_primary)
 		end
 	end
 	if is_file_manager(app) then
-		local copied = copy_file_selection()
+		local copied = copy_file_selection(function()
+			local current = deps.focused_app()
+			if type(current) ~= "string" or current == "" then current = deps.active_frame_app() end
+			return current == app and is_file_manager(current)
+		end)
 		if copied ~= nil then return copied end
 		Logger.info(LOG, "copy_selected_path: no file is selected in %s — opening the primary selection.", app)
 	end
