@@ -126,7 +126,7 @@ end
 --- @param opts table { style, renderer?, anchor_provider?, screen_provider? }
 --- @return boolean
 function M.init(opts)
-	if _cleanup_pending and not settle_cleanup() then return false end
+	if _presenting ~= nil or (_cleanup_pending and not settle_cleanup()) then return false end
 	opts = type(opts) == "table" and opts or {}
 	_style = opts.style
 	_renderer = opts.renderer
@@ -318,7 +318,7 @@ end
 
 --- Destroys the shared renderer surface.
 function M.destroy()
-	if M.hide() ~= true then return false end
+	if _presenting ~= nil or M.hide() ~= true then return false end
 	if _renderer and type(_renderer.destroy) == "function" then _renderer.destroy() end
 	_renderer = nil
 	_style = nil
