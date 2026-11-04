@@ -530,8 +530,10 @@ end
 
 --- Tears the window down.
 function M.destroy()
+	M.note_covered()
 	Renderer.destroy()
 	_on_expire = nil
+	_on_hidden = nil
 end
 
 return M

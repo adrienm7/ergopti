@@ -236,4 +236,31 @@ helpers.describe("prediction triggers: preview expiry bridge", function()
 		package.loaded["ui.tooltip.preview"] = nil
 		restore()
 	end)
+
+	helpers.it("(preview-destroy-expiry) retires its timer and rows before a new owner draws", function()
+		local scheduler = Fakes.timer_scheduler()
+		local hidden, expired = 0, 0
+		replace("adapters.timer_scheduler", scheduler)
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end,
+			show = function() return true end,
+			hide = function() hidden = hidden + 1 end,
+			is_visible = function() return true end,
+			destroy = function() end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({ style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function() return { delay = 0.25, show_tooltip = true } end },
+			on_expire = function() expired = expired + 1 end })
+		helpers.assert_true(preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect"))
+		preview.destroy()
+		helpers.assert_eq(preview.is_showing(), false)
+		helpers.assert_eq(preview.showing_rows(), nil)
+		helpers.assert_eq(scheduler.test.advance(0.25), 0)
+		helpers.assert_eq(hidden, 0, "the retired timer must not hide a successor")
+		helpers.assert_eq(expired, 0)
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+	end)
 end)
