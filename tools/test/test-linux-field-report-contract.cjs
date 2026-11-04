@@ -242,7 +242,12 @@ function read(folder, name) {
 (async () => {
 	try {
 		await check('the field report names come from the shared identifiers', () => {
-			assert.deepEqual(Object.keys(names).sort(), ['base_config_key', 'branch_prefix', 'folder']);
+			assert.deepEqual(Object.keys(names).sort(), [
+				'base_config_key',
+				'branch_prefix',
+				'environment',
+				'folder'
+			]);
 			const identifiers = fs.readFileSync(path.join(ROOT, IDENTIFIERS), 'utf8');
 			assert.match(identifiers, /^ERGOPTI_FIELD_REPORT_BRANCH_PREFIX="field\/"$/m);
 			for (const [file, text] of [
