@@ -144,11 +144,12 @@ M._list_proc = function()
 end
 -- An incomplete read or close is not usable discovery evidence. Always release
 -- the acquired stream, including when a native read raises.
-local function read_bounded(file, limit)
+local function read_bounded(file, limit, require_complete)
 	if not file then return nil end
-	local read_ok, raw = pcall(file.read, file, limit)
+	local read_ok, raw = pcall(file.read, file, limit + (require_complete and 1 or 0))
 	local close_ok, closed = pcall(file.close, file)
 	if not read_ok or type(raw) ~= "string" or not close_ok or closed ~= true then return nil end
+	if require_complete and #raw > limit then return nil end
 	return raw
 end
 
@@ -161,7 +162,7 @@ M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
 M._read_file = function(path)
 	local file = require("infra.regular_file_reader").open_source(path)
-	return read_bounded(file, MAX_SETTINGS_BYTES)
+	return read_bounded(file, MAX_SETTINGS_BYTES, true)
 end
 -- The account home only: a server's settings file is never looked for in the
 -- temporary folder home() falls back to when HOME is unset.
