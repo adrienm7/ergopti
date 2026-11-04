@@ -202,8 +202,12 @@ local function _query_output(sql)
 	if not cmd then return nil end
 	local pipe = io.popen(cmd, "r")
 	if not pipe then return nil end
-	local output = pipe:read("*a")
-	pipe:close()
+	local read_ok, output = pcall(pipe.read, pipe, "*a")
+	local close_ok, closed = pcall(pipe.close, pipe)
+	if not read_ok or type(output) ~= "string" or not close_ok or closed ~= true then
+		Logger.warn(LOG, "SQLite query could not be completely read and closed.")
+		return nil
+	end
 	local accepted, body, reason = SqliteCommand.read_exit_receipt(output)
 	if not accepted then
 		Logger.warn(LOG, "SQLite read refused: %s.", reason)
@@ -370,7 +374,12 @@ end
 --- beside old ones would make a later retry escape them twice.
 --- @return boolean True once the store holds the current encoding.
 function M.ensure_token_encoding()
-	local recorded = _query_scalar("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	local version_output = _query_output("SELECT value FROM meta WHERE key='ngram_token_encoding';")
+	if version_output == nil then
+		Logger.error(LOG, "Cannot read the n-gram key migration version.")
+		return false
+	end
+	local recorded = version_output:match("^([^\n]*)")
 	if recorded == tostring(TokenEncoding.VERSION) then return true end
 	local keys = {}
 	for table_name in pairs(TokenEncoding.MIGRATED_FAMILIES) do
