@@ -615,7 +615,8 @@ _PersonalTomlWriteLeaseOwns(Token, FilePath := unset) {
 
 ; This callback is invoked by _PersonalTomlWriteAtomic after the complete stage
 ; exists, in a short memory-only Critical span before the atomic rename. The
-; exact owner remains held across the subsequent non-Critical filesystem call.
+; exact owner remains held; the original native producer resamples its pure
+; revocable facts within its own guarded final rename span.
 _PersonalTomlAuthorizeOwnedWrite(OwnerToken, FilePath, AuthorizeFn := 0) {
 	if !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
 		return false
@@ -709,6 +710,28 @@ _PersonalTomlAppendOverrides(Lines, Overrides) {
 		Added += 1
 	}
 	return Added
+}
+
+; Pure final admission for the personal-hotstring native rename. Earlier source
+; reads and arbitrary authorization callbacks stay outside the native span.
+; A missing owner is retained only for the existing direct atomic-helper API.
+_PersonalTomlNativeAdmission(FilePath, OwnerToken := 0, OpeningSource := 0,
+		PreservationSource := 0) {
+	if OwnerToken is Object {
+		if !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath) || _PersonalWritesPaused()
+			return false
+	} else if !((OwnerToken is Integer) && OwnerToken == 0)
+		return false
+	if !((OpeningSource is Integer) && OpeningSource == 0) {
+		if !_PersonalTomlOpeningAuthority(OpeningSource, FilePath, OwnerToken)
+			return false
+	}
+	if PreservationSource is Map {
+		Configured := PersonalTomlPath()
+		if !(Configured is String) || _ConfigWriteLeaseKey(Configured) != _ConfigWriteLeaseKey(FilePath)
+			return false
+	}
+	return true
 }
 
 ; Writes a complete same-directory stage, then publishes it with one atomic,
@@ -815,9 +838,10 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 		}
 	}
 
-	; Baseline probe: the optional internal cutpoint models a queued callback
-	; after earlier admission checks, before the original unguarded native move.
-	; No final admission or configuration native adapter is added in this probe.
+	; Arbitrary replacement ports remain interruptible. Only the original native
+	; producer consumes pure final admission in its guarded rename span. The
+	; optional internal cutpoint models revocation after the earlier checks; it
+	; runs outside Critical and is never forwarded to an injected replacement.
 	Replaced := false
 	ReplaceError := ""
 	try {
@@ -828,8 +852,8 @@ _PersonalTomlWriteAtomic(FilePath, Content, WriterFn := 0, ReplaceFn := 0,
 				BeforeNativeFn.Call()
 			else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
 				throw TypeError("The internal personal TOML native cutpoint must be callable or zero.")
-			; Baseline probe deliberately retains the original unguarded producer.
-			Replaced := FSAtomicMoveReplace(StagePath, FilePath)
+			Replaced := FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError,
+				_PersonalTomlNativeAdmission.Bind(FilePath, OwnerToken, OpeningSource, PreservationSource))
 		}
 	}
 	catch as Err {
@@ -1634,8 +1658,8 @@ _PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath
 		BeforeNativeFn.Call()
 	else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
 		throw TypeError("The internal personal-information native cutpoint must be callable or zero.")
-	; Baseline probe deliberately retains the original unguarded producer.
-	return FSAtomicMoveReplace(StagePath, FilePath)
+	return FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError,
+		_PersonalInfoWriteSourceCurrent.Bind(Source, OwnerToken, FilePath))
 }
 
 ; Serialise one detached personal-information snapshot and atomically replace
