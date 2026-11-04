@@ -11,21 +11,21 @@
 
 local M = {}
 
--- errno of a missing file, as io.open reports it.
-local ENOENT = 2
+local RegularFileReader = require("infra.regular_file_reader")
 
 --- Whether the configuration file is absent, the wizard's only trigger.
 --- @param path string Absolute config.toml path.
---- @param open function|nil io.open-compatible opener.
+--- @param open function|nil Regular-file opener.
 --- @return boolean|nil absent
 --- @return string|nil detail Why presence could not be established.
 function M.config_absent(path, open)
-	local file, err, code = (open or io.open)(path, "rb")
+	local file, err, code = (open or RegularFileReader.open)(path, "rb")
 	if file then
-		file:close()
+		local called, closed, detail = pcall(file.close, file)
+		if not called or closed ~= true then return nil, tostring(called and detail or closed) end
 		return false
 	end
-	if code == ENOENT then return true end
+	if code == RegularFileReader.ENOENT then return true end
 	return nil, tostring(err)
 end
 
