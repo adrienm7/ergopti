@@ -168,7 +168,8 @@ _KLRNF_KilledWorkerResumes(Obsolete := false) {
 		if Obsolete {
 			Stored := SQLite_Open(Checkpoint)
 			AssertTrue(Stored != 0)
-			try AssertTrue(SQLite_Exec(Stored, "UPDATE klr_rebuild_meta SET value='2' WHERE key='checkpoint_format';"))
+			try AssertTrue(SQLite_Exec(Stored, "UPDATE klr_rebuild_meta SET value="
+				. SQLite_Q(Obsolete is String ? Obsolete : "2") . " WHERE key='checkpoint_format';"))
 			finally SQLite_Close(Stored)
 		}
 
@@ -394,3 +395,6 @@ _KLRNF_FirstCopyWithinTransaction() {
 }
 Test("KLR rebuild: duplicates within one transaction keep the first copy (klr-newest-first-collision)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_FirstCopyWithinTransaction))
+
+Test("KLR rebuild: ambiguous tuple checkpoints restart safely (walker-composite-checkpoint)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind("3")))

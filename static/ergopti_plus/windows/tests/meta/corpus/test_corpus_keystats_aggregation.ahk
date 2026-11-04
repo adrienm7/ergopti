@@ -602,7 +602,7 @@ _KlgAggCorpus_TypedTokens(Family, Prefix) {
 		return Out
 	for Key, Item in KLW.batch["ngram"][Family] {
 		if (SubStr(Key, 1, StrLen(Prefix)) = Prefix && Item["c"] > 0)
-			Out[SubStr(Key, StrLen(Prefix) + 1)] := Item["c"]
+			Out[Item["token"]] := Item["c"]
 	}
 	return Out
 }

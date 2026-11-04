@@ -176,7 +176,7 @@ _WJFM_EsrcControl() {
 		for Sources in [Map("manual", 2, "hs", 3), Map("manual", 5, "llm", 7)] {
 			KLW_ResetBatch()
 			Key := "2026-09-08" . Chr(1) . "merge.exe" . Chr(1) . "a"
-			KLW.batch["ngram"]["ngram_chars"][Key] := Map("c", 1, "td", 0,
+			KLW.batch["ngram"]["ngram_chars"][Key] := Map("date", "2026-09-08", "app", "merge.exe", "token", "a", "c", 1, "td", 0,
 				"cd", 0, "e", 1, "esrc", Sources)
 			_WJFM_Flush(Db)
 		}
@@ -241,7 +241,7 @@ _WJFM_NulMapKey(Kind) {
 			switch Kind {
 				case "ngram":
 					Key := "2026-09-08" . Chr(1) . "merge.exe" . Chr(1) . "x"
-					KLW.batch["ngram"]["ngram_chars"][Key] := Map("c", 0, "td", 0,
+					KLW.batch["ngram"]["ngram_chars"][Key] := Map("date", "2026-09-08", "app", "merge.exe", "token", "x", "c", 0, "td", 0,
 						"cd", 0, "e", 10, "esrc", Counts)
 					Table := "ngram_chars", Column := "esrc_json"
 				case "hourly", "hourly_min5":
@@ -364,3 +364,44 @@ _WCK_TypingReplayNul() {
 	}
 }
 Test("walker: accepted typing replay preserves a NUL-bearing literal token (walker-composite-typing)", _WCK_TypingReplayNul)
+
+
+_WCK_ContextEnvelope() {
+	Saved := KLW.ctx
+	try {
+		KLW.ctx := Map()
+		Apps := ["A", "A" . Chr(0) . "B", "A" . Chr(1) . "B", "A" . Chr(2) . "0B"]
+		for Index, App in Apps
+			KLW_GetAppCtx(App)["codec_probe"] := Index
+		AssertEqual(Apps.Length, KLW.ctx.Count, "literal app names must own independent contexts")
+		Stored := KL_JsonDecode(KL_JsonEncode(KLW_SerializeCtx()))
+		AssertEqual(1, Stored["key_format"])
+		KLW.ctx := Map()
+		KLW_RestoreCtx(Stored)
+		for Index, App in Apps
+			AssertEqual(Index, KLW_GetAppCtx(App)["codec_probe"], "versioned context keys round trip")
+		KLW_RestoreCtx(Map("legacy-app", Map("p1", "ambiguous legacy state")))
+		AssertEqual(0, KLW.ctx.Count, "legacy derived contexts are discarded instead of reinterpreted")
+		KLW_RestoreCtx(Map("key_format", 2, "contexts", Stored["contexts"]))
+		AssertEqual(0, KLW.ctx.Count, "unknown context key formats fail closed")
+	} finally KLW.ctx := Saved
+}
+Test("walker: encoded application contexts round trip and retire legacy keys (walker-composite-context)", _WCK_ContextEnvelope)
+
+_WCK_CodecVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\keystats\composite_key_vectors.json", "UTF-8"))
+	AssertEqual(1, Corpus["version"])
+	AssertTrue(Corpus["vectors"].Length >= 8)
+	Db := _WJFM_OpenMemory()
+	try {
+		for Vector in Corpus["vectors"] {
+			Fields := Vector["fields"]
+			Key := KLW_Key(Fields*)
+			AssertFalse(RegExMatch(Key, "\x00"), Vector["id"] . ": internal keys never contain NUL")
+			Rows := SQLite_Query(Db, "SELECT hex(" . SQLite_Q(Key) . ") AS encoded;")
+			AssertEqual(Vector["encoded_utf8_hex"], Rows[1]["encoded"], Vector["id"] . ": canonical tuple bytes")
+		}
+	} finally SQLite_Close(Db)
+}
+Test("walker: shared array vectors pin the Windows internal key codec (walker-composite-codec)", _WCK_CodecVectors)

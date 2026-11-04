@@ -36,7 +36,8 @@ _NEA_Flush(Db, Esrc) {
 		KLW_ResetBatch()
 		KLW.batch["app_day"][1] := Map("date", "2026-01-01", "app", "fixture.exe", "time_ms", 1)
 		KLW.batch["ngram"]["ngram_chars"] := Map("2026-01-01" . Chr(1) . "fixture.exe" . Chr(1) . "a",
-			Map("c", 1, "td", 0, "cd", 0, "e", 0, "esrc", Esrc))
+			Map("date", "2026-01-01", "app", "fixture.exe", "token", "a",
+				"c", 1, "td", 0, "cd", 0, "e", 0, "esrc", Esrc))
 		AssertTrue(SQLite_Exec(Db, KLW_BuildBatchSql("esrc-device", false)), "the flush must execute")
 	} finally {
 		KLW.batch := SavedBatch

@@ -263,3 +263,6 @@ Test("KLR durable cache: an unknown device ledger refuses the image (klr-reader-
 
 Test("KLR durable cache: pre-collision-fix image forces rebuild (klr-newest-first-collision)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("16")))
+
+Test("KLR durable cache: ambiguous tuple image forces rebuild (walker-composite-cache)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("17")))
