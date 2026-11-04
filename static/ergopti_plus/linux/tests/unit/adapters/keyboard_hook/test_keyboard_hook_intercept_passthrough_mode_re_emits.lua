@@ -176,6 +176,13 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 			"observe-mode dispatch includes the same textual Enter terminator")
 	end)
 
+	helpers.it("observes a repeat whose press preceded capture", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local chars = {}
+		kh._test_drive({ ev(EV_KEY, 30, 2) }, { onChar = function(char) chars[#chars + 1] = char end }, false)
+		helpers.assert_eq(chars, { "a" }, "the desktop has already received this repeat")
+	end)
+
 end)
 
 
