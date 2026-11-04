@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.gestures.engine.test_finger_upgrade_scroll_guard
+
+=== gestures.engine — fast-path excludes active-axis count upgrades ===
+  ok   declares new_count_active_on_locked_axis guard variable
+  ok   fast-path condition gates on not new_count_active_on_locked_axis
+  ok   uses finger_count_is_inert to check the new count on the locked axis
+  ok   fast-path still exists for the normal (inert-axis) case
+
+=== gestures.engine — 3-finger upgrade blocked on vertical scroll ===
+  ok   stray 3rd finger does not promote maxFingers when scroll is locked vert
+RESULT 5 passed 0 failed

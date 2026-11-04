@@ -1,0 +1,20 @@
+
+=== tap-hold writer: a tray change reaches the engine ===
+ERROR	set_hold: the recommended navigation layer cannot be imported (/tmp/lua_Tb1g9s/layers.toml: cannot open staging file: native file write admission unavailable) — nothing written.
+  FAIL (hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer — test_tap_hold_writer.lua:140: expected truthy — actual: false
+ERROR	'/tmp/lua_JO23zV/tap_hold.toml' is malformed — 'caps_lock hold = layer:nav' refused rather than overwrite it.
+  ok   (hold-picker-brings-the-layer-2026-10-01) an existing layers.toml is the user's and stays byte for byte
+ERROR	'/tmp/lua_K7CSzi/tap_hold.toml' is malformed — 'caps_lock hold = layer:nav' refused rather than overwrite it.
+  ok   (hold-picker-brings-the-layer-2026-10-01) a refused key write takes the layer it created back
+ERROR	set_hold: the recommended navigation layer cannot be imported (/tmp/lua_pBQ7us/layers.toml: cannot open staging file: native file write admission unavailable) — nothing written.
+  FAIL (hold-picker-brings-the-layer-2026-10-01) a saved key keeps its layer when the engine does not reload — ...ts/unit/platform/remap/tap_hold/test_tap_hold_writer.lua:172: attempt to index a nil value (field 'caps_lock')
+  ok   (hold-picker-brings-the-layer-2026-10-01) a writer bound to no layer folder writes no layer file
+  ok   (hold-picker-brings-the-layer-2026-10-01) the daemon binds the writer to the configuration folder's layer file
+
+=== tap-hold writer: the wizard imports only the checked keys ===
+
+=== tap-hold writer: classified source refusal ===
+
+=== tap-hold writer: staging write and close acknowledgement ===
+
+=== tap-hold delay model: global default, sticky per-key delays, reset (PAR-15) ===

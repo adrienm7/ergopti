@@ -1,0 +1,43 @@
+MODULE tests.unit.modules.gestures.engine.test_engine
+
+=== gestures.engine: module API surface ===
+  ok   exposes process_frame as a function
+  ok   exposes init as a function
+  ok   exposes set_any_touch_hook as a function
+
+=== gestures.engine: nil/invalid input guard ===
+  ok   process_frame(nil) fires no action
+  ok   process_frame(string) fires no action
+
+=== gestures.engine: empty frame after init ===
+  ok   process_frame({}) after init fires nothing
+
+=== gestures.engine: tap detection ===
+  ok   does not report a tap fire when action admission refuses
+  ok   reports a tap fire only after exact action acceptance
+  ok   distinguishes an invalid nil verdict from an explicit refusal
+  ok   2-finger tap fires the configured tap_2 action
+  ok   3-finger tap fires the configured tap_3 action
+  ok   tap with no configured ga entry does not crash
+  ok   gesture with movement > TAP_MAX_DELTA is not classified as tap
+
+=== gestures.engine: swipe detection ===
+  ok   3-finger right swipe fires swipe_3_right
+  ok   3-finger up swipe fires swipe_3_up
+  ok   swipe too small (delta < SWIPE_MIN) does not fire at commit
+  ok   4-finger swipe fires swipe_4_right, not swipe_3_right
+  ok   uses the axis fallback verdict before reporting a live fire
+  ok   keeps a refused live x1 action retryable without fire telemetry
+  ok   stops an incremental batch at the first refused step
+
+=== gestures.engine: any_touch_hook ===
+  ok   hook is called when process_frame receives touches (n > 0)
+  ok   hook is NOT called when n == 0
+
+=== gestures.engine: finger count tracking ===
+  ok   keeps a locked 2-finger scroll native through a sustained ghost contact (ghost-third-finger-2026-08-27)
+  ok   maxFingers tracks the peak seen during a gesture
+  ok   a 2->3 join during the landing confirms once the third contact holds
+  ok   the engine is pure with respect to pause — the gate lives in its caller
+  ok   a swipe fires, and a second identical swipe fires again — no stuck primer
+RESULT 27 passed 0 failed

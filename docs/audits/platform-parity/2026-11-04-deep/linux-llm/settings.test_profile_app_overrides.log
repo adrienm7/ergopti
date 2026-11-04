@@ -1,0 +1,10 @@
+
+=== LLM profile settings: per-application overrides ===
+  ok   app-profile: no override means the menu's profile
+  ok   app-profile: an override is stored as the v1 envelope and found by a normalised key
+  ok   app-profile: clearing removes the override and the stored text
+  ok   app-profile: an unknown profile or an unusable application is refused
+  ok   app-profile: a refused write leaves the map in force unchanged
+  ok   app-profile: an unreadable stored value applies nothing and is never overwritten
+  ok   app-profile: deleting a profile drops its overrides in the same write
+AUDIT_TEST_RESULT	7	0

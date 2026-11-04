@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"scope": "macos-gestures",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:34:56.826099+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-gestures/report.md",
+	"findings": [
+		{
+			"id": "MG001",
+			"title": "System-gesture preference probes never start their prepared ShellRunner tasks",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": [
+				"System-owned macOS gesture slots are withheld to prevent native and Ergopti double actions.",
+				"An accepted asynchronous preference refresh eventually observes a native terminal or reports failure."
+			],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/macos-gestures/probe-conflict-probes.lua",
+				"observed": "Actual ShellRunner constructs4 native task doubles; starts0, callback0; repeated recheck joins pending probe, swipe_3_left stays free. Starting the exact4 retained handles and completing enabled preference reads changes it to taken.",
+				"boundaries": "Real conflict module and real ShellRunner lifecycle over hs.task native doubles; no real commands, macOS settings or native actions."
+			},
+			"root_cause": "macos/modules/gestures/conflicts.lua:259-296 calls ShellRunner.spawn and retains/checks handles but never calls handle.start. Real shell_runner.lua:784 prepares, :793 exposes start, :831 returns without starting. snapshot_ready never changes, so conflict slots initially return free.",
+			"silent_failure": "Refresh returns true without a start error; pending probe never drains and native conflict warning/disable policy has no actual settings snapshot.",
+			"regression_test": "Use real ShellRunner with recording native task construction/start/terminal; require four starts and terminal/failure settlement; repeat refresh and settings changes, exact shutdown, and fail-closed slot admission before first snapshot. Existing spawn doubles must model prepared/start lifecycle."
+		},
+		{
+			"id": "MG002",
+			"title": "Tap commit dispatch bypasses the macOS system-gesture conflict gate",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [
+				"A macOS-owned tap_3 slot does not execute an Ergopti action while native Look up owns it.",
+				"Tap and swipe dispatch apply the same native-system slot admission."
+			],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/macos-gestures/probe-tap-conflict.lua",
+				"observed": "Real engine with system_held always true dispatches lookup on stationary3-contact tap/lift and never queries predicate. Horizontal swipe control queries same predicate and dispatches nothing.",
+				"boundaries": "Real gesture engine over native touch/clock/eventtap doubles; action recorders only, no real lookup or output."
+			},
+			"root_cause": "engine.lua:700-716 calls dispatchAction directly in tap branch; triggerAction:451-459 alone applies state.system_held. multiFingerAllowed:300 checks physical recognition policy, not native ownership. conflicts.lua:120-127 explicitly declares tap_3 blocking.",
+			"silent_failure": "Tap logs TAP FIRE with no conflict rejection even when system-held state is true; fixes to preference probing do not fix this independent dispatch omission.",
+			"regression_test": "Replay real tap commit for taken/unverified/free tap_3 state; assert no dispatch while held and one single-shot dispatch when free, alongside existing swipe control, AI and pause gates."
+		}
+	]
+}

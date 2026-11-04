@@ -1,0 +1,17 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_row_integrity
+
+=== preview: a no-op mapping is treated exactly like no match ===
+  ok   would_fire reports a no-op with a nil expansion and a truthy input
+  ok   the prospective resolver gates candidates on the expansion, not the input
+
+=== preview: star rows name the key the user actually presses ===
+  ok   reads the magic key from CoreState rather than hard-coding it
+
+=== preview: turning it off clears what is already on screen ===
+  ok   every preview-disable path crosses the transactional hide fence
+
+=== preview: the rows describe the outcome the engine will produce ===
+  ok   resolves show_tooltip with the row's own section, not nil
+  ok   gates every alternative on the global engine winner
+  ok   labels a provider row with the magic key, not Enter
+RESULT 7 passed 0 failed

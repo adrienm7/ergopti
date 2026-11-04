@@ -1,0 +1,2 @@
+PRODUCER: static descriptor and literal callback output both preserve [Literal {Left} {U+0041}]
+REPRO: actual bridge renders static descriptor [Literal {Left} {U+0041}] as [Literal  A]

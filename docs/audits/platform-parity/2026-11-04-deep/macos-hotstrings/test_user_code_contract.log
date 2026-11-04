@@ -1,0 +1,47 @@
+MODULE tests.unit.modules.dynamic_hotstrings.user_code.test_user_code_contract
+
+=== programmable dynamic hotstring contract ===
+  ok   (user-hotstrings) metadata never invokes callbacks or native probes
+  ok   (user-hotstrings) refuses changed source before callback
+  ok   (user-hotstrings) refuses changed source after user callback
+  ok   (user-hotstrings) refuses changed destination before callback
+  ok   (user-hotstrings) refuses changed destination after user callback
+  ok   (user-hotstrings) refuses changed input before callback
+  ok   (user-hotstrings) refuses changed input after user callback
+  ok   (user-hotstrings) lifecycle invalidate retires retained callbacks
+  ok   (user-hotstrings) lifecycle stop retires retained callbacks
+  ok   (user-hotstrings) lifecycle set_enabled retires retained callbacks
+  ok   (user-hotstrings) lifecycle reload retires retained callbacks
+  ok   (user-hotstrings) absent source refuses publication and quarantines retained metadata
+  ok   (user-hotstrings) source quarantine retains cancellation debt and exact closures through retry
+  ok   (user-hotstrings) present valid empty factory is an admitted publication
+  ok   (user-hotstrings) forwards exact result true
+  ok   (user-hotstrings) forwards exact result false
+  ok   (user-hotstrings) forwards exact result 0
+  ok   (user-hotstrings) forwards exact result é
+line
+  ok   (user-hotstrings) cancellation debt refuses reopening and supports exact retry
+  ok   (user-hotstrings) accepted queued publication retains guards and native ownership after callback terminal
+  ok   (user-hotstrings) queued publication refuses late source after pure callback terminal
+  ok   (user-hotstrings) queued publication refuses late destination after pure callback terminal
+  ok   (user-hotstrings) queued publication refuses late input after pure callback terminal
+  ok   (user-hotstrings) queued publication set_enabled cancels the exact native owner after callback terminal
+  ok   (user-hotstrings) queued publication reload cancels the exact native owner after callback terminal
+  ok   (user-hotstrings) queued publication stop cancels the exact native owner after callback terminal
+  ok   (user-hotstrings) queued cancel acknowledgement without native settlement retains exact debt
+  ok   (user-hotstrings) copied completion status cannot settle the original native receipt
+  ok   (user-hotstrings) already completed native receipt can settle inline after ownership adoption
+  ok   (user-hotstrings) publication rechecks its generation after an off-hook probe changes lifecycle
+  ok   (user-hotstrings) refused settlement subscription preserves native ownership and cancellation debt
+  ok   (user-hotstrings) refused commit retains its exact adopted native cleanup receipt
+  ok   (user-hotstrings) native commit refusal remains visible after its destination probe changes lifecycle
+  ok   (user-hotstrings) refused input retirement retains debt until exact acknowledgement
+  ok   (user-hotstrings) malformed reload closes old metadata without publishing candidate
+  ok   (user-hotstrings) callback exception reports without publishing exception content
+
+=== programmable hotstring source ===
+  ok   preserves absence and rejects unreadable sources
+  ok   creates an example only through an absent-source conditional publication
+  ok   loads a factory once and preserves Unicode metadata without executing callbacks
+  ok   refuses syntax, factory and descriptor errors without source disclosure
+RESULT 40 passed 0 failed

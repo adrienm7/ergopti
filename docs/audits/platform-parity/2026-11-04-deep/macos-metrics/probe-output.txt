@@ -1,0 +1,9 @@
+CONFIRMED: real watcher->real aggregator: 60000ms sleep + 30000ms lock yield sleep_ms=0, locked_ms=0, passive_count=2
+CONFIRMED: collection_suspended=true accumulates mouse_distance_px=1000.0 and appends space_change
+CONFIRMED: paused movement survives resume and is detached into next typing entry: 1000.0
+CONFIRMED: awake_focus(duration_ms=120000) leaves system awake_ms=0
+CONFIRMED: private_filter_enabled=true and policy denied, but window_switch next_title=SECRET TITLE - Private Browsing
+CONFIRMED: collection_suspended=true appends window_switch title=PAUSED SECRET
+CONFIRMED: lock/display-sleep/system-sleep/system-wake/display-wake/unlock emits only one passive_period(kind=sleep,duration_ms=1000), losing lock and prior display-sleep ownership
+CONFIRMED: full keep-awake pair (passive_period kind=awake + awake_focus) still leaves system awake_ms=0
+CONFIRMED: exact real LogManager.append_log + FIFO drain send PAUSED SECRET to Rotation.append_log; no downstream admission gate

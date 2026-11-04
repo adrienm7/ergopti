@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_registry_refresh
+
+=== personal-info save refreshes literal prefix mappings ===
+  ok   purges the old phone prefix and publishes the new one exactly once
+  ok   keeps a disabled group disabled and rebuilds it from the saved winner
+  ok   rolls the rebuilt registry back when filesystem publication refuses
+  ok   never publishes disk or memory when the registry rebuild refuses
+  ok   rebuilds prefixes for an external winner after a stale save loses
+RESULT 5 passed 0 failed

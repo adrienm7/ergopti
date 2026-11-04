@@ -1,0 +1,42 @@
+{
+	"schema_version": 1,
+	"scope": "windows-metrics",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/windows-metrics/report.md",
+	"findings": [
+		{
+			"id": "WM-001",
+			"title": "Movement-only pointer distance is silently excluded from every typing-buffer flush",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "In an isolated Windows store set/supply positive pointer distance with empty keyboard events and zero clicks/scrolls, then invoke real KL_FlushBuffer. It returns true without emitting a row or consuming distance. Quit with no additional input and data.sql lacks movement. App-switch then later typing can attribute retained distance to successor app. Source-confirmed; native AHK procedure not executed.",
+			"root_cause": "keystats.ahk:667-670 and _KL_PublishBufferSnapshot at :734-735 define empty using events/clicks/scrolls only, omitting mouse_distance / Snapshot.Distance. Collector keystats_mouse.ahk:637-645 accumulates movement independently. macOS log_manager.lua:572-575 has the same omission; Linux pending.mouse rows persist motion without keyboard events.",
+			"silent_failure": "Both flush paths report success although no owner or durable row receives positive distance; shutdown proceeds. Context changes can move retained distance into a later app row.",
+			"regression_test": "Run real distance-only collector/flush and direct snapshot publisher; assert conservation and correct source app through movement-only flush, app change, pause, rollover and shutdown. Cover both predicates and macOS comparator; native Windows runtime unavailable here."
+		},
+		{
+			"id": "WM-002",
+			"title": "Enabled metrics encryption leaves typed text and per-key events in durable plaintext today.log",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": [],
+			"reproduction": "Enable Encrypt logs on disk and wait for migration. Type a unique synthetic marker in a permitted editor, wait for journal ingest/flush, then inspect the local device today.log and data.sql before rollover. Journal contains literal marker and per-key events while SQL typed payload is encrypted. Repeat during SQL failure or migration to cover retained journals. Source-confirmed; native Windows disk procedure not executed.",
+			"root_cause": "keystats_ingest.ahk:256-259 journals KL_JsonEncode(e) directly. keystats_journal.ahk:82 and :369 use the same raw generic codec before native durable append. Encryption runs later only in keystats_sql.ahk:68-69. Normal today.log deletion occurs at rollover, and migration rewrites data.sql only. Shared menu comment menu.toml:2002-2006 and en locale label promise encrypting logs on disk; no journal exemption found. macOS rotation.lua:313 shares raw JSON journaling.",
+			"silent_failure": "The encryption switch can remain enabled and SQL encryption/migration can succeed while the same protected typed payload persists plainly in today.log. No error warns that this durable copy remains clear.",
+			"regression_test": "Native enabled-encryption disk scan of raw journals before/after ingest, restart, migration and failure. Assert synthetic text and reconstructible key payload absent from disk while replay conserves aggregates. Include macOS raw journal; clear aggregate columns remain an explicit separate design constraint."
+		},
+		{
+			"id": "WM-003",
+			"title": "Explicit dashboard cache Reset preserves and reuses its durable reader image",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "On a private synthetic metrics store build a valid cache/reader.sqlite, retain unchanged ledgers, alter an aggregate in this private cache without invalidating cache metadata, then invoke actual dashboard Reset. Successor full worker reattaches the same durable image and with no tails returns its prior aggregates. Alternatively instrument real reader image identity to prove explicit reset does not revoke it. Source-confirmed; native worker reproduction not executed.",
+			"root_cause": "clear_cache at keystats_webview.ahk:700-725 calls KLR_ResetCache and deletes only prefetch JSON. KLR_ResetCache at keystats_reader_db.ahk:139 resets RAM state, not KLR_CachePath (cache/reader.sqlite). Full worker keystats_prefetch.ahk:1016 calls KLR_BuildDatabase, which restores durable cache at :218 and returns unchanged aggregates at :258-266. No force-cold or reset-generation reaches this layer.",
+			"silent_failure": "Cachespurged diagnostic and a successful new build can still return the exact stale derived image the explicit purge was intended to clear. No ordinary corruption of valid normal aggregates is claimed.",
+			"regression_test": "Use a real saved reader image and subsequent worker through actual Reset, assert durable observed image is retired/revoked and aggregates reconstructed, with peer-publication/active-job fencing and unrelated stores preserved. Existing reset-owner test replaces external worker and covers RAM/prefetch only."
+		}
+	]
+}

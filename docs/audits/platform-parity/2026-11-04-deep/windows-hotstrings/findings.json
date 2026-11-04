@@ -1,0 +1,20 @@
+{
+	"schema_version": 1,
+	"scope": "windows-hotstrings",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/windows-hotstrings/report.md",
+	"findings": [
+		{
+			"id": "WH-001",
+			"title": "Reload of a repaired programmable source clears its problem but leaves callback admission disabled",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Leave programmable sources configured on. Cause a missing/unreadable source or throwing factory, repair the source to publish the clock example, invoke the actual Reload source menu command and wait for metadata loading. Owner.ready becomes true and the problem indicator clears, but owner.enabled remains false; @clock plus the configured magic key never reaches its callback. Toggling off/on restores operation. Production-source state transition confirmed; native execution unavailable. The accompanying recovery-repro.ahk calls the actual Windows policy class, but was not executed in this Linux environment.",
+			"root_cause": "The menu binds Reload directly to UserHotstringsReload at windows/ui/menu/menu_hotstrings.ahk:1588. RefuseSource sets enabled=false at _shared/modules/hotstrings/user_code.ahk:180-183. On successful reload the policy sets only entries/source/ready at :172-175, and the production completion at windows/modules/dynamic_hotstrings/user_code.ahk:284-289 clears the problem without restoring the effective desired enabled state. Find returns false for disabled owners at shared user_code.ahk:203-205. In contrast shared Lua user_code_driver.lua:194 restores _desired_enabled after metadata reload.",
+			"silent_failure": "Successful metadata publication removes the source problem indicator and admits a nonzero metadata count, while disabled Find returns without creating a callback ticket or reporting a new output failure.",
+			"regression_test": "Use the real source loader and actual Reload command: desired enabled -> genuine missing-source or throwing-factory failure -> repair -> menu reload -> wait -> assert owner.enabled and ready, cleared problem, preview and callback admission. Verify desired-off reload stays disabled. Existing native source-admission tests repair using UserHotstringsSetEnabled(true), which bypasses this faulty recovery path. Reconcile enabled with current effective desired configuration, never unconditional true."
+		}
+	]
+}

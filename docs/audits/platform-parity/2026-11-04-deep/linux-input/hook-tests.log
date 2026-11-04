@@ -1,0 +1,222 @@
+
+=== keyboard hook + tap-hold engine ===
+  ok   sends Ctrl for a held CapsLock, never the lock itself
+  ok   types a real Enter for a tapped CapsLock, which the hotstrings see
+  ok   runs the tap action of a lone Shift and nothing after Shift+A
+  ok   sends navigation chords while the layer key is held, and no Alt
+  ok   releases a held Ctrl when asked, mid-hold
+  ok   swallows the release of a key the engine took before it was switched off
+  ok   forwards the release of a key pressed before the engine came in
+  ok   times a tap by when the keys moved, not by when the daemon read them
+
+=== keyboard hook: the modifiers held with a control key ===
+  ok   names the shortcut modifier held with every control key (modified-backspace)
+  ok   names no shortcut modifier with a bare Backspace (modified-backspace)
+  ok   says Ctrl for the Backspace tapped on the layer key while LCtrl is held (modified-backspace)
+
+=== keyboard hook + tap-hold engine: the pointer during a tap ===
+  ok   keeps the tap across pointer motion and cancels it on a wheel turn (pointer-motion-tap)
+  ok   cancels the tap on a button press and on its release, as on Windows (pointer-motion-tap)
+  ok   keeps the tap when a finger lands on or leaves a touchpad (pointer-motion-tap)
+  ok   resets the typing buffer on a button press only, never on its release (pointer-motion-tap)
+  ok   still reports a touch as a click to the daemon while the tap survives it (touch-still-clicks)
+
+=== keyboard hook + tap-hold engine: a modifier the XKB options move ===
+  ok   leaves Tab native under a CapsLock the layout makes Ctrl or Super (engine-live-modifiers)
+  ok   still runs Tab's tap-hold with no modifier held (engine-live-modifiers)
+
+=== keyboard hook + tap-hold engine: a hold taken past the threshold ===
+  ok   holds Shift before a key typed past the threshold, and not before one typed sooner
+  ok   holds Shift from the pump once the threshold passes with no event read
+  ok   types a key stamped within the threshold and read after it unshifted (rctrl-one-shot-hold-past-threshold)
+  ok   reads every source again before telling the time (rctrl-one-shot-hold-past-threshold)
+  ok   keeps its clock fresh from the pointer (rctrl-one-shot-hold-past-threshold)
+  ok   never takes a coarse clock's step for time passed (rctrl-one-shot-hold-past-threshold)
+
+=== keyboard hook: physical editor source provenance ===
+  ok   (magic-editor-hook) distinguishes a real key from an engine's tap and navigation output
+
+=== keyboard hook: physical-origin generation ===
+  ok   (magic-editor-origin) fences a captured device when its current kernel origin becomes unqualified
+
+=== source-owned simultaneous standalone remap holds ===
+  ok   (remap-multisource) keeps Ctrl until last UP in order ab
+  ok   (remap-multisource) keeps Ctrl until last UP in order ba
+  ok   (remap-multisource) refuses an UP from a source without its own DOWN
+  ok   (remap-multisource) repeats cannot acquire or release another source's hold
+  ok   (remap-multisource) one source's repeated DOWN is not a new owner
+  ok   (remap-multisource) keeps a remaining Ctrl shortcut out of character collection
+  ok   (remap-multisource) cannot borrow a foreign source's ordered prefix
+  ok   (remap-multisource) cannot lend the remaining B hold to a released A prefix
+  ok   (remap-multisource) stops two owned holds with one native Ctrl UP
+  ok   (remap-multisource) keeps exact cleanup rows after two-owner retirement is refused
+  ok   (remap-multisource) preserves native lifetime fencing after same-path B replacement
+  ok   (remap-multisource) preserves the original keyboard hold when pointers add
+  ok   (remap-multisource) preserves the original keyboard hold when pointers remove
+  ok   (remap-multisource) keeps both native holds through repeated pointer publications ab
+  ok   (remap-multisource) keeps both native holds through repeated pointer publications ba
+  ok   (remap-multisource) retains global fail-closed retirement on keyboard removal
+  ok   (remap-multisource) keeps the original single-source ordered action eligible
+  ok   (remap-multisource) accounts for each source's deferred modifier hold
+
+=== retained remap provenance across keyboard roster changes ===
+  ok   (remap-roster-provenance) retires A without an intermediate roster publication
+  ok   (remap-roster-provenance) preserves A retirement after add peer
+  ok   (remap-roster-provenance) preserves A retirement after remove and reconnect peer
+  ok   (remap-roster-provenance) retires simultaneous same-code holds after release order ab
+  ok   (remap-roster-provenance) retires simultaneous same-code holds after release order ba
+  ok   (remap-roster-provenance) retires different retained hold modifiers as one original cohort
+  ok   (remap-roster-provenance) retains the left_alt mapping provenance
+  ok   (remap-roster-provenance) retains the right_ctrl mapping provenance
+  ok   (remap-roster-provenance) retires a deferred hold before its activation deadline
+  ok   (remap-roster-provenance) preserves an ordinary physical UP with no source departure
+  ok   (remap-roster-provenance) cannot republish input after original Reader close is refused
+
+=== keyboard source departure retires remapper input ===
+  ok   (remap-source-departure) accepts the first new hold on the surviving keyboard
+  ok   (remap-source-departure) retires a failed reader before the surviving keyboard's next hold
+  ok   (remap-source-departure) preserves a remapped hold on a retained keyboard
+  ok   (remap-source-departure) swallows the rest of another consumed hold after shared retirement
+  ok   (remap-source-departure) keeps a retained colon-path orphan distinct from a shorter event-name prefix
+  ok   (remap-source-departure) forgets an orphan from the old lifetime after watchdog removal
+  ok   (remap-source-departure) forgets an orphan from the old lifetime after fatal reader
+  ok   (remap-source-departure) refuses a successor after an orphaned source cannot retire its output
+  ok   (remap-source-departure) stops original capture when remapped key retirement is not acknowledged
+  ok   (remap-source-departure) keeps the surviving physical Shift owner
+
+=== keyboard hook: a physical layout-family change ===
+  ok   publishes the chosen family for metrics without resolving text
+  ok   refuses a name it cannot honour instead of falling back
+  ok   rejects a non-string without changing anything
+
+=== layout refresh preserves native output custody ===
+  ok   (linux-live-layout-refresh) preserves held Shift without emitting or retiring a physical key
+  ok   (linux-live-layout-refresh) reclassifies a retained Right Alt from shortcut Alt to text AltGr
+  ok   (linux-live-layout-refresh) preserves a remapper-owned hold and its output owner
+  ok   (linux-live-layout-refresh) clears an unused logical arm before publishing the fresh inverse
+  ok   (linux-live-layout-refresh) retires a spent logical arm before allowing a map callback
+  ok   (linux-live-layout-refresh) preserves the old cohort on refusal before any map change
+  ok   (linux-live-layout-refresh) closes original admission after a fresh-map throw
+  ok   (linux-live-layout-refresh) closes original admission after a fresh-map selected-map-change
+  ok   (linux-live-layout-refresh) closes original admission after a fresh-map stop
+  ok   (linux-live-layout-refresh) refuses a foreign output owner introduced during the refresh
+  ok   (linux-live-layout-refresh) rejects nested start and layout refresh while the selected map is being loaded
+
+=== keyboard hook: the daemon refreshes the active XKB keymap ===
+  ok   calls the reading side and the writing side from one handler
+
+=== daemon layout changes preserve UI state ownership ===
+  ok   (layout-ui-state-ports) preserves every current port and both notification callbacks
+  ok   (layout-ui-state-ports) keeps the actual wizard's refusal visible after a layout change
+  ok   (layout-ui-state-ports) leaves the exact previous UI state when capture refresh is refused
+
+=== keyboard_hook: re-acquires when the preferred device changes ===
+  ok   switches to the device the finder now prefers, and grabs it
+  ok   releases keys held by the source before closing it
+  ok   stops every grab when a source-key release fails
+  ok   keeps modifier state when a new source cannot be opened
+  ok   does nothing while the answer is unchanged
+  ok   does not check on every tick
+
+=== keyboard_hook: an explicit device owns its watchdog policy ===
+  ok   waits for the pinned path and never switches to the preferred device
+  ok   the daemon marks only a CLI-selected device as pinned
+  ok   pinned-watchdog: a reappearing path that lost EV_KEY is not adopted
+
+=== keyboard_hook: multi-device ownership ===
+  ok   grabs both keyboards and observes clicks from every pointer
+
+=== keyboard_hook: the watchdog when no device is there ===
+  ok   reopens the same path after a fatal read
+  ok   releases a held key after a fatal source read
+  ok   keeps the current descriptor when the finder answers nothing
+  ok   is inert before start and after stop
+
+=== keyboard_hook: ordinary overlapping physical-source release ===
+  ok   keeps the single acknowledged output Shift bit held until its last source releases
+
+=== managed source cohort consumed retirement ===
+  ok   withdraws a spent original arm before any keyboard reacquisition or publication
+
+=== managed source cohort original map authority ===
+  ok   does not mint ownership from a foreign slot already reopened before the watchdog
+
+=== managed source cohort pointer acquisition refusal ===
+  ok   does not drop an owned pointer cleanup cohort when a replacement open fails
+
+=== configured combinations preserve unrelated source-owned keys ===
+  ok   pair-multidevice none code 30 release ab
+  ok   pair-multidevice none code 30 release ba
+  ok   pair-multidevice none code 54 release ab
+  ok   pair-multidevice none code 54 release ba
+  ok   pair-multidevice none code 29 release ab
+  ok   pair-multidevice none code 29 release ba
+  ok   pair-multidevice none code 100 release ab
+  ok   pair-multidevice none code 100 release ba
+  ok   pair-multidevice tap code 30 release ab
+  ok   pair-multidevice tap code 30 release ba
+  ok   pair-multidevice tap code 54 release ab
+  ok   pair-multidevice tap code 54 release ba
+  ok   pair-multidevice tap code 29 release ab
+  ok   pair-multidevice tap code 29 release ba
+  ok   pair-multidevice tap code 100 release ab
+  ok   pair-multidevice tap code 100 release ba
+  ok   pair-multidevice hold code 30 release ab
+  ok   pair-multidevice hold code 30 release ba
+  ok   pair-multidevice hold code 54 release ab
+  ok   pair-multidevice hold code 54 release ba
+  ok   pair-multidevice hold code 29 release ab
+  ok   pair-multidevice hold code 29 release ba
+  ok   pair-multidevice hold code 100 release ab
+  ok   pair-multidevice hold code 100 release ba
+  ok   pair-multidevice chord code 30 release ab
+  ok   pair-multidevice chord code 30 release ba
+  ok   pair-multidevice chord code 54 release ab
+  ok   pair-multidevice chord code 54 release ba
+  ok   pair-multidevice chord code 29 release ab
+  ok   pair-multidevice chord code 29 release ba
+  ok   pair-multidevice chord code 100 release ab
+  ok   pair-multidevice chord code 100 release ba
+  ok   pair-multidevice source departure retains peer code 30
+  ok   pair-multidevice source departure retains peer code 54
+  ok   pair-multidevice source departure retains peer code 29
+  ok   pair-multidevice source departure retains peer code 100
+
+=== configured combinations retain their original isolation and buffering ===
+  ok   pair-multidevice genuine single-source tap remains eligible
+  ok   pair-multidevice cannot borrow a foreign tap prefix
+  ok   pair-multidevice genuine single-source hold remains eligible
+  ok   pair-multidevice cannot borrow a foreign hold prefix
+  ok   pair-multidevice genuine single-source chord remains eligible
+  ok   pair-multidevice cannot borrow a foreign chord prefix
+  ok   pair-multidevice held peer prevents buffering until its own final release
+  ok   pair-multidevice saved source withdrawal still refuses a queued action
+
+=== keyboard_hook.while_released: a dialog runs with the keyboard released ===
+  ok   releases held keys, ungrabs, runs the dialog, then grabs back
+  ok   runs the dialog directly when nothing is grabbed
+  ok   takes the keyboard back even when the dialog raises
+
+=== keyboard_hook.while_released: native refusal never blocks a grabbed keyboard ===
+  ok   does not enter a modal when native ungrab refuses
+  ok   does not enter a modal when native ungrab throws
+  ok   does not enter a modal when retiring the forwarded key fails
+  ok   closes every modal grab when restoration grab raises
+  ok   closes every modal grab when restoration pressed_keys raises
+  ok   preserves a dialog exception after a refused regrab
+  ok   closes the entire cohort when its second keyboard raises after regrab
+
+=== keyboard_hook.while_released: acknowledged modal observer ===
+  ok   brackets only the real callback after native restoration and preserves results
+
+=== keyboard_hook.while_released: running observe dialogs ===
+  ok   discards dialog input and resumes observe without any grab or synthetic output
+  ok   also discards the other keyboard's already prefetched modal input
+  ok   consumes a dialog key still held until release instead of replaying its repeats
+  ok   restores and invalidates observe state before propagating a dialog exception
+  ok   closes observe sources when native state restoration refuses
+  ok   closes observe sources when native state restoration throws
+  ok   preserves the dialog exception when observe restoration also fails
+  ok   does not acknowledge a successful observe resume when the desync consumer fails
+  ok   keeps a stopped hook direct without native work or observer acknowledgements
+TOTAL 165 passed 0 failed

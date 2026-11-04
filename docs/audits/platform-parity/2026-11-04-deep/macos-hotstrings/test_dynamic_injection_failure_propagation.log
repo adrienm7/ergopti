@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_dynamic_injection_failure_propagation
+
+=== keymap.inject_dynamic: replacement status is preserved ===
+  ok   returns the real expander false without mutating the buffer
+  ok   rejects malformed cursor context before calling the expander
+
+=== rules_engine: rejected dynamic replacement does not eat the trigger ===
+  ok   passes the magic key through and does not log completion
+  ok   cancels every fallback event built before an emitter throws
+
+=== personal_info: rejected private replacement does not eat the trigger ===
+  ok   passes the magic key through and does not log completion
+  ok   cancels private fallback deletes when field construction throws
+RESULT 6 passed 0 failed

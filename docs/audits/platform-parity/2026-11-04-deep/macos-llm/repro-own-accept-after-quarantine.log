@@ -1,0 +1,3 @@
+control: call_ok=true applied=true callback_calls=1 runtime_available=true reset_count=1
+reset_refused: call_ok=true applied=true callback_calls=1 runtime_available=true reset_count=1
+quarantine_during_reset: call_ok=true applied=true callback_calls=1 runtime_available=false reset_count=1

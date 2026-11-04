@@ -1,0 +1,41 @@
+
+=== api_remote_callbacks: safe reporting and callback ownership ===
+  ok   api_remote_callbacks: openai healthy
+  ok   api_remote_callbacks: openai chunk-string
+  ok   api_remote_callbacks: openai chunk-object
+  ok   api_remote_callbacks: openai terminal-string
+  ok   api_remote_callbacks: openai terminal-object
+  ok   api_remote_callbacks: openai terminal-throwing-object
+  ok   api_remote_callbacks: openai reentry-object
+  ok   api_remote_callbacks: openai reentry-throwing-object
+  ok   api_remote_callbacks: anthropic healthy
+  ok   api_remote_callbacks: anthropic chunk-string
+  ok   api_remote_callbacks: anthropic chunk-object
+  ok   api_remote_callbacks: anthropic terminal-string
+  ok   api_remote_callbacks: anthropic terminal-object
+  ok   api_remote_callbacks: anthropic terminal-throwing-object
+  ok   api_remote_callbacks: anthropic reentry-object
+  ok   api_remote_callbacks: anthropic reentry-throwing-object
+  ok   api_remote_callbacks: gemini healthy
+  ok   api_remote_callbacks: gemini chunk-string
+  ok   api_remote_callbacks: gemini chunk-object
+  ok   api_remote_callbacks: gemini terminal-string
+  ok   api_remote_callbacks: gemini terminal-object
+  ok   api_remote_callbacks: gemini terminal-throwing-object
+  ok   api_remote_callbacks: gemini reentry-object
+  ok   api_remote_callbacks: gemini reentry-throwing-object
+  ok   api_remote_callbacks: openai empty reply safely describes terminal objects
+  ok   api_remote_callbacks: anthropic empty reply safely describes terminal objects
+  ok   api_remote_callbacks: gemini empty reply safely describes terminal objects
+  ok   api_remote_callbacks: openai HTTP refusal safely describes terminal objects
+  ok   api_remote_callbacks: anthropic HTTP refusal safely describes terminal objects
+  ok   api_remote_callbacks: gemini HTTP refusal safely describes terminal objects
+  ok   api_remote_callbacks: openai transport failure safely describes terminal objects
+  ok   api_remote_callbacks: anthropic transport failure safely describes terminal objects
+  ok   api_remote_callbacks: gemini transport failure safely describes terminal objects
+  ok   api_remote_callbacks: safely describes empty string terminal failure
+  ok   api_remote_callbacks: safely describes number terminal failure
+  ok   api_remote_callbacks: safely describes false terminal failure
+  ok   api_remote_callbacks: safely describes function terminal failure
+  ok   api_remote_callbacks: safely describes thread terminal failure
+AUDIT_TEST_RESULT	38	0

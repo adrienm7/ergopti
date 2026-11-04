@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.gestures.config.test_sensitivity_wrongtype_failclosed
+
+=== gesture sensitivity fails closed to DEFAULT_SENSITIVITY on a wrong type ===
+  ok   a non-numeric string is replaced by the numeric default
+  ok   the stored value is always safe for the engine arithmetic and the menu format
+  ok   a zero or negative sensitivity also fails closed (no divide-by-zero)
+  ok   a genuine positive number is stored verbatim
+  ok   mode and sensitivity setters expose exact commitment
+RESULT 5 passed 0 failed

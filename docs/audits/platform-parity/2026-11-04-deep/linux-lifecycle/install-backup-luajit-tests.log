@@ -1,0 +1,238 @@
+
+=== update signature gate (Linux) ===
+  ok   (signature-gate) the shipped policy is off, so an unsigned release installs
+  ok   (signature-gate) a good signature verifies in every mode
+  ok   (signature-gate) required refuses a bad signature in words
+  ok   (signature-gate) required refuses a missing signature, off only logs it
+  ok   (signature-gate) off reports a bad signature but does not stop the update
+  ok   (signature-gate) an unusable policy refuses instead of skipping the check
+
+=== Archive Transfer Signature ===
+  ok   a good signature releases the archive with its sealed size and digest
+  ok   a bad signature refuses the archive in words
+  ok   a missing signature download reaches the gate as a fetch error
+  ok   a release without a signature asset still reaches the gate
+  ok   without a signature port the flow is unchanged
+
+=== config_backup (Linux): real files ===
+  ok   lists files, folders, and a link to a folder as neither
+  ok   backs up and restores the exact bytes of the configuration and the settings store
+
+=== config-backup-native-names ===
+  ok   (config-backup-native-names) preserves newline-file through backup and restore
+  ok   (config-backup-native-names) preserves newline-directory through backup and restore
+  ok   (config-backup-native-names) a dangling link cannot block unrelated configuration backup
+  ok   (config-backup-native-names) EACCES cannot certify directory absence
+
+=== config-backup-target-refusal ===
+  ok   (config-backup-target-refusal) refuses actual denied link target metadata
+  ok   (config-backup-target-refusal) refuses actual loop link target metadata
+
+=== config-backup-native-metadata ===
+  ok   (config-backup-native-metadata) unknown d_type requires actual denied metadata
+  ok   (config-backup-native-metadata) unknown d_type requires actual gone metadata
+  ok   (config-backup-native-metadata) unknown d_type requires actual file metadata
+
+=== installer-native-publication ===
+  ok   (installer-native-publication) exact directory move handles directory
+  ok   (installer-native-publication) exact directory move handles empty-directory
+  ok   (installer-native-publication) exact directory move handles directory-link
+  ok   (installer-native-publication) exact directory move handles file
+  ok   (installer-native-publication) exact directory move handles absent
+  ok   (installer-native-publication) activation race retains foreign root and original backup
+  ok   (installer-native-publication) genuine absent destinations still install and retain the rollback root
+  ok   (installer-native-publication) native refusal cannot fall back to a shell move
+
+=== config-backup-rule-source ===
+  ok   (config-backup-rule-source) classifies fifo before building a backup owner
+  ok   (config-backup-rule-source) classifies fifo-link before building a backup owner
+  ok   (config-backup-rule-source) classifies denied before building a backup owner
+  ok   (config-backup-rule-source) classifies file before building a backup owner
+  ok   (config-backup-rule-source) classifies file-link before building a backup owner
+  ok   (config-backup-rule-source) refuses valid bytes when the stream close is unacknowledged
+
+=== installer-native-exit-receipt ===
+  ok   (installer-native-exit-receipt) complete native listings retain exit 0
+  ok   (installer-native-exit-receipt) complete native listings retain exit 73
+  ok   (installer-native-exit-receipt) failed listing refuses staging and extraction
+
+=== known zero-dispatch native transaction ===
+  ok   known zero-dispatch terminal refusal waits for original physical ACK and returns false
+  ok   zero-started terminal with pending physical owner stays accepted and busy until ACK
+  ok   malformed owner never turns its early terminal into known zero-dispatch completion
+  ok   physical probe cannot change captured original started receipt
+  ok   physical ACK alone without authentic terminal preserves original owned admission
+  ok   captured closed allocator fact preserves the existing available offer despite observer field mutation
+  ok   matching historical error text without the fixed allocator fact keeps ordinary failure state
+  ok   physical-probe source withdrawal prevents restoring an old available offer
+
+=== updater receiving model storage isolation ===
+  ok   restores a warmed real storage owner after the receiving scenario (test_production_dispatch_refusal)
+
+=== Canonical Local Install Budget ===
+  ok   fractional original observation retains exact deadline
+  ok   mutated defaults cannot extend captured cap
+  ok   later phase observations never restart local install cap
+  ok   zero fractional and invalid caps refuse before reservation
+  ok   bad native observation refuses admission
+  ok   regressive native observation cannot authorize a new phase
+  ok   safe integer overflow refuses original deadline
+  ok   retirement is logical and cannot grant new clock consent
+  ok   forged equality token cannot borrow installation deadline
+  ok   canonical install data declares literal three minute local cap
+
+=== Canonical Archive Listing Ceiling ===
+  ok   canonical listing ceiling covers the independently measured release
+  ok   missing listing policy refuses without a guessed process limit
+  ok   non numeric listing limits refuse
+  ok   zero negative fractional and nonfinite limits refuse
+  ok   positive integer boundary is literal and bounded
+  ok   listing capture ignores inherited descriptor getters
+  ok   defaults mutation cannot enlarge a captured listing ceiling
+
+=== updater restart: starting the installed version ===
+  ok   (quit-wins-over-reload) cancels a pending systemd restart with a stop job
+  ok   (quit-wins-over-reload) cancels a relay by its marker with no XDG_RUNTIME_DIR
+  ok   (quit-wins-over-reload) a relay command checks the cancellation marker after the wait
+  ok   (quit-wins-over-reload) a relay whose marker exists does not start the launcher
+  ok   asks systemd to restart the unit that runs the daemon
+  ok   otherwise relaunches the installed launcher once this process has exited
+  ok   (restart-relay-dispatch-ack) refuses shutdown when native relay dispatch exits unsuccessfully
+  ok   really waits for the process and then runs the launcher
+  ok   reports a restart it could not start
+  ok   reads its process id from its stat line, and its unit from its cgroup
+  ok   reads its own process id from the kernel
+
+=== updater restart: the tray tells and acts ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   hands a manual check's answer to the daemon when no window can show it
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   installs a downloaded update and hands the result on for the restart
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   downloads only the release the row showed
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   greys the update row of a source run, naming why
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   hands a failed download on, which is not installed
+
+=== updater restart: the daemon restarts on an installed update ===
+  ok   wires the tray's outcomes to the notifier and the restarter
+
+=== Main restart pause wiring ===
+  ok   passes pause through both actual Main helpers
+  ok   captures current pause at all three complete-restart callsites
+
+=== shared configuration backup (config_backup) ===
+  ok   reads its rules from the shared updater defaults
+  ok   copies every configuration file, and only those, before writing its manifest
+  ok   does not copy a file root twice when it lies in the configuration folder
+  ok   refuses the whole backup when one file cannot be read, and writes no manifest
+  ok   stops at a copy it cannot write and leaves the folder without a manifest
+  ok   gives two backups of one second distinct folders
+  ok   offers the newest complete backup of a kind
+  ok   restores after backing the replaced configuration up
+  ok   refuses to report a substituted staging file as restored
+  ok   writes nothing back when a copy is missing
+  ok   refuses a manifest naming a path outside the configuration
+
+=== configuration backup binding (config-backup-binding-contract) ===
+  ok   (config-backup-binding-contract) is built only from complete ports
+  ok   (config-backup-binding-contract) builds the owner over the driver's roots and the shared rules
+  ok   (config-backup-binding-contract) refuses an unreadable or ruleless defaults file with one logged error
+  ok   (config-backup-binding-contract) refuses an unresolvable root with the driver's own line
+  ok   (config-backup-binding-contract) lets the test seam replace the roots and skip the driver's
+  ok   (config-backup-binding-contract) rebuilds the owner on each call so a moved folder is followed
+  ok   (config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file
+  ok   (config-backup-binding-contract) refuses a listing whose link target cannot be classified
+  ok   (config-backup-binding-contract) reports an absent folder as absent and a file as no folder
+
+=== shared one-click release install (release_install) ===
+  ok   does nothing until the click
+  ok   backs up first, then downloads, verifies, installs and restarts
+  ok   refuses a release without this system's asset and keeps the backup
+  ok   never installs a download that failed its verification
+  ok   reports a failed download as one, and never as a verification
+  ok   downloads nothing when the backup fails
+  ok   shows an install refusal and restarts nothing
+  ok   refuses a blocked build before any backup
+  ok   refuses a tag the loaded list does not hold, with the host's reason
+  ok   refuses a tag the loaded API list lacks as an error: the page is stale
+  ok   runs one install at a time
+
+=== shared release install capabilities (release-install-capabilities) ===
+  ok   runs a sync-only capability through its actual completion
+  ok   runs an async-only capability and waits for its actual completion
+  ok   prefers async over sync without fallback after completion true
+  ok   prefers async over sync without fallback after completion false
+  ok   refuses missing install capabilities before any side effect
+  ok   refuses install false despite a valid counterpart
+  ok   refuses install_async false despite a valid counterpart
+  ok   refuses install string despite a valid counterpart
+  ok   refuses install_async string despite a valid counterpart
+
+=== configuration backup listing of special files (config-backup-special-nodes) ===
+  ok   (config-backup-special-nodes) reports a FIFO, a socket and a link to a FIFO as other and never opens them
+
+=== Versions managed network receipt ownership ===
+  ok   classifies typed proxy evidence without exposing native secrets
+  ok   keeps untyped adapter errors unknown despite hostile detail
+  ok   never treats an unproved origin 407 as proxy evidence
+  ok   keeps failed verification separate and never installs
+  ok   requires exact operation and failure epoch before retry
+  ok   retry reruns backup-first and duplicate old callbacks cannot install
+  ok   new same-tag failure rejects the previous terminal owner
+  ok   rechecks actual owner and build policy after failure
+  ok   recomputes real external capability and never takes a page path
+  ok   reentrant native capability probe cannot lend a retired owner
+  ok   native probe failure preserves the failed phase without unbound actions
+  ok   native owner inspection cannot resurrect a retired reservation
+  ok   contract loading cannot publish a predecessor into a same-tag successor
+  ok   capability inspection cannot retire or publish into a successor
+  ok   current-owner inspection cannot replace a successor terminal
+  ok   contract loading cannot restore publication after exact page retirement
+  ok   policy-error logging cannot publish an obsolete failed phase
+  ok   keeps the original private report owner outside the public payload
+  ok   retires the exact failed reservation when native owner inspection throws
+  ok   cannot publish or clear a successor when owner fault logging reenters
+  ok   page retirement during report preserves accepted native transaction without later publication
+  ok   page retirement during backup preserves accepted native transaction without later publication
+  ok   page retirement during asset preserves accepted native transaction without later publication
+  ok   page retirement during install preserves accepted native transaction without later publication
+  ok   page retirement during success preserves accepted native transaction without later publication
+  ok   page retirement during restart preserves accepted native transaction without later publication
+  ok   reentrant blocked cannot overwrite a successor reservation before backup
+  ok   reentrant find cannot overwrite a successor reservation before backup
+  ok   retirement during pre-acceptance blocked refuses old work but permits fresh successor
+  ok   native document replacement during blocked cannot borrow pre-acceptance
+  ok   retirement during pre-acceptance find refuses old work but permits fresh successor
+  ok   native document replacement during find cannot borrow pre-acceptance
+  ok   retires action authority on close without cancelling native work
+
+=== Native Updater Publication ===
+  ok   missing native component refuses without pathname fallback
+  ok   logical cancellation remains busy until captured physical flow ACK
+  ok   exact captured flow method survives public method replacement
+  ok   malformed returned owner retains unknown debt and refuses new acquisition
+  ok   default tray source requires actual fresh pause observation
+  ok   selected release mutation cannot authorize another native route
+  ok   accepted Versions execution remains explicit rather than generic pause bypass
+  ok   native display path cannot enter original pathname installer
+  ok   cancelled artifact cleanup listener cannot publish the terminal twice
+  ok   physical acknowledgement source withdrawal cannot grant install authority
+  ok   physical acknowledgement pause withdrawal refuses default tray publication
+  ok   physical acknowledgement selected URL mutation refuses archive publication
+  ok   false initial source preserves previous verified artifact
+  ok   throwing initial source preserves previous verified artifact
+  ok   invalid initial source preserves previous verified artifact
+  ok   channel cleanup refusal preserves channel and cache before persistence
+  ok   channel cleanup reentry cannot borrow or persist a successor choice
+  ok   actual installer pre-reader deadline refusal releases manager only after authentic cleanup ACK
+
+=== updater receiving model storage isolation ===
+  ok   restores a warmed real storage owner after the receiving scenario (test_production_manager_owners)
+TOTAL 177 passed 0 failed

@@ -1,0 +1,13 @@
+MODULE tests.unit.modules.gestures.navigation.test_app_switch_direct
+
+=== previous application switches directly (app-switch-direct) ===
+  ok   (app-switch-direct) one tap on app_previous activates the previous app with no synthetic Cmd+Tab
+  ok   (app-switch-direct) app_previous_screen keeps to the screen under the cursor
+  ok   (app-switch-direct) with the cursor on no screen the screen-scoped switch does nothing
+  ok   (app-switch-direct) this runtime in front returns to the application the user was in
+  ok   (app-switch-direct) minimised, non-standard and refusing windows are passed over
+  ok   (app-switch-direct) cmd_shift_tab activates the least recent application, with no keystroke
+  ok   (app-switch-direct) win_app_next and win_app_prev cycle the active app's windows with no keystroke
+  ok   (app-switch-direct) the window cycle wraps around and starts at an edge from a panel
+  ok   (app-switch-direct) a keyboard slot runs the switch under the shortcut parent
+RESULT 9 passed 0 failed

@@ -1,0 +1,23 @@
+
+=== non-chat probe isolation ===
+  ok   preserves both native owners in chat-first order
+  ok   preserves both native owners in probe-first order
+  ok   replaces only the older typesafe probe and fences its late reply
+  ok   replaces only the older openrouter_jev probe and fences its late reply
+  ok   keeps a direct agent decision in the inference scope
+  ok   retains the ordinary chat-provider Test supersession contract
+  ok   explicit cancellation visits both scopes when refusal is none
+  ok   explicit cancellation visits both scopes when refusal is inference
+  ok   explicit cancellation visits both scopes when refusal is probe
+  ok   does not cancel a successor probe created by the first cancellation callback
+  ok   does not cancel a first-ever probe created during inference retirement
+  ok   preserves a successor probe even when the first cancellation refuses
+  ok   visits the probe HTTP owner after its logical terminal cleared activity
+  ok   fences both old callback lifetimes when the test-only state resets
+  ok   preserves inference admitted during the inference cancellation callback
+  ok   preserves inference admitted during the probe cancellation callback
+  ok   cannot replace a newer probe admitted by its source callback
+  ok   retains inference when a probe has a terminal http refusal
+  ok   retains inference when a probe has a terminal provider refusal
+  ok   refuses stale probe admission without retiring inference
+AUDIT_TEST_RESULT	20	0

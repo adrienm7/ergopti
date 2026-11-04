@@ -1,0 +1,22 @@
+MODULE tests.unit.modules.gestures.navigation.test_space_navigation_actions
+
+=== gestures.actions: wrapping Space navigation ===
+  ok   space_next_wrap on the last Space goes to the first one
+  ok   space_prev_wrap on the first Space goes to the last one
+  ok   wraps within the focused screen only
+  ok   walks back one Ctrl+Arrow per Space when gotoSpace is refused
+  ok   walks when gotoSpace raises instead of refusing
+  ok   moves one Space with one Ctrl+Arrow away from the edge
+  ok   wraps between two Spaces with the one Ctrl+Arrow that points at the other
+  ok   reads the layout once and the focused Space on every navigation
+  ok   re-reads a stale layout that does not hold the focused Space
+  ok   defers the edge jump out of the callback that asked for it
+  ok   steps once without wrapping, and says so, when the layout is unreadable
+  ok   does nothing with a single Space
+
+=== gestures.actions: plain Space navigation never wraps ===
+  ok   space_next on the last Space presses Ctrl+Right and never jumps
+
+=== gestures.actions: Mission Control and App Exposé ask the Dock ===
+  ok   toggles Mission Control and App Exposé without a keystroke
+RESULT 14 passed 0 failed

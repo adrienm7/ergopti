@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.engine.test_confirmed_drop_rebases_peak
+
+=== a confirmed finger drop outranks the sustained peak ===
+  ok   does not fire the 4-finger action after the drop is confirmed
+  ok   fires the 3-finger action the user finished with
+RESULT 2 passed 0 failed

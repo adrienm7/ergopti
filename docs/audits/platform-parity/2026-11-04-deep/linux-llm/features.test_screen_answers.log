@@ -1,0 +1,45 @@
+
+=== screen answers: missing local model admission ===
+  ok   offers the absent vision model before transmitting the screenshot
+  ok   a withdrawn vision preflight cannot offer its missing model
+
+=== screen answers: native preflight refusal ownership ===
+  ok   a refused cancellation cannot replace the existing vision request or its model
+
+=== screen actions: a region read by an API model, answered by the menu's backend ===
+  ok   registers both screen actions
+  ok   captures, reads, drafts three answers in order, and types the accepted one
+  ok   keeps the order when one answer fails and offers the others
+  ok   reads locally through Ollama's /api/chat with the image, and answers through Ollama
+  ok   sends a Gemini vision request with the key in the URL
+
+=== screen actions: a provider exchanging its key waits for its token (access-token-lease) ===
+  ok   the first screen action waits for the token, then captures and sends it as Bearer
+  ok   a refused exchange is told and captures nothing
+  ok   a screen action dropped while it waits never captures when the token arrives
+  ok   with a fresh token the next screen action captures at once
+
+=== screen actions: refusals, cancellations and failures ===
+  ok   a cancelled region sends nothing and says nothing
+  ok   a failed capture is told
+  ok   a backend without a default model is refused before any capture
+  ok   a provider without a stored key is refused before any capture
+  ok   refuses like the manual prediction while the AI is off, without capturing
+  ok   refuses while paused, without capturing
+  ok   a failed vision request is told, and the screenshot is still deleted
+  ok   an answer without a SCREEN block is a failed reading
+  ok   three failed answers are a failed reading
+
+=== screen actions: a newer action supersedes the previous one ===
+  ok   drops a superseded capture and deletes it at once
+  ok   ignores a superseded transcription and superseded answers
+  ok   typing drops the reading in flight
+
+=== llm_screen_error: the region flow with the error answers ===
+  ok   registers the action
+  ok   reads a region, asks the cause then the fix, offers them in order and types the fix
+  ok   skips a failing answer and offers the other
+  ok   both answers failing is a failed reading
+  ok   refuses before any capture while the AI is off, paused or without a model
+  ok   a newer screen action supersedes it
+AUDIT_TEST_RESULT	30	0

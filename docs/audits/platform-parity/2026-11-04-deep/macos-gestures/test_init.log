@@ -1,0 +1,33 @@
+MODULE tests.unit.modules.gestures.config.test_init
+
+=== Gestures DEFAULT_GESTURES ===
+  ok   has every slot defaulting to a registered action
+  ok   contains the expected tap slots
+  ok   contains the expected swipe-axis slots
+  ok   contains the expected single-vertical slots
+
+=== Gestures slot lists ===
+  ok   AXIS_SLOTS is a non-empty array
+  ok   SINGLE_SLOTS is a non-empty array
+  ok   AXIS_SLOTS and SINGLE_SLOTS do not overlap
+
+=== Gestures action accessors ===
+  ok   get_action returns the configured value
+2026-11-04 15:27:34:000 [WARNING] [gestures] set_action(): refusing unknown action 'ms' for slot 'tap_4'.
+[logger] unified log write refused: /tmp/lua_kr8AE9_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_kr8AE9_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_kr8AE9_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   set_action then reset restores 'none'
+  ok   get_all_actions returns a flat map
+
+=== Gestures enable/disable ===
+  ok   disable_all clears the flag
+  ok   enable_all sets the flag
+  ok   enable('all') is equivalent to enable_all
+  ok   disable('all') is equivalent to disable_all
+  ok   enable(other) is a no-op (unknown name ignored)
+
+=== Gestures re-exports ===
+  ok   exposes Conflicts.on_action_changed
+  ok   exposes Action label tables
+RESULT 17 passed 0 failed

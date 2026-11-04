@@ -1,0 +1,120 @@
+MODULE tests.unit.modules.keymap.registry.test_registry_mutation_transactions_exact_commitment
+
+=== registry mutations: exact commitment and rollback ===
+  ok   exposes one caller-owned transaction across a registration batch
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'private_registration' rolled back (details withheld; terminal type: string).
+[logger] unified log write refused: /tmp/lua_ocgjWC_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_ocgjWC_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_hotstrings.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_ocgjWC_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   withholds private callback failures while preserving rollback visibility
+2026-11-04 15:22:11:000 [WARNING] [keymap.registry] disable_group: unknown group 'missing'.
+2026-11-04 15:22:11:000 [WARNING] [keymap.registry] enable_group: unknown group 'missing'.
+  ok   returns exact booleans for committed and impossible group states
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'enable_group:hooked' rolled back (details withheld; terminal type: string).
+  ok   rolls back a programmatic enable when its post-load hook throws
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Failed to parse TOML '/workspace/ergopti/static/ergopti_plus/macos/tests/fixtures/invalid-hotstrings.toml': ...test_registry_mutation_transactions_exact_commitment.lua:132: injected TOML parse failure.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'load_toml:broken' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'enable_group:broken' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   restores settings and the live group when a section reload cannot parse
+2026-11-04 15:22:11:000 [DEBUG] [keymap.registry] Group '<name>' disabled (0 mapping(s) remaining).
+2026-11-04 15:22:11:000 [START] [keymap.registry] Loading TOML mapping file '<name>'…
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Failed to parse TOML '/virtual/personal_hotstrings.toml': injected editor reload failure.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'load_toml:personal' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] reload_toml: group '<name>' did not load its saved file; the previous mappings stay live.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'reload_toml:personal' rolled back (details withheld; terminal type: boolean).
+  ok   rolls an editor-style TOML reload back to the exact live corpus
+  ok   does not activate a TOML group that the user disabled before Save
+2026-11-04 15:22:11:000 [ERROR] [adapters.storage] set(): failed to write key 'hotstrings_section_settings_one' — ...test_registry_mutation_transactions_exact_commitment.lua:229: injected settings failure after write.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:22:11:000 [ERROR] [adapters.storage] set(): failed to write key 'hotstrings_section_settings_one' — false.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [adapters.storage] set(): failed to write key 'hotstrings_section_settings_one' — ...test_registry_mutation_transactions_exact_commitment.lua:229: injected settings failure after write.
+2026-11-04 15:22:11:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Could not roll back section setting 'hotstrings_section_settings_one'.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:22:11:000 [ERROR] [adapters.storage] set(): failed to write key 'hotstrings_section_settings_one' — false.
+2026-11-04 15:22:11:000 [ERROR] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Could not roll back section setting 'hotstrings_section_settings_one'.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   rolls back a throwing or ineffective settings write by read-back
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Error loading '/workspace/ergopti/static/ergopti_plus/macos/tests/fixtures/partial_hotstrings_failure.lua': ...plus/macos/tests/fixtures/partial_hotstrings_failure.lua:6: injected Lua hotstring load failure.
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'load_file:partial' rolled back (details withheld; terminal type: boolean).
+  ok   does not register a Lua group whose file throws after a partial add
+
+=== hotstring category scope: runtime and persistence acknowledgement ===
+  ok   (hotstring-category-owner) true/true
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) true/false
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) true/nil
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: string).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) true/throw
+  ok   (hotstring-category-owner) false/true
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) false/false
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) false/nil
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: string).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+  ok   (hotstring-category-owner) false/throw
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] set_category_scope_enabled: excluded sections must be a table.
+  ok   (hotstring-category-owner) excluded bound sections keep their own choice
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Category selection refused: unknown-category.
+  ok   (hotstring-category-owner) rejects an unknown sibling before publication
+
+=== canonical hotstring cache projection ===
+  ok   replaces stale section settings with neutral absence before registry use
+2026-11-04 15:22:11:000 [WARNING] [config_outdated] Outdated configuration entry 'hotstrings.groups.future' ignored (a hotstring choice takes true or false); it is offered for cleanup.
+2026-11-04 15:22:11:000 [WARNING] [config_outdated] Outdated configuration entry 'hotstrings.modules.rolls.future' ignored (a hotstring choice takes true or false); it is offered for cleanup.
+  ok   loads actual group and section readers without claiming unknown neighbors
+2026-11-04 15:22:11:000 [WARNING] [config_outdated] Outdated configuration entry 'hotstrings.modules.rolls.hc' ignored (a hotstring choice takes true or false); it is offered for cleanup.
+  ok   reads an old-shape owned value as neutral absence, never a refused projection (config-outdated-hotstrings)
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'canonical hotstring preferences' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Canonical hotstring preferences did not commit: false.
+  ok   refuses a cache write whose native readback did not commit
+  ok   retains an already committed corpus when the menu applies the same candidate
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'enable_group:rolls' rolled back (details withheld; terminal type: string).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'canonical hotstring preferences' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Canonical hotstring preferences did not commit: false.
+  ok   rolls settings and groups back when a real post-load hook throws
+  ok   saves sparse choices into inline tables while retaining unknown neighbors
+  ok   projects the canonical source before the actual boot call can start input
+  ok   the real menu synchronizer replaces absent canonical section choices
+
+=== personal menu: the real category persistence owner ===
+  ok   personal menu transaction true/true
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction true/false
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction true/nil
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: string).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction true/throw
+  ok   personal menu transaction false/true
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:11:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:11:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction false/false
+2026-11-04 15:22:12:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: boolean).
+2026-11-04 15:22:12:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:12:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction false/nil
+2026-11-04 15:22:12:000 [ERROR] [keymap.registry] Registry mutation 'set_groups_sections_enabled' rolled back (details withheld; terminal type: string).
+2026-11-04 15:22:12:000 [ERROR] [keymap.registry] Section batch rolled back: false.
+2026-11-04 15:22:12:000 [ERROR] [menu.keymap_lifecycle] Keymap mutation refused (set hotstring category scope): mutation did not commit (false).
+  ok   personal menu transaction false/throw
+RESULT 36 passed 0 failed

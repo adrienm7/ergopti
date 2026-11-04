@@ -1,0 +1,68 @@
+{
+	"schema_version": 1,
+	"scope": "windows-gestures",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:35:42.673261+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/windows-gestures/report.md",
+	"findings": [
+		{
+			"id": "WG-001",
+			"title": "Onboarding publishes success when Precision Touchpad restart is absent or fails",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2", "G5"],
+			"reproduction": "Executed real PowerShell7.4.6/Linux with exact extracted worker bodies and fake registry/PnP cmdlets: onboarding exits0/publishes token0 for no devices, Disable-PnpDevice refusal and Enable-PnpDevice refusal. Same injected scenarios against actual tray restart body exit1/token1. See run-worker-probes.py and worker-output.txt. No Windows PnP or AHK execution.",
+			"root_cause": "Onboarding worker allows empty device enumeration, overrides Stop with explicit SilentlyContinue for both PnP operations, then unconditionally sets success0. It lacks the standalone restart worker zero-device guard, terminating errors and re-enable finally.",
+			"silent_failure": "Wizard reads valid success token and shows successful setup even though cached native mapping was not activated; failed re-enable can leave device unrecovered by that worker.",
+			"regression_test": "Execute both emitted workers with none/disable failure/enable failure/partial multi-device failures, assert truthful failure token plus re-enable attempts. Pin one shared restart implementation or behavioral equivalence.",
+			"evidence": [
+				"windows/ui/onboarding/gesture_registration.ahk:244",
+				"windows/ui/onboarding/gesture_registration.ahk:248",
+				"windows/ui/onboarding/gesture_registration.ahk:252",
+				"windows/ui/onboarding/gesture_registration.ahk:254",
+				"windows/ui/onboarding/webview.ahk:651",
+				"windows/modules/gestures/config.ahk:1076"
+			],
+			"native_validation": "PowerShell engine exercised on Linux with fake Windows primitives; Windows5.1/PnP untested"
+		},
+		{
+			"id": "WG-002",
+			"title": "Existing invalid touchpad backup authorizes destructive registry configuration",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "SOURCE-ONLY AHK scenario, not executed: existing backup file contains garbage (or unreadable/wrong-header/incomplete current inventory), original current registry has custom DWORD values. EnsureBackup returns true by existence; Apply overwrites all34 values. Restore rejects same backup before mutation. Unexecuted fixture case in native-repros.ahk; source-checks.cjs asserts actual paths.",
+			"root_cause": "TouchpadRegistryEnsureBackup uses FSStrictExists as restoration authority for an existing backup and create-race fallback, without read/parse/current inventory proof. Restore has strict validation but only after original values have been overwritten.",
+			"silent_failure": "Apply/onboarding can report configuration success with no readable backup capable of restoring original user values. Failure surfaces only at later Clear/Restore.",
+			"regression_test": "Use real owner with in-memory seams: malformed/unreadable/wrong-key/version/missing-name existing backups refuse Apply/onboarding with zero writes. Valid existing original snapshot stays immutable; concurrent create must also be validated.",
+			"evidence": [
+				"windows/modules/gestures/touchpad_registry.ahk:135",
+				"windows/modules/gestures/touchpad_registry.ahk:142",
+				"windows/modules/gestures/touchpad_registry.ahk:150",
+				"windows/modules/gestures/touchpad_registry.ahk:185",
+				"windows/modules/gestures/touchpad_registry.ahk:308",
+				"windows/tests/unit/modules/gestures/test_touchpad_registry.ahk:322"
+			],
+			"native_validation": "not_run"
+		},
+		{
+			"id": "WG-003",
+			"title": "Onboarding cross-account UAC writes elevated administrator HKCU instead of original user hive",
+			"severity": "medium",
+			"confidence": "medium",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "SOURCE/PLATFORM conditional scenario, native Windows test not executed: launch onboarding as standard user A, enter different administrator B credentials for RunAs. Resident process backs up A HKCU; elevated worker uses bare HKCU which resolves to B. B hive changes while A gestures stay unchanged. Compare both SID hives; negative controls same-account consent and tray Apply-before-elevate.",
+			"root_cause": "Entire onboarding registry+PnP worker is elevated with *RunAs but target remains HKCU and no original-user SID/explicit HKU hive is retained. Backup owner runs before elevation under original account.",
+			"silent_failure": "Worker can report success for wrong profile; original user sees unchanged gestures and backup/clear for A cannot undo B profile modifications.",
+			"regression_test": "Native two-user UAC test verifying original SID hive changes only, backup matches same identity, administrator hive unchanged; preferably write current-user registry in resident process and elevate only PnP restart as tray already does.",
+			"evidence": [
+				"windows/ui/onboarding/gesture_registration.ahk:90",
+				"windows/ui/onboarding/gesture_registration.ahk:116",
+				"windows/ui/onboarding/gesture_registration.ahk:226",
+				"windows/_generated/touchpad_registry.ahk:23",
+				"windows/modules/gestures/config.ahk:873"
+			],
+			"native_validation": "not_run; conditional account-context source proof"
+		}
+	]
+}

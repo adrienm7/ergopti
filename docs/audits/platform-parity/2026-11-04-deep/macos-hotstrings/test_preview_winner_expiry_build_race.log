@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_winner_expiry_build_race
+
+=== preview winner expiry during row construction ===
+  ok   (preview-winner-expiry-build-race) re-resolves before painting a fallback
+RESULT 1 passed 0 failed

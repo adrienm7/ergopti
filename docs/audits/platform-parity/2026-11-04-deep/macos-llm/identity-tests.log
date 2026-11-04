@@ -1,0 +1,34 @@
+
+=== llm-core-runtime-identity ===
+  ok   reports the canonical live gate without loading a second core
+  ok   uses canonical word limits when parsing model output
+  ok   injects canonical word defaults into the active profile prompt
+  ok   reads the loaded canonical endpoint default instead of the emergency port
+
+=== actual token streaming runtime owner ===
+  ok   invalidates snapshots after stream or master transitions without acquiring a service (shared-token-streaming)
+
+=== prediction_engine: action-epoch quarantine closes async producers ===
+  ok   positive controls prove every captured producer is live while the epoch is open
+  ok   a debounce timer armed by an old epoch cannot dispatch a fetch
+  ok   a stale success callback cannot mutate, log, persist, or render
+  ok   a stale partial callback cannot mutate, log, persist, or render
+  ok   a stale failure callback cannot log or mutate the visible surface
+  ok   the stream watchdog rechecks the live epoch before logging or rendering
+
+=== remote prebuilt requests retain their credential identity ===
+  ok   chat refuses a late key after its entry was removed
+  ok   chat dispatches a current resolved key
+  ok   vision refuses a late key after its entry was removed
+  ok   vision dispatches a current resolved key
+  ok   Backboard refuses a late key after its entry was removed
+  ok   Backboard dispatches a current resolved key
+  ok   decisions refuses a late key after its entry was removed
+  ok   decisions dispatches a current resolved key
+  ok   chat refuses a key resolved for an entry that was replaced
+  ok   chat refuses a key after the stored reference changes in place
+  ok   chat remains independent of the prediction provider selection
+
+=== MLX inference effective_model parity (streaming vs non-streaming) ===
+  ok   every effective_model chain includes the model_hf_path() fallback tier
+AUDIT TARGETED TOTAL: 23 passed, 0 failed

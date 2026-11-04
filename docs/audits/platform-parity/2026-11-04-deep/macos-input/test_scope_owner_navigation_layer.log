@@ -1,0 +1,28 @@
+MODULE tests.unit.platform.remap.enable_transaction.test_scope_owner_navigation_layer
+
+=== macOS remap navigation-layer cohort ===
+  ok   backs up before creating a recommended sibling (scope-layer-cohort)
+  ok   removes the imported sibling before compiling a failed candidate's inverse (scope-layer-cohort)
+  ok   retains refuse_remove cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains unreadable cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains external_edit cleanup debt without losing the sibling (scope-layer-cohort)
+  ok   retains an unacknowledged cleanup after candidate persistence refusal (scope-layer-cohort)
+  ok   restores a parent's complete cohort using private receipt identity (scope-layer-cohort)
+  ok   refuses a forged receipt before any native effects (scope-layer-cohort)
+  ok   reverses a refused parent inverse without losing its imported sibling (scope-layer-cohort)
+  ok   keeps a conflicting parent-inverse compensation pending (scope-layer-cohort)
+  ok   a later global category refusal restores settings and the layer before completion (scope-layer-cohort)
+  ok   global retry still owes its parent target after native compensation settles (scope-layer-cohort)
+  ok   an absent success receipt never releases the global cohort (scope-layer-cohort)
+  ok   global success keeps the acknowledged import (scope-layer-cohort)
+
+=== macOS remap cohort source races ===
+  ok   detects a layer edited between cleanup admission and native undo (scope-layer-cohort)
+  ok   verifies native removal instead of accepting a false successful receipt (scope-layer-cohort)
+  ok   retains partial parent preparation until its removed bytes are restored (scope-layer-cohort)
+  ok   restores a partial removal even when the native boundary refuses (scope-layer-cohort)
+  ok   keeps an existing user's layer outside the global mutation cohort (scope-layer-cohort)
+
+=== macOS parent inverse removal-release debt ===
+  ok   retains no-effect unlink debt until native release settles (scope-layer-cohort)
+RESULT 20 passed 0 failed

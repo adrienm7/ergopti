@@ -1,0 +1,73 @@
+MODULE tests.unit.modules.keymap.expansion.test_output_token_vectors
+
+=== hotstring outputs replay the shared token corpus ===
+  ok   the corpus is loaded
+  ok   output token vector 'plain-text'
+  ok   output token vector 'empty'
+  ok   output token vector 'report-left-after-text'
+  ok   output token vector 'left-capitalised'
+  ok   output token vector 'left-uppercase'
+  ok   output token vector 'left-mixed-case'
+  ok   output token vector 'right'
+  ok   output token vector 'up'
+  ok   output token vector 'down'
+  ok   output token vector 'home'
+  ok   output token vector 'end'
+  ok   output token vector 'enter'
+  ok   output token vector 'return-is-enter'
+  ok   output token vector 'tab'
+  ok   output token vector 'backspace'
+  ok   output token vector 'bs-is-backspace'
+  ok   output token vector 'delete'
+  ok   output token vector 'del-is-delete'
+  ok   output token vector 'escape'
+  ok   output token vector 'esc-is-escape'
+  ok   output token vector 'pgup-and-pgdn'
+  ok   output token vector 'insert-and-ins'
+  ok   output token vector 'space'
+  ok   output token vector 'function-key'
+  ok   output token vector 'repeat-count'
+  ok   output token vector 'repeat-upper-bound'
+  ok   output token vector 'repeat-above-bound-is-text'
+  ok   output token vector 'repeat-zero-is-text'
+  ok   output token vector 'repeat-leading-zero-is-text'
+  ok   output token vector 'repeat-two-spaces-is-text'
+  ok   output token vector 'unicode-token'
+  ok   output token vector 'unicode-token-lower-case'
+  ok   output token vector 'unicode-token-space'
+  ok   output token vector 'unicode-token-astral'
+  ok   output token vector 'unicode-token-top'
+  ok   output token vector 'unicode-too-large-is-text'
+  ok   output token vector 'unicode-too-long-is-text'
+  ok   output token vector 'unicode-surrogate-is-text'
+  ok   output token vector 'unicode-control-is-text'
+  ok   output token vector 'unicode-not-hex-is-text'
+  ok   output token vector 'literal-left-brace'
+  ok   output token vector 'literal-right-brace'
+  ok   output token vector 'literal-left-token-written-out'
+  ok   output token vector 'lone-left-brace'
+  ok   output token vector 'lone-right-brace'
+  ok   output token vector 'empty-group'
+  ok   output token vector 'unclosed-group'
+  ok   output token vector 'unknown-group-is-text'
+  ok   output token vector 'ahk-only-directive-is-text'
+  ok   output token vector 'unknown-then-token'
+  ok   output token vector 'code-is-text'
+  ok   output token vector 'send-metacharacters-are-text'
+  ok   output token vector 'accents-around-a-token'
+  ok   output token vector 'line-feed-is-enter'
+  ok   output token vector 'crlf-is-one-enter'
+  ok   output token vector 'carriage-return-is-enter'
+  ok   output token vector 'tab-character-is-tab'
+
+=== the emitter plays the grammar with Hammerspoon key names ===
+  ok   a counted key is that many key tokens
+  ok   backspace and delete keep their Hammerspoon names
+  ok   plain text never reads the vocabulary
+
+=== a fired output with a key token (macOS) ===
+  ok   output token: {left} is pressed and the buffer is forgotten
+  ok   output token: a terminator trigger forgets the buffer too
+  ok   output token: a plain output keeps its text in the buffer
+  ok   output token: the registry form of an output resolves text and keeps keys
+RESULT 65 passed 0 failed

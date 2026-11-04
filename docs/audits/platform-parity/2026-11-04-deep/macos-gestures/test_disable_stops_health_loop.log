@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.engine.test_disable_stops_health_loop
+
+=== gestures runtime exists only while Gestures is ON ===
+  ok   reports Gestures OFF and owns nothing before enable_all commits
+  ok   acquires the complete native runtime on enable_all
+  ok   releases every native owner and silences the health check on disable_all
+  ok   rebuilds the native runtime when Gestures is switched back ON
+  ok   leaves Gestures OFF without owners when the native start is refused
+  ok   keeps Gestures ON while a watcher refuses to stop, then retries
+RESULT 6 passed 0 failed

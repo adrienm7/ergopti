@@ -1,0 +1,192 @@
+
+=== number row options, live (Linux) ===
+  ok   is available on X11 and GNOME or KDE Wayland with an installed layout, with the reason otherwise (number-row-live)
+  ok   stores the choice, then applies the stored options (number-row-live)
+  ok   keeps a stored choice the session cannot apply and says why (number-row-live)
+  ok   applies nothing when the choice cannot be stored (number-row-live)
+  ok   hands the closed code of a refused load to the caller (number-row-live)
+
+=== pause layout switch ===
+  ok   selects the pause layout on a pause and the resume layout on a resume
+  ok   switches nothing while the switch is off or the event's layout is no change
+  ok   selects the pause layout on a quit and reports when it settled
+  ok   never lets a failed quit switch stop the quit
+  ok   refuses a second initialisation and use before the first
+  FAIL is wired to the pause listener, both user quits and the shutdown owners — ...tatic/ergopti_plus/_shared/lua/test/runner_discovery.lua:12: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/workspace/scratch/parity-toolchain/modules/luv.so'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+
+=== Linux script-management chords (script-chords-three-os-2026-09-30) ===
+  ok   script-chord: an empty configuration runs the four presets and keeps each chord from the application
+  ok   script-chord: the four slots are the shared catalogue's, in menu order
+  FAIL script-chord: the switch off leaves every chord native and keeps the slots' actions — test_script_chords.lua:79: test_script_chords.lua:114: expected truthy — actual: false — actual: false
+  FAIL script-chord: an explicit none is kept and leaves that chord to the application — test_script_chords.lua:79: test_script_chords.lua:127: expected truthy — actual: false — actual: false
+  ok   script-chord: paused, only a script-management action runs
+  ok   script-chord: without AltGr, with another modifier or on another key the press is the application's
+  ok   script-chord: the cleanup keeps what the loader reads and offers an unknown action
+
+=== user physical slots: shared contract ===
+  ok   (physical-slots) canonical entry physical_none_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_KeyJ
+  ok   (physical-slots) canonical entry physical_alt_KeyJ
+  ok   (physical-slots) canonical entry physical_shift_KeyJ
+  ok   (physical-slots) canonical entry physical_super_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_alt_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_shift_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_super_KeyJ
+  ok   (physical-slots) canonical entry physical_alt_shift_KeyJ
+  ok   (physical-slots) canonical entry physical_alt_super_KeyJ
+  ok   (physical-slots) canonical entry physical_shift_super_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_alt_shift_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_alt_super_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_shift_super_KeyJ
+  ok   (physical-slots) canonical entry physical_alt_shift_super_KeyJ
+  ok   (physical-slots) canonical entry physical_ctrl_alt_shift_super_KeyJ
+  ok   (physical-slots) rejects independent invalid entry 1
+  ok   (physical-slots) rejects independent invalid entry 2
+  ok   (physical-slots) rejects independent invalid entry 3
+  ok   (physical-slots) rejects independent invalid entry 4
+  ok   (physical-slots) rejects independent invalid entry 5
+  ok   (physical-slots) rejects independent invalid entry 6
+  ok   (physical-slots) rejects independent invalid entry 7
+  ok   (physical-slots) rejects independent invalid entry 8
+  ok   (physical-slots) rejects independent invalid entry 9
+  ok   (physical-slots) rejects independent invalid entry 10
+  ok   (physical-slots) rejects independent invalid entry 11
+  ok   (physical-slots) rejects independent invalid entry 12
+  ok   (physical-slots) rejects independent invalid entry 13
+  ok   (physical-slots) rejects independent invalid entry 14
+  ok   (physical-slots) rejects independent invalid entry 15
+  ok   (physical-slots) rejects independent invalid entry 16
+  ok   (physical-slots) rejects independent invalid entry 17
+  ok   (physical-slots) rejects independent invalid entry 18
+  ok   (physical-slots) rejects independent invalid entry 19
+  ok   (physical-slots) rejects independent invalid entry 20
+  ok   (physical-slots) rejects independent invalid entry 21
+  ok   (physical-slots) rejects independent invalid entry 22
+  ok   (physical-slots) rejects independent invalid entry 23
+  ok   (physical-slots) rejects independent invalid entry 24
+  ok   (physical-slots) rejects independent invalid entry 25
+  ok   (physical-slots) rejects independent invalid entry 26
+  ok   (physical-slots) rejects independent invalid entry 27
+  ok   (physical-slots) rejects independent invalid entry 28
+  ok   (physical-slots) rejects independent invalid entry 29
+  ok   (physical-slots) rejects independent invalid entry 30
+  ok   (physical-slots) rejects independent invalid entry 31
+  ok   (physical-slots) rejects independent invalid entry 32
+  ok   (physical-slots) rejects independent invalid entry 33
+  ok   (physical-slots) rejects independent invalid entry 34
+  ok   (physical-slots) rejects independent invalid entry 35
+  ok   (physical-slots) rejects independent invalid entry 36
+  ok   (physical-slots) rejects independent invalid entry 37
+  ok   (physical-slots) rejects independent invalid entry 38
+  ok   (physical-slots) permits arbitrary registry position KeyE
+  ok   (physical-slots) permits arbitrary registry position Comma
+  ok   (physical-slots) permits arbitrary registry position Period
+  ok   (physical-slots) permits arbitrary registry position Semicolon
+  ok   (physical-slots) permits arbitrary registry position Quote
+  ok   (physical-slots) permits arbitrary registry position Space
+  ok   (physical-slots) permits arbitrary registry position Enter
+  ok   (physical-slots) permits arbitrary registry position Escape
+  ok   (physical-slots) permits arbitrary registry position F1
+  ok   (physical-slots) permits arbitrary registry position Numpad0
+  ok   (physical-slots) permits arbitrary registry position AudioVolumeUp
+  ok   (physical-slots) native metadata fact 1
+  ok   (physical-slots) native metadata fact 2
+  ok   (physical-slots) native metadata fact 3
+  ok   (physical-slots) native metadata fact 4
+  ok   (physical-slots) native metadata fact 5
+  ok   (physical-slots) native metadata fact 6
+  ok   (physical-slots) native metadata fact 7
+  ok   (physical-slots) native metadata fact 8
+  ok   (physical-slots) native metadata fact 9
+  ok   (physical-slots) native metadata fact 10
+  ok   (physical-slots) native metadata fact 11
+  ok   (physical-slots) native metadata fact 12
+  ok   (physical-slots) preserves neutral absence in the existing dynamic scope
+  ok   (physical-slots) malformed namespace stays distinct from unrelated keys
+  ok   (physical-slots) encodes modifier order without accepting aliases or sparse arrays
+  ok   (physical-slots) requires exact physical evidence and never resolves logical text
+  ok   (physical-slots) returns detached descriptors and snapshots registry identities
+  ok   (physical-slots) refuses absent native identities without another-platform fallback
+  ok   (physical-slots) capture resolves only a unique native physical identity
+  ok   (physical-slots) every candidate retains its exact canonical registry identity
+  ok   (physical-slots) board-form ambiguity stays unavailable without an event receipt
+  ok   (physical-slots) rejects malformed registry construction before exposing an owner
+
+=== physical user entries: shared operation contract ===
+  ok   (physical-entries) Unicode output remains literal: é
+  ok   (physical-entries) Unicode output remains literal: à
+  ok   (physical-entries) Unicode output remains literal: è
+  ok   (physical-entries) Unicode output remains literal: ç
+  ok   (physical-entries) Unicode output remains literal: ù
+  ok   (physical-entries) Unicode output remains literal: ,
+  ok   (physical-entries) Unicode output remains literal: .
+  ok   (physical-entries) Unicode output remains literal: :
+  ok   (physical-entries) Unicode output remains literal: ★
+  ok   (physical-entries) Unicode output remains literal: 💫
+  ok   (physical-entries) Unicode output remains literal: é
+  ok   (physical-entries) Unicode output remains literal: arbitrary Unicode text
+  ok   (physical-entries) empty defaults supply no fabricated entry
+  ok   (physical-entries) None is an entry and Remove is actual absence
+  ok   (physical-entries) shared actions require no text parameter
+  ok   (physical-entries) removal owns exactly the chosen binding's recognized parameters
+  ok   (physical-entries) repositioning carries exact new output in one scope batch
+  ok   (physical-entries) Linux uses its existing parameter section with identical binding identity
+  ok   (physical-entries) independently specified refusal 1
+  ok   (physical-entries) independently specified refusal 2
+  ok   (physical-entries) independently specified refusal 3
+  ok   (physical-entries) independently specified refusal 4
+  ok   (physical-entries) independently specified refusal 5
+  ok   (physical-entries) independently specified refusal 6
+  ok   (physical-entries) independently specified refusal 7
+  ok   (physical-entries) independently specified refusal 8
+  ok   (physical-entries) independently specified refusal 9
+  ok   (physical-entries) independently specified refusal 10
+  ok   (physical-entries) independently specified refusal 11
+  ok   (physical-entries) independently specified refusal 12
+
+=== Physical shortcut native host ownership ===
+  ok   (physical-editor-ui) refuses stale pages and retains failed native cleanup
+
+=== Physical editor position capture host epoch composition ===
+  ok   uses genuine thin-host session guards through explicitly controlled native ports
+
+=== Physical editor exact native-closed debt retry ===
+  ok   (physical-editor-close-debt) settles only the observed closed epoch before admitting a successor
+
+=== Physical editor premature close notice refusal ===
+  ok   (physical-editor-close-notice) premature same-epoch notice cannot settle cancellation retry without native ACK
+
+=== Physical editor pure constructor reservation rollback ===
+  ok   (physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: throw
+  ok   (physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: nil
+  ok   (physical-editor-constructor) refuses before native acquisition and releases only the pure reservation: false
+
+=== Physical editor returned Window retirement acknowledgement ===
+  ok   (physical-editor-window-ack) retains false nil and throw retirement debt after acknowledged native close
+
+=== physical editor terminal source currency ===
+  ok   admits an unchanged exact issuer receipt
+  ok   refuses a same-byte route handoff inside the native read callback
+  ok   refuses keyboard private currency changed inside final route callback
+  ok   refuses parameters private currency changed inside final route callback
+  ok   refuses native private currency changed inside final route callback
+  ok   refuses a changed source without substituting a new receipt
+  ok   contains failed external native reads
+  ok   contains failed final routing without admitting private bytes
+  ok   rejects a forged issuer receipt
+TOTAL 149 passed 3 failed

@@ -527,11 +527,12 @@ nothing about you or what you type to anyone. Its network requests are:
 - **Bug reports**: only when you choose to report one, it opens a prefilled
   GitHub issue in your browser, which you review before posting.
 
-The typing metrics are off by default. Once you turn them on, the keystroke
-statistics stay on your computer (optionally encrypted); password fields,
-private browsing windows and the applications you exclude are never recorded,
-and nothing is uploaded. See the
-[metrics privacy notes](static/ergopti_plus/docs/security/keystats_privacy.md).
+The typing metrics are off by default. Once enabled, their data stays on your
+computer and nothing is uploaded. Content exclusions and optional payload
+encryption have platform-specific boundaries; they do not guarantee that every
+retained artifact or activity field is excluded or encrypted. See the
+[metrics privacy notes](static/ergopti_plus/docs/security/keystats_privacy.md)
+and the [audited metrics limitations](docs/audits/platform-parity/2026-11-04-deep/report.md).
 
 ---
 
@@ -542,3 +543,5 @@ and nothing is uploaded. See the
 ## Ergopti+ platform inventory
 
 The [generated configuration inventory and parity review](docs/feature-inventory.md) lists every shared configuration entry and bindable action not declared on each OS, together with platform-restricted interactive menu entries, reasons and equivalents. The [platform parity audit](docs/platform-parity-audit.md) explains the major capability differences and their evidence. A missing entry can have an equivalent under a different name; declarations are not runtime proof. The normal `npm run gen` and website build regenerate the inventory; run `npm run codegen:feature-inventory` for just this projection. Detailed module reviews and conditional runtime differences are linked from the audit.
+
+The [deep review by OS and module](docs/audits/platform-parity/2026-11-04-deep/report.md) includes 18 scoped reports and an [intentional-difference register](docs/audits/platform-parity/2026-11-04-deep/intentional-differences.md) with rationale and user-visible effects.

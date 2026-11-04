@@ -1,0 +1,18 @@
+MODULE tests.unit.modules.gestures.actions.test_action_catalogue_parity
+
+=== action catalogue parity (macOS) ===
+  ok   uses the same pure assignability owner as boot migration
+  ok   lists every single action it can run and nothing else (action-catalogue-parity)
+  ok   lists every axis it can run and nothing else (action-catalogue-parity)
+
+=== action picker headings (macOS) ===
+  ok   builds every heading and label from its locale key, in a non-French locale too
+
+=== gesture assignment validation (macOS) ===
+2026-11-04 15:27:36:000 [WARNING] [gestures] set_action(): refusing unknown action 'no_such_action' for slot 'tap_3'.
+[logger] unified log write refused: /tmp/lua_FOGOls_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_FOGOls_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_FOGOls_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:27:36:000 [WARNING] [gestures] set_action(): refusing unknown action 'copy' for slot 'tap_3'.
+  ok   refuses an id the catalogue does not offer and keeps the binding
+RESULT 5 passed 0 failed

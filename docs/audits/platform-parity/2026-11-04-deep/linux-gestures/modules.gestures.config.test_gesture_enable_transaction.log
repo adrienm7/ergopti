@@ -1,0 +1,11 @@
+
+=== gestures: enabling after disabled boot ===
+  ok   opens the touchpad before publishing enabled and dispatches its events
+  ok   keeps the feature disabled and logs when opening the reader fails
+  ok   starts a machine without a touchpad with gestures configured on, disabled and without an error
+
+=== gestures: durable master state ===
+  ok   commits both states and restores each one after a fresh module load
+  ok   keeps a saved ON in config.toml when the boot reader cannot open (R5 parity)
+  ok   rolls activation back when the durable write fails
+AUDIT_TEST_RESULT	6	0

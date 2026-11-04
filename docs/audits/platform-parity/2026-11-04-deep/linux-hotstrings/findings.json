@@ -1,0 +1,57 @@
+{
+	"schema_version": 1,
+	"scope": "linux-hotstrings",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:10:19Z",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-hotstrings/report.md",
+	"findings": [
+		{
+			"id": "LH-001",
+			"scope": "linux-hotstrings",
+			"title": "Registered single-field dynamic expansions have no production preview row",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-hotstrings/probe.lua",
+				"observed": "Enabled @p and td/dt/date resolve through the real manager but static candidates plus dynamic preview_candidates return zero rows; @pn returns one row as positive control.",
+				"native_reproduction": false
+			},
+			"root_cause": "Daemon ergopti_hotstrings.lua:1499-1512 composes static candidates and manager.preview_candidates only. Aliases/dates register solely in shared dynamic engine (manager.lua:209,221); prefix_mappings exports no such rows. preview_candidates intentionally drops single-field tags at manager.lua:594 and dates at :587. The resolving M.preview API at :621 has no daemon caller.",
+			"silent_failure": "Supported expansions fire but their preview is absent without warnings.",
+			"regression_test": "Drive actual daemon candidate composition for enabled/disabled single aliases and each date family, asserting one masked/classified row only when admitted; include multi-field positive control and unknown boundary refusal."
+		},
+		{
+			"id": "LH-002",
+			"scope": "linux-hotstrings",
+			"title": "Invisible previews increment offered-suggestion metrics",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G5"],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-hotstrings/probe.lua",
+				"observed": "Exact extracted daemon show/metrics fragment with tooltip_preview.show returning false still emits one record_suggestion and commits _last_offered.",
+				"native_reproduction": false
+			},
+			"root_cause": "ergopti_hotstrings.lua:1529 ignores the boolean returned by preview.show and unconditionally commits offered state / metric at :1538-1540. ui/tooltip/preview.lua:431-433 and :451 return false for disabled toggle/category/unavailable renderer. keystats.lua:1083 persists offered counters.",
+			"silent_failure": "hs_suggested grows for offers never displayed, silently skewing acceptance data and deduplication.",
+			"regression_test": "Refuse preview for disabled toggle, category and unavailable renderer; assert no offered telemetry/deduplication commit. Then successfully show the same row and assert one count across redraws."
+		},
+		{
+			"id": "LH-003",
+			"scope": "linux-hotstrings",
+			"title": "Built-in dynamic expansions bypass configured expansion-delay admission",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua docs/audits/platform-parity/2026-11-04-deep/linux-hotstrings/probe.lua",
+				"observed": "Real buffer receives td and magic with 1000 ms completing gap. Shared normal timing gate rejects a 0.01-second window; real manager dynamic fallback still injects once. Production source confirms no resolved delay/timing reaches this fallback.",
+				"native_reproduction": false
+			},
+			"root_cause": "within_delay in ergopti_hotstrings.lua:1340 only guards static results/cascade. Late dynamic dispatch at :1575 supplies buffer, key, boundary and destination but no timing admission. manager.on_trigger at manager.lua:465 and combo path at :399 never consult delay or timing. Programmable path independently applies proper timing at infra/user_hotstring_runtime.lua:35-37. Windows built-in date registrations carry TimeActivationSeconds (dynamic_hotstrings.ahk:135).",
+			"silent_failure": "A built-in dynamic expansion commits after its configured deadline while ordinary prefix/static expansion respects it.",
+			"regression_test": "Drive actual daemon callback with fake monotonic times and resolved dynamic delay for alias/date/combo routes, testing below/exact/above deadline, zero, missing timing and complex keys with a longer idle threshold."
+		}
+	]
+}

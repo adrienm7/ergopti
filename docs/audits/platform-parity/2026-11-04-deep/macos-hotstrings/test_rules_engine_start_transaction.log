@@ -1,0 +1,15 @@
+MODULE tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_start_transaction
+
+=== rules_engine.start owns one atomic generation ===
+  ok   deactivates a preview registration that reports throw
+  ok   deactivates a preview registration that reports false
+  ok   refuses a live date preview without owned word-start evidence
+  ok   rolls back registry writes when the final sort explicitly refuses
+  ok   rolls back registry ownership when reporter installation returns throw
+  ok   rolls back registry ownership when reporter installation returns false
+
+=== dynamic menu shared family order ===
+  ok   keeps the independent published family metadata and returns detached records
+  ok   consumes the actual published family order: historical
+  ok   consumes the actual published family order: date-first
+RESULT 9 passed 0 failed

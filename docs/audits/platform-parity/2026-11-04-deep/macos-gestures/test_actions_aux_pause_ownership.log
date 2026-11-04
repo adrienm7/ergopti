@@ -1,0 +1,51 @@
+MODULE tests.unit.modules.gestures.actions.test_actions_aux_pause_ownership
+
+=== gesture auxiliary owner: positive controls ===
+  ok   delivers timer and shell callbacks once while ACTIVE
+
+=== gesture auxiliary owner: strict private programs ===
+  ok   retains program debt past legacy degradation and blocks its successor
+  ok   retires only user programs without cancelling an ordinary sibling action
+  ok   requires strict fresh admission before any native construction
+
+=== gesture auxiliary owner: process settlement deadline ===
+  ok   degrades loudly after bounded termination retries
+  ok   releases exact ownership when a retry proves native settlement
+  ok   waits for exact deadline settlement before terminating the child
+
+=== gesture auxiliary owner: timer settlement ===
+  ok   retains the same timer after stop false
+  ok   retains the same timer after stop nil
+  ok   retains the same timer after stop throw
+
+=== gesture auxiliary owner: process settlement ===
+  ok   retains the same open process after terminate false
+  ok   retains the same open process after terminate nil
+  ok   retains the same open process after terminate throw
+
+=== gesture auxiliary owner: acquisition refusals ===
+  ok   rejects timer construct false without late work
+  ok   rejects timer construct nil without late work
+  ok   rejects timer construct throw without late work
+  ok   rejects timer start false without late work
+  ok   rejects timer start nil without late work
+  ok   rejects timer start throw without late work
+  ok   rejects shell start false and fences its late terminal
+  ok   rejects shell start nil and fences its late terminal
+  ok   rejects shell start throw and fences its late terminal
+
+=== gesture auxiliary owner: staged timers ===
+  ok   buffers a due callback until the caller commits the exact token
+  ok   rollback permanently revokes a prepared timer
+
+=== gesture auxiliary owner: terminal identity fence ===
+  ok   rejects an old terminal delivered after onSettled released its slot
+
+=== gesture auxiliary owner: parent isolation ===
+  ok   keeps gestures timer callback in-flight until business returns
+  ok   keeps gestures shell terminal in-flight until business returns
+  ok   keeps shortcut_bindings timer callback in-flight until business returns
+  ok   keeps shortcut_bindings shell terminal in-flight until business returns
+  ok   does not let one parent's callback depth fence its sibling
+  ok   retains one parent's timer debt while a sibling shell publishes
+RESULT 31 passed 0 failed

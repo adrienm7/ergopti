@@ -1,0 +1,43 @@
+
+=== api_ollama: asynchronous streaming ===
+  ok   rejects failed stream records after partial text provider-LF (ollama-stream-provider-error)
+  ok   rejects failed stream records after partial text provider-EOF (ollama-stream-provider-error)
+  ok   rejects failed stream records after partial text malformed-LF (ollama-stream-provider-error)
+  ok   rejects failed stream records after partial text malformed-EOF (ollama-stream-provider-error)
+  ok   returns before a slow response and frames split NDJSON chunks
+  ok   cancel fires once and makes late chunks and completion inert
+  ok   a superseded request cannot publish into its successor
+
+=== api_ollama: owned missing-model preflight ===
+  ok   does not POST before tags acknowledge the requested model
+  ok   names a genuinely absent model and never sends the private request body
+  ok   does not offer a download for an unknown model-list receipt 0:
+  ok   does not offer a download for an unknown model-list receipt 404:{"models":[]}
+  ok   does not offer a download for an unknown model-list receipt 200:{"models":{}}
+  ok   does not offer a download for an unknown model-list receipt 200:broken
+  ok   cancels preflight once and fences late receipts against a newer request
+  ok   keeps the owned preflight when cancellation is refused
+  ok   classifies a model removed after the listing without treating every 404 as missing
+
+=== local model presence: independent shared corpus ===
+  ok   replays normalization, exact model errors and strict listing receipts
+
+=== local model presence: native consent and download owner ===
+  ok   never installs without an explicit affirmative confirmation
+  ok   delegates the exact model and origin only after user consent
+  ok   post-modal current owner refuses stale affirmative consent
+  ok   automatic failures never open a dialog or pull and retry a refused notification
+  ok   a generic transport failure creates no download affordance
+
+=== local model offer: origin and installer consent affinity ===
+  ok   linux-model-consent-affinity: refuses modal replacement of origin
+  ok   linux-model-consent-affinity: refuses modal replacement of model
+  ok   linux-model-consent-affinity: refuses modal replacement of installer
+  ok   linux-model-consent-affinity: refuses modal replacement of installer-owner
+  ok   linux-model-consent-affinity: refuses modal replacement of admission
+  ok   linux-model-consent-affinity: effectful admission cannot replace installer between checks
+  ok   linux-model-consent-affinity: accepted original installer retains origin and retry admission
+  ok   linux-model-consent-affinity: notification suppression belongs to its exact origin
+  ok   linux-model-consent-affinity: completed original pull cannot clear a successor origin notice
+  ok   linux-model-consent-affinity: completed pull cannot clear a notice delivered after its consent
+AUDIT_TEST_RESULT	32	0

@@ -1,0 +1,25 @@
+MODULE tests.unit.modules.gestures.engine.test_mouse_event_provenance
+
+=== gestures.actions: mouse events have exact provenance ===
+  ok   tags both lookup phases for independent consumers
+
+=== gestures.actions_click: every mouse phase has exact provenance ===
+  ok   rolls back a false user-data tagging refusal
+  ok   rolls back a nil user-data tagging refusal
+  ok   rolls back a throw user-data tagging refusal
+  ok   counts and discards one pre-handoff lifecycle owner
+  ok   wakes an idle waiter only after the native post boundary
+  ok   retries the exact event after a false post
+  ok   retries the exact event after a nil post
+  ok   retries the exact event after a throw post
+  ok   permits only mouseUp cleanup while admission is fenced
+  ok   posts an emergency mouseUp after a re-entrant pause fence
+  ok   tags left hold and ordinary release
+  ok   tags right hold and ordinary release
+  ok   keeps uncertain mouseDown and emergency mouseUp independently owned
+  ok   returns the tagged release after a false diagnostic defer
+  ok   returns the tagged release after a nil diagnostic defer
+  ok   returns the tagged release after a throw diagnostic defer
+  ok   keeps admission closed until the callback reaches its final handoff
+  ok   tags drag posts and callback-returned keyboard release
+RESULT 19 passed 0 failed

@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.gestures.actions.test_dispatch_fences
+
+=== gesture Actions dispatch fences ===
+  ok   refuses the action when held-click release returns false
+  ok   refuses the action when held-click release returns nil
+  ok   refuses the action when held-click release returns throw
+  ok   revalidates PAUSE after held-click release before dispatch
+  ok   keeps only dedicated script-control lifecycle actions live behind PAUSE
+RESULT 5 passed 0 failed

@@ -1,0 +1,49 @@
+MODULE tests.unit.platform.remap.rules.test_nav_layer_rule
+
+=== Karabiner navigation layer generated from layers.toml ===
+  ok   the recommended layer generates the hand-written layer made canonical (nav-layer-generated)
+  ok   editing one key of layers.toml changes that key only (nav-layer-generated)
+
+=== Karabiner navigation layer contracts ===
+  ok   binds nothing without a binding
+  ok   (navigation-native-case) leaves every unbound key and its case outside the layer rule
+  ok   swallows a key bound to none and takes a mouse button as a layer key
+  ok   the wheel and a repeat count have no Karabiner form
+  ok   (layer-wheel-slots) the recommended wheel is volume up and down, posted as media keys
+  ok   (layer-wheel-slots) an edited wheel slot sends its keystroke, and none swallows the turn
+2026-11-04 15:09:54:000 [WARNING] [karabiner.nav_layer] The wheel binding WheelUp is left out: a call resolution is no stroke a wheel turn can send.
+[logger] unified log write refused: /tmp/lua_fIvC8l_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_fIvC8l_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_fIvC8l_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   (layer-wheel-slots) a binding a wheel turn cannot send leaves that direction scrolling
+  ok   routes brightness wheel turns and keys through genuine native media producers
+  ok   implements every macOS call handler the vocabulary declares
+  ok   a layers.toml rejected as a whole logs an error, never a success (nav-layer-generated)
+
+=== the recommended layer comes with the key that enters it ===
+  ok   (nav-layer-fresh-install-default) a folder without layers.toml gets the preset, which generates the layer
+  ok   (nav-layer-fresh-install-default) an existing layers.toml is never replaced
+  ok   (nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it
+  ok   (nav-layer-fresh-install-default) only a key whose preset hold is the layer brings it
+
+=== navigation physical inputs and virtual outputs (iso-typing-convention) ===
+  ok   names inputs and outputs in the one physical ISO domain the ANSI product passes through (iso-key-99)
+  ok   wheel Quartz strokes use the captured layout convention, without changing ordinary keys
+
+=== navigation source close acknowledgement ===
+  ok   (nav-source-close-ack) a false user close ACK isolates the real file without SUCCESS
+  ok   (nav-source-close-ack) a nil user close ACK isolates the real file without SUCCESS
+  ok   (nav-source-close-ack) a false shipped close ACK refuses context before START
+  ok   (nav-source-close-ack) a nil shipped close ACK refuses context before START
+
+=== navigation configured input observations ===
+  ok   nav-configured captures explicit None as the genuine physical input
+  ok   nav-configured never admits later source bytes as an original-load baseline
+  ok   nav-configured refuses map mutation before the first capture
+  ok   nav-configured detached code edits cannot change a subsequent capture
+  ok   nav-configured currency refuses an observed user source replacement
+  ok   nav-configured source exports cannot supply replacement observations
+  ok   nav-configured rejoins original source bytes after the load logger callback
+  ok   nav-configured refuses actual compiled input mutation false
+  ok   nav-configured refuses actual compiled input mutation true
+RESULT 31 passed 0 failed

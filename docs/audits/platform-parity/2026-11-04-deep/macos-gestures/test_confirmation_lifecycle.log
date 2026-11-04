@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.actions.test_confirmation_lifecycle
+
+=== confirmation retains its original parent generation ===
+  ok   runs a healthy confirmation once through the real native command boundary
+  ok   cancels without starting the destructive command
+  ok   refuses the pending question while its parent remains paused
+  ok   refuses the old confirmation after the same parent has resumed
+  ok   permits a fresh question after the earlier generation was refused
+  ok   does not revoke a gesture question when only the shortcut parent cycles
+RESULT 6 passed 0 failed

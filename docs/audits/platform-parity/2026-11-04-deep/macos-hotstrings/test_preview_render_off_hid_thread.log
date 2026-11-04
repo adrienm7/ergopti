@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_render_off_hid_thread
+
+=== llm_bridge: the preview render leaves the keyboard callback ===
+  ok   shows the preview through a deferral, not inline
+  ok   the deferred body re-checks the stamp before rendering
+
+=== llm_bridge: dismissals cancel a pending render ===
+  ok   every immediate hide path bumps the stamp
+  ok   the deferred quarantine hide is reached only after invalidation
+  ok   reset_predictions drops a render already queued for the next tick
+RESULT 5 passed 0 failed

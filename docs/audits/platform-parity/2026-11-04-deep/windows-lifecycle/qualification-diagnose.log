@@ -1,0 +1,36 @@
+PASS imports collect no Source receipt and start neither main nor native children
+PASS clean actual Git and immutable twenty-one inputs receive local Source
+PASS local explicit context uses real HEAD and absolute arguments
+PASS hosted run metadata refuses local even when value is empty
+PASS credential binding grants no local or official authority
+PASS unknown mixed relative and wrong-arity modes refuse
+PASS official original manual grammar stays separate from API authentication
+PASS official malformed SHA IDs event and release refuse
+PASS Source context rejects forged labels extra fields and incoherent primitives
+PASS inert descriptor snapshot denies Proxy label injection during spread
+PASS whole tracked cleanliness covers outside selected roots
+PASS foreign candidate refuses identical working bytes
+PASS two PAC replacements without authenticated publication still refuse
+PASS original independent oracle cannot be changed by a clean successor
+PASS original cohort names order and filters cannot be changed by input data
+PASS untracked repository AHK shadow refuses
+PASS tracked case-ambiguous Source names refuse
+PASS a Windows path stat without a device still names the acquired file
+SOURCE_SEAL_CLI controls=12 elapsed_ms=2533.335 native=false official=false
+PASS strong acquired bytes identity and maximum are actual filesystem facts
+PASS real hardlink and symlink reader aliases refuse
+PASS same-byte final pathname replacement cannot pay acquired FD identity
+MODEL_DIAGNOSTIC {"calls":0,"errors":["Error: Regular unaliased source/image required."],"status":"FAIL","stderr":["Error: Regular unaliased source/image required."],"exits":[1]}
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 3
+
+    at /workspace/ergopti/tools/test/test-windows-updater-original-source.cjs:924:8
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 3,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

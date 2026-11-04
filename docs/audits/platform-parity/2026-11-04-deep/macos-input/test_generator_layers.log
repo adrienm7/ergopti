@@ -1,0 +1,78 @@
+MODULE tests.unit.platform.remap.generator.test_generator_layers
+
+=== Generator.build_karabiner_json: navigation-layer sentinel ===
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_TjxnfA_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_TjxnfA_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_TjxnfA_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   emits F20 as the first key of every navigation-layer activation
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   confines F20 and F19 to the ACTIVE lease graph
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   taps F19 right before every navigation-layer deactivation (layer-wheel-slots)
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   keeps F19 out of the historical graph older releases deployed
+
+=== Generator.build_karabiner_json: a layer key on a layer another key holds ===
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   types a key held as the layer plainly when the layer does not map it
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   swallows left Command tapping Backspace on a layer another key holds
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   applies the layer's mapping to a key held as the layer when the layer maps it
+
+=== Generator.merge_into_existing_config: no existing file ===
+  ok   returns the hs_config directly when the file cannot be read
+
+=== Generator.merge_into_existing_config: existing file preservation ===
+  ok   replaces only managed rules while preserving every personal field
+2026-11-04 15:09:54:000 [ERROR] [adapters.json_codec] decode() failed: native JSON decoder returned no value.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Merge aborted: existing karabiner.json is not valid JSON.
+  ok   fails closed when existing JSON is invalid
+
+=== Generator.KE_PHYSICAL_KC_LOG constant ===
+  ok   is a non-empty string
+  ok   ends with karabiner_kc.log
+  ok   contains a metrics/ path segment
+RESULT 13 passed 0 failed

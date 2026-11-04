@@ -1,0 +1,3 @@
+reload=true restores=1 reload_calls=1 page_phases=restoring,restored
+reload=false restores=1 reload_calls=1 page_phases=restoring,restored
+reload=throw restores=1 reload_calls=1 page_phases=restoring,restored

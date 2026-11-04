@@ -1,0 +1,42 @@
+
+=== system gesture conflicts ===
+  ok   builds status from the real reader without shell probes and deduplicates groups
+  ok   persists only explicit dismissal:
+  ok   persists only explicit dismissal: gestures.system.dismiss
+  ok   maps only supported touchpad panels
+
+=== desktop gesture status uses genuine shared frames ===
+  ok   keeps prior unknown posture and native reader captions: ar
+  ok   keeps prior unknown posture and native reader captions: cs
+  ok   keeps prior unknown posture and native reader captions: da
+  ok   keeps prior unknown posture and native reader captions: de
+  ok   keeps prior unknown posture and native reader captions: en
+  ok   keeps prior unknown posture and native reader captions: es
+  ok   keeps prior unknown posture and native reader captions: fr
+  ok   keeps prior unknown posture and native reader captions: he
+  ok   keeps prior unknown posture and native reader captions: hi
+  ok   keeps prior unknown posture and native reader captions: it
+  ok   keeps prior unknown posture and native reader captions: ja
+  ok   keeps prior unknown posture and native reader captions: ko
+  ok   keeps prior unknown posture and native reader captions: nl
+  ok   keeps prior unknown posture and native reader captions: no
+  ok   keeps prior unknown posture and native reader captions: pl
+  ok   keeps prior unknown posture and native reader captions: pt
+  ok   keeps prior unknown posture and native reader captions: ru
+  ok   keeps prior unknown posture and native reader captions: sv
+  ok   keeps prior unknown posture and native reader captions: tr
+  ok   keeps prior unknown posture and native reader captions: uk
+  ok   keeps prior unknown posture and native reader captions: zh
+  ok   refuses withdrawn gesture_system_status_linux_frame without shell or modal effects
+  ok   refuses withdrawn gesture_system_status_unknown without shell or modal effects
+  ok   refuses withdrawn gesture_system_linux_children without shell or modal effects
+  ok   refuses withdrawn gesture_system_linux_reading_frame without shell or modal effects
+  ok   refuses withdrawn gesture_system_slot_linux_frame without shell or modal effects
+  ok   refuses missing actual desktop predicate gesture_system_reader_active
+  ok   refuses non_boolean actual desktop predicate gesture_system_reader_active
+  ok   refuses throw actual desktop predicate gesture_system_reader_active
+  ok   refuses missing actual desktop predicate gesture_system_settings_unavailable
+  ok   refuses non_boolean actual desktop predicate gesture_system_settings_unavailable
+  ok   refuses throw actual desktop predicate gesture_system_settings_unavailable
+  ok   retains the actual overlap Settings callback and its refusal
+AUDIT_TEST_RESULT	37	0

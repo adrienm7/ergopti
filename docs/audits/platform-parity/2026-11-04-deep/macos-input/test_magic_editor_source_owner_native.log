@@ -1,0 +1,26 @@
+MODULE tests.unit.modules.shortcuts.magic_editor.test_magic_editor_source_owner_native
+
+=== conditional editor shortcut: native source and ordinary ownership ===
+  ok   binds the numeric direct source and retargets after source and trigger changes
+  ok   refuses ambiguous, dead and modifier-only sources
+  ok   uses only an acknowledged explicit replacement beside a native star
+  ok   refuses raw fallback when explicit replacement ownership is unacknowledged
+  ok   refuses a collaborator's two ambiguous effective physical identities
+  ok   respects explicit none and custom actions in the same ordinary slot
+  ok   preserves an explicit physical none claim from another ordinary slot
+  ok   lets a later explicit native owner win without delivering the conditional callback
+  ok   fences stale proof and callbacks after trigger, pause or admission changes
+  ok   joins refused native probe cleanup before accepting a replacement
+  ok   retargets the latest source after asynchronous cancellation settles
+  ok   retains a failed native delete for exact cleanup retry
+  ok   reports acquisition debt during a reentrant pause and releases its late candidate
+  ok   does not replace an unsupported explicit logical assignment with the default
+  ok   keeps every present legacy choice outside conditional acquisition
+  ok   fences delivery when the final context callback retires its exact owner
+  ok   rechecks parent admission after the final context callback
+  ok   rechecks native source after the final context callback
+  ok   refuses native acquisition after project callbacks revoke retired
+  ok   refuses native acquisition after project callbacks revoke parent
+  ok   refuses native acquisition after project callbacks revoke source
+  ok   allocates no source query after construction context retires its owner
+RESULT 22 passed 0 failed

@@ -1,0 +1,33 @@
+MODULE tests.unit.modules.gestures.navigation.test_native_app_switcher_owner
+
+=== native app switcher custody ===
+  ok   requires explicit finite timing and all literal native ports
+  ok   posts four acknowledged edges and publishes only after both retirements
+  ok   post admission and changed PID cannot substitute for tagged observation
+  ok   requires combined-session and HID release before the visible effect
+  ok   rejects foreign event capabilities without equality callbacks
+  ok   does not emit from a prepare callback or an early timer callback
+  ok   retains exact input debt on refusal and retries before admitting a successor
+  ok   retains exact timer debt after input retirement without repeating native cleanup
+  ok   cancellation during prepare compensates the published attempt without starting a timer
+  ok   contains recursive input cancellation and delivers completion once
+  ok   retains a thrown prepare's exact native attempt and never logs its exception
+  ok   retains a live uncommitted timer returned by the actual scheduler contract
+  ok   never turns a throwing timer constructor into an absent-handle retirement receipt
+  ok   refuses a source revoked by the native provider's last callback
+  ok   source revocation from observed callback prevents the next edge
+  ok   uses captured cleanup functions after a foreign provider replacement
+  ok   refuses backward and malformed clocks without emitting a native edge
+  ok   readiness callbacks cannot reenter and acquire an untracked operation
+  ok   completion may start a successor only after exact physical retirement
+  ok   refuses truthy readiness and edge receipts instead of native boolean admission
+  ok   retains truthy retirement receipts and does not publish them as native ACK
+
+=== native switcher terminal publication source ===
+  ok   refuses success after source revocation by cleanup: input
+  ok   refuses success after source revocation by cleanup: timer
+  ok   retains false cleanup ACK debt before checking the final source seal
+  ok   retains exact timer ACK debt after cleanup revoked the source
+  ok   holds the publication reservation through final current callback cancellation
+  ok   seals source currency after the final native provider callback
+RESULT 27 passed 0 failed

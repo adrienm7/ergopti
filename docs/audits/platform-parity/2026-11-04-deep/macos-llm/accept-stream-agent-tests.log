@@ -1,0 +1,153 @@
+
+=== streaming_handler: UI render commits prediction state ===
+  ok   withholds accumulated thinking output until the visible answer arrives
+  ok   preserves cumulative visible text and closes a broken prefix stream
+  ok   ignores a partial callback delivered after the final response
+  ok   keeps partial refs closed on a false render result
+  ok   keeps partial refs closed on a nil render result
+  ok   keeps partial refs closed on a throw render result
+  ok   does not mutate the old pool or log a suggestion before final paint
+  ok   requires a strict false-aware final dismiss-timer reset
+  ok   requires a strict nil-aware final dismiss-timer reset
+  ok   requires a strict throw-aware final dismiss-timer reset
+  ok   requires a strict false-aware chain-timing update
+  ok   requires a strict nil-aware chain-timing update
+  ok   requires a strict throw-aware chain-timing update
+  ok   publishes and logs only after every final UI step succeeds
+  ok   does not reset a request superseded inside a failing render
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+  ok   passes a live capability that refuses an outer render after B paints
+  ok   keeps B when the empty-final hide reenters a successor
+  ok   keeps B when the failure hide reenters a successor
+  ok   replays B after the facade's outer render tail overwrites it
+  ok   replays B after the facade's outer hide tail clears it
+  ok   defers PAUSE cleanup until an opaque render tail unwinds
+  ok   defers PAUSE cleanup until an opaque hide tail unwinds
+
+=== streaming_handler: every repaint propagates UI failure ===
+  ok   fails closed when the failure fallback cannot repaint retained predictions
+  ok   fails closed when the stream watchdog cannot repaint
+  ok   closes a loading surface when no partial result arrived before the watchdog
+  ok   contains a tint throw inside the partial-render transaction
+
+=== streaming_handler: watchdog construction is proven ===
+  ok   rejects a throwing constructor
+  ok   rejects a nil constructor result
+  ok   rejects a stopped constructor result
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   drops a final success superseded by the native stop proof
+  ok   does not log a response superseded by the frontmost-app lookup
+  ok   drops a failure superseded by the native stop proof
+  ok   does not notify for a failure superseded by backend lookup
+  ok   does not hide successor UI after notification send supersedes
+
+=== AI agent end to end (llm_agent_selection, llm_agent_command) ===
+  ok   sends the selection to System 2 and runs the accepted action
+  ok   runs the mail candidate with its own action
+  ok   sends System 2 to the local server with its default or named model
+  ok   refuses without System 2, before reading anything
+  ok   refuses while its mode is off
+  ok   refuses both manual actions with the AI notice while the AI is off (ai-off-agent)
+  ok   runs with the AI menu on and its prediction backend not ready
+  ok   refuses while paused, and without an API entry or key for System 2
+  ok   tells the user to select a text first
+  ok   sends a typed command, and nothing when the dialog is cancelled
+  ok   drops invalid actions and says when none is left
+  ok   reports a connector failure, and a refused Automation permission
+  ok   ignores the answer of a superseded run
+
+=== AI agent connectors (macOS) ===
+  ok   adds a calendar event from date components to the first writable calendar
+  ok   adds a reminder with its due date and notes, and one without a date
+  ok   opens a mail draft for review and never sends it
+  ok   runs a shortcut by name, its input through a private file removed afterwards
+  ok   reports a refused Automation permission with the application to allow
+  ok   lists the user's Shortcuts, capped
+
+=== Streaming UI scenario isolation ===
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores absent after success
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores absent after assertion failure
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores false after success
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores false after assertion failure
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores instance after success
+
+=== streaming_handler: UI render commits prediction state ===
+
+=== streaming_handler: stale UI tails preserve a real successor surface ===
+
+=== streaming_handler: every repaint propagates UI failure ===
+
+=== streaming_handler: watchdog construction is proven ===
+
+=== streaming_handler: final callbacks revalidate watchdog stop ===
+  ok   (streaming-ui-scope) restores instance after assertion failure
+
+=== apply_prediction: a candidate that applies itself ===
+  ok   hands the text to its owner and types nothing at the caret
+  ok   reports a refusal or a failure of the owner as not applied
+
+=== apply_prediction: direct text uses one tagged callback batch ===
+  ok   returns the replacement keystrokes and reports acceptance
+  ok   returns false and no batch when the engine has no prediction
+  ok   rejects output when overlap resolution returns throw
+  ok   rejects output when overlap resolution returns nil
+  ok   commits accepted text without chaining when native reset returns false
+  ok   commits accepted text without chaining when native reset returns nil
+  ok   contains a reset throw and commits already-fenced text without chaining
+  ok   keeps accepted text committed when chain arm returns false
+  ok   keeps accepted text committed when chain arm returns nil
+  ok   keeps accepted text committed when chain arm returns throw
+  ok   does not leak a partial text_utils stub to later tests
+AUDIT TARGETED TOTAL: 72 passed, 0 failed

@@ -1,0 +1,16 @@
+MODULE tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_save_transaction
+
+=== PersonalInfo.save_info transaction (personal-info-save-commit-gate) ===
+  ok   refuses startup without an owned registry-refresh transaction
+  ok   publishes neither memory nor disk until preview revocation and filesystem commit
+  ok   rejects unknown fields before preview or filesystem ownership
+  ok   rejects non-string field values before preview or filesystem ownership
+  ok   drops pre-existing unknown live fields from memory and serialized bytes
+  ok   escapes and reloads every personal-info control byte safely
+  ok   preserves and adopts an external edit that wins after the loaded snapshot
+  ok   fails closed when an existing configuration cannot be read
+  ok   requires exact default-file publication before registering callbacks
+
+=== Personal information editor save result (personal-info-editor-retry) ===
+  ok   keeps the same editor open when the save callback refuses the commit
+RESULT 10 passed 0 failed

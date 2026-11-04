@@ -1,0 +1,21 @@
+{
+  "baseline_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+  "node_version": "v22.22.2",
+  "yaml_version": "2.9.1",
+  "original_assertion": "only tested production bytes reach Pages",
+  "problems": [
+    "forward actual admission",
+    "publication step if",
+    "publication step if",
+    "publication step if",
+    "publication step if",
+    "publication step if",
+    "publication job if",
+    "exact read-only source checkout",
+    "preflight exact build ID",
+    "preflight exact proof ID",
+    "preflight actual byte and proof receiving",
+    "retain validated admission"
+  ],
+  "original_assertion_passed": false
+}

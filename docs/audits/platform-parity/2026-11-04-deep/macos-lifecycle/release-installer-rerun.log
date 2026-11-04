@@ -1,0 +1,50 @@
+
+=== release_installer: the authenticated asset ===
+  ok   binds the exact repository URL and GitHub's SHA-256
+  ok   refuses an archive without its digest, at another URL, or absent
+  ok   names the declared macOS archive from the shared defaults
+
+=== release_installer: staging and replacement dispatch ===
+  ok   reads the installed app and the launcher from the launcher's environment
+  ok   passes every release value as an argument and classifies the exit
+  ok   arms the replacement detached, with the previous app kept aside
+  ok   refuses outside a packaged launch
+
+=== release_installer: the staging script under /bin/sh ===
+  ok   retires only the verified owned archive before READY and refuses failed retirement
+  ok   refuses a destination parent without write access before downloading
+  ok   prints READY only after the digest, the version and the signature pass
+  ok   uses only the declared tar extractor after integrity verification
+  ok   refuses tar extraction, version and signing failures without READY
+  ok   refuses undeclared formats and foreign bundle paths before download
+  ok   stops at a failed download
+  ok   never extracts an archive whose SHA-256 differs
+  ok   refuses an archive carrying another version
+  ok   refuses an app its signing identity does not match
+
+=== release_installer: the replacement script under /bin/sh ===
+  ok   waits for the launcher, keeps the previous app and opens the chosen one
+  ok   puts the previous app back and opens it when the chosen one cannot move in
+
+=== release_installer: declared archive preference and historical compatibility ===
+  ok   uses actual shared declarations against independent exact release records
+  ok   preserves other platform assets and requires declared format-key bindings
+  ok   passes the admitted format to the actual native stage and refuses unknown formats before dispatch
+
+=== release_installer: the native stage request ===
+  ok   binds a bounded request to the original arguments and child environment
+  ok   refuses failed or oversized serialization before native acquisition
+
+=== release_installer: filesystem publication admission ===
+  ok   executes real filesystem refusals and preserves every owned original
+
+=== release_installer: concurrent filesystem publication ===
+  ok   refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)
+
+=== release_installer: complete literal extraction ===
+  ok   rejects four valid Lua suffix expressions on both literal authorities
+
+=== release_installer: explicit native script observation ===
+  ok   executes only the explicit script observer without discovering Lua (release-native-script-scope)
+  ok   binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)
+AUDIT TARGETED TOTAL: 29 passed, 0 failed

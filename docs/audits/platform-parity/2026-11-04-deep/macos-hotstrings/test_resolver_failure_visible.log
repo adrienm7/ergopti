@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_resolver_failure_visible
+
+=== dynamic resolver failure visibility ===
+  ok   (dynamic-resolver-error-once) logs off-HID and preserves sibling fallback
+RESULT 1 passed 0 failed

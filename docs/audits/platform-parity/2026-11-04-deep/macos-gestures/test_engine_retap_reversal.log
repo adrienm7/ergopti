@@ -1,0 +1,6 @@
+MODULE tests.unit.modules.gestures.engine.test_engine_retap_reversal
+
+=== gestures.engine: rapid re-tap reachability ===
+  ok   commits and separates taps across a confirmed one-finger bridge
+[PASS] test_engine_retap_reversal
+RESULT 1 passed 0 failed

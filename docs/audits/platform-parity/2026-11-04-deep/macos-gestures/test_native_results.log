@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.actions.test_native_results
+
+=== gesture Actions native result diagnostics ===
+  ok   reports system-key post false
+  ok   reports window-action false
+  ok   reports system-key post nil
+  ok   reports window-action nil
+  ok   reports system-key post throw
+  ok   reports window-action throw
+RESULT 6 passed 0 failed

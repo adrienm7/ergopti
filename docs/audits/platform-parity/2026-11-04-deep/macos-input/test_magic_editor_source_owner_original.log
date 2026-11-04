@@ -1,0 +1,38 @@
+MODULE tests.unit.modules.shortcuts.magic_editor.test_magic_editor_source_owner_original
+
+=== conditional editor shortcut: original signed-source issuer ===
+  ok   refuses a replaced original current_source_id before constructor allocation
+  ok   refuses a replaced original request before constructor allocation
+  ok   rejoins the original request issuer after the native source read
+  ok   rejoins the original request issuer after the final constructor context read
+  ok   retires the exact original query when request construction substitutes its issuer
+  ok   refuses an original asynchronous source reply after request substitution
+  ok   refuses an original asynchronous source reply after module substitution
+  ok   refuses an original asynchronous source reply after metatable substitution
+  ok   retires the exact late native handle when registration changes the original source issuer
+  ok   executes no action after live delivery substitutes original current_source_id
+  ok   executes no action after live delivery substitutes original request
+  ok   rejects a revoked issuer before refresh reads the native source
+  ok   rejoins the source issuer after the actual asynchronous projection callback
+  ok   retains the exact refused query cancellation after issuer revocation
+  ok   retains a failed late native delete under revoked source authority
+  ok   rejoins the request issuer after the original native getter during reply
+  ok   rejoins the request issuer after the original native getter during delivery
+  ok   retires the original query after settlement observer registration substitutes its issuer
+
+=== conditional editor shortcut: receipt-bound keyboard geometry ===
+  ok   projects ISO Backquote using the native translation receipt
+  ok   projects ISO neighbor using the native translation receipt
+  ok   projects ANSI Backquote using the native translation receipt
+  ok   does not acquire a JIS or unknown swapped receipt as its ANSI neighbor
+
+=== conditional editor shortcut: parent executor source rejoin ===
+  ok   fences source_id changes before parent executor entry
+  ok   fences trigger changes before parent executor entry
+  ok   fences magic_source changes before parent executor entry
+  ok   fences replace_active changes before parent executor entry
+  ok   fences paused changes before parent executor entry
+  ok   fences inhibited changes before parent executor entry
+  ok   fences current changes before parent executor entry
+  ok   allows the unchanged decision at parent executor entry
+RESULT 30 passed 0 failed

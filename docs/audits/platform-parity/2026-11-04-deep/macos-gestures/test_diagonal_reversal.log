@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.engine.test_diagonal_reversal
+
+=== gestures/engine.lua: diagonal reversal detection ===
+  ok   reversal delta for diag axis uses both dx and dy (not only Y)
+  ok   the reversal detector references lastFirePos.x for diagonal direction
+  ok   signedDistAxis diag branch also uses both dx and dy
+RESULT 3 passed 0 failed

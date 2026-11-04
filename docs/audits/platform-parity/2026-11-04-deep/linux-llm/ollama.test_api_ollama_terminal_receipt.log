@@ -1,0 +1,25 @@
+
+=== Ollama terminal inference ownership ===
+  ok   refuses HTTP EOF without an inference terminal marker ending=1
+  ok   refuses HTTP EOF without an inference terminal marker ending=0
+  ok   refuses a nonboolean terminal field "yes" before publishing its content
+  ok   refuses a nonboolean terminal field 1 before publishing its content
+  ok   refuses a nonboolean terminal field null before publishing its content
+  ok   refuses a nonboolean terminal field missing before publishing its content
+  ok   refuses a subsequent record after the terminal marker content
+  ok   refuses a subsequent record after the terminal marker duplicate terminal
+  ok   refuses a subsequent record after the terminal marker unknown envelope
+  ok   refuses an unexpected JSON root after partial text []
+  ok   refuses an unexpected JSON root after partial text "scalar"
+  ok   refuses an unexpected JSON root after partial text 1
+  ok   refuses an unexpected JSON root after partial text true
+  ok   refuses an unexpected JSON root after partial text null
+  ok   accepts byte-split UTF-8 and JSON records with a terminal EOF without newline
+  ok   accepts a single completed nonstreaming envelope and whitespace after its marker
+  ok   keeps transport failure authoritative with terminal=false
+  ok   keeps transport failure authoritative with terminal=true
+  ok   accepted cancellation prevents a terminal success from late native callbacks
+  ok   cancellation inside a chunk observer fences the rest of that native chunk and finish
+  ok   a chunk observer successor cannot inherit old records or old transport completion
+  ok   refused cancellation retains the original producer until its completed receipt
+AUDIT_TEST_RESULT	22	0

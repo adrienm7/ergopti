@@ -1,0 +1,24 @@
+MODULE tests.unit.modules.keymap.test_time_gate_corpus
+
+=== expansion delay: the shared time-gate corpus ===
+  ok   end_char_within_delay_from_last_letter (time-gate-corpus)
+  ok   end_char_past_delay_from_last_letter (time-gate-corpus)
+  ok   single_letter_end_char (time-gate-corpus)
+  ok   magic_key_within_delay_from_letter_before_it (time-gate-corpus)
+  ok   magic_key_past_delay_from_letter_before_it (time-gate-corpus)
+  ok   magic_key_ignores_earlier_letters (time-gate-corpus)
+  ok   case_conform_magic_key_within_delay (time-gate-corpus)
+  ok   tap_hold_space_measured_at_the_press (time-gate-corpus)
+  ok   deadline_instant_fires (time-gate-corpus)
+  ok   one_millisecond_past_deadline_expires (time-gate-corpus)
+  ok   configured_seconds_round_to_milliseconds (time-gate-corpus)
+  ok   configured_seconds_round_then_expire (time-gate-corpus)
+  ok   zero_delay_has_no_gate (time-gate-corpus)
+  ok   missing_reference_time_fails_closed (time-gate-corpus)
+  ok   complex_expander_inside_widened_window (time-gate-corpus)
+  ok   complex_expander_exact_widened_deadline (time-gate-corpus)
+  ok   complex_expander_past_widened_window (time-gate-corpus)
+  ok   plain_expander_is_not_widened (time-gate-corpus)
+  ok   complex_reference_carries_inside_carry_window (time-gate-corpus)
+  ok   complex_reference_carry_expired (time-gate-corpus)
+RESULT 20 passed 0 failed

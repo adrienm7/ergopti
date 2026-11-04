@@ -1,0 +1,209 @@
+
+=== onboarding locale persistence is a required commit boundary ===
+  ok   stops every success-only side effect on false, nil, and throw
+  ok   continues exactly once after an explicit persistence acknowledgement
+  ok   refuses invalid answers before persisting the language
+
+=== onboarding surfaces a write that failed without raising ===
+  ok   reports failure when batch_write RETURNS false
+  ok   reports failure when batch_write returns nil
+  ok   still reports failure when batch_write raises
+  ok   reports success only when the write is confirmed, with the answers as rows
+  ok   refuses a dangling destination before invoking batch_write
+
+=== onboarding retains actual native publication cleanup across UI lifetime ===
+  ok   blocks another Finish and reopened wizard until the original no-effect release settles
+  ok   refuses an unbound table receipt without calling forged cleanup methods
+
+=== macOS wizard generic publication compensation at actual Finish ===
+  ok   releases and inverses the published file before another native Finish can write
+  ok   keeps the original publication owner across reopen and an unrelated successor
+  ok   settles the inverse's own native release without replaying its accepted write
+
+=== wizard genuine canonical admitted native Finish with private physical files ===
+  ok   publishes an actual initialized native candidate before reporting Finish success
+  ok   settles the actual publisher continuation and admits its physical exact-source inverse
+
+=== wizard canonical successor inverse helper cohort ===
+  ok   settles actual native cleanup and inverse after reloading its registered canonical writer
+
+=== onboarding retargets config.toml after a config-dir change ===
+  ok   writes to the NEWLY resolved directory, not the stale capture
+  ok   keeps the fallback when the resolver yields the same path
+
+=== onboarding retarget falls back rather than losing the answers ===
+  ok   returns the fallback verbatim when the resolver raises
+  ok   returns the fallback verbatim when the resolver yields an empty string
+  ok   returns the fallback verbatim when the resolver yields a non-string
+  ok   returns the fallback when menu_paths itself is unusable
+
+=== onboarding commit() honours the retarget ===
+  ok   (onboarding-retarget-behavior) finish writes to the newly persisted resolver destination
+
+=== menu_paths really retargets after persist_config_dir_for_wizard ===
+  ok   resolves the new directory after the wizard persists it
+  ok   appends a trailing separator so path joins stay well-formed
+
+=== the controlled onboarding migration context retains no native grant ===
+  ok   uses the real registry and custom reader without admitting the virtual destination
+  ok   restores exact module entries and the real boot callback after success and throw
+  ok   refuses a missing explicit reader and restores both prior constructors
+
+=== onboarding configuration import transaction ===
+  ok   (onboarding-import-transaction) ready preserves empty maps at the native JSON boundary
+  ok   (onboarding-import-transaction) loadExistingConfig preserves empty maps at the native JSON boundary
+  ok   (onboarding-import-transaction) new configuration directory restarts the pages from neutral values
+  ok   (onboarding-import-transaction) decode throw cannot publish defaults
+  ok   (onboarding-import-transaction) decode nil cannot publish defaults
+  ok   (onboarding-import-transaction) close reentry cannot import into a successor
+  ok   (onboarding-import-transaction) open_nil
+  ok   (onboarding-import-transaction) open_throw
+  ok   (onboarding-import-transaction) read_nil
+  ok   (onboarding-import-transaction) read_throw
+  ok   (onboarding-import-transaction) close_nil
+  ok   (onboarding-import-transaction) close_throw
+  ok   (onboarding-import-transaction) success
+
+=== onboarding empty configuration folder ===
+  ok   (onboarding-empty-config-source) success imports the retained destination
+  ok   (onboarding-empty-config-source) absent imports the retained destination
+  ok   (onboarding-empty-config-source) read_nil imports the retained destination
+  ok   (onboarding-empty-config-source) close_nil imports the retained destination
+  ok   (onboarding-empty-config-source) an explicit folder still imports its own configuration
+
+=== onboarding retained configuration source ===
+  ok   (onboarding-empty-config-source) read reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) read_refusal reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) close reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) close_refusal reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) decode reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) decode_refusal reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) remap reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) remap_refusal reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) remap_throw reentry cannot publish a retired source
+  ok   (onboarding-empty-config-source) encode reentry cannot publish a retired source
+
+=== login startup menu ===
+  ok   a query never changes startup and a click waits for native confirmation (login-startup)
+  ok   retains one explicit click while the initial query is pending (login-startup)
+  ok   approval and worker failure cannot publish a false checkmark (login-startup)
+
+=== macOS uninstall ===
+  ok   requires native ACK before controlled quit
+  ok   rejects source trees, cancellation and existing terminal owners
+  ok   does nothing on a local version run from source
+  ok   retains the application on failed start or authorization write
+  ok   revokes malformed and late protocol messages
+
+=== macOS diagnostics native opener completion (macos-opener-terminal) ===
+  ok   refuses a throwing timing reader before constructing a native capability
+  ok   receives exit 23 instead of acknowledging start
+  ok   admits the canonical deadline before starting the native opener
+  ok   cancel fences completion while retaining pending native retirement
+  ok   independent current owners retain both concurrent opener children
+  ok   cancelling one concurrent opener cannot cancel its independent sibling
+  ok   an inline terminal followed by start throw logs once without a second outcome
+  ok   native opener admission refuses without hanging: timer_refuse
+  ok   native opener admission refuses without hanging: timer_throw
+  ok   native opener admission refuses without hanging: construct_refuse
+  ok   native opener admission refuses without hanging: construct_throw
+  ok   native opener admission refuses without hanging: start_refuse
+  ok   native opener admission refuses without hanging: start_throw
+  ok   deadline exists before native start and uses the shared timing
+  ok   timer admission reentry cannot start a retired owner's opener
+  ok   a duplicate child terminal cannot acknowledge twice
+  ok   retained cleanup retries only a retired child and preserves its successor
+  ok   a timed-out reveal with pending retirement never opens the browser
+  ok   report waits for reveal terminal and preserves its warning-only refusal
+
+=== native opener fixture restoration ===
+  ok   restores exact native modules and global state after an assertion throws
+
+=== healthcheck page actions (report-bug-flow) ===
+  ok   report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)
+  ok   report saves its attachment and opens the browser last (report-focus)
+  ok   report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)
+  ok   report stops before the browser when the clipboard refuses (report-bug-flow)
+  ok   save writes the redacted report under the diagnostics folder and reveals it
+  ok   open_path opens the folder the host collected, creating it first
+  ok   open_path refuses a field the snapshot has no value for
+  ok   open_path on a file not created yet says so, without an error (open-missing-file)
+  ok   open_settings opens the page the schema declares
+  ok   refuses to redact without the home folder (report-bug-flow)
+
+=== healthcheck debug menu reports (report-bug-flow) ===
+  ok   Report a bug copies, saves and opens the prefilled bug form (menu-report-bug)
+  ok   Report a bug notifies instead of opening the form when the clipboard refuses (menu-report-bug)
+  ok   Suggest a feature opens the feature form with the version and the system
+
+=== closed diagnostic sharing corpus ===
+  ok   excludes synthetic private fields on all driver snapshots
+
+=== English attachment export boundaries ===
+  ok   does not consult localized labels or copy free private fields
+  ok   retains clipboard and refuses browser when attachment save fails
+  ok   browser refusal never claims successful report after saving attachment
+
+=== default attachment completion ===
+  ok   requires write and close acknowledgement before reveal or browser
+
+=== stable-metadata report URL ===
+  ok   stable-metadata report URL keeps complete output local and rejects page-derived query fields
+
+=== retained installed-page observations ===
+  ok   keeps useful page outcomes without qualifying suites and refuses stale identity
+
+=== closed recent error facts ===
+  ok   keeps observed technical failure codes and excludes every private message
+
+=== redaction context carries the configuration directory (config-dir-masking) ===
+  ok   a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)
+
+=== opt-in day log in the report actions (day-log-host) ===
+  ok   collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)
+  ok   a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)
+  ok   save writes the log first, then the report, and the report records the log (day-log-host)
+  ok   without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)
+  ok   copy never carries the log and an unprepared log is refused before any file is written (day-log-host)
+  ok   a collection prepared for another snapshot is never saved (day-log-host)
+  ok   reading the file distinguishes missing, unreadable, too large and read (day-log-host)
+
+=== healthcheck: no network identity (no-network-identity) ===
+2026-11-04 15:25:18:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...pti/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+[logger] unified log write refused: /tmp/lua_ld20rd_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_ld20rd_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:25:18:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-04 15:25:18:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...pti/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-04 15:25:18:000 [WARNING] [healthcheck] Diagnostics could not read the open applications: ...pti/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:200: attempt to call a nil value (field 'runningApplications').
+2026-11-04 15:25:19:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /new/metrics/karabiner_kc.log: No such file or directory.
+[logger] topical log write refused: /tmp/lua_ld20rd_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_keystats.log: No such file or directory
+2026-11-04 15:25:19:000 [WARNING] [keystats.kc_bridge] Cannot create '/new/metrics/karabiner_kc.log' — bridge may not receive KE events.
+2026-11-04 15:25:19:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+2026-11-04 15:25:19:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...pti/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...ergopti/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+2026-11-04 15:25:19:000 [WARNING] [healthcheck] Diagnostics could not read the USB devices: ...pti/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:492: attempt to index a nil value (field 'usb').
+  ok   the whole snapshot carries no Wi-Fi name and no host name (no-network-identity)
+
+=== healthcheck: shared report enums ===
+  ok   accepts every lease phase the controller publishes
+  ok   accepts every backend identifier of the detector
+
+=== init: instance admission runs before any side effect (hs-second-instance-2026-10-22) ===
+  ok   decides admission after privacy and before settings writes, paths, timers and modules
+  ok   exits only in the stray branch and never shows it a dialog
+
+=== init: a fatal abort stops producers first (hs-fatal-dialog-after-producers-2026-10-22) ===
+  ok   cancels every timer and the KC bridge before the dialog and the exit
+
+=== M-14: onboarding short-circuit before module pre-start ===
+  ok   onboarding.should_run appears before shortcuts.start() in init.lua
+  ok   onboarding.should_run appears before boot_cleanup in init.lua
+
+=== ui.onboarding require failure is fail-fast, not silently skipped ===
+  ok   requests a bounded exit when ui.onboarding fails to load
+  ok   rejects commented-out bounded exits
+
+=== root boot: config-path initialization is fail-fast ===
+  ok   terminates visibly before the first consumer when init does not commit
+  ok   rejects log-only, invisible, and non-terminal boot mutants
+  ok   requires complete native logger authority before every input owner
+AUDIT TARGETED TOTAL: 126 passed, 0 failed

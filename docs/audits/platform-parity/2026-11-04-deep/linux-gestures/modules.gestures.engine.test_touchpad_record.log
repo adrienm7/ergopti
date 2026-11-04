@@ -1,0 +1,10 @@
+
+=== touchpad record: reading libinput record ===
+  ok   reads the device name and every evdev row of a libinput record
+  ok   refuses a record of several devices, an empty one and a malformed row
+  ok   writes a record it reads back event for event, with its expectations
+
+=== touchpad record: replaying into the decoder ===
+  ok   (touchpad-record) a recorded session decodes into its gestures on recorded time
+  ok   (touchpad-record) every kept trace decodes into the gestures it declares
+AUDIT_TEST_RESULT	5	0

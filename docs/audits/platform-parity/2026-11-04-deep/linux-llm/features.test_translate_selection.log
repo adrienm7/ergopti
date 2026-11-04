@@ -1,0 +1,69 @@
+
+=== llm_translate_selection: the selection translated and offered ===
+  ok   registers the action
+  ok   translates into the interface language, offers one candidate, and replaces on accept
+  ok   a fixed language ignores the interface's
+  ok   Escape leaves the selection untouched
+  ok   typing while it runs drops the answer
+  ok   a newer trigger supersedes the one in flight
+  ok   refuses to replace in another window
+
+=== llm_translate_selection: refusals and failures ===
+  ok   an empty selection is told, and nothing is requested
+  ok   a blank selection is an empty one
+  ok   refuses like the manual prediction while the AI is off, before reading
+  ok   refuses while paused, before reading
+  ok   an answer without the tag is a failed translation
+  ok   a failed request is a failed translation
+  ok   an invalid parameter reads nothing and sends nothing
+  ok   translates a free language name without changing selection authority
+
+=== selected translations require a known stable native focus ===
+  ok   explains a translation refusal when privacy cannot admit its text field (selection-native-focus)
+  ok   a mashed translation shortcut cancels its request in flight before the next one leaves (mashed-shortcut)
+  ok   sends a second translation at once, without waiting for the request interval (explicit-never-held)
+  ok   withdraws a completed translation after its native field changes (selection-native-focus)
+  ok   refuses translation before reading selection when focus is empty (selection-native-focus)
+  ok   refuses translation before reading selection when focus is unavailable (selection-native-focus)
+  ok   refuses translation when focus moves during selection capture (selection-native-focus)
+
+=== translation resident global privacy admission ===
+  ok   refuses protected ownership before reading translation selection (llm-global-privacy)
+  ok   refuses unknown ownership before reading translation selection (llm-global-privacy)
+  ok   refuses throw ownership before reading translation selection (llm-global-privacy)
+  ok   rechecks privacy at translation completion and before the next send (llm-global-privacy)
+  ok   refuses a translation accepted after global privacy is revoked (llm-global-privacy)
+
+=== selection capture originating action authority ===
+  ok   ai-pass2-span does not revive translate_selection after cancel during capture
+  ok   ai-pass2-span does not revive translate_selection after backend during capture
+
+=== asynchronous translation native ownership ===
+  ok   ai-pass2-span waits for capture ACK before translating and fences cancellation
+  ok   ai-pass2-span closes an accepted offer only after physical ACK cancel=false
+  ok   ai-pass2-span closes an accepted offer only after physical ACK cancel=true
+
+=== paced translations retain their originating owner ===
+  ok   (paced-offer-owner) rechecks scope after privacy paced=false
+  ok   (paced-offer-owner) rechecks shutdown after privacy paced=false
+  ok   (paced-offer-owner) rechecks successor after privacy paced=false
+  ok   (paced-offer-owner) rechecks scope after privacy paced=true
+  ok   (paced-offer-owner) rechecks shutdown after privacy paced=true
+  ok   (paced-offer-owner) rechecks successor after privacy paced=true
+
+=== translation completions retain their originating owner ===
+  ok   (translation-completion-owner) rechecks scope after privacy
+  ok   (translation-completion-owner) rechecks shutdown after privacy
+  ok   (translation-completion-owner) rechecks successor after privacy
+  ok   (translation-completion-owner) rechecks scope after focus
+  ok   (translation-completion-owner) rechecks shutdown after focus
+  ok   (translation-completion-owner) rechecks successor after focus
+
+=== translation dispatch retains its native focus owner ===
+  ok   (translation-dispatch-owner) rechecks scope after focus paced=false
+  ok   (translation-dispatch-owner) rechecks shutdown after focus paced=false
+  ok   (translation-dispatch-owner) rechecks successor after focus paced=false
+  ok   (translation-dispatch-owner) rechecks scope after focus paced=true
+  ok   (translation-dispatch-owner) rechecks shutdown after focus paced=true
+  ok   (translation-dispatch-owner) rechecks successor after focus paced=true
+AUDIT_TEST_RESULT	50	0

@@ -1,0 +1,22 @@
+MODULE tests.unit.platform.remap.runtime_owner.test_runtime_dormant
+
+=== runtime-selected Karabiner paths ===
+  ok   names the shared tool until a caller selects the owned runtime
+  ok   keeps the shared tool after selecting shared, as the default boot does
+  ok   points every variable writer at the owned tool after an explicit selection
+  ok   refuses to switch runtime inside one Lua VM and refuses unknown names
+  ok   never places the owned runtime under the official application's directory
+
+=== the remap bridge reaches the owned runtime only after an opt-in ===
+  ok   never requires the owner or its ports at load time
+  ok   binds the owner only inside the opt-in bind function
+  ok   reaches the activation rule only behind the opt-in, at boot, on pause and on resume
+  ok   never ties the owned runtime to the Tap-Hold or integration switches
+  ok   gives a closed Karabiner back on a quit but never on a reload
+  ok   selects the shared runtime when the preference is absent
+  ok   generates nothing for an owned boot until the owner admitted the runtime
+  ok   skips the official-application wizard for an owned boot
+  ok   removes an earlier build's rules from the user's own karabiner.json on an owned boot
+  ok   saves a bulk edit for the admission instead of reverting it while ours is not admitted
+  ok   deploys an owned boot only through the owned writer
+RESULT 16 passed 0 failed

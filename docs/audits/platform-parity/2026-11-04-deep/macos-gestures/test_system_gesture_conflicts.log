@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.gestures.config.test_system_gesture_conflicts
+
+=== system gesture snapshots (gesture-conflicts) ===
+  ok   cancels owned tasks and refuses late completion after shutdown
+  ok   checks the live enabled posture at boot completion and warns once per group
+  ok   does not warn when gesture startup was refused
+  ok   never probes while evaluating an assignment
+  ok   publishes only after every asynchronous defaults probe settles
+  ok   detects secondary click and three-finger dragging
+  ok   requires both swipe and drag policies before calling three-finger motion conflict-free
+  ok   keeps failed probes unknown rather than calling them disabled
+  ok   reports native pinch without manufacturing an assigned pinch conflict
+  ok   coalesces concurrent refreshes and ignores duplicate completions
+RESULT 10 passed 0 failed

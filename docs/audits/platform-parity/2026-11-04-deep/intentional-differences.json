@@ -1,0 +1,364 @@
+{
+	"schema_version": 1,
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04",
+	"classifications": {
+		"explicit_policy": "Rationale explicitly documented in source/tests/maintainer decisions.",
+		"platform_constraint": "Native API, runtime, hardware or installation prerequisite; not universal OS impossibility unless established.",
+		"guarded_unimplemented": "Deliberately safe refusal around an unfinished capability; NOT a product decision to omit it.",
+		"observed_not_decided": "Behavior is evidenced but product intent or desired cross-OS equivalence is not established.",
+		"shared_policy": "Current implementations share the policy; an older OS-specific claim was refuted."
+	},
+	"differences": [
+		{
+			"id": "script-isolation",
+			"title": "Programmable source process and state lifetime",
+			"classification": "observed_not_decided",
+			"behavior": {
+				"windows": "AHK factory/callback runs in an isolated native Job process; execution can recreate state. The mechanism is explicit; unequal closure-state lifetime is a derived consequence without a separately established product decision.",
+				"macos": "Lua factory callbacks run in the retained Lua owner outside the input hook.",
+				"linux": "Lua callbacks use the shared owner and deferred loop scheduling."
+			},
+			"evidence_reports": [
+				"windows-hotstrings/report.md",
+				"macos-hotstrings/report.md",
+				"linux-hotstrings/report.md"
+			]
+		},
+		{
+			"id": "input-event-ownership",
+			"title": "Who owns the completing physical key",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "Usually observes already delivered input and compensates; Enter/Tab have dedicated interception.",
+				"macos": "Consumes the completing event and owns native terminator replay.",
+				"linux": "Observed evdev/uinput flow compensates already forwarded input."
+			},
+			"evidence_reports": [
+				"windows-hotstrings/report.md",
+				"macos-hotstrings/report.md",
+				"linux-hotstrings/report.md"
+			]
+		},
+		{
+			"id": "complex-timing",
+			"title": "Complex-key expansion delay widening",
+			"classification": "shared_policy",
+			"behavior": {
+				"windows": "Current HSE_ComplexDelayMultiplier reads the shared multiplier/carry registry.",
+				"macos": "Complex modifier movement widens eligible expansion windows, excluding autocorrection.",
+				"linux": "ExpansionDelay.allows uses the same shared multiplier/carry rule."
+			},
+			"evidence_reports": ["linux-hotstrings/report.md", "macos-hotstrings/report.md"]
+		},
+		{
+			"id": "date-vocabulary",
+			"title": "Existing date trigger contracts",
+			"classification": "observed_not_decided",
+			"behavior": {
+				"windows": "Tests explicitly pin @dt/@td/@date and continuation behavior.",
+				"macos": "Shared dynamic rules use bare dt/td/date and word boundaries.",
+				"linux": "Same bare shared rules; no cross-OS decision to preserve the difference is established."
+			},
+			"evidence_reports": [
+				"windows-hotstrings/report.md",
+				"macos-hotstrings/report.md",
+				"linux-hotstrings/report.md"
+			]
+		},
+		{
+			"id": "physical-delivery",
+			"title": "Physical shortcut editor qualification",
+			"classification": "guarded_unimplemented",
+			"behavior": {
+				"windows": "No host/runtime supplied for the physical editor.",
+				"macos": "Native capture/bridge exists but actual physical_delivery_available returns false.",
+				"linux": "Actual delivery getter likewise returns false and gates bridge/menu. The intentional safety refusal is not a settled decision to omit the feature."
+			},
+			"evidence_reports": [
+				"windows-input/report.md",
+				"macos-input/report.md",
+				"linux-input/report.md"
+			]
+		},
+		{
+			"id": "native-modifiers",
+			"title": "Hold picker and native modifier vocabulary",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "PC Ctrl/Shift/Alt/AltGr/Win combinations; native key identity is process-wide.",
+				"macos": "Option/Command/Fn native hold catalogue, with different IDs and meaningful combinations.",
+				"linux": "PC modifier combinations with evdev native key identities; device observation does not imply per-device assignments."
+			},
+			"evidence_reports": [
+				"windows-input/report.md",
+				"macos-input/report.md",
+				"linux-input/report.md"
+			]
+		},
+		{
+			"id": "typing-rollover",
+			"title": "Typing-key tap-hold rollover policy",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Selected typing keys classify by release order and timeout.",
+				"macos": "Karabiner prioritizes native typing at next key-down before hold threshold.",
+				"linux": "Release-order classification; minimum-tap implementation differs in scope."
+			},
+			"evidence_reports": [
+				"windows-input/report.md",
+				"macos-input/report.md",
+				"linux-input/report.md"
+			]
+		},
+		{
+			"id": "save-intent",
+			"title": "Persisted intent versus live application",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Scope transactions, ordinary setters and layout selection have different terminal receipt owners. Pending receipt is not proof of applied state.",
+				"macos": "Some layer/editor saves intentionally close after accepted regeneration; later native readiness is separate.",
+				"linux": "Some ordinary setting changes retain saved intent after live reload/apply refusal; scope rollback is a separate owner."
+			},
+			"evidence_reports": [
+				"windows-input/report.md",
+				"macos-input/report.md",
+				"linux-input/report.md"
+			]
+		},
+		{
+			"id": "gesture-signals",
+			"title": "Native gesture signal and axis vocabulary",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "Ten Precision Touchpad hotkey slots; discrete finished gestures.",
+				"macos": "Native contacts permit continuous/scaled axes as well as discrete actions.",
+				"linux": "Finished discrete evdev gestures; three declared horizontal axis slots are unsupported, a confirmed capability defect rather than supported axes."
+			},
+			"evidence_reports": [
+				"windows-gestures/report.md",
+				"macos-gestures/report.md",
+				"linux-gestures/report.md"
+			]
+		},
+		{
+			"id": "gesture-defaults",
+			"title": "Recommended bindings and system coexistence",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Configures its own Precision Touchpad shortcut mappings with backup/restore.",
+				"macos": "Reads native gesture settings and asks users to remove overlaps; must not silently edit them. Current conflict defects are separately tracked.",
+				"linux": "No recommended bindings while observing without a grab, avoiding duplicate desktop actions; two-finger coexistence must not be advertised as exclusive capture."
+			},
+			"evidence_reports": [
+				"windows-gestures/report.md",
+				"macos-gestures/report.md",
+				"linux-gestures/report.md"
+			]
+		},
+		{
+			"id": "gesture-pause",
+			"title": "Native pass-through, capture timing and pause exceptions",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Original physical-key replay on pause can be custody-preserving, not an unwanted synthetic feature action.",
+				"macos": "Capture timestamps, drag/scroll guards and runtime teardown differ from finished-hotkey systems.",
+				"linux": "Script-management gestures may operate while paused; other actions are gated. Failed reader recovery can require user re-enable."
+			},
+			"evidence_reports": [
+				"windows-input/report.md",
+				"windows-gestures/report.md",
+				"macos-gestures/report.md",
+				"linux-gestures/report.md"
+			]
+		},
+		{
+			"id": "inference-backends",
+			"title": "Local AI backends and streaming conditions",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "Ollama/local API/cloud; tooltip token display is explicitly unvalidated/disabled.",
+				"macos": "Adds supported Apple-Silicon MLX; remote APIs are nonstreaming while supported local paths stream.",
+				"linux": "Ollama/local servers/cloud; remote requests are nonstreaming, local supported streams can update offers."
+			},
+			"evidence_reports": ["windows-llm/report.md", "macos-llm/report.md", "linux-llm/report.md"]
+		},
+		{
+			"id": "automatic-insertion",
+			"title": "Automatic continuation insertion",
+			"classification": "guarded_unimplemented",
+			"behavior": {
+				"windows": "Inline auto-type inserts a completed final continuation; it is not token-by-token document typing.",
+				"macos": "Offers predictions for acceptance; no equivalent automatic continuation mode.",
+				"linux": "Offers predictions for acceptance; absence of this mode is not proof the OS could never implement it."
+			},
+			"evidence_reports": ["windows-llm/report.md", "macos-llm/report.md", "linux-llm/report.md"]
+		},
+		{
+			"id": "accepted-work",
+			"title": "Accepted work across pause or UI retirement",
+			"classification": "observed_not_decided",
+			"behavior": {
+				"windows": "Some already accepted operations retain ownership; queued accepted-agent cancellation policy is unresolved, so WL-001 was removed from confirmed findings.",
+				"macos": "Accepted text can survive cleanup refusal and accepted update work can continue after page close/pause. These explicit policies do not prove every agent continuation is intended.",
+				"linux": "Operations have individual cancellation/admission owners; no universal cancellation rule is inferred from different callback shapes."
+			},
+			"evidence_reports": [
+				"windows-llm/report.md",
+				"macos-llm/report.md",
+				"macos-lifecycle/report.md",
+				"linux-llm/report.md"
+			]
+		},
+		{
+			"id": "metrics-storage",
+			"title": "Authoritative metrics store and replay",
+			"classification": "guarded_unimplemented",
+			"behavior": {
+				"windows": "Per-device append-only SQL ledgers, rebuildable resident/durable reader projections.",
+				"macos": "Append-only journal/ledger, cache and foreign-device import/replay.",
+				"linux": "Direct local metrics.sqlite, currently no equivalent ledger synchronization. This architectural limitation is not a settled product decision to omit synchronization."
+			},
+			"evidence_reports": [
+				"windows-metrics/report.md",
+				"macos-metrics/report.md",
+				"linux-metrics/report.md"
+			]
+		},
+		{
+			"id": "metrics-privacy",
+			"title": "Content filtering versus metadata and machine counters",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Private triggers can retain numeric savings while redacting content; collection pause and driver pause differ.",
+				"macos": "Private-window guarantee explicitly targets key content, not all title metadata. User collection-pause defects are separate from that policy.",
+				"linux": "Unknown accessibility context fails closed for text; machine aggregates may continue independently of the raw-event recording switch."
+			},
+			"evidence_reports": [
+				"windows-metrics/report.md",
+				"macos-metrics/report.md",
+				"linux-metrics/report.md"
+			]
+		},
+		{
+			"id": "metrics-units",
+			"title": "Pointer, CPU, Wi-Fi and awake counter semantics",
+			"classification": "observed_not_decided",
+			"behavior": {
+				"windows": "Screen-position samples, native system utilization and explicit passive keep-awake rollup; heuristic telemetry must remain labelled heuristic.",
+				"macos": "Sampled screen displacement and CPU user share; keep-awake aggregation defects are separate.",
+				"linux": "Raw pointer device units, no evdev tap-to-click; Wi-Fi can fall back to interface identity; awake_ms measures unlocked sampled uptime. Cross-OS equivalence/product intent is not established."
+			},
+			"evidence_reports": [
+				"windows-metrics/report.md",
+				"macos-metrics/report.md",
+				"linux-metrics/report.md"
+			]
+		},
+		{
+			"id": "cipher-scope",
+			"title": "Selective at-rest encryption",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Typed text/per-key SQL fields encrypted; aggregates clear by design. Raw plaintext journal exposure is a separate finding, not justified by the aggregate exception.",
+				"macos": "Selective payload encryption and local journal/ledger ownership; no assumption of full-document or whole-disk encryption.",
+				"linux": "Direct-store cipher has supported-runtime requirements; aggregates remain clear. Field scope is not a promise of universal cross-device decryption."
+			},
+			"evidence_reports": [
+				"windows-metrics/report.md",
+				"macos-metrics/report.md",
+				"linux-metrics/report.md"
+			]
+		},
+		{
+			"id": "update-ownership",
+			"title": "Installation mode owns update replacement",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Portable executable/source/install authorities differ; source is not self-replacement authority.",
+				"macos": "Application/Sparkle and designated-requirement replacement owners; selected historical releases use a separate verified path.",
+				"linux": "Standalone owner may self-replace; package manager or immutable distribution owns its updates."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		},
+		{
+			"id": "signature-policy",
+			"title": "Implemented verification versus enforced policy",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "Shipped shared detached P-256 signature enforcement remains off pending key provisioning; digest/origin policy is distinct from Authenticode.",
+				"macos": "Sparkle uses its separate signed enclosure/appcast trust path.",
+				"linux": "Shares the shipped P-256 off policy; native verification/directory publication require the supported LuaJIT runtime. Verification code presence is not proof signatures are required by default."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		},
+		{
+			"id": "feed-fallback",
+			"title": "API outage and feed-only installation",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "Can list Atom releases but refuses install without authenticated asset details.",
+				"macos": "Newest eligible feed offer can hand off to signed Sparkle metadata; not arbitrary historical Atom installation.",
+				"linux": "Lists feed releases but refuses unauthenticated asset replacement."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		},
+		{
+			"id": "backup-semantics",
+			"title": "Filtered overlay backups and native custody",
+			"classification": "explicit_policy",
+			"behavior": {
+				"windows": "TOML/JSON config backup with handle-held restoration, personal data retained by uninstall. No proven delete-new-files snapshot contract.",
+				"macos": "Filtered config root, native hs.settings excluded; POSIX staging/readback has different custody limits. Restore overlay must not be described as a full directory rollback.",
+				"linux": "Includes settings store in addition to config root; filtered overlay, pre-image and named partial/refusal outcomes. Programmable source/data archives are not a complete backup promise."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		},
+		{
+			"id": "crash-redaction",
+			"title": "Crash report redaction boundary",
+			"classification": "observed_not_decided",
+			"behavior": {
+				"windows": "Rich local error/log context is preserved; sharing redacts, with explicit local-rich rationale.",
+				"macos": "Local report builds/writes share schema; whole-document-at-rest redaction policy not established by the inspected path.",
+				"linux": "Captured redactor processes the complete encoded report before opening the output file. No actual secret disclosure is inferred solely from this difference."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		},
+		{
+			"id": "setup-prerequisites",
+			"title": "Setup, optional imports and native prerequisites",
+			"classification": "platform_constraint",
+			"behavior": {
+				"windows": "WebView2/Windows input owners and optional import outcomes have explicit acknowledgement; no native execution in this audit.",
+				"macos": "Accessibility/Automation/native registration approval and signing mode qualify startup. Failed Finish partial-publication is not an intentional exception.",
+				"linux": "Graphical/setup tools, input groups/session and LuaJIT native capabilities qualify support. Optional tap/layer import may notify failure after main answers commit deliberately."
+			},
+			"evidence_reports": [
+				"windows-lifecycle/report.md",
+				"macos-lifecycle/report.md",
+				"linux-lifecycle/report.md"
+			]
+		}
+	]
+}

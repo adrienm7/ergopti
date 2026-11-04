@@ -1,0 +1,19 @@
+
+=== workspace switcher: X11 through wmctrl ===
+  ok   wraps from the last workspace to the first, and the plain step stays
+  ok   wraps from the first workspace to the last and steps plainly inside the row
+  ok   presses the desktop's shortcut when wmctrl cannot list or switch
+  ok   walks to the wrap target with the shortcut when wmctrl refuses the switch
+  ok   names wmctrl as the missing tool on X11 without it
+  ok   refuses a listing it cannot place instead of guessing a workspace
+
+=== workspace switcher: Wayland compositors ===
+  ok   drives KDE Plasma through KWin's D-Bus interface
+  ok   names qdbus when KDE has no D-Bus client on the PATH
+  ok   drives sway on the focused output only
+  ok   quotes a sway workspace name that holds a quote and a backslash
+  ok   drives Hyprland over the active monitor's regular workspaces
+  ok   presses GNOME's own shortcut, which stops at the edges, and cannot wrap
+  ok   does not claim to know an unidentified session
+  ok   refuses an unknown direction before touching the session
+AUDIT_TEST_RESULT	14	0

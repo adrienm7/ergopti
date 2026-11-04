@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.actions.test_send_input_actions
+
+=== send input gesture actions (send-input-actions) ===
+  ok   send_shortcut presses the modifiers and the key, primary as Command
+  ok   send_key presses a named key and types a character
+  ok   send_text types the stored text, and nothing without one
+RESULT 3 passed 0 failed

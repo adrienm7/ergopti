@@ -1,0 +1,28 @@
+MODULE tests.unit.platform.remap.generator.test_generator_tap_holds_switch
+
+=== Tap-Holds feature switch in the generated rules ===
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+[logger] unified log write refused: /tmp/lua_tYAcKW_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_tYAcKW_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_karabiner.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_tYAcKW_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   generates every tap/hold rule while the switch is on
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   treats an absent switch as on, like saves older than it
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/capsword.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] capsword.json not found — CapsWord will be inactive.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/legacy_layer_keys.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Legacy layer anchor not found: 'legacy_layer_keys.json' — older blocks cannot be proven.
+2026-11-04 15:09:54:000 [ERROR] [karabiner] Cannot open file '/fake/data_dir/combos.json'.
+2026-11-04 15:09:54:000 [WARNING] [karabiner] Always-on rule file not found: 'combos.json' — skipped.
+  ok   keeps only the right-Command rule when the switch is off
+RESULT 3 passed 0 failed

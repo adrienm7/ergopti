@@ -1,0 +1,4 @@
+write=true current_dir=/new-config path_writes=1 locale_persists=1 config_writes=1 error_alerts=0 reloads=1
+write=false current_dir=/new-config path_writes=1 locale_persists=1 config_writes=1 error_alerts=1 reloads=0
+write=throw current_dir=/new-config path_writes=1 locale_persists=1 config_writes=1 error_alerts=1 reloads=0
+write=newer-schema current_dir=/new-config path_writes=1 locale_persists=1 config_writes=0 error_alerts=1 reloads=0

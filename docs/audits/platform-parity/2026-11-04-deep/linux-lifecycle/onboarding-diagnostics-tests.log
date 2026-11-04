@@ -1,0 +1,190 @@
+
+=== first-use startup ===
+  ok   opens the wizard when config.toml is absent (linux-first-use)
+  ok   never opens it over an existing configuration (linux-first-use)
+  ok   does not inspect configuration in headless or dry-run startup (linux-first-use)
+  ok   reports unreadable configuration and unavailable windows (linux-first-use)
+  ok   a dismissed wizard opens again while nothing was written (linux-first-use)
+  ok   the daemon runs the check on its own config.toml once graphical (linux-first-use)
+
+=== ui.bridge_handlers ===
+
+=== onboarding_bridge ===
+  ok   has correct bridge_name
+  ok   tells the page whether the number-row order applies, or the locale key of why not (number-row-order-linux)
+  ok   pushes the complete shared initData contract on ready
+  ok   (onboarding-empty-folder) ready names the default destination from /virtual/default-A
+  ok   (onboarding-empty-folder) ready names the default destination from /virtual/custom-B
+  ok   (onboarding-rerun) initData shows the values config.toml holds
+  ok   (onboarding-rerun) initData shows the tap-hold keys and switch of the folder
+  ok   (onboarding-rerun) an unreadable config.toml never opens neutral pages
+  ok   uses the persisted locale in the shared initData contract
+  ok   previews and selects only a shipped locale
+  ok   (onboarding-window-title) retitles the window in the previewed locale
+  ok   (onboarding-window-title) titles the window in the current locale on ready
+  ok   (onboarding-window-title) an unshipped locale leaves the title alone
+  ok   (onboarding-metrics-path) initData carries the keystats's metrics store
+  ok   (onboarding-metrics-path) a chosen folder answers with the same store
+  ok   (onboarding-metrics-path) a request without its number is refused
+  ok   (onboarding-metrics-path) the real resolver names the keystats store
+  ok   (onboarding-metrics-path) restores a warm preference path owner after a resolver failure
+  ok   (onboarding-window-title) the product name appears once in the window title
+  ok   (onboarding-rerun) projects a configuration onto wizard paths and marks what it reads
+  ok   (onboarding-rerun) a chosen folder reloads its own values under the request number
+  ok   returns a native folder picker choice through setConfigDir
+  ok   commits the answered paths in one versioned write, then restarts the daemon
+  ok   tells the user the answers apply at the next start when the daemon cannot restart
+  ok   (onboarding-tap-holds) imports the checked keys into the chosen folder after the answers
+  ok   (nav-layer-fresh-install-default) the key holding the layer brings Ergopti's layer into a new folder
+  ok   (nav-layer-fresh-install-default) an existing layers.toml is never replaced
+  ok   (nav-layer-fresh-install-default) keys that do not hold the layer import no layer file
+  ok   (nav-layer-fresh-install-default) a layer that cannot be written is reported, the keys stay
+  ok   (onboarding-tap-holds) a No or an unchecked list never reaches the tap-hold writer
+  ok   (onboarding-tap-holds) a refused import is reported and the saved answers still apply
+  ok   writes the hotstring choices into the chosen configuration folder
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_common semicolon
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_common accented letter
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_common ASCII letter
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_common Hebrew letter
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_length multiple characters
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_length invalid leading byte
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_length overlong sequence
+  ok   (onboarding-linux-trigger) refuses unsafe answer dialog.magic_key.error_empty empty input
+  ok   (onboarding-linux-trigger) preserves an existing outdated trigger until explicit replacement ;
+  ok   (onboarding-linux-trigger) preserves an existing outdated trigger until explicit replacement ù
+  ok   (onboarding-linux-trigger) retains untouched outdated number and accepts an explicit leaf replacement
+  ok   (onboarding-linux-trigger) retains untouched outdated false and accepts an explicit leaf replacement
+  ok   (onboarding-linux-trigger) retains untouched outdated empty and accepts an explicit leaf replacement
+  ok   (onboarding-linux-trigger) retains untouched outdated inline table and accepts an explicit leaf replacement
+  ok   (onboarding-linux-trigger) retains untouched outdated table header and accepts an explicit leaf replacement
+  ok   (onboarding-linux-trigger) retains a concurrent source change and retries after writer publication refusal
+  ok   (onboarding-linux-trigger) persists and re-reads safe symbol §
+  ok   (onboarding-linux-trigger) persists and re-reads safe symbol ★
+  ok   (onboarding-linux-trigger) persists and re-reads safe symbol →
+  ok   (onboarding-linux-trigger) persists and re-reads safe symbol 😀
+  ok   rejects malformed finish data without writing or closing
+  ok   restores the language and folder and says what failed when a commit step fails
+  ok   covers every action the shared page posts
+
+=== linux: crash_reporter diagnostics ===
+  ok   resolves the crash folder inside the logs folder, from HOME
+  ok   protect returns the wrapped result on success
+  ok   protect reports failure and routes the throw through dump
+  ok   protect rejects a non-function payload
+  ok   dump writes the shared JSON report with the expected fields
+  ok   a second report within the same second gets the numeric suffix
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.
+  ok   tells the user where the report landed, and says so when it cannot be saved
+  ok   keeps at most the shared cap of reports and never deletes another file
+  ok   dump ignores calls with a non-string or empty error
+  ok   get_crash_count counts report names only
+  ok   removes exactly the legacy text dumps and nothing else (legacy-crash-cleanup)
+  ok   a refused legacy delete is a warning, and a missing folder is not an error (legacy-crash-cleanup)
+  ok   captures the stack where the error was RAISED
+
+=== Crash report format and retention ===
+  ok   keeps the cap and the field list of the corpus
+  ok   derives the file stem from the UTC timestamp
+  ok   names a report and parses the name back
+  ok   refuses every name that is not a report
+  ok   deletes the oldest reports beyond the cap, and only reports
+  ok   applies the shared cap by default
+  ok   serialises a record in the documented order with the documented defaults
+  ok   raises on an unknown field and converts a non-string value
+
+=== crash privacy admission ===
+  ok   keeps file-sink admission false when canonical logger acquisition is refused
+  ok   redacts protected errors and stack while preserving technical diagnostics
+  ok   refuses private output when sink is cold
+  ok   refuses private output when sink is closed
+  ok   never substitutes the successor redactor for an in-progress dump
+  ok   retires a dump revoked during open
+  ok   retires a dump revoked during write
+  ok   retires a dump revoked during close
+  ok   retires a dump revoked during image
+  ok   refuses failed open without announcing or exposing private partial bytes
+  ok   refuses failed write without announcing or exposing private partial bytes
+  ok   refuses failed close without announcing or exposing private partial bytes
+  ok   refuses redaction provider throw without raw fallback
+  ok   refuses redaction provider nil without raw fallback
+  ok   refuses redaction provider truthy without raw fallback
+  ok   retains an explicitly fresh successor report published during the old close
+  ok   does not retry exclusive acquisition refusal 13
+  ok   does not retry exclusive acquisition refusal EACCES
+  ok   does not retry exclusive acquisition refusal EINVAL
+  ok   does not reacquire after sink revocation during an EEXIST receipt
+  ok   refuses failed publication image throw
+  ok   refuses failed publication image truthy
+  ok   refuses failed publication image false
+  ok   refuses failed publication image nil
+  ok   refuses failed publication image missing
+  ok   redacts module filenames and optional context as well as the error
+
+=== native crash history ===
+2026-11-04 15:21:14:000 [DEBUG] [adapters.file_system] read(): cannot open '/workspace/ergopti/static/ergopti_plus/linux/../_shared/build_stamp.txt' — ENOENT: no such file or directory: /workspace/ergopti/static/ergopti_plus/linux/../_shared/build_stamp.txt
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-image-QvJP1U/crash_reports/2026-11-04T15-21-14Z.json
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.
+[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.
+  ok   acknowledges only a retained redacted report image (crash-published-image)
+2026-11-04 15:21:14:000 [DEBUG] [adapters.file_system] read(): cannot open '/workspace/ergopti/static/ergopti_plus/linux/../_shared/build_stamp.txt' — ENOENT: no such file or directory: /workspace/ergopti/static/ergopti_plus/linux/../_shared/build_stamp.txt
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-00Z.json
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-00Z-2.json
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-00Z-3.json
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-01Z.json
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-00Z-4.json
+2026-11-04 15:21:14:000 [ERROR] [diagnostics.crash_reporter] Crash report written: /tmp/ergopti-crash-history-bwLZNG/crash_reports/2026-10-25T12-00-00Z-6.json
+  ok   preserves same-second reports across reporter reloads (crash-exclusive-history)
+
+=== Diagnostic snapshot: shared contract ===
+  ok   the Lua formatter declares exactly the shared field list, in order
+  ok   every shared vector renders byte for byte
+  ok   renders a path under the home directory relative to ~
+
+=== Diagnostic snapshot: commit lookup ===
+  ok   reads a detached HEAD
+  ok   follows a branch ref in a linked worktree to the common directory
+  ok   falls back to packed-refs
+  ok   answers nil outside a repository
+
+=== linux-diagnostic-read-admission ===
+  ok   linux-diagnostic-read-admission: uses native ports for stamp
+  ok   linux-diagnostic-read-admission: uses native ports for git
+  ok   linux-diagnostic-read-admission: uses native ports for pid
+  ok   linux-diagnostic-read-admission: uses native ports for facts
+
+=== Diagnostic snapshot: Linux collector ===
+  ok   fills every probe it owns from the system files
+  ok   emits one INFO line carrying every shared field
+
+=== Diagnostic snapshot: the daemon boot emits it after ready ===
+  ok   logs the snapshot once the daemon reports ready
+  ok   closes every boot stage it opens
+
+=== snapshot preparation before capture (snapshot-prepared-ready) ===
+  ok   snapshot-prepared-ready emits cached discovery with frozen boot time and whitelisted metadata
+  ok   snapshot-prepared-ready a refused discovery produces no fabricated snapshot
+  ok   snapshot-prepared-ready actual Main prepares ungrabbed then emits only after genuine ready and frozen total
+Error: could not start the keyboard hook.
+  ok   snapshot-prepared-ready actual Main hook_refused never announces ready or emits prepared facts
+  ok   snapshot-prepared-ready actual Main layout_refused never announces ready or emits prepared facts
+  ok   snapshot-prepared-ready stopping during discovery prevents later capture and emission
+  ok   snapshot-prepared-ready an acknowledged stop during daemon.ready suppresses the cached emission
+  ok   snapshot-prepared-ready an acknowledged stop during boot.complete suppresses the cached emission
+  ok   snapshot-prepared-ready optional discovery failure leaves real input ready without a false snapshot
+
+=== Linux menu uninstall ===
+  ok   does nothing for a local version run from source (menu-uninstall)
+  ok   refuses a stamped build outside every install layout (menu-uninstall)
+  ok   cancellation retains the running application (menu-uninstall)
+  ok   moves removal outside the daemon service and waits for its exact identity (menu-uninstall)
+  ok   does not close the application when worker launch fails (menu-uninstall)
+  ok   refuses an unreadable process identity (menu-uninstall)
+  ok   keeps the daemon running without a detached worker command (menu-uninstall)
+
+=== diagnostics runner (Linux) ===
+  ok   refuses a runner built without its ports
+  ok   completes an unknown action as a failure
+  ok   opens the URL of an action through the effect kind its port names
+  ok   does not know an extra action the port did not declare
+  ok   never completes a cancelled request
+TOTAL 146 passed 0 failed

@@ -1,0 +1,5 @@
+MODULE tests.unit.modules.gestures.config.test_default_gestures_are_manifest
+
+=== gestures: DEFAULT_GESTURES is the manifest's macOS values ===
+  ok   covers every single and axis slot with the manifest's action
+RESULT 1 passed 0 failed

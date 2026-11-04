@@ -1,0 +1,61 @@
+{
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"extraction": {
+		"source": "tools/test/test-ci-pipeline-wiring.cjs",
+		"start_line": 2509,
+		"end_line": 2793,
+		"closure_sha256": "cd630476e9d1a093cbd0dc888af2fb8f3bff85c99a06c50baec6ef28032f1536",
+		"dependencies": [
+			"node builtins",
+			"yaml 2.9.1 from unchanged repository package-lock/node_modules"
+		]
+	},
+	"identity_checks": [
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"baseline_git_blob": "2e3a708498cbb3caa9f3a421f94e653265c545e6",
+			"baseline_sha256": "ffce6b684d0504338e202967a996c0adfdaeea1b10ee763f0e4fc7e6877c9b09",
+			"working_sha256": "ffce6b684d0504338e202967a996c0adfdaeea1b10ee763f0e4fc7e6877c9b09",
+			"index_sha256": "ffce6b684d0504338e202967a996c0adfdaeea1b10ee763f0e4fc7e6877c9b09",
+			"working_equals_baseline": true,
+			"index_equals_baseline": true
+		},
+		{
+			"path": ".github/workflows/deploy-site.yml",
+			"baseline_git_blob": "44cbc9a90cc3f27e26b5edf23d0464d6031faec6",
+			"baseline_sha256": "6395ce718dbffc1fda2bc4e636e958548584a79b2d14db2de1f212dd37e0ad47",
+			"working_sha256": "6395ce718dbffc1fda2bc4e636e958548584a79b2d14db2de1f212dd37e0ad47",
+			"index_sha256": "6395ce718dbffc1fda2bc4e636e958548584a79b2d14db2de1f212dd37e0ad47",
+			"working_equals_baseline": true,
+			"index_equals_baseline": true
+		},
+		{
+			"path": "package.json",
+			"baseline_git_blob": "c4cf1af569e1d445320c5150418a036f58ec9661",
+			"baseline_sha256": "f79ce41d79d57d1d0568f4c2f81a2cd92f024ca674d99cf290af7f05b98e54ba",
+			"working_sha256": "f79ce41d79d57d1d0568f4c2f81a2cd92f024ca674d99cf290af7f05b98e54ba",
+			"index_sha256": "f79ce41d79d57d1d0568f4c2f81a2cd92f024ca674d99cf290af7f05b98e54ba",
+			"working_equals_baseline": true,
+			"index_equals_baseline": true
+		},
+		{
+			"path": "package-lock.json",
+			"baseline_git_blob": "4ef0a63ee297528c83c65fbaebf496adedc18a20",
+			"baseline_sha256": "5220d38742602a9f947aa67f642b147962eccd56d1482e3978783f3aeec7cab5",
+			"working_sha256": "5220d38742602a9f947aa67f642b147962eccd56d1482e3978783f3aeec7cab5",
+			"index_sha256": "5220d38742602a9f947aa67f642b147962eccd56d1482e3978783f3aeec7cab5",
+			"working_equals_baseline": true,
+			"index_equals_baseline": true
+		},
+		{
+			"path": ".node-version",
+			"baseline_git_blob": "db49bb14d78e76cc5ebbf481960bced880636a24",
+			"baseline_sha256": "4c42fb8d6334c5cdcac68b93f96c581fb83b1f58cda898cff115e5e941ef717d",
+			"working_sha256": "4c42fb8d6334c5cdcac68b93f96c581fb83b1f58cda898cff115e5e941ef717d",
+			"index_sha256": "4c42fb8d6334c5cdcac68b93f96c581fb83b1f58cda898cff115e5e941ef717d",
+			"working_equals_baseline": true,
+			"index_equals_baseline": true
+		}
+	],
+	"targeted_staged_diff": ""
+}

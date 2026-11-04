@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.gestures.engine.test_periodic_logs_on_change
+
+=== gestures health check logs on change only ===
+  ok   reports the watcher count once, then only when it changes
+  ok   keeps every watcher-count change in the log once repeat collapsing is armed
+  ok   reports the settled count again when the loop is re-entered
+  ok   keeps an untouched trackpad in the health loop without warning (gestures-idle-no-frame)
+
+=== gestures primer logs only before the first frame ===
+  ok   is silent for every event once frames are flowing
+
+=== gestures frame heartbeat logs once per touch session ===
+  ok   logs one line per session however long the fingers stay down
+RESULT 6 passed 0 failed

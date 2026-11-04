@@ -1,0 +1,9 @@
+MODULE tests.unit.modules.gestures.actions.test_gesture_emit_actions
+
+=== gesture emit actions (macOS) ===
+  ok   the generated table is populated
+  ok   every generated row has a key and a modifier list
+  ok   emits the macOS keystroke, not the Windows one
+  ok   goes back and forward in the browser history with Cmd+arrow (action-parity-nav-history)
+  ok   presses Space from a binding, as on Windows and Linux (action-parity-space)
+RESULT 5 passed 0 failed

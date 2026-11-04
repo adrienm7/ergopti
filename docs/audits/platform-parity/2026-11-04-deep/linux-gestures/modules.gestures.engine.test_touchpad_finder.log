@@ -1,0 +1,23 @@
+
+=== touchpad finder: the bitmap reader ===
+  ok   finds a bit in the last printed word
+  ok   counts words from the RIGHT, not the left
+  ok   answers false rather than raising for a bit past the end
+  ok   reads a low bit in a word that also sets high bits (bit-precision)
+
+=== touchpad finder: which device ===
+  ok   finds the touchpad and not the mouse
+  ok   rejects a device with no multitouch slots
+  ok   parses every device in the table
+
+=== touchpad finder: capability ===
+  ok   reads the finger count the hardware advertises
+  ok   does not call a normal buttonpad semi-MT
+  ok   flags semi-MT hardware without rejecting it
+
+=== touchpad finder: what an unknown capability must do ===
+  ok   offers every slot when the finger count is unknown
+  ok   marks what a three-finger pad genuinely cannot do
+  ok   leaves a slot it cannot parse alone
+  ok   orders equal pads deterministically, not by discovery luck (tie-order)
+AUDIT_TEST_RESULT	14	0

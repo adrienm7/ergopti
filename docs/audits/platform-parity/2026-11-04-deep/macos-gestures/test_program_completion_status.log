@@ -1,0 +1,14 @@
+MODULE tests.unit.modules.gestures.actions.test_program_completion_status
+
+=== private program closed completion receipts ===
+  ok   publishes failure before synchronous deadline retirement can release the action entry
+  ok   logs one admitted numeric failure without exposing private process data
+  ok   logs the trusted worker's bounded signal-derived child status
+  ok   never interprets a signed helper exit as a user program completion
+  ok   does not report a successful private program as a failure
+  ok   suppresses failure publication after the binding loses admission
+  ok   suppresses a cancelled child's completion failure
+  ok   projects only Boolean success and integer status from the native adapter
+  ok   reports malformed native status with a closed diagnostic
+  ok   refuses fractional, infinite and out-of-range native status payloads
+RESULT 10 passed 0 failed

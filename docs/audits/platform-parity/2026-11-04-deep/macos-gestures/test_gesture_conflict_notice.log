@@ -1,0 +1,8 @@
+MODULE tests.unit.ui.editors.test_gesture_conflict_notice
+
+=== gesture warning consent (gesture-conflicts) ===
+  ok   honours the menu.gestures.open_settings button
+  ok   honours the gestures.system.dismiss button
+  ok   honours the close button
+  ok   honours the refused button
+RESULT 4 passed 0 failed

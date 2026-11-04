@@ -1,0 +1,86 @@
+[
+	{
+		"module": "ollama.test_api_ollama_terminal_receipt",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t22\t0",
+		"seconds": 0.2
+	},
+	{
+		"module": "ollama.test_api_ollama_stream_parse",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t32\t0",
+		"seconds": 0.11
+	},
+	{
+		"module": "remote.test_api_remote_callbacks",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t38\t0",
+		"seconds": 0.5
+	},
+	{
+		"module": "remote.test_nonchat_probe_isolation",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t20\t0",
+		"seconds": 0.26
+	},
+	{
+		"module": "prediction.test_prompt_prediction",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t17\t0",
+		"seconds": 0.89
+	},
+	{
+		"module": "prediction.test_live_mode",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t28\t0",
+		"seconds": 3.22
+	},
+	{
+		"module": "features.test_tone_selection",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t41\t0",
+		"seconds": 1.03
+	},
+	{
+		"module": "features.test_translate_selection",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t50\t0",
+		"seconds": 1.22
+	},
+	{
+		"module": "features.test_screen_answers",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t30\t0",
+		"seconds": 0.8
+	},
+	{
+		"module": "agent.test_agent_flow",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t39\t0",
+		"seconds": 1.05
+	},
+	{
+		"module": "agent.test_agent_auto",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t25\t0",
+		"seconds": 0.71
+	},
+	{
+		"module": "agent.test_agent_connector_lifecycle",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t38\t0",
+		"seconds": 0.21
+	},
+	{
+		"module": "settings.test_profile_app_overrides",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t7\t0",
+		"seconds": 0.03
+	},
+	{
+		"module": "context.test_ai_typing_context",
+		"exit_code": 0,
+		"summary": "AUDIT_TEST_RESULT\t30\t0",
+		"seconds": 0.07
+	}
+]

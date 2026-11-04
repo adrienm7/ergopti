@@ -1,0 +1,9 @@
+MODULE tests.unit.platform.remap.generator.test_generator_owned_deploy
+
+=== Generator.deploy_owned_config ===
+  ok   writes the complete generated document to the owned path only
+  ok   does not publish an identical document again
+  ok   replaces whatever the owned file held instead of merging it
+  ok   refuses an invalid document or path and writes nothing
+  ok   reports a publication the filesystem refused
+RESULT 5 passed 0 failed

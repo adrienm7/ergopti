@@ -1,0 +1,11 @@
+MODULE tests.unit.modules.gestures.engine.test_engine_stop_releases_scroll_blocker
+
+=== Engine.stop(): contract ===
+  ok   Engine module exports a stop() function
+  ok   settles the blocker and discards the interrupted gesture before restart
+  ok   retains the exact blocker when native teardown is refused
+  ok   retains a blocker activated before start raises and retries safely
+
+=== gestures init M.stop(): tears down engine ===
+  ok   M.stop() delegates to the helper that stops Engine
+RESULT 5 passed 0 failed

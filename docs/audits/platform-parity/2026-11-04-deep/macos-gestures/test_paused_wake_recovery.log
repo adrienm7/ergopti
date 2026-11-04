@@ -1,0 +1,10 @@
+MODULE tests.unit.modules.gestures.engine.test_paused_wake_recovery
+
+=== gesture wake recovery across global pause ===
+# gesture_cleanup PASS scenario=PASS starts=2 stops=2 primers=1 wakes=1 touch_owned=false primer_owned=false wake_owned=false
+  ok   recovers an externally stopped watcher on an unpaused wake
+# gesture_cleanup PASS scenario=PASS starts=2 stops=2 primers=2 wakes=2 touch_owned=false primer_owned=false wake_owned=false
+  ok   rebuilds a paused wake before the first resumed touch
+# gesture_cleanup PASS scenario=PASS starts=3 stops=3 primers=3 wakes=2 touch_owned=false primer_owned=false wake_owned=false
+  ok   retains repeated paused wakes through native restart refusal and OFF
+RESULT 3 passed 0 failed

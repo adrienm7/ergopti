@@ -1,0 +1,430 @@
+
+=== system audio without a sound server (linux-audio-alsa-fallback) ===
+  ok   reads PipeWire's own wpctl when pactl is absent
+  ok   falls through a pactl with no server to the next stack
+  ok   reads the ALSA mixer when neither PulseAudio nor PipeWire is present
+  ok   measures no muted time when no sound stack answers
+
+=== system audio native output locale ===
+  ok   linux-system-audio-locale: retains French muted=true
+  ok   linux-system-audio-locale: retains French muted=false
+  ok   linux-system-audio-locale: retains German muted=true
+  ok   linux-system-audio-locale: retains German muted=false
+
+=== system metrics: reading the machine ===
+  ok   records the battery it was told
+  ok   keeps the lowest and highest charge of the day
+  ok   does not sample again before the interval has passed
+  ok   starts a fresh row on a new day
+
+=== system metrics: awake, locked, asleep ===
+  ok   counts the time between samples as awake
+  ok   counts it as locked when the session was locked
+  ok   calls a long gap sleep rather than use
+  ok   reports the lock and the unlock between two answers, never from 'cannot tell'
+
+=== system metrics: network changes ===
+  ok   counts a change of network
+  ok   does not count a change to or from 'cannot tell'
+  ok   reads the wireless interface with no tool on the PATH (wireless-without-awk)
+  ok   leaves the readings it cannot make at zero
+
+=== system metrics: owned restart hydration ===
+  ok   unbound-recovery: merges first binding without losing clocks or queued transitions
+  ok   hydrates the owned cumulative row before its first sample
+  ok   seeds an acknowledged absent row without invented history
+  ok   refuses unread history and retries without a writable zero day
+  ok   same database and device rebinding retains the accumulated day
+  ok   isolates changed database or device owned-b/device-a
+  ok   isolates changed database or device owned-a/device-b
+  ok   hydrates a new date and partitions its own elapsed sample clock
+  ok   folds new battery readings into the persisted extrema and sum
+  ok   a throwing loader cannot publish a destructive zero day
+  ok   reset clears the owned loader as well as the sampling state
+
+=== capture calendar ownership ===
+  ok   retires closed sources only after their complete exact prefix is acknowledged
+
+=== system-event-capture-policy ===
+  ok   refuses missing or malformed authority before sensor acquisition
+  ok   samples the exact policy once per due observation without gating aggregates
+
+=== ngram walker: the nine families ===
+  ok   produces tokens of every length from one to seven
+  ok   records words and word pairs
+  ok   keeps the last word even though the stream ends mid-sentence
+
+=== ngram walker: what must not become a sequence ===
+  ok   keeps long-gap characters but excludes their delay from n-gram timing
+  ok   does not join two characters across a long pause
+  ok   chains through a correction, never across it
+  ok   chains a hotstring's output and keeps its source
+  ok   does not carry a word across a correction
+  ok   flags the n-grams of the character a Backspace erases
+  ok   erases nothing typed before a long pause
+
+=== ngram walker: what the writer receives ===
+  ok   splits the batch by table and by application-day
+  ok   emits nothing for a family with no rows
+
+=== ngram walker: a real flush writes every family ===
+  ok   hands more than one table to the writer
+
+=== ngram walker: each character is stored once ===
+  ok   counts a typed character once in ngram_chars
+
+=== keystats: a JSON summary cannot acknowledge raw SQLite history ===
+  ok   retains the exact raw source while native persistence is unavailable
+
+=== aggregate walker: what the day was made of ===
+  ok   sorts characters into the five classes
+  ok   counts an accented letter as a letter
+  ok   does not count an expansion as something the user typed
+
+=== aggregate walker: corrections ===
+  ok   counts manual backspaces
+  ok   does not count the deletions a hotstring makes to erase its trigger
+  ok   counts a run of three or more as one cascade
+  ok   does not call a single backspace a cascade
+  ok   closes a cascade that is still open when the stream ends
+  ok   measures how quickly the user resumed
+  ok   does not call a coffee break recovery time
+
+=== aggregate walker: when the typing happened ===
+  ok   credits each keystroke to its hour and its five-minute slot
+  ok   records the first and last five-minute slot the user typed in
+  ok   skips the time-of-day tables rather than guessing when it has no clock
+
+=== aggregate walker: runs of typing ===
+  ok   counts an uninterrupted run as one burst
+  ok   starts a new burst after a real gap
+  ok   credits a burst still open when the stream ends
+  ok   keeps the squared delays so rhythm is recoverable
+  ok   records one session for a continuous stretch
+  ok   splits sessions at the coarser threshold, not the burst one
+
+=== aggregate walker: the pause buckets ===
+  ok   credits a delay to every threshold at or above it
+  ok   counts the keystrokes each bucket credits
+  ok   unrolls one row per threshold for the writer
+
+=== native JSON fallback completion ===
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on healthy — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on write_nil — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on write_false — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on write_throw — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on close_nil — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on close_false — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+/workspace/scratch/parity-toolchain/lua-5.4.8/src/lua: ...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: module 'luv' not found:
+	no field package.preload['luv']
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/luv/init.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv.lua'
+	no file '/workspace/ergopti/static/ergopti_plus/linux/../_shared/lua/luv/init.lua'
+	no file '/usr/local/share/lua/5.4/luv.lua'
+	no file '/usr/local/share/lua/5.4/luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.lua'
+	no file '/usr/local/lib/lua/5.4/luv/init.lua'
+	no file './luv.lua'
+	no file './luv/init.lua'
+	no file '/usr/local/lib/lua/5.4/luv.so'
+	no file '/usr/local/lib/lua/5.4/loadall.so'
+	no file './luv.so'
+stack traceback:
+	[C]: in function 'require'
+	...s/linux/tests/fixtures/native_keystats_json_fallback.lua:19: in main chunk
+	[C]: in ?
+  FAIL (keystats-json-fallback) retains saved data and pending events on close_throw — test_aggregate_walker_ngram_nine_families.lua:738: public flush must preserve the prior summary and retry cumulative events without SQLite — actual: false
+stack traceback:
+	[C]: in function 'error'
+	...opti/static/ergopti_plus/_shared/lua/test/assertions.lua:75: in function 'tests.helpers.assert_true'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:738: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:729>
+	[C]: in function 'xpcall'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:729: in upvalue 'fn'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:365: in function <...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:363: in function 'tests.helpers.it'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:725: in function <...ggregation/test_aggregate_walker_ngram_nine_families.lua:719>
+	[C]: in function 'pcall'
+	...pace/ergopti/static/ergopti_plus/linux/tests/helpers.lua:333: in function 'tests.helpers.describe'
+	...ggregation/test_aggregate_walker_ngram_nine_families.lua:719: in main chunk
+	[C]: in function 'require'
+	[C]: in function 'pcall'
+	...kspace/scratch/deep-parity/linux-metrics/run-focused.lua:5: in main chunk
+	[C]: in ?
+
+=== shared erased and synthetic n-gram vectors ===
+  ok   erased_word_tail_is_flagged
+  ok   erased_backspace_flags_nothing
+  ok   erased_across_flushes
+  ok   synthetic_hotstring_backspaces_are_sourced
+  ok   synthetic_llm_backspaces_are_sourced
+  ok   user_text_after_synthetic_output_starts_fresh
+
+=== aggregate walker: the streaks the layout exists to reduce ===
+  ok   counts two characters typed by one finger as a run
+  ok   does not call two different fingers a run
+  ok   breaks the run on a correction
+  ok   does not let an expansion extend a run
+  ok   breaks the run on a character the catalogue does not describe
+  ok   hands the row to the writer
+
+=== linux-hourly-manual-errors ===
+  ok   linux-hourly-manual-errors: manual correction bins are cumulative without changing typed counts
+  ok   linux-hourly-manual-errors: synthetic erasure preserves the existing manual-error exclusion
+  ok   linux-hourly-manual-errors: correction-only hours do not change first or last typed minute
+  ok   linux-hourly-manual-errors: absent clock metadata retains daily correction totals without inventing bins
+
+=== aggregate walker: backspace unigram retention ===
+  ok   linux-backspace-unigrams: manual correction keeps its count and native delay
+  ok   linux-backspace-unigrams: synthetic deletions keep HS and LLM source counts
+  ok   linux-backspace-unigrams: cascade and recovery contexts stay independent
+  ok   linux-backspace-unigrams: literal software spelling stays four codepoints
+
+=== aggregate walker: backspace sequences ===
+  ok   linux-backspace-sequences: a manual correction ends a bigram and a trigram
+  ok   linux-backspace-sequences: consecutive corrections chain with each other
+  ok   linux-backspace-sequences: the characters after a correction chain with it
+  ok   linux-backspace-sequences: a pause after the correction breaks the sequence
+  ok   linux-backspace-sequences: a pause before the correction breaks the sequence
+  ok   linux-backspace-sequences: a pause before the character breaks the sequence
+  ok   linux-backspace-sequences: synthetic deletions keep their source and chain through the output
+  ok   linux-backspace-sequences: the writer receives the correction sequences
+
+=== aggregate walker: cross-flush context ===
+  ok   linux-cross-flush-walk: a session cut by two flushes is one session
+  ok   linux-cross-flush-walk: a word and a sequence continue across the flush
+  ok   linux-cross-flush-walk: a correction ending a flush chains with the next
+  ok   linux-cross-flush-walk: the stamps cut a session the capped delays cannot
+  ok   linux-cross-flush-walk: settling credits only what its own gap has ended
+  ok   linux-cross-flush-walk: a new day credits the open context to the day it was typed on
+
+=== aggregate walker: shared correction sequence corpus ===
+  ok   corpus-correction-sequences: the corpus carries vectors
+  ok   corpus-correction-sequences: correction_continues_the_sequence
+  ok   corpus-correction-sequences: cascade_then_resume
+  ok   corpus-correction-sequences: pause_after_correction_breaks_it
+  ok   corpus-correction-sequences: correction_sequence_crosses_a_flush
+  ok   corpus-correction-sequences: typed_brackets_then_backspace
+  ok   corpus-correction-sequences: backspace_then_typed_brackets
+
+=== layout-capture-context ===
+  ok   refuses absent or unsupported captured family before advancing context
+  ok   settles recovered history without a physical input capture
+TOTAL 114 passed 7 failed

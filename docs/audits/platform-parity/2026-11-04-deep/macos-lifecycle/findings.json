@@ -1,0 +1,67 @@
+{
+	"schema_version": 1,
+	"scope": "macos-lifecycle",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:29:57.099437+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/report.md",
+	"findings": [
+		{
+			"id": "MC-001",
+			"title": "Failed onboarding Finish retains new configuration locator and locale",
+			"severity": "medium",
+			"confidence": "high_executed_real_controller_and_migration_with_recording_persistence_ports",
+			"guarantees": [
+				"Failed setup must not silently leave only part of the accepted configuration move published",
+				"Configuration locator and destination publication must share exact compensation ownership"
+			],
+			"reproduction": {
+				"kind": "executed_real_finish_controller",
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/repro-onboarding-partial-state.lua",
+				"log": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/repro-onboarding-partial-state.log",
+				"executed": true,
+				"cases": [
+					"successful moved-directory control",
+					"final writer false",
+					"final writer throws",
+					"actual destination schema_version=999 refusal before any config batch write"
+				],
+				"observed": "Failure closes wizard with error and no reload, while path_writes=1 still names new directory and locale_persists=1."
+			},
+			"root_cause": {
+				"producer": "macos/ui/onboarding/init.lua:722",
+				"later_failure": "macos/ui/onboarding/init.lua:753",
+				"failure_handler": "macos/ui/onboarding/init.lua:570",
+				"canonical_locator": "macos/infra/config_paths.lua:729",
+				"description": "Locator/locale commit before destination versioning and main configuration publication; outer Finish owner has no inverse for these fields."
+			},
+			"silent_failure": "Error claims failed Finish, but locator/locale changes persist independently; later saves resolve new directory while old runtime survives. Original directory is not claimed deleted.",
+			"regression_test": "Move directory then reject destination schema or fail/throw main publication; require old directory/locale or retained exact compensation debt; retain success and concurrent-external-change controls."
+		},
+		{
+			"id": "MC-002",
+			"title": "Restored configuration UI promises restart despite refused or throwing reload",
+			"severity": "medium",
+			"confidence": "high_executed_real_versions_bridge_with_recording_reload_port",
+			"guarantees": [
+				"Restore success message promising restart must reflect accepted reload ownership",
+				"A rejected handoff must not be indistinguishable from successful application of restored settings"
+			],
+			"reproduction": {
+				"kind": "executed_real_versions_bridge",
+				"artifact": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/repro-restore-reload-ack.lua",
+				"log": "docs/audits/platform-parity/2026-11-04-deep/macos-lifecycle/repro-restore-reload-ack.log",
+				"executed": true,
+				"cases": ["reload true", "reload false", "reload throws"],
+				"observed": "All cases publish restoring,restored; false/throw only log, canonical UI text says app restarts."
+			},
+			"root_cause": {
+				"owner": "macos/ui/changelog/init.lua:587",
+				"premature_success": "macos/ui/changelog/init.lua:610",
+				"refusal_log_only": "macos/ui/changelog/init.lua:613",
+				"description": "Restored phase publishes before reload receipt; immediate refusal and later abort have no visible pending-reload/failure state."
+			},
+			"silent_failure": "Disk restore succeeded but old process may remain; page hides restore button and promises restart without exposing reload failure. Linux counterpart shares behavior; Windows reports refusal.",
+			"regression_test": "Drive restore success with reload true/false/throw and asynchronous abort. Require explicit disk-restored/reload-required state on refusal, backup path retained, and no false restart message."
+		}
+	]
+}

@@ -1,0 +1,24 @@
+
+=== prompt prediction: a rewrite from the key press to the injected text ===
+  ok   llm_predict_rewrite rewrites the current sentence with the menu's count
+  ok   llm_prompt_prediction 'rewrite|2' sends two requests and offers both rewrites
+  ok   a normal prediction is unchanged: the menu's prompt, count, tail and budget
+
+=== prompt prediction: the binding's prompt and count, for this request only ===
+  ok   every built-in has a preset that runs it with the menu's count
+  ok   a batch prompt asks for the binding's count in one request
+  ok   outranks the automatic profile for the model
+  ok   runs a custom prompt by its id
+  ok   refuses a prompt that no longer exists, and says so
+  ok   refuses like the manual prediction while the AI is off
+  ok   refuses an invalid parameter without sending anything
+
+=== prompt prediction: what a rewrite sends ===
+  ok   refuses a blank sentence like an empty buffer
+  ok   widens a capped context to hold the whole sentence
+  ok   keeps its budget when the continuation budget is overridden
+  ok   applies to the menu's rewrite profile and to a typing trigger
+  ok   erases the trigger typed after the sentence too
+  ok   replays the shared sentence vectors through the engine
+  ok   runs a free-language contextual rewrite without changing the menu profile
+AUDIT_TEST_RESULT	17	0

@@ -1,0 +1,33 @@
+MODULE tests.unit.modules.gestures.navigation.test_open_app_action
+
+=== open_app replays the shared app corpus (macOS) ===
+  ok   the parameter is declared
+  ok   app vector 'application_name'
+  ok   app vector 'name_with_spaces'
+  ok   app vector 'bundle_identifier'
+  ok   app vector 'hyphenated_bundle_identifier'
+  ok   app vector 'application_bundle_path'
+  ok   app vector 'bundle_file_name'
+  ok   app vector 'two_part_name'
+  ok   app vector 'desktop_file_id'
+  ok   app vector 'windows_program_path'
+  ok   app vector 'windows_start_menu_shortcut'
+  ok   app vector 'windows_packaged_app'
+  ok   app vector 'unicode_name'
+  ok   app vector 'empty'
+  ok   app vector 'blank'
+  ok   app vector 'leading_space'
+  ok   app vector 'trailing_space'
+  ok   app vector 'line_break'
+  ok   app vector 'tab'
+  ok   app vector 'delete_character'
+  ok   app vector 'escape_character'
+
+=== open_app launches the binding's application (macOS) ===
+  ok   opens the application stored for the binding, under its parent
+2026-11-04 15:31:04:000 [WARNING] [gestures.actions] open_app ignored for binding 'tap_4': no valid application is stored ('').
+[logger] unified log write refused: /tmp/lua_t6HwLJ_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_2026-11-04.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_t6HwLJ_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_gestures.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_t6HwLJ_ergopti_home/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-11-04.log: No such file or directory
+  ok   a binding with no application stored opens nothing
+RESULT 23 passed 0 failed

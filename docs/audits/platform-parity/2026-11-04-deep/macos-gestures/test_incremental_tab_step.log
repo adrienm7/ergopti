@@ -1,0 +1,18 @@
+MODULE tests.unit.modules.gestures.engine.test_incremental_tab_step
+
+=== a three-finger swipe switches one tab (three-finger-tab-step) ===
+  ok   the logged 19.84-unit swipe switches exactly one tab
+  ok   a short deliberate 4.9-unit swipe still switches one tab
+  ok   a 26-unit swipe switches exactly one tab
+  ok   a 32-unit swipe switches two tabs
+  ok   a very long 60-unit swipe switches three tabs
+
+=== a slot macOS uses fires nothing (gesture-held-by-macos) ===
+  ok   a held slot fires no step, the other slots still do
+
+=== drift around a step boundary holds the tabs fired (three-finger-tab-step) ===
+  ok   hovering just below the first step does not fire it twice
+  ok   hovering just below a later step does not fire it twice
+  ok   lift-off drift back does not reverse a short swipe
+  ok   a real reversal still switches back
+RESULT 10 passed 0 failed

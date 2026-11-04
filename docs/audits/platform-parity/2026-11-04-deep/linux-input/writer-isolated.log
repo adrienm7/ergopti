@@ -1,0 +1,68 @@
+
+=== tap-hold writer: a tray change reaches the engine ===
+  ok   sets a tap in the shared schema and reloads the engine
+  ok   writes only the keys the user changed, and keeps the earlier ones
+  ok   swaps a modifier hold for the navigation layer, and back
+  FAIL (hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer — test_tap_hold_writer.lua:140: expected truthy — actual: false
+  ok   (hold-picker-brings-the-layer-2026-10-01) an existing layers.toml is the user's and stays byte for byte
+  ok   (hold-picker-brings-the-layer-2026-10-01) a refused key write takes the layer it created back
+  FAIL (hold-picker-brings-the-layer-2026-10-01) a saved key keeps its layer when the engine does not reload — ...ts/unit/platform/remap/tap_hold/test_tap_hold_writer.lua:172: attempt to index a nil value (field 'caps_lock')
+  ok   (hold-picker-brings-the-layer-2026-10-01) a writer bound to no layer folder writes no layer file
+  ok   (hold-picker-brings-the-layer-2026-10-01) the daemon binds the writer to the configuration folder's layer file
+  ok   stores a hold in the canonical spelling the loader reads back
+  ok   clears a default hold with the none option
+  ok   makes a key native: its own tap and no hold
+  ok   renders a clear that the defaults never come back through
+  ok   renders the shared preset explicitly and preserves unknown nested fields
+  ok   renders a clear of only owned tap-hold fields
+  ok   refuses to render a row it does not own or a malformed tap_hold table
+  ok   switches the feature off in the file
+  ok   writes a delay the loader reads back, and refuses one out of range
+  ok   refuses an unknown key, tap or hold, and writes nothing
+  ok   never overwrites a file that does not parse
+  ok   escapes what it writes and keeps data it does not own
+  ok   reports a change the engine could not reload
+
+=== tap-hold writer: the wizard imports only the checked keys ===
+  ok   imports each key's preset exactly over a backup, switches the feature on and leaves the rest
+  ok   never imports over a key the user configured, and writes nothing
+  ok   creates the file of a folder that has none
+  ok   refuses what it cannot import exactly, and writes nothing
+
+=== tap-hold writer: classified source refusal ===
+  ok   refuses permission before the ordinary setter stages or reloads
+  ok   refuses other_errno before the ordinary setter stages or reloads
+  ok   refuses no_errno before the ordinary setter stages or reloads
+  ok   refuses string_errno before the ordinary setter stages or reloads
+  ok   refuses open_raise before the ordinary setter stages or reloads
+  ok   refuses read_nil before the ordinary setter stages or reloads
+  ok   refuses read_raise before the ordinary setter stages or reloads
+  ok   refuses close_nil before the ordinary setter stages or reloads
+  ok   refuses close_false before the ordinary setter stages or reloads
+  ok   refuses close_raise before the ordinary setter stages or reloads
+  ok   refuses an unreadable source before the recommended import creates a backup
+  ok   admits native ENOENT and publishes the actual missing-file setter
+  ok   keeps unknown neighbors when the classified source read succeeds
+
+=== tap-hold writer: staging write and close acknowledgement ===
+  ok   refuses write_nil before publication and reload
+  ok   refuses write_false before publication and reload
+  ok   refuses write_table before publication and reload
+  ok   refuses write_string before publication and reload
+  ok   refuses write_foreign_handle before publication and reload
+  ok   refuses write_raise before publication and reload
+  ok   refuses close_nil before publication and reload
+  ok   refuses close_false before publication and reload
+  ok   refuses close_string before publication and reload
+  ok   refuses close_handle before publication and reload
+  ok   refuses close_raise before publication and reload
+  ok   refuses cleanup_refused before publication and reload
+  ok   publishes only after the actual file write and close acknowledge their owner
+
+=== tap-hold delay model: global default, sticky per-key delays, reset (PAR-15) ===
+  ok   ships no delay for any key
+  ok   a global change moves a key without its own delay and never one with it; a reset follows the global again
+  ok   a delay an earlier build copied into the file is not the user's; a delay the user sets afterwards is
+  ok   the wizard's report ignores a copied delay and counts the user's own
+  ok   a scope restore drops the user's global delay with the keys' delays
+TOTAL 55 passed 2 failed

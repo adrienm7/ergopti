@@ -1,0 +1,27 @@
+{
+	"schema_version": 1,
+	"scope": "macos-input",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:15:29.304553+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/macos-input/report.md",
+	"findings": [
+		{
+			"id": "MI-001",
+			"title": "Catalogue layer_on/layer_off actions do not synchronize the macOS navigation wheel owner",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [
+				"The navigation layer wheel and keyboard bindings follow the same accepted activation/deactivation action.",
+				"A successful layer_off must not leave wheel events consumed by the layer."
+			],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/lua-5.4.8-dlopen/src/lua docs/audits/platform-parity/2026-11-04-deep/macos-input/probe-gesture-wheel.lua",
+				"observed": "layer_on requests layer_active=1 but wheel passes scroll; after F20 entry, layer_off requests layer_active=0 but wheel still posts SOUND_UP; F19 control fixes the same owner.",
+				"boundaries": "Actual production action registry, wheel owner and sentinel owner; mocked accepted Karabiner variable-write boundary and Hammerspoon event/timer APIs. No native macOS execution."
+			},
+			"root_cause": "macos/modules/gestures/actions.lua:966-972 writes layer_active through ke_variables.set without completion/state publication; macos/modules/shortcuts/actions/system.lua:1048 tracks layer_held only from F20/F19 generator sentinels. CLI variable writes produce no sentinel.",
+			"silent_failure": "The action and native variable write can succeed without any error while wheel behavior disagrees with the keyboard navigation layer.",
+			"regression_test": "Compose real action registry and wheel owner; assert entry from layer_on and exit from layer_off after exact-generation successful write, plus refused and superseded writes. Existing probe-gesture-wheel.lua supplies both failing behaviors and a healthy sentinel control."
+		}
+	]
+}

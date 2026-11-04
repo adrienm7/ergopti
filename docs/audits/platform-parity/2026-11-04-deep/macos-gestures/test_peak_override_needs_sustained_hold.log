@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.gestures.engine.test_peak_override_needs_sustained_hold
+
+=== peak-finger override requires a sustained peak, not a stale one ===
+  ok   does not fire the 4-finger action after a single 4-finger frame
+  ok   does not fire the 4-finger action for a 4-frame peak at 120 Hz (25 ms)
+  ok   fires the 4-finger action for a peak held past the confirmation time
+RESULT 3 passed 0 failed

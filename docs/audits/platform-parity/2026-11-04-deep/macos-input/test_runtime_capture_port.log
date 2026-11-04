@@ -1,0 +1,25 @@
+MODULE tests.unit.adapters.runtime_capture.test_runtime_capture_port
+
+=== runtime capture port: start ===
+  ok   starts the managed session from the pinned declaration and the bundle-bound launcher only
+  ok   refuses an incomplete or malformed declaration before preparing anything
+  ok   takes no executable or arguments from the declaration
+  ok   is single-use: a second start is refused and prepares nothing
+  ok   names an unavailable installed source and prepares nothing
+  ok   fails when the managed session is refused or refuses to start
+
+=== runtime capture port: status and loss ===
+  ok   reports stopped before any session exists
+  ok   normalizes the policy's states to starting, admitted and stopped
+  ok   pushes a refusal of the session once, with its reason
+  ok   contains a failing loss observer
+  ok   rejects a loss observer that is not a function
+
+=== runtime capture port: stop ===
+  ok   is settled at once when no session exists
+  ok   reports pending until the session is retired, then releases the native owner once
+  ok   hands the session one observer identity however often the owner retries
+  ok   ignores a notification that is not the literal true
+  ok   passes no observer to the session when the owner passes none
+  ok   rejects an observer that is not a function and delegates closed to the source
+RESULT 17 passed 0 failed

@@ -1,0 +1,8 @@
+MODULE tests.unit.modules.keymap.preview.test_preview_mutation_commit_gate
+
+=== keymap semantic mutations wait for native preview revocation ===
+  ok   clamps every installed group delay to a non-negative activation window
+  ok   rejects malformed magic keys and custom collisions before preview revocation
+  ok   keeps the old engine state and lease when canvas hide fails
+  ok   routes the complete public registry-writer class through that fence
+RESULT 4 passed 0 failed

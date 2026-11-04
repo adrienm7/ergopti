@@ -1,0 +1,101 @@
+
+=== live mode: the sentence translated as it is typed ===
+  ok   ships a debounce shorter than the menu's and no word floor
+  ok   turns on with the binding's prompt and says so, changing no menu setting
+  ok   sends the sentence to translate_en after the live debounce, not the menu's
+  ok   sends at once when a word ends, without waiting for the live debounce (live-word-end-instant)
+  ok   keeps the live debounce at a word end once the instant word end is switched off (live-word-end-instant)
+  ok   a live keystroke is automatic: it still waits for the backend's interval (explicit-never-held)
+  ok   asks from the first word, below the menu's minimum word count
+  ok   runs with the menu's count when the binding names none
+  ok   ignores the answer of a request a new keystroke superseded
+  ok   does not ask again about the accepted sentence until the user types
+
+=== live mode: turning it on and off ===
+  ok   a second press turns it off, whatever its prompt, and typing is the menu's again
+  ok   turning off withdraws the live offer on screen
+  ok   refuses a prompt that no longer exists, and stays off
+  ok   stops, never falls back, when its prompt is deleted while it runs
+  ok   refuses an invalid parameter without turning on
+  ok   refuses like a manual prediction while the AI is off, paused or has no backend
+  ok   a pause turns it off silently, and resuming leaves it off
+  ok   switching the AI off turns it off silently
+  ok   is off at every start
+
+=== live mode: hotstrings, Tab and explicit actions ===
+  ok   waits while a hotstring preview is shown, then asks once it is gone
+  ok   an expansion dismisses the live tooltip and asks again about the expanded text
+  ok   leaves Tab alone without a live tooltip on screen
+  ok   an explicit action takes over, and live mode resumes at the next keystroke
+
+=== live mode: one normal profile chooser and retained prompt actions ===
+  ok   has one profile chooser, keeps prompt actions and retires their override on explicit selection
+
+=== live mode: the daemon tells the engine ===
+  ok   forwards every pause transition and redraws the tray on a live change
+
+=== manual profile selection retires retained Linux live actions ===
+  ok   requires exact stop ACK before profile persistence and never redraws a refused cancellation
+  ok   retains the real shortcut stop notice in all locales while the second chooser stays absent
+  ok   retains a free-language live receipt through the actual typing timer
+AUDIT_TEST_RESULT	28	0
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.

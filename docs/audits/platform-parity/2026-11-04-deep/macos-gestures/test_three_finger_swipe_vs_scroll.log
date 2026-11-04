@@ -1,0 +1,22 @@
+MODULE tests.unit.modules.gestures.engine.test_three_finger_swipe_vs_scroll
+
+=== a two-finger scroll never fires a three-finger action (three-finger-swipe-vs-scroll) ===
+  ok   a one-frame third contact on a short scroll does not fire
+  ok   a palm touching on and off during a scroll does not fire
+  ok   a thumb resting beside two scrolling fingers does not fire
+  ok   three contacts that continue as a moving pair abort
+  ok   a thumb landing after the pair scrolled is refused as the scroll's
+  ok   a contact leaving for the lift adds no phantom travel
+  ok   a three-finger touch right after a scroll does not fire
+  ok   a three-finger touch during native momentum does not fire
+
+=== a deliberate three-finger swipe still switches tabs ===
+  ok   three fingers landing together and swiping fire
+  ok   a third finger landing a frame late still makes the swipe
+  ok   fingers landing over 200 ms still make the swipe
+  ok   a third finger landing 40 ms late with the motion starting at once fires
+  ok   a slow three-finger swipe fires
+  ok   a fast short three-finger flick fires
+  ok   a two-finger touch that did not scroll arms no scroll guard
+  ok   a swipe once the scroll guard has expired fires
+RESULT 16 passed 0 failed

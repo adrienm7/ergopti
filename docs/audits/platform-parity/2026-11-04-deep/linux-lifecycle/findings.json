@@ -1,0 +1,41 @@
+{
+	"schema_version": 1,
+	"scope": "linux-lifecycle",
+	"audited_sha": "89b0b774c8c960c7ad458ac3cb98d5c97598e518",
+	"created_at": "2026-11-04T15:28:57.755026+00:00",
+	"report_path": "docs/audits/platform-parity/2026-11-04-deep/linux-lifecycle/report.md",
+	"findings": [
+		{
+			"id": "LC-001",
+			"title": "Configuration restore announces restart even when restart is refused or unavailable",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": {
+				"command": "/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit docs/audits/platform-parity/2026-11-04-deep/linux-lifecycle/probe-restore-restart.lua",
+				"environment": "LD_LIBRARY_PATH=/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu; LUA_CPATH=/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/workspace/scratch/parity-toolchain/modules51/?.so;;",
+				"steps": [
+					"Use real changelog bridge through existing authenticated document fixture and successful backup restore model.",
+					"Make state.restart return false, then test absent state.restart.",
+					"Post restore_backup; inspect returned response and shared restored-phase message."
+				],
+				"observed": "Both return phase=restored with no restarted/reason metadata; shared page displays Configuration restored: ErgoptiPlus restarts on it.",
+				"expected": "Preserve acknowledged restored bytes and pre-image, but visibly state restart required/refused rather than claiming restart.",
+				"evidence_path": "docs/audits/platform-parity/2026-11-04-deep/linux-lifecycle/probe-restore-restart.log",
+				"limits": "Effect-isolated backup/restart fixture, real bridge+shared locale. No real byte restore or process restart claim in this probe."
+			},
+			"root_cause": {
+				"locations": [
+					"static/ergopti_plus/linux/ui/changelog/bridge.lua:628",
+					"static/ergopti_plus/linux/ui/changelog/bridge.lua:632",
+					"static/ergopti_plus/_shared/ui/changelog/script.js:1307",
+					"static/ergopti_plus/_shared/data/locales/en.json:201"
+				],
+				"description": "Missing/refused restart logs error, then uses the same unconditional restored response as accepted restart; shared UI promises the app restarts."
+			},
+			"silent_failure": "Restart failure is log-only; user sees restart success wording while old runtime can remain active on stale configuration. Restored disk bytes are not claimed lost.",
+			"regression_test": "Cover successful handoff, false/missing/throwing restart; require visible restored-but-restart-required outcome, preserved pre-restore path and restored bytes; do not turn restart refusal into file rollback.",
+			"other_os": "Deduplicate with analogous macOS restore/reload reporting finding; Windows source has explicit restore reload-handoff/refusal owner."
+		}
+	]
+}

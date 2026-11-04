@@ -1,0 +1,7 @@
+MODULE tests.unit.modules.dynamic_hotstrings.injection.test_sync_injection
+
+=== rules_engine: synchronous injection (A3) ===
+  ok   _is_injecting is reset to false synchronously after injection
+  ok   a second injection is not blocked when the first completed synchronously
+  ok   is_injecting guard still prevents re-entrant injection
+RESULT 3 passed 0 failed

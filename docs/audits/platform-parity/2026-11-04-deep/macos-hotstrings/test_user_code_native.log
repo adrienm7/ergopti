@@ -1,0 +1,62 @@
+MODULE tests.unit.modules.dynamic_hotstrings.user_code.test_user_code_native
+
+=== programmable native macOS hotstrings ===
+  ok   aborts every collected batch while retaining a committed guarded carrier
+  ok   retains the exact queued transaction when native settlement observation refuses
+  ok   retains unprovable clipboard debt when payload mutation returns false
+  ok   retains exact clipboard release refusal before mutation
+  ok   retains exact clipboard release refusal after original restoration
+  ok   retains the exact clipboard timer after restoration until native stop acknowledges
+  ok   preserves a foreign clipboard replacement across repeated guarded cancellation retries: foreign clipboard
+  ok   preserves a foreign clipboard replacement across repeated guarded cancellation retries: 😀
+  ok   fences actual queued native publication after callback completion and disable
+  ok   fences actual queued native publication after callback completion and reload
+  ok   fences actual queued native publication after callback completion and source
+  ok   fences actual queued native publication after callback completion and window
+  ok   restores the owned clipboard when a queued paste publication loses its source
+  ok   releases an owned native key-up when source admission closes after its key-down
+  ok   refuses absent active enable then admits only an explicitly created present source
+  ok   warns once for a missing source, never as a driver error, and forgets it when switched off
+  ok   admits a present valid empty factory without inventing callbacks
+  ok   quarantines admitted callbacks after absent source while retaining closed intent inverse
+  ok   quarantines admitted callbacks after unreadable source while retaining closed intent inverse
+  ok   re-proves admitted source on repeated enable after absent
+  ok   re-proves admitted source on repeated enable after unreadable
+  ok   re-proves admitted source on repeated enable after edit
+  ok   refuses retained admitted checkpoint at a closed gate after absent
+  ok   refuses retained admitted checkpoint at a closed gate after edit
+  ok   does not relabel an admitted empty factory as unavailable until strict quarantine
+  ok   refuses an active checkpoint over callbacks from edited source
+  ok   keeps the mutator's own receipt when a factory makes a foreign scalar change
+  ok   restores captured callbacks and controls without executing the source factory again
+  ok   refuses the captured inverse after foreign reload
+  ok   refuses the captured inverse after foreign replace_owner
+  ok   refuses the captured inverse after foreign source
+  ok   refuses foreign configuration revision changed during source proof at capture
+  ok   refuses foreign configuration revision changed during source proof at adopt
+  ok   retains configuration inverse debt until the actual consumed-input task retires
+  ok   captures unreadable default-off source only as a quiescent closed inverse
+  ok   keeps an absent closed inverse from authorizing active source after creation
+  ok   fences source changed during the final native AX owner probe
+  ok   fences generation changed during the final native AX owner probe
+  ok   defers the actual magic event then commits text at the original cursor
+  ok   preserves suffix text for acknowledged action/cancellation true
+  ok   preserves suffix text for acknowledged action/cancellation false
+  ok   rejects old callback ownership after focus
+  ok   rejects old callback ownership after privacy
+  ok   rejects old callback ownership after pause
+  ok   rejects old callback ownership after reload
+  ok   rejects old callback ownership after source
+  ok   rejects text when user code changes the actual focused AX element
+  ok   retains swallowed magic retirement debt until the actual deferred task settles
+  ok   keeps the dynamic facade closed until native user cleanup is acknowledged
+  ok   keeps registered magic mappings ahead of executable user suffixes
+  ok   keeps ordinary saved preference synchronization from cancelling owned pending work
+  ok   (user-menu-publication-inverse) restores exact native timing after time-port
+  ok   (user-menu-publication-inverse) restores exact native timing after save-throw
+  ok   (user-menu-publication-inverse) restores exact native timing after save-refuse
+  ok   (user-menu-live-pause) fences retained controls after the real pause owner closes
+  ok   opens source through the actual menu adapter without loading or creating it
+  ok   saves declared preferences to disk then reloads them into actual native gate and timing
+  ok   uses physical activation timing and permits a slow owned callback
+RESULT 58 passed 0 failed
