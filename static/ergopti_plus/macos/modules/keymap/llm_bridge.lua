@@ -811,12 +811,12 @@ local function update_preview_body(buf)
 	-- the tap tests, so the preview and the engine cannot disagree about whether
 	-- a trigger is live. Custom providers above are unaffected: they do not go
 	-- through the trigger engine.
-	local epoch_fn = (hs and hs.timer and hs.timer.secondsSinceEpoch) or os.time
-	local preview_now = epoch_fn()
+	local deadline_now = TimerScheduler.hotstring_time
+	local preview_now = deadline_now()
 	local engine_blocked = preview_now < (_state.no_rescan_until or 0)
 	if engine_blocked then
 		Logger.debug(LOG, "Preview: static mappings skipped — engine suppressed for %.3fs more.",
-			(_state.no_rescan_until or 0) - epoch_fn())
+			(_state.no_rescan_until or 0) - deadline_now())
 	end
 
 	-- Interceptor-backed providers run before the static engine on the real
@@ -996,7 +996,7 @@ local function update_preview_body(buf)
 			-- 0 (always active), not "already expired".
 			local row_timeout = 0
 			if m.type == "literal_auto" and m.expires_at then
-				row_timeout = math.max(0, m.expires_at - epoch_fn())
+				row_timeout = math.max(0, m.expires_at - deadline_now())
 				if row_timeout <= 0 then
 					enabled = false
 					if m.is_winner then winner_expired_during_build = true end
@@ -1192,7 +1192,7 @@ local function update_preview_body(buf)
 			local function render_preview()
 				local callback_ok, callback_err = xpcall(function()
 					if my_generation ~= _preview_render_generation then return end
-					local render_now = epoch_fn()
+					local render_now = deadline_now()
 					local live_rows = {}
 					local live_timeout = nil
 					local winner_expired = false

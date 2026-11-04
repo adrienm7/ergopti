@@ -54,6 +54,7 @@ local function run_scenario()
 		current_action_epoch = function() return action_epoch end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
+		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }
 			scheduled[#scheduled + 1] = handle

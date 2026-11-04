@@ -32,6 +32,32 @@ local DEQUEUE_RETRY_TIMER_FAILURES = {
 }
 
 helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
+	helpers.it("(hotstring-clock-regression) expires a row despite a wall clock rollback", function()
+		with_fixture(function(fixture)
+			local context = fixture.load_tooltip(CASES[2])
+			local scheduler = require("adapters.timer_scheduler")
+			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
+			local awake, wall, expiries = 100, 100, 0
+			scheduler.hotstring_time = function() return awake end
+			hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = xpcall(function()
+				helpers.assert_true(context.tooltip.show_stacked({
+					{ text = "winner", duration = 0.5, expire_at = 100.5,
+						on_expire = function() expiries = expiries + 1 end },
+				}, true))
+				local timers = running_timers(context.timers)
+				helpers.assert_eq(#timers, 1)
+				awake, wall = 101, 41
+				timers[1].running = false
+				timers[1].fn()
+				helpers.assert_eq(expiries, 1, "winner expires after monotonic deadline")
+			end, debug.traceback)
+			scheduler.hotstring_time, hs.timer.secondsSinceEpoch = old_awake, old_wall
+			context.tooltip.hide_forced()
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("(tooltip-watcher-first-deadline) mounts watchers for an absolute first render", function()
 		with_fixture(function(fixture)
 			local context = fixture.load_tooltip(CASES[2])

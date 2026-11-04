@@ -15,6 +15,7 @@
 local M = {}
 local hs = hs
 local Logger = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
@@ -411,7 +412,7 @@ end
 local function arm_dequeue_timer(retry_delay_sec)
 	if not stop_dequeue_timer() then return false end
 	if not _dequeue_rows then return true end
-	local delay = Dequeue.next_expiry_delay_sec(_dequeue_rows, hs.timer.secondsSinceEpoch(), _dequeue_opts)
+	local delay = Dequeue.next_expiry_delay_sec(_dequeue_rows, TimerScheduler.hotstring_time(), _dequeue_opts)
 	local schedule_delay = retry_delay_sec or (delay and math.max(0, delay) or 0)
 	local generation = _ui_generation
 	local timer_handle = nil
@@ -690,7 +691,7 @@ end
 --- Shows a stacked multi-row tooltip where each row has its own tint.
 --- Rows are { text, tint, trigger_label, dimmed, duration }.
 --- When rows carry distinct non-zero duration values the dequeue path activates:
---- each row tracks its own expire_at timestamp and a timer prunes expired rows
+--- each row tracks its own monotonic expire_at timestamp and a timer prunes expired rows
 --- and re-renders the remaining stack, so a short row disappears first and
 --- longer rows stay visible. When all durations are identical (or zero) the
 --- simple single-timer path (set by tooltip.set_timeout before this call) is
@@ -735,7 +736,7 @@ function M.show_stacked(rows, is_enabled)
 		end
 
 		if Dequeue.should_use_dequeue_path(rows, _dequeue_opts) then
-			local now = hs.timer.secondsSinceEpoch()
+			local now = TimerScheduler.hotstring_time()
 			_dequeue_rows = select(1, Dequeue.stamp_expiry_times(rows, now, _dequeue_opts))
 
 			if not render_with_watcher_ownership(_dequeue_rows, reuse_watchers) then
@@ -773,7 +774,7 @@ end
 _dequeue_tick = function()
 	local ok, err = xpcall(function()
 		if not _dequeue_rows then return end
-		local now = hs.timer.secondsSinceEpoch()
+		local now = TimerScheduler.hotstring_time()
 		local owner_expired = nil
 		for _, row in ipairs(_dequeue_rows) do
 			if row.expire_at and row.expire_at ~= 0 and now >= row.expire_at

@@ -35,6 +35,10 @@ local function load_keymap()
 		reset_for_action_epoch = function() return true end,
 	}, { __index = function() return function() end end })
 
+	local scheduler = require("adapters.timer_scheduler")
+	local scheduler_hs = hs
+	local original_awake = scheduler.hotstring_time
+	scheduler.hotstring_time = function() return original_awake() + 10000 end
 	local state = nil
 	local RealState = require("modules.keymap.state")
 	package.loaded["modules.keymap.state"] = setmetatable({
@@ -90,10 +94,12 @@ local function load_keymap()
 	return {
 		keymap = keymap,
 		state = state,
-		now = function() return hs_stub.timer.secondsSinceEpoch() end,
+		clock_hs = scheduler_hs,
+		now = function() return scheduler.hotstring_time() end,
 		type_char = function(chars) return keydown(event(types.keyDown, 0, chars)) end,
 		click = function() return mouse(event(types.leftMouseDown, 0)) end,
 		cleanup = function()
+			scheduler.hotstring_time = original_awake
 			for name in pairs(package.loaded) do
 				if type(name) == "string" and name:match("^modules%.keymap") then package.loaded[name] = nil end
 			end
@@ -131,6 +137,42 @@ helpers.describe("hotstrings.idle_reset_seconds: a pause starts a new word", fun
 			helpers.assert_eq(f.state.WORD_TIMEOUT_SEC, 3,
 				"the delays must no longer turn the shipped pause into never")
 			helpers.assert_eq(f.keymap.is_click_resets_word_enabled(), true)
+		end)
+	end)
+
+	helpers.it("expires suppression after wall-clock rollback on the real key tap (hotstring-clock-regression)", function()
+		with_keymap(function(f)
+			local scheduler = require("adapters.timer_scheduler")
+			local old_awake, old_wall = scheduler.hotstring_time, hs.timer.secondsSinceEpoch
+			local awake, wall = 1000, 1000
+			scheduler.hotstring_time = function() return awake end
+			hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 1001, 941
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "a civil clock rollback must not extend suppression")
+			end)
+			scheduler.hotstring_time, hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("expires suppression after sleep on the real key tap (hotstring-clock-wake)", function()
+		with_keymap(function(f)
+			local scheduler = require("adapters.timer_scheduler")
+			local old_awake, old_wall = scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch
+			local awake, wall = 20000, 50000
+			scheduler.awake_time = function() return awake end
+			f.clock_hs.timer.secondsSinceEpoch = function() return wall end
+			local ok, err = pcall(function()
+				f.state.suppress_rescan(0.5)
+				awake, wall = 20000.1, 50060.1
+				f.type_char("d")
+				helpers.assert_eq(f.state.buffer, "d", "sleep must consume the suppression window")
+			end)
+			scheduler.awake_time, f.clock_hs.timer.secondsSinceEpoch = old_awake, old_wall
+			if not ok then error(err, 0) end
 		end)
 	end)
 

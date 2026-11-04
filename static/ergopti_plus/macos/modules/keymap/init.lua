@@ -1675,14 +1675,14 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
 	-- as always-ignored, so we move the check before the expensive LLM/interceptor
 	-- path so typing in any HS dialog or webview incurs no processing overhead.
-	-- One clock read per keystroke is shared by the ignored-window cache and the
-	-- inter-key delta. Ignored windows are a total pass-through boundary: no LLM,
+	-- The ignored-window and secure-field caches share their civil-clock read.
+	-- Ignored windows are a total pass-through boundary: no LLM,
 	-- interceptor, buffer, preview, or expansion runs there; only an unknown
 	-- classification may arm its off-tap AX refresh.
-	local now = hs.timer.secondsSinceEpoch()
+	local context_now = hs.timer.secondsSinceEpoch()
 
 	local is_ignored, window_generation = km_utils.is_ignored_window(
-		CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
+		CoreState.ignored_window_titles, CoreState.ignored_window_patterns, context_now)
 	if type(window_generation) == "number"
 		and window_generation ~= _last_window_context_generation
 	then
@@ -1695,7 +1695,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if is_ignored ~= false then
 		return internal_loopback == true
 	end
-	local is_secure = km_utils.is_secure_field(now)
+	local is_secure = km_utils.is_secure_field(context_now)
 	if is_secure ~= false then
 		return internal_loopback == true
 	end
@@ -1704,6 +1704,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		arm_observed_context_reconcile(true)
 	end
 
+	local now = TimerScheduler.hotstring_time()
 	local dt  = now - CoreState.last_key_time
 	_user_hotstring_elapsed = dt
 	-- 0 is the "no key yet" seed, not a timestamp: the first key has no pause.

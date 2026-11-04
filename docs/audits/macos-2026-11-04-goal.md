@@ -2,7 +2,7 @@
 
 This ledger starts with the explicit request for at least 100 bugs. Earlier fixes are included only after their individual evidence is reviewed. A shared root cause counts once even when it affects several actions or platforms. Passing focused tests does not establish native macOS validation or a complete CI pass.
 
-Confirmed and regression-tested: **100 verified / 100**, plus one excluded historical candidate under revalidation.
+Confirmed and regression-tested: **103 verified / 100**, plus one excluded historical candidate under revalidation.
 
 | ID  | Reproduced failure                                                                                        | Fix commit | Focused regression module                                          |
 | --- | --------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
@@ -39,3 +39,7 @@ ID 100 covers clipped or miscentered menu badges (4d8944e); its geometry asserti
 The damaged-cache fix also covers Linux and Windows (16eba64). Five focused Linux persistence cases pass; the Windows regression is added but has not run natively. Protected rollback assertions are now observed externally (4cc65c6); its pre-fix overlay fails because the older contract lacks the new rollback capability, so historical d609b63 remains outside the verified total pending an end-to-end baseline.
 
 ID 101 is a newly reproduced malformed notification receipt (6ea6ff1): a native constructor returning a boolean or an object with a failing send-property access escaped the refusal boundary. Access is protected before owner publication; the 13-case notification module passes. This brings the verified total to 100 while continuing to exclude d609b63. IDs are stable and are not renumbered to hide the exclusion. The new TOML neighbor-preservation test (9070271) adds coverage only and no bug count.
+
+ID 102 is the newly reproduced hotstring deadline extension after a backward wall-clock correction (eadd7bd with 6d69e87). Input suppression, previews and tooltip expiration share nondecreasing elapsed time. Observable sleep and significant forward wall-clock jumps expire short deadlines; invalid wall samples preserve awake-time progress. Integrated focused results: clock 1, state 15, actual key callback 28 and tooltip ownership 13 cases all pass. The paired sleep correction avoids introducing a migration regression and does not add another bug count. Native macOS sleep/wake acceptance remains outstanding.
+
+ID 103: a duplicate manual-update API callback overtakes the active Atom fallback (2142e2f). The first callback now owns the transition; the integrated auto-check module passes 41 cases. ID 104: a ready model-browser view reports successful catalogue/progress updates when JavaScript delivery refuses or is unavailable (6817a5f). Delivery receipts are propagated and undeliverable scripts are not queued; the integrated lifecycle module passes 12 cases. Both new regressions were reproduced before their fixes.
