@@ -113,7 +113,13 @@ function M.new(options)
 			local click = table.remove(held, 1)
 			local label = ClickIntent.describe(click.path)
 			local row = ClickIntent.find(published_rows, click.path)
-			if not row or type(row.fn) ~= "function" then
+			local enabled, prefix = true, {}
+			for _, title in ipairs(click.path) do
+				prefix[#prefix + 1] = title
+				local ancestor = ClickIntent.find(published_rows, prefix)
+				if not ancestor or ancestor.disabled == true then enabled = false; break end
+			end
+			if not row or not enabled or type(row.fn) ~= "function" then
 				lost[#lost + 1] = label
 			elseif ClickIntent.already_applied(row, click.desired) then
 				Logger.info(LOG, "Held menu click on '%s' skipped: the row is already %s, the state its click asked for.",
@@ -125,7 +131,7 @@ function M.new(options)
 			end
 		end
 		if #lost > 0 then
-			Logger.warn(LOG, "Held menu click(s) on %s not replayed: the refreshed menu has no such row.",
+			Logger.warn(LOG, "Held menu click(s) on %s not replayed: the refreshed row is unavailable.",
 				table.concat(lost, ", "))
 			local ok, err = pcall(notify)
 			if not ok then Logger.error(LOG, "Lost menu click notice failed: %s.", tostring(err)) end
