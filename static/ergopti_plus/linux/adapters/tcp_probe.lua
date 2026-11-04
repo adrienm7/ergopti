@@ -21,6 +21,8 @@
 local M = {}
 
 local NativeTimer = require("infra.native_timer")
+local Logger = require("logger.shim")
+local LOG = "adapters.tcp_probe"
 
 --- Starts one probe.
 --- @param host string Host name or address (brackets already removed).
@@ -44,7 +46,10 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		settled = true
 		local pending = listeners
 		listeners = {}
-		for _, listener in ipairs(pending) do listener() end
+		for _, listener in ipairs(pending) do
+			local ok = pcall(listener)
+			if not ok then Logger.error(LOG, "TCP probe settlement callback raised.") end
+		end
 	end
 
 	local function close(handle)
@@ -62,7 +67,10 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		if resolving and request then pcall(luv.cancel, request) end
 		close(timer)
 		close(tcp)
-		if not cancelled then callback(reachable, reason) end
+		if not cancelled then
+			local ok = pcall(callback, reachable, reason)
+			if not ok then Logger.error(LOG, "TCP probe completion callback raised.") end
+		end
 		settle()
 	end
 
@@ -114,7 +122,10 @@ function M.probe(host, port, timeout_ms, callback, luv)
 	function child.is_settled() return settled end
 	function child.on_settled(listener)
 		if type(listener) ~= "function" then return false end
-		if settled then listener() else listeners[#listeners + 1] = listener end
+		if settled then
+			local ok = pcall(listener)
+			if not ok then Logger.error(LOG, "TCP probe settlement callback raised.") end
+		else listeners[#listeners + 1] = listener end
 		return true
 	end
 	return child, nil

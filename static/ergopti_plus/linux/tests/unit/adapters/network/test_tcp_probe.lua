@@ -81,6 +81,24 @@ it("a closed loopback port answers unreachable with the connect reason", functio
 	helpers.assert_eq(answer[2], "connect")
 end)
 
+it("isolates throwing callbacks and delivers all settlement listeners", function()
+	local server, port = listener()
+	local notified = 0
+	local child = assert(Probe.probe("127.0.0.1", port, 1000, function()
+		error("controlled completion failure")
+	end, luv))
+	child.on_settled(function() error("controlled settlement failure") end)
+	child.on_settled(function() notified = notified + 1 end)
+	local ok = pcall(run_until, function() return child.is_settled() end)
+	server:close()
+	luv.run("nowait")
+	helpers.assert_true(ok, "a callback exception must not escape into the native loop")
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(notified, 1, "one listener must not suppress another")
+	local immediate = pcall(child.on_settled, function() error("controlled late failure") end)
+	helpers.assert_true(immediate, "late listeners use the same exception isolation")
+end)
+
 it("a cancel answers nothing and still settles the child", function()
 	local server, port = listener()
 	local called = false
