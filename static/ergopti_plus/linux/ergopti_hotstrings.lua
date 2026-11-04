@@ -2124,8 +2124,8 @@ local function main()
 	-- The metrics count clicks, wheel turns and distance from the same stream.
 	-- The manager names the event's pointer kind: main() is at LuaJIT's
 	-- 60-upvalue limit.
-	local function on_pointer_event(kind_of_event, code, value)
-		keystats.record_pointer(kind_of_event, code, value)
+	local function on_pointer_event(kind_of_event, code, value, source)
+		keystats.record_pointer(kind_of_event, code, value, source)
 		if kind_of_event == "frame" then return end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)

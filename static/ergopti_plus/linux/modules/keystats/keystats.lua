@@ -1167,8 +1167,9 @@ end
 --- @param kind string "press", "motion" or "frame" (pointer_metrics).
 --- @param code integer evdev code.
 --- @param value integer evdev value.
-function M.record_pointer(kind, code, value)
-	local delta = _pointer.observe(kind, code, value)
+--- @param source any|nil Pointer device identity.
+function M.record_pointer(kind, code, value, source)
+	local delta = _pointer.observe(kind, code, value, source)
 	if not delta or not may_record() then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
