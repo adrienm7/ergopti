@@ -911,10 +911,12 @@ helpers.describe("file_system adapter", function()
     end)
 
     helpers.it("exists returns true after write", function()
+	  helpers.assert_true(fs.write(tmp_file, "hello world"), "the fixture must be written")
       helpers.assert_true(fs.exists(tmp_file), "file exists after write")
     end)
 
     helpers.it("read returns exact content written", function()
+	  helpers.assert_true(fs.write(tmp_file, "hello world"), "the fixture must be written")
       local content = fs.read(tmp_file)
       helpers.assert_eq(content, "hello world", "read returns written content")
     end)
