@@ -278,7 +278,7 @@
 			"reproduction": "Open the native model browser, hold a genuine configuration write lease, select model B and click Pick.",
 			"root_cause": "static/ergopti_plus/windows/ui/model_browser/init.ahk:_LLM_ModelBrowser_PickRow ignores the transactional Boolean returned by LLM_Menu_SetModel and always hides the browser. The Web sibling closes only after an acknowledged success.",
 			"silent_failure": "The unchanged model A remains selected but its native browser disappears, presenting the refused operation as finished.",
-			"regression_test": "Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry."
+			"regression_test": "Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry. AppPicker sibling: run41924556519 proves actual lease and sharing refusals destroy the current native picker and lose checkbox selections; both fail after genuine durable refusal. This variant is retained under this durability/presentation family without increasing the finding count. Corrective outcome ownership is being prepared."
 		},
 		{
 			"id": "AHK-026",
@@ -597,7 +597,7 @@
 			"reproduction": "Native run41912869071 ate4e5e62 opens the actual layer host with sourceA, independently writes valid sourceB, then delivers the old page save through the real SDK bridge and host dispatch. Its receipt records save_entered1, save_returned1, apply_calls1 and newer_bytes_preserved0, individually and reversed. The three adjacent ready-delivery controls pass.",
 			"root_cause": "The Windows layer editor reads text for the page but retains no source receipt bound to its exact host, epoch, folders and target. GUI Save then uses an explicit unconditional writer, so it can adopt and replace later bytes from another editor.",
 			"silent_failure": "Saving an unchanged older page erases a newer navigation binding and requests applying that stale content. A retired host must also lose authority to request apply after a successful durable save.",
-			"regression_test": "The real LRDT host/native GUI, SDK callback, host timer dispatch and canonical corpus drive source-stale plus a fresh-host successful save. The fix captures the offered source once per host and uses the existing lease and admitted unchanged-source publisher; explicit non-GUI Save retains its existing contract. Exact host/epoch/folders/target admission persists through publication and is checked again after success logging before apply. A separate real WM_CLOSE-at-success-log probe observes saved=true/applied=false with zero apply calls. FakeHost save cases become explicitly inert rather than manufacturing consent. Native stale-source fail-before measured; post-fix pending. Linux already retains this opening receipt; the macOS sibling remains outside this Windows correction."
+			"regression_test": "The real LRDT host/native GUI, SDK callback, host timer dispatch and canonical corpus drive source-stale plus a fresh-host successful save. The fix captures the offered source once per host and uses the existing lease and admitted unchanged-source publisher; explicit non-GUI Save retains its existing contract. Exact host/epoch/folders/target admission persists through publication and is checked again after success logging before apply. A separate real WM_CLOSE-at-success-log probe observes saved=true/applied=false with zero apply calls. FakeHost save cases become explicitly inert rather than manufacturing consent. Native stale-source fail-before measured; post-fix pending. Linux already retains this opening receipt; the macOS sibling remains outside this Windows correction. Native post-fix run41924556519 at9a8ebad passes the selected regression cases individually and reversed, with full production compile and90/90 native hotstring E2E. HTTP E2E was not selected."
 		},
 		{
 			"id": "AHK-055",
@@ -619,7 +619,7 @@
 			"reproduction": "Native run41919871873 at2298478 uses the real native constructor, header click, selection and original Save/Delete buttons. Both cases report displayed alpha/form zeta/header_clicks1. Save changes the other stored entry while alpha remains unchanged; Delete leaves alpha present after a different entry was removed. The same failures repeat in reverse.",
 			"root_cause": "The native personal editor permits automatic header sorting but its form, Save and Delete handlers use the visible row number directly as the TOML entry-array index. Header ordering therefore separates displayed identity from the record mutated. This differs from AHK-031’s initial active-model insertion ordering.",
 			"silent_failure": "Editing or deleting the selected visible row can mutate another persistent personal expansion. The form and confirmation may also describe the wrong record, rather than the row the user selected.",
-			"regression_test": "Two personal-native-sort-owner probes use the production public native fallback, a real header HWND click, actual selection and BM_CLICK on the original buttons. Independent durable TOML checks follow the displayed trigger identity and inspect the result before the form assertion. No copied ListView style or fake writer is used. Adding NoSort retains TOML row order; the native editor does not advertise a separate sorting feature. Native fail-before measured; post-fix qualification pending."
+			"regression_test": "Two personal-native-sort-owner probes use the production public native fallback, a real header HWND click, actual selection and BM_CLICK on the original buttons. Independent durable TOML checks follow the displayed trigger identity and inspect the result before the form assertion. No copied ListView style or fake writer is used. Adding NoSort retains TOML row order; the native editor does not advertise a separate sorting feature. Native fail-before measured; post-fix qualification pending. Native post-fix run41924556519 at9a8ebad passes the selected regression cases individually and reversed, with full production compile and90/90 native hotstring E2E. HTTP E2E was not selected."
 		},
 		{
 			"id": "AHK-057",
@@ -630,7 +630,7 @@
 			"reproduction": "Raw native evidence from run41919871873 at2298478 proves Down accepted, two genuine keyboard callbacks with refused Up, then Input=abc/EndReason=Max/InProgress=false on the third character. Sending d returns under the owned Edit target guard, but no further Up is attempted and the final held-debt assertion fails, individually and reversed. The one-character retry control passes. The generic last-observation phase label was initially misread as an acquisition failure; the actual failing assertion is subject.ahk:554 after the next-key observation.",
 			"root_cause": "GestureStartKeyboardWatcher constructs InputHook(\"V L3\") and describes L3 as an input level. L is a collected-text length limit, so three characters terminate the only shared keyboard observer even when a refused mouse release still needs later retries.",
 			"silent_failure": "A synthetic held mouse button can remain held after later keyboard input because its recovery observer has already ended. Retaining typed text is unnecessary for a key-down observer.",
-			"regression_test": "Three gesture-keywatcher-length cases use the actual native hook and callbacks, keyboard injection confined to an explicitly opted-in verified child-owned Edit, and passive mouse I/O. One, three and eight refused-key sequences must retain the same observer, recover at the next allowed Up and pass the complete typed text through. The fix uses V L0 and KeyOpt All NI, preserving MinSendLevel0, notifications and visible input while ignoring text collection. Old pins are adapted; final held-state and cleanup oracles remain strict. Native three-character fail-before measured; long/text-retention coverage and post-fix qualification pending. No physical mouse injection or physical-key claim is made."
+			"regression_test": "Three gesture-keywatcher-length cases use the actual native hook and callbacks, keyboard injection confined to an explicitly opted-in verified child-owned Edit, and passive mouse I/O. One, three and eight refused-key sequences must retain the same observer, recover at the next allowed Up and pass the complete typed text through. The fix uses V L0 and KeyOpt All NI, preserving MinSendLevel0, notifications and visible input while ignoring text collection. Old pins are adapted; final held-state and cleanup oracles remain strict. Native three-character fail-before measured; long/text-retention coverage and post-fix qualification pending. No physical mouse injection or physical-key claim is made. Native post-fix run41924556519 at9a8ebad passes the selected regression cases individually and reversed, with full production compile and90/90 native hotstring E2E. HTTP E2E was not selected."
 		},
 		{
 			"id": "AHK-058",
@@ -641,7 +641,84 @@
 			"reproduction": "Native Windows run41919871873 at2298478 executes torn-drain and undelimited-drain through the real journal reader and rollover owner. Both require the bounded one-second rescue timer to revoke initialization; the committed offset stays108. The blank-batch-drain control advances over5001 empty lines and succeeds.",
 			"root_cause": "KL_DayRollover repeats every successful non-EOF ingest without checking committed byte progress. The reader deliberately preserves an unterminated record, so each iteration revisits the same offset and cannot complete the rollover or yield to the resident writer.",
 			"silent_failure": "A final partial journal record can trap day rollover in a tight loop. The journal must remain intact until its final delimiter arrives.",
-			"regression_test": "The three new rollover-state-recovery cases exercise actual files, reader, SQLite ledger and owner. Torn and complete-but-undelimited final records must return journal_no_progress promptly, retain the exact source and pending events, then succeed after the real delimiter is appended. Empty batches with real offset progress remain accepted. Guard added after successful non-EOF ingest; native post-fix qualification pending."
+			"regression_test": "The three new rollover-state-recovery cases exercise actual files, reader, SQLite ledger and owner. Torn and complete-but-undelimited final records must return journal_no_progress promptly, retain the exact source and pending events, then succeed after the real delimiter is appended. Empty batches with real offset progress remain accepted. Guard added after successful non-EOF ingest; native post-fix qualification pending. Native post-fix run41924556519 at9a8ebad passes the selected regression cases individually and reversed, with full production compile and90/90 native hotstring E2E. HTTP E2E was not selected."
+		},
+		{
+			"id": "AHK-059",
+			"title": "Legacy terminator migration reuses occupied record and state keys",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 at9a8ebad: both existing-record and future-false-state cases acknowledge migration but the actual engine omits the legacy character; fresh allocation and existing-character controls pass, individually and reversed.",
+			"root_cause": "HotstringsTerminatorMoveLegacy assigns custom_<codepoint> without reserving the admitted raw record and state namespace. An existing record or future false state can shadow a newly migrated character. The ordinary UI already owns a collision-free allocator.",
+			"silent_failure": "An acknowledged delimiter migration silently changes matching behavior and may disable a newly imported terminator.",
+			"regression_test": "Four terminator-move key allocation cases exercise real source admission, ConfigCommitUpdates and runtime projection, including second-boot idempotence. The fix reserves the raw namespace and uses _HotstringsTerminatorFreshKey; native post-fix execution pending."
+		},
+		{
+			"id": "AHK-060",
+			"title": "Terminator string membership merges case-distinct Unicode characters",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 reproduces seven lowercase engine/preview failures with uppercase controls passing, plus both exact-consumption migration failures with both/neither controls passing. Four Unicode-boundary/magic-membership probes stop on a missing headless validation helper and do not qualify those paths.",
+			"root_cause": "Windows terminator consumers use the default case-insensitive InStr and StrReplace despite exact scalar record identity. This affects matcher, consumption, framing, boundaries, preview and legacy migration. Lua sibling membership is exact.",
+			"silent_failure": "Typing an unconfigured case-distinct character can trigger an expansion, consume user text, invent a boundary, alter retained framing or reset preview incorrectly.",
+			"regression_test": "Twenty-two probes cover genuine engine and public migration consumers. All identified character-set comparisons now request case sensitivity. Four fixture prerequisite repairs and complete post-fix native qualification pending; no per-call-site count."
+		},
+		{
+			"id": "AHK-061",
+			"title": "A deleted default personal section hides the entries of the displayed section",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 case29 reports pointer=deleted_section, dropdown=Alpha, source_entries=2, visible_entries=0. The live-default control passes; reverse replay agrees.",
+			"root_cause": "OpenPersonalEditor trusts a saved nonempty default_section even when no section has that identity. The native dropdown displays its first live item while the model and list still address the absent section.",
+			"silent_failure": "An apparently selected personal section can look empty and invite unnecessary recreation of existing entries.",
+			"regression_test": "Two personal-native-default-owner cases use the actual constructor and DDL control, require unchanged opening files/preferences, and compare the live list with real source entries. The fix chooses an existing section before projecting both controls; post-fix pending."
+		},
+		{
+			"id": "AHK-062",
+			"title": "An old personal section switch destroys a successor opened during native retirement",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 case32 observes destroys=1, newer_seen=1, newer_alive_after=0, final_section=beta, newer_is_current=0. The ordinary switch control passes; reverse replay agrees.",
+			"root_cause": "_SwitchEditorSection destroys its retired window and then unconditionally calls OpenPersonalEditor. Native WM_DESTROY callbacks can legitimately publish a newer session before that old call resumes.",
+			"silent_failure": "The older user operation closes and replaces a newer personal editor session.",
+			"regression_test": "Two personal-native-switch-owner cases reenter the public constructor from exact owned-window WM_DESTROY. The fix checks the retired session epoch and successor slot after Destroy, and removes the redundant stale model read. Post-fix pending."
+		},
+		{
+			"id": "AHK-063",
+			"title": "A stale personal editor constructor publishes a dead priority control",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41924556519 case34 proves parent_create=1, newer_seen=1, native_priority_alive=1, global_priority_matches=0 and priority_error=Error. The no-reentry control passes; reverse replay agrees.",
+			"root_cause": "OpenPersonalEditor assigns _PersonalEditorPrioCtrl during construction before its final session-epoch check. A successor created through native control notifications owns a live priority edit, but the older constructor overwrites the global and then destroys that obsolete control.",
+			"silent_failure": "The current visible editor retains a dangling priority-control reference and cannot reliably save its entry.",
+			"regression_test": "Two personal-native-constructor-owner cases observe real WM_PARENTNOTIFY creation, exact HWND ownership and a subsequent genuine save. The priority control remains private until atomically published with the admitted GUI/source at the final epoch check. Post-fix pending."
+		},
+		{
+			"id": "AHK-064",
+			"title": "A rebuild guard admission failure waits forever for a nonexistent peer",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41925176895 at81d5aae: a real directory at rebuild.lock requires the one-second rescue timer to remove the obstruction before acquisition returns; the real peer-handle release control passes, individually and reversed.",
+			"root_cause": "FSOpenExclusiveGuard returns the same zero for genuine sharing contention and all other native opening or file-type failures. _KLR_RebuildAcquire interprets every zero as peer ownership and loops without a build deadline.",
+			"silent_failure": "A wrong-type or inaccessible lock path leaves the statistics rebuild waiting indefinitely rather than reporting an admission failure.",
+			"regression_test": "Two klr-rebuild-guard-admission cases retain actual CreateFile/CloseHandle behavior and bounded rescue, plus an added caller case verifying the prior published SQLite image and exact ledger remain intact. The adapter now reports Contended only for sharing/lock violations; other failures return promptly. Post-fix pending."
+		},
+		{
+			"id": "AHK-065",
+			"title": "Capacity eviction invokes the failure callback of an already cancelled request",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41925176895 at81d5aae: actual RawPost, CancelAsync and successor admission at capacity1 yield predecessor_callbacks=1 instead of0. Both real facade handles retire, both controlled native jobs spawn, and the successor completes. The live-eviction control delivers its one trimmed failure as expected; reverse agrees.",
+			"root_cause": "_LLMRemote_TrimAsyncRegistry detaches and cleans up the oldest request but calls its on_fail callback without honoring the cancelled flag. CancelAsync deliberately marks logical cancellation before deferred cleanup.",
+			"silent_failure": "An explicitly cancelled request can later publish a stale error through a callback whose owner already revoked delivery.",
+			"regression_test": "Two remote-trim-cancel cases use the public request/cancellation pipeline and actual managed facade with controlled Job I/O. The fix suppresses only the cancelled predecessor callback while retaining cleanup and live eviction notification; post-fix pending."
 		}
 	]
 }

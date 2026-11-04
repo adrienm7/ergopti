@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **58 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **65 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1057,3 +1057,95 @@ Consequence: A final partial journal record can trap day rollover in a tight loo
 Regression: The three new rollover-state-recovery cases exercise actual files, reader, SQLite ledger and owner. Torn and complete-but-undelimited final records must return journal_no_progress promptly, retain the exact source and pending events, then succeed after the real delimiter is appended. Empty batches with real offset progress remain accepted. Guard added after successful non-EOF ingest; native post-fix qualification pending.
 
 The ongoing register now contains **58 distinct new findings**. The requested target of 1,000 remains unmet.
+
+## AHK-059: Legacy terminator migration reuses occupied record and state keys
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+HotstringsTerminatorMoveLegacy assigns custom\_<codepoint> without reserving the admitted raw record and state namespace. An existing record or future false state can shadow a newly migrated character. The ordinary UI already owns a collision-free allocator.
+
+Reproduction: Native run41924556519 at9a8ebad: both existing-record and future-false-state cases acknowledge migration but the actual engine omits the legacy character; fresh allocation and existing-character controls pass, individually and reversed.
+
+Consequence: An acknowledged delimiter migration silently changes matching behavior and may disable a newly imported terminator.
+
+Regression: Four terminator-move key allocation cases exercise real source admission, ConfigCommitUpdates and runtime projection, including second-boot idempotence. The fix reserves the raw namespace and uses \_HotstringsTerminatorFreshKey; native post-fix execution pending.
+
+## AHK-060: Terminator string membership merges case-distinct Unicode characters
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+Windows terminator consumers use the default case-insensitive InStr and StrReplace despite exact scalar record identity. This affects matcher, consumption, framing, boundaries, preview and legacy migration. Lua sibling membership is exact.
+
+Reproduction: Native run41924556519 reproduces seven lowercase engine/preview failures with uppercase controls passing, plus both exact-consumption migration failures with both/neither controls passing. Four Unicode-boundary/magic-membership probes stop on a missing headless validation helper and do not qualify those paths.
+
+Consequence: Typing an unconfigured case-distinct character can trigger an expansion, consume user text, invent a boundary, alter retained framing or reset preview incorrectly.
+
+Regression: Twenty-two probes cover genuine engine and public migration consumers. All identified character-set comparisons now request case sensitivity. Four fixture prerequisite repairs and complete post-fix native qualification pending; no per-call-site count.
+
+## AHK-061: A deleted default personal section hides the entries of the displayed section
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+OpenPersonalEditor trusts a saved nonempty default_section even when no section has that identity. The native dropdown displays its first live item while the model and list still address the absent section.
+
+Reproduction: Native run41924556519 case29 reports pointer=deleted_section, dropdown=Alpha, source_entries=2, visible_entries=0. The live-default control passes; reverse replay agrees.
+
+Consequence: An apparently selected personal section can look empty and invite unnecessary recreation of existing entries.
+
+Regression: Two personal-native-default-owner cases use the actual constructor and DDL control, require unchanged opening files/preferences, and compare the live list with real source entries. The fix chooses an existing section before projecting both controls; post-fix pending.
+
+## AHK-062: An old personal section switch destroys a successor opened during native retirement
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+\_SwitchEditorSection destroys its retired window and then unconditionally calls OpenPersonalEditor. Native WM_DESTROY callbacks can legitimately publish a newer session before that old call resumes.
+
+Reproduction: Native run41924556519 case32 observes destroys=1, newer_seen=1, newer_alive_after=0, final_section=beta, newer_is_current=0. The ordinary switch control passes; reverse replay agrees.
+
+Consequence: The older user operation closes and replaces a newer personal editor session.
+
+Regression: Two personal-native-switch-owner cases reenter the public constructor from exact owned-window WM_DESTROY. The fix checks the retired session epoch and successor slot after Destroy, and removes the redundant stale model read. Post-fix pending.
+
+## AHK-063: A stale personal editor constructor publishes a dead priority control
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+OpenPersonalEditor assigns \_PersonalEditorPrioCtrl during construction before its final session-epoch check. A successor created through native control notifications owns a live priority edit, but the older constructor overwrites the global and then destroys that obsolete control.
+
+Reproduction: Native run41924556519 case34 proves parent_create=1, newer_seen=1, native_priority_alive=1, global_priority_matches=0 and priority_error=Error. The no-reentry control passes; reverse replay agrees.
+
+Consequence: The current visible editor retains a dangling priority-control reference and cannot reliably save its entry.
+
+Regression: Two personal-native-constructor-owner cases observe real WM_PARENTNOTIFY creation, exact HWND ownership and a subsequent genuine save. The priority control remains private until atomically published with the admitted GUI/source at the final epoch check. Post-fix pending.
+
+## AHK-064: A rebuild guard admission failure waits forever for a nonexistent peer
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+FSOpenExclusiveGuard returns the same zero for genuine sharing contention and all other native opening or file-type failures. \_KLR_RebuildAcquire interprets every zero as peer ownership and loops without a build deadline.
+
+Reproduction: Native run41925176895 at81d5aae: a real directory at rebuild.lock requires the one-second rescue timer to remove the obstruction before acquisition returns; the real peer-handle release control passes, individually and reversed.
+
+Consequence: A wrong-type or inaccessible lock path leaves the statistics rebuild waiting indefinitely rather than reporting an admission failure.
+
+Regression: Two klr-rebuild-guard-admission cases retain actual CreateFile/CloseHandle behavior and bounded rescue, plus an added caller case verifying the prior published SQLite image and exact ledger remain intact. The adapter now reports Contended only for sharing/lock violations; other failures return promptly. Post-fix pending.
+
+## AHK-065: Capacity eviction invokes the failure callback of an already cancelled request
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before; source correction integrated; native post-fix pending.
+
+\_LLMRemote_TrimAsyncRegistry detaches and cleans up the oldest request but calls its on_fail callback without honoring the cancelled flag. CancelAsync deliberately marks logical cancellation before deferred cleanup.
+
+Reproduction: Native run41925176895 at81d5aae: actual RawPost, CancelAsync and successor admission at capacity1 yield predecessor_callbacks=1 instead of0. Both real facade handles retire, both controlled native jobs spawn, and the successor completes. The live-eviction control delivers its one trimmed failure as expected; reverse agrees.
+
+Consequence: An explicitly cancelled request can later publish a stale error through a callback whose owner already revoked delivery.
+
+Regression: Two remote-trim-cancel cases use the public request/cancellation pipeline and actual managed facade with controlled Job I/O. The fix suppresses only the cancelled predecessor callback while retaining cleanup and live eviction notification; post-fix pending.
+
+## Native qualification at 9a8ebad
+
+Run41924556519 discovered and executed92 selected cases individually and reversed:64 passed,28 failed in each order. AHK-056 native sort, AHK-057 watcher length and owner controls, AHK-058 rollover recovery and progress, and repaired AHK-054 save admission pass. Full production compile and90/90 native hotstring E2E pass; HTTP E2E was not selected. Four delimiter probes fail on a missing headless validation prerequisite and do not establish their intended invariant. AppPicker refusal reproduces a presentation-after-failed-durability variant of AHK-025; no extra finding count. Crash receipt controls require correction before attributing a Unicode-only defect.
+
+Run41925176895 at81d5aae executes17 new probes in both orders:6 pass and11 fail, including real override data loss, cancelled callback revival and false peer contention. The override correction is being completed with legacy preservation before integration.
+
+The register contains65 distinct findings; the requested1,000 target remains unmet.
