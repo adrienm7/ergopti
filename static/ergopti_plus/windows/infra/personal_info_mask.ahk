@@ -68,7 +68,8 @@ global PI_MASK_NBSP := Chr(0xA0)
 ; The keys the shared [policy] block must carry. Named so a half-written
 ; declaration is reported by the key it is missing, instead of masking with an
 ; empty arithmetic operand and looking like a policy decision.
-global PI_MASK_REQUIRED_POLICY := ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal"]
+global PI_MASK_REQUIRED_POLICY := ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal",
+	"preserve_separators"]
 
 ; The parsed declaration, read once. The file ships with the driver and is not
 ; user-editable, so re-reading it per keystroke would be a file open on the

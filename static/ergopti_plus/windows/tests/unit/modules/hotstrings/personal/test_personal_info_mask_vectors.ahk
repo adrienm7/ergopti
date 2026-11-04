@@ -173,6 +173,20 @@ _PIMV_InvalidPoliciesFailClosed() {
 Test("personal-info mask: every malformed shared policy fails closed",
 	_PIMV_InvalidPoliciesFailClosed)
 
+_PIMV_MissingPolicyFieldsFailClosed() {
+	Full := Map("mask_char", "•", "reveal_head", 0, "reveal_tail", 0,
+		"min_length_to_reveal", 12, "preserve_separators", true)
+	for Missing in ["mask_char", "reveal_head", "reveal_tail", "min_length_to_reveal", "preserve_separators"] {
+		Policy := Full.Clone()
+		Policy.Delete(Missing)
+		AssertEqual(Missing, PersonalInfoMaskPolicyInvalidField(Policy), "report the missing policy field")
+		AssertEqual("••••••", PersonalInfoMaskValue("SECRET", Policy), "a missing field must mask every character")
+	}
+}
+Test("personal-info mask: missing policy fields fail closed (personal-mask-missing-policy)",
+	_PIMV_MissingPolicyFieldsFailClosed)
+
+
 
 ; What is TYPED is never what the bubble shows. The mask is a display function
 ; and has no route to the injection path; this pins the other direction — that a
