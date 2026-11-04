@@ -135,6 +135,16 @@ local function opening_current(owner, state, context)
 		and owner.config_paths.get_config_dir == owner.get_config_dir
 end
 
+--- A committed file may still need application after its page was replaced.
+local function committed_folder_current(owner, state)
+	if not owner or dependency(state, "config_paths", "infra.config_paths") ~= owner.config_paths
+		or owner.config_paths.get_config_dir ~= owner.get_config_dir then return false end
+	local called, dir = pcall(owner.get_config_dir)
+	return called and dir == owner.config_dir
+		and dependency(state, "config_paths", "infra.config_paths") == owner.config_paths
+		and owner.config_paths.get_config_dir == owner.get_config_dir
+end
+
 --- Uses the existing adapter seam to keep the opening snapshot at publication.
 local function opening_files(owner, state, context)
 	return {
@@ -315,7 +325,7 @@ function M.on_message(payload, state, context)
 			end
 			return result
 		end
-		if not opening_current(owner, state, context) then result.applied = false; return result end
+		if not committed_folder_current(owner, state) then result.applied = false; return result end
 		result.applied = apply(state)
 		if result.applied then
 			Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
