@@ -58,7 +58,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -115,7 +115,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 				if on_relative and on_relative(kh, keyboard, pointer, second, grabs, emitted) == false then return false end
 				return true
 			end,
-			onClick = function() end,
+			onClick = function(code) if on_click then on_click(kh, code) end end,
 			onPointerEvent = observer,
 		})
 		kh.pump()
@@ -180,6 +180,19 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			helpers.assert_true(not has(emitted, "rel:" .. REL_X .. ":2"))
 		end)
 	end
+	helpers.it("does not report a mouse motion after relative output fails", function()
+		local reports = {}
+		drive("mouse", HOLD, { { EV_REL, REL_X, 1, 3000 } }, function() return false end,
+			function(kind) reports[#reports + 1] = kind end)
+		helpers.assert_eq(reports, {}, "a failed output cannot publish motion to a retired session")
+	end)
+	helpers.it("does not publish a pointer press after its click callback stops capture", function()
+		local reports = {}
+		local emitted = drive("mouse", HOLD, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
+			function(kind) reports[#reports + 1] = kind end, false, false, function(hook) hook.stop() end)
+		helpers.assert_eq(reports, {})
+		helpers.assert_true(not has(emitted, "key:" .. BTN_LEFT .. ":1"))
+	end)
 	helpers.it("compiles a wheel direction under its own code, never a key's", function()
 		local layer = wheel_layer()
 		local up = layer[InputEvent.wheel_layer_code("vertical", 1)]
