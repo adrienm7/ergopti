@@ -2004,7 +2004,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "7c2adad3a5a0cb59b83098a6ce1ba6d34aff4f43d85d70e9df4e326d41a26340"
+PRODUCTION_SHA256 = "dc1e7f3dd58725c963aa157d8671075fc7df1ce7cbf04d301c7956b07c10a2dd"
 
 
 @dataclass(frozen=True, slots=True)
