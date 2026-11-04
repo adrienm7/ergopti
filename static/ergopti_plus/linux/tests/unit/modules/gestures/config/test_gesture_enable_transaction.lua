@@ -80,6 +80,36 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 end
 
 helpers.describe("gestures: enabling after disabled boot", function()
+	helpers.it("does not block while loading a FIFO modifier-chord catalogue", function()
+		local uv = require("luv")
+		local shell = require("adapters.shell_runner")
+		local path = os.tmpname()
+		os.remove(path)
+		assert(shell.run("mkfifo -- " .. shell.quote(path)))
+		local code = string.format([[package.path = %q
+local paths = require("infra.paths")
+local original = paths.shared
+paths.shared = function(name) if name == "modules/actions/modifier_chords.json" then return %q end; return original(name) end
+local manager = require("modules.gestures.manager")
+assert(type(manager.get_action_names()) == "table")
+]], package.path, path)
+		local exited, expired, status, signal = false, false, nil, nil
+		local timer = assert(uv.new_timer())
+		local child
+		child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(code, sig)
+			exited, status, signal = true, code, sig
+			uv.timer_stop(timer); uv.close(timer); uv.close(child)
+		end))
+		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+			expired = true; child:kill("sigkill")
+		end))
+		while not exited do uv.run("once") end
+		uv.run("nowait")
+		os.remove(path)
+		helpers.assert_eq(expired, false, "gesture catalogue loading must not wait for a FIFO writer")
+		helpers.assert_eq(status, 0)
+		helpers.assert_eq(signal, 0)
+	end)
 	helpers.it("refuses a gesture configuration FIFO without blocking startup", function()
 		local uv = require("luv")
 		local shell = require("adapters.shell_runner")
