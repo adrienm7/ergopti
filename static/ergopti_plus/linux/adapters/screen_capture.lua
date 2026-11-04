@@ -172,7 +172,7 @@ function M.capture(mode, max_edge, on_done)
 	local dir = private_dir()
 	if not dir then return nil, "no private directory could be created" end
 	local path = dir .. "/screen.png"
-	local run, reason = ShellRunner.run_async("sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
+	local called, run, reason = pcall(ShellRunner.run_async, "sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
 		{ timeout_ms = mode == "region" and REGION_TIMEOUT_MS or FULL_TIMEOUT_MS }, function(result)
 			local outcome = M.classify(mode, result.code, result.stdout, result.error)
 			if outcome.status == "failed" and type(result.stderr) == "string" and result.stderr ~= "" then
@@ -180,9 +180,9 @@ function M.capture(mode, max_edge, on_done)
 			end
 			on_done(outcome)
 		end)
-	if not run then
+	if not called or not run then
 		os.remove(dir)
-		return nil, "the capture could not start: " .. tostring(reason)
+		return nil, "the capture could not start: " .. tostring(called and reason or run)
 	end
 	Logger.debug(LOG, "Screen capture started (mode=%s).", mode)
 	return { path = path, dir = dir, cancel = run.cancel }, nil

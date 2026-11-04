@@ -78,6 +78,24 @@ helpers.describe("linux-screen-path-receipts", function()
 	end
 end)
 
+helpers.it("screen capture removes its private directory when async startup raises", function()
+	local uv = require("luv")
+	local saved = ShellRunner.run_async
+	local directory
+	ShellRunner.run_async = function(_, args)
+		directory = args[4]:match("^(.*)/screen%.png$")
+		error("injected startup failure")
+	end
+	local ok, handle, reason = pcall(ScreenCapture.capture, "full", EDGE, function() end)
+	ShellRunner.run_async = saved
+	local remains = directory and uv.fs_lstat(directory)
+	if directory then os.remove(directory) end
+	helpers.assert_true(ok, "startup exceptions must be reported as a refusal")
+	helpers.assert_eq(handle, nil)
+	helpers.assert_true(type(reason) == "string")
+	helpers.assert_eq(remains, nil, "private capture directory leaked")
+end)
+
 -- The fake tools. Each logs its name and arguments; the behaviour is chosen
 -- per scenario.
 local BEHAVIOURS = {
