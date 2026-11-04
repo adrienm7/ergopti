@@ -300,6 +300,17 @@ helpers.describe("Hotstring preview: its own rows, not the shared window", funct
 		return preview, window, state, restore
 	end
 
+	helpers.it("(preview-covered-owner) does not hide a replacement on a late hide", function()
+		local preview, window, _, restore = preview_with()
+		local shown = preview.show({ { replacement = "text", group = "rolls", fires = true } }, "autocorrect")
+		preview.note_covered()
+		preview.hide()
+		local hides = window.hides
+		restore()
+		helpers.assert_true(shown)
+		helpers.assert_eq(hides, 0, "the covered preview no longer owns the shared surface")
+	end)
+
 	helpers.it("reports its rows while shown and forgets them once hidden or covered", function()
 		local preview, window, state, restore = preview_with()
 		helpers.assert_eq(preview.is_showing(), false)

@@ -500,9 +500,11 @@ function M.hide()
 	-- The pending expiry goes with it, so a bubble hidden by the next keystroke
 	-- does not leave a timer that fires over the top of its replacement.
 	cancel_expiry()
+	if revision ~= _revision then return end
 	local was_showing = _showing_rows ~= nil
 	_showing_rows = nil
 	_showing_opts = nil
+	if not was_showing then return end
 	Renderer.hide()
 	if revision ~= _revision then return end
 	if was_showing and _on_hidden then
@@ -515,7 +517,9 @@ end
 --- window, so neither its expiry nor its hide may withdraw what replaced it.
 function M.note_covered()
 	_revision = _revision + 1
+	local revision = _revision
 	cancel_expiry()
+	if revision ~= _revision then return end
 	_showing_rows = nil
 	_showing_opts = nil
 end
@@ -551,8 +555,11 @@ end
 
 --- Tears the window down.
 function M.destroy()
+	local revision = _revision + 1
 	M.note_covered()
+	if revision ~= _revision then return false end
 	Renderer.destroy()
+	if revision ~= _revision then return false end
 	_on_expire = nil
 	_on_hidden = nil
 end
