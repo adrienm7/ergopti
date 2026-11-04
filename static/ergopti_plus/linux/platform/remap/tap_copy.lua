@@ -57,14 +57,21 @@ end
 --- @param send function Sends the copy keystroke; raises on failure.
 function Owner:run(source, send)
 	local baseline, reason = self.ports.read_counter()
-	send()
 	if baseline == nil and reason == "unsupported" then
+		-- A previous X11 check must not retry over this newer selection.
+		self.checker:stop()
+		send()
 		if not self.unsupported_reported then
 			self.unsupported_reported = true
 			self.ports.log("info",
 				"Tap-hold copies are not checked: this session exposes no clipboard change counter (Wayland, or X11 without xclip).")
 		end
 		return
+	end
+	local ok, err = pcall(send)
+	if not ok then
+		self.checker:stop()
+		error(err, 0)
 	end
 	self.checker:start(baseline, source)
 end
