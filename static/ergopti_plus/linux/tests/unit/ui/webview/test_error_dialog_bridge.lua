@@ -242,6 +242,25 @@ helpers.describe("error window bridge (linux): policy and deferral (error-dialog
 		end)
 	end)
 
+	helpers.it("(error-dialog-fold-owner) a deferred fold cannot update a replacement window", function()
+		with_bridge(nil, function(bridge, context)
+			bridge.init()
+			bridge.on_error("first", "first failure", "first failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			bridge.on_error("second", "second failure", "second failure")
+			local old_fold = context.deferred[1].fn
+			context.deferred = {}
+			bridge.on_message({ action = "close" }, {}, page(context))
+			context.epoch = nil
+			bridge.on_error("third", "third failure", "third failure")
+			run_deferred(context)
+			bridge.on_message("ready", {}, page(context))
+			old_fold()
+			helpers.assert_eq(#context.pushed, 0, "the old fold must not reach its successor")
+		end)
+	end)
+
 	helpers.it("nothing opens while the setting is unticked (error-dialog-linux)", function()
 		with_bridge({ stored = false }, function(bridge, context)
 			bridge.init()
