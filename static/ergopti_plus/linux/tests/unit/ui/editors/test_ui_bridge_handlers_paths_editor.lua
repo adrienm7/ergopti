@@ -603,7 +603,9 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		local observed = nil
 		local ok, err = xpcall(function()
 			-- config() is where the locale owner rewrites a held [script] locale.
+			-- default_config_dir() is where the storage adapter keeps storage.json.
 			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+				default_config_dir = function() return root .. "/" .. FOLDER end,
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
 			package.loaded["adapters.storage"] = nil

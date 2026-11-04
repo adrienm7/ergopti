@@ -38,7 +38,7 @@ local function boot(storage, etag_content)
 	package.loaded["adapters.file_system"] = setmetatable({
 		exists = function() return true end,
 		read = function(path)
-			if tostring(path):find("ergopti_updater_etag_", 1, true) then return etag_content end
+			if tostring(path):find("/updater_etag_", 1, true) then return etag_content end
 			return real_fs.read(path)
 		end,
 	}, { __index = real_fs })

@@ -365,7 +365,7 @@ helpers.describe("updater bounded pagination", function()
 	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
 		local real_fs = require("adapters.file_system")
 		local controlled_fs = setmetatable({ exists = function(path)
-			if path:match("/%.cache$") or path:match("/%.cache/ergopti_updater_etag_[^/]+%.txt$") then return true end
+			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return real_fs.exists(path)
 		end }, { __index = real_fs })
 		local M = helpers.load_module_with_dependency("modules.updater.manager", "adapters.file_system", controlled_fs)

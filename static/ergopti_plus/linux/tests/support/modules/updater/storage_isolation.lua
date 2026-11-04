@@ -30,6 +30,8 @@ function M.check(scenario)
 	local paths = {}
 	for key, value in pairs(previous_paths) do paths[key] = value end
 	paths.config_home = function() return directory end
+	-- The copied default_config_dir() would still read the real config_home().
+	paths.default_config_dir = function() return directory .. "/" .. FOLDER end
 	package.loaded[paths_name], package.loaded[storage_name] = paths, nil
 	local ok, err = pcall(function()
 		local storage = require(storage_name)
