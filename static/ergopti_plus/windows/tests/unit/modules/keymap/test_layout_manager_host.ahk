@@ -71,7 +71,7 @@ _LMH_Deps(Dir, Log) {
 		"install", (Id, OnDone) => (Log.Push(Map("call", "install " . Id)), Pending.Push(OnDone)),
 		"uninstall", (Id) => (Log.Push(Map("call", "uninstall " . Id)), Map("ok", true)),
 		"select", (Id) => Log.Push(Map("call", "select " . Id)),
-		"open_url", (Url) => Log.Push(Map("call", "open " . Url)),
+		"open_url", (Url) => (Log.Push(Map("call", "open " . Url)), true),
 		"close", () => Log.Push(Map("call", "close")),
 		"pending", Pending
 	)
