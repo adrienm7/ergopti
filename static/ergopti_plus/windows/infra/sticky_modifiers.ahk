@@ -37,6 +37,7 @@ StickyModifier(ActionId) {
 	Held := StickyModifierNames(ActionId)
 	TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
 	Hook := InputHook("L0 T" . TimeoutSec)
+	Hook.VisibleNonText := false
 	Hook.KeyOpt("{All}", "E")
 	Hook.KeyOpt("{LCtrl}{RCtrl}{LAlt}{RAlt}{LShift}{RShift}{LWin}{RWin}", "-E")
 	OwnerToken := SIHO_StartOwned(Hook, "sticky-modifier", true)
