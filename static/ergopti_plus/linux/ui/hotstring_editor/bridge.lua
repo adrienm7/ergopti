@@ -365,6 +365,10 @@ local function save_all(state, data, context)
 			local entry = entries[entry_index]
 			if type(entry) ~= "table" then return false end
 			if type(entry.trigger) == "string" and entry.trigger ~= "" and type(entry.output) ~= "string" then return false end
+			for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive", "final_result", "is_case_sensitive_strict" }) do
+				if entry[flag] ~= nil and type(entry[flag]) ~= "boolean" then return false end
+			end
+			if entry.priority ~= nil and not require("hotstrings.personal_metadata").valid("priority", entry.priority) then return false end
 		end
 		listed[name] = true
 	end
