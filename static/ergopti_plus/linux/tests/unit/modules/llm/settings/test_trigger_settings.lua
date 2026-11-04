@@ -820,6 +820,26 @@ end)
 
 
 helpers.describe("LLM trigger settings: applications the trigger never runs in", function()
+	helpers.it("refuses sparse exclusion edits without erasing protected applications (trigger-apps-sparse)", function()
+		local settings, storage = load_settings()
+		assert(settings.set_disabled_apps({ "firefox", "bank" }))
+		local edited = { [1] = "firefox", [3] = "bank" }
+		local accepted = settings.set_disabled_apps(edited)
+		local still_disabled, stored = settings.is_app_disabled("bank"), storage.get("llm.trigger.disabled_apps")
+		restore()
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(still_disabled, "a missing list index cannot silently remove an exclusion")
+		helpers.assert_eq(stored, { "firefox", "bank" })
+	end)
+
+	helpers.it("refuses a non-array whose entry count matches its Lua length (trigger-apps-sparse)", function()
+		local settings = load_settings()
+		local malformed = { "firefox", nil, "bank", "terminal" }
+		malformed[0] = "editor"
+		local accepted = settings.set("disabled_apps", malformed)
+		restore()
+		helpers.assert_eq(accepted, false, "a count equal to #value does not prove a dense array")
+	end)
 	helpers.it("trigger-apps: stores normalised distinct identifiers and matches the focused application", function()
 		local settings, storage = load_settings()
 		helpers.assert_eq(settings.disabled_apps(), {})
