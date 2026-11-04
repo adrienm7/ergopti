@@ -2489,7 +2489,12 @@ _Updater_IsAllowedManualUrl(Url) {
 	if Suffix == ""
 		return true
 	Boundary := SubStr(Suffix, 1, 1)
-	return Boundary == "/" || Boundary == "?" || Boundary == "#"
+	if !(Boundary == "/" || Boundary == "?" || Boundary == "#")
+		return false
+	try Path := UriDecode(RegExReplace(Suffix, "[?#].*$"))
+	catch
+		return false
+	return !RegExMatch(Path, "(?:^|/)\.\.(?:/|$)|[\\\x00-\x1f\x7f]")
 }
 
 _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {

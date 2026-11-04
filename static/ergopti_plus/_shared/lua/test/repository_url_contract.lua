@@ -31,7 +31,7 @@ return function(helpers)
 		for _, url in ipairs({
 			ROOT, ROOT .. "/", ROOT .. "/releases", ROOT .. "/releases/tag/v0.0.0-dev.150",
 			ROOT .. "/compare/v1.2.2...v1.2.3", ROOT .. "?tab=readme", ROOT .. "#readme",
-			ROOT .. "/issues?q=is%3Aopen",
+			ROOT .. "/issues?q=is%3Aopen", ROOT .. "/issues?path=../other",
 		}) do
 			helpers.assert_true(RepositoryUrl.is_repository_url(url, OWNER, REPO), url)
 		end
@@ -48,6 +48,13 @@ return function(helpers)
 			ROOT .. "/\nx", "javascript:alert(1)", "file:///etc/passwd", "",
 		}) do
 			helpers.assert_eq(RepositoryUrl.is_repository_url(url, OWNER, REPO), false, url)
+		end
+	end)
+
+	helpers.it("repository_url: refuses path traversal outside the repository", function()
+		for _, path in ipairs({ "/../other", "/%2e%2e/other", "/.%2E/other", "/%2e./other",
+			"/%2e%2e%2fother", "/%5c../other", "/%00other" }) do
+			helpers.assert_eq(RepositoryUrl.is_repository_url(ROOT .. path, OWNER, REPO), false, path)
 		end
 	end)
 

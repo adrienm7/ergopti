@@ -28,10 +28,32 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const EXPECTED_UNICODE_VERSION = '17.0';
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'unicode_case', 'data.lua');
+const FOLD_SOURCE = path.join(ROOT, 'tools', 'codegen', 'unicode', 'CaseFolding-17.0.0.txt');
+const FOLD_SHA256 = 'ff8d8fefbf123574205085d6714c36149eb946d717a0c585c27f0f4ef58c4183';
+const foldBytes = fs.readFileSync(FOLD_SOURCE);
+if (crypto.createHash('sha256').update(foldBytes).digest('hex') !== FOLD_SHA256) {
+	throw new Error('Unicode 17.0.0 CaseFolding.txt does not match the reviewed official source');
+}
+// Unicode simple case folding uses exactly statuses C and S. F is the distinct
+// full-fold mapping (which may expand), and T is the Turkic-specific mapping.
+const simpleFold = [];
+for (const line of foldBytes.toString('utf8').split(/\r?\n/)) {
+	const record = line.match(/^([0-9A-F]+);\s*([CSFT]);\s*([0-9A-F ]+);/);
+	if (!record || (record[2] !== 'C' && record[2] !== 'S')) continue;
+	const mapped = record[3].trim().split(/\s+/);
+	if (mapped.length !== 1) throw new Error('simple case fold must retain one scalar');
+	simpleFold.push([
+		String.fromCodePoint(parseInt(record[1], 16)),
+		String.fromCodePoint(parseInt(mapped[0], 16))
+	]);
+}
+if (simpleFold.length < 1400)
+	throw new Error('Unicode simple case fold is unexpectedly incomplete');
 
 if (process.versions.unicode !== EXPECTED_UNICODE_VERSION) {
 	throw new Error(
@@ -134,7 +156,8 @@ const lines = [
 for (const [name, rows] of [
 	['upper', upper],
 	['lower', lower],
-	['title', title]
+	['title', title],
+	['simple_fold', simpleFold]
 ]) {
 	lines.push(`\t${name} = {`);
 	for (const [from, to] of rows) lines.push(`\t\t[${quote(from)}] = ${quote(to)},`);

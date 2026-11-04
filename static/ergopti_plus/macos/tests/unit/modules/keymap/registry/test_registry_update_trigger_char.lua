@@ -2,16 +2,16 @@
 
 --- Regression test for keymap-core-1: update_trigger_char() recomputed
 --- m.tail_char using Lua's ASCII-only :lower() instead of
---- text_utils.trig_lower(). For magic-key mappings whose star_base ends
+--- text_utils.trig_fold(). For magic-key mappings whose star_base ends
 --- with an accented capital (e.g. "Ê"), the stored tail_char remained "Ê"
 --- instead of being lowercased to "ê", causing mappings_for_tail() to miss
 --- the bucket and silently never fire the mapping.
 ---
 --- The inconsistency was between:
----   add_raw() line: tail_char = text_utils.trig_lower(tail_codepoint(t))
+---   add_raw() line: tail_char = text_utils.trig_fold(tail_codepoint(t))
 ---   update_trigger_char() line: tail_char = tail_codepoint(new_tr):lower()
 ---
---- Fix: changed update_trigger_char to use text_utils.trig_lower().
+--- Fix: changed update_trigger_char to use text_utils.trig_fold().
 
 local helpers = require("tests.helpers")
 
@@ -40,20 +40,20 @@ helpers.assert_true(
 	"registry.lua update_trigger_char must not use tail_codepoint():lower() — ASCII-only, misses accented capitals (keymap-core-1)"
 )
 
--- Test 2: The Unicode-aware trig_lower must be used for tail_char.
--- Post-fix: `m.tail_char = text_utils.trig_lower(tail_codepoint(new_tr))`
-local has_trig_lower = fn_body:find('trig_lower(tail_codepoint(new_tr))', 1, true) ~= nil
+-- Test 2: The Unicode-aware trig_fold must be used for tail_char.
+-- Post-fix: `m.tail_char = text_utils.trig_fold(tail_codepoint(new_tr))`
+local has_trig_fold = fn_body:find('trig_fold(tail_codepoint(new_tr))', 1, true) ~= nil
 helpers.assert_true(
-	has_trig_lower,
-	"registry.lua update_trigger_char must use text_utils.trig_lower(tail_codepoint(new_tr)) for tail_char (keymap-core-1)"
+	has_trig_fold,
+	"registry.lua update_trigger_char must use text_utils.trig_fold(tail_codepoint(new_tr)) for tail_char (keymap-core-1)"
 )
 
--- Test 3: Confirm the initial registration path also uses trig_lower (invariant check).
+-- Test 3: Confirm the initial registration path also uses trig_fold (invariant check).
 -- This is the reference: update_trigger_char must mirror add_raw().
-local add_raw_trig_lower = src:find('tail_char    = text_utils.trig_lower(tail_codepoint(', 1, true) ~= nil
+local add_raw_trig_fold = src:find('tail_char    = text_utils.trig_fold(tail_codepoint(', 1, true) ~= nil
 helpers.assert_true(
-	add_raw_trig_lower,
-	"registry.lua add_raw() must set tail_char via text_utils.trig_lower(tail_codepoint()) — both paths must be consistent (keymap-core-1)"
+	add_raw_trig_fold,
+	"registry.lua add_raw() must set tail_char via text_utils.trig_fold(tail_codepoint()) — both paths must be consistent (keymap-core-1)"
 )
 
 print("[PASS] test_registry_update_trigger_char")
