@@ -460,7 +460,14 @@ function M.tick(stats, now_s)
 	end
 	local x, y = Model.frame_origin(canon, frame, _state.anchor.x, _state.anchor.y)
 	_state.last_frame = frame
-	_state.shown = Surface.draw(frame, x, y) == true
+	-- The surface can become visible before a later native draw step refuses.
+	-- Treat that attempt as shown until an acknowledged hide proves otherwise.
+	_state.shown = true
+	local called, drawn = pcall(Surface.draw, frame, x, y)
+	if not called or drawn ~= true then
+		hide()
+		return nil
+	end
 	return frame
 end
 
