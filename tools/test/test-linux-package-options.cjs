@@ -93,6 +93,28 @@ for (const format of ['deb', 'rpm']) {
 		false,
 		'a valid explicit staging request must still rebuild its owned tree'
 	);
+	if (format === 'deb') {
+		const oldOutput = path.join(BUILD, 'ergopti_1.0.3_amd64.deb');
+		fs.writeFileSync(oldOutput, 'previous package\n');
+		const silentProducer = path.join(scratch, 'silent-dpkg-deb.sh');
+		fs.writeFileSync(silentProducer, 'dpkg-deb() { return 0; }\n');
+		const missingOutput = run(script, [], { BASH_ENV: silentProducer });
+		assert.notEqual(missingOutput.status, 0, 'a stale archive cannot certify a new package');
+		assert.equal(fs.readFileSync(oldOutput, 'utf8'), 'previous package\n');
+		const refusedPublication = path.join(scratch, 'refused-deb-publication.sh');
+		fs.writeFileSync(
+			refusedPublication,
+			'dpkg-deb() { printf "new package\\n" > "${!#}"; }\n' +
+				'mv() { case "${!#}" in *.deb) return 1 ;; esac; command mv "$@"; }\n'
+		);
+		const refused = run(script, [], { BASH_ENV: refusedPublication });
+		assert.notEqual(refused.status, 0, 'a failed publication must fail the build');
+		assert.equal(fs.readFileSync(oldOutput, 'utf8'), 'previous package\n');
+		assert.equal(
+			fs.readdirSync(BUILD).filter((name) => name.startsWith('.ergopti-deb.')).length,
+			0
+		);
+	}
 	console.log(`PASS package-argument-admission-${format}`);
 }
 try {

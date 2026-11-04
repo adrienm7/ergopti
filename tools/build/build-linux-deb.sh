@@ -242,7 +242,24 @@ fi
 
 echo ""
 echo "Building .deb package..."
-dpkg-deb --root-owner-group --build "$DEB_ROOT" "$DEB_FILE"
+DEB_STAGE="$(mktemp -d "$BUILD_DIR/.ergopti-deb.XXXXXX")"
+DEB_STAGE_FILE="$DEB_STAGE/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
+cleanup_deb_stage() {
+  status=$?
+  trap - EXIT
+  if [ -e "$DEB_STAGE_FILE" ] || [ -L "$DEB_STAGE_FILE" ]; then
+    rm -f -- "$DEB_STAGE_FILE" || status=1
+  fi
+  rmdir -- "$DEB_STAGE" || status=1
+  exit "$status"
+}
+trap cleanup_deb_stage EXIT
+dpkg-deb --root-owner-group --build "$DEB_ROOT" "$DEB_STAGE_FILE"
+[ -f "$DEB_STAGE_FILE" ] && [ ! -L "$DEB_STAGE_FILE" ] && [ -s "$DEB_STAGE_FILE" ] || {
+  echo "[ERR] dpkg-deb did not produce a nonempty package file." >&2
+  exit 1
+}
+mv -T -- "$DEB_STAGE_FILE" "$DEB_FILE"
 
 if [ -f "$DEB_FILE" ]; then
   deb_size=$(du -h "$DEB_FILE" | cut -f1)
