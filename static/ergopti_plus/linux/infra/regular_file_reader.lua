@@ -130,4 +130,16 @@ function M.open_source(path)
 	return io.open(path, "r")
 end
 
+--- Reads and closes a classified source; a partial read or refused close is not data.
+--- @param path string Path to the source.
+--- @return string|nil bytes Complete source only after both operations acknowledge.
+function M.read_source(path)
+	local opened, stream = pcall(M.open_source, path)
+	if not opened or not stream then return nil end
+	local read, bytes = pcall(function() return stream:read("*a") end)
+	local closed, acknowledged = pcall(function() return stream:close() end)
+	if not read or type(bytes) ~= "string" or not closed or acknowledged ~= true then return nil end
+	return bytes
+end
+
 return M
