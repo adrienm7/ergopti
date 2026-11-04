@@ -450,6 +450,14 @@ between workers) green alone. All live checks pass, typed by the harness.
   - Then: WP9 (handoff checklist), the flip, the shared-mode deletion.
     Done on 1 November: the per-OS feature requirements table
     (`docs/design/feature-requirements.md`) and the driver-only VirtualHIDDevice update offer (3ebab93a17).
+- **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
+  install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
+  helper), Login Items lists them as separate « unidentified developer » rows, and the driver approval names pqrs'
+  extension. A Developer ID would allow: `SMAppService.daemon` for both jobs from `Contents/Library/LaunchDaemons`
+  (no password, one « Ergopti » Login Items group; launchd kills SMAppService jobs of a bundle with no Team ID,
+  `RemapLeaseGuardian.swift`), and an Ergopti-signed DriverKit extension in `Contents/Library/SystemExtensions`
+  activated with `OSSystemExtensionRequest` (needs Apple's DriverKit HID entitlements for the team). The root Core
+  keeps its own Input Monitoring row either way: launchd starts it, not Ergopti.
 - **When the owned Karabiner is the one used:** delete the Configuration rows `menu.global.karabiner_integration` and
   `menu.global.remove_from_karabiner` (`macos/ui/menu/remap_switch.lua`), which act on the installed Karabiner.
 - **Owned runtimes.** The rows in state "to do" of `_shared/data/owned_runtimes.json` are all item 31 (shared

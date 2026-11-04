@@ -305,6 +305,15 @@ step owned_runtime sh -c '
 	systemextensionsctl list 2>&1 | grep -i "Karabiner-DriverKit-VirtualHIDDevice" || echo "no pqrs driver extension listed"
 	ls "${HOME}/Library/Application Support/ErgoptiPlus/RemapRuntime"/*/receipt 2>/dev/null | sed "s#${HOME}#~#" || echo "no verified runtime download"
 	codesign -dv --verbose=2 "/Applications/$3" 2>&1 | grep -E "^(Authority|TeamIdentifier|Signature)=" || echo "no installed $3"
+	# The Console is the launcher'"'"'s child (never disclaimed), so macOS files its
+	# Input Monitoring under the app: its parent must be the launcher.
+	console="$(pgrep -f "ErgoptiPlus-Remap-Console.app/Contents/MacOS/" | head -1)"
+	if [ -n "$console" ]; then
+		parent="$(ps -o ppid= -p "$console" | tr -d " ")"
+		echo "console parent: $(ps -o comm= -p "$parent" | sed "s#.*/##")"
+	else
+		echo "console parent: no owned Console running"
+	fi
 ' sh "${ERGOPTI_SERVICE_LABEL_MACOS_CORE}" "${ERGOPTI_SERVICE_LABEL_MACOS_VIRTUAL_HID}" "${ERGOPTI_APP_BUNDLE}"
 
 # ===========================================
