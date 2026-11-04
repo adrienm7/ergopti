@@ -341,6 +341,29 @@ os.remove(user_path)
 		os.remove(user_path)
 	end)
 
+	helpers.it("preserves the effective configuration after a refused reload and retries it (reload-apply-refusal)", function()
+		local Manager, hook, _, user_path = manager()
+		local original, install = hook.engine, hook.set_remapper
+		local original_active = Manager.is_active()
+		hook.set_remapper = function() return false end
+		write(user_path, '[tap_hold]\nenabled = false\n')
+		local refused = Manager.reload()
+		local effective_file_enabled, effective_active = Manager.file_enabled(), Manager.is_active()
+		local still_installed = hook.engine == original
+		hook.set_remapper = install
+		local retried = Manager.reload()
+		local after_retry, installed_after_retry = Manager.file_enabled(), hook.engine
+		Manager._reset_for_test()
+		os.remove(user_path)
+		helpers.assert_eq(refused, false)
+		helpers.assert_true(still_installed)
+		helpers.assert_eq(effective_file_enabled, true, "a refused setting is not in force")
+		helpers.assert_eq(effective_active, original_active, "the old engine still receives keys")
+		helpers.assert_true(retried)
+		helpers.assert_eq(after_retry, false)
+		helpers.assert_nil(installed_after_retry)
+	end)
+
 	helpers.it("keeps the running engine when a reload cannot read the defaults", function()
 		local Manager, hook, _, user_path = manager()
 		local running = hook.engine
