@@ -45,6 +45,11 @@ local function with_remote(body)
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
 			if clock.sync_refusal then callback({ ok = false, status = 401 }); return false end
+			if clock.sync_success_refused then
+				callback({ ok = clock.sync_success_refused ~= "bad_envelope", status = 200,
+					body = '{"access_token":"not-sent","expires_in":3600}' })
+				return false
+			end
 			if clock.post_exception then
 				if clock.post_exception == "after_callback" then
 					callback({ ok = true, status = 200, body = '{"access_token":"early","expires_in":3600}' })
@@ -316,6 +321,37 @@ helpers.describe("Access-token providers: the shipped rows", function()
 			helpers.assert_eq(first[1], false)
 			helpers.assert_eq(first[2], "the token exchange answered HTTP 401")
 			helpers.assert_eq(later, first)
+		end)
+	end)
+
+	helpers.it("refuses synchronous success when the token dispatch returns false", function()
+		for _, variant in ipairs({ "success", "bad_envelope" }) do
+			with_remote(function(remote, calls, clock)
+				clock.sync_success_refused = variant
+				local first, later
+				remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+				remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+				helpers.assert_eq(first[1], false)
+				helpers.assert_eq(later, first)
+				helpers.assert_eq(#calls, 1)
+			end)
+		end
+	end)
+
+	helpers.it("reports failed quarantined waiters without logging their error text", function()
+		with_remote(function(remote, _, clock)
+			local entry = { id = "sa", provider = "vertex", model = "google/gemini-3.5-flash",
+				token = service_account_key(),
+				base_url = "https://aiplatform.googleapis.com/v1/projects/p1/locations/global/endpoints/openapi" }
+			clock.post_exception = "before_callback"
+			local received
+			remote.prepare_access(entry, function() error("private waiter payload") end)
+			remote.prepare_access(entry, function(ok, reason) received = { ok, reason } end)
+			drain_ticks(clock)
+			helpers.assert_eq(received[1], false)
+			local log = table.concat(clock.logs, "\n")
+			helpers.assert_contains(log, "Access token waiter failed.")
+			helpers.assert_true(not log:find("private waiter payload", 1, true))
 		end)
 	end)
 

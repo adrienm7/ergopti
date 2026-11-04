@@ -417,14 +417,17 @@ local function refresh_access(provider, entry, on_done)
 	local slot = access_slot(entry)
 	if type(on_done) == "function" then slot.waiters[#slot.waiters + 1] = on_done end
 	if slot.pending then return end
-	local function settle(ok, reason)
-		slot.pending = false
+	local function notify_waiters(ok, reason)
 		local waiters = slot.waiters
 		slot.waiters = {}
 		for _, waiter in ipairs(waiters) do
-			local called, problem = pcall(waiter, ok, reason)
-			if not called then Logger.error(LOG, "Access token waiter failed: %s", tostring(problem)) end
+			local called = pcall(waiter, ok, reason)
+			if not called then Logger.error(LOG, "Access token waiter failed.") end
 		end
+	end
+	local function settle(ok, reason)
+		slot.pending = false
+		notify_waiters(ok, reason)
 	end
 	slot.pending = true
 	-- A service-account key's assertion is signed one slice per tick
@@ -467,12 +470,12 @@ local function refresh_access(provider, entry, on_done)
 				-- its owner no retry can prove the previous request is retired.
 				slot.uncertain, slot.failure = true, "the token exchange transport state is unknown"
 				Logger.error(LOG, "Access token of provider '%s' cannot be asked: transport state is unknown.", provider.id)
-				local waiters = slot.waiters
-				slot.waiters = {}
-				for _, waiter in ipairs(waiters) do pcall(waiter, false, slot.failure) end
+				notify_waiters(false, slot.failure)
 				return
 			end
-			if staged_received then return answer(staged) end
+			if staged_received and (dispatched == true or type(staged) ~= "table" or staged.status ~= 200) then
+				return answer(staged)
+			end
 			if not dispatched then
 				received = true
 				slot.failure = "the token exchange could not be sent"

@@ -126,6 +126,22 @@ local SPEC = { system_prompt = "Reply with exactly: OK", user_text = "ping", tem
 -- =========================================
 
 helpers.describe("Access-token providers (macOS)", function()
+	helpers.it("refuses synchronous success when access dispatch returns false", function()
+		local api = load_api()
+		local access = assert(find_upvalue(api.prepare_access, "_access_client"))
+		local calls = 0
+		access.post = function(_, _, _, callback)
+			calls = calls + 1
+			callback({ ok = true, status = 200, body = '{"access_token":"not-sent","expires_in":3600}' })
+			return false
+		end
+		local first, later
+		api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) first = { ok, reason } end)
+		api.prepare_access("ibm_fixture", "ibm-api-key", function(ok, reason) later = { ok, reason } end)
+		helpers.assert_eq(first[1], false)
+		helpers.assert_eq(later, first)
+		helpers.assert_eq(calls, 1)
+	end)
 	helpers.it("quarantines a throwing access transport even after a callback", function()
 		for _, early in ipairs({ false, true }) do
 			local api = load_api()
