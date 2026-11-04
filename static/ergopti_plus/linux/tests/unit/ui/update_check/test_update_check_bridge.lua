@@ -50,7 +50,11 @@ local function load_bridge(answer)
 			if context.on_show then return context.on_show(app) end
 			return true
 		end,
-		hide = function() context.hidden = context.hidden + 1; return true end,
+		hide = function()
+			context.hidden = context.hidden + 1
+			if context.on_hide then return context.on_hide() end
+			return true
+		end,
 		eval_js = function(app, js)
 			local payload = js:match("receiveUpdateCheck%((.*)%)$")
 			context.pushed[#context.pushed + 1] = { app = app, message = payload and Json.decode(payload) }
@@ -175,6 +179,38 @@ helpers.describe("update-check window bridge (Linux)", function()
 				end)
 		end)
 	end
+
+	helpers.it("(update-check-close-owner) keeps the session when native close is refused", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function() return false end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "a refused close retains the session")
+			context.on_hide = nil
+			bridge.on_message({ action = "close" })
+			before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_eq(#context.pushed, before, "an accepted close retires the session")
+		end)
+	end)
+
+	helpers.it("(update-check-close-owner) preserves a successor opened during close", function()
+		scenario(available, function(bridge, context)
+			bridge.open(context.ctx)
+			context.on_hide = function()
+				context.on_hide = nil
+				bridge.on_window_closed()
+				helpers.assert_true(bridge.open(context.ctx))
+				return true
+			end
+			bridge.on_message({ action = "close" })
+			local before = #context.pushed
+			bridge.on_message("ready")
+			helpers.assert_true(#context.pushed > before, "the successor remains active")
+		end)
+	end)
 
 	for _, kind in ipairs({ "fifo", "regular" }) do
 		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()

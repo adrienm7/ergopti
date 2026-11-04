@@ -253,7 +253,8 @@ end
 --- @return table session
 local function new_session(updater)
 	local manager = require("ui.webview_manager")
-	return CheckSession.new({
+	local session
+	session = CheckSession.new({
 		push = push,
 		check = function(channel, on_result)
 			local dispatched = updater.check_for_updates(channel, function(_, _, _, result)
@@ -315,13 +316,20 @@ local function new_session(updater)
 			return open() == true
 		end,
 		close = function()
-			if _session ~= nil then _session.retire() end
-			_session = nil
-			manager.hide(APP)
+			if _session ~= session then return end
+			if manager.hide(APP) ~= true then
+				Logger.warn(LOG, "The update-check window could not close; its session is retained.")
+				return
+			end
+			if _session == session then
+				_session = nil
+				session.retire()
+			end
 		end,
 		log_path = function() return require("infra.logger_sink").main_log_path() end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
+	return session
 end
 
 
