@@ -190,7 +190,11 @@ helpers.describe("prediction digit accept: the real tooltip's presented state", 
 
 	helpers.it("presents candidates before its window maps, and none once hidden", function()
 		local overlay = helpers.load_module("ui.tooltip.llm")
-		pcall(overlay.show, { { to_type = "va bien" } }, {})
+		helpers.assert_true(overlay.init({ style = {}, renderer = {
+			show = function() return true end, hide = function() return true end,
+			is_visible = function() return false end,
+		} }))
+		helpers.assert_true(overlay.show({ { to_type = "va bien" } }, {}))
 		helpers.assert_true(overlay.is_showing(), "presented, whether or not the window is up yet")
 		overlay.hide()
 		helpers.assert_true(not overlay.is_showing(), "hidden by any path: nothing to accept")
