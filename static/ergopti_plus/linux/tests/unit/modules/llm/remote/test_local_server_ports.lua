@@ -169,6 +169,15 @@ helpers.describe("Linux local server port scan from /proc (local-server-ports)",
 		helpers.assert_eq(results.jan.source, "listening")
 	end)
 
+	helpers.it("does not trust ss output when process supervision reports an error after exit zero", function()
+		local results = scan_with({ [900] = "/opt/Jan/jan\0" }, {
+			ss = { exit_code = 0, error = "ss did not finish: native process group outlived leader",
+				stdout = 'LISTEN 0 128 127.0.0.1:1338 0.0.0.0:* users:(("jan",pid=900,fd=30))\n' },
+		})
+		helpers.assert_eq(results.jan.source, "default")
+		helpers.assert_true(results.jan.port ~= 1338, "failed supervision cannot establish a listener")
+	end)
+
 	helpers.it("a walk past its budget falls back to the listening pids, described from /proc (omlx-ps-timeout-listening)",
 		function()
 			local Timings = require("infra.timings")
