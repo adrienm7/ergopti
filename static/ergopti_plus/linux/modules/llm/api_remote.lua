@@ -437,7 +437,14 @@ local function refresh_access(provider, entry, on_done)
 				return settle(false, reason)
 			end
 			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", provider.id)
-			local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+			local constructing, received, staged_received, staged = true, false, false, nil
+			local function answer(result)
+				if received or slot.uncertain then return end
+				if constructing then
+					if not staged_received then staged_received, staged = true, result end
+					return
+				end
+				received = true
 				result = type(result) == "table" and result or {}
 				local raw = type(result.body) == "string" and result.body ~= "" and result.body or result.error_body
 				local decoded_ok, decoded = pcall(Json.decode, type(raw) == "string" and raw or "")
@@ -452,8 +459,22 @@ local function refresh_access(provider, entry, on_done)
 				slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
 				return settle(false, why)
-			end)
+			end
+			local called, dispatched = pcall(HttpClient.post, request.url, request.headers, request.body, answer)
+			constructing = false
+			if not called then
+				-- A constructor may throw after acquiring transport resources. Without
+				-- its owner no retry can prove the previous request is retired.
+				slot.uncertain, slot.failure = true, "the token exchange transport state is unknown"
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: transport state is unknown.", provider.id)
+				local waiters = slot.waiters
+				slot.waiters = {}
+				for _, waiter in ipairs(waiters) do pcall(waiter, false, slot.failure) end
+				return
+			end
+			if staged_received then return answer(staged) end
 			if not dispatched then
+				received = true
 				slot.failure = "the token exchange could not be sent"
 				slot.retry_at = Monotonic.now_sec() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.", provider.id)
@@ -490,6 +511,7 @@ function M.prepare_access(entry, on_ready)
 	if TokenExchange.state(provider.auth, slot.token and slot or nil, now) then
 		return on_ready(true, nil)
 	end
+	if slot.uncertain then return on_ready(false, slot.failure) end
 	if not slot.pending and slot.retry_at and now < slot.retry_at then
 		-- A refused exchange waits its pause: the reason answers at once
 		return on_ready(false, slot.failure)
@@ -507,7 +529,8 @@ function M.prewarm_access(entry)
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if not (provider and provider.auth) or type(entry.token) ~= "string" or entry.token == "" then return false end
 	access_token(provider, entry)
-	return access_slot(entry).pending == true
+	local slot = access_slot(entry)
+	return slot.pending == true and not slot.uncertain
 end
 
 --- Runs send() once an entry's access token is usable: at once for a provider

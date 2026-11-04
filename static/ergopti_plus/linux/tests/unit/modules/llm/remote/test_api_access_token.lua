@@ -44,6 +44,13 @@ local function with_remote(body)
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
+			if clock.sync_refusal then callback({ ok = false, status = 401 }); return false end
+			if clock.post_exception then
+				if clock.post_exception == "after_callback" then
+					callback({ ok = true, status = 200, body = '{"access_token":"early","expires_in":3600}' })
+				end
+				error("unknown native dispatch state")
+			end
 			return true
 		end,
 		get = function() return false end,
@@ -278,6 +285,37 @@ helpers.describe("Access-token providers: the shipped rows", function()
 			helpers.assert_true(#clock.ticks > 0, "the refused exchange must not remain pending")
 			drain_ticks(clock)
 			helpers.assert_eq(#calls, 1)
+		end)
+	end)
+
+	helpers.it("quarantines a throwing token transport even if a callback arrives", function()
+		for _, variant in ipairs({ "before_callback", "after_callback" }) do
+			with_remote(function(remote, calls, clock)
+				clock.post_exception = variant
+				local first, later
+				remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+				helpers.assert_eq(first[1], false)
+				helpers.assert_contains(first[2], "transport state is unknown")
+				answer(calls, 1, 200, { access_token = "late", expires_in = 3600 })
+				clock.now = clock.now + 120
+				clock.post_exception = nil
+				remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+				helpers.assert_eq(later, first)
+				helpers.assert_eq(#calls, 1, "an unknown transport must not overlap a retry")
+				helpers.assert_eq(remote.prewarm_access(ENTRY), false)
+			end)
+		end
+	end)
+
+	helpers.it("preserves a synchronous token refusal as the cached reason", function()
+		with_remote(function(remote, _, clock)
+			clock.sync_refusal = true
+			local first, later
+			remote.prepare_access(ENTRY, function(ok, reason) first = { ok, reason } end)
+			remote.prepare_access(ENTRY, function(ok, reason) later = { ok, reason } end)
+			helpers.assert_eq(first[1], false)
+			helpers.assert_eq(first[2], "the token exchange answered HTTP 401")
+			helpers.assert_eq(later, first)
 		end)
 	end)
 

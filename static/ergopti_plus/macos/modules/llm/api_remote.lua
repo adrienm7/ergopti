@@ -991,7 +991,14 @@ local function refresh_access(provider_id, key, on_done)
 				return settle(false, reason)
 			end
 			Logger.start(LOG, "Exchanging the key of provider '%s' for an access token…", tostring(provider_id))
-			local dispatched = _access_client.post(request.url, request.headers, request.body, function(r)
+			local constructing, received, staged_received, staged = true, false, false, nil
+			local function answer(r)
+				if received or slot.uncertain then return end
+				if constructing then
+					if not staged_received then staged_received, staged = true, r end
+					return
+				end
+				received = true
 				r = type(r) == "table" and r or {}
 				local raw = type(r.body) == "string" and r.body ~= "" and r.body or r.error_body
 				local decoded_ok, decoded = pcall(JsonCodec.decode, type(raw) == "string" and raw or "")
@@ -1006,8 +1013,20 @@ local function refresh_access(provider_id, key, on_done)
 				slot.failure, slot.retry_at = why, TimerScheduler.now() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' refused: %s.", tostring(provider_id), why)
 				return settle(false, why)
-			end)
+			end
+			local called, dispatched = pcall(_access_client.post, request.url, request.headers, request.body, answer)
+			constructing = false
+			if not called then
+				slot.uncertain, slot.failure = true, "the token exchange transport state is unknown"
+				Logger.error(LOG, "Access token of provider '%s' cannot be asked: transport state is unknown.", tostring(provider_id))
+				local waiters = slot.waiters
+				slot.waiters = {}
+				for _, waiter in ipairs(waiters) do invoke_token_callback(waiter, false, slot.failure) end
+				return
+			end
+			if staged_received then return answer(staged) end
 			if not dispatched then
+				received = true
 				slot.failure = "the token exchange could not be sent"
 				slot.retry_at = TimerScheduler.now() + ACCESS_RETRY_SECONDS
 				Logger.error(LOG, "Access token of provider '%s' cannot be asked: the request was not sent.",
@@ -1046,6 +1065,7 @@ function M.prepare_access(provider_id, key, on_ready)
 	local token = access_token(provider_id, key)
 	if token then return on_ready(true, nil, token) end
 	local slot = access_slot(provider_id, key)
+	if slot.uncertain then return on_ready(false, slot.failure, nil) end
 	if not slot.pending and slot.retry_at and TimerScheduler.now() < slot.retry_at then
 		-- A refused exchange waits its pause: the reason answers at once
 		return on_ready(false, slot.failure, nil)
@@ -1076,7 +1096,7 @@ local function deliver_resolved(callback, copy)
 		invoke_token_callback(callback, true, copy, nil)
 		return settled_token_lease()
 	end
-	if access_slot(copy.provider, key).pending ~= true then
+	if access_slot(copy.provider, key).pending ~= true or access_slot(copy.provider, key).uncertain then
 		Logger.warn(LOG, "API entry '%s' has no access token: %s.", tostring(copy.id), reason)
 		invoke_token_callback(callback, false, nil, "access_token_unavailable")
 		return settled_token_lease()
