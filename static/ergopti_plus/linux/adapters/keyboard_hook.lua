@@ -3875,7 +3875,7 @@ function M.start(opts)
 	-- retain their cold-construction originals and authenticate every returned receipt.
 	_input_reader_ports.capture_event = rawget(EvdevReader, "capture_event")
 	local options = type(opts) == "table" and opts or {}
-	if type(options.layout) == "string" and not M.set_layout(options.layout) then return false end
+	if type(options.layout) == "string" and not M.valid_layout(options.layout) then return false end
 	local admission = options.onHoldAdmission
 	if admission ~= nil and type(admission) ~= "function" then return false end
 	if _number_row.retire() ~= true then return false end
@@ -4035,7 +4035,7 @@ function M.start(opts)
 		-- at the completed lifecycle boundary so the first press can own repeats.
 		M.physical_source_receipt()
 		Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
-			#_devices, #_pointer_devices, _layout, tostring(_intercept))
+			#_devices, #_pointer_devices, type(options.layout) == "string" and options.layout or _layout, tostring(_intercept))
 		return _publish_source_transaction(tx)
 	end)
 	if not called or accepted ~= true then _retire_source_transaction(tx, "startup source publication refused") end
@@ -4043,6 +4043,7 @@ function M.start(opts)
 	if called and accepted == true then
 		_number_row.construct()
 		if not _running or not rawequal(_capture_session, capture_session) then return false end
+		if type(options.layout) == "string" then _layout = options.layout end
 		_on_hold_admission = admission
 		_hold_admission_session = capture_session
 	end
@@ -4060,14 +4061,14 @@ function M.get_layout()
 	return _layout
 end
 
---- Changes the physical keyboard family used by metrics and the heatmap.
+--- Checks a physical keyboard family without publishing it.
 ---
 --- Text capture deliberately ignores this label and follows the active XKB
 --- keymap. Keeping the setter is still required for finger maps and aggregate
 --- layout metrics, whose qwerty/azerty choice describes the physical board.
 --- @param layout string "qwerty" or "azerty".
 --- @return boolean Whether the layout was accepted.
-function M.set_layout(layout)
+function M.valid_layout(layout)
 	if type(layout) ~= "string" or layout == "" then
 		Logger.error(LOG, "set_layout(): a layout name is required — layout unchanged.")
 		return false
@@ -4081,6 +4082,14 @@ function M.set_layout(layout)
 		Logger.error(LOG, "set_layout(): '%s' is not a layout this driver knows — layout unchanged.", layout)
 		return false
 	end
+	return true
+end
+
+--- Changes the physical keyboard family used by metrics and the heatmap.
+--- @param layout string Physical family.
+--- @return boolean accepted
+function M.set_layout(layout)
+	if not M.valid_layout(layout) then return false end
 	_layout = layout
 	Logger.info(LOG, "Layout: %s.", layout)
 	return true
