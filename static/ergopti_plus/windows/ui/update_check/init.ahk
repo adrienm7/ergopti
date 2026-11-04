@@ -105,8 +105,9 @@ UpdateCheck_Begin(Request, Current) {
 ;   object for "available".
 ; @returns {Boolean} shown
 UpdateCheck_ShowResult(Request, Answer) {
-	global _UC_RequestId, _UC_Release, UC_ANSWER_STATES, UC_REASONS
-	if (Request.RequestId != _UC_RequestId) {
+	global _UC_RequestId, _UC_Release, _UC_State, UC_ANSWER_STATES, UC_REASONS
+	Owner := _UpdateCheck_CaptureActionOwner()
+	if (Request.RequestId != Owner.request) {
 		LoggerDebug("UpdateCheck", "Discarded the answer of a superseded update check.")
 		return false
 	}
@@ -125,18 +126,29 @@ UpdateCheck_ShowResult(Request, Answer) {
 		State["detail"] := NetworkKey != "" ? "" : Answer.Get("detail", "")
 		State["log_path"] := LoggerTodayLogPath()
 	}
-	_UC_Release := (Phase == "available") ? Answer["release"] : 0
+	Release := (Phase == "available") ? Answer["release"] : 0
 	if (Phase == "available") {
-		State["notes"] := _UpdateCheck_ReleaseNotes(_UC_Release)
+		State["notes"] := _UpdateCheck_ReleaseNotes(Release)
 		if Answer.Get("check_only", false)
 			State["check_only"] := true
 	}
 	LoggerInfo("UpdateCheck", "Update check window: {1} (channel {2}).", Phase, Request.Channel)
-	Accepted := _UpdateCheck_Present(State)
+	PreviousCritical := Critical("On")
+	try {
+		if !_UpdateCheck_ActionCurrent(Owner)
+			return false
+		FailureOwner := ManagedNetworkTerminalFailure.Owners.Get("updater_check", 0)
+		_UC_Release := Release
+		_UC_State := State
+	} finally Critical(PreviousCritical)
+	Current := () => _UC_RequestId == Request.RequestId && _UC_State == State && _UC_Release == Release
+	Accepted := _UpdateCheck_Present(State, false, Current)
+	if !Current.Call()
+		return false
 	if Accepted && Phase == "error" && ManagedNetworkFailureWindows_CanonicalReport(Answer.Get("network_report", 0))
 		_UpdateCheck_ShowManagedFailure(Request, State, Answer["network_report"])
-	else
-		ManagedNetworkTerminalFailure.Retire("updater_check")
+	else if IsObject(FailureOwner)
+		ManagedNetworkTerminalFailure.Retire("updater_check", FailureOwner)
 	return Accepted
 }
 
@@ -438,24 +450,40 @@ _UpdateCheck_NewWindow() {
 ; Shows a state in the open window, or opens the window.
 ; @param State {Map}
 ; @param Reopen {Boolean} A new manual check: an open window is presented again.
+; @param Current {Func|0} Optional exact-state publication predicate.
 ; @returns {Boolean} shown
-_UpdateCheck_Present(State, Reopen := false) {
+_UpdateCheck_Present(State, Reopen := false, Current := 0) {
 	global _UC_State, _UC_ResetDone, _UC_Native, _UC_WindowEpoch, _UC_PresentFn, _UC_Gui
-	_UC_State := State
-	if HasMethod(_UC_PresentFn, "Call")
-		return _UC_PresentFn.Call(State) ? true : false
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Current) && !Current.Call()
+			return false
+		_UC_State := State
+	} finally Critical(PreviousCritical)
+	if HasMethod(_UC_PresentFn, "Call") {
+		Accepted := _UC_PresentFn.Call(State) ? true : false
+		return Accepted && (!IsObject(Current) || Current.Call())
+	}
 	if !_UC_ResetDone {
 		if _UC_Native
 			_UpdateCheck_BuildNative()
-		else
-			_UpdateCheck_Send(_UC_WindowEpoch, _UpdateCheck_StateJson(State))
+		else {
+			Epoch := _UC_WindowEpoch
+			Json := _UpdateCheck_StateJson(State)
+			if IsObject(Current) && !Current.Call()
+				return false
+			_UpdateCheck_Send(Epoch, Json)
+		}
+		if IsObject(Current) && !Current.Call()
+			return false
 		; A result updates the window where it is; only the user's new click
 		; brings a covered window back.
 		if Reopen && IsSet(_UC_Gui) && IsObject(_UC_Gui)
 			WMPresentWindow(_UC_Gui)
-		return true
+		return !IsObject(Current) || Current.Call()
 	}
-	return _UpdateCheck_Open()
+	Accepted := _UpdateCheck_Open()
+	return Accepted && (!IsObject(Current) || Current.Call())
 }
 
 ; Opens the window: the shared page in WebView2, or its native counterpart.

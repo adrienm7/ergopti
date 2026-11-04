@@ -75,6 +75,27 @@ _UCNC_Command(WParam, LParam, Message, Hwnd) {
 
 _UCNC_Log(Line) {
 	global _UCNC_State, _UC_RequestId, _UC_WindowEpoch
+	if InStr(_UCNC_State.Mode, "result-") == 1 && _UCNC_State.Cutpoint == "result"
+			&& InStr(Line, "[INFO] [UpdateCheck] Update check window: available") {
+		_UCNC_State.Cutpoint := ""
+		try {
+			_UCNC_Require(_UC_RequestId == _UCNC_State.RequestA.RequestId, "A must own the result callout")
+			DllCall("User32\SendMessageW", "Ptr", _UCNC_State.WindowA.Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Ptr")
+			Started := A_TickCount
+			while _UCNC_Live(_UCNC_State.WindowA) && TickElapsed(Started) < 1000
+				Sleep(10)
+			_UCNC_Require(!_UCNC_Live(_UCNC_State.WindowA), "the result callout must actually close A")
+			_UCNC_State.NativeClose := true
+			if _UCNC_State.Mode == "result-replaced" {
+				_UCNC_Require(UpdateCheck_Begin(_UCNC_State.RequestB, "v1.0.0"), "B must begin through the public API")
+				_UCNC_State.WindowB := _UCNC_Capture()
+				_UCNC_State.PublishedB := true
+			}
+		} catch Any as Failure {
+			_UCNC_State.BoundaryFailure := Failure
+		}
+		return
+	}
 	if !InStr(Line, "[INFO] [UpdateCheck] Update-check window action: update.")
 		return
 	_UCNC_State.Actions += 1
@@ -128,12 +149,36 @@ _UCNC_Click(Window) {
 		"the real BN_CLICKED and SUT timer dispatch must both be observed exactly once")
 }
 
+_UCNC_ResultRun() {
+	global _UCNC_State, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
+	_UCNC_Require(UpdateCheck_Begin(_UCNC_State.RequestA, "v1.0.0"), "A must begin publicly")
+	_UCNC_State.WindowA := _UCNC_Capture()
+	_UCNC_State.Cutpoint := "result"
+	Release := {Tag: "v1.1.0", Body: "", RawJson: "{}"}
+	Accepted := UpdateCheck_ShowResult(_UCNC_State.RequestA,
+		Map("state", "available", "current", "v1.0.0", "latest", Release.Tag, "release", Release))
+	if IsObject(_UCNC_State.BoundaryFailure)
+		throw _UCNC_State.BoundaryFailure
+	_UCNC_Require(_UCNC_State.NativeClose && !Accepted, "A's result must be refused after its real window closes")
+	_UCNC_Require(!_UCNC_Live(_UCNC_State.WindowA), "the old result must not resurrect A")
+	_UCNC_Require(_UC_Release == 0, "the stale result must not publish its release")
+	if _UCNC_State.Mode == "result-replaced" {
+		_UCNC_Require(_UC_RequestId == _UCNC_State.RequestB.RequestId && _UC_State["state"] == "checking"
+			&& _UCNC_Live(_UCNC_State.WindowB), "B must retain its checking state and native window")
+	} else
+		_UCNC_Require(_UC_RequestId == 0 && _UC_State == 0 && _UC_ResetDone, "a closed check must remain retired")
+}
+
 _UCNC_Run() {
 	global _UCNC_State, _UC_WindowEpoch, _UC_RequestId, _UC_ResetDone, UPDATER_REQUEST_ORIGIN_MANUAL
 	_UCNC_State.RequestA := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	_UCNC_State.RequestB := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	_UCNC_Require(_UCNC_State.RequestA.RequestId != _UCNC_State.RequestB.RequestId,
 		"the genuine request factory must supply distinct private identities")
+	if InStr(_UCNC_State.Mode, "result-") == 1 {
+		_UCNC_ResultRun()
+		return
+	}
 	_UCNC_State.WindowA := _UCNC_Offer(_UCNC_State.RequestA, "v1.1.0")
 	_UCNC_State.EpochA := _UC_WindowEpoch
 	if _UCNC_State.Mode == "replaced" {
@@ -168,7 +213,8 @@ _UCNC_Main() {
 	global _UCNC_State
 	Primary := 0, ExportFailure := 0
 	_UCNC_Require(_UCNC_State.Mode == "replaced" || _UCNC_State.Mode == "current-close"
-		|| _UCNC_State.Mode == "successor-current", "the native consent mode must be known")
+		|| _UCNC_State.Mode == "successor-current" || _UCNC_State.Mode == "result-close"
+		|| _UCNC_State.Mode == "result-replaced", "the native consent mode must be known")
 	PreviousCritical := Critical("Off")
 	; This private child permits eligible native GUI callbacks during timer callouts.
 	Thread("Interrupt", 0)

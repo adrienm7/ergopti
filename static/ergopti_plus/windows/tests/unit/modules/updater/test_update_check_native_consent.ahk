@@ -137,3 +137,9 @@ Test("Update consent: fresh successor native button remains usable (update-check
 
 Test("Update geometry: canonical owner sizes native fallback and refuses invalid entries (update-check-geometry-source)",
 	_UCNO_Case.Bind("geometry"))
+
+
+Test("Update result: closing at the log boundary revokes publication (update-check-result-owner)",
+	_UCNO_Case.Bind("result-close"))
+Test("Update result: replacement keeps its own state (update-check-result-owner)",
+	_UCNO_Case.Bind("result-replaced"))
