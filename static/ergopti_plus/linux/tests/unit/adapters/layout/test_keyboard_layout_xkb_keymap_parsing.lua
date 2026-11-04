@@ -836,3 +836,25 @@ xkb_symbols "fr+us" {
 		helpers.assert_eq(kb.parse_symbols(DUMP).I372, { false, "c" })
 	end)
 end)
+
+helpers.describe("explicit keymap admission", function()
+	helpers.it("an unreadable explicit keymap never falls back to the server", function()
+		local Display = require("infra.display_server")
+		local Shell = require("adapters.shell_runner")
+		local saved_kind, saved_desktop = Display.kind(), Display.desktop()
+		local original_exec, previous_layout = Shell.exec_checked, package.loaded["adapters.keyboard_layout"]
+		local calls = 0
+		Shell.exec_checked = function() calls = calls + 1; return false, "", "controlled refusal" end
+		Display._set_for_test(Display.X11, "")
+		local ok, detail = pcall(function()
+			local layout = helpers.load_module("adapters.keyboard_layout")
+			local path = os.tmpname(); os.remove(path)
+			helpers.assert_eq(layout.refresh(path), false)
+			helpers.assert_eq(calls, 0, "a refused override must not select a different server keymap")
+		end)
+		Shell.exec_checked = original_exec
+		Display._set_for_test(saved_kind, saved_desktop)
+		package.loaded["adapters.keyboard_layout"] = previous_layout
+		if not ok then error(detail, 0) end
+	end)
+end)
