@@ -46,9 +46,9 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 			FileAppend("foreign fixture", DeadStage, "UTF-8-RAW")
 		} else if Mode = "journal" {
 			FileAppend("recovery fixture", DeadStage . "-journal", "UTF-8-RAW")
-		} else if Mode = "legacy" {
+		} else if Mode = "legacy" || Mode = "pre-collision-fix" {
 			Legacy := SQLite_Open(DeadStage)
-			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value='3' WHERE key='format_version';"))
+			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value=" . SQLite_Q(Mode = "legacy" ? "3" : "16") . " WHERE key='format_version';"))
 			finally SQLite_Close(Legacy)
 		} else if Mode = "missing-cache" {
 			KLR_ResetCache()
@@ -94,3 +94,7 @@ Test("KLR cache stages: retire the previous cache format (klr-cache-stage-owners
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("legacy")))
 Test("KLR cache stages: clean up before a cold rebuild (klr-cache-stage-ownership)",
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("missing-cache")))
+
+
+Test("KLR cache stages: retire pre-collision-fix stages (klr-cache-stage-ownership)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-collision-fix")))
