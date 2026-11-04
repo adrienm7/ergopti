@@ -170,6 +170,10 @@ helpers.describe("a three-finger swipe switches one tab (three-finger-tab-step)"
 		h.path({ 105 }, 105)
 		h.lift()
 		helpers.assert_eq(#h.fired, 0, "an over-limit frame must not be truncated into real actions")
+		for _ = 1, 100 do h.lift() end
+		h.path({ 4 }, 4)
+		h.lift()
+		helpers.assert_eq(#h.fired, 4, "a new physical gesture must work after the rejected frame")
 		h.finish()
 	end)
 
