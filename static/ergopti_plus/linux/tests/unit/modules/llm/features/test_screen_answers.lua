@@ -487,6 +487,8 @@ helpers.describe("screen actions: a region read by an API model, answered by the
 			world.wait_for(3); world.respond(3, "ANSWER: second")
 			world.wait_for(4); world.respond(4, "ANSWER: third")
 			helpers.assert_eq(offered(world)[1], "result = x**2")
+			helpers.assert_true(world.engine.handle_shortcut({ key = "1", mods = {} }))
+			helpers.assert_eq(world.typed[1].text, "result = x**2")
 		end)
 	end)
 
