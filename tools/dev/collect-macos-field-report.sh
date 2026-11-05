@@ -444,9 +444,10 @@ run_field_run() {
 		rm -f "${ready_file}" || { log "Cannot remove the previous readiness."; return 1; }
 		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
 			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
-		log "Two steps may need you: type your password if macOS asks for it (Ergopti installs its own Karabiner"
-		log "runtime), and if System Settings opens Login Items & Extensions, switch on the Karabiner driver there."
-		log "Nothing else needs a click; the run waits for both."
+		log "Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog"
+		log "names (never add one with +); type your password if macOS asks for it (Ergopti installs its own"
+		log "Karabiner runtime); and if System Settings opens Login Items & Extensions, switch on the Karabiner driver."
+		log "Nothing else needs a click; the run waits for all three."
 	elif [ ! -x "${app_binary}" ]; then
 		stale="no developer app is built"
 	else

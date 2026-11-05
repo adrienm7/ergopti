@@ -535,6 +535,22 @@ function reportFolder(paths) {
 			assert.doesNotMatch(installer, /HOST_GITHUB_API/, 'the installer must not need the REST API');
 			assert.match(installer, /git ls-remote --tags --refs "\$REMOTE\.git" 'v0\.0\.0-dev\.\*'/);
 			assert.match(installer, /"\$REMOTE\/releases\/download\/\$tag\/\$ARCHIVE"/);
+			// A second copy (a local build) would take the Accessibility grant and the boot would reset it
+			const open = installer.indexOf('open --env');
+			const unregister = installer.indexOf('"$LSREGISTER" -u "$other"');
+			assert(
+				unregister > 0 && unregister < open,
+				'other copies must be unregistered before the app opens'
+			);
+			assert(
+				installer.indexOf('"$LSREGISTER" -f "$APP"') < open,
+				'the installed copy is registered before it opens'
+			);
+			assert.doesNotMatch(
+				installer,
+				/rm -rf "\$other/,
+				'another copy is unregistered, never deleted'
+			);
 			const ask = installer.indexOf('sudo -v || fail');
 			assert(ask > 0, 'the installer must ask for the administrator password');
 			assert(
