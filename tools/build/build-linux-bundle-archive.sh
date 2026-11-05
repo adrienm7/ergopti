@@ -52,8 +52,12 @@ done
 bash "$SCRIPT_DIR/stage-linux-private-runtime.sh" "$BUILD_DIR/AppDir" "$STAGE/linux/runtime" "$STAGE/linux"
 install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$STAGE/linux/network-runtime-env.sh"
 
-tar -czf "$BUILD_DIR/$ASSET" -C "$STAGE" linux _shared bin install.sh
-(cd "$BUILD_DIR" && sha256sum -- "$ASSET" > "$ASSET.sha256" && sha256sum --check -- "$ASSET.sha256")
+# Build both artifacts in the private stage. Replacing an existing output by
+# rename avoids truncating a different user file hardlinked to that output.
+tar -czf "$STAGE/$ASSET" -C "$STAGE" linux _shared bin install.sh
+(cd "$STAGE" && sha256sum -- "$ASSET" > "$ASSET.sha256" && sha256sum --check -- "$ASSET.sha256")
+mv -T -- "$STAGE/$ASSET" "$BUILD_DIR/$ASSET"
+mv -T -- "$STAGE/$ASSET.sha256" "$BUILD_DIR/$ASSET.sha256"
 echo "Bundle contents:"
 tar -tzf "$BUILD_DIR/$ASSET" | sed -n '1,20p'
 echo "... $(tar -tzf "$BUILD_DIR/$ASSET" | wc -l) entries"
