@@ -1122,6 +1122,7 @@ end
 --- @param timestamp_ms number|nil
 function M.record_suggestion(app_id, kind, timestamp_ms)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
 	local live, dated = app_pair(app_id, timestamp_ms)
 	for _, app in ipairs({ live, dated }) do app[field] = app[field] + 1 end
@@ -1131,6 +1132,7 @@ end
 --- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
 	for _, app in ipairs({ live, dated }) do
@@ -1251,6 +1253,7 @@ local LLM_EVENT_FIELDS = {
 --- @param fields table|nil The fields of that kind (LLM_EVENT_FIELDS).
 function M.record_llm_event(app_id, kind, fields)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	local allowed = LLM_EVENT_FIELDS[kind]
 	if not allowed then
 		Logger.error(LOG, "record_llm_event(): '%s' is not an events_llm kind; the event is dropped.", tostring(kind))
@@ -1275,6 +1278,7 @@ end
 --- appears as a false logical keystroke.
 function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
 	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
@@ -1305,7 +1309,7 @@ function M.on_app_focus(app_id, timestamp_ms)
 	-- forbidden would persist them on the next flush. The in-flight interval
 	-- is forgotten rather than closed — time that must not be recorded
 	-- cannot be credited later without backfilling the forbidden gap.
-	if not may_record() then
+	if not may_record() or M.is_unrecorded_app(app_id) then
 		_focused_app_id, _focused_app_started_at = nil, nil
 		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
