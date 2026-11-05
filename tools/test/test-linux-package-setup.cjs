@@ -25,6 +25,23 @@ assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permissi
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
+	// Debian calls postinst for rollback and triggers as well as configuration.
+	{
+		const builder = fs.readFileSync(path.join(ROOT, 'tools/build/build-linux-deb.sh'), 'utf8');
+		const match = /cat > "\$DEB_ROOT\/DEBIAN\/postinst" << 'POSTINST_EOF'\n([\s\S]*?)\nPOSTINST_EOF/.exec(builder);
+		assert.ok(match, 'actual Debian postinst');
+		const stubSetup = path.join(sandbox, 'postinst-setup.sh');
+		const hook = path.join(sandbox, 'postinst');
+		const calls = path.join(sandbox, 'postinst-calls');
+		fs.writeFileSync(stubSetup, '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n');
+		fs.writeFileSync(hook, match[1].replace('/usr/lib/ergopti/install/setup_permissions.sh', bashPath(stubSetup)));
+		for (const action of ['configure', 'abort-upgrade', 'abort-remove', 'abort-deconfigure', 'triggered']) {
+			fs.writeFileSync(calls, '');
+			const result = spawnSync(bashExecutable(), [bashPath(hook), action], { encoding: 'utf8', timeout: 10000, env: { ...process.env, CALL_LOG: calls } });
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(fs.readFileSync(calls, 'utf8'), action === 'configure' ? '--active-sessions\n' : '', action);
+		}
+	}
 	// A checkout name is data, even when it contains JavaScript quotes.
 	{
 		const checkout = path.join(sandbox, "checkout's directory\n");

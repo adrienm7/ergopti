@@ -203,7 +203,9 @@ cat > "$DEB_ROOT/DEBIAN/postinst" << 'POSTINST_EOF'
 #!/bin/bash
 set -e
 
-bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions
+case "${1:-}" in
+  configure) bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions ;;
+esac
 POSTINST_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/postinst"
 echo "  DEBIAN/postinst"
