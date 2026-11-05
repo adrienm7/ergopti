@@ -1149,18 +1149,23 @@ if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# actual installed bytes need their own canonical ownership entry.
 	NATIVE_OUTPUT_DIGEST="$(sha256sum < "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
 	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
-	while IFS=$'\t' read -r native_digest native_relative || [ -n "$native_digest$native_relative" ]; do
-		[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
-		[ "$native_relative" = "linux/native_modules/luv.so" ] && continue
-		printf '%s\t%s\n' "$native_digest" "$native_relative" >> "$NATIVE_OUTPUT_MANIFEST"
-	done < "${LIB_DIR}/.ergopti-owned-files"
-	printf '%s\tlinux/bin/libergopti_archive_publication.so\n' "${NATIVE_OUTPUT_DIGEST%% *}" \
-		>> "$NATIVE_OUTPUT_MANIFEST"
-	if [ -n "$NATIVE_LUV_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
-		NATIVE_LUV_DIGEST="$(sha256sum < "${LIB_DIR}/linux/native_modules/luv.so")"
-		printf '%s\tlinux/native_modules/luv.so\n' "${NATIVE_LUV_DIGEST%% *}" >> "$NATIVE_OUTPUT_MANIFEST"
+	write_native_output_manifest() {
+		while IFS=$'\t' read -r native_digest native_relative || [ -n "$native_digest$native_relative" ]; do
+			[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
+			[ "$native_relative" = "linux/native_modules/luv.so" ] && continue
+			printf '%s\t%s\n' "$native_digest" "$native_relative" || return 1
+		done < "${LIB_DIR}/.ergopti-owned-files" || return 1
+		printf '%s\tlinux/bin/libergopti_archive_publication.so\n' "${NATIVE_OUTPUT_DIGEST%% *}" || return 1
+		if [ -n "$NATIVE_LUV_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
+			NATIVE_LUV_DIGEST="$(sha256sum < "${LIB_DIR}/linux/native_modules/luv.so")" || return 1
+			printf '%s\tlinux/native_modules/luv.so\n' "${NATIVE_LUV_DIGEST%% *}" || return 1
+		fi
+	}
+	if ! write_native_output_manifest > "$NATIVE_OUTPUT_MANIFEST" \
+		|| ! mv -T -- "$NATIVE_OUTPUT_MANIFEST" "${LIB_DIR}/.ergopti-owned-files"; then
+		rm -f -- "$NATIVE_OUTPUT_MANIFEST"
+		exit 1
 	fi
-	mv -- "$NATIVE_OUTPUT_MANIFEST" "${LIB_DIR}/.ergopti-owned-files"
 	if [ -n "$NATIVE_OUTPUT_STAGE" ]; then
 		rm -f -- "${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
 		rmdir -- "$NATIVE_OUTPUT_STAGE"
