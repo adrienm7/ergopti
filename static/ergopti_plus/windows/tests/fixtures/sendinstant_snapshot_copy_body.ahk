@@ -48,14 +48,19 @@ _SICO_RequestCopy(Phase) {
 		"The copy must come from the originally admitted independent process.")
 	BeforeRead := CB_GetSequenceNumber()
 	BeforeOwner := DllCall("User32\GetClipboardOwner", "Ptr")
-	CopiedText := CB_Read()
+	; Read the real CF_UNICODETEXT image under a fresh native lease. Retain
+	; the writer's authenticated receipt; never rename it after observing text.
+	Sample := _SICO_Sample(_SICO.Foreign)
+	CopiedText := Sample.Text
 	AfterRead := CB_GetSequenceNumber()
 	AfterOwner := DllCall("User32\GetClipboardOwner", "Ptr")
 	FileAppend("PREREQUISITE snapshot-receiver receipt_sequence=" . Identity.Sequence . " before_read_sequence=" . BeforeRead
 		. " after_read_sequence=" . AfterRead . " before_owner=" . BeforeOwner . " after_owner=" . AfterOwner
 		. " writer=" . Identity.Hwnd . " text_matches=" . (CopiedText == _SICO.Foreign) . "`n", "*", "UTF-8-RAW")
 	_SICO_Require(CopiedText == _SICO.Foreign && Identity.Sequence > 0
-		&& AfterRead == Identity.Sequence && AfterOwner == Identity.Hwnd,
+		&& Sample.RawMatches && Sample.Sequence == Identity.Sequence && Sample.Owner == Identity.Hwnd
+		&& BeforeRead == Identity.Sequence && AfterRead == Identity.Sequence
+		&& BeforeOwner == Identity.Hwnd && AfterOwner == Identity.Hwnd,
 		"The independent process must actually own the exact newly copied native text.")
 	_SICO.Copied := true
 	_SICO.WriterSequence := Identity.Sequence
@@ -110,36 +115,102 @@ CB_SaveAll() {
 	return Saved
 }
 
-; The copy receipt is captured BEFORE CloseClipboard, never inferred afterward.
-_SISC_NativeCopy(Text, &AfterClose := 0) {
+; The publication sequence before Close is intermediate on Windows (the first
+; Close can materialize compatible text formats). Authenticate after that Close
+; through a NEW own-HWND read lease, the exact transferred HGLOBAL and raw UTF-16.
+; A sampled current sequence alone is never authority for this copy or cleanup.
+_SISC_AuthenticateNativeCopy(Memory, Text) {
+	Bytes := (StrLen(Text) + 1) * 2
+	Started := A_TickCount
+	loop {
+		Opened := false, Receipt := 0
+		PreviousCritical := Critical("On")
+		try {
+			OpenWindow := DllCall("User32\GetOpenClipboardWindow", "Ptr")
+			_SICO_Require(OpenWindow != A_ScriptHwnd, "Authentication must not reopen an unacknowledged own publication lease.")
+			; Open(NULL) is ambiguous in metadata. A refused fresh Open(HWND)
+			; leaves that borrower alone; only our positive acquisition may Close.
+			if OpenWindow == 0
+				Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+			if Opened {
+				Sequence := CB_GetSequenceNumber()
+				Owner := DllCall("User32\GetClipboardOwner", "Ptr")
+				Handle := DllCall("User32\GetClipboardData", "UInt", 13, "Ptr")
+				_SICO_Require(Sequence > 0 && Owner == A_ScriptHwnd
+					&& DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+					&& Handle == Memory && DllCall("Kernel32\GlobalSize", "Ptr", Handle, "UPtr") >= Bytes,
+					"The post-close receipt requires this writer's exact transferred Unicode HGLOBAL under its own new native lease.")
+				Data := DllCall("Kernel32\GlobalLock", "Ptr", Handle, "Ptr")
+				_SICO_Require(Data != 0, "The authenticated publication image must lock.")
+				try RawMatches := DllCall("ntdll\RtlCompareMemory", "Ptr", Data, "Ptr", StrPtr(Text), "UPtr", Bytes, "UPtr") == Bytes
+				finally {
+					DllCall("Kernel32\SetLastError", "UInt", 0)
+					Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Handle, "Int")
+					_SICO_Require(Unlocked != 0 || A_LastError == 0, "The authenticated image must unlock with its own native acknowledgement.")
+				}
+				_SICO_Require(RawMatches && CB_GetSequenceNumber() == Sequence
+					&& DllCall("User32\GetClipboardOwner", "Ptr") == Owner,
+					"The original native handle, exact bytes, owner and sequence must remain stable throughout authentication.")
+				Receipt := {Sequence: Sequence, Owner: Owner, Handle: Handle, RawMatches: RawMatches}
+			}
+		} finally {
+			try {
+				if Opened
+					_SICO_Require(DllCall("User32\CloseClipboard", "Int") != 0, "Authentication must acknowledge release of only its newly acquired own lease.")
+			} finally Critical(PreviousCritical)
+		}
+		if IsObject(Receipt)
+			return Receipt
+		_SICO_Require(TickElapsed(Started) < 300, "The writer's post-close authentication must acquire a fresh bounded native lease.")
+		Sleep(5)
+	}
+}
+
+_SISC_NativeCopy(Text, &Witness := 0) {
 	Bytes := (StrLen(Text) + 1) * 2
 	Memory := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42, "UPtr", Bytes, "Ptr")
 	_SICO_Require(Memory != 0, "The independent native copy must allocate its private Unicode buffer.")
 	Transferred := false, Opened := false
+	Witness := {LeasedSequence: 0, AfterCloseSequence: 0, AuthSequence: 0, AfterAuthenticationClose: 0,
+		TransferredHandle: 0, AuthHandle: 0, RawMatches: false}
 	try {
 		Data := DllCall("Kernel32\GlobalLock", "Ptr", Memory, "Ptr")
 		_SICO_Require(Data != 0, "The independent copy allocation must lock.")
 		try StrPut(Text, Data, StrLen(Text) + 1, "UTF-16")
-		finally DllCall("Kernel32\GlobalUnlock", "Ptr", Memory)
+		finally {
+			DllCall("Kernel32\SetLastError", "UInt", 0)
+			Unlocked := DllCall("Kernel32\GlobalUnlock", "Ptr", Memory, "Int")
+			_SICO_Require(Unlocked != 0 || A_LastError == 0, "The publication allocation must unlock with acknowledgement.")
+		}
 		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
 		_SICO_Require(Opened, "The independent publisher must acquire its own actual native lease.")
 		_SICO_Require(DllCall("User32\EmptyClipboard", "Int") != 0, "The writer must acquire its complete new clipboard namespace.")
 		Transferred := DllCall("User32\SetClipboardData", "UInt", 13, "Ptr", Memory, "Ptr") == Memory
 		_SICO_Require(Transferred, "The writer must transfer its exact native Unicode data.")
-		Sequence := CB_GetSequenceNumber()
-		_SICO_Require(Sequence > 0 && DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd
+		Witness.TransferredHandle := Memory
+		Witness.LeasedSequence := CB_GetSequenceNumber()
+		_SICO_Require(Witness.LeasedSequence > 0 && DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd
 			&& DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd,
-			"The independent receipt must belong to its still-open native publication lease.")
-		return Sequence
+			"The intermediate publication metadata must belong to its still-open native lease.")
 	} finally {
 		if Opened {
-			_SICO_Require(DllCall("User32\CloseClipboard", "Int") != 0, "The writer must acknowledge release of its exact own native lease.")
-			; This value is diagnostic only; the retained receipt is not renamed.
-			AfterClose := CB_GetSequenceNumber()
+			_SICO_Require(DllCall("User32\CloseClipboard", "Int") != 0, "The writer must acknowledge release of its original native publication lease.")
+			; Diagnostic only. Authentication below is what establishes authority.
+			Witness.AfterCloseSequence := CB_GetSequenceNumber()
 		}
 		if !Transferred
 			DllCall("Kernel32\GlobalFree", "Ptr", Memory)
 	}
+	Receipt := _SISC_AuthenticateNativeCopy(Memory, Text)
+	Witness.AuthSequence := Receipt.Sequence
+	Witness.AuthHandle := Receipt.Handle
+	Witness.RawMatches := Receipt.RawMatches
+	Witness.AfterAuthenticationClose := CB_GetSequenceNumber()
+	; A later change is a refusal, never a reason to rename the retained receipt.
+	_SICO_Require(Witness.AfterAuthenticationClose == Receipt.Sequence
+		&& DllCall("User32\GetClipboardOwner", "Ptr") == Receipt.Owner,
+		"The authenticated publication must remain current after releasing its new read lease.")
+	return Receipt.Sequence
 }
 
 _SICO_Writer(Root, Mode) {
@@ -150,8 +221,11 @@ _SICO_Writer(Root, Mode) {
 	loop {
 		if FileExist(Root . "\copy.request") && !Copied {
 			; This is the actual independent clipboard mutation, not an adapter port.
-			Sequence := _SISC_NativeCopy(Mode == "same-text-copy" ? _SICO_Payload(Root) : "sendinstant external B é😀 " . Root, &AfterClose)
-			FileAppend("PREREQUISITE snapshot-writer leased_sequence=" . Sequence . " after_close_sequence=" . AfterClose
+			Sequence := _SISC_NativeCopy(Mode == "same-text-copy" ? _SICO_Payload(Root) : "sendinstant external B é😀 " . Root, &Witness)
+			FileAppend("PREREQUISITE snapshot-writer leased_sequence=" . Witness.LeasedSequence . " after_close_sequence=" . Witness.AfterCloseSequence
+				. " authenticated_sequence=" . Witness.AuthSequence . " post_auth_close_sequence=" . Witness.AfterAuthenticationClose
+				. " transferred_handle=" . Witness.TransferredHandle . " authenticated_handle=" . Witness.AuthHandle
+				. " handle_match=" . (Witness.TransferredHandle == Witness.AuthHandle) . " raw_match=" . Witness.RawMatches
 				. " owner=" . DllCall("User32\GetClipboardOwner", "Ptr") . " writer=" . A_ScriptHwnd . "`n", "*", "UTF-8-RAW")
 			_SICO_Require(Sequence > 0 && DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd,
 				"The writer must really own its published native clipboard.")
