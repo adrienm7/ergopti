@@ -131,6 +131,11 @@ passed++;
 		'/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2'
 	);
 	assert.equal(Ceiling.parseInterpreter('There is no dynamic section in this file.'), null);
+	assert.equal(
+		Ceiling.parseInterpreter('      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2 bad]'),
+		'/lib64/ld-linux-x86-64.so.2 bad',
+		'the complete interpreter is compared, including spaces'
+	);
 	for (const name of [
 		'libc.so.6',
 		'libm.so.6',
