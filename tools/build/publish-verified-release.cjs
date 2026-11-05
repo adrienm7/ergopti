@@ -15,6 +15,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 
 /** Executes one GitHub operation and rejects every unacknowledged native result. */
 function github(args) {
@@ -42,21 +43,50 @@ function expectedAssets(files) {
 		const stat = fs.lstatSync(file);
 		if (!stat.isFile() || stat.size <= 0)
 			throw new Error(`Release artifact is not a nonempty regular file: ${file}.`);
-		expected.set(name, { file, size: stat.size });
+		const hash = createHash('sha256');
+		const descriptor = fs.openSync(
+			file,
+			fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0)
+		);
+		try {
+			const before = fs.fstatSync(descriptor);
+			if (
+				!before.isFile() ||
+				before.dev !== stat.dev ||
+				before.ino !== stat.ino ||
+				before.size !== stat.size ||
+				before.mtimeMs !== stat.mtimeMs ||
+				before.ctimeMs !== stat.ctimeMs
+			)
+				throw new Error(`Release artifact changed before hashing: ${file}.`);
+			const buffer = Buffer.allocUnsafe(1024 * 1024);
+			let count;
+			while ((count = fs.readSync(descriptor, buffer, 0, buffer.length, null)) > 0)
+				hash.update(buffer.subarray(0, count));
+			const after = fs.fstatSync(descriptor);
+			if (
+				after.size !== before.size ||
+				after.mtimeMs !== before.mtimeMs ||
+				after.ctimeMs !== before.ctimeMs
+			)
+				throw new Error(`Release artifact changed while hashing: ${file}.`);
+		} finally {
+			fs.closeSync(descriptor);
+		}
+		expected.set(name, { file, size: stat.size, digest: `sha256:${hash.digest('hex')}` });
 	}
 	return expected;
 }
 
 /** Validates the actual inventory and returns only artifacts without matching receipts. */
-function missingAssets(raw, expected, draft) {
-	const release = JSON.parse(raw);
-	if (!release || release.isDraft !== draft || !Array.isArray(release.assets)) {
+function missingAssets(release, assets, expected, draft) {
+	if (!release || release.draft !== draft || !Array.isArray(assets)) {
 		throw new Error(
 			`GitHub did not acknowledge the expected ${draft ? 'draft' : 'published'} release state.`
 		);
 	}
 	const found = new Map();
-	for (const asset of release.assets) {
+	for (const asset of assets) {
 		if (
 			!asset ||
 			typeof asset.name !== 'string' ||
@@ -72,7 +102,12 @@ function missingAssets(raw, expected, draft) {
 	}
 	return [...expected.entries()].filter(([name, local]) => {
 		const asset = found.get(name);
-		return !asset || asset.state !== 'uploaded' || asset.size !== local.size;
+		return (
+			!asset ||
+			asset.state !== 'uploaded' ||
+			asset.size !== local.size ||
+			asset.digest !== local.digest
+		);
 	});
 }
 
@@ -94,10 +129,28 @@ function publishVerifiedRelease(tag, repository, files, run = github) {
 		throw new Error('A release tag and repository are required.');
 	}
 	const expected = expectedAssets(files);
-	const view = ['release', 'view', tag, '--repo', repository, '--json', 'isDraft,assets'];
+	if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository))
+		throw new Error('Invalid GitHub repository.');
+	const releasePath = `repos/${repository}/releases/tags/${encodeURIComponent(tag)}`;
+	const inventory = (draft) => {
+		const release = JSON.parse(run(['api', releasePath]));
+		if (!release || !Number.isSafeInteger(release.id) || release.id < 1 || release.tag_name !== tag)
+			throw new Error('GitHub did not acknowledge the expected release identity.');
+		const assets = [];
+		for (let page = 1; page <= 1000; page++) {
+			const rows = JSON.parse(
+				run(['api', `repos/${repository}/releases/${release.id}/assets?per_page=100&page=${page}`])
+			);
+			if (!Array.isArray(rows) || rows.length > 100)
+				throw new Error('GitHub returned an invalid paginated asset inventory.');
+			assets.push(...rows);
+			if (rows.length < 100) return missingAssets(release, assets, expected, draft);
+		}
+		throw new Error('GitHub asset inventory exceeds the pagination bound.');
+	};
 	let missing;
 	for (let attempt = 0; attempt < 3; attempt++) {
-		missing = missingAssets(run(view), expected, true);
+		missing = inventory(true);
 		if (missing.length === 0) break;
 		if (attempt === 2) {
 			throw new Error(
@@ -116,7 +169,7 @@ function publishVerifiedRelease(tag, repository, files, run = github) {
 	}
 	// Publication can make assets immutable. The last draft readback is the gate.
 	run(['release', 'edit', tag, '--repo', repository, '--draft=false']);
-	missing = missingAssets(run(view), expected, false);
+	missing = inventory(false);
 	if (missing.length !== 0) {
 		throw new Error(
 			`Published release lost verified assets: ${missing.map(([name]) => name).join(', ')}.`
