@@ -819,3 +819,120 @@ _I18nKeyCacheRoundTrip(Mode) {
 }
 for _I18nKeyCache_Mode in ["tab-key", "newline-key", "carriage-key", "backslash-key-control", "value-control", "legacy-v2-key"]
 	Test("i18n cache key fidelity: " . _I18nKeyCache_Mode . " (i18n-cache-key-fidelity)", _I18nKeyCacheRoundTrip.Bind(_I18nKeyCache_Mode))
+
+; The port substitutes only the user's regional-language observation. The
+; supplied strings come from the real Windows locale API for named locales;
+; no system language or region setting is changed by these probes.
+_IDN_NativeIso(LocaleName) {
+	Buf := Buffer(32, 0)
+	Len := DllCall("Kernel32\GetLocaleInfoEx", "Str", LocaleName, "UInt", 0x59,
+		"Ptr", Buf, "Int", 16, "Int")
+	if Len <= 1
+		throw OSError(A_LastError, "native named regional locale unavailable")
+	return StrLower(StrGet(Buf, "UTF-16"))
+}
+class _IDN_LocaleProbe {
+	__New(Region, UiRegion := "") {
+		this.Region := Region, this.UiRegion := UiRegion, this.RegionalCalls := 0, this.UiCalls := 0
+	}
+	Regional() {
+		this.RegionalCalls += 1
+		return _IDN_NativeIso(this.Region)
+	}
+	Ui() {
+		this.UiCalls += 1
+		return this.UiRegion != "" ? _IDN_NativeIso(this.UiRegion) : _IDN_ActualUiIso()
+	}
+}
+_IDN_InitFromRegion(Region, UiRegion := "") {
+	global _I18nLocale, _I18nCacheLoaded, _I18nFlagExistsCache
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	SavedLocale := _I18nLocale, SavedLoaded := _I18nCacheLoaded
+	HadFlags := IsSet(_I18nFlagExistsCache)
+	SavedIconFlags := HadFlags ? _I18nFlagExistsCache : 0
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		_I18nCacheLoaded := false
+		Fixture := _IDN_LocaleProbe(Region, UiRegion)
+		Critical("Off")
+		I18nInit(Map("script", Map("locale", "_")), Fixture)
+		Observed := _I18nLocale
+		return { Locale: Observed, Calls: Fixture.RegionalCalls + Fixture.UiCalls,
+			RegionalCalls: Fixture.RegionalCalls, UiCalls: Fixture.UiCalls }
+	} finally {
+		Critical("On")
+		_I18nLocale := SavedLocale, _I18nCacheLoaded := SavedLoaded
+		_I18nFlagExistsCache := HadFlags ? SavedIconFlags : unset
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_IDN_NorwegianCase(Region, NativeExpected, Expected) {
+	Native := _IDN_NativeIso(Region)
+	Result := _IDN_InitFromRegion(Region, Region)
+	_TestAppendProgress("# i18n named=" . Region . " native=" . Native . " init=" . Result.Locale
+		. " regional_calls=" . Result.RegionalCalls . " ui_calls=" . Result.UiCalls)
+	AssertEqual(NativeExpected, Native, "the native named-locale observation is established")
+	AssertEqual(1, Result.Calls, "real I18nInit observed the isolated native locale port")
+	AssertEqual(Expected, Result.Locale, "the declared language or current fallback is selected")
+}
+for _IDN_Row in [["nb-NO", "nb", "no"], ["nn-NO", "nn", "en"],
+		["fr-FR", "fr", "fr"], ["en-US", "en", "en"]]
+	Test("i18n: native named region " . _IDN_Row[1] . " follows declared locale policy (i18n-native-norwegian)",
+		_IDN_NorwegianCase.Bind(_IDN_Row*))
+
+_IDN_ActualUiIso() {
+	LanguageId := DllCall("Kernel32\GetUserDefaultUILanguage", "UShort")
+	if !LanguageId
+		throw Error("Windows user UI language is unavailable.")
+	Buf := Buffer(32, 0)
+	Len := DllCall("Kernel32\GetLocaleInfoW", "UInt", LanguageId, "UInt", 0x59,
+		"Ptr", Buf, "Int", 16, "Int")
+	if Len <= 1
+		throw OSError(A_LastError, "native UI language locale unavailable")
+	return StrLower(StrGet(Buf, "UTF-16"))
+}
+_IDN_UiLanguageNotRegion() {
+	global I18N_LOCALES
+	UiCode := _IDN_ActualUiIso(), UiPrefix := SubStr(UiCode, 1, 2), Expected := "en"
+	if UiPrefix == "nb"
+		Expected := "no"
+	else {
+		for Locale in I18N_LOCALES {
+			if Locale.Code == UiPrefix {
+				Expected := UiPrefix
+				break
+			}
+		}
+	}
+	Region := Expected == "fr" ? "en-US" : "fr-FR"
+	RegionalCode := _IDN_NativeIso(Region)
+	AssertTrue(RegionalCode != Expected, "the simulated regional reading differs from the actual UI language")
+	Result := _IDN_InitFromRegion(Region)
+	_TestAppendProgress("# i18n ui=" . UiCode . " expected=" . Expected . " named_region=" . Region
+		. " regional=" . RegionalCode . " init=" . Result.Locale . " regional_calls=" . Result.RegionalCalls
+		. " ui_calls=" . Result.UiCalls)
+	AssertEqual(1, Result.Calls, "one native locale port was reached")
+	AssertEqual(Expected, Result.Locale, "initial UI language follows the Windows UI language")
+}
+Test("i18n: initial UI language is independent of regional formats (i18n-native-ui-region)", _IDN_UiLanguageNotRegion)
