@@ -755,3 +755,55 @@ for _THSO_Mode in ["tap", "hold"]
 for _THSO_Mode in ["tap", "global"]
 	Test("tap-hold source: stage-time successor blocks " . _THSO_Mode . " (tap-hold-source-successor)",
 		_THSO_Extra.Bind(_THSO_Mode, "successor"))
+
+; The live model can still inherit after an external deletion of its old file.
+; Creating the first replacement must not revive the disabled default hold.
+_THSO_FirstSaveNativeOwned(TargetPath) {
+	global TapHold, _SharedDir, _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+	SplitPath(TargetPath, , &Root)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	Assert((Created is Integer) && Created == 1, "The private first-save directory must be acquired exclusively")
+	try {
+		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		DefaultBytes := FSReadUtf8Exact(Defaults)
+		AssertTrue(DefaultBytes is String && DefaultBytes != "", "The actual shared defaults must exist")
+		AssertFalse(FileExist(TargetPath), "The actual target must be absent before the first save")
+		TapHold := LoadTapHoldToml(Defaults)
+		TapHold["inherit_defaults"] := true
+		AssertEqual("enter", TapHold["keys"]["caps_lock"]["tap_action"])
+		AssertEqual("ctrl", TapHold["keys"]["caps_lock"]["hold_modifier"], "The RAM model starts with the real inherited modifier")
+		OtherTap := TapHold["keys"]["tab"]["tap_action"]
+		Result := WriteTapHoldNative("caps_lock")
+		Runtime := TapHold["keys"].Get("caps_lock", Map())
+		RuntimeTap := Runtime.Get("tap_action", ""), RuntimeHold := Runtime.Get("hold_modifier", "")
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		Source := FSReadUtf8Exact(TargetPath)
+		Document := TOML_ParseDocument(Source)
+		Reloaded := LoadTapHoldToml(TargetPath, Defaults)
+		Entry := Reloaded["keys"].Get("caps_lock", Map())
+		_TestPrint("# tap-hold first-save-native result=" . Result . " runtime_tap=" . RuntimeTap
+			. " runtime_hold=" . RuntimeHold . " reload_tap=" . Entry.Get("tap_action", "")
+			. " reload_hold=" . Entry.Get("hold_modifier", "") . " defaults_unchanged=" . FSUtf8ExactMatches(Defaults, DefaultBytes))
+		AssertEqual(1, Result, "The real native command must acknowledge the absent-target publication")
+		AssertTrue(Document["tap_hold"]["inherit_defaults"] is TOML_Bool
+			&& Document["tap_hold"]["inherit_defaults"].Value, "The actual first image retains inherited defaults")
+		AssertEqual("", RuntimeTap, "The published runtime owns a native tap")
+		AssertEqual("", RuntimeHold, "The published runtime owns no modifier")
+		AssertEqual("", Runtime.Get("hold_layer", ""), "The published runtime owns no layer")
+		AssertEqual("", Entry.Get("tap_action", ""), "The actual reload retains a native tap")
+		AssertEqual("", Entry.Get("hold_modifier", ""), "The actual reload cannot inherit the old modifier")
+		AssertEqual("", Entry.Get("hold_layer", ""), "The actual reload cannot inherit a layer")
+		AssertEqual(OtherTap, Reloaded["keys"]["tab"]["tap_action"], "An unrelated recommended mapping remains intact")
+		AssertTrue(FSUtf8ExactMatches(Defaults, DefaultBytes), "The shared defaults are read-only during this private test")
+	} finally {
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+Test("tap-hold native: absent first save retains inherited neighbours without reviving the disabled hold (tap-hold-native-first-save)",
+	() => _THHS_WithNativeFixture(_THSO_FirstSaveNativeOwned))
