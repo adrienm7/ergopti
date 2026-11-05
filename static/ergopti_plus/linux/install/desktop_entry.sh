@@ -34,3 +34,24 @@ ergopti_systemd_exec() {
 	escaped="${escaped//%/%%}"
 	printf 'ExecStart=/bin/bash "%s" --tray\n' "$escaped"
 }
+
+# Ownership is determined by the command in [Desktop Entry], not by an Exec
+# belonging to a desktop action. Duplicate main groups or commands are ambiguous.
+ergopti_desktop_entry_owned() {
+	local file="$1" launcher="$2" expected line group= main_groups=0 commands=0
+	expected="$(ergopti_desktop_exec "$launcher")" || return 1
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+			'[Desktop Entry]') group=main; main_groups=$((main_groups + 1)) ;;
+			\[*\]) group=other ;;
+			Exec=*)
+				[ "$group" = main ] || continue
+				commands=$((commands + 1))
+				case "$line" in
+					"$expected"|"Exec=$launcher --tray"|"Exec=$launcher --session-start --tray") ;;
+					*) return 1 ;;
+				esac ;;
+		esac
+	done < "$file"
+	[ "$main_groups" -eq 1 ] && [ "$commands" -eq 1 ]
+}
