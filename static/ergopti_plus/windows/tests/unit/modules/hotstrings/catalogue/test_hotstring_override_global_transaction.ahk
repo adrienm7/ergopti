@@ -530,3 +530,101 @@ _HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish() {
 Test("hotstring-override-global-transaction-20260813: direct _SaveOverrides "
 	. "calls retain atomic write-only compatibility",
 	_HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish)
+
+_HSTG_ForeignStage(Collision) {
+	Root := A_Temp . "\ergopti_override_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Owner := FSWriteDurable, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
+	Source := '[rolls]`ncolor = "#111111"`n'
+	Sentinel := "Foreign override stage: é😀 unchanged"
+	Observe(This, StagePath, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
+		Prefix := Path . "." . A_ScriptHwnd . "-"
+		if SubStr(StagePath, 1, StrLen(Prefix)) == Prefix
+				&& RegExMatch(SubStr(StagePath, StrLen(Prefix) + 1), "^\d+\.tmp$") {
+			State.hits += 1
+			State.stagePath := StagePath
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(StagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the competing private file must actually be created exclusively")
+				State.sentinelBytes := FSReadBytesStrict(StagePath)
+			}
+		}
+		State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, StagePath, Content, OpenFn, DeleteFn, FlushFn, WriteFn)
+		State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "a private override target must not detach a foreign full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		OriginalMap := _HotstringsOverrides, OriginalGen := _HSResolveGen
+		Before := FSReadBytesStrict(Path)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := HotstringsSetOverride("rolls", "", "color", "#222222")
+		After := FSReadBytesStrict(Path)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# override-stage-ownership collision=" . Collision . " calls=" . State.hits
+			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted
+			. " result=" . Result . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
+			. " live_color=" . _HotstringsOverrides["rolls"].Color . " generation_delta=" . (_HSResolveGen - OriginalGen))
+		AssertEqual(1, State.hits, "the actual default override publisher must reach its real native staging owner")
+		AssertEqual(1, State.originalEntered, "the real staging writer must be delegated exactly once")
+		AssertEqual(1, State.originalCompleted, "the real original writer must return before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		if Collision {
+			AssertTrue(StagePresent, "an override save cannot rename or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign bytes must remain exact")
+			AssertFalse(Result)
+			AssertTrue(_HotstringsOverrides == OriginalMap, "a rejected durable operation retains the original live Map owner")
+			AssertEqual(OriginalGen, _HSResolveGen)
+			AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "collision refuses all target publication")
+		} else {
+			AssertTrue(Result)
+			AssertEqual(OriginalGen + 1, _HSResolveGen)
+			AssertEqual("#222222", _HotstringsOverrides["rolls"].Color)
+			AssertFalse(StagePresent)
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual("#222222", Actual["rolls"]["color"])
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedMap
+		_HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(RefusalKey)
+				Refusals.Delete(RefusalKey)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSTG_Collision in [true, false]
+	Test("override stage: foreign collision=" . _HSTG_Collision . " (override-stage-ownership)", _HSTG_ForeignStage.Bind(_HSTG_Collision))
