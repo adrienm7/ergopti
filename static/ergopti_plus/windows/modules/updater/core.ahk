@@ -2243,7 +2243,6 @@ _Updater_PersistListCache(Url, Etag, Json, StageClockFn := 0) {
 	Current := _Updater_LoadListDiskEntry(Url)
 	if (IsObject(Current) && Current.Etag == Etag)
 		return true
-	Stage := ""
 	try {
 		Path := _Updater_ListCachePath()
 		FSEnsureDirectoryStrict(RegExReplace(Path, "[\\/][^\\/]*$"))
@@ -2253,17 +2252,13 @@ _Updater_PersistListCache(Url, Etag, Json, StageClockFn := 0) {
 		StageTick := HasMethod(StageClockFn, "Call") ? StageClockFn.Call() : A_TickCount
 		if !(StageTick is Integer) || StageTick < 0
 			throw TypeError("The release-list stage clock must return a nonnegative integer.")
-		Stage := Path . "." . StageTick . ".tmp"
-		if !FSWriteDurable(Stage, UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . Etag . "`n" . Json)
-			throw Error("the stage could not be written")
-		if !FSAtomicMoveReplace(Stage, Path)
-			throw Error("the stage could not replace the previous copy")
+		if !FSWriteReplaceOwned(Path, UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . Etag . "`n" . Json,
+				"." . StageTick . ".tmp", &Detail)
+			throw Error("the release-list stage could not be published: " . Detail)
 		_UpdaterListDiskEntry := { Etag: Etag, Json: Json }
 		try LoggerDebug("Updater", "Saved the release list copy ({1} bytes).", StrLen(Json))
 		return true
 	} catch as Err {
-		if (Stage != "")
-			FSDelete(Stage)
 		try LoggerError("Updater", "The release list copy could not be saved; this session keeps it: {1}.", Err.Message)
 		return false
 	}
