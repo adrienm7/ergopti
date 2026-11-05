@@ -214,6 +214,30 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("refuses a cached tool replaced by a symlink before execution", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local path = dir .. "/valid"
+		local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+		assert(uv.fs_chmod(path, 448))
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		local started = 0
+		connectors._set_deps_for_test({ tools_dir = function() return dir end,
+			run_tool = function() started = started + 1; return nil end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(connectors.tools(config()), { "valid" })
+			assert(uv.fs_unlink(path)); assert(uv.fs_symlink("/bin/true", path))
+			connectors.run(config(), { type = "shortcut", name = "valid" }, function() end)
+			helpers.assert_eq(started, 0, "a symlink is not an executable regular tool")
+		end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(path)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("a caller cannot alter the cached tool admission list", function()
 		with_connectors({ tools = { "valid" } }, function(Connectors, world, done)
 			local cfg = config()
