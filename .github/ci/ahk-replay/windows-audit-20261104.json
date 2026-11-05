@@ -1,21 +1,9 @@
 {
-	"expected_count": 27,
+	"expected_count": 29,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
-		{
-			"contains": "locale-cache-stage-custody",
-			"expected_count": 4
-		},
-		{
-			"contains": "locale-tsv-non-atomic-write",
-			"expected_count": 2
-		},
-		{
-			"contains": "user-command-counted-output",
-			"expected_count": 4
-		},
 		{
 			"contains": "classified-publisher-stage-custody",
 			"expected_count": 4
@@ -34,6 +22,30 @@
 		},
 		{
 			"contains": "fs-admission-source-change",
+			"expected_count": 1
+		},
+		{
+			"contains": "user-command-counted-output",
+			"expected_count": 4
+		},
+		{
+			"contains": "user-command-pause-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "user-command-firstline-work-observation",
+			"expected_count": 1
+		},
+		{
+			"contains": "user actions: real commands run through the shell (user-actions)",
+			"expected_count": 1
+		},
+		{
+			"contains": "user actions: a script's lines and a failure's first line (user-actions)",
+			"expected_count": 1
+		},
+		{
+			"contains": "user-command-counted-stderr",
 			"expected_count": 1
 		}
 	]
