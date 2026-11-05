@@ -822,7 +822,7 @@ for _TWSC_Kind in ["nul", "control", "literal"] {
 	Test("TOML actual ordinary scalar write: " . _TWSC_Kind . " (toml-write-scalar)", _TWSC_Write.Bind(_TWSC_Kind))
 }
 
-_TUNS_Case(Kind) {
+_TUNS_Case(Kind, DocumentMode := false) {
 	Payload := JsonParse(Kind == "section" ? '{"section":"owned\u0000foreign","key":"value"}'
 		: Kind == "key" ? '{"section":"owned","key":"value\u0000foreign"}' : '{"section":"owned","key":"value"}')
 	if Kind != "control" {
@@ -840,7 +840,8 @@ _TUNS_Case(Kind) {
 		AssertEqual(1, FSWriteCreateDurable(Path, '[owned]`nvalue = "Original"`n'))
 		Before := FSReadBytesStrict(Path)
 		Result := 0, Failure := 0
-		try Result := TOML_BatchWrite(Path, [{Section: Payload["section"], Key: Payload["key"], Value: "Edited"}])
+		Writer := DocumentMode ? TOML_ConfigBatchWrite : TOML_BatchWrite
+		try Result := Writer.Call(Path, [{Section: Payload["section"], Key: Payload["key"], Value: "Edited"}])
 		catch as Err
 			Failure := Err
 		After := FSReadBytesStrict(Path)
@@ -875,3 +876,52 @@ _TUNS_Case(Kind) {
 }
 for _TUNS_Kind in ["section", "key", "control"]
 	Test("TOML actual update-name admission: " . _TUNS_Kind . " (toml-update-name-scalar)", _TUNS_Case.Bind(_TUNS_Kind))
+
+
+for _TCUNS_Kind in ["section", "key", "control"]
+	Test("TOML configuration update-name admission: " . _TCUNS_Kind . " (toml-config-update-name-scalar)",
+		_TUNS_Case.Bind(_TCUNS_Kind, true))
+
+_TUNS_PureOwners() {
+	Payload := JsonParse('{"section":"owned\u0000foreign","key":"value\u0000foreign"}')
+	for Name in [Payload["section"], Payload["key"]] {
+		AssertEqual(13, StrLen(Name))
+		Failure := 0
+		try TOML_RenderKey(Name)
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is ValueError, "the renderer cannot turn a distinct original name into a shorter bare key")
+	}
+	for Kind in ["section", "key"] {
+		Update := {Section: Kind == "section" ? Payload["section"] : "owned",
+			Key: Kind == "key" ? Payload["key"] : "value", Value: "Edited"}
+		Failure := 0
+		try TOML_BuildConfigDocumentCandidate('[owned]`nvalue = "Original"`n', [Update], [])
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is ValueError, "direct configuration preparation cannot borrow a shorter native key identity")
+	}
+	Failure := 0
+	try TOML_BuildUpdatedContent(A_Temp . "\ergopti-name-owner-" . A_ScriptHwnd . "-" . Random(100000, 999999) . ".toml", [], [Payload["section"]])
+	catch as Err
+		Failure := Err
+	AssertTrue(Failure is ValueError, "namespace replacement must validate its original prefix before selecting owned sections")
+	for CodeUnit in [0xD800, 0xDC00] {
+		Invalid := "value" . Chr(CodeUnit)
+		AssertEqual(6, StrLen(Invalid))
+		AssertEqual(CodeUnit, NumGet(StrPtr(Invalid), 10, "UShort"), "the test retains an actual isolated UTF-16 surrogate")
+		Failure := 0
+		try TOML_BuildConfigDocumentCandidate('[owned]`nvalue = "Original"`n',
+			[{Section: "owned", Key: Invalid, Value: "Edited"}], [])
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is ValueError, "unpaired original key units must refuse before native identity lookup")
+	}
+	Valid := TOML_BuildConfigDocumentCandidate('[owned]`nvalue = "Original"`n',
+		[{Section: "owned", Key: "value😀", Value: "Edited"}], [])
+	Actual := TOML_ParseDocument(Valid["content"])
+	AssertEqual("Original", Actual["owned"]["value"])
+	AssertEqual("Edited", Actual["owned"]["value😀"], "a valid non-BMP identity remains distinct and writable")
+}
+Test("TOML original names: render, document preparation and replacement prefixes refuse NUL aliases (toml-name-scalar-owners)",
+	_TUNS_PureOwners)

@@ -707,10 +707,13 @@ TOML_EndsWithLineBreak(Text) {
 ; their existing flat writer. Only explicit updates and replacement prefixes own
 ; source values, so future namespaces and table-array generations stay physical.
 _TOML_ConfigPath(Section, Key := unset) {
+	if Section is String
+		SourceTextRequireUnicodeScalars(StrPtr(Section), 0, StrLen(Section))
 	Parts := Section == "" ? [] : TOML_ParseKeyPath(Section, true)
 	if IsSet(Key) {
 		if !(Key is String)
 			throw TypeError("Configuration update keys must be strings")
+		SourceTextRequireUnicodeScalars(StrPtr(Key), 0, StrLen(Key))
 		Parts.Push(Key)
 	}
 	return Parts
