@@ -436,6 +436,16 @@ local function run_tool(config, action, on_done)
 		if candidate == name then known = true end
 	end
 	if _stopping then return false end
+	if known then
+		-- The offered snapshot can be ten minutes old. Require the name in
+		-- both that snapshot and a fresh list before admitting execution.
+		_tools_cache = nil
+		known = false
+		for _, candidate in ipairs(M.tools(config)) do
+			if candidate == name then known = true end
+		end
+	end
+	if _stopping then return false end
 	if not known then
 		on_done(false, "the tool is no longer in the tools folder")
 		return false
