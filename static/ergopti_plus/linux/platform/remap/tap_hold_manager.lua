@@ -221,7 +221,7 @@ local function _run_tap(action, binding)
 		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
 			local sent, send_err = pcall(execute, action, source)
 			if not sent then error(send_err, 0) end
-		end)
+		end, tap_current or pair_current)
 	else
 		ok, err = pcall(execute, action, source)
 	end
@@ -231,10 +231,14 @@ end
 --- Builds the copy owner over the live clipboard, timer and notifier.
 --- @param execute function The catalogue executor init() was handed.
 --- @return table owner platform/remap/tap_copy.lua
-local function build_tap_copy(execute)
+local function build_tap_copy(execute, capture_destination)
 	return require("platform.remap.tap_copy").new({
 		verify_ms = Timings.ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return require("adapters.clipboard").change_counter() end,
+		capture_destination = function()
+			if type(capture_destination) ~= "function" then return nil end
+			return capture_destination()
+		end,
 		-- The retry runs on a timer: only while this initialisation still owns the
 		-- executor and the daemon is not paused.
 		send_copy = function()
@@ -682,7 +686,7 @@ function M.init(opts)
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
-	_tap_copy = build_tap_copy(opts.execute_action)
+	_tap_copy = build_tap_copy(opts.execute_action, opts.capture_copy_owner)
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
