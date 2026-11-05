@@ -14,7 +14,6 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { parse } = require('yaml');
 const { bashExecutable } = require('../lib/git-bash.cjs');
-require('./test-linux-flatpak-preflight.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-flatpak-icon-'));

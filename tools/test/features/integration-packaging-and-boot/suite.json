@@ -175,6 +175,24 @@
 			"cmd": "node",
 			"args": ["tools/test/test-feature-family-rule.cjs"],
 			"repro": "npm run test:feature-family-rule"
+		},
+		{
+			"id": "js-linux-flatpak-preflight",
+			"ordinal": 572,
+			"name": "Flatpak preflight preserves staging and published artifacts on failure",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-flatpak-preflight.cjs"],
+			"repro": "node tools/test/test-linux-flatpak-preflight.cjs",
+			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-bundle-archive-publication",
+			"ordinal": 573,
+			"name": "Linux bundle publication preserves hardlinked user files",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-bundle-archive-publication.cjs"],
+			"repro": "node tools/test/test-linux-bundle-archive-publication.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }

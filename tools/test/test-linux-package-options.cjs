@@ -15,7 +15,6 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const { stageAppDir } = require('./lib/linux-private-runtime-fixture.cjs');
-if (process.platform === 'linux') require('./test-linux-bundle-archive-publication.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-recipe-'));
