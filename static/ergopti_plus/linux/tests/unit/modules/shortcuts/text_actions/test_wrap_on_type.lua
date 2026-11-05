@@ -56,6 +56,34 @@ local function symbol(char, mods)
 end
 
 helpers.describe("wrap on type (linux): the decision", function()
+	helpers.it("consumes the symbol after a partial replacement attempt", function()
+		local primary, emitted = "old", ""
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(text) emitted = text:sub(1, 1); return false, true end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		local consumed = controller.on_key(symbol("("))
+		helpers.assert_eq(emitted, "(", "the replacement already reached the destination")
+		helpers.assert_true(consumed, "passing the physical symbol would add it after the partial replacement")
+	end)
+
+	helpers.it("consumes the symbol when output raises after its attempt receipt", function()
+		local primary = "old"
+		local controller = WrapOnType.new({
+			is_active = function() return true end,
+			get_pair = function(char) return PAIRS[char] end,
+			read_primary = function() return true, primary end,
+			type_text = function(_, _, mark_attempt) mark_attempt(); error("after attempted output") end,
+		})
+		controller.on_pointer_down()
+		primary = "selected"
+		helpers.assert_true(controller.on_key(symbol("(")))
+	end)
+
 	helpers.it("requires an acknowledged selected PRIMARY read before replacing text (wrap-primary-receipt)", function()
 		local reads, typed = 0, {}
 		local controller = WrapOnType.new({

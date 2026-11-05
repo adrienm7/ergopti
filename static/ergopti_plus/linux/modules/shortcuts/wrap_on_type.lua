@@ -60,7 +60,8 @@ end
 ---   is_active    fn() -> boolean  feature on, shortcuts on, script not paused.
 ---   get_pair     fn(char) -> { left, right }|nil  the shared wrap-pair lookup.
 ---   read_primary fn() -> ok, text  the PRIMARY selection.
----   type_text    fn(text, owner) -> boolean  types over the retained selection;
+---   type_text    fn(text, owner, on_attempt) -> delivered, attempted  types over
+---     the retained selection and calls on_attempt before a payload DOWN;
 ---     owner.current() checks activity and ownership, owner.cached() only RAM.
 ---   context_epoch fn() -> integer|nil  optional pure-memory ownership revision;
 ---     a missing or invalid result refuses selection reads and replacement. }
@@ -206,13 +207,19 @@ function M.new(opts)
 			-- native focus or PRIMARY reads for individual key-down admissions.
 			cached = function() return current(owner, epoch) end,
 		}
-		local typed_ok, typed = pcall(opts.type_text, left .. selected .. right, publication)
+		local attempted = false
+		local typed_ok, typed, reported_attempt = pcall(opts.type_text, left .. selected .. right, publication,
+			function() attempted = true end)
+		attempted = attempted or reported_attempt == true
 		if not typed_ok then
-			Logger.error(LOG, "Selection wrap raised before typing: %s — the symbol is typed instead.",
-				tostring(typed))
-			return false
+			Logger.error(LOG, "Selection wrap raised: %s.", tostring(typed))
+			return attempted
 		end
 		if typed ~= true then
+			if attempted then
+				Logger.warn(LOG, "Selection wrap stopped after attempting output; the original symbol is suppressed.")
+				return true
+			end
 			Logger.warn(LOG, "Selection wrap was refused — the symbol is typed instead.")
 			return false
 		end
