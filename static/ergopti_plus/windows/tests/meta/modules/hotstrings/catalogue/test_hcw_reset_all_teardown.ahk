@@ -56,21 +56,21 @@ _HCWRA_WidgetsInGlobalDecl() {
 }
 Test("hcw_reset_all: success-only teardown owns the global widget handle", _HCWRA_WidgetsInGlobalDecl)
 
-_HCWRA_GuiNulledAfterDestroy() {
+_HCWRA_GuiDetachedBeforeRetirement() {
 	Src := _DriverDirConcat("ui/hotstrings_config_window")
 	Body := _DriverFuncBody("_HCW_CompleteNativeReset")
 	Assert(InStr(Body, "_HCWGui := 0") > 0,
-		"successful reset teardown must set _HCWGui := 0 after Destroy() — Gui.Destroy() does not fire OnEvent('Close') (hcw-reset-all-teardown)")
+		"successful reset teardown must detach _HCWGui before native retirement — a reentrant Open must not reuse A (hcw-reset-all-teardown)")
 }
-Test("hcw_reset_all: _HCWGui is zeroed after Destroy()", _HCWRA_GuiNulledAfterDestroy)
+Test("hcw_reset_all: _HCWGui is detached before native retirement", _HCWRA_GuiDetachedBeforeRetirement)
 
-_HCWRA_WidgetsNulledAfterDestroy() {
+_HCWRA_WidgetsDetachedBeforeRetirement() {
 	Src := _DriverDirConcat("ui/hotstrings_config_window")
 	Body := _DriverFuncBody("_HCW_CompleteNativeReset")
 	Assert(InStr(Body, "_HCWWidgets := 0") > 0,
-		"successful reset teardown must set _HCWWidgets := 0 after Destroy() to prevent debounce timer from accessing destroyed controls (hcw-reset-all-teardown)")
+		"successful reset teardown must detach _HCWWidgets before native retirement so old completion cannot clear B (hcw-reset-all-teardown)")
 }
-Test("hcw_reset_all: _HCWWidgets is zeroed after Destroy()", _HCWRA_WidgetsNulledAfterDestroy)
+Test("hcw_reset_all: _HCWWidgets is detached before native retirement", _HCWRA_WidgetsDetachedBeforeRetirement)
 
 _HCWRA_CancelCalledBeforeDestroy() {
 	Src := _DriverDirConcat("ui/hotstrings_config_window")
@@ -79,6 +79,26 @@ _HCWRA_CancelCalledBeforeDestroy() {
 		"_HCW_ResetAll must discard and disarm pending numeric writes before controls are destroyed (hcw-reset-all-teardown)")
 }
 Test("hcw_reset_all: pending numeric writes are cancelled", _HCWRA_CancelCalledBeforeDestroy)
+
+; Source-level companion to native WM_DESTROY and explicit retirement-fault
+; controls. Follow the actual record into its native cleanup helper.
+_HCWRA_CustodyBeforeRetirement(Complete, Retry) {
+	Code := _DriverMaskNonCode(&Complete)
+	Cleanup := _DriverMaskNonCode(&Retry)
+	Capture := InStr(Code, "Host := {window: _HCWGui")
+	Widgets := InStr(Code, "widgets: _HCWWidgets")
+	Queue := InStr(Code, "_HCW_RetiredNativeResets.Push(Host)")
+	GuiZero := InStr(Code, "_HCWGui := 0")
+	WidgetsZero := InStr(Code, "_HCWWidgets := 0")
+	Drain := InStr(Code, "_HCW_RetryRetiredNativeResets()")
+	Destroy := InStr(Cleanup, "Window.Destroy()")
+	return Capture > 0 && Widgets > Capture && Queue > Widgets
+		&& GuiZero > Queue && WidgetsZero > Queue && Drain > GuiZero && Drain > WidgetsZero
+		&& !InStr(Code, ".Destroy()") && InStr(Cleanup, "Window := Host.window") > 0
+		&& Destroy > InStr(Cleanup, "Window := Host.window")
+		&& InStr(Cleanup, "Host.window := 0") > Destroy
+		&& !InStr(Cleanup, "_HCWGui := 0") && !InStr(Cleanup, "_HCWWidgets := 0")
+}
 
 _HCWRA_CancelBeforeDestroy() {
 	Src := _DriverDirConcat("ui/hotstrings_config_window")
@@ -92,11 +112,18 @@ _HCWRA_CancelBeforeDestroy() {
 	Assert(InStr(Body, ".Destroy()") == 0,
 		"_HCW_ResetAll must not destroy the editor outside its all-writes-success callback")
 	SuccessBody := _DriverFuncBody("_HCW_CompleteNativeReset")
-	IdxDestroy := InStr(SuccessBody, ".Destroy()")
-	IdxGuiZero := InStr(SuccessBody, "_HCWGui := 0")
-	IdxWidgetsZero := InStr(SuccessBody, "_HCWWidgets := 0")
-	Assert(IdxDestroy > 0 and IdxGuiZero > IdxDestroy and IdxWidgetsZero > IdxDestroy,
-		"the successful teardown callback must clear both handles after Destroy()")
+	RetryBody := _DriverFuncBody("_HCW_RetryRetiredNativeResets")
+	AssertTrue(_HCWRA_CustodyBeforeRetirement(SuccessBody, RetryBody),
+		"success must retain exact cleanup custody and detach both globals before native retirement")
+	AssertFalse(_HCWRA_CustodyBeforeRetirement(StrReplace(SuccessBody,
+		"_HCW_RetiredNativeResets.Push(Host)", "; _HCW_RetiredNativeResets.Push(Host)"), RetryBody),
+		"commented cleanup custody cannot qualify")
+	AssertFalse(_HCWRA_CustodyBeforeRetirement(StrReplace(SuccessBody,
+		"window: _HCWGui", "window: Foreign"), RetryBody),
+		"a foreign retained window cannot qualify")
+	AssertFalse(_HCWRA_CustodyBeforeRetirement(StrReplace(SuccessBody,
+		"_HCWGui := 0", "Host.window.Destroy()"), RetryBody),
+		"destroying before detachment cannot qualify")
 }
 Test("hcw_reset_all: cancellation precedes success-only teardown", _HCWRA_CancelBeforeDestroy)
 
