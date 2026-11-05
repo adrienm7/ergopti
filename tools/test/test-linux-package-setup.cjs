@@ -243,7 +243,7 @@ try {
 	stub(
 		'loginctl',
 		`case "$1" in
-list-sessions) printf '1 1000 desktop seat0 tty2\n2 1001 remote - -\n3 1002 console seat0 tty3\n4 120 gdm seat0 tty1\n5 1003 inactive seat0 tty4\n6 1004 gone seat0 tty5\n' ;;
+list-sessions) printf '1 1000 desktop seat0 tty2\n2 1001 remote - -\n3 1002 console seat0 tty3\n4 120 gdm seat0 tty1\n5 1003 inactive seat0 tty4\n6 1004 gone seat0 tty5\n7 999 kiosk seat0 tty6\n8 - incomplete seat0 tty7\n' ;;
 show-session) case "$2" in
 1) printf 'Type=wayland\nRemote=no\nUser=1000\nClass=user\nActive=yes\n' ;;
 2) printf 'Type=x11\nRemote=yes\nUser=1001\nClass=user\nActive=yes\n' ;;
@@ -251,6 +251,8 @@ show-session) case "$2" in
 4) printf 'Type=wayland\nRemote=no\nUser=120\nClass=greeter\nActive=yes\n' ;;
 5) printf 'Type=x11\nRemote=no\nUser=1003\nClass=user\nActive=no\n' ;;
 6) exit 1 ;;
+7) printf 'Type=x11\nRemote=no\nUser=999\nClass=user\nActive=yes\n' ;;
+8) printf 'Type=wayland\nRemote=no\nUser=\nClass=user\nActive=yes\n' ;;
 *) exit 1 ;; esac ;; esac`
 	);
 	for (const name of ['groupadd', 'usermod', 'modprobe', 'udevadm']) {
@@ -318,6 +320,14 @@ show-session) case "$2" in
 		/Session 6 could not be inspected/,
 		'a logout race is reported and deferred'
 	);
+	assert.match(result.stderr, /Session 8 could not be inspected/, 'incomplete session is deferred');
+	assert.match(result.stderr, /Refusing a non-desktop account/, 'system account remains excluded');
+	const nonDesktop = spawnSync(bashExecutable(), [bashPath(script), '--user', '999'], {
+		encoding: 'utf8', timeout: 10000,
+		env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
+	});
+	assert.notEqual(nonDesktop.status, 0, 'explicit non-desktop requests remain refused');
+
 	const calls = fs.readFileSync(callLog, 'utf8');
 	assert.match(calls, /usermod -aG input,uinput desktop/);
 	assert.equal(
