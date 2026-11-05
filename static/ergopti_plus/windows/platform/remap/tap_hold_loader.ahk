@@ -73,7 +73,7 @@ global _TapHoldOneShotCache := ""
 ; user keys inherit the default value.
 ; On missing or unreadable user file the defaults (if provided) are returned
 ; as-is so a fresh install still gets working defaults after first boot.
-LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
+LoadTapHoldToml(FilePath, DefaultsFilePath := "", CapturedSource := unset) {
 	try LoggerDebug("TapHoldLoader", "LoadTapHoldToml start: user='{1}', defaults='{2}'.", FilePath, DefaultsFilePath)
 	Result := Map("keys", Map())
 	InheritDefaults := false
@@ -83,8 +83,19 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	; The data is later merged on top of the defaults overlay so the final
 	; order is still: defaults → user (user wins per-key).
 	UserData := Map("keys", Map())
-	if FileExist(FilePath)
-		_TapHold_ParseFileInto(FilePath, UserData, DefaultsFilePath)
+	Captured := IsSet(CapturedSource)
+	if Captured && (!(CapturedSource is Map) || !CapturedSource.Has("source_present")
+			|| !(CapturedSource["source_present"] is Integer)
+			|| (CapturedSource["source_present"] != 0 && CapturedSource["source_present"] != 1)
+			|| !CapturedSource.Has("source_content") || !(CapturedSource["source_content"] is String))
+		throw TypeError("A detached tap-hold load requires an exact classified source.")
+	Present := Captured ? CapturedSource["source_present"] : !!FileExist(FilePath)
+	if Present {
+		if Captured
+			_TapHold_ParseFileInto(FilePath, UserData, DefaultsFilePath, CapturedSource["source_content"])
+		else
+			_TapHold_ParseFileInto(FilePath, UserData, DefaultsFilePath)
+	}
 	else
 		try LoggerDebug("TapHoldLoader", "No user tap-hold file found yet at '{1}'.", FilePath)
 
@@ -120,7 +131,7 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		try LoggerDebug("TapHoldLoader", "Skipping shared defaults load because inherit_defaults=false in user tap-hold file.")
 	}
 
-	if !FileExist(FilePath) {
+	if !Present {
 		try LoggerDebug("TapHoldLoader", "tap_hold.toml not found at '{1}' — skipping.", FilePath)
 		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s)) — defaults only.",
 			Result["keys"].Count)
@@ -205,10 +216,10 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 ; specifies some fields of a key still inherits the rest from a prior pass.
 ; @param MigrateWith {String} The shared defaults.toml when FilePath is a user
 ;        file, read as its migration leaves it; "" for the shipped file itself.
-_TapHold_ParseFileInto(FilePath, Result, MigrateWith := "") {
+_TapHold_ParseFileInto(FilePath, Result, MigrateWith := "", CapturedSource := unset) {
 	; Reuse the admitted semantic reader: root dotted assignments, quoted
 	; headers and inline key tables must reload the same values the writer owns.
-	try Document := TOML_ParseDocument(ReadTomlFile(FilePath), &Records)
+	try Document := TOML_ParseDocument(IsSet(CapturedSource) ? CapturedSource : ReadTomlFile(FilePath), &Records)
 	catch as Err {
 		try LoggerError("TapHoldLoader", "Cannot read the tap-hold document '{1}': {2}.", FilePath, Err.Message)
 		return

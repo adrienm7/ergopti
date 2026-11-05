@@ -849,8 +849,9 @@ _TH_BuildNativeCandidate(KeyId, Candidate) {
 	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
 		return false
 	Entry["tap_action"] := ""
-	if Entry.Has("hold_modifier")
-		Entry.Delete("hold_modifier")
+	; Absence inherits the shipped hold when inherit_defaults remains true.
+	; Native passthrough therefore owns an explicit empty hold, as "none" does.
+	Entry["hold_modifier"] := ""
 	if Entry.Has("hold_layer")
 		Entry.Delete("hold_layer")
 	return 1
@@ -918,7 +919,7 @@ _TH_PublishTapHoldCandidate(Candidate, RuntimeCandidate, EmptyKeys, OwnerToken, 
 ; tap-hold writer on the same path cannot build from a stale snapshot.
 _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0, ContentFn := 0) {
-	global TapHold, ConfigurationFile
+	global TapHold, ConfigurationFile, _SharedDir
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -971,6 +972,19 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		try {
 			StartState := TapHold
 			Candidate := _TH_CloneData(MasterGateDesiredTapHold(StartState))
+			ContentBuilder := ContentFn
+			if !HasMethod(ContentFn, "Call") {
+				; Ordinary edits own their changed leaves, never all stale RAM.
+				; Project the same captured current source used by the renderer.
+				Source := _TH_CaptureDurationSource(BoundPath)
+				if !(Source is Map)
+					throw Error("The tap-hold source cannot be captured.")
+				Defaults := _SharedDir . "\tap_hold\defaults.toml"
+				if Source["source_present"]
+					Candidate := LoadTapHoldToml(BoundPath, "", Source)
+				BeforeMutation := _TH_CloneData(Candidate)
+				ContentBuilder := _TH_BuildMutationContent.Bind(Source, BeforeMutation, Defaults)
+			}
 			Built := BuildFn.Call(Candidate)
 		} catch as Err {
 			BuildError := Err.Message
@@ -986,7 +1000,7 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 			PersistError := ""
 			try Result := _TH_WriteTapHoldToml(Candidate, OwnerToken,
 				BoundPath, StartState, WriterFn, ReplaceFn, DeleteFn,
-				AuthorizeFn, ContentFn)
+				AuthorizeFn, ContentBuilder)
 			catch as Err {
 				Result := false
 				PersistError := Err.Message
@@ -1006,6 +1020,58 @@ _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
 		return false
 	}
 	return (Result is Integer) && Result == 1 ? 1 : false
+}
+
+; Derive only changed modeled leaves; untouched physical records stay owned
+; by the captured document, including values unknown to this driver version.
+_TH_MutationRows(Before, After) {
+	Rows := []
+	AddFields(Old, New, Section) {
+		for Key, Value in New {
+			if !Old.Has(Key) || !TOML_SameValue(Old[Key], Value) {
+				Typed := TapHoldFieldKinds().Get(Key, "") == "boolean" || Key == "inherit_defaults"
+					? TOML_Bool(Value) : Value
+				Rows.Push({ Section: Section, Key: Key, Value: Typed })
+			}
+		}
+		for Key in Old
+			if !New.Has(Key)
+				Rows.Push({ Section: Section, Key: Key, Delete: true })
+	}
+	OldRoot := Map(), NewRoot := Map()
+	for Key in ["inherit_defaults", ConfigLeaf.TIME_ACTIVATION_SECONDS] {
+		if Before.Has(Key)
+			OldRoot[Key] := Before[Key]
+		if After.Has(Key)
+			NewRoot[Key] := After[Key]
+	}
+	AddFields(OldRoot, NewRoot, "tap_hold")
+	OldKeys := Before.Get("keys", Map()), NewKeys := After.Get("keys", Map())
+	for KeyId, Fields in NewKeys
+		AddFields(OldKeys.Get(KeyId, Map()), Fields, "tap_hold.keys." . TOML_RenderKey(KeyId))
+	for KeyId, Fields in OldKeys
+		if !NewKeys.Has(KeyId)
+			AddFields(Fields, Map(), "tap_hold.keys." . TOML_RenderKey(KeyId))
+	return Rows
+}
+
+_TH_BuildMutationContent(Source, Before, Defaults, Path, Data) {
+	if !_TH_DurationSourceMatches(Source, Path)
+		return false
+	if Source["source_present"] {
+		Image := _TH_BuildSemanticImage(Path, Source["source_content"], 1,
+			_TH_MutationRows(Before, Data), Defaults)
+		Source["content"] := Image["content"]
+		; Publish the projection of these exact future bytes, with defaults, rather
+		; than the stale input RAM or the sparse user-only mutation model.
+		Projected := LoadTapHoldToml(Path, Defaults,
+			Map("source_present", 1, "source_content", Source["content"]))
+		Data.Clear()
+		for Key, Value in Projected
+			Data[Key] := Value
+	} else
+		Source["content"] := _TH_DurationInitialImage(Data)
+	return Source
 }
 
 ; Rewrite the captured tap_hold.toml target from one detached candidate. The
@@ -1052,7 +1118,6 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
 
-	RuntimeCandidate := _TH_CloneData(Data)
 	EmptyKeys := Map()
 	SourceWitness := 0
 	if HasMethod(ContentFn, "Call") {
@@ -1109,6 +1174,7 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 		}
 	}
 
+	RuntimeCandidate := _TH_CloneData(Data)
 	static WriteSequence := 0
 	PreviousCritical := Critical("On")
 	try LocalSequence := ++WriteSequence
@@ -1177,7 +1243,8 @@ _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
 	ReplaceError := ""
 	try Replaced := HasMethod(ReplaceFn, "Call")
 		? ReplaceFn.Call(StagePath, BoundPath)
-		: FSAtomicMoveReplace(StagePath, BoundPath)
+		: FSConfigAtomicMoveReplace(StagePath, BoundPath, ,
+			(*) => _TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState))
 	catch as Err {
 		Replaced := false
 		ReplaceError := Err.Message

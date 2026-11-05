@@ -228,7 +228,8 @@ _THGT_AllWritersStageAuthorizeReplaceThenPublishOwned(TargetPath) {
 			AssertFalse(TapHold["keys"]["caps_lock"].Has("hold_modifier"))
 		case "native":
 			AssertEqual("", TapHold["keys"]["caps_lock"]["tap_action"])
-			AssertFalse(TapHold["keys"]["caps_lock"].Has("hold_modifier"))
+			AssertEqual("", TapHold["keys"]["caps_lock"].Get("hold_modifier", ""),
+				"native mode retains no active modifier regardless of inherited defaults")
 		case "disabled":
 			AssertEqual(0, TapHold["keys"].Count)
 			AssertFalse(TapHold.Has("layers"), "layer bindings are not tap-hold state")
@@ -588,3 +589,169 @@ _THSO_NativeInheritance(Inherit) {
 for _THSO_Inherit in [true, false]
 	Test("tap-hold native: actual reload inheritance=" . _THSO_Inherit . " (tap-hold-native-inheritance)",
 		_THSO_NativeInheritance.Bind(_THSO_Inherit))
+
+
+_THST_ForeignStageOwned(Collision, TargetPath) {
+	global TapHold, _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+	SplitPath(TargetPath, , &Root)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	Assert((Created is Integer) && Created == 1, "the staging fixture exclusively owns its private directory")
+	Owner := FSWriteDurable, HadOwn := Owner.HasOwnProp("Call")
+	if HadOwn
+		SavedCall := Owner.GetOwnPropDesc("Call")
+	Installed := false
+	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0,
+		originalEntered: 0, originalCompleted: 0, defaultPorts: false}
+	Sentinel := "Foreign tap-hold stage: é😀 unchanged"
+	Observe(This, StagePath, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
+		Prefix := TargetPath . "." . A_ScriptHwnd . "-"
+		Mine := (StagePath is String) && SubStr(StagePath, 1, StrLen(Prefix)) == Prefix
+			&& RegExMatch(SubStr(StagePath, StrLen(Prefix) + 1), "^\d+\.tmp$")
+		if Mine {
+			State.hits += 1
+			State.stagePath := StagePath
+			State.defaultPorts := (OpenFn is Integer) && OpenFn == 0
+				&& (DeleteFn is Integer) && DeleteFn == 0 && (FlushFn is Integer) && FlushFn == 0
+				&& (WriteFn is Integer) && WriteFn == 0
+			if Collision {
+				State.createdSentinel := FSWriteCreateDurable(StagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the competing exact stage must really be created exclusively")
+				State.sentinelBytes := FSReadBytesStrict(StagePath)
+			}
+			State.originalEntered += 1
+		}
+		NativeResult := Func.Prototype.Call.Call(This, StagePath, Content, OpenFn, DeleteFn, FlushFn, WriteFn)
+		if Mine
+			State.originalCompleted += 1
+		return NativeResult
+	}
+	try {
+		Source := _THSO_Source("copy")
+		AssertEqual(1, FSWriteCreateDurable(TargetPath, Source))
+		TapHold := LoadTapHoldToml(TargetPath)
+		AssertEqual("escape", TapHold["keys"]["caps_lock"]["tap_action"], "the production loader establishes the initial live owner")
+		BeforeOwner := TapHold, Before := FSReadBytesStrict(TargetPath)
+		Owner.DefineProp("Call", {Call: Observe})
+		Installed := true
+		Result := WriteTapHoldTap("caps_lock", "enter")
+		After := FSReadBytesStrict(TargetPath)
+		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
+		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
+		_TestPrint("# tap-hold-stage collision=" . Collision . " calls=" . State.hits
+			. " sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
+			. " original_completed=" . State.originalCompleted . " default_ports=" . State.defaultPorts
+			. " result=" . Result . " stage_present=" . StagePresent
+			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
+			. " live_tap=" . TapHold["keys"]["caps_lock"]["tap_action"])
+		AssertEqual(1, State.hits, "the public setter must reach the actual default staging producer")
+		AssertTrue(State.defaultPorts, "no custom opener, delete, flush, writer, or fake ACK replaces the real default producer")
+		AssertEqual(1, State.originalEntered, "the original default FSWriteDurable must really be entered")
+		AssertEqual(1, State.originalCompleted, "its genuine return must reach the caller before business assertions")
+		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
+		if Collision {
+			AssertTrue(StagePresent, "the writer cannot adopt, rename, or delete another owner's stage")
+			AssertEqual(State.sentinelBytes.Size, StageBytes.Size)
+			AssertEqual(StageBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.sentinelBytes,
+				"Ptr", StageBytes, "UPtr", StageBytes.Size, "UPtr"), "foreign stage bytes remain exact")
+			AssertFalse(Result, "a collision must refuse before live publication")
+			AssertTrue(BeforeOwner == TapHold, "the refused candidate cannot replace the original runtime owner")
+			AssertEqual("escape", TapHold["keys"]["caps_lock"]["tap_action"])
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "a collision cannot replace any target bytes")
+		} else {
+			AssertEqual(1, Result, "the actual default native publication remains functional without a collision")
+			AssertFalse(StagePresent, "a successful move retires only its own complete stage")
+			AssertEqual("enter", TapHold["keys"]["caps_lock"]["tap_action"])
+			AssertEqual("enter", TOML_ParseDocument(FSReadUtf8Exact(TargetPath))["tap_hold"]["keys"]["caps_lock"]["tap_action"])
+		}
+	} finally {
+		if Installed {
+			if HadOwn
+				Owner.DefineProp("Call", SavedCall)
+			else
+				Owner.DeleteProp("Call")
+		}
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+
+_THST_ForeignStage(Collision) {
+	return _THHS_WithNativeFixture(_THST_ForeignStageOwned.Bind(Collision))
+}
+for _THST_Collision in [true, false]
+	Test("tap-hold stage: foreign collision=" . _THST_Collision . " (tap-hold-stage-ownership)",
+		_THST_ForeignStage.Bind(_THST_Collision))
+
+
+_THSO_ExtraOwned(Mode, Scenario, TargetPath) {
+	global TapHold, _SharedDir, _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+	SplitPath(TargetPath, , &Root)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	Assert((Created is Integer) && Created == 1, "the extra fixture exclusively owns its private root")
+	StageCalls := 0, StageWritten := 0, SourceChanged := 0
+	SourceC := _THSO_Source("escape")
+	Stage(Path, Content) {
+		StageCalls += 1
+		StageWritten := FSWriteDurable(Path, Content)
+		if (StageWritten is Integer) && StageWritten == 1
+			SourceChanged := FSWriteDurable(TargetPath, SourceC)
+		return StageWritten
+	}
+	try {
+		Defaults := _SharedDir . "\tap_hold\defaults.toml"
+		Source := Scenario == "inherited"
+			? "[_meta]`nschema_version = " . TapHoldMigrationRegistry()["current"]
+				. "`n[tap_hold]`ninherit_defaults = true`n"
+			: _THSO_Source("copy")
+		AssertEqual(1, FSWriteCreateDurable(TargetPath, Source))
+		TapHold := LoadTapHoldToml(TargetPath, Defaults)
+		Before := TapHold
+		if Scenario == "inherited" {
+			AssertEqual("enter", TapHold["keys"]["caps_lock"]["tap_action"], "the shipped tap really is inherited")
+			AssertEqual("ctrl", TapHold["keys"]["caps_lock"]["hold_modifier"], "the shipped hold really is inherited")
+			Result := Mode == "tap" ? WriteTapHoldTap("caps_lock", "enter")
+				: WriteTapHoldHold("caps_lock", Map("kind", "modifier", "id", "ctrl"))
+			Document := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
+			_TestPrint("# tap-hold intent mode=" . Mode . " result=" . Result . " physical_key=" . Document["tap_hold"].Has("keys"))
+			AssertEqual(1, Result)
+			Field := Mode == "tap" ? "tap_action" : "hold_modifier"
+			AssertEqual(Mode == "tap" ? "enter" : "ctrl", Document["tap_hold"]["keys"]["caps_lock"][Field],
+				"choosing the inherited value still persists an explicit override")
+			AssertEqual("alt_tab_monitor", TapHold["keys"]["tab"]["tap_action"], "publishing the sparse edit retains other inherited runtime keys")
+		} else {
+			SourceB := _THSO_Source("enter")
+			AssertEqual(1, FSWriteDurable(TargetPath, SourceB))
+			Result := Mode == "tap" ? WriteTapHoldTap("caps_lock", "enter", Stage)
+				: WriteTapHoldGlobalDuration(0.425, Stage)
+			_TestPrint("# tap-hold stage source mode=" . Mode . " result=" . Result . " calls=" . StageCalls
+				. " staged=" . StageWritten . " changed=" . SourceChanged . " same_ram=" . (Before == TapHold))
+			AssertEqual(1, StageCalls, "the actual public writer must reach the physical stage cutpoint")
+			AssertEqual(1, StageWritten, "the fixture really writes the complete candidate stage")
+			AssertEqual(1, SourceChanged, "the independent successor C really becomes durable during staging")
+			AssertFalse(Result, "the B candidate cannot acknowledge over successor C")
+			Assert(FSUtf8ExactMatches(TargetPath, SourceC), "the actual C bytes remain untouched")
+			Assert(Before == TapHold, "a physically refused candidate cannot publish RAM")
+		}
+	} finally {
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+
+_THSO_Extra(Mode, Scenario) {
+	return _THHS_WithNativeFixture(_THSO_ExtraOwned.Bind(Mode, Scenario))
+}
+for _THSO_Mode in ["tap", "hold"]
+	Test("tap-hold source: explicit inherited " . _THSO_Mode . " remains persisted (tap-hold-source-intent)",
+		_THSO_Extra.Bind(_THSO_Mode, "inherited"))
+for _THSO_Mode in ["tap", "global"]
+	Test("tap-hold source: stage-time successor blocks " . _THSO_Mode . " (tap-hold-source-successor)",
+		_THSO_Extra.Bind(_THSO_Mode, "successor"))

@@ -82,7 +82,7 @@ _THGTM_DurableWriterIsUniqueAuthorizedAndAtomic() {
 	Assert(Body != "", "_TH_WriteTapHoldToml must remain source-visible")
 	StagePos := InStr(Body, "FSWriteDurable(StagePath, Content)")
 	AuthorizePos := InStr(Body, "_TH_AuthorizeTapHoldCommit(OwnerToken")
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, BoundPath)")
+	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, BoundPath,")
 	PublishPos := InStr(Body, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
 	Assert(StagePos > 0 && AuthorizePos > StagePos
 		&& ReplacePos > AuthorizePos && PublishPos > ReplacePos,
