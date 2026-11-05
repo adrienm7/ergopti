@@ -19,6 +19,25 @@ local helpers = require("tests.helpers")
 local ActualScenario = require("tests.support.agent_scenario")
 local i18n = require("infra.i18n")
 
+helpers.it("refuses fractional agent count limits", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	local settings = require("modules.llm.agent_settings")
+	for _, item in ipairs({
+		{ "system1", "min_chars" }, { "system1", "max_tokens" },
+		{ "system2", "max_actions" }, { "system2", "max_tokens" },
+		{ false, "max_tools" },
+	}) do
+		local config = assert(Json.decode(source))
+		local holder = item[1] and config[item[1]] or config
+		holder[item[2]] = 1.5
+		local parsed, reason = settings.parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, item[2] .. " must be a whole count")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
