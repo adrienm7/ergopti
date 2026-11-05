@@ -409,6 +409,11 @@ class MetricsAppsPageControls(unittest.TestCase):
             actual_sources[alias],
             probe.hashlib.sha256((actual_repo / alias).read_bytes()).hexdigest(),
         )
+        manifest_keys = "static/ergopti_plus/_shared/ui/metrics_manifest_keys.js"
+        self.assertEqual(
+            actual_sources[manifest_keys],
+            probe.hashlib.sha256((actual_repo / manifest_keys).read_bytes()).hexdigest(),
+        )
         repo = self.source_fixture()
         sources, digest = probe.source_identity(repo)
         self.assertEqual(len(digest), 64)
@@ -427,6 +432,7 @@ class MetricsAppsPageControls(unittest.TestCase):
         page = repo / probe.PAGE
         declared = page.read_text()
         for changed in (
+            declared.replace('<script src="../metrics_manifest_keys.js"></script>', ""),
             declared.replace('<script src="state.js"></script>', ""),
             declared.replace('src="state.js"', 'src="main.js"'),
             declared.replace('src="state.js"', 'src="unexpected.js"'),
