@@ -492,6 +492,27 @@ if (process.platform === 'linux') {
 	const { bashExecutable } = require('../lib/git-bash.cjs');
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-libc-preflight-'));
 	try {
+		// A requested image cannot succeed merely because its producer is absent.
+		const missingProducer = path.join(sandbox, 'missing-appimagetool.sh');
+		fs.writeFileSync(missingProducer, 'command() { if [ "$1" = -v ] && [ "$2" = appimagetool ]; then return 1; fi; builtin command "$@"; }\n');
+		const isolatedBuild = path.join(sandbox, 'missing-producer-build');
+		fs.mkdirSync(path.join(isolatedBuild, 'AppDir'), { recursive: true });
+		const sentinel = path.join(isolatedBuild, 'AppDir/sentinel');
+		fs.writeFileSync(sentinel, 'previous state\n');
+		const unavailable = spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build/build-linux-appimage.sh')], {
+			encoding: 'utf8', timeout: 10000,
+			env: { ...process.env, BASH_ENV: missingProducer, ERGOPTI_LINUX_BUILD_DIR: isolatedBuild }
+		});
+		assert.equal(unavailable.status, 69, unavailable.stderr);
+		assert.match(unavailable.stderr, /appimagetool/);
+		assert.equal(fs.readFileSync(sentinel, 'utf8'), 'previous state\n');
+		const stagingOnly = spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build/build-linux-appimage.sh'), '--skip-appimage'], {
+			encoding: 'utf8', timeout: 10000,
+			env: { ...process.env, BASH_ENV: missingProducer, ERGOPTI_LINUX_BUILD_DIR: isolatedBuild }
+		});
+		assert.notEqual(stagingOnly.status, 69, 'staging alone does not require appimagetool');
+		assert.match(stagingOnly.stdout, /Driver bundle not found/);
+
 		const appDir = path.join(sandbox, 'AppDir\n');
 		const write = (relative, text, mode = 0o755) => {
 			fs.mkdirSync(path.dirname(path.join(appDir, relative)), { recursive: true });
