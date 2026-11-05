@@ -1,60 +1,28 @@
 {
-	"expected_count": 48,
+	"expected_count": 19,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "metrics-live-foreground-worker",
-			"expected_count": 4
-		},
-		{
-			"contains": "klr-detached-foreground",
-			"expected_count": 3
-		},
-		{
-			"contains": "klr-live-snapshot-order",
-			"expected_count": 2
-		},
-		{
-			"contains": "suspend-prefetch-retirement",
-			"expected_count": 9
-		},
-		{
-			"contains": "keystats-worker-timings-must-be-strings",
+			"contains": "wpm-graph-native-reentry",
 			"expected_count": 5
 		},
 		{
-			"contains": "metrics-history-seed",
-			"expected_count": 8
+			"contains": "wpm persistence:",
+			"expected_count": 7
 		},
 		{
-			"contains": "hcw-native-reset-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "hcw-native-destroy-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "hcw-native-reset-retirement-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "hcw_reset_all:",
-			"expected_count": 6
-		},
-		{
-			"contains": "native-winhttp-ipv6-host1",
+			"contains": "complete actions defuse inherited Critical",
 			"expected_count": 1
 		},
 		{
-			"contains": "paths-editor-native-subscription-retirement-owner",
+			"contains": "prompt-subscription-sdk-failure-owner",
 			"expected_count": 2
 		},
 		{
-			"contains": "klr-live-deep-inventory",
-			"expected_count": 2
+			"contains": "model-subscription-sdk-failure-owner",
+			"expected_count": 4
 		}
 	]
 }
