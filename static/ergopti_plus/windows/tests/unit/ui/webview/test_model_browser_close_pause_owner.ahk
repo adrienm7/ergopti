@@ -74,8 +74,10 @@ _MBPT_WriterDiagnosticOwner(Directory) {
 	RawFunction := SubStr(Original, Definition.Idx, Cursor - Definition.Idx)
 	RegExReplace(RawFunction, "m)^`t} catch as Err \{", "", &Catches)
 	AssertEqual(1, Catches, "The actual writer must retain its one original caught exception")
-	Anchor := "} catch as Err {`n`t`tFailureDetail .="
-	Insertion := "} catch as Err {`n`t`t_MBWD_Caught(Err, Stage)`n`t`tFailureDetail .="
+	; The catch now settles a durable outcome before appending its detail.
+	; Observe its unchanged entry, independently of that first business statement.
+	Anchor := "`t} catch as Err {`n"
+	Insertion := Anchor . "`t`t_MBWD_Caught(Err, Stage)`n"
 	ChangedFunction := StrReplace(RawFunction, Anchor, Insertion, true, &Insertions)
 	AssertEqual(1, Insertions, "Only the actual writer catch may gain diagnostic observation")
 	Changed := SubStr(Original, 1, Definition.Idx - 1) . ChangedFunction . SubStr(Original, Cursor)
