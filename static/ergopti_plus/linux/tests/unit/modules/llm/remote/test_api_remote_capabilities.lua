@@ -78,6 +78,15 @@ local function tick(deferred)
 end
 
 helpers.describe("api_remote: capability listings skip what a model lacks (thinking-off-capabilities)", function()
+	helpers.it("treats null supported parameters as unknown rather than unsupported", function()
+		local remote, http, deferred = load_remote()
+		local entry = { provider = "openrouter", model = "mistralai/mistral-small-2603", token = "k" }
+		assert(remote.build_request(entry, MESSAGES, {})); tick(deferred)
+		http.gets[1].callback({ ok = true, status = 200,
+			body = '{"data":[{"id":"mistralai/mistral-small-2603","supported_parameters":null}]}' })
+		helpers.assert_eq(type(Json.decode(assert(remote.build_request(entry, MESSAGES, {})).body).reasoning), "table")
+		unload()
+	end)
 	helpers.it("keeps known capabilities when a refresh returns a null model list", function()
 		local remote, http, deferred = load_remote()
 		local entry = { provider = "openrouter", model = "mistralai/mistral-small-2603", token = "k" }

@@ -65,6 +65,14 @@ end
 -- ============================================
 
 helpers.describe("model_capabilities replays the shared corpus (thinking-off-capabilities)", function()
+	helpers.it("does not infer unsupported controls from null parameters", function()
+		local decoded = assert(json.decode_lossless('{"data":[{"id":"owned-model","supported_parameters":null}]}'))
+		local records = assert(Caps.parse("openrouter", decoded))
+		helpers.assert_nil(records["owned-model"])
+		decoded = assert(json.decode_lossless('{"data":[{"id":"owned-model","supported_parameters":[]}]}'))
+		records = assert(Caps.parse("openrouter", decoded))
+		helpers.assert_true(Caps.lacks(records["owned-model"], "unused", nil, { reasoning = true }))
+	end)
 	local corpus = read_json(helpers.shared("tests/corpus/llm/model_capabilities_vectors.json"))
 	local providers = read_json(helpers.shared("modules/llm/api_providers.json")).providers
 	local raw_families = read_json(helpers.shared("modules/llm/thinking_off.json"))
