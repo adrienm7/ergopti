@@ -332,6 +332,9 @@ local function cpu_load(config, run)
 			done({ state = "ok" }, { system = { cpu_usage = shares.system, process_cpu = shares.process } })
 		end)
 		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+		if not handle or not handle.armed then
+			done({ state = "error", detail = "Timer could not be started" })
+		end
 	end
 end
 
@@ -359,6 +362,9 @@ local function configuration(schema, run, overrides)
 			done(result, sections)
 		end)
 		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+		if not handle or not handle.armed then
+			done({ state = "error", detail = "Timer could not be started" })
+		end
 	end
 end
 
