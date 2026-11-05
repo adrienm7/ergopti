@@ -373,7 +373,7 @@ _UserCommandReportStopped(Entry) {
 }
 
 ; Reads a capture as strict UTF-8.
-; @returns {String|Boolean} The text, "" for no file or no byte, false when it is not UTF-8.
+; @returns {String|Boolean} The text, "" for no file or no byte, false for malformed or NUL-bearing UTF-8.
 _UserCommandRead(Path) {
 	try Bytes := FSReadBytesStrict(Path)
 	catch
