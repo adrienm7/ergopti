@@ -49,6 +49,25 @@ global STORAGE_VALUE_PREFIX := "__ERGOPTI_STORAGE_V1__:"
 ; ====================================
 ; ====================================
 
+; Win32 value-name parameters terminate at NUL. Preserve complete native
+; String metadata before any conversion, and retain legacy numeric names.
+; The admitted name is returned once so no later coercion can change it.
+_ST_TryNativeKeyName(Key, &Name) {
+	Name := ""
+	if Key is String
+		Candidate := Key
+	else if Key is Number
+		Candidate := String(Key)
+	else
+		return false
+	Pointer := StrPtr(Candidate)
+	Loop StrLen(Candidate)
+		if NumGet(Pointer, (A_Index - 1) * 2, "UShort") == 0
+			return false
+	Name := Candidate
+	return true
+}
+
 ; Writes one supported Storage value to the registry under Key.
 ; @param Key   {String} The value name to write under STORAGE_REG_BASE.
 ; @param Value {String|Number|Map|Array} The value to persist.
@@ -59,7 +78,9 @@ ST_Set(Key, Value) {
 
 _ST_SetWith(Key, Value, WriteFn) {
 	try {
-		return WriteFn.Call(STORAGE_REG_BASE, Key, _ST_EncodeValue(Value))
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
+		return WriteFn.Call(STORAGE_REG_BASE, Name, _ST_EncodeValue(Value))
 	} catch {
 		return false
 	}
@@ -145,8 +166,10 @@ _ST_Join(Parts) {
 ; @return {Any} The stored typed value, or DefaultValue if absent or invalid.
 ST_Get(Key, DefaultValue) {
 	try {
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return DefaultValue
 		local Result := ""
-		if !Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
+		if !Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
 			return DefaultValue
 		return _ST_DecodeValue(Result)
 	} catch {
@@ -162,7 +185,9 @@ ST_Get(Key, DefaultValue) {
 ; @return {Boolean} True on success (including "already absent"), false on error.
 ST_Delete(Key) {
 	try {
-		return Reg_DeleteValue(STORAGE_REG_BASE, Key)
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
+		return Reg_DeleteValue(STORAGE_REG_BASE, Name)
 	} catch as e {
 		LoggerError("storage", "ST_Delete failed for '{1}': {2}.", Key, e.Message)
 		return false
@@ -174,8 +199,10 @@ ST_Delete(Key) {
 ; @return {Boolean} True on success, false on error.
 ST_Has(Key) {
 	try {
+		if !_ST_TryNativeKeyName(Key, &Name)
+			return false
 		local Result := ""
-		return Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
+		return Reg_TryRead(STORAGE_REG_BASE, Name, &Result)
 	} catch {
 		return false
 	}
