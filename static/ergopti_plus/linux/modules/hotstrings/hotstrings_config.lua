@@ -1355,8 +1355,9 @@ end
 --- handed to route_bound_sources by path. Independently owned additional files
 --- use exact descriptor identities instead of overlaying another personal stem.
 --- @return table Array of absolute paths.
-local function resolve_paths()
+local function resolve_paths(cold_boot)
 	local by_stem, order, user_paths = {}, {}, {}
+	local incomplete_personal = false
 	local shipped_stems, additional = {}, {}
 	local personal_sources, descriptors_by_path = {}, {}
 	local function discover_personal(path, root)
@@ -1398,7 +1399,8 @@ local function resolve_paths()
 	-- Language folders are not overlaid by stem: french/autocorrection.toml is
 	-- its own group, not a second copy of the neutral autocorrection.toml.
 	if bundled then
-		for _, path in ipairs(Loader.find_toml_files(bundled)) do
+		-- The bundled tree is part of the installation, not an optional user folder.
+		for _, path in ipairs(Loader.find_toml_files(bundled, nil, true, false)) do
 			if not in_language_folder(path, bundled) then
 				add(path)
 				local stem = path:match("([^/]+)%.toml$")
@@ -1419,7 +1421,9 @@ local function resolve_paths()
 
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
-		for _, path in ipairs(Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth)) do
+		local found, complete = Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth, not cold_boot)
+		if complete == false then incomplete_personal = true end
+		for _, path in ipairs(found) do
 			if not in_language_folder(path, _config_dir) then
 				discover_personal(path, _config_dir:gsub("/+$", ""))
 				local stem = path:match("([^/]+)%.toml$")
@@ -1452,7 +1456,8 @@ local function resolve_paths()
 						path = candidate
 						user_paths[path] = true
 					elseif code ~= RegularFile.ENOENT then
-						error("[hotstrings_config] language override unreadable: " .. candidate .. ": " .. tostring(detail))
+						if not cold_boot then error("[hotstrings_config] language override unreadable: " .. candidate .. ": " .. tostring(detail)) end
+						incomplete_personal = true
 					end
 				end
 				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
@@ -1495,7 +1500,7 @@ local function resolve_paths()
 		records[#records + 1] = { source = source.descriptor, path = source.path,
 			legacy_name = legacy, legacy_stored = _overrides[legacy] ~= nil }
 	end
-	if #records == 0 then return paths, personal_sources, {} end
+	if #records == 0 then return paths, personal_sources, {}, incomplete_personal end
 	local inventory, refusal = PersonalAdoption.stage(records, _choices,
 		_config_dir:gsub("/+$", "") .. "/personal_hotstrings.toml")
 	assert(inventory, "personal source adoption refused: " .. tostring(refusal))
@@ -1504,7 +1509,7 @@ local function resolve_paths()
 			record.admitted, record.exclusive, record.reason = false, false, "unavailable-owner"
 		end
 	end
-	return paths, personal_sources, inventory
+	return paths, personal_sources, inventory, incomplete_personal
 end
 
 --- Loads one complete catalogue and reports whether runtime publication succeeded.
@@ -1537,7 +1542,7 @@ local function load_all_internal(personal_owner, cold_boot, inverse_sources)
 		return #_mappings, false, "common-autocorrection-overrides-unadmitted"
 	end
 
-	local resolved, staged_paths, staged_personal_sources, staged_personal_adoptions = pcall(resolve_paths)
+	local resolved, staged_paths, staged_personal_sources, staged_personal_adoptions, incomplete_personal = pcall(resolve_paths, cold_boot == true)
 	if not resolved then
 		Logger.error(LOG, "Hotstring source discovery failed; keeping the active catalogue: %s.", tostring(staged_paths))
 		return #_mappings, false, "source-unavailable"
@@ -1658,14 +1663,16 @@ local function load_all_internal(personal_owner, cold_boot, inverse_sources)
 	report_retired_choices(choices)
 	report_retired_overrides()
 
-	if common_unavailable then
-		Logger.warn(LOG, "Common autocorrection is unavailable; loaded %d unrelated mapping(s).", #filtered)
+	if common_unavailable or incomplete_personal then
+		Logger.warn(LOG, "Some hotstring sources are unavailable; loaded %d available mapping(s).", #filtered)
 	else
 		Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 			#filtered, _count_groups(filtered), _parse_errors)
 	end
-	return #filtered, true, nil, { committed = true, complete = not common_unavailable,
-		unavailable = common_unavailable and { "autocorrection" } or {} }
+	local unavailable = {}
+	if common_unavailable then unavailable[#unavailable + 1] = "autocorrection" end
+	if incomplete_personal then unavailable[#unavailable + 1] = "personal-sources" end
+	return #filtered, true, nil, { committed = true, complete = #unavailable == 0, unavailable = unavailable }
 end
 
 --- Loads a catalogue without borrowing a transaction's inverse source receipt.

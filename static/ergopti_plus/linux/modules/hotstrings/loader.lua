@@ -439,18 +439,30 @@ end
 --- included, since no text framing sits between the kernel and the paths.
 --- @param dir string Absolute path to the root directory to scan.
 --- @param max_directory_depth number|nil Deepest level scanned (find -maxdepth).
---- @return table  Array of absolute .toml file paths.
-function M.find_toml_files(dir, max_directory_depth)
+--- @param require_complete boolean|nil Refuse partial enumeration for publication.
+--- @param allow_absent_root boolean|nil An absent root is optional unless false.
+--- @return table Array of absolute .toml paths.
+--- @return boolean complete False when enumeration omitted an unavailable source.
+function M.find_toml_files(dir, max_directory_depth, require_complete, allow_absent_root)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
-	local result = {}
+	local result, complete = {}, true
 	NativeDirectory.walk(dir, max_directory_depth, function(path, kind)
 		if kind == "file" and path:sub(-5) == ".toml" and M.is_pack_file(path) then result[#result + 1] = path end
-	end, report_unlistable)
+	end, function(path, message, code)
+		report_unlistable(path, message, code)
+		-- An optional root that does not exist is an empty source. An unreadable
+		-- root or a child lost during enumeration cannot prove a complete set.
+		local optional_absence = code == "ENOENT" and path == dir and allow_absent_root ~= false
+		if not optional_absence then
+			complete = false
+			if require_complete then error("hotstring source enumeration refused: " .. tostring(code or message), 0) end
+		end
+	end)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
-	return result
+	return result, complete
 end
 
 --- Projects no-follow links and depth-boundary directories as diagnostics only.
