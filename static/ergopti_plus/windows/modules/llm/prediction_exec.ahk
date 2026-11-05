@@ -839,6 +839,41 @@ _LLM_Engine_DispatchBatch(state) {
 		(failure := "") => _LLM_Engine_OnBatchFail(state_ref, failure))
 }
 
+; Each accepted response already owns the native usage domain. Aggregate
+; fields independently: once a full-request sum cannot be represented, zero
+; means unknown for that field until this exact request has finished.
+_LLM_Engine_AccumulateUsage(state, meta) {
+	if !(meta is Map)
+		return
+	if !state.Has("usage_unknown_fields")
+		state["usage_unknown_fields"] := Map()
+	Unknown := state["usage_unknown_fields"]
+	for Field in ["prompt_tokens", "completion_tokens", "total_tokens"] {
+		if Unknown.Has(Field)
+			continue
+		Previous := _LLMRemoteUsageCount(state.Get(Field, 0))
+		Added := _LLMRemoteUsageCount(meta.Get(Field, 0))
+		if Previous > 0x7FFFFFFFFFFFFFFF - Added {
+			Unknown[Field] := true
+			state[Field] := 0
+		} else
+			state[Field] := Previous + Added
+	}
+	Field := "est_cost_usd"
+	if Unknown.Has(Field)
+		return
+	Previous := state.Get(Field, 0.0), Added := meta.Get(Field, 0.0)
+	if _LLMRemote_CatalogPriceIsValid(Previous) && _LLMRemote_CatalogPriceIsValid(Added) {
+		Total := Float(Previous) + Float(Added)
+		if _LLMRemote_CatalogPriceIsValid(Total) {
+			state[Field] := Total
+			return
+		}
+	}
+	Unknown[Field] := true
+	state[Field] := 0.0
+}
+
 _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
@@ -846,12 +881,7 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	; Capture per-request token usage when the backend provided it. Same
 	; structure as the sequential path so the finalize step can emit a
 	; unified keystats event regardless of dispatch strategy.
-	if (meta is Map) {
-		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
-		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
-		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
-		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
-	}
+	_LLM_Engine_AccumulateUsage(state, meta)
 	slots := _LLM_Engine_ParseSlots(text, state)
 	state["slots"] := slots
 	_LLM_Engine_FinalizeRequest(state)
@@ -1047,12 +1077,7 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	; Accumulate token usage / cost across variants. The Ollama path does
 	; not pass meta (its sync /api/generate response carries different
 	; fields we don't bill on); the API path does. Missing values stay 0.
-	if (meta is Map) {
-		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
-		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
-		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
-		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
-	}
+	_LLM_Engine_AccumulateUsage(state, meta)
 	; Dedup against existing slots; skip empties. Comparison is case-SENSITIVE
 	; via StrCompare(.., true): AHK v2's ``==`` operator is case-INSENSITIVE
 	; for strings, so without StrCompare two predictions that differ only by

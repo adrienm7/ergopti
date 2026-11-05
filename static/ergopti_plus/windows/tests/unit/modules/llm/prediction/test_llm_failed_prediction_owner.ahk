@@ -431,13 +431,14 @@ for _LSP_Mode in ["stale-entry", "parse-gap"]
 ; Append to test_llm_failed_prediction_owner.ahk. Family066 downstream variant coverage.
 _RUAG_Exercise(State) {
     global LLM_REMOTE_MODEL_PRICES, _Stub_LlmLogCalls, _Stub_LlmPresentedRecord, _LLM_Engine
-    Count := State.Mode == "integer-three" ? 3 : 2
-    Price := State.Mode == "cost-two" ? 1e308 : (State.Mode == "ordinary-two" ? 2.0 : 0.0)
+    Count := (State.Mode == "ordinary-two" || State.Mode == "cost-two") ? 2 : 3
+    Price := (State.Mode == "cost-two" || State.Mode == "cost-three") ? 1e308 : (State.Mode == "ordinary-two" ? 2.0 : 0.0)
     LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map("model-a", Map("in", Price, "out", 0.0)))
     AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("model-a"), "the genuine price boundary admits this finite nonnegative price")
-    PerPrompt := State.Mode == "integer-three" ? 0x7FFFFFFFFFFFFFFF : (State.Mode == "cost-two" ? 1000000 : 2)
-    PerCompletion := State.Mode == "ordinary-two" ? 1 : 0
-    PerTotal := PerPrompt + PerCompletion
+    PerPrompt := (State.Mode == "integer-three" || State.Mode == "integer-three-independent") ? 0x7FFFFFFFFFFFFFFF
+        : ((State.Mode == "cost-two" || State.Mode == "cost-three") ? 1000000 : 2)
+    PerCompletion := State.Mode == "ordinary-two" ? 1 : (State.Mode == "integer-three-independent" ? 2 : 0)
+    PerTotal := State.Mode == "integer-three-independent" ? 0x7FFFFFFFFFFFFFFF : PerPrompt + PerCompletion
     PerResponse := [], Contents := ["premiere variante correcte", "deuxieme variante correcte", "troisieme variante correcte"]
     LLM_Engine_FirePrediction("Le message du controle")
     AssertEqual(1, State.Calls.Length, "the actual public request must dispatch its first sequential variant")
@@ -481,13 +482,13 @@ _RUAG_Exercise(State) {
     if State.Mode == "ordinary-two" {
         AssertEqual(4, Prompt), AssertEqual(2, Completion), AssertEqual(6, Total)
         AssertTrue(Abs(Cost - 0.000008) < 1e-12, "ordinary per-response costs must accumulate unchanged")
-    } else if State.Mode == "integer-three" {
+    } else if State.Mode == "integer-three" || State.Mode == "integer-three-independent" {
         AssertEqual(0, Prompt, "an unrepresentable full-request count stays unknown, not a positive wrapped partial total")
         AssertEqual(0, Total)
-        AssertEqual(0, Completion)
+        AssertEqual(State.Mode == "integer-three-independent" ? 6 : 0, Completion, "one unknown counter cannot erase an independently representable completion count")
     } else {
-        AssertEqual("cost-two", State.Mode)
-        AssertEqual(2000000, Prompt), AssertEqual(2000000, Total)
+        AssertTrue(State.Mode == "cost-two" || State.Mode == "cost-three")
+        AssertEqual(Count * 1000000, Prompt), AssertEqual(Count * 1000000, Total)
         AssertTrue(_LLMRemote_CatalogPriceIsValid(Cost), "the final consumer cannot receive infinity from individually admitted prices and usages")
         AssertEqual(0.0, Cost, "the existing unrepresentable cost policy is unknown zero, never infinity or a fabricated finite ceiling")
     }
@@ -545,7 +546,7 @@ _RUAG_Case(Mode) {
 		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
 		_LOGGER_TEST_SINK := 0
 		Critical("Off")
-		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", Mode == "integer-three" ? 3 : 2, "show_info_bar", false))
+		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", (Mode == "ordinary-two" || Mode == "cost-two") ? 2 : 3, "show_info_bar", false))
 		_RUAG_Exercise(State)
 	} catch Any as Failure {
 		Primary := Failure
@@ -579,6 +580,6 @@ _RUAG_Case(Mode) {
 		throw Primary
 }
 
-for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three"]
+for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three", "cost-three", "integer-three-independent"]
     Test("Request usage aggregate: " . _RUAG_Mode . " preserves the final consumer domain (request-usage-aggregate-domain)",
         _RUAG_Case.Bind(_RUAG_Mode))
