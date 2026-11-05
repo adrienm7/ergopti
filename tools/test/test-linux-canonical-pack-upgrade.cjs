@@ -149,6 +149,37 @@ try {
 			fail('empty-marker refusal must preserve the seed and marker');
 	}
 
+	// A completion record must be an ordinary file, not a user's special path.
+	if (process.platform === 'linux') {
+		for (const kind of ['directory', 'fifo', 'dangling-link', 'link']) {
+			const root = path.join(sandbox, `marker-${kind}`);
+			const source = path.join(root, 'source');
+			const previous = path.join(root, 'previous');
+			const user = path.join(root, 'user');
+			write(path.join(source, 'seed.toml'), 'new\n');
+			write(path.join(previous, 'seed.toml'), 'old\n');
+			write(path.join(user, 'seed.toml'), 'old\n');
+			const marker = path.join(user, '.ergopti-canonical-packs-v2');
+			const target = path.join(root, 'target');
+			if (kind === 'directory') fs.mkdirSync(marker);
+			else if (kind === 'fifo') {
+				const fifo = childProcess.spawnSync('mkfifo', [marker]);
+				if (fifo.status !== 0) fail('could not create FIFO fixture');
+			} else {
+				if (kind === 'link') fs.writeFileSync(target, '2\n');
+				fs.symlinkSync(target, marker);
+			}
+			const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`;
+			const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], { encoding: 'utf8', timeout: 3000 });
+			if (refused.error || refused.status === 0) fail(`${kind} marker must be refused`);
+			if (fs.readFileSync(path.join(user, 'seed.toml'), 'utf8') !== 'old\n')
+				fail(`${kind} marker refusal must preserve the seed`);
+			const stat = fs.lstatSync(marker);
+			if (!(kind === 'directory' ? stat.isDirectory() : kind === 'fifo' ? stat.isFIFO() : stat.isSymbolicLink()))
+				fail(`${kind} marker must be preserved`);
+		}
+	}
+
 	// A stale PID-derived temporary name may contain unrelated bytes. The real
 	// migration must allocate a different file rather than truncate and rename it.
 	{

@@ -38,7 +38,8 @@ migrate_canonical_packs() {
 	local index
 	local -a user_packs=() backups=() backup_present=()
 
-	if [ -f "${marker}" ]; then
+	if [ -e "${marker}" ] || [ -L "${marker}" ]; then
+		[ -f "${marker}" ] && [ ! -L "${marker}" ] || return 1
 		# The published completion record is nonempty. An empty file cannot
 		# certify that migration ran, and stat does not open or read the path.
 		[ -s "${marker}" ] || return 1
@@ -102,7 +103,7 @@ migrate_canonical_packs() {
 	marker_tmp="$(mktemp "${marker}.tmp.XXXXXX")" || return 1
 	if ! printf '%s\n' "2" > "${marker_tmp}" \
 		|| ! chmod 0644 "${marker_tmp}" \
-		|| ! mv -- "${marker_tmp}" "${marker}"; then
+		|| ! mv -T -- "${marker_tmp}" "${marker}"; then
 		rm -f -- "${marker_tmp}" || return 1
 		return 1
 	fi
