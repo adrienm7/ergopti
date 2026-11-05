@@ -1006,17 +1006,33 @@ _MBPO_ConstructorFailure() {
 
 ; The window procedure delegates first and then issues a real public request.
 ; Each explicit action fires once; no fake Show/Hide ACK or timer is involved.
+; This retained private sidecar is diagnostic only. It survives forced child
+; retirement, so an unfinished callback cannot erase the last native phase.
+_MBPO_VisibilityTrace(State, Phase) {
+	if State.Mode != "native-hide-reopen-close" || !State.HasOwnProp("PhasePath")
+		return
+	try FileAppend(Phase . " active=" . State.Active . " shows=" . State.ShowCount
+		. " closes=" . State.CloseCalls . " tick=" . A_TickCount . "`n", State.PhasePath, "UTF-8-RAW")
+	catch
+		State.TraceFailures += 1
+}
 _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 	global _LLM_ModelBrowser_Gui
 	State.Active += 1
 	try {
+		if State.Armed && Hwnd == State.Hwnd && Message == 0x18
+			_MBPO_VisibilityTrace(State, "callback.enter." . WParam)
 		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
+		if State.Armed && Hwnd == State.Hwnd && Message == 0x18
+			_MBPO_VisibilityTrace(State, "callback.delegated." . WParam)
 		if !State.Armed || Hwnd != State.Hwnd || Message != 0x18
 			return Result
 		_MBPO_Require(_MBPO_NativeWindowPid(Hwnd) == ProcessExist(), "Only the exact owned native visibility callback may drive another action")
 		if State.Mode == "native-hide-reopen-close" && !WParam && !State.Reopened {
 			State.Reopened := true
+			_MBPO_VisibilityTrace(State, "public-show.before")
 			State.ShowReturned := LLM_ModelBrowser_Show()
+			_MBPO_VisibilityTrace(State, "public-show.after")
 			State.VisibleAfterFirstShow := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
 			State.SameAfterReopen := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
 		} else if WParam {
@@ -1025,13 +1041,16 @@ _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 			if (State.Mode == "native-show-close" && State.ShowCount == 1)
 					|| (State.Mode == "native-hide-reopen-close" && State.ShowCount == 2) {
 				State.CloseCalls += 1
+				_MBPO_VisibilityTrace(State, "nested-close.before")
 				_LLM_ModelBrowser_OnClose()
+				_MBPO_VisibilityTrace(State, "nested-close.after")
 				State.HiddenDuringClose := !DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
 			}
 		}
 		return Result
 	} catch Any as Failure {
 		State.Failed := true, State.Failure := Failure
+		_MBPO_VisibilityTrace(State, "callback.failed." . Type(Failure))
 		return 0
 	} finally State.Active -= 1
 }
@@ -1045,11 +1064,18 @@ _MBPO_VisibilityReentry() {
 	PreviousCritical := Critical("Off")
 	State := {Window: 0, Hwnd: 0, Proc: 0, Installed: false, Armed: false, Active: 0,
 		Mode: _MBPO.Mode, Reopened: false, ShowSeen: false, ShowCount: 0, VisibleAfterFirstShow: false, CloseCalls: 0, HiddenDuringClose: false,
-		SameAfterReopen: false, CriticalAtShow: -1, Failed: false, Failure: 0, Debt: false}
+		SameAfterReopen: false, CriticalAtShow: -1, Failed: false, Failure: 0, Debt: false, TraceFailures: 0}
+	if State.Mode == "native-hide-reopen-close" {
+		State.PhasePath := A_Args[2] . "\visibility-phases.txt"
+		Creation := FSWriteCreateDurable(State.PhasePath, "visibility-phase-start`n")
+		_MBPO_Require((Creation is Integer) && Creation == 1, "The private diagnostic sidecar must be created exclusively")
+	}
 	try {
+		_MBPO_VisibilityTrace(State, "setup.before-build")
 		_MBPO_Require(!_LLM_MBW_WebView2Available(), "The native visibility subject must use the actual missing browser binding")
 		_MBPO.Window := _LLM_ModelBrowser_Build(), _MBPO.Hwnd := _MBPO.Window.Hwnd
 		_LLM_ModelBrowser_Gui := _MBPO.Window
+		_MBPO_VisibilityTrace(State, "setup.after-build")
 		State.Window := _MBPO.Window, State.Hwnd := _MBPO.Hwnd
 		if State.Mode == "native-hide-reopen-close"
 			State.Window.Show("NA")
@@ -1060,18 +1086,21 @@ _MBPO_VisibilityReentry() {
 		_MBPO_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc,
 			"UPtr", 0x4D425653, "UPtr", 0, "Int"), "The exact native browser must admit its real visibility witness")
 		State.Installed := true, State.Armed := true
+		_MBPO_VisibilityTrace(State, "subject.before")
 		if State.Mode == "native-hide-reopen-close"
 			_LLM_ModelBrowser_OnClose()
 		else
 			State.ShowReturned := LLM_ModelBrowser_Show()
+		_MBPO_VisibilityTrace(State, "subject.after")
 		_MBPO_Observe()
+		_MBPO_VisibilityTrace(State, "observation.after")
 		State.Armed := false
 		VisibleAfter := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
 		SameOwner := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
 		FileAppend("OBSERVATION native-model-visibility-reentry mode=" . State.Mode . " show_seen=" . State.ShowSeen
 			. " close_calls=" . State.CloseCalls . " hidden_during_close=" . State.HiddenDuringClose
 			. " reopened=" . State.Reopened . " show_count=" . State.ShowCount . " first_show_visible=" . State.VisibleAfterFirstShow . " same_owner=" . SameOwner . " visible_after=" . VisibleAfter
-			. " critical_at_show=" . State.CriticalAtShow . "`n", "*", "UTF-8-RAW")
+			. " trace_failures=" . State.TraceFailures . " critical_at_show=" . State.CriticalAtShow . "`n", "*", "UTF-8-RAW")
 		if State.Failed
 			FileAppend("DIAGNOSTIC native-model-visibility-reentry callback_type=" . JsonStringLiteral(Type(State.Failure))
 				. " callback_message=" . JsonStringLiteral(State.Failure is Error ? State.Failure.Message : "non-Error callback value") . "`n", "*", "UTF-8-RAW")
@@ -1092,6 +1121,7 @@ _MBPO_VisibilityReentry() {
 		}
 	} finally {
 		State.Armed := false
+		_MBPO_VisibilityTrace(State, "cleanup.before-remove")
 		Removed := !State.Installed || !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
 		if !Removed
 			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc, "UPtr", 0x4D425653, "Int")
@@ -1104,6 +1134,7 @@ _MBPO_VisibilityReentry() {
 			State.Proc := 0
 		} else
 			State.Debt := true
+		_MBPO_VisibilityTrace(State, "cleanup.after-free")
 		if HadVendor
 			_VendorDir := OriginalVendor
 		else
