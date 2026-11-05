@@ -601,6 +601,86 @@ Test("config transition retention: settled raw rollback releases its original na
 
 
 
+
+_PBAD_Case(Invalid) {
+	Root := A_Temp . "\ergopti_paths_byte_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		DefaultDir := Root . "\default\"
+		TargetDir := Root . (Invalid ? "\profile" . Chr(0xFFFD) . "\" : "\profilé\")
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(DefaultDir))
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(TargetDir))
+		AssertEqual(1, FSWriteCreateDurable(DefaultDir . "config.toml", '[private]`nowner = "default"`n'))
+		AssertEqual(1, FSWriteCreateDurable(TargetDir . "config.toml", '[private]`nowner = "redirected"`n'))
+		Path := Root . "\paths.toml"
+		Source := "ConfigDirPath = " . TOML_RenderValue(StrReplace(TargetDir, "\", "/")) . "`n"
+		if Invalid
+			Source := StrReplace(Source, Chr(0xFFFD), "?", true)
+		Count := StrPut(Source, "UTF-8") - 1
+		Bytes := Buffer(Count + 1)
+		StrPut(Source, Bytes, "UTF-8")
+		Marker := -1
+		if Invalid {
+			Loop Count {
+				if NumGet(Bytes, A_Index - 1, "UChar") == Ord("?") {
+					AssertEqual(-1, Marker, "the invalid-byte injection marker must be unique")
+					Marker := A_Index - 1
+				}
+			}
+			AssertTrue(Marker >= 0)
+			NumPut("UChar", 0xFF, Bytes, Marker)
+		}
+		FileHandle := FSOpenStrict(Path, "w", "UTF-8-RAW")
+		AssertTrue(IsObject(FileHandle))
+		try AssertEqual(Count, FileHandle.RawWrite(Bytes, Count))
+		finally FileHandle.Close()
+		Before := FSReadBytesStrict(Path)
+		AssertEqual(Count, Before.Size)
+		AssertEqual(Count, DllCall("ntdll\RtlCompareMemory", "Ptr", Bytes, "Ptr", Before, "UPtr", Count, "UPtr"))
+		if Invalid {
+			AssertEqual(0xFF, NumGet(Before, Marker, "UChar"))
+			AssertFalse(FSReadUtf8Exact(Path) is String, "the actual raw locator is not valid UTF-8")
+			AssertTrue(InStr(FileRead(Path, "UTF-8"), Chr(0xFFFD), true) > 0,
+				"the native compatibility reader really substitutes a different scalar")
+		}
+		Selected := "", Refused := false, Owner := "<none>"
+		try {
+			Overrides := ReadPathsToml(Path)
+			Selected := ConfigTransitionSelectBootConfigDir(Overrides, DefaultDir)
+			if FSStrictExists(Selected . "config.toml")
+				Owner := TOML_ParseDocument(FSReadUtf8Exact(Selected . "config.toml"))["private"]["owner"]
+		} catch {
+			Refused := true
+		}
+		_TestPrint("# paths-byte-admission invalid=" . Invalid . " refused=" . Refused
+			. " selected-target=" . (Selected == TargetDir) . " actual-profile=" . Owner)
+		After := FSReadBytesStrict(Path)
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+			"Ptr", After, "UPtr", Before.Size, "UPtr"), "reading must preserve every original locator byte")
+		if Invalid
+			AssertTrue(Refused || (Selected == DefaultDir && Owner == "default"),
+				"malformed locator bytes must not admit a replacement-character configuration profile")
+		else {
+			AssertFalse(Refused, "a valid non-ASCII UTF-8 override must remain supported")
+			AssertEqual(TargetDir, Selected)
+			AssertEqual("redirected", Owner)
+		}
+	} finally {
+		if Created
+			DirDelete(Root, true)
+	}
+}
+Test("paths byte admission: invalid UTF-8 cannot select another profile (paths-byte-admission)", _PBAD_Case.Bind(true))
+Test("paths byte admission: actual Unicode UTF-8 profile remains selected (paths-byte-admission)", _PBAD_Case.Bind(false))
+
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 3/ Direct-run Entry =======
