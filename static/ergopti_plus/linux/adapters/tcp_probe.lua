@@ -195,7 +195,10 @@ function M.relay_address(relay)
 	end
 	port = tonumber(port)
 	if not host or not port or port < 1 or port > 65535 then return nil, nil end
-	if host:find(":", 1, true) then host = host:gsub("%%25", "%%") end
+	-- Curl resolves percent-encoded hostname bytes before connecting; the
+	-- reachability probe must contact that same host, including IPv6 zones.
+	host = host:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+	if host:find("\0", 1, true) then return nil, nil end
 	return host, port
 end
 
