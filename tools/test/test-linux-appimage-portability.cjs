@@ -492,12 +492,16 @@ if (process.platform === 'linux') {
 	const { bashExecutable } = require('../lib/git-bash.cjs');
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-libc-preflight-'));
 	try {
-		const appDir = path.join(sandbox, 'AppDir');
+		const appDir = path.join(sandbox, 'AppDir\n');
 		const write = (relative, text, mode = 0o755) => {
 			fs.mkdirSync(path.dirname(path.join(appDir, relative)), { recursive: true });
 			fs.writeFileSync(path.join(appDir, relative), text, { mode });
 		};
 		write('AppRun', appRunSource);
+		const wrapperSource = builder.split(`cat > "$APPDIR/usr/bin/ergopti" << 'WRAPPER_EOF'\n`)[1]
+			.split('\nWRAPPER_EOF')[0];
+		write('usr/bin/ergopti', wrapperSource);
+
 		write('usr/lib/ergopti/libc-preflight.sh', preflight, 0o644);
 		write(
 			'usr/lib/ergopti/network-runtime-env.sh',
@@ -547,14 +551,19 @@ if (process.platform === 'linux') {
 		// 2.9 is older than 2.35: the comparison is numeric.
 		assert.equal(launch('glibc 2.9', 'de_DE', false).status, Preflight.REFUSAL_EXIT);
 		assert.match(launch('glibc 2.34', 'xx_XX', false).stderr, /this system has glibc 2\.34\./);
+		fs.symlinkSync(bashExecutable(), path.join(bin, 'bash'));
+		try {
+			const wrapper = spawnSync(path.join(appDir, 'usr/bin/ergopti'), [], {
+				encoding: 'utf8', env: { PATH: bin, FAKE_LIBC: 'glibc 2.35' }
+			});
+			assert.equal(wrapper.status, 0, wrapper.stderr);
+			assert.equal(wrapper.stdout, `launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`);
+		} finally { fs.unlinkSync(path.join(bin, 'bash')); }
 		for (const libc of ['glibc 2.35', 'glibc 2.43', 'glibc 3.0']) {
 			const admitted = launch(libc, 'en_US.UTF-8', true);
 			assert.equal(admitted.status, 0, `${libc}: ${admitted.stderr}`);
 			assert.equal(admitted.stderr, '');
-			assert.match(
-				admitted.stdout,
-				/^launched \S+\/usr\/lib\/ergopti\/ergopti_hotstrings\.lua --tray\n$/
-			);
+			assert.equal(admitted.stdout, `launched ${appDir}/usr/lib/ergopti/ergopti_hotstrings.lua --tray\n`);
 		}
 	} finally {
 		fs.rmSync(sandbox, { recursive: true, force: true });
