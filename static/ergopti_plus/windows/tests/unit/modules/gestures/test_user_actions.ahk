@@ -347,3 +347,44 @@ _UAN_Case(Mode) {
 for _UAN_Mode in ["nul-copy", "nul-type", "unicode", "invalid-utf8"]
 	Test("Public command counted stdout: " . _UAN_Mode . " preserves or explicitly refuses the complete capture (user-command-counted-output)",
 		_UAN_Case.Bind(_UAN_Mode))
+
+
+_UAFP_Count(State, This, Text) {
+	State.Calls += 1
+	State.Units += StrLen(Text)
+	return Func.Prototype.Call.Call(This, Text)
+}
+_UAFP_Work() {
+	global _UserCommandEntries, USER_ACTION_NOTICE_LINE_BYTES
+	AssertEqual(0, _UserCommandEntries.Count, "The pure measurement cannot instrument another active command")
+	Limit := TimingsGet("limits", "user_action_output_bytes")
+	Maximum := USER_ACTION_NOTICE_LINE_BYTES
+	AssertTrue(Limit > Maximum && Maximum > 0, "The real capture bound must exceed its actual notification prefix")
+	Bytes := Buffer(Limit, 0x78), Input := StrGet(Bytes, -Bytes.Size, "UTF-8")
+	State := {Calls: 0, Units: 0}
+	Owner := _UserActionBytes
+	AssertFalse(Owner.HasOwnProp("Call"), "The exact pure byte-count owner must not already belong to another observer")
+	Installed := false
+	try {
+		Owner.DefineProp("Call", {Call: _UAFP_Count.Bind(State)})
+		Installed := true
+		AssertEqual(1, _UserActionBytes("x"), "The observer must forward the exact native production result")
+		AssertEqual(1, State.Calls, "The real named AHK call must enter the genuine Func.Call observer before work is attributed")
+		State.Calls := 0, State.Units := 0
+		Started := A_TickCount
+		Actual := UserActionFirstLine(Input, Maximum)
+		Elapsed := TickElapsed64(Started)
+		_TestPrint("# user-command-firstline-work input_bytes=" . Limit . " notice_bytes=" . Maximum
+			. " encoding_calls=" . State.Calls . " encoded_utf16_units=" . State.Units
+			. " elapsed_ms=" . Elapsed . " result_units=" . StrLen(Actual))
+		AssertTrue(State.Calls > 0, "The actual first-line owner must invoke the byte boundary being measured")
+		AssertEqual(SubStr(Input, 1, Maximum) . "…", Actual, "The observation must retain the complete established first-line behavior")
+		; Deliberately no elapsed-time threshold: this is native evidence, not a
+		; hardware-dependent pass/fail performance budget or a new product policy.
+	} finally {
+		if Installed
+			Owner.DeleteProp("Call")
+	}
+}
+Test("User command first-line work at the actual capture limit retains its prefix (user-command-firstline-work-observation)",
+	_UAFP_Work)
