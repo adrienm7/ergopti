@@ -275,6 +275,7 @@ return {
 	"tests.unit.infra.lifecycle.test_gui_stack",
 	"tests.unit.infra.lifecycle.test_input_access",
 	"tests.unit.infra.lifecycle.test_owned_programs",
+	"tests.unit.infra.lifecycle.test_literal_appdir",
 	"tests.unit.infra.lifecycle.test_input_capture_gate",
 	"tests.unit.infra.lifecycle.test_installation",
 	"tests.unit.infra.i18n.test_locale_path_layouts",

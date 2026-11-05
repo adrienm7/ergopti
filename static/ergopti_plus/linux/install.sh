@@ -15,6 +15,7 @@
 #   --prefix <dir>  Override base install path (default: ~/.local)
 
 set -euo pipefail
+unset ERGOPTI_LITERAL_DRIVER_ROOT ERGOPTI_LITERAL_SHARED_ROOT ERGOPTI_LITERAL_DIRECT ERGOPTI_LITERAL_DAEMON ERGOPTI_LITERAL_NATIVE_MODULES
 
 
 # ======================================
@@ -300,6 +301,11 @@ fi
 # ergopti_hotstrings.lua, which expects the installed dir to be a sibling).
 SRC_SHARED="${DRIVERS_ROOT}/_shared"
 DEST_SHARED="${LIB_DIR}/_shared"
+case "$SRC_DRIVER$SRC_SHARED${ERGOPTI_RUNTIME_PREFIX:-}" in
+	*[\;\?]*)
+		export ERGOPTI_LITERAL_DRIVER_ROOT="$SRC_DRIVER"
+		export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED/lua" ;;
+esac
 
 # Tar replaces an incumbent symlink with a payload entry (and a linked root
 # can direct extraction outside the prefix). Preserve user links before any
@@ -669,9 +675,16 @@ _check_or_install() {
 	ergopti_msg_with "  ✔  " install.capability_verified "${cmd}"
 }
 
+# Inline LuaJIT probes are app-owned entry points as well: initialise the
+# literal owner without changing LUA_INIT or host processes.
+_lua_app_probe() {
+	local bootstrap="local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX')) end; "
+	luajit -e "$bootstrap$1"
+}
+
 _check_or_install_library() {
 	local soname="$1"
-	if luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
+	if _lua_app_probe "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
 		ergopti_msg_with "  ✔  " install.already_installed "${soname}"
 		return 0
 	fi
@@ -684,7 +697,7 @@ _check_or_install_library() {
 	fi
 	ergopti_msg_with "  →  " install.installing_missing "${soname}" "${package_name}"
 	_install_required_package "${pkg_mgr}" "${package_name}"
-	if ! luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
+	if ! _lua_app_probe "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
 		ergopti_msg_with "  ✗  " install.library_still_missing "${package_name}" "${soname}" >&2
 		return 1
 	fi
@@ -852,7 +865,7 @@ _ensure_desktop_backend() {
 	local capability="$1"
 	local label="$2"
 	local probe="$3"
-	if luajit -e "${probe}" >/dev/null 2>&1; then
+	if _lua_app_probe "${probe}" >/dev/null 2>&1; then
 		ergopti_msg_with "  ✔  " install.already_installed "${label}"
 		return 0
 	fi
@@ -865,7 +878,7 @@ _ensure_desktop_backend() {
 	fi
 	ergopti_msg_with "  →  " install.installing_missing "${label}" "${package_name}"
 	_install_required_package "${pkg_mgr}" "${package_name}" || true
-	if luajit -e "${probe}" >/dev/null 2>&1; then
+	if _lua_app_probe "${probe}" >/dev/null 2>&1; then
 		ergopti_msg_with "  ✔  " install.capability_verified "${label}"
 	else
 		ergopti_msg_with "  ⚠  " install.unavailable_after_install "${label}" "${package_name}" >&2
@@ -944,7 +957,7 @@ _section install.section_lua_deps
 # tried until luajit can require the optional module; missing optional packages
 # are not fatal. Networking uses the mandatory canonical provider path instead.
 _lua_module_installed() {
-	luajit -e "require('$1')" >/dev/null 2>&1
+	_lua_app_probe "require('$1')" >/dev/null 2>&1
 }
 
 _lua_module_candidates() {

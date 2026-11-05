@@ -111,7 +111,7 @@ local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
 local SourceOpen = require("toml_codec.source_open")
 local NATIVE_WRITER = "infra.regular_file_writer"
-local has_native_writer = package.searchpath(NATIVE_WRITER, package.path) ~= nil
+local has_native_writer = (package.loaded["infra.literal_module_loader"] or package).searchpath(NATIVE_WRITER, package.path) ~= nil
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans

@@ -62,11 +62,68 @@ end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.
 local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
-package.path = SCRIPT_DIR .. "/?.lua;" ..
-               SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
-               SHARED_LUA_DIR .. "/?.lua;" ..
-               SHARED_LUA_DIR .. "/?/init.lua;" ..
-               package.path
+local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
+local literal_direct = false
+if literal_driver and literal_driver ~= "" then
+	-- A host program may start a different checkout with our environment.
+	-- Accept the roots only when they name this entry point's own directory.
+	local ffi = require("ffi")
+	ffi.cdef[[char *realpath(const char *, char *); void free(void *); int unsetenv(const char *);]]
+	local actual, claimed = ffi.C.realpath(SCRIPT_DIR, nil), ffi.C.realpath(literal_driver, nil)
+	local same = actual ~= nil and claimed ~= nil and ffi.string(actual) == ffi.string(claimed)
+	if actual ~= nil then ffi.C.free(actual) end
+	if claimed ~= nil then ffi.C.free(claimed) end
+	if not same then
+		for _, name in ipairs({ "ERGOPTI_LITERAL_DRIVER_ROOT", "ERGOPTI_LITERAL_SHARED_ROOT",
+			"ERGOPTI_LITERAL_DIRECT", "ERGOPTI_LITERAL_DAEMON", "ERGOPTI_LITERAL_NATIVE_MODULES" }) do
+			assert(ffi.C.unsetenv(name) == 0, "cannot clear stale literal root")
+		end
+		literal_driver = nil
+	end
+end
+-- `luajit ergopti_hotstrings.lua` may spell the source as "." even when
+-- its working directory contains a template delimiter.
+if (not literal_driver or literal_driver == "") and SCRIPT_DIR:sub(1, 1) ~= "/"
+	and type(jit) == "table" and jit.os == "Linux" then
+	local ffi = require("ffi")
+	ffi.cdef[[char *getcwd(char *, size_t); void free(void *);]]
+	local cwd = assert(ffi.C.getcwd(nil, 0), "cannot resolve working directory")
+	local absolute = ffi.string(cwd) .. "/" .. SCRIPT_DIR
+	ffi.C.free(cwd)
+	if absolute:find("[;?]") then SCRIPT_DIR = absolute end
+end
+if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
+	-- Direct `luajit path/to/ergopti_hotstrings.lua` is a supported entry
+	-- point too.  Give app-owned child entry points the same literal roots.
+	local ffi = require("ffi")
+	ffi.cdef[[char *getcwd(char *buf, size_t size); void free(void *); int setenv(const char *, const char *, int);]]
+	if SCRIPT_DIR:sub(1, 1) ~= "/" then
+		local cwd = assert(ffi.C.getcwd(nil, 0), "cannot resolve working directory")
+		SCRIPT_DIR = ffi.string(cwd) .. "/" .. SCRIPT_DIR
+		ffi.C.free(cwd)
+	end
+	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
+	local probe = io.open(SHARED_LUA_DIR .. "/toml_codec/source_open.lua", "rb")
+	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared/lua" end
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DRIVER_ROOT", SCRIPT_DIR, 1) == 0, "cannot export driver root")
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_SHARED_ROOT", SHARED_LUA_DIR, 1) == 0, "cannot export shared root")
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DIRECT", "1", 1) == 0, "cannot export source mode")
+	literal_driver = SCRIPT_DIR
+	literal_direct = true
+end
+if literal_driver and literal_driver ~= "" then
+	local shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
+	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
+	local ffi = require("ffi")
+	ffi.cdef[[int setenv(const char *, const char *, int);]]
+	assert(ffi.C.setenv("ERGOPTI_LITERAL_DAEMON", "1", 1) == 0, "cannot export daemon search order")
+else
+	package.path = SCRIPT_DIR .. "/?.lua;" ..
+	               SCRIPT_DIR .. "/modules/hotstrings/?.lua;" ..
+	               SHARED_LUA_DIR .. "/?.lua;" ..
+	               SHARED_LUA_DIR .. "/?/init.lua;" ..
+	               package.path
+end
 
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
 ---
