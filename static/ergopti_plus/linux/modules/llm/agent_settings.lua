@@ -119,6 +119,12 @@ function M.parse_config(text)
 	for _, key in ipairs({ "actions", "source_kinds", "learning", "ics" }) do
 		if type(root[key]) ~= "table" then return nil, "agent.json has no " .. key end
 	end
+	for _, source in ipairs({ "selection", "command", "typing" }) do
+		local label = root.source_kinds[source]
+		if type(label) ~= "string" or label == "" then
+			return nil, "agent.json source label is invalid"
+		end
+	end
 	-- The action validator uses these rules as executable schema. Reject a
 	-- broken rule here instead of raising after a model has returned an action.
 	for _, action in ipairs({ "calendar", "reminder", "mail", "shortcut" }) do
