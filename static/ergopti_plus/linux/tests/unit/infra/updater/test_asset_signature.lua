@@ -60,6 +60,23 @@ helpers.describe("update asset signature (Linux)", function()
 		helpers.assert_true(ok, "refused: " .. tostring(reason))
 	end)
 
+	helpers.it("(linux-asset-signature) a public key with trailing DER bytes is refused", function()
+		local Base64 = require("compat.base64")
+		local extended = Base64.encode(assert(Base64.decode(V.public_key_spki_base64)) .. "junk")
+		local ok, reason = Signature.verify(extended, valid_record(), V.valid.signature_base64)
+		helpers.assert_true(not ok, "a valid key prefix cannot authorize a malformed complete key")
+		helpers.assert_eq(reason, "bad_key")
+	end)
+
+	helpers.it("(linux-asset-signature) a P-224 key cannot satisfy the P-256 policy", function()
+		-- A real signature of valid_record(), generated with a secp224r1 key.
+		local key = "ME4wEAYHKoZIzj0CAQYFK4EEACEDOgAEL/DFdozz5WiHhVJ1jYYTm0Ys/TPdgpkqtD9zT7eg7HVbP015uzDeqAeTvgbMLaPu8FSM6tnPr8s="
+		local signature = "AAAAAEDqe1PVyI8mn1vwmn5qqXUt25XTkFn3IeXFMqkAAAAA9ZX6qgTBHSSfHvRtdwsgk0Vi4ic71J27/foXnQ=="
+		local ok, reason = Signature.verify(key, valid_record(), signature)
+		helpers.assert_true(not ok, "a different curve must not satisfy ecdsa-p256-sha256")
+		helpers.assert_eq(reason, "bad_key")
+	end)
+
 	-- The archive digest (infra/fd_sha256.lua) declares EVP_MD_CTX_new too. When
 	-- it loaded first, LuaJIT refused the signature check's whole declaration
 	-- block, which then reported OpenSSL as missing on the distros where the
