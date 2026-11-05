@@ -183,7 +183,7 @@ LLM_TokenExchange_Parse(Raw, &Refusal := "") {
 		Refusal := "auth.default_expires_seconds must be a whole number of seconds in bounds"
 		return ""
 	}
-	if !_LLM_TokenExchange_IsWhole(Margin) || Margin < 0 || Margin * 2 >= Default {
+	if !_LLM_TokenExchange_IsWhole(Margin) || Margin < 0 || Margin >= Default / 2 {
 		Refusal := "auth.refresh_margin_seconds must be a whole number below half the default lifetime"
 		return ""
 	}

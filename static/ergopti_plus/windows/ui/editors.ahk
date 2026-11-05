@@ -722,9 +722,15 @@ ParseHotstringsIdleResetSeconds(Raw) {
 	Text := StrReplace(Trim(Raw, " `t"), ",", ".")
 	if (Text == "" || !RegExMatch(Text, "^\d+(\.\d+)?$|^\.\d+$"))
 		return ""
-	Value := Text + 0
-	if (Value = Round(Value))
-		Value := Integer(Round(Value))
+	; Parse decimal text before AutoHotkey can wrap an overflowing integer.
+	; The setting accepts every finite nonnegative number, so values outside
+	; Int64 keep their floating-point representation instead of casting back.
+	if NumberTryParseSignedInteger(Text, &Value)
+		return Value
+	if !NumberTryParseFiniteFloat(Text, &Value)
+		return ""
+	if (Value < 0x7FFFFFFFFFFFFFFF && Value = Round(Value))
+		Value := Integer(Value)
 	return HSE_ValidIdleResetSeconds(Value) ? Value : ""
 }
 
