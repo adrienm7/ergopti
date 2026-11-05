@@ -38,19 +38,28 @@ ergopti_systemd_exec() {
 # Ownership is determined by the command in [Desktop Entry], not by an Exec
 # belonging to a desktop action. Duplicate main groups or commands are ambiguous.
 ergopti_desktop_entry_owned() {
-	local file="$1" launcher="$2" expected line group= main_groups=0 commands=0
+	local file="$1" launcher="$2" expected line trimmed value group= main_groups=0 commands=0
 	expected="$(ergopti_desktop_exec "$launcher")" || return 1
 	while IFS= read -r line || [ -n "$line" ]; do
-		case "$line" in
-			'[Desktop Entry]') group=main; main_groups=$((main_groups + 1)) ;;
-			\[*\]) group=other ;;
-			Exec=*)
-				[ "$group" = main ] || continue
-				commands=$((commands + 1))
-				case "$line" in
-					"$expected"|"Exec=$launcher --tray"|"Exec=$launcher --session-start --tray") ;;
-					*) return 1 ;;
-				esac ;;
+		# GLib ignores leading whitespace, whitespace around keys, and trailing
+		# whitespace around group headers. Preserve value bytes for comparison.
+		trimmed="${line#"${line%%[!$' \t']*}"}"
+		case "$trimmed" in
+			\[*\]*)
+				trimmed="${trimmed%"${trimmed##*[!$' \t']}"}"
+				if [ "$trimmed" = '[Desktop Entry]' ]; then
+					group=main; main_groups=$((main_groups + 1))
+				else group=other; fi ;;
+			*)
+				if [ "$group" = main ] && [[ "$trimmed" =~ ^Exec[[:blank:]]*= ]]; then
+					commands=$((commands + 1))
+					value="${trimmed#*=}"
+					value="${value#"${value%%[!$' \t']*}"}"
+					case "Exec=$value" in
+						"$expected"|"Exec=$launcher --tray"|"Exec=$launcher --session-start --tray") ;;
+						*) return 1 ;;
+					esac
+				fi ;;
 		esac
 	done < "$file"
 	[ "$main_groups" -eq 1 ] && [ "$commands" -eq 1 ]

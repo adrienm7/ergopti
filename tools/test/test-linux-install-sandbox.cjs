@@ -958,7 +958,7 @@ for (const kind of [
 }
 
 // An expected command in a duplicate key or action does not own the main entry.
-for (const kind of ['duplicate', 'action-decoy']) {
+for (const kind of ['duplicate', 'key-space', 'key-tab', 'group-space', 'action-decoy']) {
 	let original;
 	const run = runInstaller({
 		desktopProvided: true,
@@ -966,9 +966,15 @@ for (const kind of ['duplicate', 'action-decoy']) {
 			const desktop = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
 			const launcher = `${bashPath(home)}/.local/bin/ergopti-hotstrings`;
 			fs.mkdirSync(path.dirname(desktop), { recursive: true });
-			original = kind === 'duplicate'
-				? `[Desktop Entry]\nExec=${launcher} --tray\nExec=/other/program\n`
-				: `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`;
+			const foreign = {
+				duplicate: 'Exec=/other/program',
+				'key-space': ' Exec =/other/program',
+				'key-tab': 'Exec\t=/other/program',
+				'group-space': ' [Desktop Entry] \nExec=/other/program'
+			};
+			original = kind === 'action-decoy'
+				? `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`
+				: `[Desktop Entry]\nExec=${launcher} --tray\n${foreign[kind]}\n`;
 			fs.writeFileSync(desktop, original);
 		}
 	});

@@ -233,6 +233,10 @@ try {
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
 	for (const mixed of [
 		`${ownedDesktop}Exec=/other/program\n`,
+		`${ownedDesktop} Exec=/other/program\n`,
+		`${ownedDesktop}Exec =/other/program\n`,
+		`${ownedDesktop}Exec\t=/other/program\n`,
+		`${ownedDesktop} [Desktop Entry] \nExec=/other/program\n`,
 		`[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\n${ownedDesktop.match(/^Exec=.*$/m)[0]}\n`
 	]) {
 		fs.writeFileSync(desktop, mixed);
@@ -240,6 +244,8 @@ try {
 		assert.notEqual(run('enable').status, 0, 'ambiguous desktop command must be preserved');
 		assert.equal(fs.readFileSync(desktop, 'utf8'), mixed);
 	}
+	fs.writeFileSync(desktop, ownedDesktop.replace('[Desktop Entry]', ' [Desktop Entry] ').replace(/^Exec=/m, ' Exec = '));
+	assert.equal(run('status').stdout.trim(), 'disabled', 'GLib whitespace is accepted for the owned command');
 	fs.writeFileSync(desktop, `${ownedDesktop}[Desktop Action Example]\nExec=/other/program\n`);
 	assert.equal(run('status').stdout.trim(), 'disabled', 'unrelated desktop actions do not change the main command');
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
