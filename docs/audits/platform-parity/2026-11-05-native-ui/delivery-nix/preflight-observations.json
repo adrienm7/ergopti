@@ -1,0 +1,17 @@
+{
+	"source_sha": "8702c0657c24c1f7d7275e454cf8c49b2ea68dee",
+	"run": 41951477401,
+	"nix_job": 126999251198,
+	"nix_failure": {
+		"checkpoint": "checkout",
+		"boundary": "result_or_physical_debt_gate",
+		"status": 1,
+		"signal": "none",
+		"owner_error": "capture_bound",
+		"retained": false
+	},
+	"tracked_path_bytes_observed": 1111823,
+	"site_job": 127002827408,
+	"site_failure": "Install production site browsers: APT command exceeded599.999984466s and was stopped.",
+	"native_nix_credit": false
+}

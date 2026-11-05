@@ -1,0 +1,5 @@
+MODEL PASS healthy closed receipt requires actual parent sink close
+MODEL PASS absent native closure fails despite child exit zero
+MODEL PASS late close cannot beat original deadline monitor
+MODEL PASS grace refusal retains one-TERM owner until later exact close
+Owned phase protocol models: 16 passed; native execution UNRUN.

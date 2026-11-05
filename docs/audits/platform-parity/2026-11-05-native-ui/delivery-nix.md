@@ -1,0 +1,13 @@
+# Nix inventory delivery follow-up
+
+The audit remains pinned to `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`. This separate tooling correction follows the preflight of `8702c0657c24c1f7d7275e454cf8c49b2ea68dee` on November 5, 2026; it adds no product-runtime fix or new parity-finding ID.
+
+The [preflight](https://github.com/adrienm7/ergopti/actions/runs/41951477401) refused genuine Nix admission at checkout with `owner_error=capture_bound`, status 1 and no retained physical debt. The complete tracked-path output is 1,111,823 bytes, exceeding the unchanged 1 MiB native phase capture. The ordinary Git scanners were already fixed; this native qualification uses a different process owner and must keep its physical closure and cancellation guarantees.
+
+The new pinned Python helper exclusively creates a private 0600 spool, emits a small closed creator-inode receipt through the existing bounded output, then redirects stdout and execs fixed `/usr/bin/git` in the same child PID. The full Git index goes to that file. The runner reads it only after the original phase succeeds and closes physically, checks exact creator identity and complete descriptor/path stability, strictly decodes every NUL-delimited path, and seals every tracked file as before. The helper joins both original and copied execution-source hash fences. No path filtering, capture-bound increase, synchronous bypass, native-credit fallback or deadline/retirement relaxation was introduced.
+
+[Executed receipt](delivery-nix/receipt.json): 134 Nix contract controls, including actual oversized Git/physical-owner refusal and successful complete-spool closure; 16 existing phase-protocol **model** controls; false-green and formatting checks. Root independently reran the 134 controls and 16 models; [contract output](delivery-nix/root-contracts.txt) and [model output](delivery-nix/root-phase-models.txt) preserve the distinction. A second reviewer independently checked that the final HEAD/status/full-source/wrapper/probe/currentness/native-identity/debt guards are unchanged.
+
+**No installed-Nix build/runtime credit is claimed by these local controls.** A clean committed-source hosted run must still execute the actual package admission. This Linux-native qualification has no new Windows/macOS product behavior. The fifteen audit follow-ups and targeted native GUI gaps remain open.
+
+The same old preflight also stopped while installing development-site browser dependencies: APT exceeded its 600-second bound. This infrastructure result is recorded separately in [observations](delivery-nix/preflight-observations.json); no application assertion or browser launch ran in that failed step, and no timeout was weakened. Later GitHub run results remain separate from this fixed evidence.

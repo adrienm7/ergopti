@@ -1,0 +1,120 @@
+{
+	"schema_version": 1,
+	"scope": "nix-tooling-delivery-followup",
+	"created_at_utc": "2026-11-05T02:24:49.061656+00:00",
+	"source_head": "8702c0657c24c1f7d7275e454cf8c49b2ea68dee",
+	"files": {
+		"tools/test/run-linux-nix-native.cjs": "6bc66524a1afe24c63456ebc57581fabed1a2a1d2c74b29bad4e7f5fe888993e",
+		"tools/test/run-linux-nix-git-inventory.py": "91cb1c69068c622e6e501afc9c443f68ebca9d55ef9931548600288be8b7ab10",
+		"tools/test/test-linux-nix-native.cjs": "cfb60fc6caf0e794dc751c2bb73d3f0dafd67258991e889ac0b4a20a52f0f188"
+	},
+	"checks": [
+		{
+			"name": "nix-contracts",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"tools/test/test-linux-nix-native.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 2.325,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/nix-contracts.log",
+			"stdout": "PASS real oversized Git inventory: old capture refused; complete spool and original physical closure admitted.\nPASS Nix source/receipt/registration controls: 134; native Nix execution unqualified.",
+			"stderr": ""
+		},
+		{
+			"name": "phase-protocol",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"tools/test/test-linux-managed-http-phase-protocol.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 0.096,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/phase-protocol.log",
+			"stdout": "MODEL PASS healthy closed receipt requires actual parent sink close\nMODEL PASS absent native closure fails despite child exit zero\nMODEL PASS late close cannot beat original deadline monitor\nMODEL PASS grace refusal retains one-TERM owner until later exact close\nOwned phase protocol models: 16 passed; native execution UNRUN.",
+			"stderr": ""
+		},
+		{
+			"name": "false-greens",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"tools/test/find-false-greens.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 4.369,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/false-greens.log",
+			"stdout": "find-false-greens: tests that cannot fail\n\n  ok        0  tautology        baseline 0\n         Assertion that cannot fail (Assert(true) / assert_true(true))\n\n  ok        0  vacuous-absence  baseline 0\n         Absence assertion on a _DriverFuncBodyOrEmpty() that may be empty\n\n  ok        0  dead-test        baseline 0\n         Test body that asserts nothing, or a Test() never registered\n\n  ok        0  pcall-only       baseline 0\n         Assertion on a pcall status \u2014 proves \"did not crash\", nothing else\n\n  ok        0  corpus-skip      baseline 0\n         Early return when a corpus could not be loaded \u2014 a missing contract passes\n\n  ok        0  unfloored-scan   baseline 0\n         Source-scan loop that never asserts it matched anything\n\n  Not detectable here \u2014 hunt these by hand (see the false-green-tests skill):\n   - a harness that stubs the very function the test claims to verify\n   - a source-grep pinning the current SPELLING of the code, not the invariant\n\nfind-false-greens: within baseline (0 vs 0).",
+			"stderr": ""
+		},
+		{
+			"name": "prettier",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"node_modules/prettier/bin/prettier.cjs",
+				"--check",
+				"tools/test/run-linux-nix-native.cjs",
+				"tools/test/test-linux-nix-native.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 0.625,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/prettier.log",
+			"stdout": "Checking formatting...\nAll matched files use Prettier code style!",
+			"stderr": ""
+		},
+		{
+			"name": "ruff-check",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/ruff",
+				"check",
+				"tools/test/run-linux-nix-git-inventory.py"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 0.012,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/ruff-check.log",
+			"stdout": "All checks passed!",
+			"stderr": ""
+		},
+		{
+			"name": "ruff-format",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/ruff",
+				"format",
+				"--check",
+				"tools/test/run-linux-nix-git-inventory.py"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 0.008,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/ruff-format.log",
+			"stdout": "1 file already formatted",
+			"stderr": ""
+		},
+		{
+			"name": "diff-check",
+			"command": [
+				"git",
+				"diff",
+				"--check",
+				"--",
+				"tools/test/run-linux-nix-native.cjs",
+				"tools/test/run-linux-nix-git-inventory.py",
+				"tools/test/test-linux-nix-native.cjs"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"seconds": 0.01,
+			"log": "/workspace/scratch/parity-native-ui/nix-tooling/logs/diff-check.log",
+			"stdout": "",
+			"stderr": ""
+		}
+	],
+	"qualification": {
+		"installed_nix_credit": false,
+		"summary": "Focused source/receipt tests only. Real private Git inventory above 1 MiB runs through the actual existing phase owner; original bounded capture refuses, full spooled inventory and physical closure are admitted. The 16 phase controls are protocol models, not native installed Nix qualification. No Nix build/store/runtime admission was executed."
+	},
+	"mutations": "Only scratch receipt/log deliverables retained. Checks create and remove owned private temporary fixtures. No source, stage or commit edits."
+}
