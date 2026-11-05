@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **121 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **123 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1839,3 +1839,23 @@ Replay42006372296 at7cba520271a2568c094c7b475688ea40207c66ac executes no busines
 Replay42007542450 at9dd5c4f12fbdd56ad34394fb4c2443e8088d0149 executes152 selected cases:144 pass and8 fail, with identical failure names reversed. Production compile and90/90 native hotstrings pass. The selected HTTP override step passes its explicit11-case completion guard; its detailed TAP is not retained in these two archives. Selected SQL thinking-pause, timezone, proxy full-save and excluded-source debounce corrections are qualified; this is not a whole-suite result.
 
 The8 failures comprise personal/migration/locator stage ownership, two raw TOML update-name variants, successive ABC context ownership, mutable registry cache ownership and Sticky Kana capture. Only the mutable registry cache introduces a new distinct family (AHK-121); the others extend existing071/068/110/067. Correctors retain the original fail-before controls and exact native prerequisites. Replay42009207272 at7974f33b executes30 distinct targeted cases:29 pass and1 fails, identically reversed. Local/public prediction ownership and all3 queued proxy controls pass; the actual override-stage collision fails while its ordinary control passes.
+
+## Native continuations and two additional confirmed families
+
+Replay42012445164 executes52 selected cases:47 pass and5 fail in each order, with identical failures. Production compilation passes; neither E2E is selected. It qualifies the selected raw TOML names, locator, pending registry clone, migration-stage and Sticky Kana admission corrections. The cache-stage failure extends071. Three genuine password/rolling-context failures extend120: a password source followed by a focus-only switch sends A, and actual fresh allowed B input still sends both A and B after excluded or password A. The configuration-name positive control was unadmitted because its fixture omitted actual boot preparation; it proves no production failure and is repaired separately.
+
+Replay42016035455 executes110 selected cases:109 pass and1 fails in each order. Production compilation passes; neither E2E is selected. It qualifies the selected observed-context FIFO, same-app title transition, override ownership, personal/info/cache held-stage and configuration-name corrections. The sole partial-publication case reaches a nonexistent reload function in its fixture after the native rename; commit92ba8c6b calls the actual HotstringsConfigReload API. Its full qualification remains pending.
+
+Replay42017171434 executes19 selected cases:11 pass and8 fail in each order. Production compilation passes; neither E2E is selected. The four provider-NUL cases already pass, so no speculative provider patch is applied. The eight failures comprise two distinct new families below plus ROI094 and released-Kana067 siblings. The ordinary controls pass. Commitfe18d899 makes ROI mutation conditional on the canonical current snapshot; commit8f9566d8 captures custom modifier state at the endpoint rather than after its native release. Native postfix qualification is pending.
+
+### AHK-122: Exhausted signed event identities rewind recovery or publish a negative allocator
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+A genuine source containing signed MAXINT produces resolved1, accepted1, new_id1 and inserted0; INSERT OR IGNORE hides the lost event. A source containing MAXINT-1 accepts MAXINT but leaves counter_after=-9223372036854775808. The ordinary40-to41 case passes, and inverse order repeats both failures. Commitb31e9a4c refuses capacity before publishing invalid state and preserves already-reserved terminal checkpoint replay. The original three source/SQLite tests plus the new atomic capacity control await native postfix qualification. This is a persisted-domain boundary; no natural uptime exhaustion is claimed.
+
+### AHK-123: Embedded NUL registry names access or mutate a different shorter value
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+A real JSON-produced13-unit name containing NUL causes each actual ST_Set/Get/Has/Delete operation to address its distinct shorter private HKCU neighbor. Set replaces Original with Edited; Get returns Original instead of missing; Has returns1; Delete removes Original. Unicode and default-name controls pass. Commit2c5ac7cc checks the original UTF-16 span before native conversion and keeps the established numeric-key conversion contract. The six native cases and two numeric controls await native postfix qualification. Separate scalar-persistence and counted-name inventory probes are hypotheses until their own actual native receipts arrive; they add no finding count.

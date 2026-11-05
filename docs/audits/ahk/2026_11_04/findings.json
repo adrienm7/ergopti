@@ -1335,6 +1335,28 @@
 			"root_cause": "ConfigMigrateValidateRegistry shares nested ops with its raw TOML parse. ConfigRegistryCacheLoad stores that same Model as pending, so a later runtime mutation is encoded under the still-correct original source/code identity and becomes trusted source data on reload.",
 			"silent_failure": "A mutable runtime operation can become an apparently valid persistent migration rule without changing the shipped registry bytes. The test mutates only private fixture runtime state and uses the real codec/checksum; no cache envelope is forged.",
 			"regression_test": "Source41ae90d2 deep-clones the genuine typed raw Model before the runtime escapes and includes the real clone owner in development CodeIdentity. Two original native probes remain; two further typed-Boolean/ops-array cases require genuine cache flush/load, independent later hits and source-defined migration. Postfix native qualification is pending."
+		},
+		{
+			"id": "AHK-122",
+			"title": "Exhausted signed event identities rewind recovery or publish a negative allocator",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native replay42017171434 at e426210050127fe16386d5c9ad75382d8c256642: a real SQLite source at signed MAXINT resolves to1 and acknowledges a new row that INSERT OR IGNORE discards; a source at MAXINT-1 accepts MAXINT but publishes INT64_MIN as its next counter. Both fail individually and reversed; the ordinary40-to41 control passes.",
+			"root_cause": "KL_ResolveStartId increments the maximum source identity without checking signed overflow, and KL_AllocEventId publishes its increment before validating the next identity. Recovery silently rewinds rather than refusing exhausted capacity.",
+			"silent_failure": "The append returns success while the reused primary key is ignored; the allocator also leaves a negative checkpoint after a successful terminal allocation. This is a persisted-domain boundary, not a claim about natural uptime exhaustion.",
+			"regression_test": "Keep the three genuine source/SQLite cases and assert refusal preserves the allocator. Commit b31e9a4c adds bounded atomic validation, nonmonotonic recovery refusal and a capacity/Critical/checkpoint-replay control. Native postfix qualification is pending in the targeted65-case replay."
+		},
+		{
+			"id": "AHK-123",
+			"title": "Embedded NUL registry names access or mutate a different shorter value",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native replay42017171434 at e426210050127fe16386d5c9ad75382d8c256642: genuine JSON produces the13-unit name owned\\u0000foreign; ST_Set overwrites owned, ST_Get reads it, ST_Has claims its membership and ST_Delete removes it. All four fail individually and reversed; Unicode/default-name controls pass.",
+			"root_cause": "The storage entry points forward an original counted AHK String to null-terminated Win32 registry APIs without validating every original UTF-16 unit, so different logical names alias one native value.",
+			"silent_failure": "Native calls acknowledge success on the shorter valid neighbor. The public storage boolean and value readback therefore look successful while a different key was changed or disclosed.",
+			"regression_test": "Retain the six actual private-HKCU cases. Commit2c5ac7cc validates original String units before conversion across Set/Get/Has/Delete and preserves ordinary numeric coercion through two new controls. Native postfix qualification is pending in the targeted65-case replay."
 		}
 	]
 }
