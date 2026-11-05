@@ -1233,7 +1233,35 @@ function M:process(code, value, now_ms, receipt)
 		if value == DOWN then
 			if own then return {} end
 			local original = self.held[code]
-			if not original or original.undecided then return {} end
+			if not original then return {} end
+			if original.undecided then
+				-- The second source is a concurrent physical hold, not another tap
+				-- of the first source. Capture its own DOWN before deciding the roll.
+				local origin = capture_roll_origin(self, code, now_ms, receipt)
+				if not origin or source_holds[self] ~= groups or groups[code] ~= group
+					or group[source] ~= nil or self.held[code] ~= original then
+					return {}, nil, nil, { refused = true }
+				end
+				local out, tap, binding, journal = resolve_roll(self, code, "hold", now_ms)
+				if journal and journal.refused then return out, tap, binding, journal end
+				if source_holds[self] ~= groups or groups[code] ~= group
+					or group[source] ~= nil or self.held[code] ~= original then
+					return {}, nil, nil, { refused = true }
+				end
+				original.cancelled = true
+				local state = { down_at = now_ms, cancelled = true, emitted = {},
+					layer = original.layer, hold_pending = original.hold_pending }
+				local extra = {}
+				for _, mod in ipairs(original.emitted) do
+					press(self, extra, mod); state.emitted[#state.emitted + 1] = mod
+				end
+				if state.layer then self.layer_depth = self.layer_depth + 1 end
+				group[source] = { state = state, generation = generation, native_owner = native_owner }
+				self.physical_down[code] = true
+				for _, row in ipairs(extra) do out[#out + 1] = row end
+				if journal then journal[#journal + 1] = { rows = extra, origin = origin.token } end
+				return out, tap, binding, journal
+			end
 			local out, state = {}, { down_at = now_ms, cancelled = true, emitted = {},
 				layer = original.layer, hold_pending = original.hold_pending }
 			for _, other in pairs(group) do other.state.cancelled = true end

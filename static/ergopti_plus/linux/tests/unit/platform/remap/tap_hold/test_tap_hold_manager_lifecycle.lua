@@ -830,6 +830,131 @@ helpers.describe("native OneShot Manager route", function()
 		end)
 	end
 
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("keeps the surviving same-code roll hold when " .. first .. " releases first", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" } }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010)
+				s.edge(first, 57, 0, 1020)
+				s.edge(last, 30, 1, 1030); s.edge(last, 30, 0, 1040)
+				s.edge(last, 57, 0, 1050)
+				helpers.assert_eq(s.rows, { { 42, 1 }, { 30, 1 }, { 30, 0 }, { 42, 0 } },
+					"the surviving physical Space must keep Shift and neither press may type a lone Space")
+			end)
+		end)
+	end
+
+	helpers.it("keeps the navigation layer active for the surviving same-code roll owner", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010); s.edge("a", 57, 0, 1020)
+			s.edge("b", 36, 1, 1030); s.edge("b", 36, 0, 1040); s.edge("b", 57, 0, 1050)
+			local before = #s.rows
+			helpers.assert_true(before > 0, "the layer action must be delivered")
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 57 and row[1] ~= 36) end
+			s.edge("b", 36, 1, 1060); s.edge("b", 36, 0, 1070)
+			helpers.assert_eq(s.rows[before + 1], { 36, 1 })
+			helpers.assert_eq(s.rows[before + 2], { 36, 0 })
+		end)
+	end)
+
+	helpers.it("retires both same-code roll owners if configuration changes after the first output", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		local changed = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" },
+			after_sync = function(s, code, value)
+				if not changed and code == 42 and value == 1 then
+					changed = true
+					local file = assert(io.open(s.tap_path, "ab")); file:write("\n# changed after first output\n"); file:close()
+				end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010)
+			helpers.assert_true(changed)
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "the old output cannot retain Shift")
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 57, "no stale Space may be emitted") end
+		end)
+	end)
+
+	helpers.it("retires the old roll journal when its second keyboard disappears after first output", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		local removed = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" },
+			after_sync = function(s, code, value)
+				if not removed and code == 42 and value == 1 then
+					removed = true
+					s.reader.close("keyboard:" .. s.paths.b)
+				end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010)
+			helpers.assert_true(removed)
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "removed source cannot retain Shift")
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 57, "no stale Space may be emitted") end
+		end)
+	end)
+
+	for _, lost in ipairs({ "a", "b" }) do
+		helpers.it("retires both roll holds safely after source " .. lost .. " is lost", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			local options = { tap_hold_text = text, action_names = { "one_shot_shift" } }
+			Fixture.with_manager_session(options, function(s)
+				local survivor = lost == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010)
+				options.eof_path = s.paths[lost]; s.hook.pump()
+				helpers.assert_true(s.hook.isRunning())
+				s.edge(survivor, 30, 1, 1030); s.edge(survivor, 30, 0, 1040)
+				s.edge(survivor, 57, 0, 1050)
+				helpers.assert_eq(s.rows, { { 42, 1 }, { 42, 0 }, { 30, 1 }, { 30, 0 } },
+					"source loss retires the old remapper cohort without a stale Space")
+			end)
+		end)
+	end
+
+	helpers.it("does not deliver later roll effects after the first output acknowledgement fails", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		local refused = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" },
+			fail_sync = function(_, code, value)
+				if not refused and code == 42 and value == 1 then refused = true; return true end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 57, 1, 1010)
+			helpers.assert_true(refused)
+			helpers.assert_eq(s.hook.isRunning(), false, "an unknown write cannot admit later effects")
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 57, "no stale Space may be emitted") end
+		end)
+	end)
+
+	helpers.it("preserves a buffered key before joining a second same-code roll owner", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" } }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 30, 1, 1005); s.edge("b", 57, 1, 1010)
+			s.edge("a", 57, 0, 1020); s.edge("a", 30, 0, 1030); s.edge("b", 57, 0, 1040)
+			helpers.assert_eq(s.rows, { { 42, 1 }, { 30, 1 }, { 30, 0 }, { 42, 0 } })
+		end)
+	end)
+
+	helpers.it("orders a buffered instant action before the second same-code roll receipt", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+		local trace = {}
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" },
+			after_sync = function(_, code, value) trace[#trace + 1] = code .. ":" .. value end,
+			on_generic_action = function(_, action) trace[#trace + 1] = action end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1005); s.edge("b", 57, 1, 1010)
+			s.edge("a", 57, 0, 1020); s.edge("a", 1, 0, 1030); s.edge("b", 57, 0, 1040)
+			helpers.assert_eq(table.concat(trace, ","), "42:1,paste,42:0")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+
 	helpers.it("delivers rolled actions from their separate physical keyboards", function()
 		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
