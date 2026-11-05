@@ -84,7 +84,7 @@ function format_number_plain(num) {
 		);
 	}
 
-	const str = parsed.toString();
+	const str = abs_val.toString();
 	const parts = str.split('.');
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
 	return prefix + parts.join(',');
@@ -126,7 +126,7 @@ function format_number(num) {
 	}
 
 	// Apply space as thousands separator
-	const str = parsed.toString();
+	const str = abs_val.toString();
 	const parts = str.split('.');
 	parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
 	const formatted = parts.join(',');
