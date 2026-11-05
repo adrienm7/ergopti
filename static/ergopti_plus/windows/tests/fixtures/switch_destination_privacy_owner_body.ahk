@@ -184,10 +184,52 @@ _KSD_SameCaptionAppOwner(SameCaption) {
 	_KSD_Require(SecondOrigin > FirstOrigin, "The actual second app acquisition must restart title ownership rather than adopt A's origin.")
 }
 
+
+_KSD_CaseOnlyTitleOwner() {
+	global _KSD
+	A := {App: "fixture-caption-case.exe", Title: "Fixture CASE caption", Hwnd: 211}
+	B := {App: A.App, Title: "Fixture case caption", Hwnd: A.Hwnd}
+	C := {App: A.App, Title: "Fixture later caption", Hwnd: A.Hwnd}
+	_KSD_Require(!(A.Title == B.Title) && StrLower(A.Title) == StrLower(B.Title),
+		"The actual title inputs differ only by case, under the same application and window.")
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == 0,
+		"The genuine initial focus must establish its own title origin.")
+	FirstOrigin := KLHook.title_entered_at
+	Sleep(40)
+	_KSD_Acquire(B)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The actual new case-sensitive caption must be observed.")
+	SecondOrigin := KLHook.title_entered_at
+	RowsAfterCase := Keystats._pending_entries.Length
+	Sleep(40)
+	_KSD_Acquire(C)
+	_KSD_Require(KL_Hook_RefreshContext(true), "A later ordinary caption must still publish normally.")
+	if IsObject(_KSD.Failure)
+		throw _KSD.Failure
+	Windows := []
+	for Row in Keystats._pending_entries
+		if Row["type"] == "window_switch"
+			Windows.Push(Row)
+	FileAppend("RECEIPT caption-case-owner rows_after_case=" . RowsAfterCase
+		. " window_rows=" . Windows.Length . " title_origin_advanced=" . (SecondOrigin > FirstOrigin)
+		. " errors=" . _KSD.Errors . "`n", "*", "UTF-8")
+	_KSD_Require(_KSD.Errors == 0, "A hidden producer exception cannot explain a missing caption interval.")
+	_KSD_Require(Windows.Length == 2 && RowsAfterCase == 1,
+		"A case-only title change owns a separate canonical window interval.")
+	_KSD_Require(Windows[1]["app"] == A.App && Windows[1]["prev_title"] == A.Title
+		&& Windows[1]["next_title"] == B.Title && Windows[1]["duration_ms"] > 0,
+		"The first exact caption must retain its own observed positive duration.")
+	_KSD_Require(Windows[2]["app"] == A.App && Windows[2]["prev_title"] == B.Title
+		&& Windows[2]["duration_ms"] > 0 && SecondOrigin > FirstOrigin,
+		"The second exact caption cannot adopt the first caption's origin.")
+}
+
 _KSD_Exercise() {
 	global _KSD
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
+	if _KSD.Mode == "caption-case-only"
+		return _KSD_CaseOnlyTitleOwner()
 	if InStr(_KSD.Mode, "caption-app-") == 1
 		return _KSD_SameCaptionAppOwner(_KSD.Mode == "caption-app-same")
 	_KSD.A := {App: "fixture-public-a.exe", Title: "Fixture public A", Hwnd: 102}

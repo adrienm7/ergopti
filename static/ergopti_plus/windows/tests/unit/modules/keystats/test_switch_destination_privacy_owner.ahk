@@ -193,3 +193,6 @@ _KSD_WifiReportKpi(ChangedNetwork) {
 for _KSD_WifiChanged in [false, true]
 	Test("Keystats Wi-Fi dashboard: " . (_KSD_WifiChanged ? "known network change" : "signal-only control") . " reaches the actual manifest (wifi-dashboard-kpi-owner)",
 		_KSD_WifiReportKpi.Bind(_KSD_WifiChanged))
+
+Test("Keystats window caption ownership: case-only title change closes its exact interval (window-caption-case-owner)",
+	_KSD_Case.Bind("caption-case-only"))

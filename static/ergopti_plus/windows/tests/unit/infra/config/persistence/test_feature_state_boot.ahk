@@ -282,3 +282,7 @@ for Fixture in [
 ]
 	Test("script chord detached admission: " . Fixture . " (script-chords-config-admission)",
 		_FeatureStateBootRunCaptured.Bind(Fixture))
+
+for _FSBOOT_AdmissionCase in ["raw_boot_category_signed_one", "raw_boot_category_true", "raw_boot_category_false",
+		"raw_boot_idle_boolean", "raw_boot_idle_zero", "raw_boot_idle_number"]
+	Test("Feature-state real boot source admission: " . _FSBOOT_AdmissionCase, _FeatureStateBootRun.Bind(_FSBOOT_AdmissionCase))

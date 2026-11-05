@@ -663,7 +663,7 @@ _WS_Load() {
 ; live state instead of bypassing the transaction gateway.
 _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		ActiveCandidate := unset, OwnerToken := 0, BoundPath := unset,
-		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
+		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, BeforeNativeFn := 0) {
 	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
 	global _WS_StateEpoch
 	BorrowedOwner := OwnerToken is Object
@@ -682,7 +682,7 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		try {
 			return _WS_Save(unset, unset, unset, CompatibilityOwner,
 				CompatibilityPath, _WS_StateEpoch,
-				WriterFn, ReplaceFn, DeleteFn)
+				WriterFn, ReplaceFn, DeleteFn, BeforeNativeFn)
 		} finally _ConfigWriteLeaseRelease(CompatibilityOwner)
 	}
 
@@ -791,9 +791,17 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	; Keep the exact global owner, but never keep Critical, across this OS call.
 	Replaced := false
 	ReplaceError := ""
-	try Replaced := HasMethod(ReplaceFn, "Call")
-		? ReplaceFn.Call(StagePath, BoundPath)
-		: FSAtomicMoveReplace(StagePath, BoundPath)
+	try {
+		; Optional observation of the final native cutpoint, internal to this
+		; helper; the public two-argument replace adapter keeps its existing ABI.
+		if HasMethod(BeforeNativeFn, "Call")
+			BeforeNativeFn.Call()
+		else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+			throw TypeError("The private native cutpoint is not callable")
+		Replaced := HasMethod(ReplaceFn, "Call")
+			? ReplaceFn.Call(StagePath, BoundPath)
+			: FSAtomicMoveReplace(StagePath, BoundPath)
+	}
 	catch as Err {
 		Replaced := false
 		ReplaceError := Err.Message
