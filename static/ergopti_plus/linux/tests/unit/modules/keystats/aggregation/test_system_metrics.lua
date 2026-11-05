@@ -248,6 +248,15 @@ end)
 -- =================================================================
 
 helpers.describe("system metrics: awake, locked, asleep", function()
+	helpers.it("reads the native suspend-aware clock in Linux LuaJIT", function()
+		if not jit then return end -- The supported Lua 5.4 test mode has no FFI.
+		local clock = require("modules.keystats.calendar").capture(true)
+		local file = assert(io.open("/proc/uptime", "r"))
+		local line = assert(file:read("*l")); assert(file:close())
+		local uptime = assert(tonumber(line:match("^[%d%.]+"))) * 1000
+		helpers.assert_true(type(clock.boot_ms) == "number")
+		helpers.assert_true(math.abs(clock.boot_ms - uptime) < 5000, "CLOCK_BOOTTIME matches kernel uptime")
+	end)
 
 	helpers.it("counts the time between samples as awake", function()
 		with_shell({
@@ -274,6 +283,55 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			helpers.assert_eq(day.awake_ms, 0,
 				"a locked screen is not the user working, and the panel this feeds "
 					.. "exists to tell the two apart")
+		end)
+	end)
+
+	helpers.it("counts suspension even when the Linux monotonic clock stops", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step = metrics._sample_interval_ms()
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				clock.boot_ms = now
+				clock.mono_ms = now == 0 and 0 or step
+				return clock
+			end)
+			sample(0, "2026-08-06")
+			sample(step * 100, "2026-08-06")
+			helpers.assert_eq(metrics.current().sleep_ms, step * 100)
+			helpers.assert_eq(metrics.current().awake_ms, 0)
+			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 100, "2026-08-06", { asleep_ms = step * 100 }) })
+		end)
+	end)
+
+	helpers.it("partitions a suspended interval at local midnight", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local midnight = assert(os.time({ year = 2026, month = 8, day = 7, hour = 0, min = 0, sec = 0 }))
+			set_clock(function(now)
+				local wall = midnight * 1000 - 60000 + now
+				return { wall_ms = wall, mono_ms = now == 0 and 0 or 1000, boot_ms = now,
+					date = os.date("%Y-%m-%d", wall / 1000), ts = os.date("!%Y-%m-%d %H:%M:%S", wall / 1000) }
+			end)
+			sample(0, "2026-08-06"); sample(120000, "2026-08-07")
+			local days = metrics.snapshot().values
+			helpers.assert_eq(days["2026-08-06"].sleep_ms, 60000)
+			helpers.assert_eq(days["2026-08-07"].sleep_ms, 60000)
+		end)
+	end)
+
+	helpers.it("retains the old clock domain when a suspend-aware reading fails", function()
+		with_shell({}, function(metrics, sample, set_clock)
+			local step, boot = metrics._sample_interval_ms(), 0
+			set_clock(function(now, date)
+				local clock = sample_clock(now, date)
+				clock.boot_ms = boot
+				return clock
+			end)
+			sample(0, "2026-08-06")
+			boot = nil
+			helpers.assert_nil(sample(step, "2026-08-06"))
+			boot = step * 2
+			sample(step * 2, "2026-08-06")
+			helpers.assert_eq(metrics.current().awake_ms, step * 2)
 		end)
 	end)
 
