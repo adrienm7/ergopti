@@ -327,6 +327,20 @@ try {
 	assert.notEqual(run('disable').status, 0, 'foreign startup commands are never replaced');
 	assert.equal(fs.readFileSync(desktop, 'utf8'), '[Desktop Entry]\nExec=/other/program\n');
 	if (process.platform === 'linux') {
+		const unusualInstall = path.join(sandbox, 'newline\n', 'lib/ergopti/linux/install');
+		const unusualConfig = path.join(sandbox, 'newline-config');
+		fs.mkdirSync(unusualInstall, { recursive: true });
+		for (const name of ['start_at_login.sh', 'desktop_entry.sh', 'config_home.sh'])
+			fs.copyFileSync(path.join(installed, name), path.join(unusualInstall, name));
+		provideShellMessages(unusualInstall);
+		const refused = spawnSync(bashExecutable(), [posix(path.join(unusualInstall, 'start_at_login.sh')), 'enable'], {
+			encoding: 'utf8', timeout: 10000,
+			env: { ...env, XDG_CONFIG_HOME: posix(unusualConfig), PATH: `${posix(stubs)}:/usr/bin:/bin`, NO_UNIT: '1' }
+		});
+		assert.notEqual(refused.status, 0, 'an unrepresentable desktop path must fail');
+		assert.equal(fs.existsSync(path.join(unusualConfig, 'autostart/ergopti-hotstrings.desktop')), false);
+	}
+	if (process.platform === 'linux') {
 		// Native packages have no standalone ownership receipt: a similarly
 		// named file beside /usr/lib/ergopti belongs to someone else.
 		{

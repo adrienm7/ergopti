@@ -97,6 +97,9 @@ startup_record() {
 	printf '%s path=%q\n' "$record" "$3" >&2
 }
 
+# Validate the eventual Exec before allocating or publishing any setting.
+desktop_exec="$(ergopti_desktop_exec "$LAUNCHER")" || exit 78
+
 if { [ -e "$DESKTOP_FILE" ] || [ -L "$DESKTOP_FILE" ]; } \
 	&& { [ -L "$DESKTOP_FILE" ] || [ ! -f "$DESKTOP_FILE" ]; }; then
 	if [ -L "$DESKTOP_FILE" ]; then ergopti_msg startup.linked_setting >&2; fi
@@ -208,7 +211,7 @@ else
 [Desktop Entry]
 Type=Application
 Name=Ergopti
-$(ergopti_desktop_exec "$LAUNCHER")
+$desktop_exec
 Terminal=false
 Hidden=$hidden
 X-Ergopti-Startup=true
