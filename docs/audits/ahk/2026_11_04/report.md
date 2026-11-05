@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **142 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **144 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2115,3 +2115,17 @@ Replay42116306020 atdc32bfaf completes122 isolated cases and a reverse122/122 ti
 This is one distinct root cause beyond076:4294967361 fits Int64, but the pinned AHK Chr implementation narrows through ParamIndexToInt before its Unicode check. Checked Int64 parsing cannot correct that second representation boundary. The required remedy validates0..10FFFF and excludes surrogates before Chr, while preserving existing control placeholders. The five layout integer-attribute aliases remain076. Earlier provisional grouping of all nine layout probes is superseded by this native evidence and independent ABI analysis; the register now contains142 distinct findings.
 
 The same run qualifies original29 postfix and all47 LLM cases in both orders. Query controls pass25/26 and the ordinary emptytrash control passes. The remaining query failure is an incomplete double returning only Name where the unchanged production navigation guard requires Item.Path; its fixture must supply the actual private folder/name path. Confirmed-action3 and menu-stage2 failures are separately reproduced hypotheses awaiting their source fixes. No native archive ZIP download is claimed.
+
+### Native qualification: forty postfix controls and four independent baseline groups
+
+Replay42122703145 ated74b574 passes47/60 cases alone and reversed. Both complete manifests have60 timed results, no errors or omissions, and matching names/statuses. All40 postfix controls pass: layout14 (including142), confirmed6, menu6, force/unblock4 and newfile10. This qualifies the corresponding targeted source corrections, including the Item.Path fixture dependency repair.
+
+The baseline records five retry-alias failures, one updater-cache stage collision, one finite-delay serialization failure and two idle arithmetic failures. The native alias completes two real POSTs and exact owner/peer retirement yet keeps one original→child pair; cancellation and ordinary controls pass. The cache test freezes only filename time above DWORD range and preserves actual native filesystem operations through the real response consumer. The clock prerequisite source is resealed at9589a98f; the oracle was not changed.
+
+The four priority-paste cases fail before invalid handler input is reached. They do not establish four product bugs: actual native paste of abc/1.5 does not satisfy the fixture admission premise. Diagnostics will record raw native UTF-16 independently before/after one Value getter, without changing the premise. The proposed personal-editor production patch remains unapplied. Real file-reader admission also excludes noninteger priority metadata before form selection; separate guard controls are being added.
+
+### AHK-143 and AHK-144: sentinel serialization and valid runtime arithmetic
+
+An acknowledged metadata save/reload changes an admitted absolute0.0004 delay to0/unlimited, removing its actual expiry at the declared1000→1002 clock boundary. Explicit zero and1ms controls pass. This is independent of048 offset custody,049 precedence and079 maximum duration. One143 covers the absolute-formatter defect; the failing category assertion does not independently qualify the later tiny-section assertion.
+
+The accepted exact Integer2^62 second word-idle duration instead wraps when multiplied by1000 and clears the real prefix buffer after1ms. This is valid uncapped runtime comparison, independent of076 integer admission and077 refresh-margin validation. One144 covers the scaling defect. Float-only scaling is also insufficient because it rounds exact reachable native deadlines; the correction keeps safe integer products and uses a floating product only beyond that horizon. Shared source6b57f14f passes the real contract in both orders and62 actual driver unit cases with normal helpers/stubs; Windows postfix remains pending. These are declared clock-domain tests, not measurements of physical uptime. The register now contains144 distinct findings.
