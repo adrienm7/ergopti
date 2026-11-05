@@ -1122,8 +1122,7 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 		if authorized and not authorized() then return end
 		local assistant_id = Formats.backboard_assistant_id(root)
 		if not assistant_id then
-			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id (keys: %s).",
-				top_level_keys(root))
+			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id.")
 			fail("the Backboard assistant could not be created: no assistant_id in the answer")
 			return
 		end
@@ -1205,7 +1204,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		return false
 	end
 	local function fail(detail, receipt)
-		Logger.warn(LOG, "Remote request failed: %s.", detail)
+		Logger.warn(LOG, "Remote request failed: %s.", require("modules.llm.error_log").describe(detail))
 		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
@@ -1267,7 +1266,7 @@ local function decide(scope, entry, state, questions, on_done, admission)
 		return false
 	end
 	local function fail(detail, receipt)
-		Logger.warn(LOG, "Decision request failed: %s.", detail)
+		Logger.warn(LOG, "Decision request failed: %s.", require("modules.llm.error_log").describe(detail))
 		if receipt == nil then done(nil, detail) else done(nil, detail, receipt) end
 	end
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
@@ -1298,7 +1297,7 @@ local function decide(scope, entry, state, questions, on_done, admission)
 		backboard_send(scope, epoch, prepared, { system = "", text = state, questions = questions }, fail, function(root)
 			local answers, where = Formats.backboard_decision_answers(root, Json.decode)
 			if not answers then
-				Logger.warn(LOG, "Backboard returned no Jev answers; its top-level keys: %s.", top_level_keys(root))
+				Logger.warn(LOG, "Backboard returned no Jev answers.")
 				done(nil, "Backboard returned no Jev answers")
 				return
 			end

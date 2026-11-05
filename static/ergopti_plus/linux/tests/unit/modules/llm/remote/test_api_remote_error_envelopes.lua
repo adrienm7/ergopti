@@ -12,7 +12,7 @@ local Json = require("json")
 -- Load actual transitive dependencies before replacing the transport port.
 require("modules.llm.api_remote")
 
-local function isolated(body)
+local function isolated(body, logger)
 	local names = { "modules.llm.api_remote", "adapters.http_client", "logger.shim" }
 	local saved, calls = {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -23,7 +23,7 @@ local function isolated(body)
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	package.loaded["logger.shim"] = logger or helpers.make_logger_stub()
 	local ok, detail = xpcall(function()
 		local remote = helpers.load_module("modules.llm.api_remote")
 		remote._reset_for_test()
@@ -56,6 +56,41 @@ local function valid(kind)
 end
 
 helpers.describe("remote multi-step error envelopes", function()
+	helpers.it("formats backend log diagnostics without exposing free text", function()
+		local describe = require("modules.llm.error_log").describe
+		for _, case in ipairs({
+			{ "HTTP 400: private request", "HTTP 400" },
+			{ "HTTP 503", "HTTP 503" },
+			{ "HTTP 400private", "details withheld" },
+			{ "private backend message", "details withheld" },
+			{ "cancelled", "cancelled" },
+			{ "empty reply", "empty reply" },
+			{ {}, "details withheld" },
+		}) do helpers.assert_eq(describe(case[1]), case[2]) end
+		helpers.assert_eq(describe(nil), "details withheld")
+	end)
+	helpers.it("does not log arbitrary keys in a malformed Backboard answer", function()
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local lines = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		isolated(function(remote, _, answer)
+			local observed = { chunks = 0 }
+			helpers.assert_true(start(remote, "creation", observed))
+			answer('{"private_key_729":"value"}')
+			helpers.assert_eq(#observed, 1)
+		end, logger)
+		isolated(function(remote, _, answer)
+			local observed = { chunks = 0 }
+			helpers.assert_true(start(remote, "backboard-decisions", observed))
+			answer('{"assistant_id":"owned-assistant"}')
+			answer('{"private_key_729":"value"}')
+			helpers.assert_eq(#observed, 1)
+		end, logger)
+		local log = table.concat(lines, "\n")
+		helpers.assert_nil(log:find("private_key_729", 1, true))
+		helpers.assert_true(log:find("no assistant_id", 1, true) ~= nil)
+	end)
 	for _, kind in ipairs({ "decisions", "backboard-decisions" }) do
 		for _, spec in ipairs({
 			{ body = '{"answers":null}', expected = '{}' },
