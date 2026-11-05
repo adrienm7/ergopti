@@ -748,12 +748,12 @@ try {
 	stub('id', 'if [ "$1" = -u ]; then echo 0; else exit 1; fi');
 	stub(
 		'getent',
-		'if [ "$1" = passwd ]; then echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; [ "${AMBIGUOUS_PASSWD:-0}" = 1 ] && echo "other:x:1000:1000::/home/other:/bin/bash"; true; elif [ "$2" = "${FAIL_GROUP:-}" ]; then exit "${FAIL_STATUS:-1}"; else exit 2; fi'
+		'if [ "$1" = passwd ]; then if [ "$2" = 1000 ] && [ "${MISSING_FIRST_USER:-0}" = 1 ]; then exit 2; fi; if [ "$2" = 1001 ]; then echo "second:x:1001:1001::/home/second:/bin/bash"; exit 0; fi; echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; [ "${AMBIGUOUS_PASSWD:-0}" = 1 ] && echo "other:x:1000:1000::/home/other:/bin/bash"; true; elif [ "$2" = "${FAIL_GROUP:-}" ]; then exit "${FAIL_STATUS:-1}"; else exit 2; fi'
 	);
 	stub(
 		'loginctl',
 		`case "$1" in
-list-sessions) printf '1 1000 desktop seat0 tty2\n2 1001 remote - -\n3 1002 console seat0 tty3\n4 120 gdm seat0 tty1\n5 1003 inactive seat0 tty4\n6 1004 gone seat0 tty5\n7 999 kiosk seat0 tty6\n8 - incomplete seat0 tty7\n' ;;
+list-sessions) printf '1 1000 desktop seat0 tty2\n2 1001 remote - -\n3 1002 console seat0 tty3\n4 120 gdm seat0 tty1\n5 1003 inactive seat0 tty4\n6 1004 gone seat0 tty5\n7 999 kiosk seat0 tty6\n8 - incomplete seat0 tty7\n'; [ "\${EXTRA_SESSION:-0}" = 1 ] && printf '9 1001 second seat0 tty8\n'; true ;;
 show-session) case "$2" in
 1) printf 'Type=wayland\nRemote=no\nUser=1000\nClass=user\nActive=yes\n' ;;
 2) printf 'Type=x11\nRemote=yes\nUser=1001\nClass=user\nActive=yes\n' ;;
@@ -763,11 +763,16 @@ show-session) case "$2" in
 6) exit 1 ;;
 7) printf 'Type=x11\nRemote=no\nUser=999\nClass=user\nActive=yes\n' ;;
 8) printf 'Type=wayland\nRemote=no\nUser=\nClass=user\nActive=yes\n' ;;
+9) printf 'Type=wayland\nRemote=no\nUser=1001\nClass=user\nActive=yes\n' ;;
 *) exit 1 ;; esac ;; esac`
 	);
 	for (const name of ['groupadd', 'usermod', 'modprobe', 'udevadm']) {
 		stub(name, 'printf "%s %s\\n" "${0##*/}" "$*" >> "$CALL_LOG"');
 	}
+	stub(
+		'usermod',
+		'printf "%s %s\\n" "${0##*/}" "$*" >> "$CALL_LOG"; [ "${FAIL_FIRST_ENROLL:-0}" != 1 ] || [ "$3" != desktop ]'
+	);
 	// The script reads its rules and its message catalogue beside it, as in the driver tree.
 	const installDirectory = path.join(sandbox, 'install');
 	provideShellMessages(installDirectory);
@@ -863,6 +868,40 @@ show-session) case "$2" in
 	);
 	assert.match(calls, /modprobe uinput/);
 	assert.match(calls, /udevadm control --reload-rules/);
+	// A disappearing NSS identity must not prevent later graphical users from
+	// receiving access, while the overall command reports incomplete setup.
+	fs.writeFileSync(callLog, '');
+	const missingFirst = spawnSync(bashExecutable(), [bashPath(script), '--active-sessions'], {
+		encoding: 'utf8',
+		timeout: 15000,
+		env: {
+			HOME: bashPath(sandbox),
+			TEST_STUBS: bashPath(stubs),
+			CALL_LOG: bashPath(callLog),
+			MISSING_FIRST_USER: '1',
+			EXTRA_SESSION: '1'
+		}
+	});
+	assert.notEqual(missingFirst.status, 0, 'an unenrolled session remains an explicit failure');
+	assert.match(missingFirst.stderr, /code=session-enrollment-failed session=1 uid=1000/);
+	assert.match(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput second/);
+	assert.doesNotMatch(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput desktop/);
+	fs.writeFileSync(callLog, '');
+	const refusedFirst = spawnSync(bashExecutable(), [bashPath(script), '--active-sessions'], {
+		encoding: 'utf8',
+		timeout: 15000,
+		env: {
+			HOME: bashPath(sandbox),
+			TEST_STUBS: bashPath(stubs),
+			CALL_LOG: bashPath(callLog),
+			FAIL_FIRST_ENROLL: '1',
+			EXTRA_SESSION: '1'
+		}
+	});
+	assert.notEqual(refusedFirst.status, 0);
+	assert.match(refusedFirst.stderr, /code=session-enrollment-failed session=1 uid=1000/);
+	assert.match(fs.readFileSync(callLog, 'utf8'), /usermod -aG input,uinput second/);
+
 	// Reject each unusable link without replacing it or mutating groups/devices.
 	for (const relative of [
 		'etc/udev/rules.d/99-ergopti-uinput.rules',

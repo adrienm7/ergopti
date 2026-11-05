@@ -35,11 +35,11 @@ resolve_user() {
 
 enroll_user() {
 	local name
-	name="$(resolve_user "$1")"
+	name="$(resolve_user "$1")" || return 1
 	if command -v usermod >/dev/null 2>&1; then
 		usermod -aG input,uinput "$name"
 	else
-		addgroup "$name" input
+		addgroup "$name" input || return 1
 		addgroup "$name" uinput
 	fi
 }
@@ -88,6 +88,7 @@ if [ ! -e /etc/modules-load.d/ergopti-uinput.conf ] && [ ! -L /etc/modules-load.
 	install -m 644 "$SCRIPT_DIR/ergopti-uinput.conf" /etc/modules-load.d/ergopti-uinput.conf
 fi
 
+enrollment_failed=false
 if [ "$MODE" = --user ]; then
 	enroll_user "$2"
 elif command -v loginctl >/dev/null 2>&1; then
@@ -115,7 +116,10 @@ elif command -v loginctl >/dev/null 2>&1; then
 					# keyboard access and must not abort setup for other users.
 					if [[ "$uid" =~ ^[0-9]+$ ]]; then
 						if [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ]; then
-							enroll_user "$uid"
+							if ! enroll_user "$uid"; then
+								printf '[permissions] code=session-enrollment-failed session=%q uid=%s\n' "$session" "$uid" >&2
+								enrollment_failed=true
+							fi
 						else
 							ergopti_msg permissions.non_desktop_account >&2
 						fi
@@ -138,3 +142,7 @@ if [ -S /run/udev/control ]; then
 else
 	ergopti_msg permissions.udev_not_running >&2
 fi
+
+# One session disappearing or failing enrollment must not skip later sessions,
+# but callers still need to know that setup did not complete for every user.
+[ "$enrollment_failed" = false ]
