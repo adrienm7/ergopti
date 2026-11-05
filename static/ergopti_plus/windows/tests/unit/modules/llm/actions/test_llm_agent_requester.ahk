@@ -941,10 +941,97 @@ _JRO_DrainDebt() {
     _JRO_Debt := Pending
     AssertEqual(0, Pending.Length, "new probes cannot hide exact managed/peer cleanup debt")
 }
+; Observe only this fixture's already-owned HTTP/peer state. This diagnostic
+; never completes, aborts or changes admission for the subject under test.
+_JRO_Diagnostic(State, Lines, Phase, Current := 0) {
+    global _LLM_Remote_Async
+    try {
+        Info := Map("phase", Phase, "critical", A_IsCritical, "suspended", A_IsSuspended,
+            "id", State.Id, "directory_owned", State.DirectoryOwned,
+            "reservation_present", State.Id > 0 && _LLM_Remote_Async.Has(State.Id),
+            "exact_reservation", State.Id > 0 && State.Entry is Map && _LLM_Remote_Async.Get(State.Id, 0) == State.Entry)
+        if HasMethod(Current, "Call")
+            Info["original_requester_current"] := Current.Call()
+        if State.Entry is Map {
+            Info["entry_transport"] := State.Entry.Get("transport", "")
+            Info["entry_format"] := State.Entry.Get("format", "")
+            Info["entry_cancelled"] := State.Entry.Get("cancelled", false)
+            Info["entry_elapsed_ms"] := TickElapsed64(State.Entry.Get("start_tick", A_TickCount))
+            Info["entry_timeout_ms"] := State.Entry.Get("timeout_ms", 0)
+            Info["entry_has_current_fn"] := HasMethod(State.Entry.Get("requester_current", 0), "Call")
+        }
+        if IsObject(State.Http) {
+            Http := State.Http
+            Info["http_completed"] := Http.Completed
+            Info["http_aborted"] := Http.Aborted
+            Info["http_status"] := Http.Status
+            Info["http_managed"] := Http.ManagedTransport
+            Info["http_payload_published"] := Http.ManagedPayloadPublished
+            Info["http_handle_present"] := IsObject(Http.Handle)
+            Info["http_admission_timer_present"] := IsObject(Http.ManagedAdmissionFn)
+            Info["http_deadline_timer_present"] := IsObject(Http.DeadlineFn)
+            Info["http_native_dispatch_refused"] := Http.HasOwnProp("NativeDispatchRefused") && Http.NativeDispatchRefused
+            Info["http_native_receipt_present"] := Http.NativeReceipt is Map && Http.NativeReceipt.Count > 0
+            Capture := Http.ManagedCapture
+            if Capture is Map {
+                Directory := Capture["CaptureDir"]
+                for Name in ["admission.json", "transport.pending", "transport.json"]
+                    Info["worker_has_" . Name] := FileExist(Directory . Name) != ""
+            }
+        }
+        if State.Peer is Map {
+            Info["peer_released"] := State.Peer.Get("released", false)
+            if !Info["peer_released"]
+                Info["peer_exited"] := _LLM_CurlProcessExited(State.Peer)
+        }
+        if State.DirectoryOwned {
+            ReceiptPath := State.Directory . "\receipt.jsonl"
+            Info["peer_receipt_present"] := FileExist(ReceiptPath) != ""
+            if Info["peer_receipt_present"] {
+                Bytes := FileGetSize(ReceiptPath)
+                Info["peer_receipt_bytes"] := Bytes
+                if Bytes <= 4096 {
+                    Posts := 0, Statuses := []
+                    for Line in StrSplit(FileRead(ReceiptPath, "UTF-8-RAW"), "`n", "`r") {
+                        if Line == ""
+                            continue
+                        Row := JsonParse(Line)
+                        if Row is Map && Row.Get("method", "") == "POST" {
+                            Posts += 1
+                            Statuses.Push(Row.Get("status", 0))
+                        }
+                    }
+                    Info["peer_completed_posts"] := Posts, Info["peer_statuses"] := Statuses
+                }
+            }
+        }
+        Tail := []
+        for Line in Lines {
+            if A_Index > Max(0, Lines.Length - 8)
+                Tail.Push(SubStr(Line, 1, 250))
+        }
+        Info["fixture_logger_tail"] := Tail
+        _TestPrint("# JEV_REQUEST_PHASE " . KL_JsonEncode(Info))
+    } catch Any as Err {
+        _TestPrint("# JEV_REQUEST_PHASE_DIAGNOSTIC_ERROR " . KL_JsonEncode(Map("phase", Phase,
+            "error", Type(Err), "message", SubStr(Err.Message, 1, 200))))
+    }
+}
+
 _JRO_Body(Withdraw, Fx, Lines, Sent) {
+    ; LAG -> LTN -> LPP is synchronous by default and holds Critical On.
+    ; Only this real native fixture opens its message loop; restore the exact
+    ; inherited scope after all genuine callbacks and cleanup have finished.
+    PreviousCritical := Critical("Off")
+    try _JRO_NativeBody(Withdraw, Fx, Lines, Sent)
+    finally Critical(PreviousCritical)
+}
+
+_JRO_NativeBody(Withdraw, Fx, Lines, Sent) {
     global _DriverDir, _LLM_Menu, _LLM_Engine, _LLM_Remote_PostBodyFn
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _JRO_Debt
     global _LLM_Agent_Generation, _LLM_Agent_System1Revision
+    AssertFalse(A_IsCritical, "native managed admission and polling need an open message loop")
     AssertFalse(A_IsSuspended)
     AssertEqual(0, _LLM_Remote_Async.Count)
     State := {Directory: "", DirectoryOwned: false, StopPath: "", Peer: 0, Id: 0, Entry: 0, Http: 0}
@@ -1005,11 +1092,13 @@ _JRO_Body(Withdraw, Fx, Lines, Sent) {
                 LLM_Agent_InvalidateTyping()
             AssertEqual(!Withdraw, Current.Call(), "only the public withdrawal changes the original requester authority")
         } finally Critical(PreviousCritical)
+        AssertFalse(A_IsCritical, "the short owner mutation must restore the open native loop")
         Started := A_TickCount
         while _LLM_Remote_Async.Has(State.Id) && TickElapsed64(Started) < 20000 {
             _SR_TreePoll()
             Sleep(10)
         }
+        _JRO_Diagnostic(State, Lines, "after-native-wait", Current)
         AssertFalse(_LLM_Remote_Async.Has(State.Id), "the actual remote reservation settles before peer shutdown")
         AssertTrue(Http.Completed)
         AssertFalse(IsObject(Http.Handle), "the real managed worker has retired its exact native handle")
@@ -1048,6 +1137,7 @@ _JRO_Body(Withdraw, Fx, Lines, Sent) {
                 "the live Jev none-choice reaches the actual triage consumer without waking System2")
     } catch Any as Err {
         Primary := Err
+        _JRO_Diagnostic(State, Lines, "before-cleanup", IsSet(Current) ? Current : 0)
     } finally {
         try _JRO_Cleanup(State)
         catch Any as Err {
