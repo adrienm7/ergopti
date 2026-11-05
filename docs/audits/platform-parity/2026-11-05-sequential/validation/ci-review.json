@@ -47,5 +47,14 @@
 		],
 		"remaining_primary_failure": "macOS app build: curl exit28 during Lua/LuaSocket dependency acquisition in bundle-macos-luasocket.sh, after launcher and proxy relay builds succeed. The quiet log does not identify which of its two archive URLs timed out."
 	},
-	"policy": "Delivery uses the documented maintainer exception for native/prerequisite gaps; no claim of a green all-OS preflight on the final integrated delivery commit."
+	"policy": "Delivery uses the documented maintainer exception for native/prerequisite gaps; no claim of a green all-OS preflight on the final integrated delivery commit.",
+	"subsequent_upstream_integration": {
+		"source": "814f6bc",
+		"macos_mirror_fix": "f4fa559",
+		"native_prerequisite_controls": 123,
+		"skipped": 0,
+		"log": "final-native-mirror-tests.log",
+		"log_sha256": "0fff37e9eb5e283cea18cd55a6b2f3a54570851b9a71dd685bce4c4c574d6b2f",
+		"qualification": "Earlier failed CI source96909db predates this fix. Current-source native macOS artifact qualification remains open; do not infer it from a source integration or fixture success."
+	}
 }
