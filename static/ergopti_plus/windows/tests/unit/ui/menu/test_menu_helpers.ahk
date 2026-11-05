@@ -112,25 +112,28 @@ Test("menu_helpers: empty and duplicated shared boundaries refuse construction",
 ; The actual helper and native RegisterMenuItem path must preserve each choice.
 _MH_NativeSuffixCollision(Order) {
 	Descriptions := Order == "generated-first" ? ["LPUL section", "LPUL section", "LPUL section #2"]
-		: ["LPUL section #2", "LPUL section", "LPUL section"]
+		: Order == "literal-first" ? ["LPUL section #2", "LPUL section", "LPUL section"]
+		: Order == "case-generated-first" ? ["LPUL section", "lpul section", "LPUL SECTION #2"]
+		: ["LPUL SECTION #2", "LPUL section", "lpul section"]
 	Model := _MH_Fixture(Descriptions[1], Descriptions[2], Descriptions[3])
 	Labels := _HS_BuildDisambiguatedSectionLabels(Model)
-	MenuOwner := Menu(), Count := -1
+	MenuOwner := Menu(), Count := -1, Receipts := []
 	try {
 		for Key in ["alpha", "beta", "gamma"] {
 			Callback := ((Value, *) => Value).Bind(Key)
-			AssertEqual(1, RegisterMenuItem(MenuOwner, Labels[Key], Callback),
-				"Each actual personal section row must be admitted by the native dispatcher")
+			Receipts.Push(RegisterMenuItem(MenuOwner, Labels[Key], Callback))
 		}
 		Count := DllCall("GetMenuItemCount", "ptr", MenuOwner.Handle, "int")
 		_TestPrint("# personal-suffix order=" . Order . " labels=" . Labels["alpha"] . "|" . Labels["beta"]
 			. "|" . Labels["gamma"] . " native=" . Count)
+		for Receipt in Receipts
+			AssertEqual(1, Receipt, "Each actual personal section row must be admitted by the native dispatcher")
 		AssertTrue(Labels["alpha"] != Labels["beta"] && Labels["alpha"] != Labels["gamma"]
 			&& Labels["beta"] != Labels["gamma"], "Each real section description must receive a unique label")
 		AssertEqual(3, Count, "The real native menu must retain all three personal section choices")
 	} finally _CTC_ReleaseMenu(MenuOwner)
 }
-for _MH_SuffixOrder in ["generated-first", "literal-first"]
+for _MH_SuffixOrder in ["generated-first", "literal-first", "case-generated-first", "case-literal-first"]
 	Test("menu_helpers: " . _MH_SuffixOrder . " preserves literal personal section suffixes (personal-suffix-menu-owner)",
 		_MH_NativeSuffixCollision.Bind(_MH_SuffixOrder))
 
