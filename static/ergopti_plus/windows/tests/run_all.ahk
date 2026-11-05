@@ -982,6 +982,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
 #Include unit/adapters/crash_report/test_screenshot_worker_ownership.ahk
+#Include unit/adapters/crash_report/test_screenshot_layered_native.ahk
 #Include unit/ui/onboarding/test_onboarding_finish_payload.ahk
 #Include unit/ui/onboarding/test_onboarding_answers.ahk
 #Include unit/ui/onboarding/test_onboarding_metrics_path.ahk
