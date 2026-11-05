@@ -280,41 +280,21 @@ let dailyBoundsChart = null;
  * Apps are colored by their dominant icon colour; markers for system events
  * are omitted because the manifest only stores counts, not timestamps.
  */
-function renderDayTimeline() {
+function renderDayTimeline(aggData) {
 	const container = document.getElementById('day_timeline_container');
 	if (!container) return;
-
-	// Pick the target day: explicit selection if any, otherwise the most
-	// recent day in manifestData.
-	let targetDay = currentSelectedDate;
-	if (!targetDay || !manifestData[targetDay]) {
-		const dates = Object.keys(manifestData).sort();
-		targetDay = dates[dates.length - 1] || null;
-	}
+	const projection = aggData || getAggregatedData();
+	const day = projection.rich.timeline_day;
+	const targetDay = day.date;
 	if (!targetDay) {
 		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_day')}</div>`;
 		return;
 	}
-
-	const dayData = manifestData[targetDay] || {};
-	// hourly[hh] → array of {app, ms}
 	const byHour = {};
 	for (let h = 0; h < 24; h++) byHour[String(h).padStart(2, '0')] = [];
-
-	Object.entries(dayData).forEach(([appName, appData]) => {
-		if (appName === '_sys' || appName === '_system') return;
-		if (!appData.hourly) return;
-		Object.entries(appData.hourly).forEach(([hh, hData]) => {
-			let ms = hData.time_ms || 0;
-			if (ms === 0 && hData.c > 0) {
-				// Estimate from chars proportion if time_ms missing
-				let totalChars = 0;
-				Object.values(appData.hourly).forEach((h) => (totalChars += h.c || 0));
-				if (totalChars > 0) ms = (hData.c / totalChars) * (appData.app_time_ms || 0);
-			}
-			if (ms > 0 && byHour[hh]) byHour[hh].push({ app: appName, ms });
-		});
-	});
+	for (const row of day.rows) {
+		if (byHour[row.hour]) byHour[row.hour].push(row);
+	}
 
 	const ROW_H = 18;
 	const GAP = 3;
@@ -579,24 +559,12 @@ function renderTopWindowsTable(aggData) {
  * Renders the top sessions table (#37). Uses per-app-day session_longest_ms
  * as a proxy: for each (date, app) row we surface its longest single session.
  */
-function renderTopSessionsTable() {
+function renderTopSessionsTable(aggData) {
 	const tbody = document.getElementById('top_sessions_tbody');
 	if (!tbody) return;
-	const rows = [];
-	Object.entries(manifestData || {}).forEach(([dateStr, dayData]) => {
-		Object.entries(dayData || {}).forEach(([appName, appData]) => {
-			if (appName === '_sys' || appName === '_system') return;
-			const longest = Number(appData.session_longest_ms) || 0;
-			if (longest > 0) {
-				rows.push({
-					date: dateStr,
-					app: appName,
-					ms: longest,
-					chars: Number(appData.session_longest_chars) || 0
-				});
-			}
-		});
-	});
+	// Sort a copy: the cached projection belongs to all dashboard consumers.
+	const projection = aggData || getAggregatedData();
+	const rows = [...(projection.rich.sessions.rows || [])];
 	rows.sort((a, b) => b.ms - a.ms);
 	const top = rows.slice(0, 30);
 	if (top.length === 0) {
