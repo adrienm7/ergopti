@@ -45,6 +45,7 @@ local function with_stage(body, options)
 		-- The physical setter deliberately commits AFTER its callback returns.
 		s.value = value; s.writes[#s.writes + 1] = value; s.inside = false
 		if s.failure == phase then
+			if options.external_after_failure then s.value = "external copy" end
 			s.failure = nil
 			if options.throws then error("controlled native write exception") end
 			return false
@@ -83,6 +84,31 @@ local function with_stage(body, options)
 end
 
 helpers.describe("prepared clipboard exact lifetime", function()
+	helpers.it("does not overwrite an external copy after a failed setter", function()
+		with_stage(function(s)
+			s.failure = "set"
+			helpers.assert_eq(s.stage.prepare(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+			helpers.assert_eq(s.stage.close(), false, "ambiguous restoration remains pending")
+			s.value = "replacement"
+			helpers.assert_true(s.stage.close(), "the inverse can settle when our payload is identifiable")
+			helpers.assert_eq(s.value, "original")
+		end, { external_after_failure = true })
+	end)
+
+	helpers.it("does not overwrite an external copy after a failed restore", function()
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.failure = "restore"
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 2)
+		end, { external_after_failure = true })
+	end)
+
 	helpers.it("retains restoration when the ownership read is unavailable", function()
 		local options = {}
 		with_stage(function(s)
