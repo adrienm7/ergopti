@@ -55,14 +55,17 @@ local SUCCEEDED = { [0] = true }
 --- @param accepted table Exit codes that are an answer.
 --- @param timeout_ms number Its deadline.
 --- @param on_text function Receives stdout, or nil and the cause when the command failed.
-local function run(program, args, accepted, timeout_ms, on_text)
+local function run(program, args, accepted, timeout_ms, on_text, scope)
 	local settled = false
 	local function finish(text, cause)
-		if settled then return end
+		if settled or (scope and scope:is_cancelled()) then return end
 		settled = true
 		on_text(text, cause)
 	end
-	local admitted = M._run(program, args, { timeout_ms = timeout_ms },
+	local start = scope and function(program_name, arguments, options, callback)
+		return scope:run(program_name, arguments, options, callback)
+	end or M._run
+	local admitted = start(program, args, { timeout_ms = timeout_ms },
 		function(result)
 			-- A zero-exit leader may still leave an unretired process group;
 			-- that supervision error makes its captured output inconclusive.
@@ -84,12 +87,14 @@ end
 --- @param keep function Receives a command line, returns whether to keep it.
 --- @param timeout_ms number The whole walk's deadline.
 --- @param on_text function Receives the rows, or nil and the cause.
-local function read_command_lines(pids, keep, timeout_ms, on_text)
+local function read_command_lines(pids, keep, timeout_ms, on_text, scope)
 	local deadline = M._now_ms() + timeout_ms
 	local rows, index = {}, 1
 	local function slice()
+		if scope and not scope:admitted() then scope:cancel(); return end
 		local last = math.min(index + PIDS_PER_SLICE - 1, #pids)
 		for position = index, last do
+			if scope and not scope:admitted() then scope:cancel(); return end
 			local pid = pids[position]
 			local raw = M._read_cmdline(pid)
 			-- Arguments are NUL-terminated (LuaJIT patterns cannot name NUL, %c
@@ -106,10 +111,13 @@ local function read_command_lines(pids, keep, timeout_ms, on_text)
 			return
 		end
 		if index > #pids then on_text(table.concat(rows, "\n")); return end
-		if not M._defer(slice) then
+		local function refused()
+			if scope and scope:is_cancelled() then return end
 			Logger.warn(LOG, "The /proc walk could not yield to the loop: no reading this sweep.")
 			on_text(nil, "/proc walk was not scheduled")
 		end
+		local deferred = scope and scope:defer(slice, refused) or (not scope and M._defer(slice))
+		if not deferred then refused() end
 	end
 	slice()
 end
@@ -173,7 +181,7 @@ M._home = function() return ConfigPaths.account_home() end
 --- Finds where each catalogue server listens, asynchronously.
 --- @param entries table Array of { id, descriptor, base_url } (catalogue order).
 --- @param on_done function Receives results: id -> llm.local_server_ports result.
-function M.scan(entries, on_done)
+local function scan(entries, on_done, scope)
 	if type(entries) ~= "table" or type(on_done) ~= "function" then
 		error("local_server_ports.scan: entries and on_done are required")
 	end
@@ -182,10 +190,16 @@ function M.scan(entries, on_done)
 	local function listeners(on_listeners)
 		run("ss", { "-Hltnp" }, SUCCEEDED, Timings.ms("llm", "local_server_port_scan_timeout_ms"), function(output)
 			on_listeners(output and Policy.parse_ss(output) or nil)
-		end)
+		end, scope)
+	end
+	local function read_file(path)
+		if scope and not scope:admitted() then scope:cancel(); return nil end
+		local content = M._read_file(path)
+		if scope and not scope:admitted() then scope:cancel(); return nil end
+		return content
 	end
 	Policy.scan(entries, {
-		os = "linux", home = M._home(), read_file = M._read_file, decode_json = Json.decode,
+		os = "linux", home = M._home(), read_file = read_file, decode_json = Json.decode,
 		logger = Logger, log = LOG,
 		list_processes = function(pattern, on_text)
 			local pids, cause = proc_pids()
@@ -195,7 +209,7 @@ function M.scan(entries, on_done)
 				return
 			end
 			read_command_lines(pids, Policy.process_matcher(pattern),
-				Timings.ms("llm", "local_server_process_lookup_timeout_ms"), on_text)
+				Timings.ms("llm", "local_server_process_lookup_timeout_ms"), on_text, scope)
 		end,
 		-- ss names the owner of a socket only for the user's own processes,
 		-- which is where a local server the user started runs
@@ -203,9 +217,159 @@ function M.scan(entries, on_done)
 		list_all_listeners = listeners,
 		describe_processes = function(pids, on_text)
 			read_command_lines(pids, function() return true end,
-				Timings.ms("llm", "local_server_port_scan_timeout_ms"), on_text)
+				Timings.ms("llm", "local_server_port_scan_timeout_ms"), on_text, scope)
 		end,
 	}, on_done)
 end
+
+--- Legacy callback API; its existing process and timer ownership is unchanged.
+function M.scan(entries, on_done)
+	return scan(entries, on_done, nil)
+end
+
+--- Starts a scan with exact child process and timer ownership.
+--- A throwing constructor retains unknown debt rather than inventing an ACK.
+function M.scan_owned(entries, on_done, admission)
+	if type(entries) ~= "table" or type(on_done) ~= "function"
+		or (admission ~= nil and type(admission) ~= "function") then
+		error("local_server_ports.scan_owned: entries and on_done are required")
+	end
+	local scope, children, tokens = {}, {}, {}
+	local constructing, cancelled, cancelling_scope, observing, completed, uncertain = 0, false, false, false, false, false
+	function scope:admitted()
+		if cancelled then return false end
+		if admission == nil then return true end
+		constructing = constructing + 1
+		local ok, current = pcall(admission)
+		constructing = constructing - 1
+		return ok and current == true and not cancelled
+	end
+	local function add(start)
+		constructing = constructing + 1
+		local called, child = pcall(start)
+		constructing = constructing - 1
+		if not called or type(child) ~= "table" or type(child.cancel) ~= "function"
+			or type(child.is_settled) ~= "function" then
+			uncertain = true
+			scope.failed = true
+			scope:cancel()
+			Logger.error(LOG, "Owned local server scan child could not be acquired.")
+			return nil
+		end
+		local record = { child = child, cancel = child.cancel, settled = child.is_settled }
+		children[#children + 1] = record
+		if cancelled then pcall(record.cancel, child) end
+		return child
+	end
+	local function dispatch(callback, ...)
+		constructing = constructing + 1
+		if not scope:admitted() then
+			scope:cancel()
+			constructing = constructing - 1
+			return
+		end
+		local ok = pcall(callback, ...)
+		constructing = constructing - 1
+		if not ok then
+			scope.failed, uncertain = true, true
+			scope:cancel()
+			Logger.error(LOG, "Owned local server scan callback raised an error.")
+		end
+	end
+	function scope:is_cancelled() return cancelled end
+	function scope:is_settled()
+		if observing or constructing ~= 0 or uncertain or not (completed or cancelled) then return false end
+		observing = true
+		local all_settled = true
+		for _, record in ipairs(children) do
+			local ok, settled = pcall(record.settled, record.child)
+			if not ok or settled ~= true then all_settled = false; break end
+		end
+		observing = false
+		return all_settled and constructing == 0 and not uncertain and (completed or cancelled)
+	end
+	function scope:cancel()
+		if cancelling_scope then return false end
+		cancelled, cancelling_scope = true, true
+		constructing = constructing + 1
+		for _, record in ipairs(children) do pcall(record.cancel, record.child) end
+		constructing = constructing - 1
+		cancelling_scope = false
+		return self:is_settled()
+	end
+	function scope:run(program, args, options, callback)
+		if not self:admitted() then self:cancel(); return false end
+		local token = {}
+		tokens[#tokens + 1] = token
+		local owner = "local-server-port:" .. tostring(token)
+		local child = add(function()
+			return M._owned_process(program, args, { owner = owner, timeout_ms = options.timeout_ms,
+				authorized = function() return scope:admitted() end }, function(result)
+				dispatch(callback, result)
+			end)
+		end)
+		if child == nil or not self:admitted() then self:cancel(); return false end
+		if child.started == true and child.error == nil then return true end
+		local inspected, settled = pcall(child.is_settled, child)
+		if inspected and settled == true then return false end
+		if type(child.on_settled) ~= "function" then
+			self.failed = true
+			self:cancel()
+			Logger.error(LOG, "Owned local server scan cannot observe child settlement.")
+			return false
+		end
+		local registered, ack = pcall(child.on_settled, child, function()
+			dispatch(callback, { error = "native process dispatch refused" })
+		end)
+		if not registered or ack ~= true then
+			self.failed = true
+			self:cancel()
+			Logger.error(LOG, "Owned local server scan settlement observer was refused.")
+			return false
+		end
+		return not cancelled
+	end
+	function scope:defer(callback, refused)
+		if not self:admitted() then self:cancel(); return false end
+		local child = add(function()
+			return M._owned_timer(Monotonic.now_ms(), function()
+				dispatch(callback)
+			end)
+		end)
+		if child == nil or not self:admitted() then self:cancel(); return false end
+		if child.started == true then return true end
+		local inspected, settled = pcall(child.is_settled, child)
+		if inspected and settled == true then return false end
+		if type(child.on_settled) ~= "function" then
+			self.failed = true
+			self:cancel()
+			Logger.error(LOG, "Owned local server scan cannot observe child settlement.")
+			return false
+		end
+		local registered, ack = pcall(child.on_settled, child, function()
+			dispatch(refused)
+		end)
+		if not registered or ack ~= true then
+			self.failed = true
+			self:cancel()
+			Logger.error(LOG, "Owned local server scan settlement observer was refused.")
+			return false
+		end
+		return not cancelled
+	end
+	constructing = constructing + 1
+	local ok = pcall(scan, entries, function(results)
+		if completed then return end
+		if not scope:admitted() then scope:cancel(); return end
+		completed = true
+		on_done(results)
+	end, scope)
+	constructing = constructing - 1
+	if not ok then scope.failed = true; uncertain = true; scope:cancel() end
+	return scope
+end
+
+M._owned_process = function(...) return require("adapters.owned_process").start(...) end
+M._owned_timer = function(...) return require("infra.managed_http_deadline").start(...) end
 
 return M

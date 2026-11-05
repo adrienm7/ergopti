@@ -16,7 +16,7 @@ local M = {}
 --- @return table scans The entries of every scan, for assertions.
 function M.install(overrides)
 	local scans = {}
-	package.loaded["modules.llm.local_server_ports"] = { scan = function(entries, on_done)
+	local ports = { scan = function(entries, on_done)
 		scans[#scans + 1] = entries
 		local results = {}
 		for _, entry in ipairs(entries) do
@@ -27,6 +27,17 @@ function M.install(overrides)
 		end
 		on_done(results)
 	end }
+	function ports.scan_owned(entries, on_done)
+		local operation = { settled = false, cancelled = false }
+		function operation:cancel() self.cancelled = true; return self.settled end
+		function operation:is_settled() return self.settled end
+		ports.scan(entries, function(results)
+			if not operation.cancelled then on_done(results) end
+			operation.settled = true
+		end)
+		return operation
+	end
+	package.loaded["modules.llm.local_server_ports"] = ports
 	return scans
 end
 

@@ -19,11 +19,11 @@ local LOG = "llm.local_servers"
 local catalogue_order, catalogue_servers, _, catalogue_discovery, _, _, catalogue_identities = Catalogue.load({})
 -- Server id -> the last port scan result (llm.local_server_ports); the callbacks
 -- of the rescans waiting for the running scan, nil when none runs
-local port_scans, scan_waiters = {}, nil
+local port_scans, scan_waiters, scan_owners = {}, nil, {}
 local order, servers = catalogue_order, catalogue_servers
 local requests, pending, view_receipts = {}, {}, setmetatable({}, { __mode = "k" })
 local queued = {}
-local closed, view_generation, configuration_generation = false, 0, 0
+local closed, cancelling, active_waiters, active_rescans, active_acquisitions, active_http_callbacks, cancel_generation, view_generation, configuration_generation = false, false, 0, 0, 0, 0, 0, 0, 0
 local cached_source, source_initialized = nil, false
 local controller = Discovery.new({ order = order, clock = Clock.now_ms, identities = catalogue_identities,
 	max_age = function() return Timings.ms("llm", "local_server_detection_max_age_ms") end,
@@ -73,7 +73,7 @@ local function refresh_views()
 		view_generation = view_generation + 1
 		for _, record in pairs(requests) do
 			record.successor = nil
-			if record.operation then record.operation:cancel() end
+			if record.operation and record.cancel then pcall(record.cancel, record.operation) end
 		end
 	end
 end
@@ -200,19 +200,25 @@ end
 
 local acquire
 local function retire(id, record)
-	if requests[id] ~= record or not record.operation or record.operation:is_settled() ~= true then return end
+	if requests[id] ~= record or not record.operation then return end
+	local operation, observe = record.operation, record.observe
+	if type(observe) ~= "function" or operation.is_settled ~= observe then return end
+	local ok, settled = pcall(observe, operation)
+	if not ok or settled ~= true or requests[id] ~= record or record.operation ~= operation
+		or operation.is_settled ~= observe or requests[id] ~= record then return end
 	requests[id] = nil
 	local successor = record.successor
+	record.successor = nil
 	if successor then acquire(id, successor) end
 end
 
 --- A successor may wait behind an exact native operation's retained close debt.
-acquire = function(id, job)
+local function acquire_owned(id, job)
 	if not job.current() then job.settle(nil); return end
 	local prior = requests[id]
 	if prior then
 		prior.successor = job
-		if prior.operation then prior.operation:cancel(); retire(id, prior) end
+		if prior.operation and prior.cancel then pcall(prior.cancel, prior.operation); retire(id, prior) end
 		return
 	end
 	local record = { constructing = true }
@@ -222,10 +228,17 @@ acquire = function(id, job)
 	local normalized = Remote.normalize_base_url(job.target.base_url)
 	if not normalized then requests[id] = nil; job.settle(nil); return end
 	local delivered, response = false, nil
-	local function deliver(value)
+	local function deliver_owned(value)
 		if record.constructing or record.observing then delivered, response = true, value; return end
-		if requests[id] == record and job.current() and record.operation.started == true then job.settle(value)
+		if requests[id] == record and job.current() and requests[id] == record
+			and record.operation.started == true and requests[id] == record then job.settle(value)
 		else job.settle(nil) end
+	end
+	local function deliver(value)
+		active_http_callbacks = active_http_callbacks + 1
+		local ok = pcall(deliver_owned, value)
+		if not ok then pcall(Logger.error, LOG, "Local discovery HTTP callback raised an error.") end
+		active_http_callbacks = active_http_callbacks - 1
 	end
 	local function unavailable()
 		if job.current() then job.settle({ ok = false, status = 0, body = "", probe_error = true })
@@ -243,24 +256,38 @@ acquire = function(id, job)
 		unavailable()
 		return
 	end
-	record.operation = operation
-	if record.successor or not job.current() then operation:cancel() end
+	record.operation, record.observe, record.cancel, record.subscribe = operation, operation.is_settled,
+		operation.cancel, operation.on_settled
+	if record.successor or not job.current() then pcall(record.cancel, operation) end
 	-- Native refusal may synchronously invoke its response before returning a
 	-- dead-start operation. Register typed retirement before replaying any answer.
 	record.observing = true
-	local observing, accepted = pcall(operation.on_settled, operation, function()
-		if not record.observing then retire(id, record) end
+	local observing, accepted = pcall(record.subscribe, operation, function()
+		active_http_callbacks = active_http_callbacks + 1
+		local ok = pcall(function() if not record.observing then retire(id, record) end end)
+		if not ok then pcall(Logger.error, LOG, "Local discovery settlement callback raised an error.") end
+		active_http_callbacks = active_http_callbacks - 1
 	end)
 	record.observing = false
 	if not observing or accepted ~= true then
 		Logger.error(LOG, "Local discovery could not observe its exact HTTP settlement owner.")
-		operation:cancel()
+		pcall(record.cancel, operation)
 		unavailable()
 	elseif operation.started ~= true then
 		Logger.error(LOG, "Local discovery native HTTP dispatch was refused.")
 		unavailable()
 	elseif delivered then deliver(response) end
 	retire(id, record)
+end
+
+acquire = function(id, job)
+	active_acquisitions = active_acquisitions + 1
+	local ok = pcall(acquire_owned, id, job)
+	if not ok then
+		pcall(Logger.error, LOG, "Local discovery acquisition raised an error; ownership is retained.")
+		pcall(job.settle, nil)
+	end
+	active_acquisitions = active_acquisitions - 1
 end
 
 --- Defers native acquisition until after the owning loop pumps physical input.
@@ -312,11 +339,46 @@ local function sweep(admit, on_done)
 	return controller.sweep(targets, function(target, settle, ticket)
 		local captured = private_targets[target.id]
 		local function current()
-			return not closed and ticket.is_current() and admitted(admit)
-				and Entries.source_is_current(source) and same_target(captured, M.target(target.id)) and ticket.is_current()
+			local function active()
+				if closed then return false end
+				local ok, held = pcall(ticket.is_current)
+				return ok and held == true and not closed
+			end
+			if not active() or not admitted(admit) or not active() then return false end
+			local checked, source_current = pcall(Entries.source_is_current, source)
+			if not checked or source_current ~= true or not active() then return false end
+			local read, live_target = pcall(M.target, target.id)
+			if not read or not active() or not same_target(captured, live_target) then return false end
+			return active()
 		end
 		return queue_acquisition(target.id, { target = captured, settle = settle, current = current })
 	end, on_done)
+end
+
+--- A waiter remains owned through its callback stack, even after its scan retires.
+local function notify_waiters(waiters, changed)
+	active_waiters = active_waiters + 1
+	for _, waiter in ipairs(waiters) do
+		if waiter.on_done then
+			local called = pcall(waiter.on_done, changed)
+			if not called then pcall(Logger.error, LOG, "Local server rescan callback raised an error.") end
+		end
+	end
+	active_waiters = active_waiters - 1
+end
+
+--- Retires a scan only when its exact owned native children acknowledge closure.
+local function retire_scan(owner)
+	if type(owner.operation) == "table" and owner.operation.failed == true then owner.cancelled = true end
+	if owner.constructing or owner.uncertain or type(owner.operation) ~= "table" then return false end
+	local ok, settled = pcall(owner.is_settled, owner.operation)
+	if not ok or settled ~= true then return false end
+	scan_owners[owner] = nil
+	if owner.cancelled and scan_waiters == owner then
+		scan_waiters = nil
+		notify_waiters(owner, false)
+	end
+	return true
 end
 
 --- Starts an asynchronous catalogue sweep with source/admission fences, after
@@ -325,14 +387,24 @@ end
 --- @param admit function Current admission.
 --- @param on_done function|nil Receives changed when the sweep published.
 --- @return boolean started
-function M.rescan(admit, on_done)
-	if closed or type(admit) ~= "function" or not admitted(admit) then return false end
-	if not Entries.capture_source() then return false end
+local function rescan_owned(admit, on_done)
+	local generation = cancel_generation
+	local function current() return not closed and generation == cancel_generation end
+	if not current() or type(admit) ~= "function" or not admitted(admit) or not current() then return false end
+	for owner in pairs(scan_owners) do retire_scan(owner) end
+	if not current() or not admitted(admit) or not current() then return false end
+	if not Entries.capture_source() or not current() then return false end
 	if scan_waiters then
+		if scan_waiters.cancelled then return false end
 		scan_waiters[#scan_waiters + 1] = { admit = admit, on_done = on_done }
 		return true
 	end
-	local owner = { { admit = admit, on_done = on_done } }
+	if type(Ports.scan_owned) ~= "function" then
+		Logger.error(LOG, "Owned local server port scanning is unavailable.")
+		return false
+	end
+	local owner = { { admit = admit, on_done = on_done }, constructing = true }
+	scan_owners[owner] = true
 	scan_waiters = owner
 	local entries, undescribed = {}, {}
 	for _, id in ipairs(catalogue_order) do
@@ -344,33 +416,50 @@ function M.rescan(admit, on_done)
 				detail = "no discovery descriptor in local_servers.json" }
 		end
 	end
-	local ok = pcall(Ports.scan, entries, function(results)
+	local ok, operation = pcall(Ports.scan_owned, entries, function(results)
 		if scan_waiters ~= owner then return end
-		for id, result in pairs(undescribed) do results[id] = result end
-		port_scans = results
 		local waiters = owner
 		scan_waiters = nil
 		local function done(changed)
-			for _, waiter in ipairs(waiters) do
-				if waiter.on_done then
-					local called = pcall(waiter.on_done, changed)
-					if not called then Logger.error(LOG, "Local server rescan callback raised an error.") end
-				end
-			end
+			notify_waiters(waiters, changed)
 		end
+		if owner.cancelled then done(false); return end
+		for id, result in pairs(undescribed) do results[id] = result end
+		port_scans = results
 		-- The newest admission decides; an expired one publishes nothing
 		local last = waiters[#waiters]
 		if not last or sweep(last.admit, done) ~= true then
 			Logger.warn(LOG, "Local server sweep was not admitted after its port scan.")
 			done(false)
 		end
-	end)
-	if not ok then
-		if scan_waiters == owner then scan_waiters = nil end
+	end, function() return not owner.cancelled and current() end)
+	do
+		owner.constructing = false
+		if ok and type(operation) == "table" and type(operation.cancel) == "function"
+			and type(operation.is_settled) == "function" then
+			owner.operation, owner.cancel, owner.is_settled = operation, operation.cancel, operation.is_settled
+			if owner.cancelled then pcall(owner.cancel, operation) end
+		else
+			owner.uncertain = true
+		end
+		if type(operation) == "table" and operation.failed then owner.cancelled = true end
+		retire_scan(owner)
+	end
+	if not ok or owner.uncertain or operation.failed then
+		-- A throwing constructor may have retained native work.
+		if scan_waiters == owner then owner.cancelled = true end
 		Logger.error(LOG, "The local server port scan could not start.")
 		return false
 	end
-	return true
+	return not owner.cancelled and current()
+end
+
+function M.rescan(admit, on_done)
+	active_rescans = active_rescans + 1
+	local ok, accepted = pcall(rescan_owned, admit, on_done)
+	if not ok then pcall(Logger.error, LOG, "Local server rescan raised an error; ownership is retained.") end
+	active_rescans = active_rescans - 1
+	return ok and accepted == true
 end
 
 --- Lists every local server view with where it was looked for and what it
@@ -407,17 +496,45 @@ function M.views()
 end
 
 --- Logical fencing precedes physical cancellation; unresolved owners stay retained.
-function M.cancel()
+local function cancel_owned()
+	local settled, captured = true, {}
+	cancel_generation = cancel_generation + 1
+	if scan_waiters then scan_waiters.cancelled = true end
+	for owner in pairs(scan_owners) do
+		owner.cancelled = true
+		captured[#captured + 1] = owner
+	end
 	revoke_queued()
 	view_generation = view_generation + 1
 	controller.invalidate()
-	local settled = true
+	for _, owner in ipairs(captured) do
+		if scan_owners[owner] then
+			if owner.operation then pcall(owner.cancel, owner.operation) end
+			if not retire_scan(owner) then settled = false end
+		end
+	end
+	if scan_waiters then settled = false end
 	for id, record in pairs(requests) do
 		record.successor = nil
-		if record.operation then record.operation:cancel(); retire(id, record) end
+		if record.operation and record.cancel then pcall(record.cancel, record.operation); retire(id, record) end
 		if requests[id] ~= nil then settled = false end
 	end
+	-- A settlement callback may have admitted a successor after the snapshot.
+	if active_waiters ~= 0 or active_rescans ~= 0 or active_acquisitions ~= 0 or active_http_callbacks ~= 0
+		or scan_waiters or next(scan_owners) ~= nil
+		or next(requests) ~= nil or next(queued) ~= nil then
+		settled = false
+	end
 	return settled
+end
+
+function M.cancel()
+	if cancelling then return false end
+	cancelling = true
+	local ok, settled = pcall(cancel_owned)
+	if not ok then pcall(Logger.error, LOG, "Local server cancellation raised an error; ownership is retained.") end
+	cancelling = false
+	return ok and settled == true
 end
 function M.shutdown() closed = true; return M.cancel() end
 function M.order() refresh_views(); local copy = {}; for index,id in ipairs(order) do copy[index] = id end; return copy end

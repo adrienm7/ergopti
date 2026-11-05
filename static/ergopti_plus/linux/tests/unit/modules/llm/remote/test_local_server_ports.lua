@@ -283,3 +283,336 @@ for _, kind in ipairs({ "settings", "proc" }) do
 		end)
 	end
 end
+
+helpers.it("(local-port-owned) waits for the exact cancelled slice timer close", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, timer = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer
+	local close_ack, cancelled, callback_count = false, 0, 0
+	local pids = {}
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function() return nil end
+	scanner._owned_timer = function()
+		return { started = true, cancel = function() cancelled = cancelled + 1; return true end,
+			is_settled = function() return close_ack end }
+	end
+	local ok, err = pcall(function()
+		local scan = scanner.scan_owned({ { id = "test", descriptor = { process_names = { "test" }, command_lines = {} },
+			base_url = "http://127.0.0.1:8000" } }, function() callback_count = callback_count + 1 end)
+		helpers.assert_eq(scan:is_settled(), false)
+		helpers.assert_eq(scan:cancel(), false)
+		helpers.assert_eq(cancelled, 1)
+		helpers.assert_eq(callback_count, 0)
+		close_ack = true
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_timer = list, read_cmdline, timer
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) waits for the exact cancelled ss process receipt", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local close_ack, cancelled, callback_count = false, 0, 0
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function()
+		return { started = true, cancel = function() cancelled = cancelled + 1; return true end,
+			is_settled = function() return close_ack end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		descriptor.address_flags = {}
+		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() callback_count = callback_count + 1 end)
+		helpers.assert_eq(scan:cancel(), false)
+		helpers.assert_eq(cancelled, 1)
+		helpers.assert_eq(callback_count, 0)
+		close_ack = true
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a real slice timer acknowledges close before settlement", function()
+	local scanner, uv = require("modules.llm.local_server_ports"), require("luv")
+	local list, read_cmdline = scanner._list_proc, scanner._read_cmdline
+	local pids, deliveries = {}, 0
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function() return nil end
+	local ok, err = pcall(function()
+		local scan = scanner.scan_owned({ { id = "test", descriptor = { process_names = { "test" }, command_lines = {} },
+			base_url = "http://127.0.0.1:8000" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(scan:cancel(), false, "scheduled close is not a native close ACK")
+		for _ = 1, 100 do if scan:is_settled() then break end; uv.run("nowait") end
+		helpers.assert_eq(scan:is_settled(), true)
+		helpers.assert_eq(deliveries, 0)
+	end)
+	scanner._list_proc, scanner._read_cmdline = list, read_cmdline
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a real process acknowledges exit and closure before settlement", function()
+	local scanner, uv = require("modules.llm.local_server_ports"), require("luv")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local deliveries = 0
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function(_, _, options, callback)
+		return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
+	end
+	local ok, err = pcall(function()
+		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		descriptor.address_flags = {}
+		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(scan:cancel(), false)
+		for _ = 1, 2000 do
+			if scan:is_settled() then break end
+			uv.run("nowait")
+			uv.sleep(1)
+		end
+		helpers.assert_eq(scan:is_settled(), true)
+		helpers.assert_eq(deliveries, 0)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a throwing timer constructor keeps uncertain debt and publishes nothing", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, timer = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer
+	local pids, deliveries = {}, 0
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function() return nil end
+	scanner._owned_timer = function() error("synthetic constructor failure") end
+	local ok, err = pcall(function()
+		local scan = scanner.scan_owned({ { id = "test", descriptor = { process_names = { "test" }, command_lines = {} },
+			base_url = "http://127.0.0.1:8000" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(scan:cancel(), false)
+		helpers.assert_eq(scan:is_settled(), false)
+		helpers.assert_eq(deliveries, 0)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_timer = list, read_cmdline, timer
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a refused process waits for its native close before completing", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local closed, listener, process_callback, deliveries = false, nil, nil, 0
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function(_, _, _, callback)
+		process_callback = callback
+		return { started = false, error = "refused", cancel = function() return true end,
+			is_settled = function() return closed end, on_settled = function(_, fn) listener = fn; return true end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = read("modules/llm/local_servers.json").servers.omlx.discovery
+		descriptor.address_flags = {}
+		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(deliveries, 0)
+		helpers.assert_eq(scan:is_settled(), false)
+		closed = true
+		process_callback({ exit_code = -1, error = "refused" })
+		listener()
+		helpers.assert_eq(deliveries, 1, "physical completion and settlement notification are one result")
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a refused slice waits for its native close before fallback", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, timer, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer, scanner._owned_process
+	local pids, closed, listener, starts, deliveries = {}, false, nil, 0, 0
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function() return nil end
+	scanner._owned_timer = function()
+		return { started = false, cancel = function() return true end,
+			is_settled = function() return closed end, on_settled = function(_, fn) listener = fn; return true end }
+	end
+	scanner._owned_process = function()
+		starts = starts + 1
+		return { started = false, error = "refused", cancel = function() return true end,
+			is_settled = function() return true end }
+	end
+	local ok, err = pcall(function()
+		local raw = read("modules/llm/local_servers.json").servers.omlx.discovery
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx", raw))
+		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(starts, 0)
+		helpers.assert_eq(deliveries, 0)
+		helpers.assert_eq(scan:is_settled(), false)
+		closed = true
+		listener()
+		helpers.assert_eq(deliveries, 1)
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_timer, scanner._owned_process = list, read_cmdline, timer, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a physically settled child retains its active callback frame", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local callback, closed, during = nil, false, nil
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function(_, _, _, done)
+		callback = done
+		return { started = true, cancel = function() return true end, is_settled = function() return closed end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
+			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local scan
+		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() during = scan:cancel() end)
+		helpers.assert_type(callback, "function")
+		closed = true
+		callback({ exit_code = 0, stdout = "" })
+		helpers.assert_eq(during, false, "the business callback still owns its stack")
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) a missing observer retains only the known timer debt", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, timer = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer
+	local pids, closed, deliveries = {}, false, 0
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function() return nil end
+	scanner._owned_timer = function()
+		return { started = false, cancel = function() return true end, is_settled = function() return closed end }
+	end
+	local ok, err = pcall(function()
+		local scan = scanner.scan_owned({ { id = "test", descriptor = { process_names = { "test" }, command_lines = {} },
+			base_url = "http://127.0.0.1:8000" } }, function() deliveries = deliveries + 1 end)
+		helpers.assert_eq(scan.failed, true)
+		helpers.assert_eq(scan:is_settled(), false)
+		closed = true
+		helpers.assert_eq(scan:is_settled(), true)
+		helpers.assert_eq(deliveries, 0)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_timer = list, read_cmdline, timer
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) joins an overlapping slice close and ss process", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, timer, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer, scanner._owned_process
+	local pids, timer_done, process_done, fire, timer_cancel, process_cancel = {}, false, false, nil, 0, 0
+	for i = 1, 129 do pids[i] = tostring(i) end
+	scanner._list_proc = function() return pids end
+	scanner._read_cmdline = function(pid) if pid == 1 then return "/usr/bin/omlx-server\0" end end
+	scanner._owned_timer = function(_, callback)
+		fire = callback
+		return { started = true, cancel = function() timer_cancel = timer_cancel + 1; return true end,
+			is_settled = function() return timer_done end }
+	end
+	scanner._owned_process = function()
+		return { started = true, cancel = function() process_cancel = process_cancel + 1; return true end,
+			is_settled = function() return process_done end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
+			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		local scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() error("cancelled scan published") end)
+		helpers.assert_type(fire, "function")
+		fire()
+		helpers.assert_eq(scan:cancel(), false)
+		helpers.assert_eq(timer_cancel, 1)
+		helpers.assert_eq(process_cancel, 1)
+		timer_done = true
+		helpers.assert_eq(scan:is_settled(), false, "ss still owns its native process")
+		process_done = true
+		helpers.assert_eq(scan:is_settled(), true)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_timer, scanner._owned_process = list, read_cmdline, timer, process
+	assert(ok, err)
+end)
+
+helpers.it("review-scan-admit: an admission callback remains active after native settlement", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local callback, closed, during, armed, scan = nil, false, nil, false, nil
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function(_, _, _, done)
+		callback = done
+		return { started = true, cancel = function() return true end, is_settled = function() return closed end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
+			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() end,
+			function() if armed then during = scan:cancel() end; return true end)
+		closed, armed = true, true
+		callback({ exit_code = 0, stdout = "" })
+		helpers.assert_eq(during, false, "admission still executes within the native callback")
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+
+helpers.it("(local-port-owned) child cancellation cannot acknowledge its active cancel frame", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local closed, during, scan = false, nil, nil
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function()
+		return { started = true, cancel = function() closed = true; during = scan:is_settled(); return true end,
+			is_settled = function() return closed end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
+			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() end)
+		helpers.assert_eq(scan:cancel(), true)
+		helpers.assert_eq(during, false)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
+
+helpers.it("(local-port-owned) nested settlement observation cannot acknowledge itself", function()
+	local scanner = require("modules.llm.local_server_ports")
+	local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+	local armed, during, scan = false, nil, nil
+	scanner._list_proc = function() return { "1" } end
+	scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+	scanner._owned_process = function()
+		return { started = true, cancel = function() return true end, is_settled = function()
+			if armed then armed = false; during = scan:cancel() end
+			return true
+		end }
+	end
+	local ok, err = pcall(function()
+		local descriptor = assert(require("llm.local_server_ports").descriptor("omlx",
+			read("modules/llm/local_servers.json").servers.omlx.discovery))
+		scan = scanner.scan_owned({ { id = "omlx", descriptor = descriptor,
+			base_url = "http://127.0.0.1:8000/v1" } }, function() end)
+		armed = true
+		helpers.assert_eq(scan:cancel(), true)
+		helpers.assert_eq(during, false)
+	end)
+	scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+	assert(ok, err)
+end)
