@@ -286,3 +286,118 @@ Test("personal info source: actual UTF-16 BOM literal identity still saves and r
 for _PICAL_Mode in ["inline-control", "dotted-control", "multiline-literal-control", "bare-date-type"]
 	Test("personal info canonical grammar: " . _PICAL_Mode . " (personal-info-canonical-grammar)",
 		_PISYN_PublicRoundTrip.Bind(_PICAL_Mode))
+
+_PIENC_Bytes(Source, Utf16 := false, Bom := false) {
+	if Utf16 {
+		Count := StrLen(Source) * 2
+		Encoded := Buffer(Count + 2, 0)
+		StrPut(Source, Encoded, StrLen(Source) + 1, "UTF-16")
+		Result := Buffer(2 + Count, 0)
+		NumPut("UShort", 0xFEFF, Result)
+		DllCall("ntdll\RtlMoveMemory", "Ptr", Result.Ptr + 2, "Ptr", Encoded, "UPtr", Count)
+		return Result
+	}
+	Count := StrPut(Source, "UTF-8") - 1
+	Encoded := Buffer(Count + 1, 0)
+	StrPut(Source, Encoded, Count + 1, "UTF-8")
+	Offset := Bom ? 3 : 0
+	Result := Buffer(Offset + Count, 0)
+	if Bom {
+		NumPut("UChar", 0xEF, Result, 0)
+		NumPut("UChar", 0xBB, Result, 1)
+		NumPut("UChar", 0xBF, Result, 2)
+	}
+	DllCall("ntdll\RtlMoveMemory", "Ptr", Result.Ptr + Offset, "Ptr", Encoded, "UPtr", Count)
+	return Result
+}
+_PIENC_Case(Kind) {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	global ScriptInformation, _TomlUnreadableFiles, HSE_RuntimeDecisionGeneration
+	Saved := {hadInfo: IsSet(PersonalInformation), hadLetters: IsSet(PersonalInformationLetters),
+		cache: _ReadPersonalInfoTomlCache, generation: HSE_RuntimeDecisionGeneration,
+		hadPath: ScriptInformation.Has("PersonalInfoTomlPath"), path: ScriptInformation.Get("PersonalInfoTomlPath", "")}
+	Saved.info := Saved.hadInfo ? PersonalInformation : 0
+	Saved.letters := Saved.hadLetters ? PersonalInformationLetters : 0
+	Root := A_Temp . "\ergopti_personal_info_encoding_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\personal_info.toml", Created := false
+	try {
+		AssertFalse(A_IsSuspended)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		PersonalInformation := Map("first_name", "Placeholder", "last_name", "Before")
+		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
+		_ReadPersonalInfoTomlCache := false
+		ScriptInformation["PersonalInfoTomlPath"] := Path
+		Invalid := Kind == "invalid-utf8" || Kind == "odd-utf16"
+		First := Kind == "invalid-utf8" ? "A?B" : "Zoë😀"
+		Source := _PISW_Image(First, "Initial")
+		Utf16 := Kind == "utf16-control" || Kind == "odd-utf16"
+		Input := _PIENC_Bytes(Source, Utf16, Kind == "utf8-bom-control")
+		if Kind == "invalid-utf8" {
+			AssertEqual(StrLen(Source), Input.Size, "the injected marker subject is genuinely ASCII before corruption")
+			Marker := InStr(Source, "?", true)
+			AssertTrue(Marker > 0)
+			NumPut("UChar", 0xFF, Input, Marker - 1)
+		} else if Kind == "odd-utf16" {
+			Odd := Buffer(Input.Size + 1, 0)
+			DllCall("ntdll\RtlMoveMemory", "Ptr", Odd, "Ptr", Input, "UPtr", Input.Size)
+			NumPut("UChar", 0x41, Odd, Input.Size)
+			Input := Odd
+		}
+		FileHandle := FSOpenStrict(Path, "w", "UTF-8-RAW")
+		AssertTrue(IsObject(FileHandle))
+		try AssertEqual(Input.Size, FileHandle.RawWrite(Input, Input.Size), "the native fixture writes its complete nonempty byte image")
+		finally FileHandle.Close()
+		Before := FSReadBytesStrict(Path)
+		_PISW_Bytes(Input, Before, "the physical source must contain exactly the independently constructed bytes")
+		if Kind == "invalid-utf8" {
+			AssertEqual(0xFF, NumGet(Before, Marker - 1, "UChar"), "the real source contains a byte forbidden in UTF-8")
+			AssertFalse(FSReadUtf8Exact(Path) is String, "the genuine strict native decoder must independently reject this UTF-8 image")
+		} else if Utf16 {
+			AssertEqual(0xFEFF, NumGet(Before, 0, "UShort"))
+			AssertEqual(Kind == "odd-utf16" ? 1 : 0, Mod(Before.Size, 2))
+		}
+		if !Invalid {
+			NativeDecoded := FileRead(Path, "UTF-8")
+			if SubStr(NativeDecoded, 1, 1) == Chr(0xFEFF)
+				NativeDecoded := SubStr(NativeDecoded, 2)
+			AssertEqual(Source, NativeDecoded, "the positive control must be independently readable through native BOM detection")
+		}
+		ReadPersonalInfoToml(Path)
+		Opening := _PersonalInfoCaptureEditorSource(Path)
+		Result := PersonalInfoCommitValues(Path, Map("last_name", "Edited"), 0, 0, 0, 0, Opening)
+		After := FSReadBytesStrict(Path)
+		_TestPrint("# personal-info-encoding kind=" . Kind . " result=" . Result . " before-bytes=" . Before.Size
+			. " after-bytes=" . After.Size . " latched=" . _TomlUnreadableFiles.Has(Path))
+		if Invalid {
+			AssertFalse(Result, "an unreadable original encoding must refuse an unrelated field edit instead of normalizing away its bytes")
+			_PISW_Bytes(Before, After, "an unsupported source encoding must remain byte-for-byte unchanged")
+			AssertTrue(_TomlUnreadableFiles.Has(Path), "the public reader must fence its unrepresentable decoded model")
+		} else {
+			AssertTrue(Result, "valid native UTF-8/UTF-16 source protocols retain the true public persistence route")
+			Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			AssertEqual(First, Disk["info"]["first_name"])
+			AssertEqual("Edited", Disk["info"]["last_name"])
+			_ReadPersonalInfoTomlCache := false
+			ReadPersonalInfoToml(Path)
+			AssertEqual(First, PersonalInformation["first_name"])
+			AssertEqual("Edited", PersonalInformation["last_name"])
+		}
+	} finally {
+		PersonalInformation := Saved.hadInfo ? Saved.info : unset
+		PersonalInformationLetters := Saved.hadLetters ? Saved.letters : unset
+		_ReadPersonalInfoTomlCache := Saved.cache
+		HSE_RuntimeDecisionGeneration := Saved.generation
+		if Saved.hadPath
+			ScriptInformation["PersonalInfoTomlPath"] := Saved.path
+		else
+			ScriptInformation.Delete("PersonalInfoTomlPath")
+		if _TomlUnreadableFiles.Has(Path)
+			_TomlUnreadableFiles.Delete(Path)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _PIENC_Kind in ["invalid-utf8", "odd-utf16", "utf8-control", "utf8-bom-control", "utf16-control"]
+	Test("personal info encoding admission: " . _PIENC_Kind . " (personal-info-encoding)", _PIENC_Case.Bind(_PIENC_Kind))
