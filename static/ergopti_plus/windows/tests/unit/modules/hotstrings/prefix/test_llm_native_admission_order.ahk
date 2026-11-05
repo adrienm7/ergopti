@@ -1,6 +1,7 @@
 ﻿; tests/unit/modules/hotstrings/prefix/test_llm_native_admission_order.ahk
 
 _LNAO_ProduceLater(State) {
+	State.LaterCalls += 1
 	State.Started := true
 	try LLM_Bridge_FeedCharIfActive("b")
 	catch Any as Failure
@@ -10,6 +11,15 @@ _LNAO_ProduceLater(State) {
 ; Delay the real detector through its existing callable object. The genuine
 ; implementation is restored before both reads, so no verdict is fabricated.
 _LNAO_DelayedDetector(State, Callback, Self, Args*) {
+	; A serialized admission can deliver the one-shot after the first read but
+	; before _AAG_WithFn unwinds. Later reads still use the real detector and
+	; must not rearm the callback which is currently delivering that character.
+	if State.Intercepted {
+		Self.DeleteProp("Call")
+		try return Self.Call(Args*)
+		finally Self.DefineProp("Call", {Call: _LNAO_DelayedDetector.Bind(State, Callback)})
+	}
+	State.Intercepted := true
 	State.CriticalAtRead := !!A_IsCritical
 	Self.DeleteProp("Call")
 	try {
@@ -41,7 +51,7 @@ _LNAO_Sequence(Active, Fx, Lines, Sent, Scope, Schedule, Focus) {
 		_LLM_Bridge_ApplyBufferEdit()
 	else
 		LLM_Bridge_MirrorAgentEdit(0, "", true)
-	State := {Started: false, Done: false, Failure: 0, CriticalAtRead: false,
+	State := {Started: false, Done: false, Failure: 0, CriticalAtRead: false, Intercepted: false, LaterCalls: 0,
 		LaterBeforeRead: false, Secure: true}
 	Callback := _LNAO_ProduceLater.Bind(State)
 	PreviousCritical := Critical("Off")
@@ -62,8 +72,9 @@ _LNAO_Sequence(Active, Fx, Lines, Sent, Scope, Schedule, Focus) {
 	Buffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
 	_TestPrint("# LLM_NATIVE_ADMISSION_ORDER " . KL_JsonEncode(Map("active", Active,
 		"later_before_read", State.LaterBeforeRead, "critical_at_read", State.CriticalAtRead,
-		"actual_detector_secure", State.Secure, "later_done", State.Done,
+		"actual_detector_secure", State.Secure, "later_done", State.Done, "later_calls", State.LaterCalls,
 		"units", StrLen(Buffer), "ordered_ab", Buffer == "ab", "requests", Fx.Remote.Length)))
+	AssertEqual(1, State.LaterCalls, "the probe delivers exactly one later public character")
 	AssertFalse(State.Secure, "the actual isolated normal detector must establish the same allowed verdict")
 	AssertEqual("ab", Buffer, "native classification must not reorder or discard the earlier character in the same field")
 	AssertEqual(0, Fx.Remote.Length), AssertEqual(0, Fx.Ollama.Length)
