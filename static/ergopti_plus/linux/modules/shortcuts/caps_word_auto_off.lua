@@ -291,7 +291,7 @@ end
 --- @param value any Validated value.
 --- @param apply function Mutates a settings copy.
 --- @return boolean committed
-local function persist(path, value, apply)
+local function persist(path, value, apply, resolve_value)
 	-- The Shortcuts scope owns every [shortcuts] leaf while it publishes.
 	local manager = package.loaded["modules.shortcuts.manager"]
 	if type(manager) == "table" and type(manager.configuration_admitted) == "function"
@@ -299,8 +299,15 @@ local function persist(path, value, apply)
 		Logger.error(LOG, "CapsWord auto-off change refused: a shortcut configuration scope is still pending.")
 		return false
 	end
+	local staged
 	local called, committed, detail = pcall(function()
-		local _, source = read_settings()
+		local source
+		staged, source = read_settings()
+		if resolve_value then
+			local reason
+			value, reason = resolve_value(staged)
+			if value == nil then return false, reason end
+		end
 		return Writer.batch_write(Paths.config("config.toml"),
 			{ Manifest.sparse_operation(path, value) }, nil, source)
 	end)
@@ -308,9 +315,8 @@ local function persist(path, value, apply)
 		Logger.error(LOG, "CapsWord auto-off change was not persisted: %s.", tostring(called and detail or committed))
 		return false
 	end
-	local updated = M.settings()
-	apply(updated)
-	publish(updated)
+	apply(staged, value)
+	publish(staged)
 	Logger.info(LOG, "%s set to %s.", path, type(value) == "table" and table.concat(value, ", ") or tostring(value))
 	return true
 end
@@ -331,12 +337,9 @@ end
 --- @param checked boolean Wanted state.
 --- @return boolean committed
 function M.set_terminator(key, checked)
-	local list, reason = Policy.with_terminator(M.settings().terminators, key, checked)
-	if not list then
-		Logger.warn(LOG, "CapsWord delimiter change '%s' refused: %s.", tostring(key), tostring(reason))
-		return false
-	end
-	return persist(TERMINATORS_PATH, list, function(settings) settings.terminators = list end)
+	return persist(TERMINATORS_PATH, nil,
+		function(settings, list) settings.terminators = list end,
+		function(settings) return Policy.with_terminator(settings.terminators, key, checked) end)
 end
 
 --- Switches one pointer kind.
