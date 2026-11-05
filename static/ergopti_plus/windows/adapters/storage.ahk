@@ -49,6 +49,15 @@ global STORAGE_VALUE_PREFIX := "__ERGOPTI_STORAGE_V1__:"
 ; ====================================
 ; ====================================
 
+; The original native units are authoritative; C-string helpers stop at NUL.
+_ST_StringHasNativeNul(Text) {
+	Pointer := StrPtr(Text)
+	Loop StrLen(Text)
+		if NumGet(Pointer, (A_Index - 1) * 2, "UShort") == 0
+			return true
+	return false
+}
+
 ; Win32 value-name parameters terminate at NUL. Preserve complete native
 ; String metadata before any conversion, and retain legacy numeric names.
 ; The admitted name is returned once so no later coercion can change it.
@@ -60,10 +69,8 @@ _ST_TryNativeKeyName(Key, &Name) {
 		Candidate := String(Key)
 	else
 		return false
-	Pointer := StrPtr(Candidate)
-	Loop StrLen(Candidate)
-		if NumGet(Pointer, (A_Index - 1) * 2, "UShort") == 0
-			return false
+	if _ST_StringHasNativeNul(Candidate)
+		return false
 	Name := Candidate
 	return true
 }
@@ -88,8 +95,13 @@ _ST_SetWith(Key, Value, WriteFn) {
 
 _ST_EncodeValue(Value) {
 	global STORAGE_VALUE_PREFIX
-	if Value is String
-		return STORAGE_VALUE_PREFIX . "s:" . Value
+	if Value is String {
+		; Ordinary and historical strings retain their exact s: protocol. A
+		; NUL-bearing String needs a JSON scalar so REG_SZ cannot truncate it.
+		return _ST_StringHasNativeNul(Value)
+			? STORAGE_VALUE_PREFIX . "q:" . JsonStringLiteral(Value)
+			: STORAGE_VALUE_PREFIX . "s:" . Value
+	}
 	if Value is Integer
 		return STORAGE_VALUE_PREFIX . "i:" . String(Value)
 	if Value is Float
@@ -108,6 +120,11 @@ _ST_DecodeValue(Stored) {
 	Body := SubStr(Payload, 3)
 	switch Tag {
 		case "s:": return Body
+		case "q:":
+			Decoded := JsonParse(Body)
+			if !(Decoded is String)
+				throw ValueError("Storage quoted scalar envelope must contain a JSON String.")
+			return Decoded
 		case "i:": return Integer(Body)
 		case "f:": return Float(Body)
 		case "j:":

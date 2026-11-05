@@ -427,3 +427,78 @@ _STNT_ClearCountedName(CountedNul) {
 for _STNT_Counted in [true, false]
 	Test("storage counted native name inventory: nul=" . _STNT_Counted
 		. " (storage-native-counted-inventory)", _STNT_ClearCountedName.Bind(_STNT_Counted))
+
+_STQ_OriginalEnvelopeCompatibility() {
+	global STORAGE_VALUE_PREFIX
+	for Value in ["Ordinary", "001", "é😀", STORAGE_VALUE_PREFIX . 'q:"literal user text"'] {
+		AssertEqual(STORAGE_VALUE_PREFIX . "s:" . Value, _ST_EncodeValue(Value), "ordinary string bytes keep the original s: envelope")
+		AssertEqual(Value, _ST_DecodeValue(_ST_EncodeValue(Value)))
+	}
+	OldObject := _ST_DecodeValue(STORAGE_VALUE_PREFIX . 'j:{"value":"old object","items":[1,2]}')
+	AssertTrue(OldObject is Map)
+	AssertEqual("old object", OldObject["value"])
+	AssertTrue(OldObject["items"] is Array)
+	AssertEqual(2, OldObject["items"][2])
+	AssertEqual("42", _ST_DecodeValue("42"), "untagged legacy strings retain their original interpretation")
+}
+Test("storage quoted scalar: original s/j and untagged envelopes stay compatible (storage-quoted-scalar-protocol)", _STQ_OriginalEnvelopeCompatibility)
+
+_STQ_QuotedScalarContract() {
+	global STORAGE_VALUE_PREFIX
+	Value := JsonParse('{"value":"A\u0000B"}')["value"]
+	AssertEqual(3, StrLen(Value))
+	Encoded := _ST_EncodeValue(Value)
+	AssertEqual(STORAGE_VALUE_PREFIX . 'q:"A\u0000B"', Encoded, "only a NUL-bearing scalar selects the new JSON-string envelope")
+	Decoded := _ST_DecodeValue(Encoded)
+	AssertTrue(Decoded is String)
+	AssertEqual(3, StrLen(Decoded))
+	AssertEqual(0, NumGet(StrPtr(Decoded), 2, "UShort"))
+	AssertEqual(66, NumGet(StrPtr(Decoded), 4, "UShort"))
+	for Raw in ['q:"unterminated', 'q:"prefix" true', 'q:{"value":"not a scalar string"}', 'q:["not a scalar string"]', 'j:"still not an object"'] {
+		Threw := false
+		try _ST_DecodeValue(STORAGE_VALUE_PREFIX . Raw)
+		catch
+			Threw := true
+		AssertTrue(Threw, "malformed or wrongly typed envelopes retain out-of-band decoder refusal")
+	}
+}
+Test("storage quoted scalar: complete String and strict decoder type (storage-quoted-scalar-protocol)", _STQ_QuotedScalarContract)
+
+_STQ_PublicInvalidEnvelope(Kind) {
+	global STORAGE_REG_BASE, STORAGE_VALUE_PREFIX
+	SavedBase := STORAGE_REG_BASE
+	Subkey := "Software\Ergopti_StorageQuotedAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := "HKCU\" . Subkey, Handle := 0, Owned := false
+	Stored := STORAGE_VALUE_PREFIX . (Kind == "syntax" ? 'q:"unterminated' : 'q:{"not":"a String"}')
+	try {
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 0xF003F,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		Owned := Status == 0 && Disposition == 1
+		AssertTrue(Owned)
+		AssertTrue(Handle != 0)
+		STORAGE_REG_BASE := Path
+		AssertTrue(Reg_WriteString(Path, "payload", Stored))
+		AssertTrue(Reg_TryRead(Path, "payload", &Before))
+		AssertEqual(Stored, Before)
+		Actual := ST_Get("payload", "quoted scalar safe fallback")
+		AssertTrue(Reg_TryRead(Path, "payload", &After))
+		_TestPrint("# storage-quoted-scalar-invalid kind=" . Kind . " disposition=" . Disposition
+			. " returned_fallback=" . (Actual == "quoted scalar safe fallback") . " raw_unchanged=" . (Before == After))
+		AssertEqual("quoted scalar safe fallback", Actual, "the public reader must refuse invalid q: syntax/types with its caller's default")
+		AssertEqual(Before, After, "a refused envelope read never rewrites the authoritative stored bytes")
+	} finally {
+		STORAGE_REG_BASE := SavedBase
+		try {
+			if Owned
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647, "Str", Subkey, "UInt"))
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+		}
+	}
+}
+for _STQ_Kind in ["syntax", "type"]
+	Test("storage quoted scalar public refusal: " . _STQ_Kind
+		. " (storage-quoted-scalar-invalid)", _STQ_PublicInvalidEnvelope.Bind(_STQ_Kind))
