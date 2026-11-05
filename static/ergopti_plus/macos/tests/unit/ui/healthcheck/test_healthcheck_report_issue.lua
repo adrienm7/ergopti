@@ -481,6 +481,71 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(#calls.open_url, 0, "the form never opens without its report")
 	end)
 
+	helpers.it("repeated report saves use the exclusive file owner without replacing the first", function()
+		local previous_fs = package.loaded["adapters.file_system"]
+		local previous_attributes = hs.fs.attributes
+		local files = {}
+		package.loaded["adapters.file_system"] = { create_if_absent = function(path, text)
+			if files[path] ~= nil then return false, "exists" end
+			files[path] = text
+			return true, "created"
+		end }
+		hs.fs.attributes = function() return "directory" end
+		local ok, first, second, first_bytes = pcall(function()
+			local Report, _, overrides = load_report()
+			hs.fs.attributes = function() return "directory" end
+			overrides.save = nil
+			local config, snapshot = documents(), host_snapshot(false)
+			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local action = { action = "save", text = document.text, name = document.name }
+			local context = Report.redaction_context(overrides)
+			local one = completed_action(Report, action, paths(), config, context, overrides, snapshot)
+			if not one.path then return one, nil, nil end
+			files[one.path] = files[one.path] .. "\nuser annotation\n"
+			local two = completed_action(Report, action, paths(), config, context, overrides, snapshot)
+			return one, two, files[one.path]
+		end)
+		package.loaded["adapters.file_system"] = previous_fs
+		hs.fs.attributes = previous_attributes
+		helpers.assert_true(ok)
+		helpers.assert_eq(first.ok, true, tostring(first.error))
+		helpers.assert_eq(second.ok, true)
+		helpers.assert_true(first.path ~= second.path)
+		helpers.assert_true(first_bytes:find("user annotation", 1, true) ~= nil)
+	end)
+
+	for _, kind in ipairs({ "directory", "link" }) do
+		helpers.it("skips a report name already occupied by a " .. kind, function()
+			local Report, _, overrides = load_report()
+			overrides.save = nil
+			local previous_fs, previous_attributes, previous_link = package.loaded["adapters.file_system"],
+				hs.fs.attributes, hs.fs.symlinkAttributes
+			local attempted = {}
+			hs.fs.attributes = function() return "directory" end
+			hs.fs.symlinkAttributes = function(path)
+				if path == LOGS .. "/diagnostics/" .. NAME then return { mode = kind } end
+				return nil
+			end
+			package.loaded["adapters.file_system"] = { create_if_absent = function(path)
+				attempted[#attempted + 1] = path
+				if path == LOGS .. "/diagnostics/" .. NAME then return false, "error" end
+				return true, "created"
+			end }
+			local ok, result = pcall(function()
+				local config, snapshot = documents(), host_snapshot(false)
+				local doc = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+				return completed_action(Report, { action = "save", text = doc.text, name = doc.name }, paths(),
+					config, Report.redaction_context(overrides), overrides, snapshot)
+			end)
+			package.loaded["adapters.file_system"] = previous_fs
+			hs.fs.attributes, hs.fs.symlinkAttributes = previous_attributes, previous_link
+			helpers.assert_true(ok)
+			helpers.assert_eq(result.ok, true)
+			helpers.assert_eq(#attempted, 1)
+			helpers.assert_true(attempted[1] ~= LOGS .. "/diagnostics/" .. NAME)
+		end)
+	end
+
 	helpers.it("save writes the redacted report under the diagnostics folder and reveals it", function()
 		local result, calls = perform({ action = "save", text = REPORT, name = NAME })
 		helpers.assert_eq(result.ok, true)
@@ -674,44 +739,30 @@ helpers.describe("English attachment export boundaries", function()
 end)
 
 helpers.describe("default attachment completion", function()
-	helpers.it("requires write and close acknowledgement before reveal or browser", function()
-		for _, refusal in ipairs({ "none", "write", "close", "both" }) do
-			local config = documents()
-			local snapshot = host_snapshot(false)
+	helpers.it("requires exclusive publication acknowledgement before reveal or browser", function()
+		for _, admitted in ipairs({ true, false }) do
+			local config, snapshot = documents(), host_snapshot(false)
 			local doc = Share.document(snapshot, config.schema, "ignored")
 			local Report, calls, overrides = load_report()
-			overrides.save = nil -- Exercise the actual production default, not an effect replacement.
-			local original_open = io.open
-			local original_attributes = hs.fs.attributes
-			local writes, closes = 0, 0
+			overrides.save = nil
+			local previous_fs, previous_attributes = package.loaded["adapters.file_system"], hs.fs.attributes
+			local writes = 0
 			hs.fs.attributes = function() return "directory" end
-			io.open = function(_, mode)
-				assert(mode == "wb", "only the attachment write is admitted")
-				return {
-					write = function(_, text)
-						writes = writes + 1
-						assert(text == doc.text, "the complete approved text reaches the real save owner")
-						if refusal == "write" or refusal == "both" then return nil, "write-refused" end
-						return true
-					end,
-					close = function()
-						closes = closes + 1
-						if refusal == "close" or refusal == "both" then return nil, "close-refused" end
-						return true
-					end,
-				}
-			end
+			package.loaded["adapters.file_system"] = { create_if_absent = function(_, text)
+				writes = writes + 1
+				assert(text == doc.text, "the complete approved text reaches the exclusive owner")
+				return admitted, admitted and "created" or "error", "refused"
+			end }
 			local ok, err = xpcall(function()
 				local result = completed_action(Report, { action = "report", text = doc.text, fields = {} },
 					paths(), config, Report.redaction_context(overrides), overrides, snapshot)
-				helpers.assert_eq(result.ok, refusal == "none")
+				helpers.assert_eq(result.ok, admitted)
 				helpers.assert_eq(writes, 1)
-				helpers.assert_eq(closes, 1, "a failed write still closes its exact file")
-				helpers.assert_eq(#calls.reveal, refusal == "none" and 1 or 0)
-				helpers.assert_eq(#calls.open_url, refusal == "none" and 1 or 0)
+				helpers.assert_eq(#calls.reveal, admitted and 1 or 0)
+				helpers.assert_eq(#calls.open_url, admitted and 1 or 0)
 			end, debug.traceback)
-			io.open = original_open
-			hs.fs.attributes = original_attributes
+			package.loaded["adapters.file_system"] = previous_fs
+			hs.fs.attributes = previous_attributes
 			if not ok then error(err, 0) end
 		end
 	end)
