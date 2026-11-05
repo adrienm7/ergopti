@@ -16,6 +16,9 @@ local Input = require("infra.input_event")
 --- @return table session
 function M.new(options)
 	options = options or {}
+	local doubled = { "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout", "modules.hotstrings.injector", "modules.gestures.combo_emitter" }
+	local saved_modules = {}
+	for _, name in ipairs(doubled) do saved_modules[name] = package.loaded[name] end
 	local queues, sources, handles, paths, next_fd = {}, {}, {}, {}, 10
 	for _, id in ipairs({ "a", "b", "c" }) do
 		local path = os.tmpname()
@@ -111,6 +114,7 @@ function M.new(options)
 		Reader._reset_backend(); Writer.close_owned(session.cap)
 		for _, path in pairs(paths) do os.remove(path) end
 		package.loaded["modules.hotstrings.device_finder"] = saved_finder
+		for _, name in ipairs(doubled) do package.loaded[name] = saved_modules[name] end
 	end
 	return session
 end
