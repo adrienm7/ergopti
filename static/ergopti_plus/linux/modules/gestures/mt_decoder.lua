@@ -340,10 +340,13 @@ function M.new(opts)
 		if _touching or _started_at then _last_frame_at = now end
 
 		if _touching then
+			-- Contact duration begins with the touch, even when its position is
+			-- reported in a later frame. Waiting for coordinates can turn a long
+			-- stationary hold into a short tap.
+			if not _started_at then _started_at = now end
 			if cx and cy then
 				if not _origin_x then
 					_origin_x, _origin_y = cx, cy
-					_started_at = now
 				end
 				_last_x, _last_y = cx, cy
 
