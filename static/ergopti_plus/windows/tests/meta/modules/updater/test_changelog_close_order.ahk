@@ -27,7 +27,7 @@ _CLCO_CheckOrder(FnName) {
 	Body := _DriverFuncBody(FnName)
 	Assert(Body != "", FnName . " must exist in ui/changelog/init.ahk")
 
-	ResetPos := InStr(Body, "_CLW_Reset()")
+	ResetPos := InStr(Body, "_CLW_Reset(")
 	Assert(ResetPos > 0, FnName . " must call _CLW_Reset() to close the WebView2 controller")
 
 	DestroyPos := InStr(Body, ".Destroy()")
