@@ -627,7 +627,7 @@ _LDP_Join(State, Role) {
     AssertTrue(_LLM_CurlReleaseProcess(Owner))
 }
 _LDP_Cleanup(State) {
-    global _LLM_Engine, _LLM_Bridge_Active, _LLM_Remote_Async
+    global _LLM_Engine, _LLM_Bridge_Active, _LLM_Remote_Async, SFD_FIELD_CACHE
     Errors := []
     State.InputActive := false
     try {
@@ -667,6 +667,17 @@ _LDP_Cleanup(State) {
             AssertFalse(_LLM_Remote_Async.Get(Id, 0) == Entry)
         }
         AssertFalse(State.Engine["timer_active"])
+    } catch Any as Err
+        Errors.Push(Err)
+    try {
+        if State.SfdOwned {
+            AssertTrue(SFD_FIELD_CACHE == State.SfdCache, "only the exact private detector cache can be retired")
+            AssertTrue(SFD_Stop(), "the private detector must acknowledge native hook retirement")
+            AssertTrue(SFD_FIELD_CACHE == State.SfdCache)
+            AssertEqual(0, SFD_FIELD_CACHE.Get("pending_hwnd", 0), "native Edit classification must not strand a UIA probe")
+            SFD_FIELD_CACHE := State.SfdPrevious
+            State.SfdOwned := false
+        }
     } catch Any as Err
         Errors.Push(Err)
     for Role in ["peer", "app"] {
@@ -710,6 +721,12 @@ _LDP_Native(Mode, Calls, Lines) {
     global _LLM_Agent_Generation, _LLM_Agent_Auto, _PrefixInputHook, HSE_Buffer, _PrefixBuffer
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LDP_Debt, _LLM_Live
     global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+    global SFD_FIELD_CACHE
+    Retyped := Mode == "excluded-switches-typed" || Mode == "password-switches-typed"
+    PasswordProbe := Mode == "password-stays" || Mode == "password-switches" || Mode == "plain-stays" || Mode == "password-switches-typed"
+    SecretOrigin := PasswordProbe && Mode != "plain-stays"
+    AllowedOrigin := Mode == "allowed-stays" || Mode == "plain-stays"
+    Switches := Mode == "excluded-switches" || Mode == "password-switches" || Retyped
     AssertFalse(A_IsCritical)
     AssertFalse(A_IsSuspended)
     AssertEqual(0, _LLM_Remote_Async.Count)
@@ -728,9 +745,20 @@ _LDP_Native(Mode, Calls, Lines) {
     State := {Directory: "", DirectoryOwned: false, Peer: 0, PeerStop: "", App: 0, AppStop: "",
         GuiA: 0, Hook: 0, InputActive: false, InputChars: "", InputCallbacks: 0, InputDowns: 0,
         TypedHwnd: 0, TypedControl: 0, Failure: 0, Id: 0, Entry: 0, Engine: _LLM_Engine,
-        Endpoint: "", OwnEntries: Map()}
+        Endpoint: "", OwnEntries: Map(), SfdOwned: false, SfdPrevious: 0, SfdCache: 0, SecureSource: -1, SecureFocus: -1}
     Primary := 0
     try {
+        if PasswordProbe {
+            AssertFalse(SFD_FIELD_CACHE.Get("focus_tracking_active", false), "do not borrow a live native secure-field observer")
+            AssertEqual(0, SFD_FIELD_CACHE.Get("focus_hook", 0))
+            AssertEqual(0, SFD_FIELD_CACHE.Get("focus_callback", 0))
+            AssertEqual(0, SFD_FIELD_CACHE.Get("pending_hwnd", 0), "do not borrow a pending UIA classification")
+            State.SfdPrevious := SFD_FIELD_CACHE
+            State.SfdCache := SFD_FIELD_CACHE.Clone()
+            SFD_FIELD_CACHE := State.SfdCache
+            State.SfdOwned := true
+            SFD_Refresh()
+        }
         State.Directory := A_Temp . "\ergopti_llm_source_" . A_TickCount . "_" . Random(1, 1000000)
         Ack := FSCreateDirectoryExclusiveStrict(State.Directory)
         AssertTrue(Ack is Integer && Ack == 1)
@@ -771,7 +799,7 @@ _LDP_Native(Mode, Calls, Lines) {
         Port := Integer(SubStr(PortRecord, 1, -1))
         AssertTrue(Port > 0 && Port <= 65535)
         State.GuiA := Gui(, "Owned excluded source " . Nonce)
-        EditA := State.GuiA.AddEdit("w360 h100")
+        EditA := State.GuiA.AddEdit("w360 h100" . (SecretOrigin ? " Password" : ""))
         State.GuiA.Show("w400 h150")
         AHwnd := State.GuiA.Hwnd, AControl := EditA.Hwnd
         AApp := WinGetProcessName("ahk_id " . AHwnd), BApp := WinGetProcessName("ahk_id " . BHwnd)
@@ -789,17 +817,25 @@ _LDP_Native(Mode, Calls, Lines) {
         _LLM_Agent_Auto := Map("timer", 0, "offer", "", "triaged", Map(), "order", [])
         _LLM_Engine_RemoteTransport := 0
         LLM_Engine_Init(Map("backend", "api", "api_entries", [Entry], "api_entry_id", "source-owned",
-            "profile_id", "basic", "n_predictions", 1, "disabled_apps", [AApp],
+            "profile_id", "basic", "n_predictions", 1, "disabled_apps", PasswordProbe ? [] : [AApp],
+            "disable_password_fields", true,
             "debounce_ms", 1000, "instant_on_word_end", false, "show_info_bar", false))
-        State.TypedHwnd := Mode == "allowed-stays" ? BHwnd : AHwnd
-        State.TypedControl := Mode == "allowed-stays" ? BControl : AControl
+        State.TypedHwnd := AllowedOrigin ? BHwnd : AHwnd
+        State.TypedControl := AllowedOrigin ? BControl : AControl
         WinActivate("ahk_id " . State.TypedHwnd)
         AssertTrue(WinWaitActive("ahk_id " . State.TypedHwnd, , 2))
         ControlFocus(State.TypedControl)
         AssertEqual(State.TypedControl, WIGetFocusedControlToken())
-        AssertEqual(Mode != "allowed-stays", _LLM_Engine_ShouldSuppressForDisabledApps(),
+        AssertEqual(!PasswordProbe && Mode != "allowed-stays", _LLM_Engine_ShouldSuppressForDisabledApps(),
             "native app identity establishes the real excluded/allowed precondition")
-        Canary := Mode == "allowed-stays" ? "allowed_context_b_canary" : "private_context_a_canary"
+        if PasswordProbe {
+            AssertTrue(_LLM_Engine["disable_password_fields"], "the real typed engine option must enable password protection")
+            AssertEqual(SecretOrigin, !!(WinGetStyle("ahk_id " . State.TypedControl) & 0x20), "the actual source Edit must carry the intended native ES_PASSWORD style")
+            AssertEqual(State.TypedControl, SFD_FocusedHwnd(), "the real detector must identify the exact native source control")
+            State.SecureSource := SFD_IsSecureField()
+            AssertEqual(SecretOrigin, State.SecureSource, "the genuine native detector must independently classify the source before typing")
+        }
+        Canary := AllowedOrigin ? "allowed_context_b_canary" : "private_context_a_canary"
         State.Hook := InputHook("V L0 I1")
         State.Hook.KeyOpt("{All}", "+N")
         State.Hook.OnChar := _LDP_Char.Bind(State)
@@ -830,13 +866,42 @@ _LDP_Native(Mode, Calls, Lines) {
             InputCount := State.InputCallbacks, DownCount := State.InputDowns
             BeforeCounter := _LLM_Remote_AsyncCounter
         } finally Critical(SnapshotCritical)
-        if Mode == "excluded-switches" {
+        if Switches {
             ; No Send/keys/click: this is an application's ordinary activation.
             AssertTrue(DllCall("User32\SetForegroundWindow", "Ptr", BHwnd, "Int"),
                 "the current foreground owner transfers activation through the real native API")
             AssertTrue(WinWaitActive("ahk_id " . BHwnd, , 2))
             AssertEqual(BControl, WIGetFocusedControlToken())
             AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(), "the live B app is genuinely allowed")
+        }
+        if PasswordProbe {
+            AssertEqual(Switches ? BControl : State.TypedControl, SFD_FocusedHwnd())
+            State.SecureFocus := SFD_IsSecureField()
+            AssertEqual(SecretOrigin && !Switches, State.SecureFocus, "the real current-field detector must distinguish source password A from the current plain B")
+        }
+        OriginHwnd := State.TypedHwnd, OriginControl := State.TypedControl
+        if Retyped {
+            ; Genuine new input rearms from B. The new context may be sent, but
+            ; none of the excluded/password A canary may survive that rearm.
+            State.TypedHwnd := BHwnd, State.TypedControl := BControl
+            AllowedCanary := "allowed_context_b_canary"
+            PriorCallbacks := State.InputCallbacks
+            PreviousSendLevel := A_SendLevel
+            try {
+                SendLevel(2)
+                SendEvent("{Text}" . AllowedCanary)
+            } finally SendLevel(PreviousSendLevel)
+            Started := A_TickCount
+            while (State.InputChars != Canary . AllowedCanary || !_LLM_Engine["timer_active"]) && TickElapsed64(Started) < 2000
+                Sleep(5)
+            if IsObject(State.Failure)
+                throw State.Failure
+            AssertEqual(Canary . AllowedCanary, State.InputChars, "both actual I1 input bursts must be observed in order")
+            AssertEqual(AllowedCanary, ControlGetText(BControl), "the fresh allowed context is genuinely present in native B")
+            AssertEqual(PriorCallbacks + StrLen(AllowedCanary), State.InputCallbacks)
+            AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending))
+            AssertTrue(_LLM_Engine_Plan().Pending["token"] != ArmToken, "fresh B input supersedes the original A arm through the real engine")
+            InputCount := State.InputCallbacks, DownCount := State.InputDowns
         }
         PendingAfterSwitch := IsObject(_LLM_Engine_Plan().Pending)
         Started := A_TickCount
@@ -854,8 +919,8 @@ _LDP_Native(Mode, Calls, Lines) {
         }
         if IsObject(State.Failure)
             throw State.Failure
-        AssertEqual(InputCount, State.InputCallbacks, "activation introduces no new characters to replace the source buffer")
-        AssertEqual(DownCount, State.InputDowns, "native activation introduces no new keydown that could cancel the old timer")
+        AssertEqual(InputCount, State.InputCallbacks, "settlement introduces no characters beyond the explicitly admitted native bursts")
+        AssertEqual(DownCount, State.InputDowns, "settlement introduces no additional keydown beyond the admitted native bursts")
         State.InputActive := false
         State.Hook.Stop()
         AssertFalse(State.Hook.InProgress)
@@ -878,14 +943,16 @@ _LDP_Native(Mode, Calls, Lines) {
         _TestPrint("# LLM_DEBOUNCE_SOURCE " . KL_JsonEncode(Map("mode", Mode, "arm_token", ArmToken,
             "pending_after_switch", PendingAfterSwitch, "native_chars", State.InputCallbacks, "native_keydowns", State.InputDowns,
             "source_app", SourceApp, "focus_app", FocusApp, "a_app", AApp, "b_app", BApp,
+            "source_secure", State.SecureSource, "focus_secure", State.SecureFocus,
+            "origin_hwnd", OriginHwnd, "origin_control", OriginControl, "fresh_b_input", Retyped,
             "typed_hwnd", State.TypedHwnd, "typed_control", State.TypedControl,
             "captured_source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
             "captured_source_control", Source is Map ? Source.Get("control", 0) : 0,
             "focus_hwnd", WIGetForegroundHwnd(),
             "native_request_delta", NativeDelta, "http_posts", Posts, "source_a_received", SourceA,
             "source_b_received", SourceB, "remaining_requests", _LLM_Remote_Async.Count)))
-        ExpectedPosts := Mode == "allowed-stays" ? 1 : 0
-        AssertEqual(ExpectedPosts, Posts, "the excluded source's captured context must never reach HTTP after another app gains focus")
+        ExpectedPosts := (AllowedOrigin || Retyped) ? 1 : 0
+        AssertEqual(ExpectedPosts, Posts, "only the genuinely allowed context may produce one HTTP request")
         if ExpectedPosts
             AssertEqual(1, NativeDelta, "the live control creates its genuine remote reservation once")
         if Posts {
@@ -936,3 +1003,11 @@ _LDP_Run(Mode) {
 for _LDP_Mode in ["excluded-stays", "allowed-stays", "excluded-switches"]
     Test("Debounce source privacy: " . _LDP_Mode . " retains native typed provenance (llm-debounce-source-privacy)",
         _LDP_Run.Bind(_LDP_Mode))
+
+for _LDP_PasswordMode in ["password-stays", "plain-stays", "password-switches"]
+    Test("Debounce password source privacy: " . _LDP_PasswordMode . " retains actual secure-field provenance (llm-debounce-password-source-privacy)",
+        _LDP_Run.Bind(_LDP_PasswordMode))
+
+for _LDP_RetypedMode in ["excluded-switches-typed", "password-switches-typed"]
+    Test("Debounce private rolling context: " . _LDP_RetypedMode . " never taints fresh allowed native input (llm-debounce-private-retyped-context)",
+        _LDP_Run.Bind(_LDP_RetypedMode))
