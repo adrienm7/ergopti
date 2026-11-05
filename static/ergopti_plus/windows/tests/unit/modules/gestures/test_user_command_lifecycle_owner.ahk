@@ -11,7 +11,8 @@ _UCLC_Source() {
 	AssertEqual(Footer, SubStr(Source, -StrLen(Footer)))
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
 	Seen := Map()
-	for Symbol in ["UserActions_RunCommand", "JsonParse", "SendKeysVocabulary", "TimerSetCallback"] {
+	for Symbol in ["UserActions_RunCommand", "JsonParse", "SendKeysVocabulary", "TimerSetCallback",
+		"PLC_CreateProcessWithInheritedHandles"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The real command composition needs its production owner: " . Symbol)
 		if !Seen.Has(Owner) {
