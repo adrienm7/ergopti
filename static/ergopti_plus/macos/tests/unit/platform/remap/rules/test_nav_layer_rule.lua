@@ -372,6 +372,37 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		end)
 	end)
 
+	helpers.it("refuses a shipped preset read or close failure and closes the stream", function()
+		with_folder(function(dir)
+			for _, failure in ipairs({ "read_throw", "read_nil", "close_nil" }) do
+				local original_open, closes = io.open, 0
+				io.open = function(path, mode)
+					local file, err = original_open(path, mode)
+					if not file or not path:match("layer_actions%.toml$") then return file, err end
+					return {
+						read = function(_, ...)
+							if failure == "read_throw" then error("read refused") end
+							if failure == "read_nil" then return nil, "read refused" end
+							return file:read(...)
+						end,
+						close = function()
+							closes = closes + 1
+							file:close()
+							if failure == "close_nil" then return nil, "close refused" end
+							return true
+						end,
+					}
+				end
+				local called, imported = pcall(NavLayer.import_recommended, { shared_root = helpers.shared(), config_dir = dir })
+				io.open = original_open
+				helpers.assert_true(called)
+				helpers.assert_nil(imported, failure .. " must prevent publishing the preset")
+				helpers.assert_eq(closes, 1)
+				helpers.assert_nil(content(dir .. "/layers.toml"))
+			end
+		end)
+	end)
+
 	helpers.it("(nav-layer-fresh-install-default) an existing layers.toml is never replaced", function()
 		for label, own in pairs({ edited = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n',
 			empty = "" }) do

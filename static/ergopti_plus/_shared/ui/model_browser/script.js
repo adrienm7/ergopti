@@ -85,6 +85,7 @@ var NUMERIC_SORT = { disk_gb: true, ram_gb: true, params_b: true };
 var postBridgeMessage = makeHostBridge('model_browser_bridge');
 var _session = null;
 var _catalogueOwner = {};
+var _modelDrafts = new Map();
 
 /** Posts an action with the optional native operation identity. */
 function postModelAction(action) {
@@ -105,6 +106,7 @@ function injectModels(payload) {
 		}
 		session = payload.session;
 	}
+	if (session === null || _session !== session) _modelDrafts = new Map();
 	_session = session;
 	_catalogueOwner = {};
 	_models = payload.models;
@@ -537,6 +539,16 @@ function hasTools(b) {
 
 /** Applies the filters and the active sort, then rebuilds every group. */
 function render() {
+	var active = document.activeElement;
+	var editing =
+		active && active._modelDraftOwner === _catalogueOwner
+			? {
+					backend: active._modelDraftBackend,
+					start: active.selectionStart,
+					end: active.selectionEnd,
+					direction: active.selectionDirection
+				}
+			: null;
 	var table = document.getElementById('models');
 	var empty = document.getElementById('empty');
 	if (!table) return;
@@ -578,6 +590,18 @@ function render() {
 		table.appendChild(tbody);
 	});
 
+	if (editing && typeof table.querySelectorAll === 'function') {
+		table.querySelectorAll('input.add-input').forEach(function (input) {
+			if (input._modelDraftBackend !== editing.backend) return;
+			input.focus();
+			if (
+				typeof input.setSelectionRange === 'function' &&
+				editing.start !== null &&
+				editing.end !== null
+			)
+				input.setSelectionRange(editing.start, editing.end, editing.direction);
+		});
+	}
 	if (empty) empty.style.display = rows.length === 0 ? 'block' : 'none';
 	updateCount(rows.length, _models.length);
 	updateCurrent();
@@ -907,6 +931,12 @@ function buildGroupHead(b, rows, expanded, narrowed) {
 		var input = document.createElement('input');
 		input.type = 'text';
 		input.className = 'add-input';
+		input._modelDraftOwner = catalogueOwner;
+		input._modelDraftBackend = b.id;
+		input.value = _modelDrafts.get(b.id) || '';
+		input.addEventListener('input', function () {
+			if (_catalogueOwner === catalogueOwner) _modelDrafts.set(b.id, input.value);
+		});
 		input.setAttribute('spellcheck', 'false');
 		input.setAttribute('autocomplete', 'off');
 		var hint = _t(texts.placeholder);

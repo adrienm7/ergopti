@@ -78,6 +78,17 @@ end
 -- =================================================================
 
 helpers.describe("prefix expansions: what is built", function()
+	helpers.it("counts formatted phone characters rather than UTF-8 bytes", function()
+		local phone = "06 12 34 56 78"
+		local found = {}
+		for _, mapping in ipairs(for_section("phoneprefixes", { phone_number_clean = phone })) do
+			found[mapping.trigger] = mapping.replacement
+		end
+		helpers.assert_nil(found["06 "])
+		helpers.assert_eq(found["06 12"], phone)
+		helpers.assert_eq(#for_section("phoneprefixes", { phone_number_clean = "06 " }), 0)
+	end)
+
 	helpers.it("retains compact and spaced IBAN expansions for nonbreaking spaces", function()
 		local iban = "FR76 12 3456"
 		local mappings = for_section("ibanprefixes", { iban = iban })

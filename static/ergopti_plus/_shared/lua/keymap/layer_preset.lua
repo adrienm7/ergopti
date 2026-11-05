@@ -60,8 +60,14 @@ M.KEPT = "kept"
 local function read_shipped(path)
 	local fh, err = io.open(path, "rb")
 	if not fh then error("layer_preset: cannot read " .. path .. ": " .. tostring(err), 0) end
-	local content = fh:read("*a")
-	fh:close()
+	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" then
+		error("layer_preset: cannot read " .. path .. ": " .. tostring(read_ok and read_err or content), 0)
+	end
+	if not close_ok or closed ~= true then
+		error("layer_preset: cannot close " .. path .. ": " .. tostring(close_ok and close_err or closed), 0)
+	end
 	if type(content) ~= "string" or content == "" then error("layer_preset: " .. path .. " is empty", 0) end
 	return content
 end

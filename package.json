@@ -560,6 +560,7 @@
 		"test:hotstrings-config-number-input": "node ./tools/test/test-hotstrings-config-number-input.cjs",
 		"test:metrics-app-fallback-icon-unicode": "node ./tools/test/test-metrics-app-fallback-icon-unicode.cjs",
 		"test:personal-editor-multiline": "node ./tools/test/test-personal-editor-multiline.cjs",
+		"test:browser:model-browser-draft": "node ./tools/test/browser/model-browser-draft.playwright.cjs",
 		"test:browser:hotstring-editor": "node ./tools/test/browser/hotstring-editor-whitespace.playwright.cjs",
 		"test:browser:layer-editor": "node ./tools/test/browser/layer-editor.playwright.cjs",
 		"test:browser:layout-composer": "node ./tools/test/browser/layout-composer.playwright.cjs",

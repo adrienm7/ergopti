@@ -123,6 +123,8 @@ function M.detect_system_locale()
 	end
 	-- Try exact two-letter prefix first (e.g. "fr" from "fr_FR")
 	local lang = raw:match("^([a-z][a-z])")
+	-- Norwegian catalogues use "no", while the system identifies its two written forms.
+	if lang == "nb" or lang == "nn" then lang = "no" end
 	if lang and is_known(lang) then
 		Logger.debug(LOG, "detect_system_locale: '%s' → '%s'.", raw, lang)
 		return lang

@@ -75,10 +75,13 @@ local function run_case(case)
 			helpers.assert_eq(starts, 1, "the public request must acquire one actual stream")
 			helpers.assert_eq(type(done), "function")
 			helpers.assert_eq(type(chunk), "function")
-			for _, part in ipairs(case.chunks) do chunk(nil, part, "") end
+			for _, part in ipairs(case.chunks) do
+				if part == false then chunk(nil, nil, "") else chunk(nil, part, "") end
+			end
 			if case.cancelled then helpers.assert_true(api.cancel_streaming()) end
 			settled = true
-			done(case.exit_code or 0, case.remaining or "", "")
+			if case.lost_final then done(case.exit_code or 0, nil, "")
+			else done(case.exit_code or 0, case.remaining or "", "") end
 			helpers.assert_eq(#partials, case.partials == nil and 1 or case.partials,
 				"the transport must deliver the real token before terminal classification")
 			helpers.assert_eq(#successes, case.success and 1 or 0,
@@ -100,6 +103,8 @@ end
 
 helpers.describe("Ollama provider completion receipt", function()
 	for _, case in ipairs({
+		{ name = "rejects native undecodable stdout between valid records", chunks = { TOKEN, false, DONE } },
+		{ name = "rejects native undecodable terminal stdout", chunks = { TOKEN, DONE }, lost_final = true },
 		{ name = "rejects HTTP EOF after a nonterminal token", chunks = { TOKEN } },
 		{ name = "rejects a missing done field", chunks = { (TOKEN:gsub(',"done":false', '')) }, partials = 0 },
 		{ name = "rejects a string completion marker", chunks = { TOKEN, (DONE:gsub('true', '"true"')) } },
