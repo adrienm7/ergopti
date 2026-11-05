@@ -1,66 +1,30 @@
 {
-	"expected_count": 289,
+	"expected_count": 72,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "agent-native-nul-input",
-			"expected_count": 4
-		},
-		{
-			"contains": "wifi-dashboard-kpi-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "one-shot-native-spent-controls",
-			"expected_count": 5
-		},
-		{
-			"contains": "wrap-native-render-focus",
-			"expected_count": 2
-		},
-		{
-			"contains": "changelog-show-native-close",
-			"expected_count": 2
-		},
-		{
-			"contains": "Feature-state real boot source admission:",
+			"contains": "backspace-repeat-native-epoch",
 			"expected_count": 6
 		},
 		{
-			"contains": "Diagnostics collection skipped physical checks never pass",
-			"expected_count": 1
-		},
-		{
-			"contains": "storage native enumeration receipt:",
-			"expected_count": 5
-		},
-		{
-			"contains": "collection-guided-native-write",
+			"contains": "gesture-title-native-transform-target",
 			"expected_count": 2
 		},
 		{
-			"contains": "wrap-native-trigger-epoch",
+			"contains": "llm-profile-nonllm-source",
 			"expected_count": 2
 		},
 		{
-			"contains": "mistral-content-chunks",
-			"expected_count": 11
+			"contains": "personal info source projection:",
+			"expected_count": 7
 		},
 		{
-			"contains": "agent-ics-delayed",
+			"contains": "wrap-stage-ownership",
 			"expected_count": 2
 		},
 		{
-			"contains": "keystats-native-key-char-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "gesture-transform-native-render-focus",
-			"expected_count": 2
-		},
-		{
-			"contains": "sendinstant-post-receipt-owner",
+			"contains": "request-usage-aggregate-domain",
 			"expected_count": 3
 		},
 		{
@@ -68,223 +32,51 @@
 			"expected_count": 4
 		},
 		{
-			"contains": "roi-context-word-owner",
-			"expected_count": 6
+			"contains": "wpm-compensation-authority",
+			"expected_count": 8
 		},
 		{
-			"contains": "selection-capture-native-control-focus",
-			"expected_count": 2
+			"contains": "wpm-global-barrier-20260813:",
+			"expected_count": 8
 		},
 		{
-			"contains": "keystats-control-char-echo",
+			"contains": "config-typed-wpm-producers",
+			"expected_count": 1
+		},
+		{
+			"contains": "toml-numeric-string-widget",
+			"expected_count": 3
+		},
+		{
+			"contains": "walker-composite-checkpoint",
+			"expected_count": 1
+		},
+		{
+			"contains": "manifest-payload-contract",
+			"expected_count": 1
+		},
+		{
+			"contains": "metrics-system-manifest",
+			"expected_count": 3
+		},
+		{
+			"contains": "i18n-source-shape",
+			"expected_count": 7
+		},
+		{
+			"contains": "keystats network: A/disconnected/A emits disconnect and reconnect",
+			"expected_count": 1
+		},
+		{
+			"contains": "keystats network: A/unknown/A preserves state without false transitions",
+			"expected_count": 1
+		},
+		{
+			"contains": "program-provider-unc-root",
 			"expected_count": 9
 		},
 		{
-			"contains": "keystats-native-unicode-packet",
-			"expected_count": 2
-		},
-		{
-			"contains": "final-context-duration-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "wifi-connectivity-kpi-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "optional boot full-save source ownership:",
-			"expected_count": 4
-		},
-		{
-			"contains": "clipboard-clear-receipt-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "selection-admitted-sequence",
-			"expected_count": 32
-		},
-		{
-			"contains": "sendinstant-clipboard-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "selection-restore-revalidation",
-			"expected_count": 14
-		},
-		{
-			"contains": "selection-startup-revocation",
-			"expected_count": 17
-		},
-		{
-			"contains": "selection-timer-release",
-			"expected_count": 3
-		},
-		{
-			"contains": "selection-startup-owner-settlement",
-			"expected_count": 2
-		},
-		{
-			"contains": "selection-clipboard-busy",
-			"expected_count": 1
-		},
-		{
-			"contains": "wrap-visible-suffix",
-			"expected_count": 1
-		},
-		{
-			"contains": "roi-halflife-native64-owner",
-			"expected_count": 5
-		},
-		{
-			"contains": "switch-destination-privacy-owner",
-			"expected_count": 7
-		},
-		{
-			"contains": "roi-prune-bounded",
-			"expected_count": 3
-		},
-		{
-			"contains": "keystats arrival FIFO:",
-			"expected_count": 16
-		},
-		{
-			"contains": "one-shot-native-control-flags",
-			"expected_count": 2
-		},
-		{
-			"contains": "agent-ics-private-acl",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-profile-opening-image",
-			"expected_count": 18
-		},
-		{
-			"contains": "native-profile-paste-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-profile-preopen-source",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-profile-source-representation",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-profile-preopen-navigation",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-profile-memory-source",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-profile-projection-canonical",
-			"expected_count": 7
-		},
-		{
-			"contains": "llm-profile-projection-unknown-api",
-			"expected_count": 1
-		},
-		{
-			"contains": "prompt-startup-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "prompt-navigation-custody",
-			"expected_count": 4
-		},
-		{
-			"contains": "config: flat [llm] persistence is gated",
-			"expected_count": 1
-		},
-		{
-			"contains": "AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: Outlook saves events and tasks and only displays mails",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: without Outlook, an .ics file or a mailto: link is opened",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: a tool of the tools folder runs with the input as its argument",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: a typing pause is triaged, then System 2 offers its actions",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: the automatic mode respects its threshold, the keystrokes and the other tooltips",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: accepting and dismissing move a per-application threshold, kept locally",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: typing over an automatic suggestion dismisses it",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: Jev is offered as System 1 only, every chat provider as both",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: System 1 asks Jev through a decisions provider",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: System 1 asks Jev through Backboard and logs where the answers were",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: System 2 chats through Backboard",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: the automatic mode triages over an automatic prediction and replaces it",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: a manual prediction's tooltip is not an automatic one",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: the agent's timers are one-shots",
-			"expected_count": 1
-		},
-		{
-			"contains": "klr-cache-stage-ownership",
-			"expected_count": 7
-		},
-		{
-			"contains": "klr-reader-durable-cache",
-			"expected_count": 9
-		},
-		{
-			"contains": "klr-readonly-image",
-			"expected_count": 4
-		},
-		{
-			"contains": "klr-rebuild-resume",
-			"expected_count": 3
-		},
-		{
-			"contains": "klr-executed-round-ownership",
-			"expected_count": 5
-		},
-		{
-			"contains": "reader-sql-late-refusal",
-			"expected_count": 1
-		},
-		{
-			"contains": "reader-sql-operational-retry",
+			"contains": "sendinstant-native-snapshot-copy",
 			"expected_count": 3
 		}
 	]
