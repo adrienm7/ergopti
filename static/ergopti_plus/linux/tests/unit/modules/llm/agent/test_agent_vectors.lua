@@ -183,6 +183,13 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		end
 	end)
 
+	helpers.it("rejects malformed Unicode in model-generated email addresses", function()
+		local config = read_json("modules/llm/agent.json")
+		local invalid = "a" .. string.char(0xed, 0xa0, 0x80) .. "@example.com"
+		local action = Agent.validate_action(config, { type = "mail", body = "Hello", to = { invalid } }, { tools = {} })
+		helpers.assert_nil(action, "an email address cannot contain malformed UTF-8")
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }
