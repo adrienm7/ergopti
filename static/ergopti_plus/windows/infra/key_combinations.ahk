@@ -1119,6 +1119,12 @@ KeyCombinationChordsReadConfig(Cache) {
 	Delay := Stored.Get(ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, ManifestDefaultFor(ConfigKey.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS))
 	Symmetric := Stored.Get("symmetric", ManifestDefaultFor(ConfigKey.MOD_COMBOS_SYMMETRIC))
 	Enabled := Stored.Get("enabled", true)
+	Snapshot := ConfigTomlBootSnapshot(Cache)
+	if IsObject(Snapshot) {
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, &Delay)
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
+		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "enabled", &Enabled)
+	}
 	try KeyCombinationChordConfig := KeyCombinationChordSettings(
 		IsNumber(Delay) ? Delay + 0 : Delay, Symmetric ? 1 : 0)
 	catch as Err {
