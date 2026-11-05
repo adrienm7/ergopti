@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **113 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **114 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1817,3 +1817,9 @@ Native replay41974178449 (26b1ecd81954794d09806e746265724e60332bc1) qualifies th
 The ordinary TOML foreign-stage failure in that same replay extends AHK-071 rather than the distinct-finding count. Commit a5b3687b retains exclusive stage ownership through exact readback and publication, and preserves truthful session feedback after an unacknowledged native rename. Five additional native-I/O regressions and the nine adapted atomic contracts await Windows replay.
 
 AHK-113 is a source-confirmed field-run timestamp defect: date and time were formatted from separate UTC reads, allowing a midnight crossing to produce a timestamp one day behind. The helper now captures one instant; deterministic formatting and single-read source contracts await native qualification. No system clock change or measured midnight race is claimed.
+
+Replay41980253833 at3005ee52e6c0a2b67e785395a52a3cab79f1c890 executes all142 selected cases:138 pass and4 fail, with the same names and counts reversed. Production compile and90/90 native hotstring E2E pass. It qualifies the selected SendInstant native CAS, locator byte handling, ordinary held TOML publication and existing-file OpenApp regressions. The remaining profile before-ACK fixture cutpoint and decimal-only atomic scanner require review; neither is silently promoted to a product defect.
+
+AHK-114 is independently demonstrated by the real Jev requester/private HTTP peer: after original requester withdrawal, one actual POST still publishes before the stale consumer ignores it. Exact transport and registry retirement succeed. The live control passes; the withdrawn case fails in both orders. The same replay confirms a destruction-reentrancy sibling of AHK-109: a native replacement changelog window survives but the returning old Close clears its global owner. Both fixes are in progress.
+
+Replay41981613076 executes no business cases: its discovery stops on the reserved AHK variable name Case in the newly added UTC test. That test syntax is corrected; no qualification is attributed to this failed discovery.
