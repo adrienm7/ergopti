@@ -1052,7 +1052,7 @@ function renderDashboard() {
 		renderSankey(aggData);
 
 		// Radial top 8 (#27) and burst histogram (#34)
-		renderRadialTop8(appsArray);
+		renderRadialTop8(apps_by_time);
 		renderBurstHistogram(aggData);
 
 		// Daily trajectories (#29-32)

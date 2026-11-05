@@ -4717,4 +4717,55 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+test('apps radial top eight use the same focus ranking as the top-app bars', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		radial_top8_chart: { getContext: () => 'radial' },
+		apps_bar_chart: { getContext: () => 'bar' }
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	const charts = {};
+	context.Chart = class {
+		constructor(owner, config) {
+			charts[owner] = config;
+		}
+		destroy() {}
+	};
+	const apps = {};
+	for (let i = 1; i <= 9; i++) apps[`App${String(i).padStart(2, '0')}`] = { app_time_ms: i * 1000 };
+	context.window.bootstrapMetricsAppsData({ '2026-10-25': apps }, {}, {});
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.deepEqual(Array.from(charts.radial.data.labels), [
+		'App09',
+		'App08',
+		'App07',
+		'App06',
+		'App05',
+		'App04',
+		'App03',
+		'App02'
+	]);
+	assert.deepEqual(Array.from(charts.bar.data.labels), [
+		'App09',
+		'App08',
+		'App07',
+		'App06',
+		'App05',
+		'App04',
+		'App03'
+	]);
+});
 console.log(`${passed} passed, 0 failed.`);
