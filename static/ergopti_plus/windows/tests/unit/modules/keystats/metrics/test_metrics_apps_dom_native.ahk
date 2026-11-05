@@ -283,3 +283,64 @@ _KLWF_Case(Mode) {
 for _KLWF_Mode in ["parent-control", "worker", "worker-switch-ingest", "worker-typing-ingest"]
 	Test("Metrics live foreground: " . _KLWF_Mode . " through the actual native producer (metrics-live-foreground-worker)",
 		_KLWF_Case.Bind(_KLWF_Mode))
+
+; The bounded subject keeps real monotonic elapsed time, native focus and all I/O.
+; Only public calendar date/timestamp reads use the declared boundary.
+_KMCD_Source(Root) {
+	global _DriverDir
+	Code := _KLWF_Source(Root)
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\worker_live_foreground_body.ahk")
+	AssertEqual(Fixture, SubStr(Code, StrLen(Code) - StrLen(Fixture) + 1))
+	return SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
+		. FSReadStrict(_DriverDir . "\tests\fixtures\keystats_calendar_focus_body.ahk")
+}
+_KMCD_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "A retained actual worker tree prevents another fixture")
+	Root := A_Temp . "\ergopti_calendar_focus_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Primary := 0, Retired := false
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The private subject directory must be acquired exclusively")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, _KMCD_Source(Root . "\store")))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Root . "\store", Mode], _KLWF_Completed.Bind(State))
+		AssertTrue(Handle.start(), "The actual owned focus producer must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed64(Started) < 25000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		for Line in StrSplit(StrReplace(State.Output . State.ErrorText, "`r`n", "`n"), "`n")
+			if Trim(Line) != ""
+				_TestPrint("# calendar-focus-child " . Line)
+		AssertEqual(1, State.Calls, "The actual process tree must settle within its bound")
+		AssertEqual(0, State.Code, "The actual producer and reader must preserve calendar interval ownership")
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS calendar-focus " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := {Handle: Handle, Root: Root}
+		else if Retired && Created
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The actual parent and descendant workers must retire before root deletion")
+}
+
+for _KMCD_Mode in ["same-day", "midnight"]
+	Test("Keystats calendar focus: " . _KMCD_Mode . " retains actual interval days (keystats-calendar-focus-owner)",
+		_KMCD_Case.Bind(_KMCD_Mode))
