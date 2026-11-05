@@ -83,20 +83,26 @@ function Owner:run(source, send, source_current)
 	self:stop()
 	local generation = self.generation
 	local baseline, reason = self.ports.read_counter()
-	if self.generation ~= generation then return end
+	if self.generation ~= generation then return false end
+	local function source_admitted()
+		if type(source_current) ~= "function" then return self.generation == generation end
+		local ok, current = pcall(source_current)
+		return ok and current == true and self.generation == generation
+	end
 	if baseline == nil and reason == "unsupported" then
 		-- A previous X11 check must not retry over this newer selection.
-		send()
-		if self.generation ~= generation then return end
+		if not source_admitted() then return false end
+		local sent = send()
+		if self.generation ~= generation or sent == false then return false end
 		if not self.unsupported_reported then
 			self.unsupported_reported = true
 			self.ports.log("info",
 				"Tap-hold copies are not checked: this session exposes no clipboard change counter (Wayland, or X11 without xclip).")
 		end
-		return
+		return true
 	end
 	local captured, destination = pcall(self.ports.capture_destination)
-	if self.generation ~= generation then return end
+	if self.generation ~= generation or not source_admitted() then return false end
 	self.retry_destination = captured and destination or nil
 	self.retry_source = type(source_current) == "function" and source_current or nil
 	local ok, err = pcall(send)
@@ -104,8 +110,12 @@ function Owner:run(source, send, source_current)
 		if self.generation == generation then self:stop() end
 		error(err, 0)
 	end
-	if self.generation ~= generation then return end
+	if self.generation ~= generation or err == false then
+		if self.generation == generation then self:stop() end
+		return false
+	end
 	self.checker:start(baseline, source)
+	return true
 end
 
 --- Abandons a pending check (pause, stop, a new engine).

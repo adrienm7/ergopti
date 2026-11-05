@@ -283,16 +283,18 @@ function M.with_manager_session(options, body)
 		local ConfigPaths = require("infra.config_paths")
 		local Files = require("adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
-		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer" }
+		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 		local folder = os.tmpname(); os.remove(folder)
 		assert(os.execute("mkdir '" .. folder:gsub("'", "'\\''") .. "'"))
 		local source_path, tap_path = folder .. "/config.toml", folder .. "/tap_hold.toml"
+		s.tap_path = tap_path
+		if options.nav_fixture then require("tests.support.nav_layer_fixture").write(folder) end
 		local function write(path, text)
 			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
 		end
 		write(source_path, s.bytes)
-		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(""))
+		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or ""))
 		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
 		Files.read_with_status = function(path)
 			if path == source_path then
@@ -303,6 +305,7 @@ function M.with_manager_session(options, body)
 		end
 		local manager
 		local called, failure = pcall(function()
+			if options.clipboard then package.loaded["adapters.clipboard"] = options.clipboard end
 			if options.before_manager then options.before_manager(s) end
 			local Layout = h.load_module("adapters.keyboard_layout")
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
@@ -322,7 +325,7 @@ function M.with_manager_session(options, body)
 		if manager then pcall(manager._reset_for_test) end
 		ConfigPaths.config, Files.read_with_status = original_route, original_read
 		for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
-		os.remove(source_path); os.remove(tap_path)
+		os.remove(source_path); os.remove(tap_path); os.remove(folder .. "/layers.toml")
 		os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
 		if not called then error(failure, 0) end
 	end)

@@ -24,49 +24,22 @@ local KEY_A, KEY_J = 30, 36
 --- user's tap_hold.toml holding `user_text`. drive(events) feeds
 --- { code, value, at_ms } events and returns what the desktop receives.
 local function with_session(user_text, body)
-	local Hook = helpers.load_module("adapters.keyboard_hook")
-	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
-	local dir = os.tmpname()
-	os.remove(dir)
-	local made = os.execute('mkdir "' .. dir .. '"')
-	assert(made == true or made == 0, "the isolated configuration folder must exist")
-	local path = dir .. "/tap_hold.toml"
-	require("tests.support.nav_layer_fixture").write(dir)
-	local fh = assert(io.open(path, "w"))
-	fh:write(user_text)
-	fh:close()
-	local ok, err = pcall(function()
-		Manager.init({
-			keyboard_hook = Hook,
-			execute_action = function() end,
-			action_names = function() return {} end,
-			on_text_injected = function() end,
-			defaults_path = DEFAULTS,
-			user_path = path,
-		})
+	local Fixture = require("tests.support.input_owner_fixture")
+	Fixture.with_manager_session({ tap_hold_text = user_text, nav_fixture = true,
+		action_names = { "one_shot_shift" } }, function(s)
 		body(function(events)
-			local emitted, stream = {}, {}
-			for index, e in ipairs(events) do
-				stream[index] = { type = EV_KEY, code = e[1], value = e[2], at_ms = e[3] }
-			end
-			Hook._test_drive(stream, {
-				onEmitRaw = function(code, value) emitted[#emitted + 1] = code .. ":" .. value; return true end,
-				onChar = function() end,
-			}, true)
-			local down = {}
-			for _, pair in ipairs(emitted) do
-				local code, value = pair:match("^(%d+):(%d+)$")
-				if value == "1" then down[code] = true elseif value == "0" then down[code] = nil end
+			local before = #s.rows
+			for _, event in ipairs(events) do s.edge("a", event[1], event[2], event[3]) end
+			local emitted, down = {}, {}
+			for index = before + 1, #s.rows do
+				local code, value = s.rows[index][1], s.rows[index][2]
+				emitted[#emitted + 1] = code .. ":" .. value
+				if value == 1 then down[code] = true elseif value == 0 then down[code] = nil end
 			end
 			helpers.assert_nil(next(down), "no key may be left down: " .. table.concat(emitted, " "))
 			return table.concat(emitted, " ")
 		end)
 	end)
-	Manager._reset_for_test()
-	os.remove(path)
-	os.remove(dir .. "/layers.toml")
-	os.execute('rmdir "' .. dir .. '"')
-	if not ok then error(err, 0) end
 end
 
 -- Space as the maintainer set it: its own key on a tap, Shift on a hold.
@@ -74,6 +47,41 @@ local SPACE_SHIFT = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_
 local SPACE_LAYER = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.space]\nhold_layer = "nav"\n'
 
 helpers.describe("tap-hold roll: a typing key is decided by the order of the releases", function()
+	helpers.it("does not capture or journal an ordinary unconfigured key", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = {}, roll_keys = { "space" }, tap_min_ms = 0,
+			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
+		local captures = 0
+		helpers.assert_true(engine:set_roll_origin_capture(function() captures = captures + 1; return {} end,
+			function() return true end))
+		local _, _, _, down = engine:process(KEY_A, DOWN, 0)
+		local _, _, _, up = engine:process(KEY_A, UP, 20)
+		helpers.assert_nil(down); helpers.assert_nil(up)
+		helpers.assert_eq(captures, 0)
+	end)
+
+	helpers.it("journals both instant actions in physical order", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = { space = { hold_modifier = "shift" }, escape = { tap_action = "copy" },
+			delete = { tap_action = "paste" } }, roll_keys = { "space" }, tap_min_ms = 0,
+			lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
+		local origins = {}
+		helpers.assert_true(engine:set_roll_origin_capture(function(code, at)
+			local token = {}; origins[code] = token; return token
+		end, function(token) return token ~= nil end))
+		engine:process(SPACE, DOWN, 0)
+		engine:process(1, DOWN, 10)
+		local _, _, _, journal = engine:process(111, DOWN, 20)
+		helpers.assert_eq(#journal, 3)
+		helpers.assert_eq(journal[1].origin, origins[SPACE])
+		helpers.assert_eq(journal[1].rows[1].code, SPACE)
+		helpers.assert_eq(journal[2].tap, "copy")
+		helpers.assert_eq(journal[2].binding, "tap_hold__escape")
+		helpers.assert_eq(journal[2].origin, origins[1])
+		helpers.assert_eq(journal[3].tap, "paste")
+		helpers.assert_eq(journal[3].binding, "tap_hold__delete")
+		helpers.assert_eq(journal[3].origin, origins[111])
+	end)
 
 	helpers.it("(tap-hold-roll-is-a-tap-2026-10-01) Space rolled over a letter types the space, then the letter", function()
 		with_session(SPACE_SHIFT, function(drive)

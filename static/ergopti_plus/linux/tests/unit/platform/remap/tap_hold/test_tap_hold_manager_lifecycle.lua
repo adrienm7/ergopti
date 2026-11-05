@@ -133,6 +133,37 @@ os.remove(user_path)
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("reports an explicit refusal of the delayed copy retry", function()
+		local names = { "adapters.clipboard", "adapters.timer_scheduler", "adapters.notifier" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local callback, warnings, calls = nil, 0, 0
+		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_, fn) callback = fn; return { armed = true } end,
+			cancel = function() return true end,
+		}
+		package.loaded["adapters.notifier"] = { send = function() warnings = warnings + 1; return true end }
+		local Manager, path
+		local ok, err = xpcall(function()
+			local hook, actions
+			Manager, hook, actions, path = manager(nil, { capture_copy_owner = function()
+				return { current = function() return true end }
+			end, execute_action = function()
+				calls = calls + 1
+				if calls == 2 then return false end
+			end })
+			hook.on_tap("copy")
+			helpers.assert_eq(calls, 1)
+			callback()
+			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(warnings, 1, "the refused retry is reported without waiting for another timer")
+		end, debug.traceback)
+		if Manager then Manager._reset_for_test() end
+		if path then os.remove(path) end
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("transports the actual monitor tap binding through release and queued rollover", function()
 		local Manager, hook, actions, user_path = manager()
 		local Engine = require("platform.remap.tap_hold_engine")
@@ -767,6 +798,285 @@ helpers.describe("native OneShot Manager route", function()
 		end, debug.traceback)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		if not ok then error(err, 0) end
+	end)
+
+	for _, pair_mode in ipairs({ "configured", "none" }) do
+		helpers.it("delivers both instant actions replayed by a rolled typing key: " .. pair_mode, function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+				.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+			local trace = {}
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+				clipboard = { change_counter = function() return nil, "unsupported" end },
+				after_sync = function(_, code, value) trace[#trace + 1] = tostring(code) .. ":" .. tostring(value) end,
+				on_generic_action = function(_, action) trace[#trace + 1] = action end,
+				before_manager = function(s)
+					if pair_mode == "none" then s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "none"\n' end
+				end }, function(s)
+				if pair_mode == "none" then helpers.assert_eq(s.owner.has_bindings(), false) end
+				s.edge("a", 57, 1, 1000)
+				s.edge("a", 1, 1, 1010)
+				s.edge("a", 111, 1, 1020)
+				s.edge("a", 1, 0, 1030)
+				s.edge("a", 111, 0, 1040)
+				s.edge("a", 57, 0, 1050)
+				helpers.assert_eq(#s.actions, 2)
+				helpers.assert_eq(s.actions[1][1], "copy")
+				helpers.assert_eq(s.actions[2][1], "paste")
+				helpers.assert_eq(table.concat(trace, ","), "57:1,57:0,copy,paste", "rows and actions preserve event order")
+				helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "no virtual key remains held")
+			end)
+		end)
+	end
+
+	helpers.it("delivers rolled actions from their separate physical keyboards", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end } }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			s.edge("b", 1, 0, 1030); s.edge("a", 111, 0, 1040); s.edge("a", 57, 0, 1050)
+			helpers.assert_eq(#s.actions, 2)
+			helpers.assert_eq(s.actions[1][2], "tap_hold__escape")
+			helpers.assert_eq(s.actions[2][2], "tap_hold__delete")
+		end)
+	end)
+
+	helpers.it("does not deliver a later roll action after the first retires its hook", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+				clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function(s) s.hook.stop() end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(#s.actions, 1)
+			helpers.assert_eq(s.actions[1][1], "copy")
+		end)
+	end)
+
+	for _, first in ipairs({ "copy", "paste" }) do
+		helpers.it("stops a rolled sequence when its first " .. first .. " action explicitly refuses", function()
+			local second = first == "copy" and "paste" or "copy"
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "' .. first .. '"\n'
+				.. '[tap_hold.keys.delete]\ntap_action = "' .. second .. '"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+				clipboard = { change_counter = function() return nil, "unsupported" end },
+				on_generic_action = function() return false end }, function(s)
+				s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+				helpers.assert_eq(#s.actions, 1, "the explicitly refused first action cannot authorize the second")
+				helpers.assert_eq(s.actions[1][1], first)
+				helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+			end)
+		end)
+	end
+
+	helpers.it("continues a rolled sequence when the executor reports no result", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function() return nil end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(#s.actions, 2, "nil acknowledges only that the action was attempted")
+		end)
+	end)
+
+	helpers.it("stops a real rolled sequence when its first action explicitly refuses", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function() return false end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(#s.actions, 1, "the refused first action cannot authorize the second")
+			helpers.assert_eq(s.actions[1][1], "copy")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "no virtual key remains held")
+		end)
+	end)
+
+	helpers.it("stops a real rolled sequence when a non-copy first action refuses", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "copy"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function() return false end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(#s.actions, 1, "the refused first action cannot authorize the second")
+			helpers.assert_eq(s.actions[1][1], "paste")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "no virtual key remains held")
+		end)
+	end)
+
+
+	helpers.it("refuses a reentrant reload without delivering a later roll action", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		local reload_ok
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function(s) reload_ok = s.manager.reload() end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(reload_ok, false, "reload during owned delivery must be refused")
+			helpers.assert_eq(#s.actions, 1, "an interrupted journal cannot deliver its remaining action")
+		end)
+	end)
+
+	helpers.it("does not run rolled actions after a key-output acknowledgement fails", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			fail_sync = function(_, code, value) return code == 57 and value == 0 end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(#s.actions, 0, "no action follows an unacknowledged output")
+		end)
+	end)
+
+	helpers.it("retires rolled output when its source changes between key emissions", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		local changed = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			after_sync = function(s, code, value)
+				if not changed and code == 57 and value == 1 then
+					changed = true; s.bytes = s.bytes .. "\n# source changed\n"
+				end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(changed, true)
+			helpers.assert_eq(#s.actions, 0, "no action may follow source withdrawal")
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "the original virtual hold is retired")
+		end)
+	end)
+
+	helpers.it("does not release a synthetic hold that its journal never published", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.left_ctrl]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			on_generic_action = function(s)
+				helpers.assert_eq(s.engine.key_refs[29], 1, "the future Ctrl hold was prepared by the engine")
+				s.bytes = s.bytes .. "\n# source changed after copy\n"
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 29, 1, 1020)
+			helpers.assert_eq(#s.actions, 1)
+			for _, row in ipairs(s.rows) do
+				helpers.assert_true(row[1] ~= 29, "an unpublished Ctrl must not be pressed or released")
+			end
+			helpers.assert_true(s.hook.isRunning(), "clean retirement keeps capture running")
+		end)
+	end)
+
+	helpers.it("retires rolled output when the tap-hold file changes between emissions", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+			.. '[tap_hold.keys.delete]\ntap_action = "paste"\n'
+		local changed = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "copy", "paste", "one_shot_shift" },
+			clipboard = { change_counter = function() return nil, "unsupported" end },
+			after_sync = function(s, code, value)
+				if not changed and code == 57 and value == 1 then
+					changed = true
+					local file = assert(io.open(s.tap_path, "ab")); file:write("\n# tap source changed\n"); file:close()
+				end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 1, 1, 1010); s.edge("a", 111, 1, 1020)
+			helpers.assert_eq(changed, true)
+			helpers.assert_eq(#s.actions, 0)
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+
+	helpers.it("preserves physical Shift custody through a roll timeout", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" } }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 42, 1, 1010)
+			s.pump_at(1400)
+			helpers.assert_true(s.hook.isRunning(), "the resolved roll must not stop capture")
+			s.edge("a", 57, 0, 1410)
+			helpers.assert_eq(s.writer.output_view(s.output).down, { 42 }, "physical Shift stays held after the roll key releases")
+			s.edge("a", 42, 0, 1420)
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil, "Shift must be released")
+		end)
+	end)
+
+	helpers.it("does not retain an invisible roll layer after source withdrawal", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, nav_fixture = true, action_names = { "one_shot_shift" } }, function(s)
+			s.edge("a", 57, 1, 1000)
+			s.bytes = s.bytes .. "\n# source changed before timeout\n"
+			s.pump_at(1400)
+			local before = #s.rows
+			s.edge("a", 36, 1, 1410); s.edge("a", 36, 0, 1420)
+			helpers.assert_eq(s.rows[before + 1], { 36, 1 }, "the withdrawn layer cannot redirect J")
+			helpers.assert_eq(s.rows[before + 2], { 36, 0 })
+		end)
+	end)
+
+	helpers.it("does not reuse a cached roll proof after its source changes", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" } }, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("a", 30, 1, 1020)
+			s.edge("a", 57, 0, 1040); s.edge("a", 30, 0, 1060)
+			local before = #s.rows
+			s.bytes = s.bytes .. "\n# source changed between rolls\n"
+			s.edge("a", 57, 1, 2000)
+			helpers.assert_eq(#s.rows, before + 1, "an unadmitted roll must pass through immediately")
+			helpers.assert_eq(s.rows[#s.rows], { 57, 1 })
+			s.edge("a", 57, 0, 2020)
+		end)
+	end)
+
+	helpers.it("keeps a delayed roll action tied to its original keyboard", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "copy"\n'
+		local options = { tap_hold_text = text, action_names = { "copy", "one_shot_shift" },
+			position_bits = true, on_capture_reacquired = function() return true end,
+			clipboard = { change_counter = function() return nil, "unsupported" end } }
+		Fixture.with_manager_session(options, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 1, 1, 1010)
+			s.pump_at(1400)
+			helpers.assert_eq(#s.actions, 1, "the original held source may deliver after timeout")
+			s.edge("b", 1, 0, 1410); s.edge("a", 57, 0, 1420)
+		end)
+		Fixture.with_manager_session(options, function(s)
+			s.edge("a", 57, 1, 1000); s.edge("b", 1, 1, 1010)
+			local original = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.b))
+			options.eof_path = s.paths.b; s.hook.pump(); options.eof_path = nil
+			helpers.assert_eq(s.reader.source_owner_current(original), false)
+			s.held[s.paths.b] = {}
+			package.loaded["modules.hotstrings.device_finder"].find_devices = function() return { s.paths.a, s.paths.b }, {} end
+			for _ = 1, s.hook.DEVICE_CHECK_TICKS do s.hook.check_device() end
+			s.pump_at(1400)
+			helpers.assert_eq(#s.actions, 0, "a reconnected source cannot revive the old DOWN")
+		end)
 	end)
 
 	helpers.it("loads the saved action and arms through the actual Manager callback", function()

@@ -44,7 +44,7 @@ local function manager(user_text, opts)
 	Manager.init({
 		keyboard_hook = hook,
 		capture_copy_owner = opts and opts.capture_copy_owner,
-		execute_action = function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
+		execute_action = opts and opts.execute_action or function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
 		action_names = require("modules.gestures.manager").get_executable_action_names,
 		on_text_injected = function(text) resets[#resets + 1] = text end,
 		defaults_path = DEFAULTS,

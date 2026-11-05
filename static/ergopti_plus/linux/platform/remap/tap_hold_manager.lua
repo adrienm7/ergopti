@@ -172,10 +172,10 @@ local function _run_tap(action, binding)
 		if not ok or type(result) ~= "table" or not result.ok then
 			Logger.error(LOG, "The one-shot Shift could not type its result: %s.",
 				tostring(ok and type(result) == "table" and result.error or result))
-			return
+			return false
 		end
 		_on_text_injected(action.type_text)
-		return
+		return true
 	end
 	-- A logging sink may synchronously revoke or republish the engine. Capture
 	-- its Manager before the callback, then join again before the irreversible
@@ -184,16 +184,16 @@ local function _run_tap(action, binding)
 	local execute = _execute_action
 	if type(binding) == "string" and binding:match("^combination__") then
 		local combinations, engine, generation = _combinations, _engine, _generation
-		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return end
+		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return false end
 		local captured, guard = pcall(combinations.capture_runtime)
-		if not captured or type(guard) ~= "function" then return end
+		if not captured or type(guard) ~= "function" then return false end
 		pair_current = function()
 			local checked, current = pcall(guard)
 			return checked and current == true and _initialized and not _paused
 				and rawequal(_combinations, combinations) and rawequal(_engine, engine)
 				and _generation == generation and _execute_action == execute
 		end
-		if not pair_current() then return end
+		if not pair_current() then return false end
 	else
 		local loaded, engine, generation = _loaded, _engine, _generation
 		tap_current = function()
@@ -201,16 +201,16 @@ local function _run_tap(action, binding)
 				and engine ~= nil and rawequal(_loaded, loaded) and rawequal(_engine, engine)
 				and rawequal(_installed_engine, engine) and _generation == generation and _execute_action == execute
 		end
-		if not tap_current() then return end
+		if not tap_current() then return false end
 	end
 	-- Re-read at delivery: the AI may be switched off between the key and its run.
 	if AiActions.blocked(action) then
 		Logger.debug(LOG, "Tap action '%s' held back: the AI is off.", action)
-		return
+		return false
 	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
-	if pair_current and not pair_current() then return end
-	if tap_current and not tap_current() then return end
+	if pair_current and not pair_current() then return false end
+	if tap_current and not tap_current() then return false end
 	local source = binding or "tap_hold"
 	local ok, err
 	-- A dry run keeps the physical remap and touches no clipboard at all, not
@@ -221,11 +221,16 @@ local function _run_tap(action, binding)
 		ok, err = pcall(_tap_copy.run, _tap_copy, source, function()
 			local sent, send_err = pcall(execute, action, source)
 			if not sent then error(send_err, 0) end
+			return send_err
 		end, tap_current or pair_current)
 	else
 		ok, err = pcall(execute, action, source)
 	end
-	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
+	if not ok then
+		Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err))
+		return false
+	end
+	return err ~= false
 end
 
 --- Builds the copy owner over the live clipboard, timer and notifier.
@@ -243,8 +248,8 @@ local function build_tap_copy(execute, capture_destination)
 		-- executor and the daemon is not paused.
 		send_copy = function()
 			if not _initialized or _paused or _execute_action ~= execute then return false end
-			local sent = pcall(execute, COPY_ACTION, "tap_hold")
-			return sent
+			local called, result = pcall(execute, COPY_ACTION, "tap_hold")
+			return called and result ~= false
 		end,
 		after = function(delay_ms, callback)
 			local handle = require("adapters.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
@@ -443,6 +448,90 @@ local function _buffered_ports()
 end
 
 --- Installs or removes the engine to match the current state.
+local original_roll_runtime, original_roll_tap, original_roll_get_tap, original_roll_is_active
+local cached_roll_proof
+local function roll_ports_current()
+	return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		and type(original_roll_runtime) == "function" and type(original_roll_tap) == "function"
+		and type(original_roll_get_tap) == "function" and type(original_roll_is_active) == "function"
+		and rawget(M, "is_active") == original_roll_is_active
+		and rawget(M, "capture_configuration_edit") == original_roll_runtime
+		and rawget(M, "capture_tap_action") == original_roll_tap and rawget(M, "get_tap_action") == original_roll_get_tap
+end
+local function roll_capture_runtime()
+	if not roll_ports_current() then return nil end
+	local cached = cached_roll_proof
+	if cached and cached.current() == true then return cached end
+	cached_roll_proof = nil
+	local combinations = _combinations
+	local issuer = combinations and managed_owners[combinations]
+	local capture = issuer and issuer.capture_collision_inventory
+	if type(capture) ~= "function" or rawget(combinations, "capture_collision_inventory") ~= capture
+		or not original_logical_catalogue_current(combinations) then return nil end
+	local runtime = original_roll_runtime()
+	local loaded = _loaded
+	if type(runtime) ~= "function" or type(loaded) ~= "table" then return nil end
+	local generation, engine, installed, enabled, file_enabled = _generation, _engine, _installed_engine, _enabled, loaded.enabled
+	local path, defaults = _user_path, _defaults_path
+	local keys_ref, rolls_ref, catalog_ref, holds_ref = loaded.keys, loaded.roll_keys, loaded.catalog, loaded.hold_picker
+	local lone, rolls, catalog, holds, keys = loaded.lone_tap_max_ms, copy_fields(loaded.roll_keys),
+		copy_fields(loaded.catalog), copy_fields(loaded.hold_picker), copy_fields(loaded.keys)
+	local inventory = capture()
+	local source_current = type(inventory) == "table" and rawget(inventory, "current") or nil
+	local source_sealed = type(inventory) == "table" and rawget(inventory, "sealed") or nil
+	if type(source_current) ~= "function" or type(source_sealed) ~= "function" then return nil end
+	local function sealed()
+		return roll_ports_current() and _initialized and not _paused and _generation == generation
+			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _enabled == enabled
+			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
+			and loaded.enabled == file_enabled and loaded.lone_tap_max_ms == lone
+			and rawequal(loaded.keys, keys_ref) and rawequal(loaded.roll_keys, rolls_ref)
+			and rawequal(loaded.catalog, catalog_ref) and rawequal(loaded.hold_picker, holds_ref)
+			and rawequal(_combinations, combinations) and rawget(combinations, "capture_collision_inventory") == capture
+			and rawget(inventory, "current") == source_current and rawget(inventory, "sealed") == source_sealed
+			and source_sealed() == true
+	end
+	local function complete()
+		return fields_equal(loaded.keys, keys) and fields_equal(loaded.roll_keys, rolls)
+			and fields_equal(loaded.catalog, catalog) and fields_equal(loaded.hold_picker, holds)
+			and original_logical_catalogue_current(combinations)
+	end
+	local function current()
+		return sealed() and complete() and runtime() == true and source_current() == true and complete() and sealed()
+	end
+	if not current() then return nil end
+	local proof = { current = current, sealed = sealed }
+	cached_roll_proof = proof
+	return proof
+end
+local function roll_capture_tap(binding, action)
+	if not roll_ports_current() then return nil end
+	local key = type(binding) == "string" and binding:match("^tap_hold__(.+)$") or nil
+	local runtime = cached_roll_proof
+	if not key or type(runtime) ~= "table" or type(runtime.current) ~= "function"
+		or type(runtime.sealed) ~= "function" or runtime.current() ~= true then return nil end
+	local generation, engine, loaded = _generation, _engine, _loaded
+	local function sealed()
+		return roll_ports_current() and runtime == cached_roll_proof and runtime.sealed() == true
+			and _initialized and not _paused and _enabled and _generation == generation
+			and rawequal(_engine, engine) and rawequal(_loaded, loaded) and original_roll_get_tap(key) == action
+	end
+	local function current() return sealed() and runtime.current() == true and sealed() end
+	if not current() then return nil end
+	return { current = current, sealed = sealed }
+end
+local function roll_ports()
+	return { capture_runtime = roll_capture_runtime, capture_tap = roll_capture_tap, current = roll_ports_current }
+end
+
+local function engine_has_roll(engine)
+	if type(engine) ~= "table" or type(engine.by_code) ~= "table" then return false end
+	for _, config in pairs(engine.by_code) do
+		if type(config) == "table" and config.roll == true then return true end
+	end
+	return false
+end
+
 local function _apply()
 	_generation = _generation + 1
 	local function install(engine, on_tap)
@@ -454,12 +543,12 @@ local function _apply()
 	if _engine and _combinations and _combinations.has_bindings() and not _engine.has_combinations then
 		if install(nil) == false then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
-		_engine = CombinationEngine.new(_engine, configured, _buffered_ports(), projection)
+		_engine = CombinationEngine.new(_engine, configured, _buffered_ports(), projection, roll_ports())
 	end
 	if _engine and _engine.has_combinations then
 		if install(nil) ~= true then return false end
 		local configured, projection = pair_options(_loaded,_combinations)
-		if _engine:configure(configured, _buffered_ports(), projection) ~= true then return false end
+		if _engine:configure(configured, _buffered_ports(), projection, roll_ports()) ~= true then return false end
 		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
 	end
 	if _active() then
@@ -599,10 +688,12 @@ local function _build(loaded, boot)
 				and _tap_action_set()[action] == true
 		end } })
 	issued.engine_options=rawget(combinations,"engine_options")
+	issued.capture_edit_source=rawget(combinations,"capture_edit_source")
+	issued.capture_collision_inventory=rawget(combinations,"capture_collision_inventory")
  managed_owners[combinations]=issued
-	if combinations.has_bindings() then
+	if combinations.has_bindings() or engine_has_roll(engine) then
 		local configured, projection = pair_options(loaded,combinations)
-		engine = CombinationEngine.new(engine, configured, _buffered_ports(), projection)
+		engine = CombinationEngine.new(engine, configured, _buffered_ports(), projection, roll_ports())
 		nav_wrapped = true
 	end
 	local nav_record = { unavailable = true }
@@ -893,15 +984,18 @@ function M.capture_configuration_edit()
 	local path, defaults, loaded = _user_path, _defaults_path, _loaded
 	local engine, installed, generation = _engine, _installed_engine, _generation
 	local enabled, combinations = _enabled, _combinations
-	local keys = copy_fields(loaded.keys)
-	local file_enabled = loaded.enabled
+	local keys, rolls, catalog, holds = copy_fields(loaded.keys), copy_fields(loaded.roll_keys),
+		copy_fields(loaded.catalog), copy_fields(loaded.hold_picker)
+	local file_enabled, lone = loaded.enabled, loaded.lone_tap_max_ms
 	local function runtime()
 		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
 			and M.capture_configuration_edit == factory and _initialized and not _paused
 			and _generation == generation and _user_path == path and _defaults_path == defaults
 			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
 			and _enabled == enabled and rawequal(_combinations, combinations)
-			and loaded.enabled == file_enabled and fields_equal(loaded.keys, keys) and config_exports_current()
+			and loaded.enabled == file_enabled and loaded.lone_tap_max_ms == lone
+			and fields_equal(loaded.keys, keys) and fields_equal(loaded.roll_keys, rolls)
+			and fields_equal(loaded.catalog, catalog) and fields_equal(loaded.hold_picker, holds) and config_exports_current()
 			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
 	end
 	local bytes, status = read(path)
@@ -909,8 +1003,9 @@ function M.capture_configuration_edit()
 	if not runtime() or (status ~= "ok" and status ~= "absent") or shipped_status ~= "ok"
 		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string" then return nil end
 	local ok, decoded = pcall(original_config_load, defaults, path)
-	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled
-		or not fields_equal(decoded.keys, keys) or not runtime() then return nil end
+	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled or decoded.lone_tap_max_ms ~= lone
+		or not fields_equal(decoded.keys, keys) or not fields_equal(decoded.roll_keys, rolls)
+		or not fields_equal(decoded.catalog, catalog) or not fields_equal(decoded.hold_picker, holds) or not runtime() then return nil end
 	local function current()
 		if not runtime() then return false end
 		local content, classification = read(path)
@@ -966,6 +1061,8 @@ function M.capture_tap_action(binding, action)
 	if guard() ~= true then return nil end
 	return guard, path
 end
+
+original_roll_runtime, original_roll_tap, original_roll_get_tap, original_roll_is_active = M.capture_configuration_edit, M.capture_tap_action, M.get_tap_action, M.is_active
 
 --- The keys the tray lists, in order, each with its hand and label key: the
 --- Linux column of the shared key catalogue ([tap_hold.catalog]).
@@ -1059,6 +1156,7 @@ function M._reset_for_test()
 	_on_text_injected = nil
 	if _tap_copy then _tap_copy:stop() end
 	_tap_copy = nil
+	cached_roll_proof = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
 	_dry_run = false
