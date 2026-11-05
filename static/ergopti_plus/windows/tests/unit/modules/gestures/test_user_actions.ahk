@@ -401,3 +401,22 @@ Test("User command first-line work at the actual capture limit retains its prefi
 
 Test("Public command counted stderr: NUL capture retains the generic failed-exit receipt (user-command-counted-stderr)",
 	_UAN_Case.Bind("nul-stderr"))
+
+_UA_FirstLineScalarBoundaries() {
+	Rocket := Chr(0x1F600), Accent := Chr(0xE9)
+	Ascii := StrGet(Buffer(201, 0x78), -201, "UTF-8")
+	Cases := [
+		[SubStr(Ascii, 1, 200), 200, SubStr(Ascii, 1, 200)],
+		[Ascii, 200, SubStr(Ascii, 1, 200) . "…"],
+		[Rocket . "x", 1, "…"], [Rocket . "x", 2, "…"],
+		[Rocket . "x", 3, "…"], [Rocket . "x", 4, Rocket . "…"],
+		[Rocket . "x", 5, Rocket . "x"],
+		[Accent . Rocket . "x", 6, Accent . Rocket . "…"],
+		["x", 0, "…"], ["x", -1, "…"],
+		["`r`n `t`r`n" . Accent . "`r`nsecond", 2, Accent]
+	]
+	for Index, Row in Cases
+		AssertEqual(Row[3], UserActionFirstLine(Row[1], Row[2]), "First-line UTF-8 boundary " . Index)
+}
+Test("User command first-line byte limits retain complete Unicode scalars (user-command-firstline-scalars)",
+	_UA_FirstLineScalarBoundaries)
