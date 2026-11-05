@@ -23,6 +23,48 @@ local function roster_session(s, initial)
 end
 
 helpers.describe("source-owned simultaneous standalone remap holds", function()
+	helpers.it("does not report synthetic remapped modifiers as physical holds", function()
+		local holds, token = {}, {}
+		Fixture.with_session({ before_hook = function(s)
+			local start = s.hook.start
+			s.hook.start = function(options)
+				s.hook.start = start
+				options.onHoldAdmission = function() return token end
+				options.onHold = function(code) holds[#holds + 1] = code end
+				return start(options)
+			end
+		end }, function(s)
+			s.edge("a", 58, 1, 1)
+			s.pump_at(400)
+			s.edge("a", 58, 0, 500)
+			local down, up = false, false
+			for _, row in ipairs(s.rows) do
+				if row[1] == 29 and row[2] == 1 then down = true end
+				if row[1] == 29 and row[2] == 0 then up = true end
+			end
+			helpers.assert_true(down and up, "the remapper must actually emit synthetic Ctrl down/up")
+			helpers.assert_eq(holds, {}, "the synthetic Ctrl is not a physical hold")
+			s.edge("a", 42, 1, 600)
+			s.edge("a", 42, 0, 800)
+			helpers.assert_eq(holds, { 42 }, "the independently pressed Shift still counts")
+		end)
+	end)
+	helpers.it("measures the same held modifier independently on two keyboards", function()
+		local holds, token = {}, {}
+		Fixture.with_session({ before_hook = function(s)
+			local start = s.hook.start
+			s.hook.start = function(options)
+				s.hook.start = start
+				options.onHoldAdmission = function() return token end
+				options.onHold = function(code, duration, source) holds[#holds + 1] = { code, duration, source } end
+				return start(options)
+			end
+		end }, function(s)
+			s.edge("a", 42, 1, 100); s.edge("b", 42, 1, 200)
+			s.edge("a", 42, 0, 400); s.edge("b", 42, 0, 500)
+			helpers.assert_eq(holds, { { 42, 300, s.paths.a }, { 42, 300, s.paths.b } })
+		end)
+	end)
 	helpers.it("does not emergency-stop a capture restarted by the CapsWord loss callback (emergency-caps-successor)", function()
 		local capture = { is_ready = function() return true end, reset_state = function() return true end,
 			caps_locked = function() return true end, cancel_compose = function() return true end,

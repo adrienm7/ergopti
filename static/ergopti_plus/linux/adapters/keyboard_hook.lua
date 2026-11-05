@@ -1750,21 +1750,6 @@ local function _dispatch_post_remap(ev, source)
 		if not _running or _capture_session ~= session then return end
 	end
 
-	-- XKB has already consumed the transition above. Modifiers still produce no
-	-- domain event; returning here prevents a test double or a malformed keymap
-	-- from inventing a typed character for a physical modifier.
-	if is_modifier then
-		_forward_raw(ev, source)
-		return
-	end
-	if ev.code == EvdevCodes.KEY_CAPSLOCK then
-		-- The desktop's CapsLock is the user's again: a CapsWord session riding
-		-- on it ends, and must not toggle it back.
-		if ev.value == InputEvent.VALUE_DOWN and _locks.word then _locks.end_word(false, "CapsLock pressed") end
-		_forward_raw(ev, source)
-		return
-	end
-
 	-- How long the key was held, measured here because this is the only place a
 	-- release is seen at all.
 	--
@@ -1773,12 +1758,14 @@ local function _dispatch_post_remap(ev, source)
 	-- metrics: on a keyboard whose whole design is tap-hold, how long a key was
 	-- held is the difference between the two things it can mean, and
 	-- agg_app_day_kc_hold was empty because nothing measured it.
-	if ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
+	local eligible_hold = not ev.remapped or ev.original_owner
+		or (not is_modifier and ev.code ~= EvdevCodes.KEY_CAPSLOCK)
+	if eligible_hold and ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
 		local key = source_key(source, ev.code)
 		local token, callback = hold_owner()
 		_pressed_at[key] = token and Monotonic.now_ms() or nil
 		_hold_owners[key] = token and { token = token, callback = callback } or nil
-	elseif ev.value == InputEvent.VALUE_UP and ev.code > 0 then
+	elseif eligible_hold and ev.value == InputEvent.VALUE_UP and ev.code > 0 then
 		local pressed_key = source_key(source, ev.code)
 		local down_at, owner = _pressed_at[pressed_key], _hold_owners[pressed_key]
 		_pressed_at[pressed_key], _hold_owners[pressed_key] = nil, nil
@@ -1801,6 +1788,20 @@ local function _dispatch_post_remap(ev, source)
 			end
 			if not _running or _capture_session ~= session then return end
 		end
+	end
+
+	-- XKB has already consumed the transition above. Modifiers produce no text;
+	-- retire their admitted hold first, then forward them without inventing a character.
+	if is_modifier then
+		_forward_raw(ev, source)
+		return
+	end
+	if ev.code == EvdevCodes.KEY_CAPSLOCK then
+		-- The desktop's CapsLock is the user's again: a CapsWord session riding
+		-- on it ends, and must not toggle it back.
+		if ev.value == InputEvent.VALUE_DOWN and _locks.word then _locks.end_word(false, "CapsLock pressed") end
+		_forward_raw(ev, source)
+		return
 	end
 
 	local consumed_key = source_key(source, ev.code)
