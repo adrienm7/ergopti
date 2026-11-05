@@ -35,6 +35,12 @@
 
 local helpers = require("tests.helpers")
 
+helpers.it("linux-reload-entrypoint: the actual daemon compiles with LuaJIT", function()
+	if not jit then return end
+	local chunk, reason = loadfile(helpers.driver_root() .. "/ergopti_hotstrings.lua")
+	helpers.assert_true(type(chunk) == "function", tostring(reason))
+end)
+
 
 --- Returns the TOP-LEVEL item whose title matches.
 ---
