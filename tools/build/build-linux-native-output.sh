@@ -19,7 +19,7 @@ done
 
 [[ "$(uname -s)" == Linux ]] || { echo "Native archive output requires Linux" >&2; exit 1; }
 [[ "$SOURCE_DIR" == /* && "$OUTPUT_DIR" == /* ]] || { echo "Absolute owned build directories required" >&2; exit 1; }
-SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd -P)"
+IFS= read -r -d '' SOURCE_DIR < <(CDPATH= cd -Pe -- "$SOURCE_DIR" && printf '%s\0' "$PWD")
 for source_name in archive_publication.c archive_publication.h; do
 	[[ -f "${SOURCE_DIR}/${source_name}" && ! -L "${SOURCE_DIR}/${source_name}" ]] || {
 		echo "Ordinary native backend source required" >&2; exit 1;
@@ -29,7 +29,7 @@ done
 TASK_COMPILER="${CC:-cc}"
 command -v "$TASK_COMPILER" >/dev/null || { echo "Native C compiler unavailable" >&2; exit 1; }
 mkdir -p "$OUTPUT_DIR"
-OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd -P)"
+IFS= read -r -d '' OUTPUT_DIR < <(CDPATH= cd -Pe -- "$OUTPUT_DIR" && printf '%s\0' "$PWD")
 DESTINATION="${OUTPUT_DIR}/libergopti_archive_publication.so"
 [[ ! -e "$DESTINATION" && ! -L "$DESTINATION" ]] || { echo "Native backend destination occupied" >&2; exit 1; }
 STAGE_DIR="$(mktemp -d "${OUTPUT_DIR}/.ergopti-native-output.XXXXXX")"

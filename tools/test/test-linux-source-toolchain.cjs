@@ -55,6 +55,19 @@ try {
 	const copiedBuilder = path.join(scratch, 'model repository', builderRelative);
 	fs.mkdirSync(path.dirname(copiedBuilder), { recursive: true });
 	fs.copyFileSync(path.join(root, builderRelative), copiedBuilder);
+	if (process.platform === 'linux') {
+		const unusualSource = path.join(scratch, 'source with trailing newline\n');
+		const unusualOutput = path.join(scratch, 'output with trailing newline\n');
+		fs.mkdirSync(unusualSource);
+		for (const name of ['archive_publication.c', 'archive_publication.h'])
+			fs.copyFileSync(path.join(sourceDirectory, name), path.join(unusualSource, name));
+		const built = spawnSync(bashExecutable(), [bashPath(copiedBuilder), '--source-directory',
+			bashPath(unusualSource), '--output-directory', bashPath(unusualOutput)],
+			{ encoding: 'utf8', timeout: 30000 });
+		assert.equal(built.status, 0, built.stderr || built.error?.message);
+		assert.ok(fs.existsSync(path.join(unusualOutput, 'libergopti_archive_publication.so')));
+		assert.equal(fs.existsSync(unusualOutput.trimEnd()), false);
+	}
 	const archiveDriver = path.join(scratch, 'archive/linux');
 	fs.mkdirSync(archiveDriver, { recursive: true });
 	for (const [label, selectedDriver, manager, skip, repair, ready, packageStatus, expected] of [
