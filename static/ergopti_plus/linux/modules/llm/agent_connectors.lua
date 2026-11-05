@@ -235,7 +235,9 @@ function M.tools(config)
 	if _stopping then return {} end
 	local now = _deps.clock()
 	if _stopping then return {} end
-	if _tools_cache and now - _tools_cache.at < TOOLS_TTL_SEC then return copy_tools(_tools_cache.names) end
+	if _tools_cache and now >= _tools_cache.at and now - _tools_cache.at < TOOLS_TTL_SEC then
+		return copy_tools(_tools_cache.names)
+	end
 	local directory = _deps.tools_dir()
 	if _stopping then return {} end
 	local names, reason = _deps.list_executables(directory)
