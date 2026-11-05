@@ -546,3 +546,30 @@ helpers.describe("layout-capture-context", function()
 		helpers.assert_eq(context, {})
 	end)
 end)
+
+helpers.it("refuses a FIFO finger catalogue without blocking aggregation", function()
+	local uv = require("luv")
+	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-finger-fifo-XXXXXX"))
+	local fifo, script = directory .. "/catalogue", directory .. "/child.lua"
+	local made = os.execute("mkfifo " .. require("text_utils").shell_quote(fifo))
+	assert(made == 0 or made == true)
+	local file = assert(io.open(script, "wb"))
+	assert(file:write(string.format([[
+package.path = %q
+local paths = require("infra.paths")
+local previous = paths.shared
+paths.shared = function(name)
+  if name == "data/keycodes/azerty.json" then return arg[1] end
+  return previous(name)
+end
+require("keystats.finger_map")._reset()
+local ok, err = pcall(require("modules.keystats.aggregate_walker").walk,
+  {}, "2026-01-01", "app", nil, { physical_layout = "qwerty" })
+assert(not ok and tostring(err):find("finger catalogue is unavailable", 1, true))
+]], package.path)))
+	assert(file:close())
+	local quote = require("text_utils").shell_quote
+	local status = os.execute("timeout 3 " .. quote(assert(uv.exepath())) .. " " .. quote(script) .. " " .. quote(fifo))
+	assert(uv.fs_unlink(script)); assert(uv.fs_unlink(fifo)); assert(uv.fs_rmdir(directory))
+	helpers.assert_true(status == 0 or status == true, "a special catalogue must be refused before a blocking read")
+end)

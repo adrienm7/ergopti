@@ -50,11 +50,7 @@ local MIN5_STEP_MINUTES = 5
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local handle = io.open(path, "r")
-	if not handle then return nil end
-	local content = handle:read("*a")
-	handle:close()
-	return content
+	return require("adapters.file_system").read(path)
 end
 
 --- Validates the physical family against its actual provider registry.
