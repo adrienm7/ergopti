@@ -88,7 +88,7 @@
 			"expected_count": 1
 		},
 		{
-			"contains": "agent-timezone-native-boundary",
+			"contains": "agent-timezone-native-fallback-boundary",
 			"expected_count": 1
 		},
 		{
