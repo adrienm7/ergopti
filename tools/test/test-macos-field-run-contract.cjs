@@ -566,6 +566,15 @@ function reportFolder(paths) {
 			}
 		});
 
+		await check('a reload during the run requests it again instead of ending the report', () => {
+			// The maintainer reloaded from the menu while nothing seemed to happen (field report 2026-11-05)
+			assert.match(collector, /^FIELD_RUN_RELOAD_RETRIES=2$/m);
+			assert.match(collector, /plutil -extract cause\.kind raw/);
+			assert.match(collector, /request_id="mac-\$\{stamp\}-r\$\{attempt\}"/);
+			assert.match(collector, /do not reload or quit Ergopti/);
+			assert.match(collector, /printf '%-28s LogsDirPath\\n' "log_folder"/);
+		});
+
 		await check('the collector runs the shell checklist steps from their own file', () => {
 			assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/macos-field-shell-checks\.sh"$/m);
 			assert.match(
