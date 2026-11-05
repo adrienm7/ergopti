@@ -316,7 +316,9 @@ _TPO_BootSealSource(Mode) {
 	global ConfigurationFile, Features, _IniCache, _BootConfigSnapshot
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
 	global _ProxyOverrideInitialized, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
-	global _ProxyOverrideDeclaration, PROXY_OVERRIDE_ENVIRONMENT
+	global _ProxyOverrideDeclaration, PROXY_OVERRIDE_ENVIRONMENT, _ProxyOverrideBootSealSource
+	SavedBootSource := _ProxyOverrideBootSealSource
+	Control := Mode == "unchanged-control" || Mode == "unchanged-bom-control"
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Saved := [Features, _IniCache, _ProxyOverrideInitialized, _ProxyOverrideStored,
 		_ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideDeclaration,
@@ -341,6 +343,8 @@ _TPO_BootSealSource(Mode) {
 		RelayB := "http://fixture-user:fixture-b@proxy-b.invalid:8080"
 		SourceA := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
 			. "`n[" . Declaration["section"] . "]`n" . Declaration["key"] . " = " . TOML_RenderValue(RelayA) . "`n"
+		if Mode == "unchanged-bom-control"
+			SourceA := Chr(0xFEFF) . SourceA
 		AssertTrue(FSWriteCreateDurable(Path, SourceA))
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
@@ -372,11 +376,11 @@ _TPO_BootSealSource(Mode) {
 			_TOML_ConfigPath(Declaration["section"], Declaration["key"]))
 		AssertTrue(Physical["found"])
 		Clear := ProxyOverride_Unseal(Physical["value"])
-		Preserved := Mode == "unchanged-control" ? Clear == RelayA : Clear == RelayB
+		Preserved := Control ? Clear == RelayA : Clear == RelayB
 		_TestPrint("# proxy-boot-source mode=" . Mode . " sealed_now=" . Sealed
 			. " physical_source_preserved=" . Preserved . " old_runtime_sealed=" . _ProxyOverrideSealed)
 		AssertTrue(Preserved, "The automatic boot sealer cannot replace an independently edited proxy setting with old runtime credentials")
-		if Mode == "unchanged-control" {
+		if Control {
 			AssertTrue(Sealed)
 			AssertTrue(ProxyOverride_IsSealed(Physical["value"]), "The real DPAPI producer must seal unchanged A")
 			AssertTrue(_ProxyOverrideSealed)
@@ -391,6 +395,7 @@ _TPO_BootSealSource(Mode) {
 		Features := Saved[1], _IniCache := Saved[2]
 		_ProxyOverrideInitialized := Saved[3], _ProxyOverrideStored := Saved[4]
 		_ProxyOverridePublished := Saved[5], _ProxyOverrideSealed := Saved[6], _ProxyOverrideDeclaration := Saved[7]
+		_ProxyOverrideBootSealSource := SavedBootSource
 		_ConfigBootRejectedOverrides := Saved[8], _ConfigBootOutdatedEntries := Saved[9]
 		_BootConfigSnapshot := HadSnapshot ? SavedSnapshot : unset
 		_ConfigFullSaveCoordinator(Coordinator)
@@ -407,3 +412,6 @@ _TPO_BootSealSource(Mode) {
 for _TPO_BootMode in ["unchanged-control", "external-before-queue", "external-after-queue"]
 	Test("Proxy automatic credential seal: " . _TPO_BootMode . " preserves its actual boot source (proxy-boot-seal-source)",
 		_TPO_BootSealSource.Bind(_TPO_BootMode))
+
+Test("Proxy automatic credential seal: a native BOM source retains usable boot authority (proxy-boot-seal-source)",
+	_TPO_BootSealSource.Bind("unchanged-bom-control"))

@@ -4,7 +4,7 @@
 ; MODULE: Proxy Override Live Fixture
 ; DESCRIPTION:
 ; The real http_client and its real managed worker under one stored proxy
-; override: publishes the value the way boot does, sends one real request, asks
+; override: publishes a detached route value, sends one real request, asks
 ; each route owner of the adapter what it would do, runs the menu row over the
 ; plan's typed values, and writes what came back. tools/test/
 ; test-windows-proxy-override-e2e.cjs builds the plan and reads the fake network.
@@ -73,11 +73,19 @@ _OwnerMain(PlanPath) {
 	_VendorDir := Plan["vendor"]
 	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))
-	; The first start after an edit by hand: the request below then runs on the sealed value.
+	; Direct publication has no authenticated bootstrap source and cannot start
+	; an automatic migration. Positive boot sealing uses the native unit owner.
 	if Plan.Get("seal_at_start", false) {
 		Result["sealed_now"] := ProxyOverride_SealStoredAtStart() ? 1 : 0
 		Result["committed"] := _OwnerCommitted
+		Result["runtime_sealed"] := _ProxyOverrideSealed ? 1 : 0
+		Result["unchanged_unsealed"] := !_ProxyOverrideSealed
+			&& StrCompare(_ProxyOverrideStored, Plan["stored"], true) == 0
 	}
+	; A separate real DPAPI sample qualifies encrypted route transport only;
+	; it neither publishes a bootstrap receipt nor claims a configuration write.
+	if Plan.Get("sample_envelope", false)
+		Result["sample_envelope"] := ProxyOverride_Seal(Plan["stored"])
 	Settings := Map("auto_detect", false, "pac_url", Plan.Get("pac_url", ""), "proxy", Plan.Get("system_proxy", ""), "bypass", "")
 
 	Http := CurlAsyncRequest()
