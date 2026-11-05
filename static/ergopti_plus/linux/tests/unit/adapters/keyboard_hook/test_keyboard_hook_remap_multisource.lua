@@ -724,3 +724,21 @@ helpers.describe("physical magic key post-output failure", function()
 		end)
 	end)
 end)
+
+helpers.describe("keyboard source loss with a shared physical modifier", function()
+	for _, lost in ipairs({ "a", "b" }) do
+		helpers.it("keeps Shift down for the surviving keyboard after losing " .. lost, function()
+			local options = {}
+			Fixture.with_session(options, function(s)
+				s.edge("a", 42, 1, 10); s.edge("b", 42, 1, 20)
+				helpers.assert_eq(s.rows, { { 42, 1 } })
+				options.eof_path = s.paths[lost]
+				s.hook.pump()
+				helpers.assert_true(s.hook.isRunning(), "the other keyboard remains live")
+				helpers.assert_eq(s.rows, { { 42, 1 } }, "loss of one source must not release another's Shift")
+				s.edge(lost == "a" and "b" or "a", 42, 0, 30)
+				helpers.assert_eq(s.rows, { { 42, 1 }, { 42, 0 } }, "the surviving physical release finishes the shared hold")
+			end)
+		end)
+	end
+end)
