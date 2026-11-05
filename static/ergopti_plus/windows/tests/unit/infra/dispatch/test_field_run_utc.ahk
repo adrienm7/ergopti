@@ -13,13 +13,13 @@ _FRU_OneUtcRead() {
 Test("field run: one UTC instant supplies both timestamp fields (field-run-utc-snapshot)", _FRU_OneUtcRead)
 
 _FRU_Boundaries() {
-	for Case in [
+	for Vector in [
 		["20261104235959", "2026-11-04T23:59:59Z"],
 		["20261105000000", "2026-11-05T00:00:00Z"],
 		["20240229235959", "2024-02-29T23:59:59Z"],
 		["20250101000000", "2025-01-01T00:00:00Z"]
 	] {
-		AssertEqual(Case[2], _FieldRun_IsoNow(Case[1]), "the entire UTC document timestamp uses one supplied instant")
+		AssertEqual(Vector[2], _FieldRun_IsoNow(Vector[1]), "the entire UTC document timestamp uses one supplied instant")
 	}
 }
 Test("field run: UTC formatting preserves midnight and leap-day boundaries (field-run-utc-boundaries)", _FRU_Boundaries)
