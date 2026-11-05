@@ -3714,11 +3714,44 @@ function mark_incomplete_read(part, incomplete) {
 	if (window.metrics_freshness) window.metrics_freshness.mark_incomplete(part, incomplete);
 }
 
+/** Preserve only explicitly omitted slots; every other slot is a complete replacement. */
+function merge_partial_today_data(previous, incoming, partial_types) {
+	if (!partial_types.length) return incoming;
+	const merged = Object.create(null);
+	for (const [app, bucket] of Object.entries(incoming || {})) {
+		merged[app] = Object.assign(Object.create(null), bucket);
+	}
+	for (const [app, bucket] of Object.entries(previous || {})) {
+		for (const kind of partial_types) {
+			if (!Object.hasOwn(bucket, kind)) continue;
+			if (!Object.hasOwn(merged, app)) merged[app] = Object.create(null);
+			merged[app][kind] = bucket[kind];
+		}
+	}
+	return merged;
+}
+
+/** Fetch omitted tables only for a visible tab whose selection includes today. */
+function request_partial_today_refresh() {
+	if (!app_state.today_partial_types.includes(app_state.current_tab) || !has_typing_app_selection())
+		return false;
+	const today = get_local_date_string();
+	const start = document.getElementById('date_start')?.value || '';
+	const end = document.getElementById('date_end')?.value || '';
+	if ((start && today < start) || (end && today > end)) return false;
+	// The existing request owner coalesces this selection while it is in flight.
+	// Keep rendered rows rather than showing a spinner for this live refresh.
+	request_range_data(false);
+	return true;
+}
+
 /**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
  *     plus `incomplete: true` when the host read missed rows. A host may name
+ *     `today_partial_types` lists omitted table slots, anchored by `today_date`;
+ *     an absent list means a complete replacement. A host may also name
  *     its history with `historical_serial`, and then replace `historical` with
  *     `historical_reused: true` when the request named that same serial.
  * @param {number|null} [request_id=null] - Native request ownership token.
@@ -3726,6 +3759,21 @@ function mark_incomplete_read(part, incomplete) {
  */
 function receive_range_data(payload, request_id = null) {
 	if (!can_receive_range_data(request_id)) return false;
+	const has_day = Boolean(payload) && Object.hasOwn(payload, 'today_date');
+	// Legacy complete payloads have no captured day; never reuse their slots.
+	const day = has_day ? payload.today_date : '';
+	const kinds =
+		payload && Object.hasOwn(payload, 'today_partial_types') ? payload.today_partial_types : [];
+	if (
+		!Array.isArray(kinds) ||
+		kinds.some((kind) => typeof kind !== 'string' || !Object.hasOwn(app_state.data, kind))
+	)
+		throw new TypeError('Invalid partial today table metadata.');
+	if ((has_day || kinds.length) && (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)))
+		throw new TypeError('Invalid today snapshot date.');
+	if (kinds.length && !has_day)
+		throw new TypeError('Partial today data requires its captured date.');
+	const partial_types = [...new Set(kinds)];
 	const serial = Number.isSafeInteger(payload?.historical_serial)
 		? payload.historical_serial
 		: null;
@@ -3747,8 +3795,12 @@ function receive_range_data(payload, request_id = null) {
 	if (payload.historical_reused !== true) {
 		app_state.historical_cache = payload.historical;
 		app_state.historical_serial = serial;
+		app_state.historical_cache_incomplete = payload.incomplete === true;
 	}
-	app_state.today_live_data = payload.today;
+	const prior_today = day === app_state.today_live_date ? app_state.today_live_data : null;
+	app_state.today_live_data = merge_partial_today_data(prior_today, payload.today, partial_types);
+	app_state.today_partial_types = partial_types;
+	app_state.today_live_date = day;
 	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();
 	return true;
@@ -3762,6 +3814,8 @@ function receive_range_data(payload, request_id = null) {
 window.receive_live_update = function (today_idx) {
 	invalidate_typing_projection_cache();
 	app_state.today_live_data = today_idx;
+	app_state.today_partial_types = [];
+	app_state.today_live_date = get_local_date_string();
 	if (app_state.live_update_timer) clearTimeout(app_state.live_update_timer);
 	app_state.live_update_timer = setTimeout(() => {
 		apply_local_filters();

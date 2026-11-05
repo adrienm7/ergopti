@@ -928,7 +928,11 @@ KLPF_WorkerMain() {
 								KLPF_WorkerFail(stage, phase)
 						Refused := []
 						KLR_BeginPartialRead()
-						try RangeJson := KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps)
+						SnapshotDay := FormatTime(A_Now, "yyyy-MM-dd")
+						try {
+								RangeJson := KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps, SnapshotDay)
+								RangeJson := KLPF_RangeJsonWithDay(RangeJson, SnapshotDay)
+						}
 						finally Refused := KLR_EndPartialRead()
 						if Refused.Length
 								RangeJson := KLPF_MarkJsonIncomplete(RangeJson)
@@ -1105,6 +1109,8 @@ KLPF_SerializeBlob(blob) {
 		; Extract trusted SQL JSON before encoding metadata. Attach it only at
 		; the encoder-owned object boundary, never by searching user-controlled keys.
 		today_json_raw := ""
+		today_partial_types_json := ""
+		today_date_json := ""
 		prefetch_json_raw := ""
 		manifest_json_raw := ""
 		if blob.Has("__klpf_manifest_json") {
@@ -1117,6 +1123,13 @@ KLPF_SerializeBlob(blob) {
 		}
 		if blob.Has("__klpf_today_json") {
 				today_json_raw := blob["__klpf_today_json"]
+				if blob.Has("_prefetch_data") && blob["_prefetch_data"] is Map {
+						TodayMeta := blob["_prefetch_data"]
+						if TodayMeta.Has("today_partial_types")
+								today_partial_types_json := KL_JsonEncode(TodayMeta["today_partial_types"])
+						if TodayMeta.Has("today_date")
+								today_date_json := KL_JsonEncode(TodayMeta["today_date"])
+				}
 				blob.Delete("__klpf_today_json")
 				blob.Delete("_prefetch_data")
 		}
@@ -1145,9 +1158,16 @@ KLPF_SerializeBlob(blob) {
 		if (today_json_raw != "") {
 				json := SubStr(json, 1, StrLen(json) - 1)
 						. ',"_prefetch_data":{"today":' . today_json_raw
+						. (today_partial_types_json != "" ? ',"today_partial_types":' . today_partial_types_json : "")
+						. (today_date_json != "" ? ',"today_date":' . today_date_json : "")
 						. (range_incomplete ? ',"incomplete":true' : "") . "}}"
 		}
 		return json
+}
+
+; Attach owned calendar provenance without decoding the encoded token dictionaries.
+KLPF_RangeJsonWithDay(Json, SnapshotDay) {
+		return SubStr(Json, 1, StrLen(Json) - 1) . ',"today_date":' . KL_JsonEncode(SnapshotDay) . "}"
 }
 
 ; Read only the small provenance header; legacy snapshots have no trusted seed.
@@ -1308,7 +1328,7 @@ KLPF_UniqueAppsFromManifest(manifest) {
 }
 
 KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "", EncodeManifest := false) {
-		global KLPF_MANIFEST_CACHE
+		global KLPF_MANIFEST_CACHE, KLR_NGRAM_TYPE_TABLE, KLR_NGRAM_LIVE_TABLE
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 		use_cache := !EncodeManifest && !CompleteSnapshot && (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
 		if EncodeManifest {
@@ -1354,6 +1374,7 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 				}
 				blob["__klpf_prefetch_json"] := KLR_BuildRangeSplitTodayJson(db,
 						first_date, today, KLPF_UniqueAppsFromManifest(manifest), today)
+				blob["__klpf_prefetch_json"] := KLPF_RangeJsonWithDay(blob["__klpf_prefetch_json"], today)
 				return blob
 		}
 
@@ -1376,8 +1397,15 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 				; without interpreting application names as serialization markers.
 				today_json := KLR_BuildTodayIdxJson(db, KLPF_UniqueAppsFromManifest(manifest), false, today)
 				; Omit historical data: an explicit empty map means a full replacement.
+				PartialTypes := []
+				for Code in KLR_NGRAM_TYPE_TABLE
+						if !KLR_NGRAM_LIVE_TABLE.Has(Code)
+								PartialTypes.Push(Code)
+				; Omission is not an empty table. The page retains these slots and
+				; requests a complete selected range only when one becomes visible.
 				blob["_prefetch_data"] := Map(
-						"today", "__KLPF_TODAY_PLACEHOLDER__"
+						"today", "__KLPF_TODAY_PLACEHOLDER__",
+						"today_partial_types", PartialTypes, "today_date", today
 				)
 				blob["__klpf_today_json"] := today_json
 				return blob
@@ -1393,6 +1421,7 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 		range_data := Map("historical", Map(), "today", Map())
 		if (first_date != "")
 				range_data := KLR_ReadRangeSplitToday(db, first_date, today, apps_list, today)
+		range_data["today_date"] := today
 		blob["_prefetch_data"] := range_data
 		return blob
 }
