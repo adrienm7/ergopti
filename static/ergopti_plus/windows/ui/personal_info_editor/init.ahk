@@ -71,7 +71,10 @@ _PiEdWeb_TryOpen() {
 	global _VendorDir, _SharedDir
 	global _PiEdWeb_EditorSource, _PiEdWeb_SubscriptionOwner
 
+	EntryEpoch := _PiEdWeb_SessionEpoch
 	_PiEdWeb_RetryRetiredHosts()
+	if _PiEdWeb_SessionEpoch != EntryEpoch
+		return true
 	if !_PiEdWeb_Available()
 		return false
 

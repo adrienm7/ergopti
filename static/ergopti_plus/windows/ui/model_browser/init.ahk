@@ -709,7 +709,13 @@ _LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 	global _VendorDir, _SharedDir, _I18nLocale
 
 	FallbackEpoch := 0
+	EntryEpoch := _LLM_MBW_SessionEpoch
 	_LLM_MBW_RetryRetiredHosts()
+	if _LLM_MBW_SessionEpoch != EntryEpoch {
+		; Retirement consumed this older opening; forbid native fallback too.
+		FallbackEpoch := -1
+		return 0
+	}
 	if IsSet(_LLM_MBW_Gui) {
 		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
 		WMPresentWindow(Window)
