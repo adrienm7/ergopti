@@ -489,3 +489,63 @@ _KCCE_SuccessorLogBody(World, Ports) {
 	} finally Suspend(WasSuspended)
 }
 Test("key chord lifecycle: logging cannot fire a retired action or erase its successor (chord-callout-successor)", _KCCE_SuccessorDuringLog)
+
+_KCSBOOT_ReadTypedSettings(Mode, _World, _Ports) {
+	global ConfigurationFile, _ConfigBootReadFailed
+	global KeyCombinationChordConfig, _KeyCombinationChordPolicy
+	SavedPath := ConfigurationFile, SavedReadFailed := _ConfigBootReadFailed
+	Root := A_Temp . "\ergopti_key_chord_boot_types_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\config.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "the real source fixture must acquire its root before any write")
+		DelayRaw := "100", SymmetryRaw := "false", ExpectedDelay := 100, ExpectedSymmetry := false, Elapsed := 0
+		switch Mode {
+			case "quoted-symmetry": SymmetryRaw := '"false"'
+			case "number-symmetry": SymmetryRaw := "2"
+			case "quoted-delay": DelayRaw := '"500"', Elapsed := 200
+			case "boolean-delay": DelayRaw := "true", Elapsed := 50
+			case "true-control": SymmetryRaw := "true", ExpectedSymmetry := true
+			case "numeric-delay-control": DelayRaw := "500", ExpectedDelay := 500, Elapsed := 200
+		}
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[mod_combos]`n"
+			. "simultaneous_threshold_ms = " . DelayRaw . "`nsymmetric = " . SymmetryRaw . "`n"
+			. '[mod_combos.config.caps_lock_then_tab]`ncombo = "copy"`n'
+			. '[mod_combos.config.tab_then_caps_lock]`ncombo = "paste"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"], "the source must have a genuine current-schema boot admission")
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlBootSnapshot(Cache)
+		AssertTrue(IsObject(Snapshot), "the policy must receive the actual boot cache rather than a detached mock")
+		ConfigTomlBootSnapshotValue(Snapshot, "mod_combos", "symmetric", &CanonicalSymmetry)
+		ConfigTomlBootSnapshotValue(Snapshot, "mod_combos", "simultaneous_threshold_ms", &CanonicalDelay)
+		AssertEqual(ExpectedSymmetry, CanonicalSymmetry, "the canonical boot owner already knows the stored or default symmetry")
+		AssertEqual(ExpectedDelay, CanonicalDelay, "the canonical boot owner already knows the stored or default timing")
+		KeyCombinationChordsReadConfig(Cache)
+		Forward := _KeyCombinationChordPolicy.Choose("caps_lock", "tab", Elapsed)
+		Reverse := _KeyCombinationChordPolicy.Choose("tab", "caps_lock", Elapsed)
+		if Elapsed > ExpectedDelay {
+			AssertFalse(Forward, "an outdated quoted delay cannot lengthen the real policy's chord window")
+			AssertFalse(Reverse)
+		} else {
+			AssertTrue(Forward is Map && Reverse is Map, "valid timing must preserve both authored actions")
+			AssertEqual(ExpectedSymmetry ? "paste" : "copy", Forward["action"], "the actual policy must not route a non-symmetric order to its reverse action")
+			AssertEqual("paste", Reverse["action"])
+		}
+		AssertEqual(ExpectedSymmetry, KeyCombinationChordConfig[MenuCommand.COMBO_SYMMETRIC])
+		AssertEqual(ExpectedDelay, KeyCombinationChordConfig[ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS])
+		AssertEqual(Source, FSReadUtf8Exact(Path), "loading outdated values must leave the authored source unchanged")
+	} finally {
+		ConfigurationFile := SavedPath, _ConfigBootReadFailed := SavedReadFailed
+		if Created {
+			try _TOML_InvalidateParseCache(Path)
+			finally DirDelete(Root, true)
+		}
+	}
+}
+for _KCSBOOT_Mode in ["quoted-symmetry", "number-symmetry", "quoted-delay", "boolean-delay", "false-control", "true-control", "numeric-delay-control"]
+	Test("key chord boot settings: " . _KCSBOOT_Mode,
+		_KCCE_With.Bind(Map(), false, _KCSBOOT_ReadTypedSettings.Bind(_KCSBOOT_Mode)))

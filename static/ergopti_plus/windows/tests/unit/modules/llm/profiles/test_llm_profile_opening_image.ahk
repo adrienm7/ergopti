@@ -34,7 +34,7 @@ _PFI_NativeInputTick(Step) {
 		return
 	Step.Busy := true
 	try {
-		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . A_Pid) {
+		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . ProcessExist()) {
 			if WinGetTitle("ahk_id " . Hwnd) != Step.Title
 				continue
 			Step.Hwnd := Hwnd
@@ -173,6 +173,10 @@ _PFI_Run(Mode) {
 		_LLM_Menu["enabled"] := false
 		State.InitialProfiles := LLM_Menu_DeepClone(Profiles)
 		State.InitialImage := FSReadUtf8Exact(World.ConfigPath)
+		; A source captured only after this valid external replacement must not
+		; bless the old live profile array as the source of those newer bytes.
+		if Mode == "edit-preopen-external"
+			_PFI_External(State)
 		MenuBefore := _LLM_Menu
 		Port := Map("input", _PFI_Input.Bind(State), "confirm", _PFI_Confirm.Bind(State),
 			"notify", _PFI_Notify.Bind(State), "collect", _PFI_Collect.Bind(State),
@@ -210,8 +214,19 @@ _PFI_Run(Mode) {
 			Result := LLM_Menu_OnUserProfileClick(Profiles[1], Port)
 		Accepted := Mode == "edit-current" || Mode == "create-current" || Mode == "delete-current"
 			|| Mode == "web-current" || Mode == "use-current"
+			|| (Mode == "edit-preopen-external" && World.ApplyCalls == 1)
 			|| Mode == "edit-native-paste" || Mode == "edit-native-single"
 		Cancelled := InStr(Mode, "cancel") > 0
+		if Mode == "edit-preopen-external" {
+			Observed := TOML_ParseFreshFileTyped(World.ConfigPath)
+			ObservedProfiles := _LLM_Menu_DeserializeUserProfiles(Observed["llm"]["user_profiles"])
+			AssertTrue(ObservedProfiles is Array && ObservedProfiles.Length == 2)
+			Preserved := ObservedProfiles[2]["system_single"] == "external-b-must-survive"
+			_TestPrint("# profile-preopen-source apply_calls=" . World.ApplyCalls . " input_calls=" . State.Inputs
+				. " physical_sibling_preserved=" . Preserved
+				. " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
+			AssertTrue(Preserved, "Opening the editor after replacement cannot bless stale RAM and erase the newer independent profile")
+		}
 		AssertEqual(Accepted, World.ApplyCalls, "Only an owned accepted image may publish the real profile action.")
 		HandledChooser := InStr(Mode, "chooser-edit") || InStr(Mode, "use")
 		if HandledChooser
@@ -233,8 +248,9 @@ _PFI_Run(Mode) {
 			AssertEqual(ExpectedCount, Saved.Length)
 			Sibling := Mode == "delete-current" ? Saved[1] : Saved[2]
 			AssertEqual("user_profile_b", Sibling["id"])
-			AssertEqual("original-b", Sibling["system_single"], "Successful edits preserve the independent sibling profile.")
-			if Mode == "edit-current" || Mode == "web-current" {
+			AssertEqual(Mode == "edit-preopen-external" ? "external-b-must-survive" : "original-b",
+				Sibling["system_single"], "Successful edits preserve the independent sibling profile.")
+			if Mode == "edit-current" || Mode == "web-current" || Mode == "edit-preopen-external" {
 				AssertEqual("edited-a", Saved[1]["system_single"])
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
@@ -253,7 +269,11 @@ _PFI_Run(Mode) {
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
 		}
-		if SubStr(Mode, 1, 5) == "edit-" || SubStr(Mode, 1, 7) == "create-"
+		if Mode == "edit-preopen-external" {
+			AssertTrue(State.Inputs <= 2, "A refused stale opening may stop before the native inputs")
+			if Accepted
+				AssertEqual(2, State.Inputs, "A source-reconciled successful edit must still consume both actual inputs")
+		} else if SubStr(Mode, 1, 5) == "edit-" || SubStr(Mode, 1, 7) == "create-"
 			AssertEqual(Cancelled && Mode != "edit-native-cancel" ? 1 : 2, State.Inputs, "Both actual fallback inputs must be exercised except ordinary label cancellation.")
 		if InStr(Mode, "delete")
 			AssertEqual(2, State.Confirms, "Removal must exercise both real confirmation callbacks.")
@@ -261,7 +281,11 @@ _PFI_Run(Mode) {
 			AssertEqual(1, State.Confirms)
 			AssertEqual(2, State.Inputs, "The chooser must carry its original image into the subsequent editor.")
 		}
-		if !Cancelled && Mode != "web-successor"
+		if Mode == "edit-preopen-external" {
+			AssertTrue(State.Collects <= 1, "A refused stale image must never retry its full projection automatically")
+			if Accepted
+				AssertEqual(1, State.Collects, "A successful reconciled edit must serialize its actual candidate")
+		} else if !Cancelled && Mode != "web-successor"
 			AssertEqual(1, State.Collects, "The actual profile collector must run before native image refusal.")
 		AssertFalse(_ConfigWriteTerminalIsActive(), "Every path must release its exact borrowed configuration lease.")
 	} finally {
@@ -316,3 +340,8 @@ Test("LLM profile policy: cold recommendation is composed before menu startup (l
 for _PFI_NativeMode in ["edit-native-paste", "edit-native-single", "edit-native-cancel"]
 	Test("LLM native profile prompt: " . _PFI_NativeMode . " retains pasted lines (native-profile-paste-owner)",
 		_PFI_Run.Bind(_PFI_NativeMode))
+
+Test("LLM profile opening source: prior external sibling edit survives (llm-profile-preopen-source)",
+	_PFI_Run.Bind("edit-preopen-external"))
+Test("LLM profile opening source: matching live and physical images still edit (llm-profile-preopen-source)",
+	_PFI_Run.Bind("edit-current"))
