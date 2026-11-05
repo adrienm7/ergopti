@@ -1423,3 +1423,47 @@ _KCTR_DurableCase(Mode) {
 for _KCTR_Mode in ["complete-control", "partial-retry", "privacy-terminal", "transition-retry"]
 	Test("Keystats context tail: " . _KCTR_Mode . " consumes only independently acknowledged intervals (context-tail-retry-owner)",
 		_KCTR_DurableCase.Bind(_KCTR_Mode))
+
+
+; Proposed append-only native regression for test_keystats_reader_manifest_contract.ahk.
+; This measures canonical journal reconstruction, not a native InputHook batching race.
+_KTPR_CorpusCase(VectorId) {
+	Corpus := _KlgAggCorpus_LoadCorpus()
+	AssertTrue(Corpus is Map && Corpus.Has("vectors"), "Use the same shared golden input and expected values as the real walker contract")
+	Vector := 0
+	for Candidate in Corpus["vectors"]
+		if Candidate["id"] == VectorId
+			Vector := Candidate
+	AssertTrue(Vector is Map && Vector["events"].Length == 1, "This focused case must select one genuine corpus typing row")
+	Raw := Vector["events"][1]
+	Events := [], Text := ""
+	for Ev in Raw["events"] {
+		Events.Push([Ev["char"], Ev["delay"], Ev["meta"]])
+		Text .= Ev["char"]
+	}
+	Entry := Map("type", "typing", "_event_id", 1, "app", Raw["app"],
+		"timestamp", Raw["timestamp"], "events", Events, "text", Text,
+		"pause_before_ms", Events[1][2])
+	Date := SubStr(Raw["timestamp"], 1, 10)
+	Expected := Vector["expected"]["app_day"][Date . Chr(1) . Raw["app"]]
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Sql in KL_BuildInserts(Entry)
+			AssertTrue(SQLite_Exec(Db, Sql), "The actual canonical typing builder must persist the shared input unchanged")
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Cell := KLR_ReadManifest(Db, Date, Date)[Date][Raw["app"]]
+		_TestPrint("# think-pause-corpus id=" . VectorId . " chars=" . Cell["chars"]
+			. " pauses=" . Cell["pauses"] . " think_time=" . Cell["think_time"])
+		AssertEqual(Expected["chars"], Cell["chars"])
+		AssertEqual(Expected["pauses"], Cell["pauses"], "SQL-owned pause counts must retain manual pauses at every position in a canonical row")
+		AssertEqual(Expected["think_time_ms"], Cell["think_time"], "The published reconstruction must honor the shared event-level thinking-time contract")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KTPR_Id in ["simple_typing_3_chars", "typing_with_think_pause"]
+	Test("Keystats reader shared think-pause corpus: " . _KTPR_Id . " survives canonical SQL projection (reader-think-pause-corpus)",
+		_KTPR_CorpusCase.Bind(_KTPR_Id))

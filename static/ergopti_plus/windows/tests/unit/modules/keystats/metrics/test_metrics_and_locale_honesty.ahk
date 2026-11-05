@@ -255,3 +255,34 @@ _MLH_ContextOriginsRetainNative64Domain() {
 }
 Test("Keystats native64 context: watermark and acknowledged endpoint retain full native origins (context-native64-origin-contract)",
 	_MLH_ContextOriginsRetainNative64Domain)
+
+
+; Both callers inside Critical and the non-Critical watcher share this owner.
+_KCC_CompensationAtomicSource(Body) {
+	Claim := InStr(Body, 'PreviousCritical := Critical("On")')
+	Release := InStr(Body, 'finally Critical(PreviousCritical)')
+	if Claim <= 0 || Release <= Claim
+		return false
+	for Statement in ["Now :=", "Pending := KLHook.context_transition", "IsObject(KLHook.context_stop)",
+		"Pending.App.Shift :=", "Pending.Title.Shift :=", "KLHook.app_entered_at :=", "KLHook.title_entered_at :="] {
+		Position := InStr(Body, Statement)
+		if Position <= Claim || Position >= Release
+			return false
+	}
+	return true
+}
+
+_KCC_CompensationAtomicOwner() {
+	Body := _StripFullLineComments(_DriverFuncBody("KL_Hook_AdvanceContextWatermarks"))
+	Assert(_KCC_CompensationAtomicSource(Body),
+		"The stop/frame observation and both clock compensations must share one bounded RAM Critical owner")
+	Assert(!_KCC_CompensationAtomicSource(StrReplace(Body, 'PreviousCritical := Critical("On")', 'PreviousCritical := 0')),
+		"The guard must reject the actual former unprotected transaction")
+	for Forbidden in ["DllCall(", "Sleep(", "Logger", "MF_ShouldFilter", "FileRead(", "FileAppend("]
+		Assert(InStr(Body, Forbidden) == 0, "The compensation claim must perform no I/O or yielding callout: " . Forbidden)
+	Watcher := _StripFullLineComments(_DriverFuncBody("KL_Watchers_OnKeystroke"))
+	Assert(InStr(Watcher, "KL_Hook_AdvanceContextWatermarks(gap)") > 0,
+		"The non-Critical watcher caller must continue to use the shared atomic compensation owner")
+}
+Test("Keystats compensation: native origins and pending receipts advance under one RAM claim (context-compensation-atomic-owner)",
+	_KCC_CompensationAtomicOwner)

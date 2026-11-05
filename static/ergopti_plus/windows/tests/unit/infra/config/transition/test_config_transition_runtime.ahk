@@ -602,7 +602,7 @@ Test("config transition retention: settled raw rollback releases its original na
 
 
 
-_PBAD_Case(Invalid, Protocol := "utf8") {
+_PBAD_Case(Invalid, Protocol := "utf8", ReplacementScalar := false) {
 	Root := A_Temp . "\ergopti_paths_byte_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Created := false
 	try {
@@ -610,7 +610,7 @@ _PBAD_Case(Invalid, Protocol := "utf8") {
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
 		DefaultDir := Root . "\default\"
-		TargetDir := Root . (Invalid ? "\profile" . Chr(0xFFFD) . "\" : "\profilé\")
+		TargetDir := Root . ((Invalid || ReplacementScalar) ? "\profile" . Chr(0xFFFD) . "\" : "\profilé\")
 		AssertEqual(1, FSCreateDirectoryExclusiveStrict(DefaultDir))
 		AssertEqual(1, FSCreateDirectoryExclusiveStrict(TargetDir))
 		AssertEqual(1, FSWriteCreateDurable(DefaultDir . "config.toml", '[private]`nowner = "default"`n'))
@@ -715,3 +715,5 @@ Test("paths byte admission: actual Unicode UTF-16LE BOM profile remains selected
 
 if A_LineFile = A_ScriptFullPath
 	RunTests()
+
+Test("paths byte admission: valid replacement scalar selects its exact profile (paths-valid-replacement-scalar)", _PBAD_Case.Bind(false, "utf8", true))
