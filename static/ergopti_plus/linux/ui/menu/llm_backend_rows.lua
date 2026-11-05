@@ -390,7 +390,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	--- The entry the page was drawn with is still the active one.
 	local function active_commands_ready()
 		local current = entries.active()
-		return active ~= nil and current ~= nil and current.id == active.id
+		return active ~= nil and current == active
 	end
 	-- Two entries of one provider and host can share a model name: each
 	-- entry's own model wins, then the first entry keeps a shared known model
@@ -431,8 +431,10 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
 				run = function() return run_test(remote, dialogs, entry, label, function() return entry_retained(entries, entry) end, page_current) end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+				if not entry_retained(entries, entry) then return false end
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+				if not entry_retained(entries, entry) then return false end
 				if entries.remove(entry.id) ~= true then return false end
 				changed()
 				return true
