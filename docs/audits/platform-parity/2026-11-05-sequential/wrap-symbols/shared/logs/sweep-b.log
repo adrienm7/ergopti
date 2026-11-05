@@ -1,0 +1,12 @@
+$ python3 /workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/shared/probes/build-comparison.py
+exit=0 sha256=a0c1650df26ff25ad38fde2352bd866a9ac796d18a3d6c165672a769e19e1989
+inventory:43 catalogue rows,7 groups,36 capabilities,2 enable settings,7 management commands,21 locales; missing locale keys={}
+$ /workspace/scratch/parity-toolchain/ci-bin/lua5.4 /workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/shared/probes/shared-model.lua /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/shared
+exit=0 sha256=8edce89d8b480d20dce2128527d08aee922bbe5436f32e1995183a8ca956d0a0
+TOTAL assertions=283; actual shared parser/preferences/mutation executed; native GUI and desktop receiving unrun
+$ /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/shared/probes/shared-model.lua /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/shared
+exit=0 sha256=c8d849264b236c2fd5601f7a4dbabeb5bc2c29399a37d55a552afa1fd5236a15
+TOTAL assertions=283; actual shared parser/preferences/mutation executed; native GUI and desktop receiving unrun
+Whole bounded review: catalogue43/groups7; parameter aliases/order/collisions/Unicode/multichar/empty;2 settings+schema;7 management commands+native alternatives;21 locale projections;36 capabilities; actual preference publication/reentry/stale controls.
+OS owner guillemet,macOS filtering,Linux picker omission evidence remains separately owned; no new shared confirmed root. Source inventory=53 files.
+Source inventory identical to sweep A.

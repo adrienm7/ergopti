@@ -1,0 +1,55 @@
+{
+	"schema_version": 1,
+	"scope": "macOS WPM widget/readout only",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"skills": ["adversarial-audit", "false-green-tests", "hammerspoon-driver"],
+	"surfaces": [
+		{
+			"surface": "widget/menubar/shared UI all files",
+			"status": "source and actual-owner Lua5.4 execution"
+		},
+		{
+			"surface": "native canvas drag admission",
+			"status": "actual owner over native contract seam plus pinned native source"
+		},
+		{
+			"surface": "hotplug cached anchors",
+			"status": "actual-owner requested geometry plus native borderless/setFrame/AppKit contract; Darwin compositor not executed"
+		},
+		{
+			"surface": "source colors, graph, startup idle, idle decay, pause stop/resume, stale callbacks, refused draw",
+			"status": "actual owner controls plus 57 registered WPM passing cases"
+		},
+		{
+			"surface": "public menu, metrics scope and global pause registry",
+			"status": "source-reviewed joins; no native menu clicks"
+		},
+		{
+			"surface": "keystats rolling/source producer",
+			"status": "actual get_live_stats/notify source reviewed; synthetic payload seam in owner proof"
+		},
+		{
+			"surface": "position durability",
+			"status": "actual Storage healthy publication; nontransactional independent keys source-reviewed; refusal risk not counted"
+		},
+		{
+			"surface": "platform parity",
+			"status": "shared Linux model/surface and Windows GDI+ owners compared; shared role owns idle policy declaration issue"
+		}
+	],
+	"registered_tests": {
+		"passed": 57,
+		"failed": 0,
+		"log": "probes/registered-wpm.log"
+	},
+	"dry_sweeps": ["probes/dry-A.json", "probes/dry-B.json"],
+	"limits": [
+		"No Darwin native UI/compositor/input delivery",
+		"No performance or memory measurements",
+		"No user logs/config/clipboard/live services"
+	],
+	"deferred": [
+		"Position reset/drag durability failure is not a confirmed new root; adapter refusal logs are visible",
+		"README always-visible menubar text is stale documentation, not runtime finding"
+	]
+}

@@ -1,0 +1,13 @@
+char="«" consumed=false writes=0 reads=1 output=""
+EXPLICIT_PARAMETER « left="« " right=" »"
+char="»" consumed=false writes=0 reads=1 output=""
+EXPLICIT_PARAMETER » left="« " right=" »"
+char="(" consumed=true writes=1 reads=2 output="(lève\
+二😀)"
+char=")" consumed=true writes=1 reads=2 output="(lève\
+二😀)"
+char="(" consumed=false writes=0 reads=2 output=""
+char="(" consumed=false writes=0 reads=1 output=""
+char="(" consumed=false writes=0 reads=1 output=""
+AMBIGUOUS_QUOTE typed=„…“ parameter=“…”
+PASS production manager catalogue and production wrap controller; recording output port only; no native input/clipboard

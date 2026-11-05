@@ -1,0 +1,2 @@
+PASS actual shared Lua mask owner + actual TOML policy: 15 vectors, 6 malformed policies, 15 fields; unknown-declaration and astral redaction controls. Runtime=Lua 5.1 LuaJIT 2.1.1793383622
+LIMIT: pure shared mask execution only. Not Windows AHK port, editor, typing, logs, clipboard, or native receiving.

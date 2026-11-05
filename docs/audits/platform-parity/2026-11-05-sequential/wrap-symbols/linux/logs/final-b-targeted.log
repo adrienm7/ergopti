@@ -1,0 +1,682 @@
+
+=== wrap_selection parameter replays the shared wrap-pair corpus ===
+# lua_timing {"schema":1,"driver":"linux","id":2,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"the parameter is declared and the real catalogue is loaded","status":"pass","elapsed_ms":0.011547,"timing_error":""}
+  ok   the parameter is declared and the real catalogue is loaded
+# lua_timing {"schema":1,"driver":"linux","id":3,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_opening_parenthesis'","status":"pass","elapsed_ms":0.013861,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_opening_parenthesis'
+# lua_timing {"schema":1,"driver":"linux","id":4,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_closing_parenthesis'","status":"pass","elapsed_ms":0.044968,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_closing_parenthesis'
+# lua_timing {"schema":1,"driver":"linux","id":5,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_guillemet_without_its_space'","status":"pass","elapsed_ms":0.010315,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_guillemet_without_its_space'
+# lua_timing {"schema":1,"driver":"linux","id":6,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_closing_guillemet'","status":"pass","elapsed_ms":0.010325,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_closing_guillemet'
+# lua_timing {"schema":1,"driver":"linux","id":7,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'opening_symbol_wins_over_closing_symbol'","status":"pass","elapsed_ms":0.012099,"timing_error":""}
+  ok   wrap-pair vector 'opening_symbol_wins_over_closing_symbol'
+# lua_timing {"schema":1,"driver":"linux","id":8,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_symmetric_symbol'","status":"pass","elapsed_ms":0.015644,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_symmetric_symbol'
+# lua_timing {"schema":1,"driver":"linux","id":9,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'catalogue_pipe_is_a_symbol_not_a_separator'","status":"pass","elapsed_ms":0.013731,"timing_error":""}
+  ok   wrap-pair vector 'catalogue_pipe_is_a_symbol_not_a_separator'
+# lua_timing {"schema":1,"driver":"linux","id":10,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'surrounding_spaces_are_trimmed'","status":"pass","elapsed_ms":0.027241,"timing_error":""}
+  ok   wrap-pair vector 'surrounding_spaces_are_trimmed'
+# lua_timing {"schema":1,"driver":"linux","id":11,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_pair'","status":"pass","elapsed_ms":0.030256,"timing_error":""}
+  ok   wrap-pair vector 'custom_pair'
+# lua_timing {"schema":1,"driver":"linux","id":12,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_pair_keeps_its_inner_spaces'","status":"pass","elapsed_ms":0.034081,"timing_error":""}
+  ok   wrap-pair vector 'custom_pair_keeps_its_inner_spaces'
+# lua_timing {"schema":1,"driver":"linux","id":13,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_markdown_bold'","status":"pass","elapsed_ms":0.015122,"timing_error":""}
+  ok   wrap-pair vector 'custom_markdown_bold'
+# lua_timing {"schema":1,"driver":"linux","id":14,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'empty'","status":"pass","elapsed_ms":0.001442,"timing_error":""}
+  ok   wrap-pair vector 'empty'
+# lua_timing {"schema":1,"driver":"linux","id":15,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'blank'","status":"pass","elapsed_ms":0.001242,"timing_error":""}
+  ok   wrap-pair vector 'blank'
+# lua_timing {"schema":1,"driver":"linux","id":16,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'unknown_symbol'","status":"pass","elapsed_ms":0.014882,"timing_error":""}
+  ok   wrap-pair vector 'unknown_symbol'
+# lua_timing {"schema":1,"driver":"linux","id":17,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_pair_without_right'","status":"pass","elapsed_ms":0.015503,"timing_error":""}
+  ok   wrap-pair vector 'custom_pair_without_right'
+# lua_timing {"schema":1,"driver":"linux","id":18,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_pair_without_left'","status":"pass","elapsed_ms":0.015994,"timing_error":""}
+  ok   wrap-pair vector 'custom_pair_without_left'
+# lua_timing {"schema":1,"driver":"linux","id":19,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'custom_pair_with_blank_side'","status":"pass","elapsed_ms":0.131839,"timing_error":""}
+  ok   wrap-pair vector 'custom_pair_with_blank_side'
+# lua_timing {"schema":1,"driver":"linux","id":20,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'two_separators'","status":"pass","elapsed_ms":0.028132,"timing_error":""}
+  ok   wrap-pair vector 'two_separators'
+# lua_timing {"schema":1,"driver":"linux","id":21,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"wrap-pair vector 'line_break'","status":"pass","elapsed_ms":0.020160,"timing_error":""}
+  ok   wrap-pair vector 'line_break'
+# lua_timing {"schema":1,"driver":"linux","id":1,"kind":"module","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","name":"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors","status":"pass","elapsed_ms":33.776896,"timing_error":""}
+
+=== wrap on type (linux): the decision ===
+# lua_timing {"schema":1,"driver":"linux","id":23,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"wraps a mouse selection and swallows the symbol","status":"pass","elapsed_ms":0.035574,"timing_error":""}
+  ok   wraps a mouse selection and swallows the symbol
+# lua_timing {"schema":1,"driver":"linux","id":24,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"wraps a Shift+Arrow selection with a multi-byte pair","status":"pass","elapsed_ms":0.008903,"timing_error":""}
+  ok   wraps a Shift+Arrow selection with a multi-byte pair
+# lua_timing {"schema":1,"driver":"linux","id":25,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"types the symbol with no selection, without reading anything","status":"pass","elapsed_ms":0.006450,"timing_error":""}
+  ok   types the symbol with no selection, without reading anything
+# lua_timing {"schema":1,"driver":"linux","id":26,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"types the symbol after a deselecting click (stale PRIMARY)","status":"pass","elapsed_ms":0.006730,"timing_error":""}
+  ok   types the symbol after a deselecting click (stale PRIMARY)
+# lua_timing {"schema":1,"driver":"linux","id":27,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"types the symbol once any other key ended the selection","status":"pass","elapsed_ms":0.004286,"timing_error":""}
+  ok   types the symbol once any other key ended the selection
+# lua_timing {"schema":1,"driver":"linux","id":28,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"passes the symbol through while disabled or paused","status":"pass","elapsed_ms":0.003545,"timing_error":""}
+  ok   passes the symbol through while disabled or paused
+# lua_timing {"schema":1,"driver":"linux","id":29,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"leaves a modifier chord alone","status":"pass","elapsed_ms":0.003485,"timing_error":""}
+  ok   leaves a modifier chord alone
+# lua_timing {"schema":1,"driver":"linux","id":30,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"types the symbol when the wrap could not be typed","status":"pass","elapsed_ms":0.031928,"timing_error":""}
+  ok   types the symbol when the wrap could not be typed
+
+=== wrap selection read owner ===
+# lua_timing {"schema":1,"driver":"linux","id":31,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"revokes output when PRIMARY reading pauses the feature","status":"pass","elapsed_ms":0.048844,"timing_error":""}
+  ok   revokes output when PRIMARY reading pauses the feature
+# lua_timing {"schema":1,"driver":"linux","id":32,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"explicit retirement during baseline read cannot resurrect or type","status":"pass","elapsed_ms":0.007901,"timing_error":""}
+  ok   explicit retirement during baseline read cannot resurrect or type
+# lua_timing {"schema":1,"driver":"linux","id":33,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"explicit retirement during selected read cannot resurrect or type","status":"pass","elapsed_ms":0.018237,"timing_error":""}
+  ok   explicit retirement during selected read cannot resurrect or type
+# lua_timing {"schema":1,"driver":"linux","id":34,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"a newer ordinary key during PRIMARY reading retires the older wrap","status":"pass","elapsed_ms":0.004116,"timing_error":""}
+  ok   a newer ordinary key during PRIMARY reading retires the older wrap
+# lua_timing {"schema":1,"driver":"linux","id":35,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"an older baseline read cannot replace a nested pointer's baseline","status":"pass","elapsed_ms":0.006230,"timing_error":""}
+  ok   an older baseline read cannot replace a nested pointer's baseline
+# lua_timing {"schema":1,"driver":"linux","id":36,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"a nested selection opening during a wrap read survives the old request","status":"pass","elapsed_ms":0.010786,"timing_error":""}
+  ok   a nested selection opening during a wrap read survives the old request
+# lua_timing {"schema":1,"driver":"linux","id":37,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"rechecks ownership after the baseline activity callback itself retires it","status":"pass","elapsed_ms":0.002684,"timing_error":""}
+  ok   rechecks ownership after the baseline activity callback itself retires it
+# lua_timing {"schema":1,"driver":"linux","id":38,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"rechecks ownership after the selected activity callback itself retires it","status":"pass","elapsed_ms":0.005969,"timing_error":""}
+  ok   rechecks ownership after the selected activity callback itself retires it
+# lua_timing {"schema":1,"driver":"linux","id":39,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"captures the typed pair before PRIMARY reading can mutate its shared table","status":"pass","elapsed_ms":0.095884,"timing_error":""}
+  ok   captures the typed pair before PRIMARY reading can mutate its shared table
+# lua_timing {"schema":1,"driver":"linux","id":40,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"acknowledged typing consumes the symbol while preserving a newly opened selection","status":"pass","elapsed_ms":0.013711,"timing_error":""}
+  ok   acknowledged typing consumes the symbol while preserving a newly opened selection
+# lua_timing {"schema":1,"driver":"linux","id":41,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"Ctrl+A opens a fresh owned window and Shift navigation extends it without rereading","status":"pass","elapsed_ms":0.030977,"timing_error":""}
+  ok   Ctrl+A opens a fresh owned window and Shift navigation extends it without rereading
+
+=== wrap on type (linux): the probe never types into the window ===
+# lua_timing {"schema":1,"driver":"linux","id":42,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"reads PRIMARY with no key sent and no clipboard write","status":"pass","elapsed_ms":0.291749,"timing_error":""}
+  ok   reads PRIMARY with no key sent and no clipboard write
+
+=== wrap on type (linux): the tray row ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":43,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"draws the wrap-on-type toggle in the shortcuts submenu","status":"pass","elapsed_ms":136.178632,"timing_error":""}
+  ok   draws the wrap-on-type toggle in the shortcuts submenu
+# lua_timing {"schema":1,"driver":"linux","id":44,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"matches a multi-byte wrap symbol from the shared catalogue","status":"pass","elapsed_ms":1.414959,"timing_error":""}
+  ok   matches a multi-byte wrap symbol from the shared catalogue
+
+=== wrap feature callback ownership ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":45,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"acknowledges the real durable preference before refresh (wrap-feature-owner)","status":"pass","elapsed_ms":61.072073,"timing_error":""}
+  ok   acknowledges the real durable preference before refresh (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":46,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"toggles fresh external state rather than a held checkmark (wrap-feature-owner)","status":"pass","elapsed_ms":58.766754,"timing_error":""}
+  ok   toggles fresh external state rather than a held checkmark (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":47,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses held callbacks while real configuration is reserved (wrap-feature-owner)","status":"pass","elapsed_ms":108.858856,"timing_error":""}
+  ok   refuses held callbacks while real configuration is reserved (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":48,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"keeps refusal bytes and runtime when the actual setter cannot publish (wrap-feature-owner)","status":"pass","elapsed_ms":45.879892,"timing_error":""}
+  ok   keeps refusal bytes and runtime when the actual setter cannot publish (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":49,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"preserves the existing master gate after its row was retained (wrap-feature-owner)","status":"pass","elapsed_ms":97.692083,"timing_error":""}
+  ok   preserves the existing master gate after its row was retained (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":50,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses the setter's false receipt (wrap-feature-owner)","status":"pass","elapsed_ms":60.908778,"timing_error":""}
+  ok   refuses the setter's false receipt (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":51,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses the setter's nil receipt (wrap-feature-owner)","status":"pass","elapsed_ms":64.971672,"timing_error":""}
+  ok   refuses the setter's nil receipt (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":52,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses the setter's numeric receipt (wrap-feature-owner)","status":"pass","elapsed_ms":48.605975,"timing_error":""}
+  ok   refuses the setter's numeric receipt (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":53,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses the setter's truthy receipt (wrap-feature-owner)","status":"pass","elapsed_ms":50.163234,"timing_error":""}
+  ok   refuses the setter's truthy receipt (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":54,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"rejects missing or malformed live readiness without a setter call (wrap-feature-owner)","status":"pass","elapsed_ms":314.057355,"timing_error":""}
+  ok   rejects missing or malformed live readiness without a setter call (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":55,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses malformed wrap preference instead of inventing its opposite (wrap-feature-owner)","status":"pass","elapsed_ms":88.608399,"timing_error":""}
+  ok   refuses malformed wrap preference instead of inventing its opposite (wrap-feature-owner)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":56,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"rechecks reservation acquired by the current preference getter (wrap-feature-owner)","status":"pass","elapsed_ms":64.697484,"timing_error":""}
+  ok   rechecks reservation acquired by the current preference getter (wrap-feature-owner)
+
+=== configured wrap-symbol collision reservations ===
+# lua_timing {"schema":1,"driver":"linux","id":57,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) emits genuine plain/Shift trigger claims without reading PRIMARY","status":"pass","elapsed_ms":2.602005,"timing_error":""}
+  ok   (wrap-configured-reservation) emits genuine plain/Shift trigger claims without reading PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":58,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) proves empty configured claims when enabled is off","status":"pass","elapsed_ms":1.552296,"timing_error":""}
+  ok   (wrap-configured-reservation) proves empty configured claims when enabled is off
+# lua_timing {"schema":1,"driver":"linux","id":59,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) proves empty configured claims when wrap_text_if_selected is off","status":"pass","elapsed_ms":1.380737,"timing_error":""}
+  ok   (wrap-configured-reservation) proves empty configured claims when wrap_text_if_selected is off
+# lua_timing {"schema":1,"driver":"linux","id":60,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) invalidates an old frame after a real switch round trip","status":"pass","elapsed_ms":2.849448,"timing_error":""}
+  ok   (wrap-configured-reservation) invalidates an old frame after a real switch round trip
+# lua_timing {"schema":1,"driver":"linux","id":61,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) refuses changed genuine catalogue bytes without adopting a new baseline","status":"pass","elapsed_ms":1.722071,"timing_error":""}
+  ok   (wrap-configured-reservation) refuses changed genuine catalogue bytes without adopting a new baseline
+# lua_timing {"schema":1,"driver":"linux","id":62,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) refuses a changed actual map or replaced dispatch getter","status":"pass","elapsed_ms":1.680680,"timing_error":""}
+  ok   (wrap-configured-reservation) refuses a changed actual map or replaced dispatch getter
+# lua_timing {"schema":1,"driver":"linux","id":63,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) refuses stale configured switches rather than rereading them as runtime","status":"pass","elapsed_ms":1.688631,"timing_error":""}
+  ok   (wrap-configured-reservation) refuses stale configured switches rather than rereading them as runtime
+# lua_timing {"schema":1,"driver":"linux","id":64,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) original catalogue load refuses a false close ACK","status":"pass","elapsed_ms":1.029329,"timing_error":""}
+  ok   (wrap-configured-reservation) original catalogue load refuses a false close ACK
+# lua_timing {"schema":1,"driver":"linux","id":65,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) original catalogue load refuses a nil close ACK","status":"pass","elapsed_ms":1.495290,"timing_error":""}
+  ok   (wrap-configured-reservation) original catalogue load refuses a nil close ACK
+# lua_timing {"schema":1,"driver":"linux","id":66,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) original configuration load refuses a false close ACK","status":"pass","elapsed_ms":1.070721,"timing_error":""}
+  ok   (wrap-configured-reservation) original configuration load refuses a false close ACK
+# lua_timing {"schema":1,"driver":"linux","id":67,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) original configuration load refuses a nil close ACK","status":"pass","elapsed_ms":1.116841,"timing_error":""}
+  ok   (wrap-configured-reservation) original configuration load refuses a nil close ACK
+# lua_timing {"schema":1,"driver":"linux","id":68,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) configuration ownership revokes a previously captured frame","status":"pass","elapsed_ms":2.121884,"timing_error":""}
+  ok   (wrap-configured-reservation) configuration ownership revokes a previously captured frame
+
+=== Corrupt wrap reservation configuration refusal ===
+# lua_timing {"schema":1,"driver":"linux","id":69,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"(wrap-configured-reservation) corrupt actual config refuses rather than manufacturing empty claims","status":"pass","elapsed_ms":2.043976,"timing_error":""}
+  ok   (wrap-configured-reservation) corrupt actual config refuses rather than manufacturing empty claims
+
+=== wrap on type: genuine daemon lifetime wiring ===
+# lua_timing {"schema":1,"driver":"linux","id":70,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"keeps normal mouse selection through the actual privacy reset callback","status":"pass","elapsed_ms":3.678165,"timing_error":""}
+  ok   keeps normal mouse selection through the actual privacy reset callback
+# lua_timing {"schema":1,"driver":"linux","id":71,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the pre-pause window and admits a fresh mouse selection after resume","status":"pass","elapsed_ms":2.846513,"timing_error":""}
+  ok   retires the pre-pause window and admits a fresh mouse selection after resume
+# lua_timing {"schema":1,"driver":"linux","id":72,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous application's window before the first focus observer","status":"pass","elapsed_ms":2.703979,"timing_error":""}
+  ok   retires the previous application's window before the first focus observer
+# lua_timing {"schema":1,"driver":"linux","id":73,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the pre-capture window and preserves exact capture release ownership","status":"pass","elapsed_ms":2.705431,"timing_error":""}
+  ok   retires the pre-capture window and preserves exact capture release ownership
+# lua_timing {"schema":1,"driver":"linux","id":74,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"does not read PRIMARY or open a global window for a pointer inside captured UI","status":"pass","elapsed_ms":2.970660,"timing_error":""}
+  ok   does not read PRIMARY or open a global window for a pointer inside captured UI
+# lua_timing {"schema":1,"driver":"linux","id":75,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"allows early pause and capture callbacks before the Wrap owner is published","status":"pass","elapsed_ms":1.625536,"timing_error":""}
+  ok   allows early pause and capture callbacks before the Wrap owner is published
+
+=== wrap on type: committed shortcut context epochs ===
+# lua_timing {"schema":1,"driver":"linux","id":76,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous window after a committed wrap switch","status":"pass","elapsed_ms":7.553015,"timing_error":""}
+  ok   retires the previous window after a committed wrap switch
+# lua_timing {"schema":1,"driver":"linux","id":77,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous window after a committed master switch","status":"pass","elapsed_ms":3.980831,"timing_error":""}
+  ok   retires the previous window after a committed master switch
+# lua_timing {"schema":1,"driver":"linux","id":78,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous window after a committed configuration reservation","status":"pass","elapsed_ms":3.537643,"timing_error":""}
+  ok   retires the previous window after a committed configuration reservation
+# lua_timing {"schema":1,"driver":"linux","id":79,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous window after a committed configuration rollback","status":"pass","elapsed_ms":3.053184,"timing_error":""}
+  ok   retires the previous window after a committed configuration rollback
+# lua_timing {"schema":1,"driver":"linux","id":80,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"retires the previous window after a committed initialization","status":"pass","elapsed_ms":3.536401,"timing_error":""}
+  ok   retires the previous window after a committed initialization
+# lua_timing {"schema":1,"driver":"linux","id":81,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses a committed roundtrip during opening activity","status":"pass","elapsed_ms":3.777655,"timing_error":""}
+  ok   refuses a committed roundtrip during opening activity
+# lua_timing {"schema":1,"driver":"linux","id":82,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses a committed roundtrip during opening PRIMARY","status":"pass","elapsed_ms":6.005341,"timing_error":""}
+  ok   refuses a committed roundtrip during opening PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":83,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses a committed roundtrip during selected PRIMARY","status":"pass","elapsed_ms":4.074141,"timing_error":""}
+  ok   refuses a committed roundtrip during selected PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":84,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses a committed roundtrip during pair lookup","status":"pass","elapsed_ms":5.456631,"timing_error":""}
+  ok   refuses a committed roundtrip during pair lookup
+# lua_timing {"schema":1,"driver":"linux","id":85,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses a committed roundtrip during final activity","status":"pass","elapsed_ms":4.267492,"timing_error":""}
+  ok   refuses a committed roundtrip during final activity
+# lua_timing {"schema":1,"driver":"linux","id":86,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"keeps the epoch and admitted selection when durable publication refuses","status":"pass","elapsed_ms":3.589952,"timing_error":""}
+  ok   keeps the epoch and admitted selection when durable publication refuses
+# lua_timing {"schema":1,"driver":"linux","id":87,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied nil context epoch before PRIMARY","status":"pass","elapsed_ms":0.008593,"timing_error":""}
+  ok   refuses an explicitly supplied nil context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":88,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied false context epoch before PRIMARY","status":"pass","elapsed_ms":0.003605,"timing_error":""}
+  ok   refuses an explicitly supplied false context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":89,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied string context epoch before PRIMARY","status":"pass","elapsed_ms":0.003706,"timing_error":""}
+  ok   refuses an explicitly supplied string context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":90,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied negative context epoch before PRIMARY","status":"pass","elapsed_ms":0.042274,"timing_error":""}
+  ok   refuses an explicitly supplied negative context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":91,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied fraction context epoch before PRIMARY","status":"pass","elapsed_ms":0.091918,"timing_error":""}
+  ok   refuses an explicitly supplied fraction context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":92,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied NaN context epoch before PRIMARY","status":"pass","elapsed_ms":0.032369,"timing_error":""}
+  ok   refuses an explicitly supplied NaN context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":93,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied infinity context epoch before PRIMARY","status":"pass","elapsed_ms":0.014992,"timing_error":""}
+  ok   refuses an explicitly supplied infinity context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":94,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"refuses an explicitly supplied table context epoch before PRIMARY","status":"pass","elapsed_ms":0.013730,"timing_error":""}
+  ok   refuses an explicitly supplied table context epoch before PRIMARY
+# lua_timing {"schema":1,"driver":"linux","id":95,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"rejects a malformed optional context getter","status":"pass","elapsed_ms":0.009464,"timing_error":""}
+  ok   rejects a malformed optional context getter
+# lua_timing {"schema":1,"driver":"linux","id":96,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"preserves a successor opened reentrantly by the context getter","status":"pass","elapsed_ms":0.011648,"timing_error":""}
+  ok   preserves a successor opened reentrantly by the context getter
+# lua_timing {"schema":1,"driver":"linux","id":97,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"does not open after its context getter revokes the local selection owner","status":"pass","elapsed_ms":0.006400,"timing_error":""}
+  ok   does not open after its context getter revokes the local selection owner
+# lua_timing {"schema":1,"driver":"linux","id":98,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"discards an admitted window when its context becomes unavailable","status":"pass","elapsed_ms":0.035774,"timing_error":""}
+  ok   discards an admitted window when its context becomes unavailable
+# lua_timing {"schema":1,"driver":"linux","id":99,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"still consumes confirmed output if its callback advances the context","status":"pass","elapsed_ms":0.021192,"timing_error":""}
+  ok   still consumes confirmed output if its callback advances the context
+# lua_timing {"schema":1,"driver":"linux","id":22,"kind":"module","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","name":"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type","status":"pass","elapsed_ms":1292.929175,"timing_error":""}
+
+=== wrap output publication ownership ===
+# lua_timing {"schema":1,"driver":"linux","id":101,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"commits a stable Unicode wrap through the actual Main and clipboard","status":"pass","elapsed_ms":37.539137,"timing_error":""}
+  ok   commits a stable Unicode wrap through the actual Main and clipboard
+# lua_timing {"schema":1,"driver":"linux","id":102,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps per-DOWN publication checks in RAM","status":"pass","elapsed_ms":6.365508,"timing_error":""}
+  ok   keeps per-DOWN publication checks in RAM
+# lua_timing {"schema":1,"driver":"linux","id":103,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses focus during clipboard-read without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.946609,"timing_error":""}
+  ok   refuses focus during clipboard-read without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":104,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses focus during clipboard-write without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.894710,"timing_error":""}
+  ok   refuses focus during clipboard-write without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":105,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses focus during clipboard-settle without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.117415,"timing_error":""}
+  ok   refuses focus during clipboard-settle without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":106,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses focus during paste-lookup without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":9.892886,"timing_error":""}
+  ok   refuses focus during paste-lookup without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":107,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses focus during ctrl-down without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.009533,"timing_error":""}
+  ok   refuses focus during ctrl-down without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":108,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses password during clipboard-read without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.227295,"timing_error":""}
+  ok   refuses password during clipboard-read without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":109,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses password during clipboard-write without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.193095,"timing_error":""}
+  ok   refuses password during clipboard-write without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":110,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses password during clipboard-settle without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.430501,"timing_error":""}
+  ok   refuses password during clipboard-settle without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":111,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses password during paste-lookup without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":4.987555,"timing_error":""}
+  ok   refuses password during paste-lookup without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":112,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses password during ctrl-down without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.891521,"timing_error":""}
+  ok   refuses password during ctrl-down without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":113,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause during clipboard-read without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.642455,"timing_error":""}
+  ok   refuses pause during clipboard-read without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":114,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause during clipboard-write without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.193550,"timing_error":""}
+  ok   refuses pause during clipboard-write without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":115,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause during clipboard-settle without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":20.328098,"timing_error":""}
+  ok   refuses pause during clipboard-settle without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":116,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause during paste-lookup without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":8.419008,"timing_error":""}
+  ok   refuses pause during paste-lookup without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":117,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause during ctrl-down without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":9.000674,"timing_error":""}
+  ok   refuses pause during ctrl-down without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":118,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause-aba during clipboard-read without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":9.719235,"timing_error":""}
+  ok   refuses pause-aba during clipboard-read without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":119,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause-aba during clipboard-write without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":7.367046,"timing_error":""}
+  ok   refuses pause-aba during clipboard-write without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":120,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause-aba during clipboard-settle without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.188022,"timing_error":""}
+  ok   refuses pause-aba during clipboard-settle without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":121,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause-aba during paste-lookup without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.962086,"timing_error":""}
+  ok   refuses pause-aba during paste-lookup without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":122,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses pause-aba during ctrl-down without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":8.655884,"timing_error":""}
+  ok   refuses pause-aba during ctrl-down without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":123,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses configuration-aba during clipboard-read without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.881660,"timing_error":""}
+  ok   refuses configuration-aba during clipboard-read without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":124,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses configuration-aba during clipboard-write without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.975712,"timing_error":""}
+  ok   refuses configuration-aba during clipboard-write without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":125,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses configuration-aba during clipboard-settle without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":6.246770,"timing_error":""}
+  ok   refuses configuration-aba during clipboard-settle without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":126,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses configuration-aba during paste-lookup without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":5.962292,"timing_error":""}
+  ok   refuses configuration-aba during paste-lookup without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":127,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"refuses configuration-aba during ctrl-down without borrowing the new field (wrap-output-owner)","status":"pass","elapsed_ms":7.827218,"timing_error":""}
+  ok   refuses configuration-aba during ctrl-down without borrowing the new field (wrap-output-owner)
+# lua_timing {"schema":1,"driver":"linux","id":128,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"preserves a successor selection opened during clipboard I/O","status":"pass","elapsed_ms":7.837303,"timing_error":""}
+  ok   preserves a successor selection opened during clipboard I/O
+# lua_timing {"schema":1,"driver":"linux","id":129,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps clipboard restoration false observable and fatal","status":"pass","elapsed_ms":8.136563,"timing_error":""}
+  ok   keeps clipboard restoration false observable and fatal
+# lua_timing {"schema":1,"driver":"linux","id":130,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps clipboard restoration throw observable and fatal","status":"pass","elapsed_ms":8.364807,"timing_error":""}
+  ok   keeps clipboard restoration throw observable and fatal
+# lua_timing {"schema":1,"driver":"linux","id":131,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps an exception from Main type_text observable as an error","status":"pass","elapsed_ms":21.104867,"timing_error":""}
+  ok   keeps an exception from Main type_text observable as an error
+# lua_timing {"schema":1,"driver":"linux","id":132,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps a simultaneous Ctrl DOWN refusal and destination revocation fatal","status":"pass","elapsed_ms":10.009072,"timing_error":""}
+  ok   keeps a simultaneous Ctrl DOWN refusal and destination revocation fatal
+# lua_timing {"schema":1,"driver":"linux","id":133,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps a real native paste failure fatal and restores the clipboard","status":"pass","elapsed_ms":8.223184,"timing_error":""}
+  ok   keeps a real native paste failure fatal and restores the clipboard
+
+=== wrap fixture constructor isolation ===
+# lua_timing {"schema":1,"driver":"linux","id":134,"kind":"case","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"keeps a cold real store writable after the actual wrap scenarios","status":"pass","elapsed_ms":439.321693,"timing_error":""}
+  ok   keeps a cold real store writable after the actual wrap scenarios
+# lua_timing {"schema":1,"driver":"linux","id":100,"kind":"module","module":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","name":"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner","status":"pass","elapsed_ms":732.029326,"timing_error":""}
+
+=== Linux configured wrap-symbol physical collision preflight ===
+# lua_timing {"schema":1,"driver":"linux","id":136,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) refuses an enabled none wrap trigger before any publication","status":"pass","elapsed_ms":48.722331,"timing_error":""}
+  ok   (wrap-configured-preflight) refuses an enabled none wrap trigger before any publication
+# lua_timing {"schema":1,"driver":"linux","id":137,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) refuses an enabled shift wrap trigger before any publication","status":"pass","elapsed_ms":58.416257,"timing_error":""}
+  ok   (wrap-configured-preflight) refuses an enabled shift wrap trigger before any publication
+# lua_timing {"schema":1,"driver":"linux","id":138,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) ctrl bypasses wrapping but gains no native delivery rights","status":"pass","elapsed_ms":76.207283,"timing_error":""}
+  ok   (wrap-configured-preflight) ctrl bypasses wrapping but gains no native delivery rights
+# lua_timing {"schema":1,"driver":"linux","id":139,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) alt bypasses wrapping but gains no native delivery rights","status":"pass","elapsed_ms":42.900064,"timing_error":""}
+  ok   (wrap-configured-preflight) alt bypasses wrapping but gains no native delivery rights
+# lua_timing {"schema":1,"driver":"linux","id":140,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) super bypasses wrapping but gains no native delivery rights","status":"pass","elapsed_ms":37.298765,"timing_error":""}
+  ok   (wrap-configured-preflight) super bypasses wrapping but gains no native delivery rights
+# lua_timing {"schema":1,"driver":"linux","id":141,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) disabled wrapping is not a guessed collision or native readiness","status":"pass","elapsed_ms":84.338043,"timing_error":""}
+  ok   (wrap-configured-preflight) disabled wrapping is not a guessed collision or native readiness
+# lua_timing {"schema":1,"driver":"linux","id":142,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) a real switch round trip during XKB observation revokes old claims","status":"pass","elapsed_ms":41.912138,"timing_error":""}
+  ok   (wrap-configured-preflight) a real switch round trip during XKB observation revokes old claims
+# lua_timing {"schema":1,"driver":"linux","id":143,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(wrap-configured-preflight) explicit physical None preserves native intent without observing wrap reservations","status":"pass","elapsed_ms":23.435505,"timing_error":""}
+  ok   (wrap-configured-preflight) explicit physical None preserves native intent without observing wrap reservations
+
+=== Linux genuine configured prediction collision preflight ===
+# lua_timing {"schema":1,"driver":"linux","id":144,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) refuses original native navigation role before publication","status":"pass","elapsed_ms":69.268653,"timing_error":""}
+  ok   (prediction-configured-preflight) refuses original native navigation role before publication
+# lua_timing {"schema":1,"driver":"linux","id":145,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) refuses original native digit role before publication","status":"pass","elapsed_ms":43.768221,"timing_error":""}
+  ok   (prediction-configured-preflight) refuses original native digit role before publication
+# lua_timing {"schema":1,"driver":"linux","id":146,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) refuses either-side Shift Tab before publication","status":"pass","elapsed_ms":80.002274,"timing_error":""}
+  ok   (prediction-configured-preflight) refuses either-side Shift Tab before publication
+# lua_timing {"schema":1,"driver":"linux","id":147,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) refuses possible live or agent Tab before publication","status":"pass","elapsed_ms":47.473496,"timing_error":""}
+  ok   (prediction-configured-preflight) refuses possible live or agent Tab before publication
+# lua_timing {"schema":1,"driver":"linux","id":148,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) refuses actual native source typing a digit before publication","status":"pass","elapsed_ms":65.262324,"timing_error":""}
+  ok   (prediction-configured-preflight) refuses actual native source typing a digit before publication
+# lua_timing {"schema":1,"driver":"linux","id":149,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) unknown disabled AI plus otherwise free input","status":"pass","elapsed_ms":41.924206,"timing_error":""}
+  ok   (prediction-configured-preflight) unknown disabled AI plus otherwise free input
+# lua_timing {"schema":1,"driver":"linux","id":150,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) unknown disabled AI plus known collision","status":"pass","elapsed_ms":60.385936,"timing_error":""}
+  ok   (prediction-configured-preflight) unknown disabled AI plus known collision
+# lua_timing {"schema":1,"driver":"linux","id":151,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) original factory change revokes the source join","status":"pass","elapsed_ms":44.547603,"timing_error":""}
+  ok   (prediction-configured-preflight) original factory change revokes the source join
+# lua_timing {"schema":1,"driver":"linux","id":152,"kind":"case","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"(prediction-configured-preflight) actual request cancellation change revokes the source join","status":"pass","elapsed_ms":47.070921,"timing_error":""}
+  ok   (prediction-configured-preflight) actual request cancellation change revokes the source join
+# lua_timing {"schema":1,"driver":"linux","id":135,"kind":"module","module":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","name":"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol","status":"pass","elapsed_ms":914.372233,"timing_error":""}
+
+=== clipboard selection transaction ===
+# lua_timing {"schema":1,"driver":"linux","id":154,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"transforms and restores through the X11 backend","status":"pass","elapsed_ms":0.370878,"timing_error":""}
+  ok   transforms and restores through the X11 backend
+# lua_timing {"schema":1,"driver":"linux","id":155,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"uses wl-clipboard under Wayland","status":"pass","elapsed_ms":0.342015,"timing_error":""}
+  ok   uses wl-clipboard under Wayland
+# lua_timing {"schema":1,"driver":"linux","id":156,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"detects no selection without pasting the sentinel","status":"pass","elapsed_ms":0.336236,"timing_error":""}
+  ok   detects no selection without pasting the sentinel
+# lua_timing {"schema":1,"driver":"linux","id":157,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"restores before reporting a timing failure","status":"pass","elapsed_ms":0.325370,"timing_error":""}
+  ok   restores before reporting a timing failure
+# lua_timing {"schema":1,"driver":"linux","id":158,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"reads the selection without pasting and restores the clipboard","status":"pass","elapsed_ms":0.349176,"timing_error":""}
+  ok   reads the selection without pasting and restores the clipboard
+# lua_timing {"schema":1,"driver":"linux","id":159,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"reports no selection from the read probe and restores the clipboard","status":"pass","elapsed_ms":0.293322,"timing_error":""}
+  ok   reports no selection from the read probe and restores the clipboard
+
+=== clipboard file-selection probe (text/uri-list) ===
+# lua_timing {"schema":1,"driver":"linux","id":160,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"reads the copied files as text/uri-list and restores the clipboard (x11)","status":"pass","elapsed_ms":0.354844,"timing_error":""}
+  ok   reads the copied files as text/uri-list and restores the clipboard (x11)
+# lua_timing {"schema":1,"driver":"linux","id":161,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"reads the copied files as text/uri-list and restores the clipboard (wayland)","status":"pass","elapsed_ms":0.302205,"timing_error":""}
+  ok   reads the copied files as text/uri-list and restores the clipboard (wayland)
+# lua_timing {"schema":1,"driver":"linux","id":162,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"reports no file selection when the copy published no uri-list","status":"pass","elapsed_ms":0.290967,"timing_error":""}
+  ok   reports no file selection when the copy published no uri-list
+# lua_timing {"schema":1,"driver":"linux","id":163,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"(linux-uri-list-xclip-sentinel) reads the sentinel back as no file selection","status":"pass","elapsed_ms":0.290437,"timing_error":""}
+  ok   (linux-uri-list-xclip-sentinel) reads the sentinel back as no file selection
+
+=== asynchronous native selected-range transactions ===
+# lua_timing {"schema":1,"driver":"linux","id":164,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span commits the original range only once after the physical ACK","status":"pass","elapsed_ms":0.384859,"timing_error":""}
+  ok   ai-pass2-span commits the original range only once after the physical ACK
+# lua_timing {"schema":1,"driver":"linux","id":165,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span refuses changed offset before any physical edit","status":"pass","elapsed_ms":0.371980,"timing_error":""}
+  ok   ai-pass2-span refuses changed offset before any physical edit
+# lua_timing {"schema":1,"driver":"linux","id":166,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span refuses changed text before any physical edit","status":"pass","elapsed_ms":0.353382,"timing_error":""}
+  ok   ai-pass2-span refuses changed text before any physical edit
+# lua_timing {"schema":1,"driver":"linux","id":167,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span refuses changed focus before any physical edit","status":"pass","elapsed_ms":0.278699,"timing_error":""}
+  ok   ai-pass2-span refuses changed focus before any physical edit
+# lua_timing {"schema":1,"driver":"linux","id":168,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span refuses changed privacy before any physical edit","status":"pass","elapsed_ms":0.241794,"timing_error":""}
+  ok   ai-pass2-span refuses changed privacy before any physical edit
+# lua_timing {"schema":1,"driver":"linux","id":169,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span refuses changed authorization before any physical edit","status":"pass","elapsed_ms":0.232610,"timing_error":""}
+  ok   ai-pass2-span refuses changed authorization before any physical edit
+# lua_timing {"schema":1,"driver":"linux","id":170,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span rejects an absent or refused physical success receipt 1","status":"pass","elapsed_ms":0.732772,"timing_error":""}
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 1
+# lua_timing {"schema":1,"driver":"linux","id":171,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span rejects an absent or refused physical success receipt 2","status":"pass","elapsed_ms":0.375825,"timing_error":""}
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 2
+# lua_timing {"schema":1,"driver":"linux","id":172,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span rejects an absent or refused physical success receipt 3","status":"pass","elapsed_ms":0.303467,"timing_error":""}
+  ok   ai-pass2-span rejects an absent or refused physical success receipt 3
+# lua_timing {"schema":1,"driver":"linux","id":173,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains cancel cleanup until actual native ACK","status":"pass","elapsed_ms":0.371379,"timing_error":""}
+  ok   ai-pass2-span retains cancel cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":174,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains stop cleanup until actual native ACK","status":"pass","elapsed_ms":0.328664,"timing_error":""}
+  ok   ai-pass2-span retains stop cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":175,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains timeout cleanup until actual native ACK","status":"pass","elapsed_ms":0.291328,"timing_error":""}
+  ok   ai-pass2-span retains timeout cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":176,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains authorization cleanup until actual native ACK","status":"pass","elapsed_ms":0.251017,"timing_error":""}
+  ok   ai-pass2-span retains authorization cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":177,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains privacy cleanup until actual native ACK","status":"pass","elapsed_ms":0.316766,"timing_error":""}
+  ok   ai-pass2-span retains privacy cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":178,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains focus cleanup until actual native ACK","status":"pass","elapsed_ms":0.207653,"timing_error":""}
+  ok   ai-pass2-span retains focus cleanup until actual native ACK
+# lua_timing {"schema":1,"driver":"linux","id":179,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after start-throw","status":"pass","elapsed_ms":0.237768,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after start-throw
+# lua_timing {"schema":1,"driver":"linux","id":180,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after missing-cancel","status":"pass","elapsed_ms":0.548535,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-cancel
+# lua_timing {"schema":1,"driver":"linux","id":181,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after missing-settled","status":"pass","elapsed_ms":0.633844,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-settled
+# lua_timing {"schema":1,"driver":"linux","id":182,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after missing-registration","status":"pass","elapsed_ms":0.671320,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after missing-registration
+# lua_timing {"schema":1,"driver":"linux","id":183,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after register-throw","status":"pass","elapsed_ms":0.558431,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after register-throw
+# lua_timing {"schema":1,"driver":"linux","id":184,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span retains inconclusive acquired ownership after register-refuse","status":"pass","elapsed_ms":0.563938,"timing_error":""}
+  ok   ai-pass2-span retains inconclusive acquired ownership after register-refuse
+# lua_timing {"schema":1,"driver":"linux","id":185,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span handles inline native settlement after subscription ACK","status":"pass","elapsed_ms":0.551100,"timing_error":""}
+  ok   ai-pass2-span handles inline native settlement after subscription ACK
+# lua_timing {"schema":1,"driver":"linux","id":186,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"ai-pass2-span fences reentry before native dispatch and cannot pump libuv","status":"pass","elapsed_ms":0.775176,"timing_error":""}
+  ok   ai-pass2-span fences reentry before native dispatch and cannot pump libuv
+# lua_timing {"schema":1,"driver":"linux","id":153,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","name":"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction","status":"pass","elapsed_ms":13.740215,"timing_error":""}
+
+=== clipboard paste snapshot ===
+# lua_timing {"schema":1,"driver":"linux","id":188,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"aborts before mutation when snapshot read fails (lnx-062)","status":"pass","elapsed_ms":1.473097,"timing_error":""}
+  ok   aborts before mutation when snapshot read fails (lnx-062)
+# lua_timing {"schema":1,"driver":"linux","id":189,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"preserves a genuinely empty clipboard (lnx-062)","status":"pass","elapsed_ms":1.271293,"timing_error":""}
+  ok   preserves a genuinely empty clipboard (lnx-062)
+# lua_timing {"schema":1,"driver":"linux","id":190,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"keeps a copy another application made during the paste","status":"pass","elapsed_ms":1.475270,"timing_error":""}
+  ok   keeps a copy another application made during the paste
+# lua_timing {"schema":1,"driver":"linux","id":191,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"restores the clipboard and balances the chord when any emit fails (lnx-004)","status":"pass","elapsed_ms":10.506269,"timing_error":""}
+  ok   restores the clipboard and balances the chord when any emit fails (lnx-004)
+# lua_timing {"schema":1,"driver":"linux","id":192,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"treats an emitter exception like a failed chord and still restores","status":"pass","elapsed_ms":2.694595,"timing_error":""}
+  ok   treats an emitter exception like a failed chord and still restores
+# lua_timing {"schema":1,"driver":"linux","id":193,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"restores after a timing exception once replacement text was staged","status":"pass","elapsed_ms":1.442701,"timing_error":""}
+  ok   restores after a timing exception once replacement text was staged
+# lua_timing {"schema":1,"driver":"linux","id":187,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","name":"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic","status":"pass","elapsed_ms":19.850701,"timing_error":""}
+
+=== clipboard partial setter restoration ===
+# lua_timing {"schema":1,"driver":"linux","id":195,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"restores paste after a setter false beyond mutation","status":"pass","elapsed_ms":0.852423,"timing_error":""}
+  ok   restores paste after a setter false beyond mutation
+# lua_timing {"schema":1,"driver":"linux","id":196,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"restores paste after a setter throw beyond mutation","status":"pass","elapsed_ms":0.265510,"timing_error":""}
+  ok   restores paste after a setter throw beyond mutation
+# lua_timing {"schema":1,"driver":"linux","id":197,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"reports refused paste restoration after a partial setter: false","status":"pass","elapsed_ms":0.223697,"timing_error":""}
+  ok   reports refused paste restoration after a partial setter: false
+# lua_timing {"schema":1,"driver":"linux","id":198,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"reports refused paste restoration after a partial setter: throw","status":"pass","elapsed_ms":0.209255,"timing_error":""}
+  ok   reports refused paste restoration after a partial setter: throw
+# lua_timing {"schema":1,"driver":"linux","id":199,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"preserves paste when its initial setter failed before mutation","status":"pass","elapsed_ms":0.200933,"timing_error":""}
+  ok   preserves paste when its initial setter failed before mutation
+# lua_timing {"schema":1,"driver":"linux","id":200,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"retains healthy paste delivery and original clipboard","status":"pass","elapsed_ms":0.253261,"timing_error":""}
+  ok   retains healthy paste delivery and original clipboard
+# lua_timing {"schema":1,"driver":"linux","id":201,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"restores uri-list after a setter false beyond mutation","status":"pass","elapsed_ms":0.264708,"timing_error":""}
+  ok   restores uri-list after a setter false beyond mutation
+# lua_timing {"schema":1,"driver":"linux","id":202,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"restores uri-list after a setter throw beyond mutation","status":"pass","elapsed_ms":0.222926,"timing_error":""}
+  ok   restores uri-list after a setter throw beyond mutation
+# lua_timing {"schema":1,"driver":"linux","id":203,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"reports refused uri-list restoration after a partial setter: false","status":"pass","elapsed_ms":0.226310,"timing_error":""}
+  ok   reports refused uri-list restoration after a partial setter: false
+# lua_timing {"schema":1,"driver":"linux","id":204,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"reports refused uri-list restoration after a partial setter: throw","status":"pass","elapsed_ms":0.325931,"timing_error":""}
+  ok   reports refused uri-list restoration after a partial setter: throw
+# lua_timing {"schema":1,"driver":"linux","id":205,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"preserves uri-list when its initial setter failed before mutation","status":"pass","elapsed_ms":0.346391,"timing_error":""}
+  ok   preserves uri-list when its initial setter failed before mutation
+# lua_timing {"schema":1,"driver":"linux","id":206,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"retains healthy uri-list delivery and original clipboard","status":"pass","elapsed_ms":0.242185,"timing_error":""}
+  ok   retains healthy uri-list delivery and original clipboard
+# lua_timing {"schema":1,"driver":"linux","id":194,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","name":"tests.unit.adapters.synthetic_input.test_clipboard_partial_write","status":"pass","elapsed_ms":4.536787,"timing_error":""}
+
+=== clipboard snapshot restorability ===
+# lua_timing {"schema":1,"driver":"linux","id":208,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage refuses NUL before mutation","status":"pass","elapsed_ms":1.097321,"timing_error":""}
+  ok   snapshot preflight: stage refuses NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":209,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage refuses canary NUL before mutation","status":"pass","elapsed_ms":1.011151,"timing_error":""}
+  ok   snapshot preflight: stage refuses canary NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":210,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage restores ASCII exactly","status":"pass","elapsed_ms":0.954836,"timing_error":""}
+  ok   snapshot preflight: stage restores ASCII exactly
+# lua_timing {"schema":1,"driver":"linux","id":211,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage restores empty exactly","status":"pass","elapsed_ms":1.091333,"timing_error":""}
+  ok   snapshot preflight: stage restores empty exactly
+# lua_timing {"schema":1,"driver":"linux","id":212,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage restores UTF8 exactly","status":"pass","elapsed_ms":0.994196,"timing_error":""}
+  ok   snapshot preflight: stage restores UTF8 exactly
+# lua_timing {"schema":1,"driver":"linux","id":213,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: stage restores UTF8 two final LF exactly","status":"pass","elapsed_ms":0.987886,"timing_error":""}
+  ok   snapshot preflight: stage restores UTF8 two final LF exactly
+# lua_timing {"schema":1,"driver":"linux","id":214,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text refuses NUL before mutation","status":"pass","elapsed_ms":0.938692,"timing_error":""}
+  ok   snapshot preflight: paste_text refuses NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":215,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text refuses canary NUL before mutation","status":"pass","elapsed_ms":0.973384,"timing_error":""}
+  ok   snapshot preflight: paste_text refuses canary NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":216,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text restores ASCII exactly","status":"pass","elapsed_ms":1.146104,"timing_error":""}
+  ok   snapshot preflight: paste_text restores ASCII exactly
+# lua_timing {"schema":1,"driver":"linux","id":217,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text restores empty exactly","status":"pass","elapsed_ms":1.059414,"timing_error":""}
+  ok   snapshot preflight: paste_text restores empty exactly
+# lua_timing {"schema":1,"driver":"linux","id":218,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text restores UTF8 exactly","status":"pass","elapsed_ms":1.262520,"timing_error":""}
+  ok   snapshot preflight: paste_text restores UTF8 exactly
+# lua_timing {"schema":1,"driver":"linux","id":219,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: paste_text restores UTF8 two final LF exactly","status":"pass","elapsed_ms":1.092164,"timing_error":""}
+  ok   snapshot preflight: paste_text restores UTF8 two final LF exactly
+# lua_timing {"schema":1,"driver":"linux","id":220,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection refuses NUL before mutation","status":"pass","elapsed_ms":0.910360,"timing_error":""}
+  ok   snapshot preflight: read_selection refuses NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":221,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection refuses canary NUL before mutation","status":"pass","elapsed_ms":0.997621,"timing_error":""}
+  ok   snapshot preflight: read_selection refuses canary NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":222,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection restores ASCII exactly","status":"pass","elapsed_ms":1.264924,"timing_error":""}
+  ok   snapshot preflight: read_selection restores ASCII exactly
+# lua_timing {"schema":1,"driver":"linux","id":223,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection restores empty exactly","status":"pass","elapsed_ms":1.026936,"timing_error":""}
+  ok   snapshot preflight: read_selection restores empty exactly
+# lua_timing {"schema":1,"driver":"linux","id":224,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection restores UTF8 exactly","status":"pass","elapsed_ms":1.084041,"timing_error":""}
+  ok   snapshot preflight: read_selection restores UTF8 exactly
+# lua_timing {"schema":1,"driver":"linux","id":225,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection restores UTF8 two final LF exactly","status":"pass","elapsed_ms":0.948467,"timing_error":""}
+  ok   snapshot preflight: read_selection restores UTF8 two final LF exactly
+# lua_timing {"schema":1,"driver":"linux","id":226,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list refuses NUL before mutation","status":"pass","elapsed_ms":0.884411,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list refuses NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":227,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list refuses canary NUL before mutation","status":"pass","elapsed_ms":0.891010,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list refuses canary NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":228,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list restores ASCII exactly","status":"pass","elapsed_ms":0.927025,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list restores ASCII exactly
+# lua_timing {"schema":1,"driver":"linux","id":229,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list restores empty exactly","status":"pass","elapsed_ms":0.967846,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list restores empty exactly
+# lua_timing {"schema":1,"driver":"linux","id":230,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list restores UTF8 exactly","status":"pass","elapsed_ms":0.910850,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list restores UTF8 exactly
+# lua_timing {"schema":1,"driver":"linux","id":231,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: read_selection_uri_list restores UTF8 two final LF exactly","status":"pass","elapsed_ms":1.022108,"timing_error":""}
+  ok   snapshot preflight: read_selection_uri_list restores UTF8 two final LF exactly
+# lua_timing {"schema":1,"driver":"linux","id":232,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection refuses NUL before mutation","status":"pass","elapsed_ms":0.903720,"timing_error":""}
+  ok   snapshot preflight: transform_selection refuses NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":233,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection refuses canary NUL before mutation","status":"pass","elapsed_ms":0.843600,"timing_error":""}
+  ok   snapshot preflight: transform_selection refuses canary NUL before mutation
+# lua_timing {"schema":1,"driver":"linux","id":234,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection restores ASCII exactly","status":"pass","elapsed_ms":0.950770,"timing_error":""}
+  ok   snapshot preflight: transform_selection restores ASCII exactly
+# lua_timing {"schema":1,"driver":"linux","id":235,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection restores empty exactly","status":"pass","elapsed_ms":0.973215,"timing_error":""}
+  ok   snapshot preflight: transform_selection restores empty exactly
+# lua_timing {"schema":1,"driver":"linux","id":236,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection restores UTF8 exactly","status":"pass","elapsed_ms":1.210792,"timing_error":""}
+  ok   snapshot preflight: transform_selection restores UTF8 exactly
+# lua_timing {"schema":1,"driver":"linux","id":237,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: transform_selection restores UTF8 two final LF exactly","status":"pass","elapsed_ms":0.953244,"timing_error":""}
+  ok   snapshot preflight: transform_selection restores UTF8 two final LF exactly
+# lua_timing {"schema":1,"driver":"linux","id":238,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: raw read_checked retains NUL without writes","status":"pass","elapsed_ms":0.905413,"timing_error":""}
+  ok   snapshot preflight: raw read_checked retains NUL without writes
+# lua_timing {"schema":1,"driver":"linux","id":239,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: raw read_primary retains NUL without writes","status":"pass","elapsed_ms":0.988397,"timing_error":""}
+  ok   snapshot preflight: raw read_primary retains NUL without writes
+# lua_timing {"schema":1,"driver":"linux","id":240,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"snapshot preflight: existing writer hard guard still refuses NUL before dispatch","status":"pass","elapsed_ms":1.020015,"timing_error":""}
+  ok   snapshot preflight: existing writer hard guard still refuses NUL before dispatch
+# lua_timing {"schema":1,"driver":"linux","id":207,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","name":"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability","status":"pass","elapsed_ms":33.865359,"timing_error":""}
+
+=== prepared clipboard exact lifetime ===
+# lua_timing {"schema":1,"driver":"linux","id":242,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"constructs and closes an unused stage without desktop IO or admission","status":"pass","elapsed_ms":0.265249,"timing_error":""}
+  ok   constructs and closes an unused stage without desktop IO or admission
+# lua_timing {"schema":1,"driver":"linux","id":243,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"prepares before paste and restores the exact saved bytes length 8","status":"pass","elapsed_ms":0.306150,"timing_error":""}
+  ok   prepares before paste and restores the exact saved bytes length 8
+# lua_timing {"schema":1,"driver":"linux","id":244,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"prepares before paste and restores the exact saved bytes length 0","status":"pass","elapsed_ms":0.266401,"timing_error":""}
+  ok   prepares before paste and restores the exact saved bytes length 0
+# lua_timing {"schema":1,"driver":"linux","id":245,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the admission preparation frame unwinds","status":"pass","elapsed_ms":0.262385,"timing_error":""}
+  ok   defers close until the admission preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":246,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the backend preparation frame unwinds","status":"pass","elapsed_ms":0.228103,"timing_error":""}
+  ok   defers close until the backend preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":247,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the read preparation frame unwinds","status":"pass","elapsed_ms":0.211268,"timing_error":""}
+  ok   defers close until the read preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":248,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the build preparation frame unwinds","status":"pass","elapsed_ms":0.298159,"timing_error":""}
+  ok   defers close until the build preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":249,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the set preparation frame unwinds","status":"pass","elapsed_ms":0.245069,"timing_error":""}
+  ok   defers close until the set preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":250,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"defers close until the settle preparation frame unwinds","status":"pass","elapsed_ms":0.219590,"timing_error":""}
+  ok   defers close until the settle preparation frame unwinds
+# lua_timing {"schema":1,"driver":"linux","id":251,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"restores after a setter commits then refuses","status":"pass","elapsed_ms":0.215224,"timing_error":""}
+  ok   restores after a setter commits then refuses
+# lua_timing {"schema":1,"driver":"linux","id":252,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"keeps restore debt after an acknowledgement refuses","status":"pass","elapsed_ms":0.193962,"timing_error":""}
+  ok   keeps restore debt after an acknowledgement refuses
+# lua_timing {"schema":1,"driver":"linux","id":253,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"restores after the settle wait refuses","status":"pass","elapsed_ms":0.202876,"timing_error":""}
+  ok   restores after the settle wait refuses
+# lua_timing {"schema":1,"driver":"linux","id":254,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"restores after a setter commits then throws","status":"pass","elapsed_ms":0.378179,"timing_error":""}
+  ok   restores after a setter commits then throws
+# lua_timing {"schema":1,"driver":"linux","id":255,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"keeps restore debt after an acknowledgement throws","status":"pass","elapsed_ms":0.248184,"timing_error":""}
+  ok   keeps restore debt after an acknowledgement throws
+# lua_timing {"schema":1,"driver":"linux","id":256,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"restores after the settle wait throws","status":"pass","elapsed_ms":0.224367,"timing_error":""}
+  ok   restores after the settle wait throws
+# lua_timing {"schema":1,"driver":"linux","id":257,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"keeps a copy another application made during the paste","status":"pass","elapsed_ms":0.260091,"timing_error":""}
+  ok   keeps a copy another application made during the paste
+# lua_timing {"schema":1,"driver":"linux","id":258,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"a late native setter cannot overwrite restoration after a close request","status":"pass","elapsed_ms":0.208213,"timing_error":""}
+  ok   a late native setter cannot overwrite restoration after a close request
+# lua_timing {"schema":1,"driver":"linux","id":259,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"rechecks revocation after preparation admission 2","status":"pass","elapsed_ms":0.205729,"timing_error":""}
+  ok   rechecks revocation after preparation admission 2
+# lua_timing {"schema":1,"driver":"linux","id":260,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"rechecks revocation after preparation admission 3","status":"pass","elapsed_ms":0.206891,"timing_error":""}
+  ok   rechecks revocation after preparation admission 3
+# lua_timing {"schema":1,"driver":"linux","id":261,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"rechecks revocation after preparation admission 4","status":"pass","elapsed_ms":0.200632,"timing_error":""}
+  ok   rechecks revocation after preparation admission 4
+# lua_timing {"schema":1,"driver":"linux","id":262,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"retains a restoration frame until its physical setter returns","status":"pass","elapsed_ms":0.206661,"timing_error":""}
+  ok   retains a restoration frame until its physical setter returns
+# lua_timing {"schema":1,"driver":"linux","id":263,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"does not restore or acknowledge close during the emit paste frame","status":"pass","elapsed_ms":0.249516,"timing_error":""}
+  ok   does not restore or acknowledge close during the emit paste frame
+# lua_timing {"schema":1,"driver":"linux","id":264,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"does not restore or acknowledge close during the paste_wait paste frame","status":"pass","elapsed_ms":0.409686,"timing_error":""}
+  ok   does not restore or acknowledge close during the paste_wait paste frame
+# lua_timing {"schema":1,"driver":"linux","id":265,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"refuses a nested preparation without a second native snapshot","status":"pass","elapsed_ms":0.395164,"timing_error":""}
+  ok   refuses a nested preparation without a second native snapshot
+# lua_timing {"schema":1,"driver":"linux","id":266,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"rechecks revocation after the admission callback following Ctrl DOWN","status":"pass","elapsed_ms":0.261784,"timing_error":""}
+  ok   rechecks revocation after the admission callback following Ctrl DOWN
+# lua_timing {"schema":1,"driver":"linux","id":267,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"refuses unavailable before replacing any clipboard bytes","status":"pass","elapsed_ms":0.230647,"timing_error":""}
+  ok   refuses unavailable before replacing any clipboard bytes
+# lua_timing {"schema":1,"driver":"linux","id":268,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"refuses read_refused before replacing any clipboard bytes","status":"pass","elapsed_ms":0.353422,"timing_error":""}
+  ok   refuses read_refused before replacing any clipboard bytes
+# lua_timing {"schema":1,"driver":"linux","id":241,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","name":"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage","status":"pass","elapsed_ms":7.585064,"timing_error":""}
+
+=== staged selected output exact range ===
+# lua_timing {"schema":1,"driver":"linux","id":270,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"writes and reselects the verified Unicode span ok","status":"pass","elapsed_ms":6.433852,"timing_error":""}
+  ok   writes and reselects the verified Unicode span ok
+# lua_timing {"schema":1,"driver":"linux","id":271,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"writes and reselects the verified Unicode span ☃","status":"pass","elapsed_ms":6.329204,"timing_error":""}
+  ok   writes and reselects the verified Unicode span ☃
+# lua_timing {"schema":1,"driver":"linux","id":272,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"writes and reselects the verified Unicode span é","status":"pass","elapsed_ms":6.688915,"timing_error":""}
+  ok   writes and reselects the verified Unicode span é
+# lua_timing {"schema":1,"driver":"linux","id":273,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"writes and reselects the verified Unicode span 👩‍💻","status":"pass","elapsed_ms":5.809852,"timing_error":""}
+  ok   writes and reselects the verified Unicode span 👩‍💻
+# lua_timing {"schema":1,"driver":"linux","id":274,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"refuses a same-field selected range changed during write","status":"pass","elapsed_ms":17.352921,"timing_error":""}
+  ok   refuses a same-field selected range changed during write
+# lua_timing {"schema":1,"driver":"linux","id":275,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"refuses a same-field selected range changed during settle","status":"pass","elapsed_ms":9.355238,"timing_error":""}
+  ok   refuses a same-field selected range changed during settle
+# lua_timing {"schema":1,"driver":"linux","id":276,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"returns an honest partial result when the caret moves during the existing twenty milliseconds","status":"pass","elapsed_ms":5.337321,"timing_error":""}
+  ok   returns an honest partial result when the caret moves during the existing twenty milliseconds
+# lua_timing {"schema":1,"driver":"linux","id":277,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while cancel reenters read","status":"pass","elapsed_ms":4.682786,"timing_error":""}
+  ok   retains the staging frame while cancel reenters read
+# lua_timing {"schema":1,"driver":"linux","id":278,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while stop reenters read","status":"pass","elapsed_ms":4.391799,"timing_error":""}
+  ok   retains the staging frame while stop reenters read
+# lua_timing {"schema":1,"driver":"linux","id":279,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while cancel reenters write","status":"pass","elapsed_ms":4.346931,"timing_error":""}
+  ok   retains the staging frame while cancel reenters write
+# lua_timing {"schema":1,"driver":"linux","id":280,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while stop reenters write","status":"pass","elapsed_ms":4.809377,"timing_error":""}
+  ok   retains the staging frame while stop reenters write
+# lua_timing {"schema":1,"driver":"linux","id":281,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while cancel reenters settle","status":"pass","elapsed_ms":4.268503,"timing_error":""}
+  ok   retains the staging frame while cancel reenters settle
+# lua_timing {"schema":1,"driver":"linux","id":282,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while stop reenters settle","status":"pass","elapsed_ms":4.365669,"timing_error":""}
+  ok   retains the staging frame while stop reenters settle
+# lua_timing {"schema":1,"driver":"linux","id":283,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while cancel reenters restore-wait","status":"pass","elapsed_ms":5.059654,"timing_error":""}
+  ok   retains the staging frame while cancel reenters restore-wait
+# lua_timing {"schema":1,"driver":"linux","id":284,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while stop reenters restore-wait","status":"pass","elapsed_ms":4.683637,"timing_error":""}
+  ok   retains the staging frame while stop reenters restore-wait
+# lua_timing {"schema":1,"driver":"linux","id":285,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while cancel reenters reselect","status":"pass","elapsed_ms":4.442204,"timing_error":""}
+  ok   retains the staging frame while cancel reenters reselect
+# lua_timing {"schema":1,"driver":"linux","id":286,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"retains the staging frame while stop reenters reselect","status":"pass","elapsed_ms":4.358599,"timing_error":""}
+  ok   retains the staging frame while stop reenters reselect
+# lua_timing {"schema":1,"driver":"linux","id":287,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"never starts a fresh clipboard preparation after native route retirement","status":"pass","elapsed_ms":3.977816,"timing_error":""}
+  ok   never starts a fresh clipboard preparation after native route retirement
+# lua_timing {"schema":1,"driver":"linux","id":288,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"passes a decreasing remainder from the single canonical admission deadline","status":"pass","elapsed_ms":4.622996,"timing_error":""}
+  ok   passes a decreasing remainder from the single canonical admission deadline
+# lua_timing {"schema":1,"driver":"linux","id":289,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"expires after payload without resetting its deadline or retrying the consumed read","status":"pass","elapsed_ms":5.592676,"timing_error":""}
+  ok   expires after payload without resetting its deadline or retrying the consumed read
+# lua_timing {"schema":1,"driver":"linux","id":290,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"keeps clipboard restoration debt visible after a successful payload","status":"pass","elapsed_ms":5.350200,"timing_error":""}
+  ok   keeps clipboard restoration debt visible after a successful payload
+# lua_timing {"schema":1,"driver":"linux","id":291,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"settles a retired writing frame only after a later actual clipboard restoration ACK","status":"pass","elapsed_ms":5.686656,"timing_error":""}
+  ok   settles a retired writing frame only after a later actual clipboard restoration ACK
+# lua_timing {"schema":1,"driver":"linux","id":292,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"reports a real native first-character mutation when authority retires before the remaining text","status":"pass","elapsed_ms":5.792787,"timing_error":""}
+  ok   reports a real native first-character mutation when authority retires before the remaining text
+# lua_timing {"schema":1,"driver":"linux","id":293,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"does not mistake a Ctrl modifier-only refusal for a payload mutation","status":"pass","elapsed_ms":5.768180,"timing_error":""}
+  ok   does not mistake a Ctrl modifier-only refusal for a payload mutation
+# lua_timing {"schema":1,"driver":"linux","id":294,"kind":"case","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"keeps payload mutation visible after a throwing paste-consumption wait","status":"pass","elapsed_ms":6.966463,"timing_error":""}
+  ok   keeps payload mutation visible after a throwing paste-consumption wait
+# lua_timing {"schema":1,"driver":"linux","id":269,"kind":"module","module":"tests.unit.adapters.synthetic_input.test_selected_output_range","name":"tests.unit.adapters.synthetic_input.test_selected_output_range","status":"pass","elapsed_ms":147.371890,"timing_error":""}
+
+=== selected output retains its original native custody ===
+# lua_timing {"schema":1,"driver":"linux","id":296,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"releases Broker custody during the cold span observation","status":"pass","elapsed_ms":24.030189,"timing_error":""}
+  ok   releases Broker custody during the cold span observation
+# lua_timing {"schema":1,"driver":"linux","id":297,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"preserves a genuine physical modifier UP between transactions for 42","status":"pass","elapsed_ms":8.018326,"timing_error":""}
+  ok   preserves a genuine physical modifier UP between transactions for 42
+# lua_timing {"schema":1,"driver":"linux","id":298,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"preserves a genuine physical modifier UP between transactions for 56","status":"pass","elapsed_ms":7.467727,"timing_error":""}
+  ok   preserves a genuine physical modifier UP between transactions for 56
+# lua_timing {"schema":1,"driver":"linux","id":299,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"cannot adopt a close and reopen of the same Writer table after payload","status":"pass","elapsed_ms":6.878430,"timing_error":""}
+  ok   cannot adopt a close and reopen of the same Writer table after payload
+# lua_timing {"schema":1,"driver":"linux","id":300,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"cannot adopt a newly attached Broker after payload","status":"pass","elapsed_ms":7.758806,"timing_error":""}
+  ok   cannot adopt a newly attached Broker after payload
+# lua_timing {"schema":1,"driver":"linux","id":301,"kind":"case","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"refuses a changed output method even when its replacement reports success","status":"pass","elapsed_ms":6.216955,"timing_error":""}
+  ok   refuses a changed output method even when its replacement reports success
+# lua_timing {"schema":1,"driver":"linux","id":295,"kind":"module","module":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","name":"tests.unit.modules.hotstrings.injector.test_selected_output_custody","status":"pass","elapsed_ms":60.956604,"timing_error":""}
+TARGETED passed=290 failed=0

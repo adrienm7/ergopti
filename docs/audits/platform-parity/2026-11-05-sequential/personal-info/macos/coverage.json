@@ -1,0 +1,70 @@
+{
+	"schema_version": 1,
+	"scope": "macOS personal information",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"confirmed_roots": ["PIM-001", "PIM-002"],
+	"fields": {
+		"total": 15,
+		"default_aliases": 13,
+		"masked": ["iban", "bic", "credit_card", "social_security_number"],
+		"proof": "probes/matrix.lua",
+		"additional_alias_positive_control": "existing p=city works; added ASCII x=city does not"
+	},
+	"surfaces": [
+		{
+			"surface": "actual typed @ alias/full combo and preview",
+			"basis": "actual Keymap/Personal/Expander/Registry/Synthetic/preview bridge over immediate native ports; all13 defaults and all15 fields exercised"
+		},
+		{
+			"surface": "prefix output and literal data provenance",
+			"basis": "actual editor save plus actual Rules/Registry/Expander/Synthetic; native-seam event objects record command payload, no Darwin receiving"
+		},
+		{
+			"surface": "editor and native lifecycle",
+			"basis": "actual editor/UIBuilder/native close controller over pinned native WebView fixture; isolated editor callback/construction tests"
+		},
+		{
+			"surface": "masking and privacy",
+			"basis": "actual declared4-secret field previews; all15 is_private=true at sink; failed-open/unknown-field failclosed control; isolated private-context8cases; source log-sink gate"
+		},
+		{
+			"surface": "consent, pause, ignored/secure/unknown field and retired callbacks",
+			"basis": "actual keymap processing + actual Utils/SecureFieldDetector over native-shaped app/window/AX, source boot/menu guards"
+		},
+		{
+			"surface": "source load/save/refresh/reload",
+			"basis": "actual FileSystem and Rules registry transaction, retained before/after aliases, registered config/save/refresh failures, source filewatcher/reload join"
+		}
+	],
+	"registered": {
+		"isolated_modules": 19,
+		"passed": 126,
+		"failed": 0,
+		"zero_case_files": ["tests.unit.ui.editors.test_personal_info_editor_port_leak"],
+		"ledger": "probes/registered-isolated.json",
+		"substring_only_personal_info": {
+			"matched_cases": 6,
+			"qualification": "not full-module coverage"
+		}
+	},
+	"mechanical_false_green": "baseline0vs0",
+	"prior_deduplication": [
+		"MH001 provider preview token projection; personal value affected but not new finding",
+		"MVB001 initial action-picker data; MVB002 unsaved hotstring draft close",
+		"MCF001 locale config publication",
+		"Known cross-family/multi-item clipboard roots not recounted"
+	],
+	"intent_limits": [
+		"No arbitrary Unicode alias requirement inferred",
+		"No arbitrary info-field schema extension requirement inferred",
+		"ADR009 config.toml-only scope not applied as generic personal-file obligation",
+		"Editor full values are distinct from preview-only masking",
+		"Numeric phone validation not present; adversarial accepted string tests data integrity"
+	],
+	"native_limits": [
+		"No real Darwin WebKit/Quartz/AX/TCC/desktop receiving/focus transition",
+		"No real secrets or user config/logs/clipboard/live services",
+		"No performance or memory measurements"
+	],
+	"dry_sweeps": ["probes/dry-A.json", "probes/dry-B.json"]
+}

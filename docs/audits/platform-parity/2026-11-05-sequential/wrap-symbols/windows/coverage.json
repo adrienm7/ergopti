@@ -1,0 +1,223 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"provenance": "Windows source projection only; no native AHK/clipboard/UIA/desktop receiving",
+	"native_windows_execution": false,
+	"source_owners": [
+		{
+			"path": "static/ergopti_plus/windows/infra/wrap_pair.ahk",
+			"sha256": "162a3e5dd04411b05fb122b655ae7f644aea2f40e50b5203705008d1e460cc26",
+			"review": "full file"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/wrap_symbols_config.ahk",
+			"sha256": "f5424293976ab7443b87297be1719567b4bf07a6500fd27462d79e03b6fd02ec",
+			"review": "full file"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout/layout_ergopti.ahk",
+			"sha256": "1bd24324386564c89a2656cfc7e7a4a06f09eae8722e49c673aadcf5948dccf0",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/config.ahk",
+			"sha256": "a9cd769afffd8b50a2f63910aef32fc8267be371beaa08e083e357f423f1338e",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/init.ahk",
+			"sha256": "4f9e0f965448e32d0e70a96a787b4ae750e5cf0294d60a10cd175ab8a358a677",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk",
+			"sha256": "4134c136e4c19b68fea77e8f27ebe5756af068110a7a3d707be98525e66eb8b7",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/uia_selection_worker_entry.ahk",
+			"sha256": "c0c38fa5bcbfd6cfa1ad315fa8e3996ca64cda9f45ea8ca6631608b71382b9e1",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/uia_worker.ahk",
+			"sha256": "e4bb55e3489f831c6e7d1e5ac45089f3b72733c86c134e79541269c4878ebe33",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/action_picker_webview.ahk",
+			"sha256": "a9d16bdbaa4e2e77203b408250b0e6ec6d0dde10f0ec185ff99bc280771ec455",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/config_io.ahk",
+			"sha256": "c756a12e4d17066f86070742948577e9ca923cb4f5b38873b3383dce8fe8062e",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/tap_keys.ahk",
+			"sha256": "0f208ff7c16926ef11dba8ba3b01bbc29eb32383d6f32377cfe769b51bf4546c",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"review": "bounded relevant callers/effects"
+		},
+		{
+			"path": "static/ergopti_plus/windows/vendor/UIA.ahk",
+			"sha256": "e2460a50cc5c8590c080c14ce270e5e44431c41abfc9d7c26ed86b6b6410339d",
+			"review": "bounded relevant callers/effects"
+		}
+	],
+	"topics": [
+		{
+			"surface": "catalogue/order/opening-closing collision/spaced pairs/fallback",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "public custom pair dialogs/committed active map/remap source switching",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "built-in/group/all/reset/delete toggles and persistence load/refusal",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "keyboard/script/gesture/tap-hold action assignment parameter editor/dispatch",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "typed prefix vs direct remap exact argument routes",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "UIA worker bounded text/context/deadline/cache/single use",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "async clipboard selection allformat snapshot/generation restore",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "final paste primitive receipt vs native application consumption",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "Unicode UTF16/scalar/multichar/newline selection/undo limits",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "password/protected/unsupported providers and app policy",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "pause/resume/reload/stale/duplicate callbacks",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "failure diagnostics and previous WCP duplicates",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		}
+	],
+	"cross_driver_sources": [
+		"static/ergopti_plus/_shared/lua/wrap_pair/init.lua",
+		"static/ergopti_plus/_shared/modules/wrap_symbols/wrap_symbols.json",
+		"static/ergopti_plus/_shared/modules/actions/actions.toml",
+		"static/ergopti_plus/_shared/modules/menu/menu.toml",
+		"static/ergopti_plus/macos/modules/shortcuts/actions/text.lua",
+		"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+		"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+		"static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua",
+		"static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua"
+	],
+	"executed_probes": [
+		{
+			"probe": "proofs/source-contract.mjs",
+			"kind": "Node22 source assertions only",
+			"result": "pass",
+			"native_windows": false
+		},
+		{
+			"probe": "proofs/shared-parser.lua",
+			"kind": "actual shared Lua parameter owner",
+			"runtimes": ["Lua5.4", "LuaJIT"],
+			"vectors": 19,
+			"extra_controls": ["supplementary Unicode", "line break rejection"],
+			"result": "pass",
+			"desktop_receiving": false
+		}
+	],
+	"excluded_duplicates": [
+		"WCP-001 selection startup focus change",
+		"WCP-002 output preparation destination/pause"
+	],
+	"noncanonical_observations": [
+		"raw spaced guillemet route mismatch grouped with shared root; Windows direct remap can work",
+		"Windows UTF16 one-unit custom editor rejects supplementary Unicode scalar",
+		"Linux current custom/toggle surfaces differ; native PRIMARY wrap controller",
+		"single-pass active collision vs opening-first explicit parser",
+		"native consumption/undo/full format recovery unmeasured"
+	],
+	"dry_sweeps": [
+		{
+			"pass": "A",
+			"whole_bounded_scope": true,
+			"new_roots": 0
+		},
+		{
+			"pass": "B",
+			"whole_bounded_scope": true,
+			"new_roots": 0
+		}
+	],
+	"limits": [
+		"No native AHK or Windows UIA/clipboard/key effects",
+		"No latency/memory/performance measurements",
+		"No real user config/clipboard/log/service reads",
+		"Source proof does not establish precise native callback schedule or actual target application consumption"
+	]
+}

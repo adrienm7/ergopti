@@ -1,0 +1,15 @@
+{
+	"completed_utc": "2026-11-05T12:38:15.210464+00:00",
+	"code_head": "fd621d4fd9de5c5e32390256229e26cd9346e258",
+	"upstream_base": "bce0b58b221a6dfed5f7ab959ba36a618c75f91e",
+	"command": "PATH=/workspace/scratch/parity-toolchain/ci-bin:$PATH LOGNAME=agent PYTHONDONTWRITEBYTECODE=1 npm run verify",
+	"exit_code": 0,
+	"js_checks_passed": 572,
+	"host_not_executed_cases": 1,
+	"host_not_executed_reason": "Unavailable AHK host case explicitly unexecuted, not passed.",
+	"source_claim_check": "496 claims,167 paths; current claimed production bytes match pin; expected TODO drift",
+	"current_main_decisive_replays": 33,
+	"native_ci": "Not green; see ci-review.json and delivery.md. Native prerequisite gaps are documented under the later maintainer delivery policy.",
+	"log": "final-integration-verify.log",
+	"log_sha256": "6bcce75e0b152124891f6f5243e6527a60696652e96ee3a7950960a826c64cc8"
+}

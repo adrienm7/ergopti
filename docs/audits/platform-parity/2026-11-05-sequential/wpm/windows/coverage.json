@@ -1,0 +1,168 @@
+{
+	"schema_version": 1,
+	"scope": "wpm-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"provenance": "source projection only; Node source checks are not AutoHotkey execution",
+	"native_execution": false,
+	"allfiles": [
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/README.md",
+			"sha256": "bc608b2ef9c9742a2bd23aa17513b359ed71be046ebfd8cc89c8ca401ccee611",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/init.ahk",
+			"sha256": "80298a82d4c45873009b9517429f3acfb03b9c0db29476cbce16b29f3947616b",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_category_color.ahk",
+			"sha256": "2104b470e401825737f87a3bae65151dae464374877c62ac83c15f8b9313a2f8",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_config.ahk",
+			"sha256": "210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_display.ahk",
+			"sha256": "203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_gdiplus_ownership.ahk",
+			"sha256": "fefad49304a0b997cf748fd81878ab274d66e7e31faf2b3ed22161ec980e4561",
+			"review": "full source"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk",
+			"sha256": "84c17eb40cbcacdc93c652179ae5f8a9619cc7d561addf1bd6de2102b53ffe77",
+			"review": "full source"
+		}
+	],
+	"public_and_effect_boundary": [
+		"static/ergopti_plus/windows/ErgoptiPlus.ahk",
+		"static/ergopti_plus/windows/ui/menu/menu_metrics.ahk",
+		"static/ergopti_plus/windows/ui/menu/menu_metrics_actions.ahk",
+		"static/ergopti_plus/windows/adapters/graphics_renderer.ahk",
+		"static/ergopti_plus/windows/modules/keystats/keystats_hook.ahk",
+		"static/ergopti_plus/windows/modules/keystats/keystats_hotstring_log.ahk",
+		"static/ergopti_plus/windows/modules/keystats/keystats_collection.ahk",
+		"static/ergopti_plus/windows/modules/keystats/keystats_health.ahk",
+		"static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_builder.ahk",
+		"static/ergopti_plus/windows/infra/config_io.ahk",
+		"static/ergopti_plus/windows/infra/menu_dispatcher.ahk",
+		"static/ergopti_plus/windows/infra/menu_startup_commands.ahk"
+	],
+	"cross_driver_comparators": [
+		"static/ergopti_plus/_shared/lua/wpm_widget/model.lua",
+		"static/ergopti_plus/_shared/lua/keystats/live_wpm.lua",
+		"static/ergopti_plus/_shared/modules/wpm_widget/constants.toml",
+		"static/ergopti_plus/_shared/modules/timings/constants.toml",
+		"static/ergopti_plus/_shared/modules/menu/menu.toml",
+		"static/ergopti_plus/macos/ui/wpm/wpm_widget.lua",
+		"static/ergopti_plus/macos/ui/wpm/shared.lua",
+		"static/ergopti_plus/macos/modules/keystats/init.lua",
+		"static/ergopti_plus/linux/ui/wpm/widget.lua",
+		"static/ergopti_plus/linux/ui/wpm/tray_readout.lua",
+		"static/ergopti_plus/linux/modules/keystats/keystats.lua"
+	],
+	"topics": [
+		{
+			"surface": "configuration/defaults/load/save/refusal",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "initialization/boot-delayed-show",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "hidden-until-typed/tooltip keepalive",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "idle hide/source color hold (no idleFade setting)",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "drag compact/graph anchor/admission/refusal",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "display DPI/work area/multi-monitor",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "graph and compact ticks/native GDI+ and bitmap failure/debt",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "driver suspend/collection pause/session reset/resume",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "reload/duplicates/stale callbacks",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "public manual/hotstring/AI producers",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "source switching and neutral colors",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "tray platform constraint/localization",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "existing tests/false-green boundary/previous finding deduplication",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		}
+	],
+	"findings": ["WPMW-001", "WPMW-002"],
+	"additional_parity_observations": [
+		"latest accepted synthetic source vs AI-first independent holds",
+		"shared Lua idle/mouse show rule vs Windows last-input hide gate",
+		"graph vertical geometry/clamping",
+		"unverified DPI/physical vs logical sizing",
+		"Windows lack of five-second WPM idle reset exposed by later tooltip"
+	],
+	"excluded_duplicates": ["Existing Windows WCF pair-position persistence finding"],
+	"dry_sweeps": [
+		{
+			"pass": "A",
+			"scope": "whole bounded WPM scope",
+			"new_roots": 0,
+			"proof": "proofs/dry-sweeps.md"
+		},
+		{
+			"pass": "B",
+			"scope": "whole bounded WPM scope reverse effects-to-callers",
+			"new_roots": 0,
+			"proof": "proofs/dry-sweeps.md"
+		}
+	],
+	"limits": [
+		"No native AHK/Windows/GUI/GDI or timer/menu execution",
+		"No performance/latency/memory measurement",
+		"No live configuration, clipboard, user logs or services",
+		"Mixed DPI, monitor hotplug and native graph hit testing unverified"
+	]
+}

@@ -1,0 +1,53 @@
+# macOS WPM widget and menubar audit
+
+Audited SHA: `7aecd9a25b35efdcff68898919506dc2f6fd02d0` (2026-11-05). Two confirmed medium-severity roots. No production or registered test edits. Native Darwin desktop unavailable; evidence is genuine Lua 5.4 executing actual readout owners over bounded native seams, plus independently fetched Hammerspoon 1.1.1 source contracts. This is not native desktop receiving proof.
+
+## Confirmed findings
+
+### WPMM-001 — Floating widget never opts into native mouse callbacks
+
+Medium severity, high confidence; G2. Enable the floating widget, type, then attempt to drag it in either compact or graph mode. The canvas remains at the original position. The production owner installs `mouseCallback` but never sets element `trackMouseDown`, `trackMouseUp`, `trackMouseMove`, canvas defaults, or `canvasMouseEvents`. Hammerspoon initializes all these flags false. Its callback setter changes `ignoresMouseEvents` only; the native dispatcher still requires one of the tracking flags before delivering any callback.
+
+The decisive actual-owner run produces four compact elements, zero admitted mouse callbacks, and unchanged `(1515,927)`. A positive seam control enables canvas-level events, repeats the same actions, and the same production callback moves the canvas by `(90,90)`, proving the missing admission is causal. This positive control changes the probe's native canvas configuration; production never performs it. No direct closure invocation is used to prove reachable native drag. A direct retained callback is used only for the separate stale-closure control.
+
+Source owners: `macos/ui/wpm/wpm_widget.lua:309` and its element construction at 373 onward; `macos/adapters/graphics_renderer.lua:58` also does not configure tracking. Healthy start succeeds, so visibility compensation and pause resource guards do not diagnose this. There is no error because no business callback runs. The Reset position menu item is a limited backstop, restoring a default rather than allowing a chosen position. Existing geometry/pause tests invoke captured callbacks directly, bypassing native admission. Regression direction: preserve the native false defaults in the seam, dispatch pointer events only through admitted hit regions, and require actual compact and graph movement plus final persistence. Validate outside-surface release separately on Darwin.
+
+Evidence: `probes/owner.lua`, `probes/owner.log`, `probes/native-canvas-contract.txt` (exact source URL/ref, full downloaded SHA-256 and line-numbered excerpts; setter implicit-enabling countercheck included).
+
+### WPMM-002 — Cached default anchor becomes permanently offscreen after display shrink
+
+Medium severity, high confidence; G2. Start with no stored position on a 1600×1000 display, enable the widget and type; default compact anchor is `(1515,927)`. Change the available desktop to 800×600 and continue typing. The production owner queries the current screen every draw but only computes an anchor when `_pos_x` or `_pos_y` is nil. Its cached anchor remains `(1515,927)` and the entire canvas stays outside the available desktop. Repeated draws, stop/start and graph changes retain the anchor. No diagnostic is emitted, and the menu still considers the runtime active.
+
+Source: `macos/ui/wpm/wpm_widget.lua:269–286`, with `wpm_widget.model.default_anchor/frame_origin` as pure coordinate owners. There is no topology watcher, validity check, or clamp. This reproduction does not depend on WPMM-001 or on a successful drag: it starts from the normal default. The Reset position menu action works as an explicit backstop: the same owner then draws at `(715,527)`. A reload without a saved position also recomputes, limiting persistence of this variant; a saved offscreen position would survive reload. Regression direction: draw once, change available display geometry, require the next displayed frame to intersect a current display, and preserve intentional multi-monitor positions rather than unconditionally clamping to the main screen.
+
+Native boundary countercheck: Hammerspoon 1.1.1 constructs NSWindowStyleMaskBorderless; canvas.frame invokes size/topLeft, whose setter sends the requested NSWindow setFrame. Apple documents automatic constrainFrameRect for titled windows and explicitly says horizontal location is unaffected. Thus its standard constraint does not repair the stale X coordinate. No application-wide screen watcher resetting WPM was found. These are native implementation/API evidence, not executed Darwin hotplug. `probes/native-position-contract.txt` retains source URLs, full-file hashes and excerpts.
+
+Evidence: `probes/owner.lua`, `probes/owner.log`, `probes/native-position-contract.txt`; healthy reset control immediately follows the failing topology transition. This is a user-action/display effect failure; no G4 or G3 claim is made.
+
+## Entry points and operational coverage
+
+- Menu `menu_metrics.build` restores saved visibility on rebuild, gates starts on global pause and metrics enabled, and executes visibility toggles through persistence, exact lifecycle acknowledgment, compensation and refresh. Colors and graph controls call the corresponding owners. `metrics_scope` captures configuration and uses `apply_configuration` with retained scope compensation. These joins are source-reviewed; the probe does not claim native menu clicks.
+- Actual widget startup acquires the genuine timer adapter handle and mouse tap, starts only after enabled-state acknowledgment, lazily creates the canvas when stats become visible, and stops rejected canvas allocation. Both compact and graph render through the actual shared model/canon. The probe exercises graph switch, source-group override, colors off, hidden-before-typing startup, idle decay and pause-style stop/resume.
+- Actual menubar is created only while WPM/source/tooltip requires it, uses localized shared labels and source color, and deletes the native item when idle. It is not always visible despite the local README saying so; this is documentation drift, not another runtime finding.
+- Queued timer/canvas callbacks carry running/generation/identity fences. The owner probe retains a stopped canvas callback and verifies no resurrection. The 57 registered WPM cases additionally cover callback retirement/restart boundaries, render exceptions, acquisition refusal, timer cleanup debt and stale geometry. Existing tests passing is not evidence that native drag was exercised.
+- Keystats join reviewed: `get_live_stats` evicts rolling event buffers, resets effective and physical WPM after the shared idle interval, returns `source`, `source_variant`, `source_time`; notifications update source/variant/time. The probe supplies synthetic producer payloads and stubs the color resolver's data response. It does not execute collection, privacy, SQL or native key capture.
+- Position loading uses `tonumber` on Storage values; default recomputes if either coordinate is absent. Actual drag closure writes X then Y independently after changing RAM. Reset sets RAM nil and independently deletes each key, without checking either result. These are not a cohort transaction. Native setter refusal is logged by Storage, so do not describe it as wholly silent or conflate runtime movement with durability. Drag refusal is not counted as another confirmed reachable defect because native drag is currently blocked by WPMM-001. Reset refusal remains a separate coverage risk, not a canonical finding here.
+- Close is the owning menu OFF / stop path; the canvas has no close affordance. Native process exit destroys Hammerspoon resources. Global pause explicitly inventories both `ui.wpm` owners in `modules/shortcuts/script_control.lua`, including `resume_after_pause` rollback intent; menu reconciliation is an additional backstop, not the sole pause owner.
+
+## Cross-platform distinctions and prior work
+
+Compared actual effect owners, not only names: Linux `ui/wpm/widget.lua` uses the same model, but native surface `draw` and `is_dragging` own admission/visibility; its cached default anchor likewise is not recomputed each tick. Windows floating readout is GDI+ and has its own pointer/idle path. Menubar absence on Windows is explicitly platform-scoped and already tracked in TODO; not recounted. The shared role owns shared-model visibility/source/declaration comparisons, including nonzero rolling WPM versus newer mouse activity; not duplicated here. Windows-specific hidden-until-typed and idle-fade labels are not exposed macOS settings: macOS operational policy is lazy creation plus shared source/idle visibility, not an advertised idleFade toggle.
+
+Prior search included repository TODO, 2026-11-04 metrics/deep reports, 2026-11-05 native-ui reports, old WPM stale-geometry tests and Windows audit index. Root additionally checked the prior WCF position-pair campaign: no known native-admission duplicate. Old stale-geometry F-LOW-9 is already fixed by `_canvas_geom`; this audit does not recount it. Stored coordinate pair durability is not conflated with that prior Windows finding.
+
+## Verification and limits
+
+Run from any cwd:
+
+```sh
+/workspace/scratch/parity-toolchain/ci-bin/lua5.4 /workspace/scratch/parity-sequential-2026-11-05/wpm/macos/probes/owner.lua /workspace/worktrees/parity-sequential-2026-11-05/macos
+```
+
+Actual executed owners: widget, menubar, WPM shared/model/canon, GraphicsRenderer, Storage, TimerScheduler and TOML parser. Seams: native `hs` canvas/screen/timer/eventtap/settings/styledtext/menubar, logger, shared-path resolver, timing data binding, i18n string, synthetic keystats and hotstring group resolver. These seams supply data and native return shapes; no fake widget/display policy replaces production. Native canvas event admission is derived from fetched 1.1.1 implementation. No native hit-testing, compositor visibility, actual monitor hotplug, mouse delivery, native settings durability, GC or runloop scheduling was measured.
+
+`tests/run.lua --only=wpm`: 57 pass, 0 fail (864 modules discovered); `probes/registered-wpm.log`. False-green scanner passes its mechanical baseline (`probes/false-green-scan.log`); direct callback fixtures remain a human-identified native-admission coverage gap. Two final whole bounded-scope dry sweeps A/B rechecked lifecycle/configuration/source/display/position/cleanup/stale joins, compiled 12 relevant Lua owner files, and replayed all healthy/refused/stale controls with no new roots (`probes/dry-A.json`, `probes/dry-B.json`, accompanying logs). Performance and memory unmeasured. No user logs/config/clipboard or live services accessed.

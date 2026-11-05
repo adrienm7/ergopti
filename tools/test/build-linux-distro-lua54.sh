@@ -14,6 +14,7 @@ fi
 pin_reader="$source_root/tools/build/read-native-source-pin.py"
 version="$(python3 "$pin_reader" lua54 version)"
 url="$(python3 "$pin_reader" lua54 url)"
+mirror_url="$(python3 "$pin_reader" lua54 mirror_url)"
 digest="$(python3 "$pin_reader" lua54 sha256)"
 luv_revision="$(python3 "$pin_reader" luv revision)"
 test "$(git -C "$luv_source" rev-parse HEAD)" = "$luv_revision"
@@ -21,10 +22,17 @@ git -C "$luv_source" fsck --strict
 mkdir -m 0755 "$destination"
 mkdir -m 0755 "$destination/bin" "$destination/modules"
 # lua.org intermittently times out (curl 28) or drops the TLS handshake (35) on
-# the hosted runners: retry each bounded attempt; the pinned digest below still
-# admits only the exact archive.
-curl --fail --silent --show-error --location --connect-timeout 30 --max-time 120 \
-    --retry 4 --retry-delay 10 --retry-all-errors "$url" -o "$destination/lua.tar.gz"
+# the hosted runners, and on 2026-11-05 refused every attempt of two runs: retry
+# each bounded attempt, then Debian's byte-identical orig archive. The pinned
+# digest below still admits only the exact archive.
+fetch() {
+    curl --fail --silent --show-error --location --connect-timeout 30 --max-time 120 \
+        --retry 4 --retry-delay 10 --retry-all-errors "$1" -o "$destination/lua.tar.gz"
+}
+if ! fetch "$url"; then
+    printf '%s\n' "lua.org refused the Lua $version archive; fetching Debian's identical copy." >&2
+    fetch "$mirror_url"
+fi
 printf '%s  %s\n' "$digest" "$destination/lua.tar.gz" | sha256sum --check
 # This archive is admitted before extraction; build the original Linux target,
 # whose exported Lua symbols bind the extension to this exact interpreter.

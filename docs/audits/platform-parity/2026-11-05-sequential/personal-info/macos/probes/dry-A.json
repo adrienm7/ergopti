@@ -1,0 +1,117 @@
+{
+	"sweep": "A",
+	"completed_at": "2026-11-05T09:42:20.611301+00:00",
+	"new_roots": 0,
+	"confirmed_roots": ["PIM-001", "PIM-002"],
+	"actual_owner_probes": 4,
+	"bounded_review": [
+		"15fields/13defaultaliases/newASCIIalias/remap+sourcebeforeafter",
+		"literal field data versus actual prefix command token route; actual editor/controller/UIBuilder save acceptance",
+		"per-field masking/raw output/private sink flag; failclosed classification/native protected field gates",
+		"typed/keymap/action/openfile/menu consent initialization before capture/trigger/reset/staticwinner",
+		"registry/conditional file publication/candidate rollback/changed winner/preview fence and watcher reload joins",
+		"owner callbacks/stale retirement/security/ignore/unknown/pause/stop; prior MH/MVB/MCF/clipboard deduplication; no native credit"
+	],
+	"source_inventory": [
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua",
+			"sha256": "6d33555bdb978b3d9604a5c41c70cf99ab58bee098c0f14026f5b7d3d26e7a60",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/rules_engine.lua",
+			"sha256": "28523d822adc3f2529cc6cb91a8b792d7356cb0838e3a3fab13afac10f31271a",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
+			"sha256": "9fdc916ab6b25fcb661826d6108c2ee5ab9e7bb9a3a58aad296560ef5e7f1d7d",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/personal_info_fields.lua",
+			"sha256": "f7e2959266e4ee2f2cba3da06f9b362ddb89ca2a865df3467125f818ccbeb24d",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/personal_info_editor/init.lua",
+			"sha256": "0635ba68bf24f14053081c1526544690e4a4c29c2f2c1940de07373f7ce9efb0",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/ui_builder.lua",
+			"sha256": "ea66ae4a00070b0ee4facef220b7ab991f41e531af7385ff497f30c6a3fe932b",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/webview_close_owner.lua",
+			"sha256": "075a34c6791884ff8187a6d8dd688f6b51226f4e2f4e0e989663afcff86b5323",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_hotstrings.lua",
+			"sha256": "de5ae6e4ea7004f6be9d4307f373fefb47a3d311ab517589399b186e11007cfd",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/file_watchers.lua",
+			"sha256": "e18a72271f194a265b306757c36c4487b1b1bbac91787681432d3aecc00c6bdd",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/file_system.lua",
+			"sha256": "b0b67258ea3bd02fdb8ea68c5ce323b334aedb17d1ad7332775508d23d9c2cef",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/llm_bridge.lua",
+			"sha256": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/utils.lua",
+			"sha256": "46c0b4e7a1926e4b056090da6df95352845153f54a3b947ff89e60ca1cb1f6f3",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/secure_field_detector.lua",
+			"sha256": "1b79ce5c1786a4e132891f65946945db346b7754613d980b2b26ccbe7780f700",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/personal_info/mask.lua",
+			"sha256": "e0a0f3ad2447d2fbb086288ef01ff5b4940708849599b5a5545d798a461a0edd",
+			"compile": "pass"
+		}
+	]
+}

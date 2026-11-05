@@ -1,0 +1,2 @@
+PASS schema1 required fields/enums, SHA shape, report/evidence existence, both dry sweep markers and source hashes.
+Repository workflow validator only accepts in-repository ahk/hammerspoon artifacts; authorized scratch Linux task scope uses this local validation.

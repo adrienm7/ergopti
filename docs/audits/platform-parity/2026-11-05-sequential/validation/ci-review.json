@@ -1,0 +1,60 @@
+{
+	"reviewed_utc": "2026-11-05T12:10:16.801874+00:00",
+	"preflight_one": {
+		"run_id": 42010013528,
+		"source": "eb302b29cd225f79c4b0003031c53666896dd8b5",
+		"conclusion": "failure",
+		"primary_failures": [
+			"Alpine: Lua download curl exit28, no unit groups received",
+			"macOS installed-app native-client preparation: Lua.org curl exit28"
+		]
+	},
+	"preflight_two": {
+		"run_id": 42014901978,
+		"source": "96909dbd7bbb9cbc80bfc20ede4d1b2461bf5ad7",
+		"attempt": 2,
+		"run_state": {
+			"conclusion": "failure",
+			"head_sha": "96909dbd7bbb9cbc80bfc20ede4d1b2461bf5ad7",
+			"run_attempt": 2,
+			"status": "completed"
+		},
+		"latest_job_counts": {
+			"success": 106,
+			"skipped": 5,
+			"failure": 3
+		},
+		"latest_failures": [
+			{
+				"id": 127230769029,
+				"name": "macOS / Verdict (All mandatory results)",
+				"attempt": 2
+			},
+			{
+				"id": 127226724221,
+				"name": "macOS / Build (ErgoptiPlus.app, macOS 26)",
+				"attempt": 2
+			},
+			{
+				"id": 127235940976,
+				"name": "Release / Verify all lanes and original plan",
+				"attempt": 2
+			}
+		],
+		"resolved_by_actual_retry": [
+			"Fedora unit and distro qualification",
+			"Intel NumberRow/NativeInputSource XCTest controls"
+		],
+		"remaining_primary_failure": "macOS app build: curl exit28 during Lua/LuaSocket dependency acquisition in bundle-macos-luasocket.sh, after launcher and proxy relay builds succeed. The quiet log does not identify which of its two archive URLs timed out."
+	},
+	"policy": "Delivery uses the documented maintainer exception for native/prerequisite gaps; no claim of a green all-OS preflight on the final integrated delivery commit.",
+	"subsequent_upstream_integration": {
+		"source": "814f6bc",
+		"macos_mirror_fix": "f4fa559",
+		"native_prerequisite_controls": 123,
+		"skipped": 0,
+		"log": "final-native-mirror-tests.log",
+		"log_sha256": "0fff37e9eb5e283cea18cd55a6b2f3a54570851b9a71dd685bce4c4c574d6b2f",
+		"qualification": "Earlier failed CI source96909db predates this fix. Current-source native macOS artifact qualification remains open; do not infer it from a source integration or fixture success."
+	}
+}

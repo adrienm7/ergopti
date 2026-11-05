@@ -1,0 +1,30 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"run_id": 41960243417,
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/41960243417",
+	"jobs": 108,
+	"conclusion": "failure",
+	"failed_jobs": [
+		{
+			"id": 127027089000,
+			"name": "macOS / E2E tests (Native XCTest (macOS 15, Intel))",
+			"conclusion": "failure"
+		},
+		{
+			"id": 127032113996,
+			"name": "macOS / Verdict (All mandatory results)",
+			"conclusion": "failure"
+		},
+		{
+			"id": 127036637605,
+			"name": "Release / Verify all lanes and original plan",
+			"conclusion": "failure"
+		}
+	],
+	"root_cause_observed": "Native macOS Intel French input source selection not observed before fixture deadline; temporary source cleanup unavailable. Not attributed to this docs-only continuation; do not call baseline dev CI green.",
+	"preceding_preflight": {
+		"run_id": 41955641822,
+		"conclusion": "success",
+		"source": "Previous delivery source-bound preflight; not current campaign validation."
+	}
+}

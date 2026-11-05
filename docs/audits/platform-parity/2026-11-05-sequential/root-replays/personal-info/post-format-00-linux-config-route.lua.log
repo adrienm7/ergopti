@@ -1,0 +1,5 @@
+CONFIG_OVERRIDE acknowledged=true effective_route_differs=true
+DYNAMIC_INIT loaded=DEFAULT_VALUE effective_file=EFFECTIVE_VALUE
+EDITOR_SAVE default_file=EDITED_DEFAULT effective_file=EFFECTIVE_VALUE
+EXPLICIT_PATH_CONTROL loaded=EFFECTIVE_VALUE
+PASS actual config paths+Storage+dynamic owner+TOML writer, isolated private files; no user configuration

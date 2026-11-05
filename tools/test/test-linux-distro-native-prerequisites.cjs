@@ -169,6 +169,18 @@ function runControls(scratch) {
 		const preparation = fs.readFileSync(helper, 'utf8');
 		assert.ok(mac.includes('read-native-source-pin.py'));
 		assert.ok(preparation.includes('read-native-source-pin.py'));
+		// lua.org refused the hosted runners for hours (2026-11-05): both Lua
+		// downloads follow with Debian's byte-identical copy, still digest-checked.
+		const linuxLua = fs.readFileSync(
+			path.join(ROOT, 'tools/test/build-linux-distro-lua54.sh'),
+			'utf8'
+		);
+		for (const [name, source] of [
+			['macOS luasocket', mac],
+			['Linux Lua 5.4', linuxLua]
+		]) {
+			assert.match(source, /lua54 mirror_url\)"/, `${name}: the mirror comes from the pin`);
+		}
 		assert.equal(
 			mac.includes(pins.lua54.sha256),
 			false,
@@ -201,6 +213,12 @@ function runControls(scratch) {
 			},
 			(data) => {
 				data.lua54.url = 'https://example.invalid/lua.tar.gz';
+			},
+			(data) => {
+				data.lua54.mirror_url = 'https://example.invalid/lua.tar.gz';
+			},
+			(data) => {
+				delete data.lua54.mirror_url;
 			},
 			(data) => {
 				data.luv.revision = 'latest';

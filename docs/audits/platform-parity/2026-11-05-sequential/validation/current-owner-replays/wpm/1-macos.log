@@ -1,0 +1,13 @@
+healthy idle startup: no canvas or menubar
+healthy typing: compact canvas + 42 WPM menubar
+healthy source/color switch: live group override reaches both owners; colors-off neutralizes both
+WPMM-001 native admission: 0 delivered callbacks; requested drag leaves coordinates 1515,927
+positive admission control: 3 callbacks; actual owner moves +90,+90 and saves
+healthy pause/resume: graph setting retained, resources reacquired
+stale closure control: stopped canvas cannot resurrect
+WPMM-002 display shrink 1600x1000 -> 800x600: still x=1515, y=927; entire canvas outside display; new diagnostics=0
+reset backstop restores visible geometry 715,527
+healthy idle decay: canvas hidden and native menubar item deleted
+refused canvas control: start false; stopped; diagnostics retained
+PASS actual owners: widget, menubar, shared model/canon, graphics adapter, timer adapter, storage adapter; native hs seams only
+error:update_widget_body(): failed to allocate the widget canvas.

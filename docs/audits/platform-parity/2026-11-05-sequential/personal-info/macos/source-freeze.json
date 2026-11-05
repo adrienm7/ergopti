@@ -1,0 +1,31 @@
+{
+	"frozen_at": "2026-11-05T09:42:21.299000+00:00",
+	"excluded_mutable_runtime_fixture": "probes/synthetic-personal-info.toml (recreated by each probe)",
+	"files": {
+		"coverage.json": "8c9e685f19fc5035822453b1eee547ac3ff13ac72bf15f64afca6d3b9a00e8b4",
+		"findings.json": "c732cab665e5722f5c9eb8ee1f1c12fba756fcf7555c5cb7fb42130b225563d9",
+		"report.md": "6eacb04e5259a993fa90646306d0a1379fca97cb93af0a4258c3e66d1d22bf35",
+		"probes/aliases.after.toml": "c6df6507a58a84b5aa4a7453e7e2ebf76f0ef27c129fd20ebb9581434108d72f",
+		"probes/registered-isolated.log": "c382e502a9e7186f104080eed56e7853c7ad7567306b836c639a4b68b3b1e727",
+		"probes/log-sinks.log": "af2899fc756fd6fdf3a7d8c719dc549a2fc3cfc678ad1d6736e9cbe199264b20",
+		"probes/run-registered.py": "9e2010b5e7a9766a3b145dcec141a54211bd0ec898fdb7cf74ad36c51be4823f",
+		"probes/gates.lua": "5bfd597f2b8e42551d61c985065759e0aec00f02cda7cfe9fb0e0486641352ba",
+		"probes/registered-personal-info.log": "318167fe965f1b98781ad1b43530a04a47db0d87ee0a61c2d6128ded6bbc6c5a",
+		"probes/dry-A.log": "c5c0aca293058d900c08ba508b7c5c3cb3ca7e5ae4127c2981f75643b2a4a70c",
+		"probes/prefix.lua": "56c0050df2edb556a98b1e9545aa97e28cf3602d14fa7f1bf1d19aad7162d47b",
+		"probes/registered-isolated.json": "0c45afa199cf10f7061312951d14f0059c3fdcabdcda9d0671f0a21a24e6bfb9",
+		"probes/dry-B.json": "d31fc2a8cfddf95fdbbd16606512c5a4f5928a5030de77d4447801a7f892a18e",
+		"probes/matrix.lua": "6eb132664e559cc7805beca20114067904353e1655a9a1c17346554809436718",
+		"probes/false-green-scan.log": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+		"probes/contract-excerpts.txt": "b460c26b494ad651cec27f5e1c8c5140b0553605108006289aedfed23a0d0eac",
+		"probes/dry-A.json": "f24786d3c622466110b2f1712d237dc12e6f13c9b76712be6570a1fdcabc21c1",
+		"probes/prefix.log": "67beb78d5d733e6a43c25819f9a2cbc5fc3da3ad4fc7b173a11771c8082a718c",
+		"probes/aliases.before.toml": "794eb701b98c652a3a316f638f61a1b689858a3f0a003a6647e7abcaef8467f0",
+		"probes/dry-B.log": "61e1c3912f28834670c857f0d04b6c7825da80dc92a557f8d1d1b6c22ed254b7",
+		"probes/engine.lua": "f5cacc9142a43a4f9cc20a3a486deea594b4ad8d271fff93c040ba4f1f4bf51e",
+		"probes/matrix.log": "92c8ea29322119225152fb7a9fec615f46086aab7fe385b47ea2e5cdb2566690",
+		"probes/gates.log": "94d3c8443cc07e0ebca6572551b96e89bf7e5d513a787b56dab05515e44d1f19",
+		"probes/engine.log": "fcf32d20660a85c1de2b8ef339f4accc0b574f46708e1f529c92b051a5c30a19",
+		"probes/manifest-validation.txt": "20c27c5657f79105befe22941068118aed515c52baeebfb389669657f0883d15"
+	}
+}

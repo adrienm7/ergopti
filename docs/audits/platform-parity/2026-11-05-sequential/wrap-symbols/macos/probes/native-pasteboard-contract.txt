@@ -1,0 +1,180 @@
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/pasteboard/libpasteboard.m
+Ref: 1.1.1
+SHA256 full fetched file: 5818af8a2d4b66a7e760d6f1828978d243acd41383e78047f625ea74aab7c8f6
+This is native source evidence; no Darwin execution.
+
+185: /// hs.pasteboard.contentTypes([name]) -> table
+186: /// Function
+187: /// Return the UTI strings of the data types for the first pasteboard item on the specified pasteboard.
+188: ///
+189: /// Parameters:
+190: ///  * name - An optional string containing the name of the pasteboard. Defaults to the system pasteboard
+191: ///
+192: /// Returns:
+193: ///  * a table containing the UTI strings of the data types for the first pasteboard item.
+194: static int pasteboard_pasteboardItemTypes(lua_State* L) {
+195:     NSPasteboard* thePasteboard = lua_to_pasteboard(L, 1);
+196: 
+197:     lua_newtable(L) ;
+198: // make sure there is something on the pasteboard...
+199:     NSArray *items = [thePasteboard pasteboardItems] ;
+200:     if (items && [items count] > 0) {
+201:         NSPasteboardItem* item = [items objectAtIndex:0];
+202:         for (NSString* type in [item types]) {
+203:             lua_pushstring(L, [type UTF8String]) ; lua_rawseti(L, -2, luaL_len(L, -2) + 1) ;
+204:         }
+205:     }
+206:     return 1;
+
+255: 
+256: /// hs.pasteboard.allContentTypes([name]) -> table
+257: /// Function
+258: /// An array whose elements are a table containing the content types for each element on the clipboard.
+259: ///
+260: /// Parameters:
+261: ///  * name - an optional string indicating the pasteboard name.  If nil or not present, defaults to the system pasteboard.
+262: ///
+263: /// Returns:
+264: ///  * an array with each index representing an object on the pasteboard.  If the pasteboard contains only one element, this is equivalent to `{ hs.pasteboard.contentTypes(name) }`.
+265: static int allPBItemTypes(lua_State *L) {
+266:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;
+267:     [skin checkArgs:LS_TNUMBER | LS_TSTRING | LS_TNIL | LS_TOPTIONAL, LS_TBREAK] ;
+268:     NSPasteboard* thePasteboard = lua_to_pasteboard(L, 1);
+269:     lua_newtable(L) ;
+270:     NSArray *items = [thePasteboard pasteboardItems] ;
+271:     if (items) {
+272:         for(NSUInteger i = 0 ; i < [items count]; i++) {
+273:             lua_newtable(L) ;
+274:             NSPasteboardItem* item = [items objectAtIndex:i];
+275:             for (NSString* type in [item types]) {
+276:                 [skin pushNSObject:type] ; lua_rawseti(L, -2, luaL_len(L, -2) + 1) ;
+277:             }
+278:             lua_rawseti(L, -2, luaL_len(L, -2) + 1) ;
+279:         }
+280:     }
+281:     return 1;
+282: }
+283: 
+
+333: /// Returns the first item on the pasteboard with the specified UTI as raw data
+334: ///
+335: /// Parameters:
+336: ///  * name - an optional string indicating the pasteboard name.  If nil or not present, defaults to the system pasteboard.
+337: ///  * uti  - a string specifying the UTI of the pasteboard item to retrieve.
+338: ///
+339: /// Returns:
+340: ///  * a lua string containing the raw data of the specified pasteboard item
+341: ///
+342: /// Notes:
+343: ///  * The UTI's of the items on the pasteboard can be determined with the [hs.pasteboard.allContentTypes](#allContentTypes) and [hs.pasteboard.contentTypes](#contentTypes) functions.
+344: static int readItemForType(lua_State *L) {
+345:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;
+346:     NSPasteboard *pb ;
+347:     NSString     *type ;
+348:     if (lua_gettop(L) == 1) {
+349:         [skin checkArgs:LS_TSTRING, LS_TBREAK] ;
+350:         pb   = [NSPasteboard generalPasteboard] ;
+351:         type = [skin toNSObjectAtIndex:1] ;
+352:     } else {
+353:         [skin checkArgs:LS_TNUMBER | LS_TSTRING | LS_TNIL, LS_TSTRING, LS_TBREAK] ;
+354:         pb = lua_to_pasteboard(L, 1) ;
+355:         type = [skin toNSObjectAtIndex:2] ;
+356:     }
+357:     if (pb && type) {
+358:         @try {
+359:             [skin pushNSObject:[pb dataForType:type]] ;
+360:         } @catch (NSException *exception) {
+361:             return luaL_error(L, [[exception reason] UTF8String]) ;
+362:         }
+363:     } else if (!pb) {
+364:         return luaL_error(L, "unable to get pasteboard") ;
+365:     } else {
+366:         return luaL_error(L, "unable to evaluate type string") ;
+367:     }
+368:     return 1 ;
+
+521: /// hs.pasteboard.writeDataForUTI([name], uti, data, [add]) -> boolean
+522: /// Function
+523: /// Sets the pasteboard to the contents of the data and assigns its type to the specified UTI.
+524: ///
+525: /// Parameters:
+526: ///  * name - an optional string indicating the pasteboard name.  If nil or not present, defaults to the system pasteboard.
+527: ///  * uti  - a string specifying the UTI of the pasteboard item to set.
+528: ///  * data - a string specifying the raw data to assign to the pasteboard.
+529: ///  * add  - an optional boolean value specifying if data with other UTI values should retain.  This value must be strictly either true or false if given, to avoid ambiguity with preceding parameters.
+530: ///
+531: /// Returns:
+532: ///  * True if the operation succeeded, otherwise false (which most likely means ownership of the pasteboard has changed)
+533: ///
+534: /// Notes:
+535: ///  * The UTI's of the items on the pasteboard can be determined with the [hs.pasteboard.allContentTypes](#allContentTypes) and [hs.pasteboard.contentTypes](#contentTypes) functions.
+536: static int writeItemForType(lua_State *L) {
+537:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;
+538:     NSPasteboard *pb ;
+539:     BOOL          add = NO ;
+540:     NSString     *type ;
+541:     NSData       *data ;
+542:     if (lua_gettop(L) >= 3) {
+543:         if (lua_isboolean(L, -1)) {
+544:             add = (BOOL)lua_toboolean(L, -1) ;
+545:             lua_settop(L, -2) ;
+546:         } else if (lua_isnil(L, -1)) {
+547:             lua_settop(L, -2) ;
+548:         }
+549:     }
+550:     if (lua_gettop(L) == 2) {
+551:         [skin checkArgs:LS_TSTRING, LS_TSTRING, LS_TBREAK] ;
+552:         pb   = [NSPasteboard generalPasteboard] ;
+553:         type = [skin toNSObjectAtIndex:1] ;
+554:         data = [skin toNSObjectAtIndex:2 withOptions:LS_NSLuaStringAsDataOnly] ;
+555:     } else {
+556:         [skin checkArgs:LS_TNUMBER | LS_TSTRING | LS_TNIL, LS_TSTRING, LS_TSTRING, LS_TBREAK] ;
+557:         pb = lua_to_pasteboard(L, 1) ;
+558:         type = [skin toNSObjectAtIndex:2] ;
+559:         data = [skin toNSObjectAtIndex:3 withOptions:LS_NSLuaStringAsDataOnly] ;
+560:     }
+561:     if (pb && type && data) {
+562:         @try {
+563:             if (!add) {
+564:                 [pb clearContents] ;
+565:             }
+566:             lua_pushboolean(L, [pb setData:data forType:type]) ;
+567:         } @catch (NSException *exception) {
+568:             return luaL_error(L, [[exception reason] UTF8String]) ;
+569:         }
+570:     } else if (!pb) {
+571:         return luaL_error(L, "unable to get pasteboard") ;
+572:     } else if (!type) {
+573:         return luaL_error(L, "unable to evaluate type string") ;
+574:     } else {
+575:         return luaL_error(L, "unable to evaluate data string") ;
+576:     }
+577:     return 1 ;
+578: }
+579: 
+
+894: 
+895: /// hs.pasteboard.writeObjects(object, [name]) -> boolean
+896: /// Function
+897: /// Sets the pasteboard contents to the object or objects specified.
+898: ///
+899: /// Parameters:
+900: ///  * object - an object or table of objects to set the pasteboard to.  The following objects are recognized:
+901: ///    * a lua string, which can be received by most applications that can accept text from the clipboard
+902: ///    * `hs.styledtext` object, which can be received by most applications that can accept a raw NSAttributedString (often converted internally to RTF, RTFD, HTML, etc.)
+903: ///    * `hs.sound` object, which can be received by most applications that can accept a raw NSSound object
+904: ///    * `hs.image` object, which can be received by most applications that can accept a raw NSImage object
+905: ///    * a table with the `url` key and value representing a file or resource url, which can be received by most applications that can accept an NSURL object to represent a file or a remote resource
+906: ///    * a table with keys as described in `hs.drawing.color` to represent a color, which can be received by most applications that can accept a raw NSColor object
+907: ///    * an array of one or more of the above objects, allowing you to place more than one object onto the clipboard.
+908: ///  * name - an optional string indicating the pasteboard name.  If nil or not present, defaults to the system pasteboard.
+909: ///
+910: /// Returns:
+911: ///  * true or false indicating whether or not the clipboard contents were updated.
+912: ///
+913: /// Notes:
+914: ///  * Most applications can only receive the first item on the clipboard.  Multiple items on a clipboard are most often used for intra-application communication where the sender and receiver are specifically written with multiple objects in mind.
+915: static int writeObjects(lua_State *L) {
+916:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;
+917:     NSPasteboard* pboard ;
+918:     if (lua_gettop(L) == 1) {

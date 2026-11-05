@@ -1,0 +1,8 @@
+healthy default alias p: actual Keymap/Personal/Expander/Synthetic emit exact literal braces+Unicode; preview=Synthetic  雪
+PIM-001 extra alias x=city: configured valid known field; preview=nil consumed=false emitted=nil
+PIM-001 normal editor save: save=true; extra alias x removed from actual TOML; known city value retained
+healthy multifield pn: literal {Tab} remains field data; exactly one real Tab pair; logical emitted value has no tab
+disabled control: no personal preview/consume/emission
+trigger change control: old magic event cannot expand
+positive alias remap control: p=city works with exact Audit City preview+output; x=city in SAME source remains inert
+PASS stopped actual owners; no native Darwin or real secret used

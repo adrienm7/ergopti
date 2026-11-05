@@ -1,0 +1,34 @@
+{
+	"schema_version": 1,
+	"scope": "personal-info-shared",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/shared/report.md",
+	"findings": [
+		{
+			"id": "PIS-001",
+			"title": "Shared prefix counts advertise mappings that are not generated for unspaced personal values",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["truthful_status"],
+			"reproduction": "Run ci-bin/luajit probes/prefix-count-owner.lua PINNED_SHARED_WORKTREE ARTIFACT_DIRECTORY. It writes a synthetic personal_info.toml with an unspaced SSN and IBAN and no aliases, enables only the two prefix families, and initializes the actual Linux manager. Actual manager.prefix_mappings() returns2 mappings while actual manager.active_count() returns4. probes/shared-model.lua independently executes the actual shared helper and actual pure Prefix.build with unspaced/spaced/empty/disabled controls on Lua5.4 and LuaJIT.",
+			"root_cause": "_shared/lua/dynamic_hotstrings/init.lua compute_prefix_counts returns2 whenever raw SSN length>=5 or raw IBAN length>=6. The registration owners add a second spaced trigger only when it differs from the raw trigger. Passing only stripped values into the shared count function cannot express whether that second mapping exists. Linux Prefix.counts feeds this estimate into manager.active_count and the dynamic menu; macOS source-traces the same helper into section.count.",
+			"silent_failure": "The count is a normal nonnegative integer, so no refusal or error is raised. Typed prefix output still works, hiding the status mismatch. Existing threshold-only count vectors and spaced happy-path fixtures do not compare the status against the actual producer for unspaced values.",
+			"regression_test": "Use actual prefix producers to compare the advertised count against distinct generated mappings for compact values, normally spaced values, spaces only after the distinguishing prefix, empty/short values and disabled families. Retain actual manager integration; do not merely change a source assertion or copy the helper formula.",
+			"evidence": [
+				"probes/shared-model.lua",
+				"logs/model-lua54.log",
+				"logs/model-luajit.log",
+				"probes/prefix-count-owner.lua",
+				"logs/prefix-count-owner.log",
+				"comparison.json"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/shared/report.md",
+			"basis": "Actual shared helper and genuine Linux mapping/count owner over private synthetic data; other OS analogues source-traced, native menus unrendered.",
+			"additional_property_basis": {
+				"truthful_status": "A menu count presented as active hotstrings must equal the currently generated runtime mappings."
+			}
+		}
+	]
+}

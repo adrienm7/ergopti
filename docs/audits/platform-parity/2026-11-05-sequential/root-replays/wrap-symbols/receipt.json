@@ -1,0 +1,107 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"rebindings": [
+		"Only Linux private fixture destination moved to root owned replay directory; no business source changed."
+	],
+	"replays": [
+		{
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/windows/probes/source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"log": "windows/source-contract.mjs.txt"
+		},
+		{
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/macos/probes/trigger.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "macos/trigger.lua.txt"
+		},
+		{
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/macos/probes/menu.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "macos/menu.lua.txt"
+		},
+		{
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/macos/probes/multi-item.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "macos/multi-item.lua.txt"
+		},
+		{
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/macos/probes/copied.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "macos/copied.lua.txt"
+		},
+		{
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/linux/probes/catalogue-owner.lua"
+			],
+			"exit_code": 0,
+			"log": "linux/catalogue-owner.lua.txt"
+		},
+		{
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/linux/probes/menu-owner.lua"
+			],
+			"exit_code": 0,
+			"log": "linux/menu-owner.lua.txt"
+		},
+		{
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/linux/probes/custom-parameter.lua"
+			],
+			"exit_code": 0,
+			"log": "linux/custom-parameter.lua.txt"
+		},
+		{
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/shared"
+			],
+			"exit_code": 0,
+			"log": "shared/shared-model-lua.txt"
+		},
+		{
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/root-replays/wrap-symbols/shared"
+			],
+			"exit_code": 0,
+			"log": "shared/shared-model-luajit.txt"
+		}
+	]
+}

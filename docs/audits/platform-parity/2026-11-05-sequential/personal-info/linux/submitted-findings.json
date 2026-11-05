@@ -1,0 +1,63 @@
+{
+	"schema_version": 1,
+	"scope": "linux-personal-info",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "PIL-001",
+			"title": "Personal multi-field expansion drops the retained original text-destination publication",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Capture an actual focus-guard publication for the original field, then change controlled resident focus during actual layout planning. Actual manager/injector single @p refuses with zero writes; combo @np succeeds with 14 recorded writes including backspaces and real Tab to the successor. Healthy controls succeed. Uses synthetic s/e values and recording native ports, not a desktop receiver.",
+			"root_cause": "manager.on_trigger calls _fire_combo(prefix,t) without publication; _fire_combo calls inject_fields without destination. Injector.inject_fields has no publication parameter and prepares/runs with nil admission. Channel/layout ownership cannot substitute for original focused-field authority.",
+			"silent_failure": "Combo reports success despite stale publication; privacy log redaction does not prevent wrong-field output. Native transport refusal is a cleanup backstop, but successful writes to the wrong focus produce no warning.",
+			"regression_test": "Exercise original Main/manager/injector around focus/privacy/pause retirement before first erase and during planning/clipboard settlement, requiring zero writes into successor and complete cleanup. Preserve real Tab continuation using an appropriate form authority rather than requiring the original field after every intentional Tab.",
+			"evidence": [
+				"probes/combo-publication.lua",
+				"logs/final-a-combo-publication.log",
+				"logs/final-b-combo-publication.log",
+				"logs/source-boundaries.txt",
+				"source-hashes.json"
+			]
+		},
+		{
+			"id": "PIL-002",
+			"title": "Personal-information source and editor save ignore the effective configuration directory",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Acknowledge actual Paths.set_config_dir to a private custom directory using real Storage. Seed distinct default/effective personal files, then initialize actual manager without personal_info_path. It loads default and genuine capture/save edits default, leaving effective unchanged. Explicit effective path init loads correct value.",
+			"root_cause": "manager.init builds default_config_dir()/personal_info.toml instead of ConfigPaths.config personal_info.toml. Production Main init and magic-key callback supply only trigger_char. The public open_personal_info action uses effective Paths.config, creating split source authority.",
+			"silent_failure": "Initialization/save succeed with no warning against default source while configured-path action opens another file. Reset to default or explicit init path works; production callers do not pass the explicit path.",
+			"regression_test": "Select actual custom config directory, seed distinct files, execute actual startup/magic-key initialization and editor save, and assert a single effective source. Keep independent bootstrap Storage discovery.",
+			"evidence": [
+				"probes/config-route.lua",
+				"logs/final-a-config-route.log",
+				"logs/final-b-config-route.log",
+				"logs/source-boundaries.txt",
+				"source-hashes.json"
+			]
+		},
+		{
+			"id": "PIL-003",
+			"title": "Missing first-boot personal-info file prevents editor initialization and source creation",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Initialize actual manager against absent private source and call genuine editor bridge ready with valid current page epoch. pushed=false, zero init JS and zero initial notices; Save fails and creates no file. Independently create valid source/reinitialize and same page pushes fields. Closed epoch remains refused.",
+			"root_cause": "Absent parse returns empty tables; capture_info_edit requires existing classified ok file with info table. Bridge ready silently returns on missing receipt, and save requires that receipt. No Linux startup/install/onboarding first-create seed path was found; page renders supplied fields only.",
+			"silent_failure": "Initial editor refusal emits no init data or notice. A later save is refused, but UI cannot create its source. Manual valid TOML creation and reinitialization are backstops.",
+			"regression_test": "Add authorized absent-source creation coverage through actual source owner/bridge/writer, including source-appearance races, foreign epochs and write refusal. Preserve absent/stale source admission guards; introduce legitimate first-create authority.",
+			"evidence": [
+				"probes/editor-firstboot.lua",
+				"logs/final-a-editor-firstboot.log",
+				"logs/final-b-editor-firstboot.log",
+				"logs/source-boundaries.txt",
+				"source-hashes.json"
+			]
+		}
+	]
+}

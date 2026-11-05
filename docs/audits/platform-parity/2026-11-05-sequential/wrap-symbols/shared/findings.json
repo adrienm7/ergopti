@@ -1,0 +1,8 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-shared",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/shared/report.md",
+	"findings": []
+}

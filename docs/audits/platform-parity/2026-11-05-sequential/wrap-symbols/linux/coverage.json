@@ -1,0 +1,68 @@
+{
+	"schema_version": 1,
+	"scope": "linux-wrap-symbols",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"entry_points": [
+		"typed opening/closing symbol via grabbed onConsume",
+		"menu fixed-pair picker",
+		"parameterized wrap_selection action via gesture/keyboard/tap/script bindings",
+		"wrap-on-type menu toggle",
+		"canonical parameter/scope load-save-reset",
+		"pointer/Shift-navigation/Ctrl+A selection window"
+	],
+	"actual_owner_probes": [
+		"catalogue-owner.lua: genuine manager+controller, Unicode/multiline, AltGr, baseline/policy/config ABA controls",
+		"menu-owner.lua: full actual menu builder with genuine catalogue and manager",
+		"custom-parameter.lua: actual gesture parameter owner+TOML writer private file, invalid/lease/stale guard/reload controls"
+	],
+	"registered_modules": 11,
+	"registered_cases": {
+		"passed": 290,
+		"failed": 0
+	},
+	"dry_sweeps": [
+		{
+			"name": "A",
+			"after_last_new_root": "WSL-002",
+			"whole_bounded_scope": true,
+			"new_roots": 0,
+			"all_owner_probes": "pass",
+			"registered_passed": 290,
+			"registered_failed": 0
+		},
+		{
+			"name": "B",
+			"after_last_new_root": "WSL-002",
+			"whole_bounded_scope": true,
+			"new_roots": 0,
+			"all_owner_probes": "pass",
+			"registered_passed": 290,
+			"registered_failed": 0
+		}
+	],
+	"deduplicated": [
+		"LCP-001 all-format clipboard snapshots",
+		"LCP-002 foreign clipboard owner restore",
+		"LCP-003 exact selected-range custody",
+		"TODO.md:30 Linux per-pair user management gap"
+	],
+	"covered": [
+		"catalogue metadata/order/duplicate endpoint/spaced triggers",
+		"custom delimiter parameter syntax and persistence",
+		"menu and action empty-selection distinction",
+		"source/runtime configuration revisions and mutation leases",
+		"pause/master/security/field publication and stale native callbacks",
+		"actual Main injection acknowledgement and fatal/refused cleanup controls",
+		"session-selected PRIMARY and CLIPBOARD command capabilities",
+		"known all-format/restoration/range deficits kept explicit"
+	],
+	"limits": [
+		"No real user clipboard/config/input/editor touched",
+		"No actual X11/Wayland desktop selection/native receiving",
+		"Application undo/preserved selection and clipboard MIME negotiation unmeasured",
+		"Native command acknowledgement is not editor acknowledgement",
+		"No G4, performance or memory claim",
+		"Ambiguous typed quote alias priority remains unknown intent"
+	],
+	"finding_ids": ["WSL-001", "WSL-002"]
+}

@@ -1,0 +1,1 @@
+Independent schema1 required-field, enum/guarantee-label, unique-ID and scope-relative evidence-path validation: PASS. Repository validate-report cannot admit a report outside repository; scratch-only rule preserved.

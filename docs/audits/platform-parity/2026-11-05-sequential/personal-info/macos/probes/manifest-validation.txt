@@ -1,0 +1,1 @@
+PASS independent schema1 required fields/enums/guarantee names/unique IDs/evidence path existence. Repository validator rejects reports outside checkout; scratch-only location preserved.

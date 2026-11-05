@@ -1,0 +1,99 @@
+{
+	"fields": [
+		{
+			"key": "iban",
+			"label": "iban",
+			"value": "",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "bic",
+			"label": "bic",
+			"value": "SYNTHETIC_1_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "credit_card",
+			"label": "credit_card",
+			"value": "SYNTHETIC_2_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "social_security_number",
+			"label": "social_security_number",
+			"value": "SYNTHETIC_3_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "phone_number",
+			"label": "phone_number",
+			"value": "SYNTHETIC_4_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "phone_number_clean",
+			"label": "phone_number_clean",
+			"value": "SYNTHETIC_5_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "date_of_birth",
+			"label": "date_of_birth",
+			"value": "SYNTHETIC_6_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "first_name",
+			"label": "first_name",
+			"value": "SYNTHETIC_7_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "last_name",
+			"label": "last_name",
+			"value": "SYNTHETIC_8_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "email_address",
+			"label": "email_address",
+			"value": "SYNTHETIC_9_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "work_email_address",
+			"label": "work_email_address",
+			"value": "SYNTHETIC_10_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "street_address",
+			"label": "street_address",
+			"value": "SYNTHETIC_11_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "postal_code",
+			"label": "postal_code",
+			"value": "SYNTHETIC_12_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "city",
+			"label": "city",
+			"value": "SYNTHETIC_13_🙂\n<literal>",
+			"hint": "(@x★)"
+		},
+		{
+			"key": "country",
+			"label": "country",
+			"value": "SYNTHETIC_14_🙂\n<literal>",
+			"hint": "(@x★)"
+		}
+	],
+	"strings": {
+		"common.save": "Save",
+		"common.cancel": "Cancel",
+		"editor.personal_info.window_title": "Synthetic Editor"
+	}
+}

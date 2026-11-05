@@ -1,0 +1,139 @@
+{
+	"modules": [
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.injection.test_personal_preview_static_ownership",
+			"exit": 0,
+			"passed": 1,
+			"failed": 0,
+			"full_output_sha256": "436b4b97ea095dc63c2c1310bfee94f888b6efaf2d0d8cc0d8f438c2ca600f72"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info",
+			"exit": 0,
+			"passed": 8,
+			"failed": 0,
+			"full_output_sha256": "1f2c28d3f7b863768b7921e3dc07052621e629cd800f1f910e61dae1ec40343e"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_altbackspace",
+			"exit": 0,
+			"passed": 2,
+			"failed": 0,
+			"full_output_sha256": "000c245afbf2d08309b1f2c613d91b3efed9c259f1b70d35b31160ed95b0dc17"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_back_to_back",
+			"exit": 0,
+			"passed": 2,
+			"failed": 0,
+			"full_output_sha256": "ec35e03feba605cc0e166536780ab60d75f30297bbdf3ea11596a7fe1a2aba2a"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_combo_all_or_nothing",
+			"exit": 0,
+			"passed": 5,
+			"failed": 0,
+			"full_output_sha256": "94f84c91e1bed53de59fe1ee952ffe8f46b896f0913b27acba92545122431b12"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_combo_matches_buffer",
+			"exit": 0,
+			"passed": 3,
+			"failed": 0,
+			"full_output_sha256": "f66e639a6bda21af6fa41f86c4d93babb7a96e5b986d058f11086762303ceeaa"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_config_transaction",
+			"exit": 0,
+			"passed": 13,
+			"failed": 0,
+			"full_output_sha256": "563e46467d6abfcfbb950d70ff330cfb87eb63a88942a23d323b04d7ee75474e"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_multifield_no_tab_desync",
+			"exit": 0,
+			"passed": 3,
+			"failed": 0,
+			"full_output_sha256": "a550e92aca0c0f978c285b7a2b19a35300296e6c44eec974f6a1d3a439361a56"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_registry_refresh",
+			"exit": 0,
+			"passed": 5,
+			"failed": 0,
+			"full_output_sha256": "aa1997c6d1cf70bf2ee14ccfaccfdd1360cef89c60c4c27b04746b08ab594267"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_save_transaction",
+			"exit": 0,
+			"passed": 10,
+			"failed": 0,
+			"full_output_sha256": "6b33ba59e81ad996417954a0a71319863bcf9135874fbe2e719e62d924c7f494"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_sync_injection",
+			"exit": 0,
+			"passed": 4,
+			"failed": 0,
+			"full_output_sha256": "3f3ba09d9e76f100ef30edd89bd5f9b26e51e9bcb85403025e7c7253da9a4c3c"
+		},
+		{
+			"module": "tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_trigger_char_sync",
+			"exit": 0,
+			"passed": 7,
+			"failed": 0,
+			"full_output_sha256": "73bf62dfa56468c18ddbd57979fc7390088060f489e2ff622a1c16c4b6d0bce2"
+		},
+		{
+			"module": "tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted",
+			"exit": 0,
+			"passed": 8,
+			"failed": 0,
+			"full_output_sha256": "0cdb85c0faa533952501157aab762e5e691d54e26e6564cd49662313d0695770"
+		},
+		{
+			"module": "tests.unit.modules.keymap.preview.test_preview_masks_secrets",
+			"exit": 0,
+			"passed": 14,
+			"failed": 0,
+			"full_output_sha256": "0a8195bf5aca01f64aad9c74f1a8096bd84226b71a6e5d5f639f3e97153aa5b4"
+		},
+		{
+			"module": "tests.unit.ui.editors.test_personal_info_editor_close_transaction",
+			"exit": 0,
+			"passed": 1,
+			"failed": 0,
+			"full_output_sha256": "84f0de1a8192d6157be666990f231b8364242431e4d0c8d6c0113b81ece7c62e"
+		},
+		{
+			"module": "tests.unit.ui.editors.test_personal_info_editor_construction",
+			"exit": 0,
+			"passed": 11,
+			"failed": 0,
+			"full_output_sha256": "177a169ee95a3bf5e26b1c832f0b4e4ffc958ba559ba21b27c5125bff27d9bda"
+		},
+		{
+			"module": "tests.unit.ui.editors.test_personal_info_editor_owner_callbacks",
+			"exit": 0,
+			"passed": 24,
+			"failed": 0,
+			"full_output_sha256": "691a4fb9d579729666c8ae4cddfc26cba25839f3bc708e690cca45240c765110"
+		},
+		{
+			"module": "tests.unit.ui.editors.test_personal_info_editor_port_leak",
+			"exit": 0,
+			"passed": 0,
+			"failed": 0,
+			"full_output_sha256": "c3f11cc9ffc2b1149b6c6742b9383413c7845764b928ac0b9116374c59749474"
+		},
+		{
+			"module": "tests.unit.ui.menu.hotstrings.test_menu_personal_info_source",
+			"exit": 0,
+			"passed": 5,
+			"failed": 0,
+			"full_output_sha256": "f1dd67d4b03c8726def5ba55262f5d1e1be52563d33a4be03bc1d2f7af3c6d3b"
+		}
+	],
+	"total_passed": 126,
+	"total_failed": 0
+}

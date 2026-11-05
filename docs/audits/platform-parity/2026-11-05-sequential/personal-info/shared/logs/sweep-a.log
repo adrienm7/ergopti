@@ -1,0 +1,17 @@
+$ python3 /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared/probes/build-comparison.py
+exit=0 sha256=a122f59410f05edf4885d716215393c8f5531bad5cf77d3033073ffc62072149
+inventory:15 fields,4masked,13 examplealiases,4 featurefamilies,42 capabilities,21 locales;16TOML+15JSON vectors+6 invalidpolicy cases
+$ /workspace/scratch/parity-toolchain/ci-bin/lua5.4 /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared/probes/shared-model.lua /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared
+exit=0 sha256=974c5f8ff4fbf6276d9dbfc5d64c524b48bf4e2471c7103f3b2ef4465009dd0d
+TOTAL assertions=108; actual shared owners and actual pure Linux prefix producer; native GUI/output receiving unrun; one count-contract mismatch observed
+$ /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared/probes/shared-model.lua /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared
+exit=0 sha256=36eab3c093d4da4d5e495e4f7ee700a06f3fe907a052292daa36cccbaf5b7c29
+TOTAL assertions=108; actual shared owners and actual pure Linux prefix producer; native GUI/output receiving unrun; one count-contract mismatch observed
+$ /workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared/probes/prefix-count-owner.lua /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared
+exit=0 sha256=33636f4ffd7f732a8dced72e1f84584f3462c6edbc45555f8950af68dbfb8a20
+PIS-001 genuine manager status advertises4 while genuine producer emits2; no native GUI/output receiving claimed
+$ /workspace/scratch/parity-toolchain/ci-bin/node /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared/probes/frontend.cjs /workspace/worktrees/parity-sequential-2026-11-05/shared /workspace/scratch/parity-sequential-2026-11-05/personal-info/shared
+exit=0 sha256=ff070d748547b07e7f01122d25fff6c50c3c3f7239cd191802efe4217dd85069
+ACTUAL_SHARED_FRONTEND canonical_fields=15 save_values=15 Unicode/multiline/empty values retained; save/cancel/Escape/ready messages verified; assertions=39; minimal DOM/bridge ports only, no native rendering or save acknowledgment claimed
+Whole bounded review:15fields/4secret-preview/13aliases;42capabilities;4feature families/schema1..16;editor+fileaction;21locale projections (one metadata-only key missing in all21);108 assertions on eachLua;actualmanager4vs2;frontend39assertions.
+Known phone/magic gaps and prior config/editor/crypto roots deduplicated. Native GUI unrun. No new shared root after PIS-001; sourcefiles=62

@@ -1,0 +1,15 @@
+{
+	"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua": "61bcf37b7a5e26145f8b9c0ac40b51ce13899f1c6ebf75ef496329daafafbad6",
+	"static/ergopti_plus/linux/modules/dynamic_hotstrings/prefix_rules.lua": "68349d9cc3ee05b9f23d54e748023060922a0605fe5283611105e881b9fa66f4",
+	"static/ergopti_plus/linux/modules/hotstrings/injector.lua": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+	"static/ergopti_plus/linux/infra/personal_info_fields.lua": "e8ae78cf6dd50d16e14878be7f957bcb7f2746848e17a65e313507b17b63442c",
+	"static/ergopti_plus/linux/infra/config_paths.lua": "2363e9b8cf88dd7a7d55bdcb47f0fcb1e4226d94987961839eb8f76b30deddcc",
+	"static/ergopti_plus/linux/ergopti_hotstrings.lua": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+	"static/ergopti_plus/linux/ui/personal_info_editor/bridge.lua": "844140e63f6b500201d1a5307b07e3f3c389d9f8b2b5e2cc5827f4d0ab2742b8",
+	"static/ergopti_plus/linux/ui/tooltip/preview.lua": "49d45bf4e78fd377c35f3437485f4f09b0939f83707592fb6a6f33af2d5b1697",
+	"static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f",
+	"static/ergopti_plus/_shared/ui/personal_info_editor/script.js": "0f8d78ab19a293fba1bff3c00a5c1a859d8c9d1990017240ed7e35c536646779",
+	"static/ergopti_plus/_shared/modules/personal_info/fields.toml": "cd4d630eda6de88dde70c4074094060b597b9284c5c9647a4494388f0e01e17c",
+	"static/ergopti_plus/_shared/lua/personal_info/mask.lua": "e0a0f3ad2447d2fbb086288ef01ff5b4940708849599b5a5545d798a461a0edd",
+	"static/ergopti_plus/_shared/core/config_schema/examples/personal_info.example.toml": "ca12b48bab377d26c3b51abc6da4b518dca43735980fa798b82a3850dfd153bf"
+}

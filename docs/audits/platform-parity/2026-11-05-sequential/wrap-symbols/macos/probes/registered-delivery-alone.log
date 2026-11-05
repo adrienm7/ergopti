@@ -1,0 +1,10 @@
+Compact receipt. SHA256 of full original output: e759c6d09f66263636f2312e5a0ff72411929a21eb1413386a5c8455b3abe544
+Command: lua5.4 tests/run.lua --only=tests.unit.modules.shortcuts.pause_owners.test_shortcut_delivery
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.shortcuts.pause_owners.test_shortcut_delivery","name":"updates the live wrap preference without replacing its active native owner","status":"pass","elapsed_ms":28.846708,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.shortcuts.pause_owners.test_shortcut_delivery","name":"retains the exact wrap owner when menu rewiring follows rollback delete false","status":"pass","elapsed_ms":31.342199,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.shortcuts.pause_owners.test_shortcut_delivery","name":"retains the exact wrap owner when menu rewiring follows rollback delete nil","status":"pass","elapsed_ms":30.523478,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.shortcuts.pause_owners.test_shortcut_delivery","name":"retains the exact wrap owner when menu rewiring follows rollback delete throw","status":"pass","elapsed_ms":36.275406,"timing_error":""}
+Total modules: 1
+Passed tests:  12
+Failed tests:  0
+[OK] All Lua unit tests passed.

@@ -1,0 +1,1 @@
+Repository validate-report refused external scratch destination: report must be inside the repository. No repository copy created. Independent JSON schema1 required fields, guarantee labels, unique IDs and evidence-path existence all pass.

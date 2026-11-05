@@ -1,0 +1,4 @@
+ACTUAL_MENU parens=true german_curly=true standard_curly=false pair_rows=42
+CATALOGUE_PAIRS 43
+EXPLICIT_ACTION standard_curly=true
+PASS genuine menu builder and genuine catalogue; no native menu/display

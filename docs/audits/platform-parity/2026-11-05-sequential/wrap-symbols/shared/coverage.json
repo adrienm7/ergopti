@@ -1,0 +1,99 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-shared-contract",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"confirmed_findings": 0,
+	"inventory": {
+		"catalogue_rows": 43,
+		"catalogue_groups": 7,
+		"capabilities": 36,
+		"enable_settings": 2,
+		"management_commands": 7,
+		"locales": 21,
+		"source_files_hashed": 53
+	},
+	"actual_business_owners_executed": [
+		"_shared/lua/wrap_pair/init.lua",
+		"_shared/lua/menu/wrap_preferences.lua",
+		"_shared/lua/menu/wrap_mutation.lua",
+		"_shared/lua/toml_codec/leaf_rows.lua",
+		"_shared/lua/toml_codec/init.lua",
+		"_shared/lua/compat/utf8.lua"
+	],
+	"runtimes": ["genuine Lua5.4", "genuine LuaJIT"],
+	"assertions_per_runtime": 283,
+	"independent_golden_vectors": 19,
+	"endpoint_inventory": {
+		"rows": 43,
+		"endpoints_per_row": 2,
+		"expectation_basis": "explicit opening-first rule; native lookup map reconstruction never treated as execution"
+	},
+	"healthy_controls": [
+		"all catalogue endpoint aliases",
+		"symmetric pipe token vs custom separator",
+		"multichar/Unicode parameters",
+		"scalar preference array and Boolean states",
+		"future metadata and owned leaf deletion",
+		"literal ACK publication while input sees prior view"
+	],
+	"refused_controls": [
+		"invalid action parameter corpus",
+		"wrong TOML container kinds",
+		"multichar management symbol",
+		"obsolete source collision",
+		"false/nil/truthy/throwing save receipts",
+		"reentrant nested mutation",
+		"foreign successor replacement"
+	],
+	"os_owner_references": {
+		"spaced_guillemet_trigger": "macOS and Linux actual owner probes; Windows source trace",
+		"overlap_filtering": "macOS actual trigger probe; Windows filters before map construction",
+		"overlap_picker_omission": "Linux actual menu-builder probe42 rows vs43; shared inventory aligns"
+	},
+	"policy_observations": [
+		"default quote overlap differs between native lookup last-win and explicit parser opening-first",
+		"Linux direct picker no-selection empty-pair insertion differs from parameter binding no-op",
+		"Linux flat picker intentionally lacks Windows/macOS management controls",
+		"management scalar symbols intentionally differ from multichar action parameters"
+	],
+	"duplicates_excluded": [
+		"prior clipboard all-format/rich/text restore differences",
+		"prior typed-wrap native selection API and PRIMARY stale refusal policy"
+	],
+	"source_only": [
+		"Windows/native lookup and clipboard dispatch",
+		"native GUI captions and prompt delivery",
+		"native keyboard consumption and modifier behavior",
+		"native persistence staging and acknowledgment",
+		"all3 destination/privacy/lifecycle adapter tracing"
+	],
+	"native_gui_executed": false,
+	"native_receiving_executed": false,
+	"unmeasured": [
+		"actual desktop selection capture",
+		"native output receiving and pasteboard restoration",
+		"native file durability",
+		"backend async scheduling",
+		"hardware modifier events",
+		"performance/latency/G4",
+		"memory growth"
+	],
+	"sweeps": [
+		{
+			"id": "a",
+			"new_shared_roots": 0,
+			"log": "logs/sweep-a.log",
+			"sha256": "e09cd0a2cd711b56f3efff9637de914a428657d199a73f280a6203a9d139a087"
+		},
+		{
+			"id": "b",
+			"new_shared_roots": 0,
+			"log": "logs/sweep-b.log",
+			"sha256": "97e44a0e1b3e1a526b82d5f57f4a79edcd8440cc5c35a93284ff51040a46eae3"
+		}
+	],
+	"validation": {
+		"repo_tool": "incompatible with external scratch/custom scope; rejection retained",
+		"brief_schema": "probes/validate-artifacts.py"
+	}
+}

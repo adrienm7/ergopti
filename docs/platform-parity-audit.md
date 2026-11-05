@@ -10,6 +10,10 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Sequential WPM, wrap and personal-information continuation
+
+The [sequential November 5 audit](audits/platform-parity/2026-11-05-sequential/report.md) keeps four OS/shared reviewers on the same module before advancing: WPM, wrap symbols, then personal information, at `7aecd9a25b35efdcff68898919506dc2f6fd02d0`. It adds independently replayed owner evidence, qualified Windows source projections and a [generated capability/intent comparison](audits/platform-parity/2026-11-05-sequential/capabilities.md). Canonical findings, shared mechanisms, known duplicates, policy questions and native receiving gaps remain distinct. The root TODO tracks the open findings; dated validators check evidence and projection drift without claiming automated semantic parity.
+
 ## Native runtime, editor and diagnostics continuation
 
 The [nine-scope November 5 audit](audits/platform-parity/2026-11-05-native-ui/report.md) follows managed runtime/provisioning, WebView editors and diagnostics separately on each OS at `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`. It retains 15 qualified findings, documents intentional differences and refuted hypotheses, and adds an automatic source-area register alongside the existing generated feature inventory. Source presence and declared availability remain distinct from verified native behavior. The [capability comparison](audits/platform-parity/2026-11-05-native-ui/capabilities.md) and root TODO record the concrete follow-ups.

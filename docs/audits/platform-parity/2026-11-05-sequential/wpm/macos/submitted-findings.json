@@ -1,0 +1,43 @@
+{
+	"schema_version": 1,
+	"scope": "WPM macOS widget/readout",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "WPMM-001",
+			"title": "Floating WPM canvas never opts into native mouse event delivery",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Enable floating WPM, type, attempt a compact or graph drag. Actual owner emits no element tracking flags or canvasMouseEvents; faithful native admission delivers zero callbacks, leaving the frame unchanged. Explicit native opt-in positive control delivers three callbacks and moves the same owner +90,+90.",
+			"root_cause": "wpm_widget installs mouseCallback without native trackMouseDown/Up/Move or canvasMouseEvents; Hammerspoon 1.1.1 defaults all false and mouseCallback setter only disables ignoresMouseEvents.",
+			"silent_failure": "No callback is dispatched and no exception occurs. Runtime start succeeds, so native acquisition compensation cannot detect the absent interaction. Reset position only restores a default.",
+			"regression_test": "Exercise actual widget through native-default event admission, not direct callback invocation; require compact and graph movement/persistence and retained callback fencing after stop.",
+			"evidence": [
+				"report.md",
+				"probes/owner.lua",
+				"probes/owner.log",
+				"probes/native-canvas-contract.txt"
+			]
+		},
+		{
+			"id": "WPMM-002",
+			"title": "WPM default anchor remains outside the desktop after display shrink",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "With no stored anchor start at 1600x1000, type to allocate default x1515,y927; shrink available desktop to800x600 and tick again. Actual owner keeps requesting x1515,y927 without diagnostics; Reset changes requested geometry to715,527.",
+			"root_cause": "wpm_widget queries current screen but initializes _pos_x/_pos_y only when nil; display topology changes never invalidate or validate cached anchors. Hammerspoon forwards the requested frame to borderless NSWindow; AppKit documented constrainFrameRect leaves horizontal position unaffected.",
+			"silent_failure": "Runtime remains running and draw succeeds at requested offscreen coordinates. Reset is an explicit recovery backstop; no automatic visibility or topology check exists. Actual compositor hotplug was not executed.",
+			"regression_test": "Start with default anchor, replace desktop geometry, and require next draw to intersect a current display while respecting intentional multi-monitor placement. Include native Darwin validation.",
+			"evidence": [
+				"report.md",
+				"probes/owner.lua",
+				"probes/owner.log",
+				"probes/native-position-contract.txt"
+			]
+		}
+	]
+}

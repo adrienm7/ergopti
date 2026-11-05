@@ -36,6 +36,53 @@ the field-run step or the hand action that proves it and the commits it confirms
 - [ ] **Windows and Linux:** evaluate equivalents of the macOS bundled App Cloner (isolated application copies and profiles) and Encryptor (file encryption/decryption by drag-and-drop). These are bundled apps, distinct from the shared text and metrics encryption features.
 - [ ] Triage each OS-specific configuration entry, action and greyed menu item in the generated [feature inventory](docs/feature-inventory.md). The recorded reason and equivalent distinguish OS-specific mechanisms from actual product gaps. Recheck runtime and hardware behavior before declaring parity.
 
+## Sequential WPM, wrap and personal-info parity follow-up
+
+[November 5 sequential audit](docs/audits/platform-parity/2026-11-05-sequential/report.md) at `7aecd9a25b35efdcff68898919506dc2f6fd02d0`: four reviewers stayed on one module at a time, with independent root replays before advancing. [Generated capability and intentional-difference comparison](docs/audits/platform-parity/2026-11-05-sequential/capabilities.md). These are bounded source/actual-owner findings; Windows native execution and desktop receiving remain qualified. Findings below remain open; this campaign changes evidence and tracking, not production behavior.
+
+### wpm
+
+- [ ] **[CODE] WPMW-001:** Delayed boot Show overrides a newer widget disable. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md).
+- [ ] **[CODE] WPMW-002:** Graph reports success after native bitmap upload refuses. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md).
+- [ ] **[CODE] WPMM-001:** Floating WPM canvas never opts into native mouse event delivery. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md).
+- [ ] **[CODE] WPMM-002:** WPM default anchor remains outside the desktop after display shrink. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md).
+- [ ] **[CODE] WPML-001:** Refused redraw clears shown while the existing native widget remains visible, skipping later idle hide. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/report.md).
+
+### wrap-symbols
+
+- [ ] **[CODE] WSW-001:** Saved custom wrap pair is ignored by remapped symbol keys. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md).
+- [ ] **[CODE] WSW-002:** UIA selection prefix is wrapped as though it were the complete selection. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md).
+- [ ] **[CODE] WSM-001:** Checked guillemet pair does not match native layout trigger strings. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md).
+- [ ] **[CODE] WSM-002:** Wrap clipboard restoration discards later pasteboard items. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md).
+- [ ] **[CODE] WSM-003:** Disabling lower curly quotes removes a still-enabled opener. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md).
+- [ ] **[CODE] WSL-001:** Typed guillemets cannot match their spaced built-in wrap pair. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md).
+- [ ] **[CODE] WSL-002:** Endpoint alias collision removes the standard curly-double-quote pair from the actual menu. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md).
+
+### personal-info
+
+- [ ] **[CODE] PIW-001:** Eager registered compounds escape field-navigation separators and admit partial identities. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md).
+- [ ] **[CODE] PIW-002:** Valid TOML known personal fields silently load as placeholders. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md).
+- [ ] **[CODE] PIM-001:** Added valid ASCII aliases are ignored and removed by unrelated personal-info saves. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md).
+- [ ] **[CODE] PIM-002:** Personal prefix expansion interprets accepted field data as key commands. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md).
+- [ ] **[CODE] PIL-001:** Personal multi-field expansion drops the retained original text-destination publication. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/linux/report.md).
+- [ ] **[CODE] PIL-002:** Personal-information source and editor save ignore the effective configuration directory. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/linux/report.md).
+- [ ] **[CODE] PIL-003:** Missing first-boot personal-info file prevents editor initialization and source creation. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/linux/report.md).
+- [ ] **[CODE] PIS-001:** Shared prefix counts advertise mappings that are not generated for unspaced personal values. [Evidence and regression direction](docs/audits/platform-parity/2026-11-05-sequential/personal-info/shared/report.md).
+
+### Policy, documentation and verification debt
+
+- [ ] **[CI] Native Lua acquisition:** qualify current-source macOS LuaSocket/native-client build and launch after Lua.org timeouts; the upstream byte-identical Debian mirror changes for Linux and macOS are integrated, and targeted fetch/refusal controls pass. The earlier failed CI sources predate the macOS mirror fix. Preserve exact hashes and native receiving requirements. [Delivery evidence](docs/audits/platform-parity/2026-11-05-sequential/delivery.md).
+- [ ] **[CI] Native keyboard-source fixture:** investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
+
+- [ ] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption.
+- [ ] **[PARITY] Personal aliases and preparation:** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
+
+- [ ] **[PARITY] WPM:** decide pointer-hide and overlapping colour-source precedence explicitly across OSes; current code differs. Preserve the distinction between an unknown-intent discrepancy and a confirmed bug.
+- [ ] **[PARITY] Linux WPM:** clarify whether no-tray means headless or floating-widget-capable; qualify GTK pumping accordingly. Review an explicit recovery surface for guarded rollback debt without bypassing its fail-closed admission.
+- [ ] **[PARITY] Wrap management:** decide Windows supplementary Unicode scalar support; its UTF-16-length validator currently rejects scalar pairs accepted by macOS. Linux custom pair management is already tracked above; parameter-specific custom delimiters are available.
+- [ ] **[CODE] Wrap documentation:** correct the shared catalogue README claiming two drivers and obsolete open/close/label_key shape; retain trigger normalization separately from spaced output delimiters.
+- [ ] **[CI] macOS wrap fixtures:** remove combined-run module-cache/i18n contamination: the combined selection reports 255 passes and four failures while the affected delivery fixture alone passes 12/0. Do not replace actual production owners with more forgiving stubs.
+
 ## Native runtime, editor and diagnostics parity follow-up
 
 [November 5 audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md): nine bounded OS × module scopes at `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`; 15 qualified findings, including one shared frontend root affecting all three OSes. These are source/model/private native-port findings, not 15 native desktop reproductions. [Capability and intentional-difference comparison](docs/audits/platform-parity/2026-11-05-native-ui/capabilities.md). The canonical manifests exclude counterchecked LVB-002 and MRT-005.
@@ -192,6 +239,16 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
 - [ ] **HS-010 / MG001:** System-gesture preference probes never start their prepared ShellRunner tasks. [macos-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/macos-gestures/report.md). Implement the stated boundary regression before claiming closure.
 - [ ] **HS-011 / MG002:** Tap commit dispatch bypasses the macOS system-gesture conflict gate. [macos-gestures evidence](docs/audits/platform-parity/2026-11-04-deep/macos-gestures/report.md). Implement the stated boundary regression before claiming closure.
 - [ ] **Two copies of the app erase each other's Accessibility grant (field report 2026-11-05).** A local build (`build/macos`, local self-signed certificate) and the `/Applications` dev prerelease (CI certificate) share `com.ergoptiplus.app.hammerspoon`. The switch the user turns on can match the other copy. The copy that boots is then not trusted, and `infra/accessibility_wait.lua` runs `tccutil reset` on the bundle id, which removes the switch at every reload. The field run's installer now unregisters every other copy before it opens the app; the app itself still needs the fix: before the reset, find every registered copy of the bundle id (LaunchServices) whose signature differs from the running one, and name its path in the guidance dialog instead of resetting in a loop. The boot now resets the entry once per install (version, device and inode of the launcher) and shows only macOS's own prompt. `ui.permission_dialog.guide_accessibility`, its tests and its locale strings are now unused: retire them.
+- [ ] **Owned runtime: the helper's own report path still demands two code hashes (field report 2026-11-05).** The published helper carries one SHA-256 code directory per slice. The launcher now admits one or two (`OwnedRuntimeInstallMainOperation.codeDirectoryHashes`), which unblocks the install. `OwnedVirtualHIDDaemonReportStageOwner.admitImage` is compiled into the helper and still requires `hashes.count == 2`; switch it to the same rule at the next runtime rebuild. The install acceptance (`tools/build/owned_runtime_install_acceptance.sh`) runs the helper directly with sudo and never exercised the launcher's check; drive it through `--request-owned-runtime-install` instead.
+- [ ] **Field checks report a missing owned runtime as broken config.** With the owned runtime selected but not admitted, nothing is generated: `field_tap_hold_thresholds` fails `unreadable` on the never-created `karabiner.json` (`adapters/field_check_ports.lua:121-149`), and `field_tap_copy` counts the nil deployed timeout as short (`infra/field_check_tap_copy.lua:72-74`). Both should report `skip:runtime_not_admitted`.
+- [ ] **Field run follow-ups from the 2026-11-05 report (30 pass, 12 fail).**
+  - `field_lease` runs before `field_owned_install` in `data/field_run.json`: move it after `owned_install_reload`, and report `cli_present`, `guardian_state` and `cli_version` as `skip:owned_runtime_not_admitted` without the 30 s guardian wait when the owned runtime is not admitted (`infra/field_check_checks.lua:129-171`). Its `config_present` reads the shared `~/.config/karabiner/karabiner.json` instead of `KePaths.config_file_for(KePaths.selected_runtime())`.
+  - `field_owned_runtime` fails `capture_unloaded` on every owned boot: `runtime_owner_ports.new()` loads `physical_capture` eagerly (`adapters/runtime_owner_ports.lua:294`). Make that check info now that owned is the default, or the require lazy.
+  - `field_owned_start` fails `user_karabiner_closed` when the runtime is not ready; leaving the user's Karabiner-Elements running is then correct (`infra/field_check_owned_activation.lua:88-95`): `skip:runtime_not_ready`.
+  - `field_owned_pause` is rolled back by Ollama: a serve task that exited 78 leaves its start cleanup unsettled, `pause_warmup` returns false (`modules/llm/api_ollama.lua:571-592, 714-735`), and the global pause gives up. A dead, unpublished daemon must not block the pause.
+  - The managed Ollama daemon itself exited 78 ("operation"): the next report names the primary and cleanup failures (`managed_ollama_serve.py` now prints both).
+  - `key_accounting` fails `window_unfocused` intermittently: the first key asks `hs.window.focusedWindow()` once, 0.6 s after the scratch window shows, and a 523 ms main-thread hold made it miss (`adapters/field_probe_ports.lua:711-714, 799`). Wait for the window's own focus report, and give the two refusal sites distinct tokens.
+  - The Mac's LogsDirPath still ends in the old `ergopti_plus` folder, so logs land in `…/ergopti_plus/Ergopti/`; the migration only rewrites old default folders.
 
 ### Linux
 

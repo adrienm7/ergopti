@@ -1,0 +1,66 @@
+{
+	"schema_version": 1,
+	"scope": "linux-personal-info",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"fields_covered": 15,
+	"masked_fields": ["bic", "credit_card", "iban", "social_security_number"],
+	"aliases": "13 shipped example aliases plus independently assigned aliases for all15 fields; NFC/malformed/decomposed registered cases",
+	"entry_points": [
+		"single @alias magic trigger",
+		"ordered multi-alias form expansion",
+		"phone/SSN/IBAN ordinary prefix mappings",
+		"preview and log classification",
+		"personal-info editor ready/save/cancel/close",
+		"configuration directory and open-personal-info action",
+		"initialization/magic-key reinitialization and canonical preferences"
+	],
+	"actual_owner_probes": [
+		"combo-publication.lua: production manager/injector/layout/focus guard, controlled native ports",
+		"config-route.lua: actual Paths/Storage/source/writer private file authority",
+		"editor-firstboot.lua: actual missing/existing source owner and editor bridge with faithful host receipts",
+		"all-fields.lua: actual policy/manager/bridge payload with recording insertion boundary",
+		"prefix-count-owner.lua: actual manager count countercheck owned by shared role"
+	],
+	"registered_modules": 16,
+	"registered_cases": {
+		"passed": 191,
+		"failed": 0
+	},
+	"dry_sweeps": [
+		{
+			"name": "A",
+			"whole_bounded_scope": true,
+			"after_last_new_root": "PIL-003",
+			"new_roots": 0,
+			"owner_probes": "pass",
+			"registered_passed": 191,
+			"registered_failed": 0
+		},
+		{
+			"name": "B",
+			"whole_bounded_scope": true,
+			"after_last_new_root": "PIL-003",
+			"new_roots": 0,
+			"owner_probes": "pass",
+			"registered_passed": 191,
+			"registered_failed": 0
+		}
+	],
+	"deduplicated": [
+		"original hotstrings.md shortest phone prefix missing magic",
+		"original hotstrings.md +33 national zero",
+		"LH-001/002/003 preview/metrics/delay",
+		"LCP-001/002/003 clipboard formats/foreign owner/exact range",
+		"shared prefix count finding"
+	],
+	"limits": [
+		"No actual native text/window/clipboard/service receiving",
+		"No real secrets or user configuration",
+		"Application Tab focus/undo and WebKit DOM not measured",
+		"All-format clipboard preservation remains existing deficit",
+		"No G4/performance/memory claim",
+		"Source-only Linux packaging/seed absence search is bounded and documented"
+	],
+	"source_hashes": "source-hashes.json",
+	"finding_ids": ["PIL-001", "PIL-002", "PIL-003"]
+}

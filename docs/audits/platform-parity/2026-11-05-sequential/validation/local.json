@@ -1,0 +1,33 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"completed_utc": "2026-11-05T10:17:49.027066+00:00",
+	"command": "PATH=/workspace/scratch/parity-toolchain/ci-bin:$PATH LOGNAME=agent PYTHONDONTWRITEBYTECODE=1 npm run verify",
+	"exit_code": 0,
+	"gates": ["format", "ahk-encoding", "js"],
+	"js_checks_passed": 572,
+	"not_executed": {
+		"cases": 1,
+		"checks": 1,
+		"reason": "AHK cases unavailable on this Linux host are explicitly reported as not executed, never passed."
+	},
+	"encoding_files": 2563,
+	"extra_checks": [
+		"Final format check after all proof files staged: pass",
+		"Canonical validator: 12 scopes,20 IDs,120 capability rows",
+		"Populated and all-zero acceptance controls;11 rejection controls: pass",
+		"496 retained source hash claims: pinned/current production matches; expected TODO drift",
+		"33 decisive post-format replays: pass",
+		"Existing site/config/action/menu projection --check: pass",
+		"Internal changed Markdown file targets exist",
+		"Independent read-only integration review: no material issues"
+	],
+	"snapshot_sha256": {
+		"docs/audits/platform-parity/2026-11-05-sequential/index.json": "4e420c3572364d4c7eacba8fce6646c2c6b743e712edd992ae5e2027b3e39a92",
+		"docs/audits/platform-parity/2026-11-05-sequential/capabilities.json": "a375024ff5a2bd3972709bf3f550d5fb8d706a2aa62a4265b1c25c5ad10d2ef1",
+		"docs/audits/platform-parity/2026-11-05-sequential/phases.json": "d6d230a406b41a6d6eee21d7a752413f5171428cf9cd08353ca8e784e016d4d4",
+		"TODO.md": "00dc2d7574adc787179b0ef39597ec50f69741a5ea3721e68dd699857bada76b"
+	},
+	"log": "local-verify.log",
+	"log_sha256": "68bcceb597b23d9f08389448a483b4f299ba8203ee72c2d845d78233605c5da2",
+	"limits": "No production behavior changed. Desktop/native receiving gaps and the separately recorded macOS combined-wrap fixture failures remain open; this is not a native parity certificate."
+}

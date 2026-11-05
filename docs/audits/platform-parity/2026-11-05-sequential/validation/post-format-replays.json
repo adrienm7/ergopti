@@ -1,0 +1,471 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"rebindings": "Only original artifact/private-fixture paths rebound to root-owned post-format staging. Business sources and source worktree arguments unchanged. Archived byte hashes identify repository-formatted programs; original receipts retain original scratch execution provenance.",
+	"replays": [
+		{
+			"module": "wpm",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wpm/windows/proofs/source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"archived_program": "wpm/windows/proofs/source-contract.mjs",
+			"archived_sha256": "979ac755b653551182a0907ba2c6f6a27bbfbcf64270de482ea7d36844c49846",
+			"replay_sha256": "979ac755b653551182a0907ba2c6f6a27bbfbcf64270de482ea7d36844c49846",
+			"log": "root-replays/wpm/post-format-00-windows-source-contract.mjs.log"
+		},
+		{
+			"module": "wpm",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wpm/macos/probes/owner.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "wpm/macos/probes/owner.lua",
+			"archived_sha256": "b2d983b72359100806ca8b55daad0c7197c2dce278cff9fa2b5634b772ed2b88",
+			"replay_sha256": "b2d983b72359100806ca8b55daad0c7197c2dce278cff9fa2b5634b772ed2b88",
+			"log": "root-replays/wpm/post-format-01-macos-owner.lua.log"
+		},
+		{
+			"module": "wpm",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wpm/linux/probes/owner.lua",
+				"throw"
+			],
+			"exit_code": 0,
+			"archived_program": "wpm/linux/probes/owner.lua",
+			"archived_sha256": "f79e535641c4500e637171016f220e2a95e2b60f5153a67b249c320c3aeacdb8",
+			"replay_sha256": "f79e535641c4500e637171016f220e2a95e2b60f5153a67b249c320c3aeacdb8",
+			"log": "root-replays/wpm/post-format-02-linux-owner.lua.log"
+		},
+		{
+			"module": "wpm",
+			"role": "shared-lua",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wpm/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "wpm/shared/probes/shared-model.lua",
+			"archived_sha256": "a2d99cc6adf347957ccdbc18464cfbf299b09d11e7d9115e486f92b48b26248d",
+			"replay_sha256": "a2d99cc6adf347957ccdbc18464cfbf299b09d11e7d9115e486f92b48b26248d",
+			"log": "root-replays/wpm/post-format-03-shared-lua-shared-model.lua.log"
+		},
+		{
+			"module": "wpm",
+			"role": "shared-jit",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wpm/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "wpm/shared/probes/shared-model.lua",
+			"archived_sha256": "a2d99cc6adf347957ccdbc18464cfbf299b09d11e7d9115e486f92b48b26248d",
+			"replay_sha256": "a2d99cc6adf347957ccdbc18464cfbf299b09d11e7d9115e486f92b48b26248d",
+			"log": "root-replays/wpm/post-format-04-shared-jit-shared-model.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/windows/probes/source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/windows/probes/source-contract.mjs",
+			"archived_sha256": "6269eb90e794d0beae92473fdb6e6160a2c1ffb362ea83bc8dc047ac82e73018",
+			"replay_sha256": "6269eb90e794d0beae92473fdb6e6160a2c1ffb362ea83bc8dc047ac82e73018",
+			"log": "root-replays/wrap-symbols/post-format-00-windows-source-contract.mjs.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/macos/probes/trigger.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/macos/probes/trigger.lua",
+			"archived_sha256": "aa3d44c7e7497e6648b2f960a594ca6a4cd3fb40ed7e7ce59fa49de951080dbb",
+			"replay_sha256": "aa3d44c7e7497e6648b2f960a594ca6a4cd3fb40ed7e7ce59fa49de951080dbb",
+			"log": "root-replays/wrap-symbols/post-format-01-macos-trigger.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/macos/probes/menu.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/macos/probes/menu.lua",
+			"archived_sha256": "40f0887722dad7d7afa3db19604942363c5b6d944ddc72abf6670f56fe7dc258",
+			"replay_sha256": "40f0887722dad7d7afa3db19604942363c5b6d944ddc72abf6670f56fe7dc258",
+			"log": "root-replays/wrap-symbols/post-format-02-macos-menu.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/macos/probes/multi-item.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/macos/probes/multi-item.lua",
+			"archived_sha256": "88070bd237ead639eff8a8f775af3ee39d543761d5a5aede5b186ef983c899b3",
+			"replay_sha256": "88070bd237ead639eff8a8f775af3ee39d543761d5a5aede5b186ef983c899b3",
+			"log": "root-replays/wrap-symbols/post-format-03-macos-multi-item.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/macos/probes/copied.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/macos/probes/copied.lua",
+			"archived_sha256": "b6224d93651136a7f90642aa2df38648e1023eb78f9f767d2c73dcf10a29af8c",
+			"replay_sha256": "b6224d93651136a7f90642aa2df38648e1023eb78f9f767d2c73dcf10a29af8c",
+			"log": "root-replays/wrap-symbols/post-format-04-macos-copied.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/linux/probes/catalogue-owner.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/linux/probes/catalogue-owner.lua",
+			"archived_sha256": "da0391a8a87fb8ac95395a8e4046737dca3a5b5908584158e3e918b80363b086",
+			"replay_sha256": "da0391a8a87fb8ac95395a8e4046737dca3a5b5908584158e3e918b80363b086",
+			"log": "root-replays/wrap-symbols/post-format-05-linux-catalogue-owner.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/linux/probes/menu-owner.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/linux/probes/menu-owner.lua",
+			"archived_sha256": "c58a24cb0a13f9c203d22ff6db6e0a7065dc32e9ae9c08168b39ebd7f4b8a55d",
+			"replay_sha256": "c58a24cb0a13f9c203d22ff6db6e0a7065dc32e9ae9c08168b39ebd7f4b8a55d",
+			"log": "root-replays/wrap-symbols/post-format-06-linux-menu-owner.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/linux/probes/custom-parameter.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/linux/probes/custom-parameter.lua",
+			"archived_sha256": "f1133dee281649b92edbe0fa27615acdbdb11c80ef1d524e45f119971b3b1308",
+			"replay_sha256": "501cacd0e3eb476d372735d61e1b9bc9dd0b95cde830db19647d7955f0ad9025",
+			"log": "root-replays/wrap-symbols/post-format-07-linux-custom-parameter.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/shared/probes/shared-model.lua",
+			"archived_sha256": "c17a9209b873fd04562b060f9a75e94822b4d658b53a19fe651a95167a66df4b",
+			"replay_sha256": "c17a9209b873fd04562b060f9a75e94822b4d658b53a19fe651a95167a66df4b",
+			"log": "root-replays/wrap-symbols/post-format-08-shared-shared-model.lua.log"
+		},
+		{
+			"module": "wrap-symbols",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/wrap-symbols/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/wrap-symbols/shared/probes/shared-model.lua",
+			"archived_sha256": "c17a9209b873fd04562b060f9a75e94822b4d658b53a19fe651a95167a66df4b",
+			"replay_sha256": "c17a9209b873fd04562b060f9a75e94822b4d658b53a19fe651a95167a66df4b",
+			"log": "root-replays/wrap-symbols/post-format-09-shared-shared-model.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/linux/probes/config-route.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/linux/probes/config-route.lua",
+			"archived_sha256": "9aacd734348f057501518d4a3decb7c31f89c5e7065bd3a0795dfa8231722f4b",
+			"replay_sha256": "6af4b3664985f7d2961d7ede997e0d4c7bbddb17437b682239c7711e2bef0776",
+			"log": "root-replays/personal-info/post-format-00-linux-config-route.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/linux/probes/editor-firstboot.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/linux/probes/editor-firstboot.lua",
+			"archived_sha256": "d284a7ce7a5ba12b2af532d4022030622a7772e2f471ea5ac55eec501fa34c62",
+			"replay_sha256": "7ef4a0500b5e3eb7700574927a5aabe8a3b0bcee8124e274e80462fb638122a1",
+			"log": "root-replays/personal-info/post-format-01-linux-editor-firstboot.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/source-contract.mjs",
+			"archived_sha256": "0a786d7dfa9ca45cd9a3f960717a81cacb3aa4ddaef34d935f0536f8dffd00ab",
+			"replay_sha256": "0a786d7dfa9ca45cd9a3f960717a81cacb3aa4ddaef34d935f0536f8dffd00ab",
+			"log": "root-replays/personal-info/post-format-02-windows-source-contract.mjs.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/reader-source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/reader-source-contract.mjs",
+			"archived_sha256": "99fb404d3f0748992ca0e34c299c57d04d4a81dd577c58591d4999ea92ee1145",
+			"replay_sha256": "99fb404d3f0748992ca0e34c299c57d04d4a81dd577c58591d4999ea92ee1145",
+			"log": "root-replays/personal-info/post-format-03-windows-reader-source-contract.mjs.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/shared-mask.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/shared-mask.lua",
+			"archived_sha256": "f95384ec19c193f476256d93554e5cd6eb9b9c63d23a0492f5f54e6f41580d93",
+			"replay_sha256": "f95384ec19c193f476256d93554e5cd6eb9b9c63d23a0492f5f54e6f41580d93",
+			"log": "root-replays/personal-info/post-format-04-windows-shared-mask.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/literal-toml.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/literal-toml.lua",
+			"archived_sha256": "235bd2833d41df147498fb7a077ac51efda04962cabd9787601cedc5233c5f5a",
+			"replay_sha256": "235bd2833d41df147498fb7a077ac51efda04962cabd9787601cedc5233c5f5a",
+			"log": "root-replays/personal-info/post-format-05-windows-literal-toml.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/shared-mask.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/shared-mask.lua",
+			"archived_sha256": "f95384ec19c193f476256d93554e5cd6eb9b9c63d23a0492f5f54e6f41580d93",
+			"replay_sha256": "f95384ec19c193f476256d93554e5cd6eb9b9c63d23a0492f5f54e6f41580d93",
+			"log": "root-replays/personal-info/post-format-06-windows-shared-mask.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes/literal-toml.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/windows/probes"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/windows/probes/literal-toml.lua",
+			"archived_sha256": "235bd2833d41df147498fb7a077ac51efda04962cabd9787601cedc5233c5f5a",
+			"replay_sha256": "235bd2833d41df147498fb7a077ac51efda04962cabd9787601cedc5233c5f5a",
+			"log": "root-replays/personal-info/post-format-07-windows-literal-toml.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/linux/probes/combo-publication.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/linux/probes/combo-publication.lua",
+			"archived_sha256": "9f8d85a1f98ebea13c180f27e6dbf46f4e845404647e1c2b4b37c75bd285c1d6",
+			"replay_sha256": "9d20fc746f8f6493a9e70d9a1fcec4cbcae4a2715793e46c07f4d8e04147b36f",
+			"log": "root-replays/personal-info/post-format-08-linux-combo-publication.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/linux/probes/all-fields.lua"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/linux/probes/all-fields.lua",
+			"archived_sha256": "26d2068faad4b83af0d49bca6b02c55fb0c5416a60eba517ced53150d49a7a8b",
+			"replay_sha256": "a8a5006544407b06921bad3bbd65307c43003bc73f2673df37198d923f935a09",
+			"log": "root-replays/personal-info/post-format-09-linux-all-fields.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/shared/probes/shared-model.lua",
+			"archived_sha256": "c05f0e4c768ce1f5d5609a6c1875440c6fe618548d5d620a09f017cf8fdd84c0",
+			"replay_sha256": "c05f0e4c768ce1f5d5609a6c1875440c6fe618548d5d620a09f017cf8fdd84c0",
+			"log": "root-replays/personal-info/post-format-10-shared-shared-model.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/shared/probes/shared-model.lua",
+			"archived_sha256": "c05f0e4c768ce1f5d5609a6c1875440c6fe618548d5d620a09f017cf8fdd84c0",
+			"replay_sha256": "c05f0e4c768ce1f5d5609a6c1875440c6fe618548d5d620a09f017cf8fdd84c0",
+			"log": "root-replays/personal-info/post-format-11-shared-shared-model.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared/probes/prefix-count-owner.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/shared/probes/prefix-count-owner.lua",
+			"archived_sha256": "7b2c6cb100bb03b459b423998d2a52f836937775539bba6d041638236fd2a7bd",
+			"replay_sha256": "7b2c6cb100bb03b459b423998d2a52f836937775539bba6d041638236fd2a7bd",
+			"log": "root-replays/personal-info/post-format-12-shared-prefix-count-owner.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "shared",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared/probes/frontend.cjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/shared"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/shared/probes/frontend.cjs",
+			"archived_sha256": "818349ea9535daaf7dad7a5cdc09bcaf10d9734369043356bfb0505a47b7f090",
+			"replay_sha256": "818349ea9535daaf7dad7a5cdc09bcaf10d9734369043356bfb0505a47b7f090",
+			"log": "root-replays/personal-info/post-format-13-shared-frontend.cjs.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/macos/probes/engine.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/macos/probes/engine.lua",
+			"archived_sha256": "f5cacc9142a43a4f9cc20a3a486deea594b4ad8d271fff93c040ba4f1f4bf51e",
+			"replay_sha256": "f5cacc9142a43a4f9cc20a3a486deea594b4ad8d271fff93c040ba4f1f4bf51e",
+			"log": "root-replays/personal-info/post-format-14-macos-engine.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/macos/probes/prefix.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/macos/probes/prefix.lua",
+			"archived_sha256": "56c0050df2edb556a98b1e9545aa97e28cf3602d14fa7f1bf1d19aad7162d47b",
+			"replay_sha256": "56c0050df2edb556a98b1e9545aa97e28cf3602d14fa7f1bf1d19aad7162d47b",
+			"log": "root-replays/personal-info/post-format-15-macos-prefix.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/macos/probes/matrix.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/macos/probes/matrix.lua",
+			"archived_sha256": "6eb132664e559cc7805beca20114067904353e1655a9a1c17346554809436718",
+			"replay_sha256": "6eb132664e559cc7805beca20114067904353e1655a9a1c17346554809436718",
+			"log": "root-replays/personal-info/post-format-16-macos-matrix.lua.log"
+		},
+		{
+			"module": "personal-info",
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/post-format-replays/personal-info/macos/probes/gates.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"archived_program": "root-replays/personal-info/macos/probes/gates.lua",
+			"archived_sha256": "5bfd597f2b8e42551d61c985065759e0aec00f02cda7cfe9fb0e0486641352ba",
+			"replay_sha256": "5bfd597f2b8e42551d61c985065759e0aec00f02cda7cfe9fb0e0486641352ba",
+			"log": "root-replays/personal-info/post-format-17-macos-gates.lua.log"
+		}
+	]
+}

@@ -13,12 +13,21 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 pin_reader="$repo_root/tools/build/read-native-source-pin.py"
 lua_version="$(python3 "$pin_reader" lua54 version)"
 lua_url="$(python3 "$pin_reader" lua54 url)"
+lua_mirror_url="$(python3 "$pin_reader" lua54 mirror_url)"
 lua_sha256="$(python3 "$pin_reader" lua54 sha256)"
 
 # Hammerspoon 1.1.1 embeds Lua 5.4.7. Compile only the extension, never a second
 # Lua runtime: all Lua symbols must resolve to the embedded interpreter.
-curl --fail --silent --show-error --location --max-time 120 \
-	"$lua_url" -o "$work/lua.tar.gz"
+# lua.org refused the hosted runners for hours on 2026-11-05: Debian's
+# byte-identical orig archive follows; the digest below admits only the exact one.
+fetch_lua() {
+	curl --fail --silent --show-error --location --connect-timeout 30 --max-time 120 \
+		--retry 2 --retry-delay 10 --retry-all-errors "$1" -o "$work/lua.tar.gz"
+}
+if ! fetch_lua "$lua_url"; then
+	printf '%s\n' "lua.org refused the Lua $lua_version archive; fetching Debian's identical copy." >&2
+	fetch_lua "$lua_mirror_url"
+fi
 curl --fail --silent --show-error --location --max-time 120 \
 	https://codeload.github.com/lunarmodules/luasocket/tar.gz/refs/tags/v3.1.0 -o "$work/luasocket.tar.gz"
 printf '%s  %s\n' \

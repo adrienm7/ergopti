@@ -1,0 +1,1 @@
+PASS brief-schema validation:manifest/report/coverage/comparison,43 rows,7 groups,36 capabilities,2 settings,7 commands,21 locales,LF artifacts. Repository validator external-path rejection retained; no false gate green.

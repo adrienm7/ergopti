@@ -563,6 +563,28 @@ class ProductionServeControls(unittest.TestCase):
         self.assertIsNone(self.owner.source_fd)
         self.assertEqual(self.binary.stat().st_nlink, 1)
 
+    def test_operation_refusal_names_its_primary_and_cleanup_failures(self):
+        # Field run 2026-11-05: a failed startup whose cleanup failed too printed only "operation"
+        def raised(error):
+            try:
+                raise error
+            except RuntimeError as caught:
+                return caught
+
+        refusal = self.subject.ServeRefusal(
+            "operation",
+            primary=raised(RuntimeError("bind refused")),
+            cleanup=raised(RuntimeError("retire refused")),
+        )
+        facts = self.subject.serve_refusal_facts(refusal)
+        self.assertRegex(
+            facts, r"^operation, primary=RuntimeError at \S+:\d+ raised, cleanup=RuntimeError at "
+        )
+        self.assertNotIn("/", facts)
+        self.assertEqual(
+            self.subject.serve_refusal_facts(self.subject.ServeRefusal("state")), "state"
+        )
+
     def test_legacy_serve_without_binding_emits_no_new_protocol_bytes(self):
         stream = io.StringIO()
         self.assertEqual(self.run_lifecycle(stream, nonce=None), 78)
@@ -1153,10 +1175,14 @@ class CallerInputControls(unittest.TestCase):
             ),
         ):
             result = self.subject.main()
-        # The reason is one fixed word the driver logs, never a path or a value.
+        # The reason is one fixed word the driver logs, never a path or a value,
+        # then the retained failures' path-free facts (serve_refusal_facts).
         self.assertRegex(
-            diagnostic.getvalue(), r"\AManaged Ollama daemon admission refused: [a-z_]+\.\n\Z"
+            diagnostic.getvalue(),
+            r"\AManaged Ollama daemon admission refused: [a-z_]+"
+            r"(, (primary|cleanup)=\w+ at [\w.]+:\d+ \w+( from [\w.]+:\d+ \w+)?(, \w+=[\w.:-]+)*)*\.\n\Z",
         )
+        self.assertNotIn("/", diagnostic.getvalue())
         return result
 
     def terminal_ack(self, stream, *, active):

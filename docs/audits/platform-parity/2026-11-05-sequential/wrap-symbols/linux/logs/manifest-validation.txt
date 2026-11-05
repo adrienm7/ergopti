@@ -1,0 +1,2 @@
+PASS task schema1, required fields and enums, SHA shape, report/evidence existence, and both final sweep markers.
+Repository workflow validator supports only in-repository ahk/hammerspoon dated artifacts; scratch Linux task uses task-local validation.

@@ -1,0 +1,2 @@
+PASS actual shared TOML codec: 3 syntactically distinct private sources decode identical known personal-info field and alias. Runtime=Lua 5.4 PUC
+LIMIT: pure codec oracle; no AutoHotkey parser, editor save or typing execution. Windows consequence remains source-derived.

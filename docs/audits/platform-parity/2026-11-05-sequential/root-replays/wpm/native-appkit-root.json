@@ -1,0 +1,17 @@
+[
+	{
+		"url": "https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/constrainframerect(_:to:).json",
+		"sha256": "8ca2efacaae762d6bf0b765c4170061f515487405df7838433ba79e3cc10cce3",
+		"text": "The proposed frame rectangle to adjust. The screen on which the top edge of the window\u2019s frame is to lie. The adjusted frame rectangle. If the window is resizable and the window\u2019s height is greater than the screen height, the rectangle\u2019s height is adjusted to fit within the screen as well. The rectangle\u2019s width and horizontal location are unaffected. You shouldn\u2019t need to invoke this method yourself; it\u2019s invoked automatically (and the modified frame is used to locate and set the size of the window) whenever a titled   object is placed onscreen and whenever its size is changed. Subclasses can override this method to prevent their instances from being constrained or to constrain them differently."
+	},
+	{
+		"url": "https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/setframe(_:display:).json",
+		"sha256": "294645856d5730c6425bb4185cc90ac9680d9ce80682a80f01d9239118941ac6",
+		"text": "The frame rectangle for the window, including the title bar. Specifies whether the window redraws the views that need to be displayed. When   the window sends a   message down its view hierarchy, thus redrawing all views. Note that the window server limits window position coordinates to \u00b116,000 and sizes to 10,000."
+	},
+	{
+		"url": "https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/setframe(_:display:animate:).json",
+		"sha256": "462ac755bd58b7cfc9cb58cfa1a65d9fb45b865b95a8da21bd4cb12daf7b8409",
+		"text": "The frame rectangle for the window, including the title bar. Specifies whether the window redraws the views that need to be displayed. When   the window sends a   message down its view hierarchy, thus redrawing all views. Specifies whether the window performs a smooth resize.   to perform the animation, whose duration is specified by  ."
+	}
+]

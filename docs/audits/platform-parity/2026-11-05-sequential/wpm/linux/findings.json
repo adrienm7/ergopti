@@ -1,0 +1,30 @@
+{
+	"schema_version": 1,
+	"scope": "wpm-linux",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/report.md",
+	"findings": [
+		{
+			"id": "WPML-001",
+			"title": "Refused redraw clears shown while the existing native widget remains visible, skipping later idle hide",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Start the actual widget against the actual surface, draw WPM=42, throw from the next native resize before mutation while the old window remains visible, restore the native methods, and tick WPM=0 after idle timeout. Native hide is never called and the old visible surface remains. Explicit stop and the healthy idle control hide successfully. Execution uses GTK-shaped native bindings, not a live GTK display. GTK resize normally returns void/nil; the separately retained literal-false run is a wrapper-refusal control only. Canonical evidence is the throw-mode logs.",
+			"root_cause": "linux/ui/wpm/widget.lua:459 replaces _state.shown with the latest Surface.draw acknowledgment. adapters/wpm_surface.lua:274-290 returns false on redraw failure without hiding an existing window. The idle branch at widget.lua:441-443 only calls hide when shown is true, losing an outstanding visible surface after a failed refresh.",
+			"silent_failure": "The initial redraw refusal is logged. The subsequent idle hide is silently skipped, with zero native hide calls. Explicit stop or a successful later active redraw are backstops.",
+			"regression_test": "Exercise actual widget and actual surface owners after an acknowledged visible draw. Refuse or throw each redraw native boundary, restore native health, advance past idle timeout, and require an acknowledged hide of the preexisting surface. Keep exact native visibility ownership until hide acknowledgment.",
+			"evidence": [
+				"probes/owner.lua",
+				"logs/final-sweep-a-owner-throw.log",
+				"logs/final-sweep-b-owner-throw.log",
+				"logs/final-sweep-a-owner.log",
+				"logs/final-sweep-b-owner.log",
+				"logs/source-boundaries.txt"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/report.md",
+			"basis": "Actual Lua owners over explicitly controlled native ports; native surface receiving not executed"
+		}
+	]
+}

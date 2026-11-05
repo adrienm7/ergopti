@@ -1,0 +1,307 @@
+
+linux/modules/shortcuts/manager.lua
+213: 	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
+214: 		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
+215: 		return lookup, ordered
+216: 	end
+217: 
+218: 	for _, group in ipairs(data.groups) do
+219: 		for _, pair in ipairs(group.pairs or {}) do
+220: 			if type(pair) == "table"
+221: 					and type(pair.left) == "string" and pair.left ~= ""
+222: 					and type(pair.right) == "string" and pair.right ~= "" then
+223: 				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
+224: 				lookup[pair.left] = { left = pair.left, right = pair.right }
+225: 				if pair.right ~= pair.left then
+226: 					lookup[pair.right] = { left = pair.left, right = pair.right }
+227: 				end
+228: 			end
+229: 		end
+230: 	end
+231: 
+232: 	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", TableUtil.count(lookup))
+233: 
+234: 	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
+235: 	return lookup, ordered
+236: end
+237: 
+238: --- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
+239: --- single source of truth (never hardcoded here). Each entry maps a trigger
+240: --- character to its { left, right } wrapping symbols; WRAP_PAIR_LIST keeps the
+241: --- catalogue order.
+242: local WRAP_PAIRS, WRAP_PAIR_LIST = load_wrap_pairs()
+243: 
+244: --- Checks whether a character is a wrap-pair trigger.
+245: --- @param ch string Single character.
+246: --- @return table|nil { left, right } or nil if not a wrap character.
+247: function M.get_wrap_pair(ch)
+248: 	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
+249: 	-- the catalogue too, and a byte test made every one of them unmatched.
+250: 	if not TextCase.is_single_character(ch) then return nil end
+251: 	return WRAP_PAIRS[ch]
+
+linux/modules/shortcuts/manager.lua
+270: --- The left and right symbols a wrap_selection parameter names: a catalogue
+271: --- symbol or a custom left|right pair (_shared/lua/wrap_pair).
+272: --- @param value any The stored parameter.
+273: --- @return string|nil left
+274: --- @return string|nil right Both nil when the value names no pair.
+275: function M.resolve_wrap_pair(value)
+276: 	return WrapPair.parse(value, WRAP_PAIR_LIST)
+277: end
+
+linux/modules/shortcuts/manager.lua
+373: function M.wrap_selection(left, right)
+374: 	if _configuration_owner ~= nil then return false end
+375: 	local publication = capture_text_destination()
+376: 	if not publication then Logger.warn(LOG, "Selection wrapping refused: no retained text destination."); return false end
+377: 	record("wrap_selection")
+378: 	if type(left) ~= "string" or type(right) ~= "string" then return false end
+379: 	local ok, reason = Clipboard.transform_selection(function(selected)
+380: 		return left .. selected .. right
+381: 	end, ComboEmitter.press, EventLoop.sleep_ms, publication)
+382: 	if ok then return true end
+383: 	if reason == "no_selection" then
+384: 		local result = Injector.inject(0, left .. right, false, nil, publication)
+385: 		return type(result) == "table" and result.ok == true
+386: 	end
+387: 	if reason == "destination_changed" then
+388: 		Logger.warn(LOG, "Selection wrapping stopped: its original text destination was retired.")
+389: 		return false
+390: 	end
+391: 	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
+392: 	return false
+393: end
+
+linux/modules/shortcuts/manager.lua
+590: local function transform_selection(action, transform)
+591: 	if _configuration_owner ~= nil then return false end
+592: 	local publication = capture_text_destination()
+593: 	if not publication then Logger.warn(LOG, "%s refused: no retained text destination.", action); return false end
+594: 	record(action)
+595: 	-- Metric delivery can reserve configuration before clipboard ownership begins.
+596: 	if _configuration_owner ~= nil then return false end
+597: 	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms, publication)
+598: 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
+599: 	return ok
+600: end
+601: 
+602: --- Toggles the current selection between Unicode uppercase and lowercase.
+603: function M.transform_uppercase()
+
+linux/modules/shortcuts/manager.lua
+728: 		-- The pair is the binding's own parameter, validated by the executor.
+729: 		-- Nothing selected: nothing is typed, as on macOS and Windows.
+730: 		["wrap_selection"] = function(_, parameter)
+731: 			local left, right = M.resolve_wrap_pair(parameter)
+732: 			if not left then
+733: 				Logger.warn(LOG, "wrap_selection ignored: no valid pair ('%s').", tostring(parameter))
+734: 				return false
+735: 			end
+736: 			return transform_selection("wrap_selection", function(selected)
+737: 				return left .. selected .. right
+738: 			end)
+739: 		end,
+740: 	}
+741: end
+
+linux/modules/shortcuts/manager.lua
+824: function M.wrap_selection_epoch()
+825: 	return collision_generation
+826: end
+827: 
+828: --- Persists and applies the wrap-on-type switch.
+829: --- @param enabled boolean
+830: --- @return boolean True when the state was committed.
+831: function M.set_wrap_on_type_enabled(enabled)
+832: 	if _configuration_owner ~= nil then return false end
+833: 	if type(enabled) ~= "boolean" then
+834: 		Logger.error(LOG, "Wrap-on-type state must be a boolean — nothing changed.")
+835: 		return false
+836: 	end
+837: 	if _persist then
+838: 		if not TomlWriter or not _config_path then
+839: 			Logger.error(LOG, "Wrap-on-type state cannot be persisted — nothing changed.")
+840: 			return false
+841: 		end
+842: 		local ok, err = TomlWriter.batch_write(_config_path, {
+843: 			{ section = CONFIG_SECTION, key = WRAP_ON_TYPE_KEY, value = enabled },
+844: 		})
+845: 		if not ok then
+846: 			Logger.error(LOG, "Could not persist the wrap-on-type state: %s.", tostring(err))
+847: 			return false
+848: 		end
+849: 	end
+850: 	_wrap_on_type = enabled
+851: 	collision_generation = collision_generation + 1
+852: 	Logger.info(LOG, "Wrap selection on typed symbol %s.", enabled and "enabled" or "disabled")
+853: 	return true
+854: end
+
+linux/modules/shortcuts/wrap_on_type.lua
+157: 			end
+158: 			return false
+159: 		end
+160: 		local char = type(detail.char) == "string" and detail.char or ""
+161: 		if mods.ctrl and not mods.alt and not mods.meta and char:lower() == "a" then
+162: 			baseline, baseline_epoch = nil, nil
+163: 			local active = opts.is_active()
+164: 			if current(owner, epoch) and active then open_window(owner, epoch) end
+165: 			return false
+166: 		end
+167: 
+168: 		local window = baseline
+169: 		-- Every other key ends the window: typing replaces a selection, plain
+170: 		-- navigation and Escape clear it.
+171: 		baseline, baseline_epoch = nil, nil
+172: 		if window == nil then return false end
+173: 		if mods.ctrl or mods.alt or mods.meta then return false end
+174: 		local pair = opts.get_pair(char)
+175: 		if not current(owner, epoch) or type(pair) ~= "table" then return false end
+176: 		local left, right = pair.left, pair.right
+177: 		local active = opts.is_active()
+178: 		if not current(owner, epoch) or not active then return false end
+179: 
+180: 		local ok, selected = opts.read_primary()
+181: 		if not current(owner, epoch) or not ok or type(selected) ~= "string" or selected == "" then return false end
+182: 		if selected == window then
+183: 			Logger.debug(LOG, "PRIMARY unchanged since the selection window opened — typing '%s'.", char)
+184: 			return false
+185: 		end
+186: 
+187: 		Logger.debug(LOG, "Wrapping a %d-byte selection in %s…%s.", #selected, left, right)
+188: 		active = opts.is_active()
+
+linux/tests/unit/modules/shortcuts/text_actions/test_wrap_on_type.lua
+15: local WrapOnType = helpers.load_module("modules.shortcuts.wrap_on_type")
+16: 
+17: local KEY_LEFT = 105
+18: local KEY_9 = 10
+19: local PAIRS = { ["("] = { left = "(", right = ")" }, ["«"] = { left = "« ", right = " »" } }
+20: 
+21: --- A controller over recording doubles.
+22: --- @param state table|nil { active, primary, type_ok }
+23: --- @return table controller, table log
+24: local function controller_with(state)
+25: 	state = state or {}
+26: 	local log = { reads = 0, typed = {} }
+27: 	local controller
+28: 	controller = WrapOnType.new({
+29: 		context_epoch = state.context_epoch,
+30: 		is_active = function()
+31: 			if state.on_active then state.on_active(controller, log, state) end
+32: 			return state.active ~= false
+33: 		end,
+34: 		get_pair = function(char) return state.pair or PAIRS[char] end,
+35: 		read_primary = function()
+36: 			log.reads = log.reads + 1
+37: 			if state.on_read then state.on_read(controller, log, state) end
+38: 			return true, state.primary or ""
+39: 		end,
+
+linux/tests/unit/modules/shortcuts/text_actions/test_wrap_on_type.lua
+66: 
+67: 	helpers.it("wraps a Shift+Arrow selection with a multi-byte pair", function()
+68: 		local controller, log, state = controller_with({ primary = "" })
+69: 		helpers.assert_true(not controller.on_key({ code = KEY_LEFT, mods = { shift = true } }))
+70: 		state.primary = "mot"
+71: 		helpers.assert_true(controller.on_key(symbol("«", { altgr = true })))
+72: 		helpers.assert_eq(log.typed, { "« mot »" })
+73: 	end)
+74: 
+
+_shared/modules/wrap_symbols/wrap_symbols.json
+1: {
+2: 	"_comment": "Single source of truth for the built-in wrap-selection symbol catalogue, shared by the AHK tray menu (lib/wrap_symbols_config.ahk) and the macOS menubar (modules/shortcuts/actions/text.lua). Do NOT hardcode this list, its order, or its grouping in driver code — edit it here only.",
+3: 	"_comment_format": "'groups' is an ordered array of groups. Each group has an 'i18n' key (resolved to a localised label via the locale JSON; both menus render the group as a NAMED nested sub-submenu) and a 'pairs' array of {left, right}. 'left' is the opening character and the canonical key for the per-symbol enabled/disabled state; 'right' is the closing character (equal to 'left' for symmetric symbols). Asymmetric pairs register both characters so typing either one wraps the selection.",
+4: 	"groups": [
+
+_shared/modules/wrap_symbols/wrap_symbols.json
+18: 				{ "left": "'", "right": "'" },
+19: 				{ "left": "`", "right": "`" },
+20: 				{ "left": "‘", "right": "’" },
+21: 				{ "left": "“", "right": "”" },
+22: 				{ "left": "„", "right": "“" },
+23: 				{ "left": "« ", "right": " »" }
+24: 			]
+25: 		},
+26: 		{
+27: 			"i18n": "menu.shortcuts.wrap_group_angle",
+
+linux/ergopti_hotstrings.lua
+1993: 	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
+1994: 		context_epoch = shortcuts and shortcuts.wrap_selection_epoch,
+1995: 		is_active = function()
+1996: 			return shortcuts ~= nil and shortcuts.is_enabled()
+1997: 				and shortcuts.configuration_admitted()
+1998: 				and shortcuts.is_wrap_on_type_enabled()
+1999: 				and not script_actions.is_paused()
+2000: 				and not secure_focus_guard.blocks_text()
+2001: 				and not input_capture_gate.blocks_text()
+2002: 		end,
+2003: 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
+2004: 		read_primary = require("adapters.clipboard").read_primary,
+2005: 		type_text = function(text, owner)
+2006: 			if opts.dry_run then return false end
+2007: 			if type(owner) ~= "table" or type(owner.current) ~= "function"
+2008: 				or type(owner.cached) ~= "function" then return false end
+2009: 			local current, cached = owner.current, owner.cached
+2010: 			if not current() then return false end
+2011: 			local destination = secure_focus_guard.capture_text_owner()
+2012: 			if not destination or not current() then return false end
+2013: 			local function retained(check)
+2014: 				return owner.current == current and owner.cached == cached and check()
+2015: 			end
+2016: 			local publication = {
+2017: 				current = function() return retained(current) and destination.current() and retained(current) end,
+2018: 				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
+2019: 			}
+2020: 			local result = injector.inject(0, text, false, nil, publication)
+2021: 			if type(result) ~= "table" or result.ok ~= true then return false end
+2022: 			-- The caret moved over replaced text: what the engine buffered no longer
+2023: 			-- describes the line, and what precedes the caret is not known.
+2024: 			_undoable = nil
+2025: 			engine:reset(false)
+2026: 			return true
+2027: 		end,
+2028: 	})
+
+linux/ui/menu/menu_shortcuts.lua
+235: 	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
+236: 	-- `pairs` would give the user a different order on every rebuild.
+237: 	local wrap_items = {}
+238: 	local opening = {}
+239: 	for ch, pair in pairs(sc.get_wrap_pairs()) do
+240: 		-- Only the opening character: each pair is stored under both of its ends.
+241: 		if ch == pair.left then opening[#opening + 1] = { ch = ch, pair = pair } end
+242: 	end
+243: 	table.sort(opening, function(a, b) return a.ch < b.ch end)
+244: 	for _, entry in ipairs(opening) do
+245: 		local pair = entry.pair
+246: 		-- The pair around an ellipsis, and nothing else. This used to append a
+247: 		-- second illustration, "(«texte»)", whose only content was a French word —
+248: 		-- so the row was a translated label followed by an untranslated one, and
+249: 		-- the ellipsis had already said the same thing in every language.
+250: 		wrap_items[#wrap_items + 1] = {
+251: 			label  = string.format("%s … %s", entry.ch, pair.right),
+252: 			action = function() sc.wrap_selection(pair.left, pair.right) end,
+253: 		}
+254: 	end
+
+linux/adapters/keyboard_hook.lua
+1802: 				_consumed_down[consumed_key] = true
+1803: 			end
+1804: 			return
+1805: 		end
+1806: 	end
+1807: 
+1808: 	if row_plan then
+1809: 		local delivered, row_text, row_identity = _number_row.deliver(row_plan, ev, source)
+1810: 		if not delivered then return end
+1811: 		char, identity = row_text, row_identity
+1812: 	else
+1813: 		local delivered, receipt = _forward_raw(ev, source)
+1814: 		if not delivered then return end
+1815: 		-- Ownership can settle without typing: duplicate downs, shared presses
+1816: 		-- and repeats of a key spent by an injection have no semantic text.
+1817: 		if receipt and receipt.native_writes == 0 then return end

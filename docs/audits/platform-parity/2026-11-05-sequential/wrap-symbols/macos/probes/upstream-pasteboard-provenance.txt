@@ -1,0 +1,4 @@
+Exact upstream Lua wrapper executed by multi-item.lua
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/pasteboard/pasteboard.lua
+SHA256: bebf829ac6cdb8b148269c44689b01820cff3993e1bb9742cdf0188729ea19b5
+Pinned native runtime reference: static/ergopti_plus/_shared/data/owned_runtimes.json HS runtime version1.1.1

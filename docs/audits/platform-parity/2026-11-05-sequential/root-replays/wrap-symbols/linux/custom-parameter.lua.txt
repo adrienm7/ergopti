@@ -1,0 +1,4 @@
+CUSTOM_PERSIST value=【|】 actual_file=true unknown_leaf=keep
+CUSTOM_RELOAD value=OPEN|CLOSE binding=tap_3 action=wrap_selection
+INVALID_AND_LEASE_REFUSALS preserve_value=true old_delivery_guard_revoked=true
+PASS actual gesture parameter owner and actual TOML writer; no evdev/clipboard/output

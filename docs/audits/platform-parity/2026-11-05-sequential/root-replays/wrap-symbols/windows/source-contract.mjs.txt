@@ -1,0 +1,245 @@
+PROVENANCE: Node22 source assertions and retained source excerpts only. No AHK/Windows/UIA/clipboard/keyboard/menu execution, no JS port of business behavior. Native source projections in report require Windows receiving.
+sha256 f5424293976ab7443b87297be1719567b4bf07a6500fd27462d79e03b6fd02ec static/ergopti_plus/windows/infra/wrap_symbols_config.ahk
+sha256 d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8 static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk
+sha256 edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661 static/ergopti_plus/windows/modules/keymap/layout.ahk
+sha256 e4bb55e3489f831c6e7d1e5ac45089f3b72733c86c134e79541269c4878ebe33 static/ergopti_plus/windows/adapters/uia_worker.ahk
+sha256 4134c136e4c19b68fea77e8f27ebe5756af068110a7a3d707be98525e66eb8b7 static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk
+sha256 dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk
+sha256 aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503 static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk
+sha256 e2460a50cc5c8590c080c14ce270e5e44431c41abfc9d7c26ed86b6b6410339d static/ergopti_plus/windows/vendor/UIA.ahk
+sha256 162a3e5dd04411b05fb122b655ae7f644aea2f40e50b5203705008d1e460cc26 static/ergopti_plus/windows/infra/wrap_pair.ahk
+sha256 8b43b818f379f3e53f91a917d04b4b539888edc46a2cd9bd96e6b703c2e54ce0 static/ergopti_plus/_shared/modules/wrap_symbols/wrap_symbols.json
+WSW-001 source contract: accepted custom pair overrides active mapping but concrete registered remap caller uses retained built-in args and wrapper never reads current pair.
+static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk:477
+477: _WS_MenuAddCustom() {
+478: 	; Step 1 — opening character
+479: 	IB1 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_prompt"), t("dialog.shortcuts.wrap_symbol_title"), "w360 h140")
+480: 	if (IB1.Result != "OK") {
+481: 		return
+482: 	}
+483: 	LeftChar := Trim(IB1.Value, " `t")
+484: 	if (StrLen(LeftChar) != 1) {
+485: 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_title"), "Icon!")
+486: 		return
+487: 	}
+488: 
+489: 	; Step 2 — closing character (optional — empty means symmetric)
+490: 	IB2 := Ui_InputBox(t("dialog.shortcuts.wrap_symbol_close_prompt"), t("dialog.shortcuts.wrap_symbol_close_title"), "w360 h140")
+491: 	if (IB2.Result != "OK") {
+492: 		return
+493: 	}
+494: 	RightChar := Trim(IB2.Value, " `t")
+495: 	if (RightChar != "" and StrLen(RightChar) != 1) {
+496: 		Ui_MsgBox(t("dialog.shortcuts.wrap_symbol_invalid"), t("dialog.shortcuts.wrap_symbol_close_title"), "Icon!")
+497: 		return
+498: 	}
+499: 	if (RightChar == "") {
+500: 		RightChar := LeftChar
+501: 	}
+502: 
+503: 	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
+504: 	return _WS_MenuRebuildAfterCommit(Committed)
+505: }
+506: 
+static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk:503
+503: 	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
+504: 	return _WS_MenuRebuildAfterCommit(Committed)
+505: }
+506: 
+static/ergopti_plus/windows/infra/wrap_symbols_config.ahk:262
+262: WrapSymbols_AddCustom(LeftChar, RightChar, WriterFn := 0, ReplaceFn := 0,
+263: 		DeleteFn := 0) {
+264: 	if !(LeftChar is String) || !(RightChar is String)
+265: 			|| StrLen(LeftChar) != 1 || StrLen(RightChar) != 1 {
+266: 		try LoggerError("WrapSymbols", "Refusing to add a malformed custom symbol pair.")
+267: 		return false
+268: 	}
+269: 	return _WS_CommitCandidate(
+270: 		_WS_BuildAddCustomCandidate.Bind(LeftChar, RightChar),
+271: 		WriterFn, ReplaceFn, DeleteFn)
+272: }
+273: 
+274: ; Remove the custom pair at position Idx (1-based), then persist + rebuild.
+static/ergopti_plus/windows/infra/wrap_symbols_config.ahk:309
+309: 	for Pair in Custom {
+310: 		if !(Pair is Map) || !Pair.Has("left") || !Pair.Has("right")
+311: 			return false
+312: 		L := Pair["left"]
+313: 		R := Pair["right"]
+314: 		if !(L is String) || !(R is String)
+315: 			return false
+316: 		Active[L] := Pair
+317: 		if (R != L)
+318: 			Active[R] := Pair
+319: 	}
+320: 	return Active
+321: }
+322: 
+static/ergopti_plus/windows/infra/wrap_symbols_config.ahk:328
+328: 	for Pair in Custom {
+329: 		if !(Pair is Map) || !Pair.Has("left") || !Pair.Has("right")
+330: 			return false
+331: 		LeftChar := Pair["left"]
+332: 		RightChar := Pair["right"]
+333: 		if !(LeftChar is String) || !(RightChar is String)
+334: 			return false
+335: 		Candidate.Push(Map("left", LeftChar, "right", RightChar))
+336: 	}
+337: 	return Candidate
+338: }
+339: 
+340: _WS_BuildToggleCandidate(OpenChar, Disabled, Custom) {
+341: 	if Disabled.Has(OpenChar)
+static/ergopti_plus/windows/infra/wrap_symbols_config.ahk:481
+481: 	for Pair in Custom {
+482: 		if !(Pair is Map) || !Pair.Has("left") || !Pair.Has("right")
+483: 			return false
+484: 		LeftChar := Pair["left"]
+485: 		RightChar := Pair["right"]
+486: 		if !(LeftChar is String) || !(RightChar is String)
+487: 				|| StrLen(LeftChar) != 1 || StrLen(RightChar) != 1
+488: 			return false
+489: 		Lines .= "`n[[custom]]`n"
+490: 		Lines .= "left  = `"" . _WS_EscapeToml(LeftChar) . "`"`n"
+491: 		Lines .= "right = `"" . _WS_EscapeToml(RightChar) . "`"`n"
+492: 	}
+493: 	return Lines
+494: }
+static/ergopti_plus/windows/modules/keymap/layout.ahk:1017
+1016: 	HotIf((*) => Features["hotstrings"]["rolls"]["hashtag_quote"]["enabled"] and IsRealAltGrPress())
+1017: 	Hotkey("SC138 & SC017", _RollHashtagQuoteHandler, "I2")
+1018: 	HotIf()
+1019: }
+static/ergopti_plus/windows/modules/keymap/layout.ahk:981
+981: _RollHashtagQuoteEmit() {
+982: 	if AltGrLayerShiftHeld() {
+983: 		_RollEmitCritical("%")
+984: 	} else {
+985: 		HashtagOrQuote()
+986: 	}
+987: }
+988: HashtagOrQuote() {
+static/ergopti_plus/windows/modules/keymap/layout.ahk:1004
+1002: 		_RollEmitCritical('"')
+1003: 	} else {
+1004: 		WrapTextIfSelected("#", "#", "#")
+1005: 	}
+1006: }
+1007: 
+static/ergopti_plus/windows/modules/keymap/layout.ahk:613
+611: 		and Features["shortcuts"].Has(ConfigLeaf.WRAP_TEXT_IF_SELECTED)
+612: 		and Features["shortcuts"][ConfigLeaf.WRAP_TEXT_IF_SELECTED]
+613: 	if (WrapEnabled and WrapSymbols_IsEnabled(LeftSymbol)) {
+614: 		; Critical is RELEASED across the selection probe and the clipboard
+615: 		; round-trip, then restored.
+static/ergopti_plus/windows/modules/keymap/layout.ahk:645
+643: 				; lookup by one. SendInstant, in contrast, does NOT record — so
+644: 				; the explicit push belongs only to its success branch.
+645: 				if !SendInstant(LeftSymbol Selection RightSymbol)
+646: 					SendNewResult(Symbol)
+647: 				else
+648: 					; Wrapping ends at the closing text, which can differ from the
+649: 					; pressed key and can include a no-break prefix or a surrogate pair.
+650: 					UpdateLastSentCharacter(SubStr(RightSymbol, -_TextTailCodeUnits(RightSymbol, 1)))
+651: 				return
+652: 			}
+static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk:563
+561: 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
+562: 		; therefore cannot be interrupted after the erase but before the paste.
+563: 		SendInput(Prefix . "^v")
+564: 		_SendInstantReport(Text)
+565: 		return true
+566: 	} catch as err {
+567: 		; SendInput can fail after the restore timer was armed. Cancel that exact
+WSW-002 source contract: worker requests <=8192, treats nonempty bounded text as ok without completeness status, snapshot consumer returns unchanged text and whole-selection wrapper uses it.
+static/ergopti_plus/windows/adapters/uia_worker.ahk:26
+26: global UIASW_MAX_TEXT_CHARS := 8192
+27: ; Transport discriminators outside the valid selection-length domain.
+28: ; PostMessage gives the worker only one integer payload field, so these values
+29: ; request typed probes while 1..UIASW_MAX_TEXT_CHARS remain selection requests.
+30: global UIASW_PASSWORD_REQUEST_CODE := UIASW_MAX_TEXT_CHARS + 1
+31: global UIASW_BOUNDS_REQUEST_CODE := UIASW_MAX_TEXT_CHARS + 2
+32: 
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:558
+558: _UIASW_Request(Context, OnTerminal, RequestCode) {
+559: 	global UIASW_DEADLINE_MS
+560: 	if A_IsSuspended || !(Context is Map) || !IsObject(OnTerminal)
+561: 		return false
+562: 	if !(RequestCode is Integer) || RequestCode <= 0
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:608
+608: UIASW_Request(Context, OnTerminal) {
+609: 	global UIASW_MAX_TEXT_CHARS
+610: 	return _UIASW_Request(Context, OnTerminal, UIASW_MAX_TEXT_CHARS)
+611: }
+612: 
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:610
+610: 	return _UIASW_Request(Context, OnTerminal, UIASW_MAX_TEXT_CHARS)
+611: }
+612: 
+613: UIASW_RequestPassword(Context, OnTerminal) {
+614: 	global UIASW_PASSWORD_REQUEST_CODE
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:615
+615: 	return _UIASW_Request(Context, OnTerminal, UIASW_PASSWORD_REQUEST_CODE)
+616: }
+617: 
+618: UIASW_RequestBounds(Context, OnTerminal) {
+619: 	global UIASW_BOUNDS_REQUEST_CODE
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:620
+620: 	return _UIASW_Request(Context, OnTerminal, UIASW_BOUNDS_REQUEST_CODE)
+621: }
+622: 
+623: UIASW_PostRequest(WorkerHwnd, RequestGeneration, MaxTextChars) {
+624: 	return UIAW_PostRequest(WorkerHwnd, RequestGeneration, MaxTextChars)
+static/ergopti_plus/windows/adapters/uia_worker.ahk:216
+211: 				Status := "no_text_pattern"
+212: 			} else {
+213: 				Pattern := Element.GetPattern("Text")
+214: 				Ranges := Pattern.GetSelection()
+215: 				if (Ranges.Length > 0) {
+216: 					Body := Ranges[1].GetText(MaxTextChars)
+217: 					if (Body != "" && !RegExMatch(Body, "^(\r\n|\r|\n)+$"))
+218: 						Status := "ok"
+219: 				}
+220: 			}
+221: 		}
+222: 	} catch as Err {
+223: 		Status := "failed"
+224: 		Body := StrReplace(StrReplace(Err.Message, "`r", " "), "`n", " ")
+static/ergopti_plus/windows/modules/keymap/layout.ahk:378
+375: 	if (Status = "ok" && Result is Map) {
+376: 		CandidateText := Result.Get("Text", "")
+377: 		if CandidateText != "" && !RegExMatch(CandidateText, "^(\r\n|\r|\n)+$")
+378: 			PublishableText := CandidateText
+379: 	} else if (Status = "failed") {
+380: 		LogDetail := (Result is Map)
+static/ergopti_plus/windows/modules/keymap/layout.ahk:421
+419: 			} else {
+420: 				_UIA_SelectionCache := {
+421: 					Text: PublishableText,
+422: 					Hwnd: Context["Hwnd"],
+423: 					Control: Context["Control"],
+424: 					InputEpoch: Context["InputEpoch"],
+425: 					CapturedAt: A_TickCount,
+426: 					Consumed: false
+427: 				}
+428: 			}
+429: 		}
+430: 	} finally {
+static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk:845
+840: 			|| Snapshot.Control != LiveControl
+841: 			|| Snapshot.InputEpoch != LiveInputEpoch
+842: 			|| ElapsedMs > MaxAgeMs
+843: 		return ""
+844: 	Snapshot.Consumed := true
+845: 	return Snapshot.Text
+846: }
+847: 
+static/ergopti_plus/windows/vendor/UIA.ahk:6846
+6845:     ; Returns the plain text of the text range.
+6846:     GetText(maxLength := -1) {
+6847:         local text
+6848:         return (ComCall(12, this, "int", maxLength, "ptr*", &text := 0), UIA.BSTR(text))
+6849:     }
+6850: 
+Catalogue floor: 43 ordered pairs. No arbitrary native selection text or clipboard read.
+PASS: 2 nonvacuous source findings; native Windows execution count=0.

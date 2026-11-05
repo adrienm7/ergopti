@@ -1,0 +1,6 @@
+{
+	"url": "https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nf-uiautomationclient-iuiautomationtextrange-gettext",
+	"sha256": "3113c2bc707ae304d0ee01c78b05cefbf35b2a7920ee7ac1920ba41b76fbc11b",
+	"contract": "Parameters [in] maxLength Type: int The maximum length of the string to return, or -1 if no limit is required. [out, retval] text Type: BSTR* Receives a pointer to the string, possibly truncated at the specified maxLength . Return value Type: HRESULT If this method succeeds, it returns S_OK . Otherwise, it returns an HRESULT error code.",
+	"meaning": "Native API documentation, not Windows execution."
+}

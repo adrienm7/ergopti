@@ -1,0 +1,11 @@
+NO_TRAY show_ack=true queued=1 dispatched=0
+STARTED_TRAY queued=0 dispatched=1
+REFUSED_REDRAW native_visible=true owner_shown=false
+IDLE_AFTER_REFUSAL native_visible=true owner_shown=false
+EXPLICIT_STOP native_visible=false
+HEALTHY_IDLE native_visible=false
+PASS actual Lua owners; GTK-shaped binding; no live desktop proof
+WIDGET_RECOVERED_NATIVE public_start=false public_stop=false tick_noop=true snapshot=nil
+WIDGET_MANUAL_RETRY helper=true ticks_resume=true
+TRAY_RECOVERED_NATIVE public_start=false public_stop=false tick_noop=true snapshot=nil
+TRAY_MANUAL_RETRY helper=true ticks_resume=true

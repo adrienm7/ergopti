@@ -1,0 +1,99 @@
+{
+	"schema_version": 1,
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"module_order": ["wpm", "wrap-symbols", "personal-info"],
+	"modules": [
+		{
+			"module": "wpm",
+			"scopes": [
+				{
+					"role": "windows",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wpm/windows/findings.json",
+					"ids": ["WPMW-001", "WPMW-002"]
+				},
+				{
+					"role": "macos",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wpm/macos/findings.json",
+					"ids": ["WPMM-001", "WPMM-002"]
+				},
+				{
+					"role": "linux",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wpm/linux/findings.json",
+					"ids": ["WPML-001"]
+				},
+				{
+					"role": "shared",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wpm/shared/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wpm/shared/findings.json",
+					"ids": []
+				}
+			]
+		},
+		{
+			"module": "wrap-symbols",
+			"scopes": [
+				{
+					"role": "windows",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/findings.json",
+					"ids": ["WSW-001", "WSW-002"]
+				},
+				{
+					"role": "macos",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/macos/findings.json",
+					"ids": ["WSM-001", "WSM-002", "WSM-003"]
+				},
+				{
+					"role": "linux",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/findings.json",
+					"ids": ["WSL-001", "WSL-002"]
+				},
+				{
+					"role": "shared",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/shared/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/shared/findings.json",
+					"ids": []
+				}
+			]
+		},
+		{
+			"module": "personal-info",
+			"scopes": [
+				{
+					"role": "windows",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/windows/findings.json",
+					"ids": ["PIW-001", "PIW-002"]
+				},
+				{
+					"role": "macos",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/findings.json",
+					"ids": ["PIM-001", "PIM-002"]
+				},
+				{
+					"role": "linux",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/linux/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/linux/findings.json",
+					"ids": ["PIL-001", "PIL-002", "PIL-003"]
+				},
+				{
+					"role": "shared",
+					"report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/shared/report.md",
+					"manifest": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/shared/findings.json",
+					"ids": ["PIS-001"]
+				}
+			]
+		}
+	],
+	"shared_mechanisms": {
+		"spaced_guillemet_trigger_vs_output": ["WSM-001", "WSL-001"],
+		"flattened_endpoint_alias_catalogue": ["WSM-003", "WSL-002"]
+	}
+}

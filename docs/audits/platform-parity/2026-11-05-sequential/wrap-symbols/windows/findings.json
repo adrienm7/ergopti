@@ -1,0 +1,39 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md",
+	"findings": [
+		{
+			"id": "WSW-001",
+			"title": "Saved custom wrap pair is ignored by remapped symbol keys",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["Configured-delimiter consistency across public routes"],
+			"reproduction": "SOURCE PROJECTION, not AHK execution: wrap feature and hashtag_quote roll enabled, builtin # enabled; use actual two-step Add custom menu with # and ~ and accept successful persistence. Select alpha in supported UIA editor, ensure preceding output is not ( or [, press AltGr+SC017 without layer Shift. Registered HashtagOrQuote calls WrapTextIfSelected(\"#\",\"#\",\"#\") and sends #alpha# rather than committed #alpha~. Standard OS-layout prefix route reads active custom map correctly.",
+			"root_cause": "Custom commit publishes current active pair after builtins, but remapped WrapTextIfSelected uses its concrete built-in bound delimiters and only checks disabled-left, never current active pair; final successful SendInstant does not come back through prefix wrapping.",
+			"silent_failure": "Output succeeds with the older built-in pair; menu label and live/durable custom map correctly advertise #…~ and no exception/refusal occurs.",
+			"regression_test": "Actual AHK Add-custom dialogs/private acknowledged persistence -> registered remap chain -> faithful selection and recorded final sender; compare no-override, custom collision, remove/reload, disabled/refused commit, and OS-layout prefix routes. Verify target receiving separately.",
+			"evidence": ["proofs/source-contract.mjs", "proofs/source-contract.log"],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md",
+			"basis": "Actual business-owner replay over explicit native boundaries; Windows source contract only. See evidence and limitations in source report."
+		},
+		{
+			"id": "WSW-002",
+			"title": "UIA selection prefix is wrapped as though it were the complete selection",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["Selected-text integrity"],
+			"reproduction": "SOURCE PROJECTION, not AHK execution: select 8192 ASCII a characters plus trailing Z in UIA TextPattern editor other than excluded Code.exe; allow valid current worker result, consume within750ms, press real mapped # wrapper with no roll prefix. Worker GetText(8192) returns prefix only, reports ok, cache/consumer forwards it, wrapper pastes #+prefix+# over entire8193-character selection, losing Z. Under-limit healthy and stale/refused controls differ.",
+			"root_cause": "Bounded UIA GetText limit8192 is treated as complete selection with no range-length/completeness/truncated status. The parent snapshot validates context and age only; replacement spans full selected native range.",
+			"silent_failure": "Nonempty bounded Body is normal ok; no truncation observer in worker, wire payload, parent publication, consumer or wrapper. Existing timeout/failed/stale warnings never run; successful native paste cannot recover omitted suffix.",
+			"regression_test": "Preserve bounded worker/deadline and add bounded completeness detection/refusal. Genuine AHK worker facade with faithful TextPattern maxLength -> parent cache -> single-use consumer -> public wrapper; test8191/8192/8193, Unicode/CRLF, current/stale/canceled/timeout and exact receiving/undo separately. No unbounded GetText(-1).",
+			"evidence": ["proofs/source-contract.mjs", "proofs/source-contract.log"],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/windows/report.md",
+			"basis": "Actual business-owner replay over explicit native boundaries; Windows source contract only. See evidence and limitations in source report."
+		}
+	]
+}

@@ -1,0 +1,73 @@
+{
+	"schema_version": 1,
+	"scope": "linux-wpm-widget-readout",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"execution": "genuine LuaJIT, production Lua owners, GTK/FFI-shaped injected native bindings; no live desktop",
+	"entry_points": [
+		"daemon restore and periodic tick",
+		"menu enable/disable/colors/graph/reset",
+		"canonical preference load/save",
+		"metrics scope capture/apply/compensation",
+		"native drag press/motion/release",
+		"GTK paint and AppIndicator status scheduling"
+	],
+	"covered": [
+		"defaults and sparse canonical preferences",
+		"source/color/unit join",
+		"hidden until typed, idle and tooltip policy",
+		"graph bounded history and compact-anchor conversion",
+		"position atomic storage and reset",
+		"show/hide/refused redraw",
+		"stop compensation and guarded restoration debt",
+		"pause and process reload callers",
+		"tray PNG flip, native handle update and remove",
+		"GTK pump ownership",
+		"prior-report duplicate check"
+	],
+	"tests": {
+		"official_uppercase_WPM": {
+			"passed": 7,
+			"failed": 0
+		},
+		"official_lowercase_wpm": {
+			"passed": 10,
+			"failed": 0
+		},
+		"targeted_registered_modules": 6,
+		"targeted_cases": {
+			"passed": 222,
+			"failed": 0
+		},
+		"false_green_scan": "within baseline 0 vs 0"
+	},
+	"dry_sweeps": [
+		{
+			"name": "A",
+			"whole_bounded_scope": true,
+			"new_roots": 0,
+			"owner_refusal_false_and_throw": "pass",
+			"targeted_passed": 222,
+			"targeted_failed": 0
+		},
+		{
+			"name": "B",
+			"whole_bounded_scope": true,
+			"new_roots": 0,
+			"owner_refusal_false_and_throw": "pass",
+			"targeted_passed": 222,
+			"targeted_failed": 0
+		}
+	],
+	"hypotheses_not_findings": [
+		"deliberately fail-closed ordinary inverse debt lacks automatic retry",
+		"no-tray pump coupling versus documented headless mode intent",
+		"off-screen saved anchor on monitor topology change"
+	],
+	"limits": [
+		"No lgi, Xvfb or libayatana; real GTK/SNI receiving not executed",
+		"No real pointer capture, DPI or hotplug experiment",
+		"No performance or memory measurement",
+		"Shared model semantic findings owned by shared role"
+	],
+	"finding_ids": ["WPML-001"]
+}

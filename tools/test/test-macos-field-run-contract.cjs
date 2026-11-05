@@ -573,6 +573,12 @@ function reportFolder(paths) {
 			assert.match(collector, /request_id="mac-\$\{stamp\}-r\$\{attempt\}"/);
 			assert.match(collector, /do not reload or quit Ergopti/);
 			assert.match(collector, /printf '%-28s LogsDirPath\\n' "log_folder"/);
+			// The driver appends its folder to a LogsDirPath that does not end with it
+			const paths = fs.readFileSync(path.join(ROOT, 'tools/dev/field-report-paths.py'), 'utf8');
+			assert.match(
+				paths,
+				/os\.path\.basename\(log_dir\) != app:\n\s+log_dir = os\.path\.join\(log_dir, app\)/
+			);
 		});
 
 		await check('the collector runs the shell checklist steps from their own file', () => {

@@ -1,0 +1,3 @@
+[32m[OK] every one of the 27 sink(s) that can carry a hotstring trigger either redacts it or is withheld by its caller.[0m
+     windows: 27 trigger-carrying sink(s) — 3 redact in place, 22 judged safe upstream
+     lua: 18 value-carrying sink(s) across both Lua drivers, 14 reduced to a length or redacted

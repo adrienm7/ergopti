@@ -1,0 +1,31 @@
+# Hammerspoon configuration — auto-generated. Hand-edits are
+# preserved across saves provided the file remains valid TOML.
+
+
+
+
+
+[info]
+bic = "AUDITBIC"
+city = "Audit City"
+country = "Audit Country"
+credit_card = "1111 2222 3333 4444"
+date_of_birth = "01/02/2000"
+email_address = "audit@example.test"
+first_name = "Synthetic {Tab} 雪"
+iban = "FR1212345678901234567890123"
+last_name = "Fixture"
+phone_number = "0102030405"
+phone_number_clean = "01 02 03 04 05"
+postal_code = "12345"
+social_security_number = "1 11 11 11 111 111 11"
+street_address = "Line1\nLine2"
+work_email_address = "work@example.test"
+
+
+
+
+
+[letters]
+p = "first_name"
+x = "city"

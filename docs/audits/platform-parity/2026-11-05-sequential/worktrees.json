@@ -1,0 +1,46 @@
+[
+	{
+		"role": "windows",
+		"source_root": "/workspace/worktrees/parity-sequential-2026-11-05/windows",
+		"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+		"dependency_link": "Task-owned node_modules symlink; no npm install.",
+		"recovery_ref": "refs/audit/parity-sequential-2026-11-05/windows",
+		"retired": true,
+		"retired_utc": "2026-11-05T09:48:51.244574+00:00",
+		"retirement": "Tracked and index bytes unchanged; only owned node_modules symlink unlinked; clean non-forced worktree removal.",
+		"recreate_command": "git worktree add --detach /workspace/worktrees/parity-sequential-2026-11-05/windows refs/audit/parity-sequential-2026-11-05/windows"
+	},
+	{
+		"role": "macos",
+		"source_root": "/workspace/worktrees/parity-sequential-2026-11-05/macos",
+		"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+		"dependency_link": "Task-owned node_modules symlink; no npm install.",
+		"recovery_ref": "refs/audit/parity-sequential-2026-11-05/macos",
+		"retired": true,
+		"retired_utc": "2026-11-05T09:48:51.606830+00:00",
+		"retirement": "Tracked and index bytes unchanged; only owned node_modules symlink unlinked; clean non-forced worktree removal.",
+		"recreate_command": "git worktree add --detach /workspace/worktrees/parity-sequential-2026-11-05/macos refs/audit/parity-sequential-2026-11-05/macos"
+	},
+	{
+		"role": "linux",
+		"source_root": "/workspace/worktrees/parity-sequential-2026-11-05/linux",
+		"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+		"dependency_link": "Task-owned node_modules symlink; no npm install.",
+		"recovery_ref": "refs/audit/parity-sequential-2026-11-05/linux",
+		"retired": true,
+		"retired_utc": "2026-11-05T09:48:51.964588+00:00",
+		"retirement": "Tracked and index bytes unchanged; only owned node_modules symlink unlinked; clean non-forced worktree removal.",
+		"recreate_command": "git worktree add --detach /workspace/worktrees/parity-sequential-2026-11-05/linux refs/audit/parity-sequential-2026-11-05/linux"
+	},
+	{
+		"role": "shared",
+		"source_root": "/workspace/worktrees/parity-sequential-2026-11-05/shared",
+		"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+		"dependency_link": "Task-owned node_modules symlink; no npm install.",
+		"recovery_ref": "refs/audit/parity-sequential-2026-11-05/shared",
+		"retired": true,
+		"retired_utc": "2026-11-05T09:48:52.331863+00:00",
+		"retirement": "Tracked and index bytes unchanged; only owned node_modules symlink unlinked; clean non-forced worktree removal.",
+		"recreate_command": "git worktree add --detach /workspace/worktrees/parity-sequential-2026-11-05/shared refs/audit/parity-sequential-2026-11-05/shared"
+	}
+]

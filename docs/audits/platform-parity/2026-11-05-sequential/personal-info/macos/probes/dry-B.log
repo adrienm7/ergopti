@@ -1,0 +1,57 @@
+PROBE engine exit0 SHA256 f5cacc9142a43a4f9cc20a3a486deea594b4ad8d271fff93c040ba4f1f4bf51e
+healthy default alias p: actual Keymap/Personal/Expander/Synthetic emit exact literal braces+Unicode; preview=Synthetic  雪
+PIM-001 extra alias x=city: configured valid known field; preview=nil consumed=false emitted=nil
+PIM-001 normal editor save: save=true; extra alias x removed from actual TOML; known city value retained
+healthy multifield pn: literal {Tab} remains field data; exactly one real Tab pair; logical emitted value has no tab
+disabled control: no personal preview/consume/emission
+trigger change control: old magic event cannot expand
+positive alias remap control: p=city works with exact Audit City preview+output; x=city in SAME source remains inert
+PASS stopped actual owners; no native Darwin or real secret used
+
+PROBE prefix exit0 SHA256 56c0050df2edb556a98b1e9545aa97e28cf3602d14fa7f1bf1d19aad7162d47b
+REACHABLE editor control: actual editor/controller/UIBuilder/bridge accepts phone string; actual save commits and closes native-shaped view
+CONTROL @t: emits exact full phone value 0123{Tab}45 as literal data; native Tab count=0
+PREFIX trigger0123 consumed=true logical="0123\00945" native Tab count=1
+
+PROBE matrix exit0 SHA256 6eb132664e559cc7805beca20114067904353e1655a9a1c17346554809436718
+default alias m -> email_address full-value/private=true
+default alias t -> phone_number full-value/private=true
+default alias n -> last_name full-value/private=true
+default alias a -> street_address full-value/private=true
+default alias p -> first_name full-value/private=true
+default alias c -> credit_card full-value/private=true
+default alias b -> bic full-value/private=true
+default alias e -> email_address full-value/private=true
+default alias d -> date_of_birth full-value/private=true
+default alias w -> work_email_address full-value/private=true
+default alias f -> phone_number_clean full-value/private=true
+default alias i -> iban full-value/private=true
+default alias s -> social_security_number full-value/private=true
+field bic remap p: full-value/private=true preview=masked
+field city remap p: full-value/private=true preview=unmasked
+field country remap p: full-value/private=true preview=unmasked
+field credit_card remap p: full-value/private=true preview=masked
+field date_of_birth remap p: full-value/private=true preview=unmasked
+field email_address remap p: full-value/private=true preview=unmasked
+field first_name remap p: full-value/private=true preview=unmasked
+field iban remap p: full-value/private=true preview=masked
+field last_name remap p: full-value/private=true preview=unmasked
+field phone_number remap p: full-value/private=true preview=unmasked
+field phone_number_clean remap p: full-value/private=true preview=unmasked
+field postal_code remap p: full-value/private=true preview=unmasked
+field social_security_number remap p: full-value/private=true preview=masked
+newline preview normalization="Line1Line2"
+field street_address remap p: full-value/private=true preview=unmasked
+field work_email_address remap p: full-value/private=true preview=unmasked
+MATRIX PASS: 13 default aliases;15 known fields;4 masked fields;known MH001 literal-provider preview delta retained once
+classification-unavailable and unknown-field controls: fail closed; no raw value shown
+
+PROBE gates exit0 SHA256 5bfd597f2b8e42551d61c985065759e0aec00f02cda7cfe9fb0e0486641352ba
+healthy native-classified control: personal expansion accepted
+pause control: pass-through, no personal preview/output
+native secure-field control: pass-through, no personal preview/output
+native unknown-field control: pass-through, no personal preview/output
+native ignored-app control: pass-through, no personal preview/output
+retired personal callback control: pass-through, no personal preview/output
+stopped keymap control: pass-through, no personal preview/output
+
