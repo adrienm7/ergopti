@@ -437,3 +437,95 @@ Test("TOML held publication: borrowed gateway reports partial session and blocks
 Test("TOML held publication: owned full native acknowledgement publishes (toml-held-publication)", _TCHP_Case.Bind(false, "control"))
 Test("TOML held publication: borrowed full native acknowledgement retains owner (toml-held-publication)", _TCHP_Case.Bind(true, "control"))
 Test("TOML held publication: actual held-stage corruption refuses before rename (toml-held-publication)", _TCHP_Case.Bind(false, "corrupt"))
+
+_TRIO_Flush(State, Handle, Phase) {
+	State.flushes += 1
+	try {
+		AssertFalse(A_IsCritical)
+		if Phase == "stage" && !State.changed {
+			if FSWriteDurable(State.targetA, '[custom]`nvalue = "External"`n') != 1
+				throw Error("The competing original target was not written.")
+			State.winner := FSReadBytesStrict(State.targetA)
+			SetWorkingDir(State.otherCwd)
+			State.changed := true
+		}
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", Handle, "Int")
+			throw OSError(A_LastError, "the relative-path fixture's genuine stage flush")
+		return 1
+	} catch as Err {
+		State.error := Err
+		return 0
+	}
+}
+_TRIO_Case(Race) {
+	SavedCwd := A_WorkingDir
+	Nonce := A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Root := A_Temp . "\ergopti_toml_relative_" . Nonce
+	Created := false
+	Relative := Race ? "nested_" . Nonce . "\data.toml" : "data_" . Nonce . ".toml"
+	FirstDir := Root . "\first", SecondDir := Root . "\second"
+	PathA := FirstDir . "\" . Relative, PathB := SecondDir . "\" . Relative
+	State := {targetA: PathA, otherCwd: SecondDir, flushes: 0, changed: false, error: 0, winner: 0}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "a private cwd scope must not redirect an accepted foreign full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(FirstDir))
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(SecondDir))
+		if Race {
+			AssertEqual(1, FSCreateDirectoryExclusiveStrict(FirstDir . "\nested_" . Nonce))
+			AssertEqual(1, FSCreateDirectoryExclusiveStrict(SecondDir . "\nested_" . Nonce))
+		}
+		Source := '[custom]`nvalue = "Initial"`n'
+		AssertEqual(1, FSWriteCreateDurable(PathA, Source))
+		AssertEqual(1, FSWriteCreateDurable(PathB, Source))
+		OtherBefore := FSReadBytesStrict(PathB)
+		SetWorkingDir(FirstDir)
+		Updates := [{Section: "custom", Key: "value", Value: "Edited"}]
+		Result := Race ? _TOML_BatchWriteImpl(Relative, Updates, [], "write", , , false, 0, _TRIO_Flush.Bind(State))
+			: TOML_BatchWrite(Relative, Updates)
+		ActualA := FSReadBytesStrict(PathA), ActualB := FSReadBytesStrict(PathB)
+		ValueA := TOML_ParseDocument(FSReadUtf8Exact(PathA))["custom"]["value"]
+		_TestPrint("# toml-relative race=" . Race . " result=" . Result . " targetA=" . ValueA
+			. " flushes=" . State.flushes . " changed=" . State.changed . " cwd-second=" . (A_WorkingDir == SecondDir))
+		if IsObject(State.error)
+			throw State.error
+		AssertEqual(OtherBefore.Size, ActualB.Size)
+		AssertEqual(OtherBefore.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", OtherBefore,
+			"Ptr", ActualB, "UPtr", OtherBefore.Size, "UPtr"), "the competing current-directory target is not this operation's source or destination")
+		if Race {
+			AssertTrue(State.changed, "the real stage flush must run the cwd/source mutation cutpoint")
+			AssertFalse(Result, "the original native target changed after capture and must remain authoritative")
+			AssertEqual("External", ValueA)
+			AssertEqual(State.winner.Size, ActualA.Size)
+			AssertEqual(State.winner.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.winner,
+				"Ptr", ActualA, "UPtr", State.winner.Size, "UPtr"))
+		} else {
+			AssertTrue(Result, "the public drop-in ordinary writer must retain basename-relative support")
+			AssertEqual("Edited", ValueA)
+			TOML_RefuseWrites(Relative, "private logical path fence")
+			Refused := TOML_BatchWrite(Relative, [{Section: "custom", Key: "value", Value: "Retry"}])
+			AssertFalse(Refused, "capturing an absolute I/O target must not bypass the original logical refusal identity")
+			AssertEqual("private logical path fence", TOML_WriteRefusal(Relative))
+			AfterRefusal := FSReadBytesStrict(PathA)
+			AssertEqual(ActualA.Size, AfterRefusal.Size)
+			AssertEqual(ActualA.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", ActualA,
+				"Ptr", AfterRefusal, "UPtr", ActualA.Size, "UPtr"))
+		}
+	} finally {
+		SetWorkingDir(SavedCwd)
+		if Created {
+			for KeyPath in [Relative, PathA, PathB] {
+				_TOML_InvalidateParseCache(KeyPath)
+				Refusals := _TOML_WriteRefusals()
+				Key := _TOML_WriteRefusalKey(KeyPath)
+				if Refusals.Has(Key)
+					Refusals.Delete(Key)
+			}
+			DirDelete(Root, true)
+		}
+	}
+}
+Test("TOML relative native target: public basename save retains logical refusal identity (toml-relative-native-target)", _TRIO_Case.Bind(false))
+Test("TOML relative native target: cwd movement cannot bless a different source (toml-relative-native-target)", _TRIO_Case.Bind(true))
