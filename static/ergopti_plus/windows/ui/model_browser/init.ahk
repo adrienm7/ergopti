@@ -34,6 +34,12 @@
 global _LLM_ModelBrowser_Gui := unset
 ; Closing a reused native host revokes any selection still applying.
 global _LLM_ModelBrowser_Epoch := 0
+; Native visibility requests have their own last-intent receipt. The timer
+; retains only that receipt, never a Gui or its controls.
+global _LLM_ModelBrowser_Visibility := 0
+global _LLM_ModelBrowser_VisibilityTimer := 0
+global _LLM_ModelBrowser_VisibilityTimerRevision := 0
+
 
 ; Column index of "params" in the ListView — kept as a constant so the
 ; sort-on-header handler can resolve it without a magic number. Indices
@@ -78,22 +84,29 @@ LLM_ModelBrowser_Show() {
 			return web
 	}
 	if IsSet(_LLM_ModelBrowser_Gui) {
-		; A reused Gui that fails to refresh (e.g. models.json was edited
-		; and re-parses badly) used to fall through to rebuild a SECOND
-		; Gui without destroying the first — Gui handle leak. Catch the
-		; failure, destroy the stale Gui, and let the rebuild path run.
+		Window := _LLM_ModelBrowser_Gui
+		Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, true)
+		if !(Ticket is Object)
+			return 0
 		try {
-			_LLM_ModelBrowser_Gui.Show()
-			_LLM_ModelBrowser_RefreshRows(_LLM_ModelBrowser_Gui.ListView)
-			return _LLM_ModelBrowser_Gui
+			if !_LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
+				return 0
+			_LLM_ModelBrowser_RefreshRows(Window.ListView)
+			return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) ? Window : 0
 		} catch {
-			try _LLM_ModelBrowser_Gui.Destroy()
-			_LLM_ModelBrowser_Gui := unset
+			; A stale refresh/Show may not retire a successor, even if that
+			; successor reuses the same native Gui object.
+			if !_LLM_ModelBrowser_VisibilityRetire(Ticket, Window)
+				return 0
+			try Window.Destroy()
 		}
 	}
 	_LLM_ModelBrowser_Gui := _LLM_ModelBrowser_Build()
-	_LLM_ModelBrowser_Gui.Show()
-	return _LLM_ModelBrowser_Gui
+	Window := _LLM_ModelBrowser_Gui
+	Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, true)
+	if !(Ticket is Object) || !_LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
+		return 0
+	return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) ? Window : 0
 }
 
 
@@ -402,18 +415,142 @@ _LLM_ModelBrowser_NativeCurrent(Owner) {
 }
 
 _LLM_ModelBrowser_OnClose(Params*) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch
+	global _LLM_ModelBrowser_Gui
+	if !IsSet(_LLM_ModelBrowser_Gui)
+		return false
+	Window := _LLM_ModelBrowser_Gui
+	Owner := Params.Length && IsObject(Params[1]) && Params[1].HasOwnProp("lifecycle") ? Params[1] : 0
+	Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, false, Owner)
+	if !(Ticket is Object)
+		return false
+	try return _LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
+	return false
+}
+
+; Claim only fixed-size RAM under Critical; native visibility and timer calls
+; stay outside it. A paused browser remains browsable, but a lifecycle change
+; or pause transition may never be adopted by an older continuation.
+_LLM_ModelBrowser_VisibilityClaim(Window, Visible, Owner := 0) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition
+	global _LLM_ModelBrowser_Visibility, _LLM_ModelBrowser_VisibilityTimer
 	PreviousCritical := Critical("On")
 	try {
-		if Params.Length && IsObject(Params[1]) && Params[1].HasOwnProp("lifecycle")
-				&& !_LLM_ModelBrowser_NativeCurrent(Params[1])
-			return false
-		if !IsSet(_LLM_ModelBrowser_Gui)
-			return false
-		Window := _LLM_ModelBrowser_Gui
+		if !IsSet(_LLM_ModelBrowser_Gui) || _LLM_ModelBrowser_Gui != Window
+				|| (Owner is Object && !_LLM_ModelBrowser_NativeCurrent(Owner))
+			return 0
 		_LLM_ModelBrowser_Epoch += 1
+		Ticket := {epoch: _LLM_ModelBrowser_Epoch, gui_ptr: ObjPtr(Window), visible: !!Visible,
+			lifecycle: _LifecycleLatestTransition, paused: A_IsSuspended}
+		OldTicket := _LLM_ModelBrowser_Visibility, OldTimer := _LLM_ModelBrowser_VisibilityTimer
+		_LLM_ModelBrowser_Visibility := Ticket, _LLM_ModelBrowser_VisibilityTimer := 0
 	} finally Critical(PreviousCritical)
-	try Window.Hide()
+	if IsObject(OldTimer)
+		try SetTimer(OldTimer, 0)
+	return Ticket
+}
+
+_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_ModelBrowser_Visibility
+	return Ticket is Object && _LLM_ModelBrowser_Visibility == Ticket
+		&& IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Window && ObjPtr(Window) == Ticket.gui_ptr
+		&& _LLM_ModelBrowser_Epoch == Ticket.epoch && _LifecycleLatestTransition == Ticket.lifecycle
+		&& A_IsSuspended == Ticket.paused
+}
+
+_LLM_ModelBrowser_VisibilityPerform(Window, Ticket) {
+	if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+		return false
+	if Ticket.visible
+		Window.Show()
+	else
+		Window.Hide()
+	; Win32 can finish an older ShowWindow after a newer nested Show/Hide
+	; already returned. Reconcile the actual last intent, not the old caller.
+	_LLM_ModelBrowser_VisibilityReconcile(Window)
+	return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+		&& !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int") == Ticket.visible
+}
+
+_LLM_ModelBrowser_VisibilityReconcile(Window) {
+	global _LLM_ModelBrowser_Visibility
+	; Bound work on an interrupted native stack. A third reentrant action
+	; gets an exact one-shot continuation instead of an unbounded native loop.
+	Loop 2 {
+		Ticket := _LLM_ModelBrowser_Visibility
+		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+			return false
+		Visible := !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int")
+		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+			continue
+		if Visible == Ticket.visible
+			return true
+		if Ticket.visible
+			Window.Show()
+		else
+			Window.Hide()
+	}
+	Ticket := _LLM_ModelBrowser_Visibility
+	if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+		return false
+	if !!DllCall("IsWindowVisible", "Ptr", Window.Hwnd, "Int") == Ticket.visible
+		return _LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+	_LLM_ModelBrowser_VisibilitySchedule(Ticket, Window)
+	return false
+}
+
+_LLM_ModelBrowser_VisibilitySchedule(Ticket, Window) {
+	global _LLM_ModelBrowser_VisibilityTimer, _LLM_ModelBrowser_VisibilityTimerRevision
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window) || IsObject(_LLM_ModelBrowser_VisibilityTimer)
+			return false
+		_LLM_ModelBrowser_VisibilityTimerRevision += 1
+		Timer := _LLM_ModelBrowser_VisibilityResume.Bind(Ticket, _LLM_ModelBrowser_VisibilityTimerRevision)
+		_LLM_ModelBrowser_VisibilityTimer := Timer
+	} finally Critical(PreviousCritical)
+	try SetTimer(Timer, -1)
+	catch as Failure {
+		PreviousCritical := Critical("On")
+		try {
+			if _LLM_ModelBrowser_VisibilityTimer == Timer
+				_LLM_ModelBrowser_VisibilityTimer := 0
+		} finally Critical(PreviousCritical)
+		throw Failure
+	}
+	return true
+}
+
+_LLM_ModelBrowser_VisibilityResume(Ticket, Revision) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_VisibilityTimer, _LLM_ModelBrowser_VisibilityTimerRevision
+	PreviousCritical := Critical("On")
+	try {
+		if Revision != _LLM_ModelBrowser_VisibilityTimerRevision
+			return
+		OldTimer := _LLM_ModelBrowser_VisibilityTimer
+		_LLM_ModelBrowser_VisibilityTimer := 0
+		if !IsSet(_LLM_ModelBrowser_Gui)
+			return
+		Window := _LLM_ModelBrowser_Gui
+		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+			return
+	} finally Critical(PreviousCritical)
+	try _LLM_ModelBrowser_VisibilityReconcile(Window)
+	catch as Failure
+		try LoggerError("LLM.browser", "Native visibility continuation failed: {1}", Failure.Message)
+}
+
+_LLM_ModelBrowser_VisibilityRetire(Ticket, Window) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LLM_ModelBrowser_Visibility, _LLM_ModelBrowser_VisibilityTimer
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_ModelBrowser_VisibilityCurrent(Ticket, Window)
+			return false
+		OldTicket := _LLM_ModelBrowser_Visibility, OldTimer := _LLM_ModelBrowser_VisibilityTimer
+		_LLM_ModelBrowser_Epoch += 1
+		_LLM_ModelBrowser_Visibility := 0, _LLM_ModelBrowser_VisibilityTimer := 0, _LLM_ModelBrowser_Gui := unset
+	} finally Critical(PreviousCritical)
+	if IsObject(OldTimer)
+		try SetTimer(OldTimer, 0)
 	return true
 }
 

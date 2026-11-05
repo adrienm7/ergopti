@@ -326,3 +326,7 @@ for _MBBK_VisibilityMode in ["native-hide-current", "native-hide-reopen"]
 for _MBBK_ConstructorMode in ["native-ctor-current", "native-ctor-malformed"]
 	Test("Native model constructor: " . _MBBK_ConstructorMode . " retires its exact window and callbacks (model-browser-native-constructor-failure)",
 		_MBPT_Case.Bind(_MBBK_ConstructorMode))
+
+for _MBBK_ReentryMode in ["native-show-current", "native-show-close", "native-hide-reopen-close"]
+	Test("Native model visibility ordering: " . _MBBK_ReentryMode . " uses real native requests (model-browser-native-visibility-order-owner)",
+		_MBPT_Case.Bind(_MBBK_ReentryMode))

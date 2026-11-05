@@ -384,6 +384,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-show-current" || _MBPO.Mode == "native-show-close" || _MBPO.Mode == "native-hide-reopen-close" {
+		_MBPO_VisibilityReentry()
+		return
+	}
 	if _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed" {
 		_MBPO_ConstructorFailure()
 		return
@@ -465,6 +469,7 @@ _MBPO_Main() {
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
 		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced"
 		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen"
+		|| _MBPO.Mode == "native-show-current" || _MBPO.Mode == "native-show-close" || _MBPO.Mode == "native-hide-reopen-close"
 		|| _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
@@ -971,4 +976,114 @@ _MBPO_ConstructorFailure() {
 	}
 	_MBPO_Require(!DllCall("IsWindow", "Ptr", State.Hwnd, "Int") && State.Disposed == 1,
 		"The exact privately observed native window and lifetime marker must settle before child exit")
+}
+
+
+; The window procedure delegates first and then issues a real public request.
+; Each explicit action fires once; no fake Show/Hide ACK or timer is involved.
+_MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
+	global _LLM_ModelBrowser_Gui
+	State.Active += 1
+	try {
+		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
+		if !State.Armed || Hwnd != State.Hwnd || Message != 0x18
+			return Result
+		_MBPO_Require(WinGetPID("ahk_id " . Hwnd) == ProcessExist(), "Only the exact owned native visibility callback may drive another action")
+		if State.Mode == "native-hide-reopen-close" && !WParam && !State.Reopened {
+			State.Reopened := true
+			State.ShowReturned := LLM_ModelBrowser_Show()
+			State.VisibleAfterFirstShow := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+			State.SameAfterReopen := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
+		} else if WParam {
+			State.ShowSeen := true, State.ShowCount += 1
+			State.CriticalAtShow := A_IsCritical
+			if (State.Mode == "native-show-close" && State.ShowCount == 1)
+					|| (State.Mode == "native-hide-reopen-close" && State.ShowCount == 2) {
+				State.CloseCalls += 1
+				_LLM_ModelBrowser_OnClose()
+				State.HiddenDuringClose := !DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+			}
+		}
+		return Result
+	} catch Any as Failure {
+		State.Failed := true, State.Failure := Failure
+		return 0
+	} finally State.Active -= 1
+}
+_MBPO_VisibilityReentry() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _VendorDir, _DriverDir, ConfigurationFile
+	HadVendor := IsSet(_VendorDir)
+	if HadVendor
+		OriginalVendor := _VendorDir
+	else
+		_VendorDir := _DriverDir . "\vendor"
+	PreviousCritical := Critical("Off")
+	State := {Window: 0, Hwnd: 0, Proc: 0, Installed: false, Armed: false, Active: 0,
+		Mode: _MBPO.Mode, Reopened: false, ShowSeen: false, ShowCount: 0, VisibleAfterFirstShow: false, CloseCalls: 0, HiddenDuringClose: false,
+		SameAfterReopen: false, CriticalAtShow: -1, Failed: false, Failure: 0, Debt: false}
+	try {
+		_MBPO_Require(!_LLM_MBW_WebView2Available(), "The native visibility subject must use the actual missing browser binding")
+		_MBPO.Window := _LLM_ModelBrowser_Build(), _MBPO.Hwnd := _MBPO.Window.Hwnd
+		_LLM_ModelBrowser_Gui := _MBPO.Window
+		State.Window := _MBPO.Window, State.Hwnd := _MBPO.Hwnd
+		if State.Mode == "native-hide-reopen-close"
+			State.Window.Show("NA")
+		_MBPO_Require(WinGetPID("ahk_id " . State.Hwnd) == ProcessExist()
+			&& !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int") == (State.Mode == "native-hide-reopen-close"),
+			"The real starting visibility must match the tested production action")
+		State.Proc := CallbackCreate(_MBPO_VisibilityProc.Bind(State), , 6)
+		_MBPO_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc,
+			"UPtr", 0x4D425653, "UPtr", 0, "Int"), "The exact native browser must admit its real visibility witness")
+		State.Installed := true, State.Armed := true
+		if State.Mode == "native-hide-reopen-close"
+			_LLM_ModelBrowser_OnClose()
+		else
+			State.ShowReturned := LLM_ModelBrowser_Show()
+		_MBPO_Observe()
+		State.Armed := false
+		VisibleAfter := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+		SameOwner := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
+		FileAppend("OBSERVATION native-model-visibility-reentry mode=" . State.Mode . " show_seen=" . State.ShowSeen
+			. " close_calls=" . State.CloseCalls . " hidden_during_close=" . State.HiddenDuringClose
+			. " reopened=" . State.Reopened . " show_count=" . State.ShowCount . " first_show_visible=" . State.VisibleAfterFirstShow . " same_owner=" . SameOwner . " visible_after=" . VisibleAfter
+			. " critical_at_show=" . State.CriticalAtShow . "`n", "*", "UTF-8-RAW")
+		if State.Failed
+			FileAppend("DIAGNOSTIC native-model-visibility-reentry callback_type=" . JsonStringLiteral(Type(State.Failure))
+				. " callback_message=" . JsonStringLiteral(State.Failure is Error ? State.Failure.Message : "non-Error callback value") . "`n", "*", "UTF-8-RAW")
+		_MBPO_Require(!State.Failed && State.ShowSeen && SameOwner,
+			"The native Show callback must execute on the actual unchanged GUI owner")
+		_MBPO_Require(_MBPO.Errors.Length == 0 && _MBPO.WriterEntries == 0
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+			"Visibility ordering must preserve configuration bytes without technical errors")
+		if State.Mode == "native-show-current"
+			_MBPO_Require(State.CloseCalls == 0 && State.ShowReturned == State.Window && VisibleAfter,
+				"An unopposed public native Show must still return and display its actual window")
+		else {
+			_MBPO_Require(State.CloseCalls == 1 && State.HiddenDuringClose && !VisibleAfter,
+				"A newer actual Close accepted inside Show must remain hidden during Close and after the older Show returns")
+			if State.Mode == "native-hide-reopen-close"
+				_MBPO_Require(State.Reopened && State.SameAfterReopen && State.ShowCount == 2 && State.VisibleAfterFirstShow,
+					"The third action must follow the successful visible public reopen and occur inside its actual repair Show")
+		}
+	} finally {
+		State.Armed := false
+		Removed := !State.Installed || !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+		if !Removed
+			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc, "UPtr", 0x4D425653, "Int")
+		Started := A_TickCount
+		while State.Active && TickElapsed(Started) < 1000
+			Sleep(1)
+		if Removed && !State.Active {
+			if State.Proc
+				CallbackFree(State.Proc)
+			State.Proc := 0
+		} else
+			State.Debt := true
+		if HadVendor
+			_VendorDir := OriginalVendor
+		else
+			_VendorDir := unset
+		Critical(PreviousCritical)
+	}
+	_MBPO_Require(!State.Debt, "The exact visibility subclass must retire before its callback code is freed")
 }
