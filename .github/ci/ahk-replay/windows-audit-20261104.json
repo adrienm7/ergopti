@@ -1,5 +1,5 @@
 {
-	"expected_count": 13,
+	"expected_count": 45,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
@@ -9,7 +9,55 @@
 		},
 		{
 			"contains": "personal-info-write-scalar",
-			"expected_count": 3
+			"expected_count": 5
+		},
+		{
+			"contains": "provider-multipart-091",
+			"expected_count": 10
+		},
+		{
+			"contains": "context-clock-ack-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "open-app-native-quoted-path",
+			"expected_count": 1
+		},
+		{
+			"contains": "toml-stage-collision",
+			"expected_count": 2
+		},
+		{
+			"contains": "paths-byte-admission",
+			"expected_count": 2
+		},
+		{
+			"contains": "keystats-native-unicode-packet",
+			"expected_count": 2
+		},
+		{
+			"contains": "TOML native decoded key admission: escaped-spelling-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "TOML native decoded key admission: non-nul-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "TOML native decoded key admission: known-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "jev-native-requester",
+			"expected_count": 2
+		},
+		{
+			"contains": "changelog-show-native-close",
+			"expected_count": 2
+		},
+		{
+			"contains": "gesture-title-native-transform-target",
+			"expected_count": 2
 		}
 	]
 }
