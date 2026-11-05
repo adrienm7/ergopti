@@ -50,6 +50,19 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	helpers.it("suppresses a manual test when the active entry is replaced", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
+		state.entries, state.active = { entry }, entry
+		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		helpers.assert_eq(#state.tests, 1)
+		state.active = { id = "chosen", provider = "cerebras", model = "other", token = "test" }
+		state.finish_test(true, "OK", 10)
+		local notices = #state.infos + #state.errors
+		restore()
+		helpers.assert_eq(notices, 0)
+	end)
+
 	for _, kind in ipairs({ "new chat", "new system", "manual" }) do
 		helpers.it("suppresses " .. kind .. " test results after page closure", function()
 			local build, state, restore = setup("api")
