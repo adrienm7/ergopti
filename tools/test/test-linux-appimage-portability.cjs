@@ -717,7 +717,7 @@ function zsyncFor(length, overrides = {}) {
 		Length: String(length),
 		'Hash-Lengths': '2,2,4',
 		URL: Update.APPIMAGE_ASSET,
-		'SHA-1': '0123456789abcdef0123456789abcdef01234567',
+		'SHA-1': require('node:crypto').createHash('sha1').update(image).digest('hex'),
 		...overrides
 	};
 	const text = Object.entries(fields)
@@ -771,6 +771,7 @@ for (const [what, badImage, badZsync, expected] of [
 	],
 	['a zsync of another size', image, zsyncFor(image.length + 1), /Length/],
 	['a zsync without a hash', image, zsyncFor(image.length, { 'SHA-1': null }), /SHA-1/],
+	['a zsync for different bytes', image, zsyncFor(image.length, { 'SHA-1': '0'.repeat(40) }), /SHA-1.*match/],
 	[
 		'a zsync with no blocks',
 		image,
