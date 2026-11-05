@@ -83,6 +83,11 @@ function M.new(deps)
 			return false, "update signature policy invalid: " .. text
 		end
 		local subject = { name = deps.asset_name, size = asset.size, sha256 = asset.sha256 }
+		-- The release signer writes one protocol LF after the Base64 signature.
+		-- Strip that delimiter only; extra content remains invalid to the verifier.
+		if type(signature_text) == "string" and signature_text:sub(-1) == "\n" then
+			signature_text = signature_text:sub(1, -2)
+		end
 		local verdict, why_not = deps.verifier.evaluate(policy, subject, signature_text)
 		if signature_text == nil and fetch_error ~= nil and why_not == "no_signature" then why_not = "fetch_failed" end
 		local text = M.REASON_TEXT[why_not] or tostring(why_not)

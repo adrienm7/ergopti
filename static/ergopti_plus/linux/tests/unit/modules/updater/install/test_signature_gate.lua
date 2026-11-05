@@ -71,6 +71,15 @@ helpers.describe("update signature gate (Linux)", function()
 		end
 	end)
 
+	helpers.it("(signature-gate) accepts the LF-terminated release signature file", function()
+		local gate, lines = build(policy("required"))
+		helpers.assert_true(gate.decide(ASSET, V.valid.signature_base64 .. "\n"),
+			"the release signer writes one terminal LF")
+		helpers.assert_eq(lines[1], "info: Update signature verified.")
+		local invalid = build(policy("required"))
+		helpers.assert_true(not invalid.decide(ASSET, V.valid.signature_base64 .. "\nextra"))
+	end)
+
 	helpers.it("(signature-gate) required refuses a bad signature in words", function()
 		local gate, lines = build(policy("required"))
 		local accepted, message = gate.decide(MOVED, V.valid.signature_base64, nil)
