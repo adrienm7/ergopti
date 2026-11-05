@@ -366,6 +366,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen" {
+		_MBPO_ShowHide()
+		return
+	}
 	if _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced" {
 		_MBPO_BackendAdmission()
 		return
@@ -437,7 +441,8 @@ _MBPO_Main() {
 		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0, InitialBackend: "", BackendPickReturns: 0}
 	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
-		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced",
+		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced"
+		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -746,4 +751,103 @@ _MBPO_BackendAdmission() {
 		}
 		Suspend(false)
 	}
+}
+
+
+; A genuine WM_SHOWWINDOW from the genuine Hide delegates its native window
+; procedure first, then issues the real public Show. This is explicit native
+; reentry, not a simulated timer gap before Hide or a fabricated Win32 failure.
+_MBPO_ShowHideProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch
+	State.Active += 1
+	try {
+		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
+		if State.Armed && !State.HideSeen && Hwnd == State.Hwnd && Message == 0x18 && !WParam {
+			State.HideSeen := true
+			State.EpochAtHide := _LLM_ModelBrowser_Epoch
+			State.CallbackCritical := A_IsCritical
+			if State.Reopen {
+				_MBPO_Require(WinGetPID("ahk_id " . Hwnd) == ProcessExist(), "The natural visibility callback may only reopen its exact owned process")
+				State.ShowReturned := LLM_ModelBrowser_Show()
+				State.SameOwner := State.ShowReturned == State.Window && _LLM_ModelBrowser_Gui == State.Window
+				State.VisibleDuring := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+			}
+		}
+		return Result
+	} catch Any as Failure {
+		State.Failed := true, State.Failure := Failure
+		return 0
+	} finally State.Active -= 1
+}
+_MBPO_ShowHide() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _VendorDir, _DriverDir, ConfigurationFile
+	HadVendor := IsSet(_VendorDir)
+	if HadVendor
+		OriginalVendor := _VendorDir
+	else
+		; This is the real uncompiled driver vendor location. The component
+		; contains no browser SDK; availability must take its genuine false branch.
+		_VendorDir := _DriverDir . "\vendor"
+	PreviousCritical := Critical("Off")
+	State := {Window: 0, Hwnd: 0, Proc: 0, Installed: false, Armed: false, Active: 0,
+		HideSeen: false, Reopen: _MBPO.Mode == "native-hide-reopen", EpochAtHide: -1, CallbackCritical: -1,
+		SameOwner: false, VisibleDuring: false, Failed: false, Failure: 0, Debt: false}
+	_MBPO.HideState := State
+	try {
+		_MBPO_Require(!_LLM_MBW_WebView2Available(), "The actual component must remain genuinely outside browser availability, not use a fallback policy stub")
+		_MBPO.Window := _LLM_ModelBrowser_Build(), _MBPO.Hwnd := _MBPO.Window.Hwnd
+		_LLM_ModelBrowser_Gui := _MBPO.Window
+		State.Window := _MBPO.Window, State.Hwnd := _MBPO.Hwnd
+		State.Window.Show("NA")
+		_MBPO_Require(DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+			&& WinGetPID("ahk_id " . State.Hwnd) == ProcessExist(), "The genuine native browser must own its visible HWND before Close")
+		State.Proc := CallbackCreate(_MBPO_ShowHideProc.Bind(State), , 6)
+		_MBPO_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc,
+			"UPtr", 0x4D425348, "UPtr", 0, "Int"), "The exact native browser must admit its visibility witness")
+		State.Installed := true, State.Armed := true
+		BeforeEpoch := _LLM_ModelBrowser_Epoch
+		_LLM_ModelBrowser_OnClose()
+		_MBPO_Observe()
+		State.Armed := false
+		VisibleAfter := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
+		FileAppend("OBSERVATION native-model-show-hide mode=" . _MBPO.Mode . " hide_seen=" . State.HideSeen
+			. " epoch_before=" . BeforeEpoch . " epoch_at_hide=" . State.EpochAtHide
+			. " same_owner=" . State.SameOwner . " visible_during_show=" . State.VisibleDuring
+			. " visible_after_close=" . VisibleAfter . " callback_critical=" . State.CallbackCritical . "`n", "*", "UTF-8-RAW")
+		if State.Failed
+			FileAppend("DIAGNOSTIC native-model-show-hide callback_type=" . JsonStringLiteral(Type(State.Failure))
+				. " callback_message=" . JsonStringLiteral(State.Failure is Error ? State.Failure.Message : "non-Error callback value") . "`n", "*", "UTF-8-RAW")
+		_MBPO_Require(!State.Failed && State.HideSeen && State.EpochAtHide == BeforeEpoch + 1,
+			"The real native visibility message must follow its original production Close claim")
+		_MBPO_Require(_MBPO.Errors.Length == 0 && _MBPO.WriterEntries == 0
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+			"A natural window visibility check must never need configuration writes or technical errors")
+		if State.Reopen
+			_MBPO_Require(State.SameOwner && State.VisibleDuring && VisibleAfter,
+				"A newer actual public Show accepted during native Hide must remain visible after the older Close returns")
+		else
+			_MBPO_Require(!VisibleAfter, "The current Close without a newer Show must still hide its actual browser")
+	} finally {
+		State.Armed := false
+		Removed := !State.Installed || !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+		if !Removed
+			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc, "UPtr", 0x4D425348, "Int")
+		Started := A_TickCount
+		while State.Active && TickElapsed(Started) < 1000
+			Sleep(1)
+		if Removed && !State.Active {
+			if State.Proc
+				CallbackFree(State.Proc)
+			State.Proc := 0
+		} else
+			State.Debt := true
+		if HasProp(State, "ShowReturned") && IsObject(State.ShowReturned) && State.ShowReturned != State.Window
+			try State.ShowReturned.Destroy()
+		if HadVendor
+			_VendorDir := OriginalVendor
+		else
+			_VendorDir := unset
+		Critical(PreviousCritical)
+	}
+	_MBPO_Require(!State.Debt, "The exact native subclass must retire before its callback memory is released")
 }

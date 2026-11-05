@@ -318,3 +318,7 @@ Test("Native model backend admission: pause/resume at the second schema entry ca
 
 Test("Native model backend admission: replacement at the real second writer entry cannot publish (model-browser-native-backend-writer-owner)",
 	_MBPT_Case.Bind("native-backend-second-writer-replaced"))
+
+for _MBBK_VisibilityMode in ["native-hide-current", "native-hide-reopen"]
+	Test("Native model visibility: " . _MBBK_VisibilityMode . " observes real Show during Hide (model-browser-native-show-hide-owner)",
+		_MBPT_Case.Bind(_MBBK_VisibilityMode))
