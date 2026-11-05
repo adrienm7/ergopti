@@ -1,167 +1,31 @@
 {
-	"expected_count": 110,
+	"expected_count": 19,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "context-nonempty-prepare-owner",
-			"expected_count": 8
-		},
-		{
-			"contains": "context-clock-ack-owner",
+			"contains": "provider-nul-accept",
 			"expected_count": 4
 		},
 		{
-			"contains": "context-clock-ack-third",
-			"expected_count": 2
+			"contains": "roi-stale-owner",
+			"expected_count": 3
 		},
 		{
-			"contains": "context-tail-retry-owner",
-			"expected_count": 4
+			"contains": "event-id-domain-owner",
+			"expected_count": 3
 		},
 		{
-			"contains": "final-context-duration-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "context-native64-origin-contract",
+			"contains": "sticky-kana-native-released",
 			"expected_count": 1
 		},
 		{
-			"contains": "switch-destination-privacy-owner",
-			"expected_count": 7
+			"contains": "sticky-kana-native)",
+			"expected_count": 2
 		},
 		{
-			"contains": "keystats-shutdown-close-chain",
-			"expected_count": 1
-		},
-		{
-			"contains": "focus-refresh-bounded-resident",
-			"expected_count": 9
-		},
-		{
-			"contains": "keystats-session-close-retry",
-			"expected_count": 5
-		},
-		{
-			"contains": "keystats-idle-resume-retry",
+			"contains": "storage-native-name-nul",
 			"expected_count": 6
-		},
-		{
-			"contains": "keystats: a paused context tick is not billed as foreground app time",
-			"expected_count": 1
-		},
-		{
-			"contains": "override-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstring-override-partial-publication",
-			"expected_count": 2
-		},
-		{
-			"contains": "override-last-authorizer-source",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstring-override-global-transaction-20260813:",
-			"expected_count": 10
-		},
-		{
-			"contains": "personal-info-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal info source projection:",
-			"expected_count": 7
-		},
-		{
-			"contains": "personal-info-source-witness",
-			"expected_count": 5
-		},
-		{
-			"contains": "personal-opening-source: real native save keeps independently replaced source",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-opening-source: same image keeps BOM, CRLF, and present empty classification",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-opening-source: own A then deferred B keeps exact publication lineage",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-opening-source: saved but reload refused retains own image for resync retry",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-opening-source: actual no-delete handle refuses rename without source advancement",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-editor-preservation: a changed durable image refuses after staging",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-editor-preservation: retained rows preserve foreign metadata and comments",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-editor-preservation: foreign children retain their array element",
-			"expected_count": 1
-		},
-		{
-			"contains": "toml-config-update-name-scalar",
-			"expected_count": 3
-		},
-		{
-			"contains": "override-post-ack-truthful-feedback",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstrings-cache-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstrings cache initial publication:",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstrings_cache: a truncated stage cannot become a fresh cache (AHK-167)",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstrings cache: .tsv write/read round-trip is lossless",
-			"expected_count": 1
-		},
-		{
-			"contains": "metrics-locale-honesty: the app-time watermark never overshoots the present",
-			"expected_count": 1
-		},
-		{
-			"contains": "metrics-locale-honesty: both compensations use the clamped advance",
-			"expected_count": 1
-		},
-		{
-			"contains": "context-compensation-atomic-owner",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-held-partial",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-toml-write-failure: both writers log their terminal write failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "meta personal-info-save:",
-			"expected_count": 3
 		}
 	]
 }
