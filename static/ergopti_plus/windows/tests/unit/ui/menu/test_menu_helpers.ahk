@@ -133,3 +133,16 @@ _MH_NativeSuffixCollision(Order) {
 for _MH_SuffixOrder in ["generated-first", "literal-first"]
 	Test("menu_helpers: " . _MH_SuffixOrder . " preserves literal personal section suffixes (personal-suffix-menu-owner)",
 		_MH_NativeSuffixCollision.Bind(_MH_SuffixOrder))
+
+; Observe actual Win32/AHK Menu.Add equality without presuming case semantics.
+_MH_NativeCaseReceipt() {
+	MenuOwner := Menu()
+	try {
+		First := RegisterMenuItem(MenuOwner, "LPUL Case", (*) => 1)
+		Second := RegisterMenuItem(MenuOwner, "lpul case", (*) => 2)
+		Count := DllCall("GetMenuItemCount", "ptr", MenuOwner.Handle, "int")
+		_TestPrint("# menu-native-case first=" . First . " second=" . Second . " native_count=" . Count)
+		AssertTrue(Count == 1 || Count == 2, "The isolated actual Menu must settle to an observable count")
+	} finally _CTC_ReleaseMenu(MenuOwner)
+}
+Test("menu_helpers: native case comparison is observed on an owned menu (menu-native-case-receipt)", _MH_NativeCaseReceipt)
