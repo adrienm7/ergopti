@@ -1,87 +1,63 @@
 {
-	"expected_count": 64,
+	"expected_count": 54,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "takenote-pause-lifecycle-owner",
+			"contains": "model-browser-close-pause-owner",
 			"expected_count": 6
-		},
-		{
-			"contains": "takenote-native64-deadline",
-			"expected_count": 3
-		},
-		{
-			"contains": "takenote-async-job",
-			"expected_count": 3
-		},
-		{
-			"contains": "takenote-hotpath-nonblocking",
-			"expected_count": 2
-		},
-		{
-			"contains": "takenote-timeout-cause",
-			"expected_count": 1
-		},
-		{
-			"contains": "takenote-suspend-effect-time",
-			"expected_count": 1
-		},
-		{
-			"contains": "TakeNote: shared job observes existence and focus before explicit maximize",
-			"expected_count": 1
-		},
-		{
-			"contains": "TakeNote: shared job reports a bounded focus/launch timeout",
-			"expected_count": 1
-		},
-		{
-			"contains": "shortcuts: TakeNote defers and targets maximize safely",
-			"expected_count": 1
-		},
-		{
-			"contains": "prefix-scalar-framing",
-			"expected_count": 16
-		},
-		{
-			"contains": "LLM live mode: expansion observers require an unchanged verified typing target",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-debounce-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-password-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-private-retyped-context",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-native-admission-order",
-			"expected_count": 2
-		},
-		{
-			"contains": "profile-suffix-menu-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "personal-suffix-menu-owner",
-			"expected_count": 4
 		},
 		{
 			"contains": "model-browser-native-backend",
 			"expected_count": 2
 		},
 		{
-			"contains": "model-browser-close-pause-owner",
-			"expected_count": 6
+			"contains": "one-shot-native-spent-controls",
+			"expected_count": 5
 		},
 		{
-			"contains": "tap-hold-native-inheritance",
+			"contains": "one-shot-native-control-flags",
+			"expected_count": 4
+		},
+		{
+			"contains": "one-shot-native-tab-flags",
 			"expected_count": 2
+		},
+		{
+			"contains": "one-shot-native-kana-flags",
+			"expected_count": 2
+		},
+		{
+			"contains": "suppressive-capture-settlement",
+			"expected_count": 14
+		},
+		{
+			"contains": "sticky-custom-endpoint-receipt",
+			"expected_count": 5
+		},
+		{
+			"contains": "sticky-kana-native",
+			"expected_count": 5
+		},
+		{
+			"contains": "sticky-kana-capture-options",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot-native-kana-balancing",
+			"expected_count": 4
+		},
+		{
+			"contains": "one-shot-native-failed-down",
+			"expected_count": 1
+		},
+		{
+			"contains": "takenote-native-document-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "managed-bootstrap-lifetime",
+			"expected_count": 1
 		}
 	]
 }
