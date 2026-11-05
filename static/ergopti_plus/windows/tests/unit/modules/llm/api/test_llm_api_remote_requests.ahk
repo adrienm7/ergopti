@@ -793,3 +793,99 @@ _NUFT_Run() {
     _ManagedRemoteFixtureWithLlmTimings(_NUFT_PriceScale)
 }
 Test("Remote usage cost: tiny finite price keeps positive USD across scaling (usage-finite-cost)", _NUFT_Run)
+
+_MCC_Poll(Resolved, Body) {
+    global _LLM_Remote_Async
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Control := _ManagedCurlControlState(), Heard := [], Id := 0, Entry := 0, Primary := 0, Result := 0
+    Port := Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+        "create_http", _NUI_Create.Bind(Control))
+    try {
+        Id := LLM_RemotePostBody_Async(Resolved, "https://mistral-content-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+            (Text, Usage := "") => Heard.Push(Map("ok", true, "text", Text, "usage", Usage)),
+            (Info := "") => Heard.Push(Map("ok", false, "info", Info)), 20000, "mistral_content_control", 0, 0, Port)
+        AssertTrue(_LLM_Remote_Async.Has(Id))
+        Entry := _LLM_Remote_Async[Id], Http := Control["request"]
+        AssertTrue(Entry["http"] == Http)
+        _ManagedCurlControlAck(Control)
+        Http._PollManagedAdmission()
+        AssertTrue(Http.ManagedPayloadPublished)
+        AssertTrue(FSWrite(Http.BodyPath, Body))
+        AssertTrue(FSWrite(Http.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+        HandoffCritical := Critical("On")
+        try {
+            Control["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+            _LLMRemote_PollRequest(Id)
+        } finally Critical(HandoffCritical)
+        AssertTrue(Http.Completed && Http.ResponseEncodingValid)
+        AssertEqual(200, Http.Status)
+        AssertFalse(_LLM_Remote_Async.Has(Id))
+        AssertFalse(IsObject(Http.Handle))
+        AssertEqual(1, Heard.Length)
+        Result := Map("verdict", Heard[1], "callbacks", Heard.Length,
+            "reservation_present", _LLM_Remote_Async.Has(Id), "http_handle_retired", !IsObject(Http.Handle))
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            if Entry is Map && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Entry {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            if Control.Has("request") {
+                AssertTrue(Control["request"].Abort())
+                AssertFalse(IsObject(Control["request"].Handle))
+                _ManagedCurlControlRelease(Control)
+            }
+        } catch Any as Failure {
+            _TestPrint("# MISTRAL_CONTENT_CLEANUP " . KL_JsonEncode(Map("error", Type(Failure), "message", SubStr(Failure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+    return Result
+}
+
+_MCC_Row(Mode) {
+    switch Mode {
+        case "string": Content := '"owned-mistral-answer"', Expected := "owned-mistral-answer"
+        case "text-chunk": Content := '[{"type":"text","text":"owned-mistral-answer"}]', Expected := "owned-mistral-answer"
+        case "thinking-plus-text":
+            Content := '[{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
+        case "thinking-only":
+            Content := '[{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]}]'
+            Expected := ""
+        default: throw ValueError("Unknown Mistral content case.")
+    }
+    Body := '{"id":"fixture-mistral","object":"chat.completion","created":1,"model":"mistral-small-latest",'
+        . '"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":' . Content . '}}],'
+        . '"usage":{"prompt_tokens":2,"completion_tokens":3,"total_tokens":5}}'
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", "mistral", "Model", "mistral-small-latest",
+        "Token", "owned-fixture-secret", "BaseUrl", "https://mistral-content-fixture.invalid/v1"))
+    AssertTrue(Resolved is Map && Resolved["Format"] == "openai", "the shipped Mistral producer uses the genuine OpenAI-format consumer")
+    Classified := _LLMRemoteClassifyResponse(Resolved["Format"], Body, Resolved["Model"])
+    Poll := _MCC_Poll(Resolved, Body)
+    Verdict := Poll["verdict"]
+    _TestPrint("# MISTRAL_CONTENT_CHUNKS " . KL_JsonEncode(Map("mode", Mode, "format", Resolved["Format"],
+        "classifier_ok", Classified["ok"], "classifier_text", Classified["text"], "classifier_reason", Classified["reason"],
+        "poll_ok", Verdict["ok"], "poll_text", Verdict.Get("text", ""), "poll_reason", Verdict.Get("info", Map()).Get("reason", ""),
+        "callbacks", Poll["callbacks"], "reservation_present", Poll["reservation_present"], "http_handle_retired", Poll["http_handle_retired"])))
+    AssertEqual(Expected != "", Classified["ok"], "the official Mistral assistant-content union must retain ordinary text and exclude reasoning")
+    AssertEqual(Expected, Classified["text"])
+    AssertEqual(Expected != "", Verdict["ok"], "the actual public RawPost/Poll consumer must deliver the declared response union")
+    if Expected != ""
+        AssertEqual(Expected, Verdict["text"], "structured thinking never replaces the text answer")
+    else
+        AssertEqual("canonical_empty", Verdict["info"]["reason"], "reasoning-only content is terminally empty")
+    AssertEqual(1, Poll["callbacks"])
+    AssertFalse(Poll["reservation_present"])
+    AssertTrue(Poll["http_handle_retired"])
+}
+_MCC_Run(Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_MCC_Row.Bind(Mode))
+}
+for _MCC_Mode in ["string", "text-chunk", "thinking-plus-text", "thinking-only"]
+    Test("Mistral response: " . _MCC_Mode . " reaches the actual response consumer (mistral-content-chunks)", _MCC_Run.Bind(_MCC_Mode))
