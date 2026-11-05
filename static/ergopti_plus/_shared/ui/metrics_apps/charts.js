@@ -307,7 +307,9 @@ function renderDayTimeline(aggData) {
 	for (let h = 0; h < 24; h++) {
 		const hh = String(h).padStart(2, '0');
 		const slots = byHour[hh] || [];
-		const totalMs = Math.min(
+		// Estimates can assign more than one hour to a single slot. Scale all
+		// contributions together while keeping their original values in tooltips.
+		const scaleMs = Math.max(
 			slots.reduce((s, x) => s + x.ms, 0),
 			60 * 60 * 1000
 		);
@@ -319,7 +321,7 @@ function renderDayTimeline(aggData) {
 		slots.sort((a, b) => b.ms - a.ms);
 		let cursor = 0;
 		slots.forEach((s) => {
-			const w = (s.ms / (60 * 60 * 1000)) * HOUR_W;
+			const w = (s.ms / scaleMs) * HOUR_W;
 			const col = getAppColor(s.app, 0);
 			const tip = `${s.app} · ${formatDuration(s.ms)} (${hh}h)`;
 			svg += `<rect x="${LABEL_LEFT + cursor}" y="${y}" width="${w}" height="${ROW_H}" rx="2" fill="${col}" fill-opacity="0.9"><title>${escapeHtml(tip)}</title></rect>`;

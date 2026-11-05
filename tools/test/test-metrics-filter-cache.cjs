@@ -4381,4 +4381,48 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} day timeline contains estimated hours within its grid`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('day_timeline_container', page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-02': { Editor: { app_time_ms: 10800000, hourly: { 12: { c: 1 } } } }
+		});
+		vm.runInContext("currentPeriod = 'day'; currentSelectedDate = '2026-10-02';", page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		const html = page.elements.get('day_timeline_container').innerHTML;
+		const bar = html.match(
+			/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="18"[^>]*><title>Editor/
+		);
+		assert.ok(bar, 'the actual SVG includes the application contribution');
+		assert.ok(
+			Number(bar[1]) + Number(bar[2]) <= 38 + 720,
+			'the bar stays inside the one-hour track'
+		);
+		assert.match(html, /Editor · 3h/);
+		publishLoadedAppsData(
+			page,
+			host,
+			{
+				'2026-10-02': {
+					Editor: { app_time_ms: 3600000, hourly: { 12: { c: 1 } } },
+					Other: { app_time_ms: 1800000, hourly: { 12: { c: 1 } } }
+				}
+			},
+			{},
+			2
+		);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		const two = page.elements.get('day_timeline_container').innerHTML;
+		const bars = [
+			...two.matchAll(
+				/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="18"[^>]*><title>(?:Editor|Other)/g
+			)
+		];
+		assert.equal(bars.length, 2);
+		assert.ok(bars.every((m) => Number(m[1]) + Number(m[2]) <= 38 + 720));
+		assert.equal(Number(bars[0][2]) / Number(bars[1][2]), 2);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);
