@@ -545,7 +545,23 @@ function M.set_action(slot_id, action_id)
 	-- Explicit None is a personal native-behavior claim. Scope removal alone
 	-- restores absence; it must never be confused with selecting this action.
 	local operation = require("shortcuts.assignment").operation(slot_id, action_id, owns_slot, Gestures.is_assignable)
-	local committed, detail = Writer.batch_write(path, { operation })
+	local assignments, explicit, generation = _assignments, _explicit_assignments, _dispatch_generation
+	local bytes, status = Writer.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function() return M.configuration_candidate(Codec.decode(bytes or "")) end)
+	if not ok or type(expected) ~= "table" or type(expected.assignments) ~= "table"
+		or type(expected.explicit_assignments) ~= "table" or _assignments ~= assignments
+		or _explicit_assignments ~= explicit or _dispatch_generation ~= generation or _configuration_owner ~= nil then return false end
+	local function same(left, right)
+		for key, value in pairs(left) do if right[key] ~= value then return false end end
+		for key, value in pairs(right) do if left[key] ~= value then return false end end
+		return true
+	end
+	if not same(assignments, expected.assignments) or not same(explicit, expected.explicit_assignments) then
+		Logger.warn(LOG, "Keyboard shortcut configuration changed externally; reload shortcuts before editing.")
+		return false
+	end
+	local committed, detail = Writer.batch_write(path, { operation }, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist '%s': %s.", slot_id, tostring(detail))
 		return false

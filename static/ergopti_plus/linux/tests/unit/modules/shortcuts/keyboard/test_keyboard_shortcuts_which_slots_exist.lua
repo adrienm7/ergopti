@@ -107,6 +107,37 @@ end)
 -- =================================================================
 
 helpers.describe("keyboard shortcuts: what is stored", function()
+	helpers.it("keyboard-config-owner: refuses an edit when a sibling binding changes externally", function()
+		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
+		local ok, err = pcall(function()
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+			local external = '[shortcuts.keyboard]\nprimary_j = "enter"\n'
+			Sandbox.write_bytes(config.path, external)
+			helpers.assert_eq(shortcuts.set_action("primary_k", "select_line"), false)
+			helpers.assert_eq(Sandbox.read_bytes(config.path), external)
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+		end)
+		drop_config()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("keyboard-config-owner: refuses a sibling change racing the file write", function()
+		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
+		local Writer = require("toml_codec.writer")
+		local original = Writer.batch_write
+		local external = '[shortcuts.keyboard]\nprimary_j = "enter"\n'
+		local ok, err = pcall(function()
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+			Writer.batch_write = function(...) Sandbox.write_bytes(config.path, external); return original(...) end
+			helpers.assert_eq(shortcuts.set_action("primary_k", "select_line"), false)
+			helpers.assert_eq(Sandbox.read_bytes(config.path), external)
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+		end)
+		Writer.batch_write = original
+		drop_config()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("keyboard-config-owner: ignores legacy storage and clears persisted overrides on restart", function()
 		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local ok, err = pcall(function()
@@ -126,6 +157,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 			helpers.assert_eq(shortcuts.get_action("ctrl_not_a_key"), "none")
 			helpers.assert_eq(shortcuts.set_action("ctrl_not_a_key", "enter"), false)
 			Sandbox.write_bytes(config.path, Sandbox.read_bytes(config.path) .. "primary_j = \"select_line\"\n[other]\nvalue = 42\n")
+			shortcuts._reset() -- the file is the source before this fixture checks sparse editing
 			local decoded = Codec.decode(Sandbox.read_bytes(config.path))
 			local marked = {}
 			shortcuts.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
