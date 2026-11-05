@@ -112,6 +112,33 @@ h.describe("owned dialog host exit statuses (owned-dialog-host)", function()
 		h.assert_true(err.text:find("unknown option --bogus", 1, true) ~= nil, err.text)
 	end)
 
+	h.it("(owned-dialog-output) refuses acceptance when stdout cannot flush", function()
+		local full = io.open("/dev/full", "wb")
+		if not full then return end
+		local gtk = setmetatable({
+			gtk_dialog_run = function() return -5 end,
+			gtk_entry_get_text = function() return "selected answer" end,
+		}, { __index = function() return function() return {} end end })
+		local lib = { gtk = gtk, ffi = { string = function(value) return value end }, glib = {} }
+		local ok, status = pcall(Host.main, { "--entry", "--ok-label=OK", "--cancel-label=Cancel" }, full, sink(), function() return lib end)
+		pcall(full.close, full)
+		h.assert_true(ok, tostring(status))
+		h.assert_true(status ~= Host.EXIT_ACCEPTED and status ~= Host.EXIT_CANCELLED,
+			"a lost answer is neither acceptance nor user cancellation")
+	end)
+
+	h.it("(owned-dialog-output) refuses a rejected write without logging the answer", function()
+		local out, err = { write = function() return nil, "refused" end, flush = function() return true end }, sink()
+		local gtk = setmetatable({
+			gtk_dialog_run = function() return -5 end,
+			gtk_entry_get_text = function() return "sensitive-answer-canary" end,
+		}, { __index = function() return function() return {} end end })
+		local lib = { gtk = gtk, ffi = { string = function(value) return value end }, glib = {} }
+		local status = Host.main({ "--entry", "--ok-label=OK", "--cancel-label=Cancel" }, out, err, function() return lib end)
+		h.assert_eq(status, Host.EXIT_IO_ERROR)
+		h.assert_nil(err.text:find("sensitive-answer-canary", 1, true))
+	end)
+
 	h.it("(owned-dialog-host) no GTK 3 or no display exits 69, never the cancel status", function()
 		local out, err = sink(), sink()
 		local status = Host.main({ "--question", "--text=Q" }, out, err, function() return nil, "GTK 3 is not installed" end)
