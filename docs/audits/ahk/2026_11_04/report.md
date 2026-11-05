@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **119 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **120 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1831,3 +1831,7 @@ Five new distinct families are confirmed:115 decoded physical-key membership,116
 Native replay42004194057 at5f7909360bf96c03f96b62b1b40719010b19b761 executes63 selected cases:58 pass and5 fail, with the same names and counts reversed. Production compile passes; both E2E manifests are unselected. It qualifies the selected escaped-key boot ownership, UI-language/Norwegian mapping, Kana tap, scalar admission, existing-directory prefix, onboarding and authenticated proxy boot corrections. Personal-output probes already pass through central scalar admission; no speculative writer patch is applied.
 
 The two actual proxy full-save failures extend072, and the simulated timezone second-boundary failure extends113. A separate excluded-source debounce request is observed with both negative/positive controls; its ownership chain is under review before allocating a distinct finding. The shutdown-chain failure is again a missing real dependency in the generated child, not a demonstrated product failure. Source96db265f corrects nonempty A-to-B preparation ownership; source04970810 implements SQL thinking-pause reconstruction; e2e33a1d observes a single native timezone bias. Their targeted native qualification remains pending.
+
+AHK-120 is independently confirmed by replay42004194057: after24 actual injected characters arm the real timer in excluded A, a focus-only switch to allowed B produces one genuine private HTTP POST with A context. The excluded-stays0POST and allowed-stays1POST controls pass; inverse repeats. Current focus alone cannot admit a retained excluded-source payload. Correction and native postfix qualification remain pending.
+
+Replay42006372296 at7cba520271a2568c094c7b475688ea40207c66ac executes no business cases: discovery stops on reserved variable Local in the new independent timezone test. Production compilation passes; neither E2E is selected. The fixture variable is renamed LocalTime before retry; the unexecuted134-case cohort receives no qualification.

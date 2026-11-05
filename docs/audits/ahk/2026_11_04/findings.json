@@ -1313,6 +1313,17 @@
 			"root_cause": "The SQL daily rollup counts only t.pause_before_ms with a literal2000 cutoff, whereas the canonical walker counts eligible manual event delays at every position using the shared think-pause threshold. The walker no longer publishes those SQL-owned counters.",
 			"silent_failure": "Accepted canonical event data loses interior thinking-time metrics on reconstruction. This proves reconstruction semantics, not a default Windows InputHook batching or hardware interleaving.",
 			"regression_test": "Extend the existing numeric typing projection and its cache/checkpoint invalidation, count actual eligible manual events, retain encrypted authoritative rows and memory-only clear payloads, and preserve resident reuse without full historical decrypt. Two shared-corpus cases retain fail-before/control; implementation and further numeric/projection regression tests are in progress. Source04970810 integrates nullable numeric projection, finite/nonnegative accumulation, shared threshold identity, encrypted-row handling and cache21/checkpoint7 invalidation. Nine new numeric/migration/encrypted/checkpoint probes accompany the original2 corpus cases; native postfix qualification remains pending."
+		},
+		{
+			"id": "AHK-120",
+			"title": "A debounce focus change sends text captured in an excluded application",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Native run42004194057 at5f790936 captures24 real injected characters in an owned excluded A Edit through the actual InputHook/fallback bridge, arms the real debounce, and activates authenticated allowed B with no additional input. The managed private HTTP peer receives one POST containing A context. Excluded-stays sends0; allowed-stays sends1 with B context. Same inverse result.",
+			"root_cause": "LLM_Engine_FirePrediction retains the captured source but the disabled-app admission checks only the current focused application when the delayed timer fires. Allowed B therefore lends its admission to excluded A payload.",
+			"silent_failure": "A user exclusion can be bypassed by a focus change while a prediction is pending. The probe uses private canaries and a local owned HTTP peer, not user secrets or external services; no physical keyboard or complete DLL dispatcher claim is made.",
+			"regression_test": "Three native source-provenance cases retain the actual timer, native source/focus identities, managed HTTP publication and exact peer/request retirement. Source admission must check captured application identity as well as current policy and preserve that source gate through asynchronous publication. Correction is in progress; native postfix qualification is pending."
 		}
 	]
 }
