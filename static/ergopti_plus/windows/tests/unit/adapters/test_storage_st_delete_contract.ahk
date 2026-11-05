@@ -92,7 +92,7 @@ _STEA_ActualClear(Mode) {
 	SavedBase := STORAGE_REG_BASE
 	Subkey := "Software\Ergopti_StorageAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Path := "HKCU\" . Subkey
-	Owned := false, Handle := 0, Probe := 0, Denied := 0, ChangedAcl := false, Original := 0
+	Owned := false, Handle := 0, Probe := 0, Denied := 0, ChangedAcl := false, Original := 0, LongName := ""
 	try {
 		Disposition := 0
 		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
@@ -105,6 +105,29 @@ _STEA_ActualClear(Mode) {
 		if Mode != "empty-control" {
 			AssertTrue(ST_Set("owned_marker", "keep"))
 			AssertEqual("keep", ST_Get("owned_marker", "missing"))
+		}
+		if Mode == "long-name-control" {
+			LongName := "long_"
+			loop 600
+				LongName .= "x"
+			AssertTrue(ST_Set(LongName, "long-value"))
+			Found := 0
+			for Name in ST_Keys()
+				if Name == LongName
+					Found += 1
+			AssertEqual(1, Found, "a name larger than the initial native buffer must retain its exact identity")
+		}
+		if Mode == "absent-control" {
+			AssertEqual(0, DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt"))
+			Handle := 0
+			AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647, "Str", Subkey, "UInt"))
+			Owned := false
+			AbsentHandle := 0
+			AbsentStatus := DllCall("Advapi32\RegOpenKeyExW", "Ptr", -2147483647,
+				"Str", Subkey, "UInt", 0, "UInt", 1, "Ptr*", &AbsentHandle, "UInt")
+			if AbsentHandle
+				DllCall("Advapi32\RegCloseKey", "Ptr", AbsentHandle, "UInt")
+			AssertEqual(2, AbsentStatus, "the native positive control must be genuinely absent, not inaccessible")
 		}
 		if Mode == "denied" {
 			Needed := 0
@@ -138,12 +161,15 @@ _STEA_ActualClear(Mode) {
 				"Ptr", Name, "UInt*", &NameLength, "Ptr", 0, "UInt*", &ValueType,
 				"Ptr", 0, "UInt*", &DataLength, "UInt")
 			AssertEqual(5, EnumStatus, "the real native value enumeration must report ERROR_ACCESS_DENIED, never ERROR_NO_MORE_ITEMS")
+			AssertEqual(0, ST_Keys().Length, "public keys keeps its legacy empty-on-error behavior")
 		}
 		Result := ST_Clear()
 		_TestPrint("# storage-native-enum mode=" . Mode . " clear_result=" . Result . " acl_denied=" . ChangedAcl)
 		AssertEqual(Mode != "denied", Result, "the actual default Storage clear cannot acknowledge an inaccessible store as empty")
 		if Mode != "denied"
 			AssertFalse(ST_Has("owned_marker"), "a successful real clear must actually remove its marker")
+		if LongName != ""
+			AssertFalse(ST_Has(LongName), "the complete native inventory must also delete the full long name")
 	} finally {
 		try {
 			if ChangedAcl {
@@ -170,5 +196,5 @@ _STEA_ActualClear(Mode) {
 		}
 	}
 }
-for _STEA_Mode in ["denied", "accessible-control", "empty-control"]
+for _STEA_Mode in ["denied", "accessible-control", "empty-control", "absent-control", "long-name-control"]
 	Test("storage native enumeration receipt: " . _STEA_Mode, _STEA_ActualClear.Bind(_STEA_Mode))

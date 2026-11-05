@@ -305,6 +305,69 @@ Reg_EnumValues(keyPath) {
 }
 
 
+
+; Enumerates Storage's value-name inventory with an explicit native completion
+; receipt. The legacy Reg_EnumValues API intentionally collapses errors to[].
+; A missing key is a successfully empty store; all other failures refuse.
+Reg_TryEnumValueNames(keyPath, &Names) {
+	Names := []
+	if !(keyPath is String) || RegExMatch(keyPath, "\x00")
+		return false
+	Slash := InStr(keyPath, "\")
+	RootName := StrUpper(Slash ? SubStr(keyPath, 1, Slash - 1) : keyPath)
+	SubKey := Slash ? SubStr(keyPath, Slash + 1) : ""
+	Roots := Map("HKCU", -2147483647, "HKEY_CURRENT_USER", -2147483647,
+		"HKLM", -2147483646, "HKEY_LOCAL_MACHINE", -2147483646,
+		"HKCR", -2147483648, "HKEY_CLASSES_ROOT", -2147483648,
+		"HKU", -2147483645, "HKEY_USERS", -2147483645,
+		"HKCC", -2147483643, "HKEY_CURRENT_CONFIG", -2147483643)
+	if !Roots.Has(RootName)
+		return false
+	Handle := 0
+	try Status := DllCall("Advapi32\RegOpenKeyExW", "Ptr", Roots[RootName], "Str", SubKey,
+		"UInt", 0, "UInt", 1, "Ptr*", &Handle, "UInt") ; KEY_QUERY_VALUE
+	catch
+		return false
+	if Status != 0
+		return Status == 2 || Status == 3
+	Collected := [], Complete := false, Closed := false
+	try {
+		Index := 0, Capacity := 256
+		Name := Buffer(Capacity * 2, 0)
+		loop {
+			Characters := Capacity
+			; Name/type-only enumeration needs no data buffer or data-size output.
+			Status := DllCall("Advapi32\RegEnumValueW", "Ptr", Handle, "UInt", Index,
+				"Ptr", Name, "UInt*", &Characters, "Ptr", 0, "Ptr", 0,
+				"Ptr", 0, "Ptr", 0, "UInt")
+			if Status == 259 { ; ERROR_NO_MORE_ITEMS is the only completion receipt.
+				Complete := true
+				break
+			}
+			if Status == 234 { ; ERROR_MORE_DATA: grow the UTF-16 value-name buffer.
+				; Windows' value-name domain is16383 UTF-16 units plus terminator.
+				if Capacity >= 16384
+					break
+				Capacity := Min(16384, Max(Capacity * 2, Characters + 1))
+				Name := Buffer(Capacity * 2, 0)
+				continue
+			}
+			if Status != 0 || Characters >= Capacity
+				break
+			Collected.Push(Characters ? StrGet(Name, Characters, "UTF-16") : "")
+			Index += 1
+		}
+	} catch {
+		Complete := false
+	} finally {
+		try Closed := DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt") == 0
+	}
+	if !Complete || !Closed
+		return false
+	Names := Collected
+	return true
+}
+
 ; Enumerates all sub-key names directly under a registry key.
 ; Returns an Array of strings (key names, not full paths).
 ; Returns an empty Array when the key does not exist.
