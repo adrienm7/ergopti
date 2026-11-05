@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **140 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **141 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2065,3 +2065,17 @@ Replay42100331558 at61f5dc57 passes44/46 cases individually and reversed. PiEd9,
 The five Backspace controls pass and establish the native deletion contract needed by135; they are not five new defects. Pure RAM revocation preserves the physical omitted unit, and consecutive high units require multiple independently observed corrections. The proposed V2 source remains withdrawn; a compact numeric omission history is being prepared without attributing document identity to a cache generation.
 
 The two new failures extend109. Prompt's real initial retirement accepts B and completes its native Close, but the returning older open still creates C (three windows/controllers, gui1). Paths permits fallback after a pre-effect Destroy refusal while its old native host remains alive. Source25005eb5 captures admission before retirement and keeps model fallback consumed after newer intent; sourcef33e694f retains exact bare native cleanup debt and requires observed retirement before fallback. Original failure oracles are unchanged. Four analogous PiEd/model admission controls and three Paths post-effect/retry/reentry controls await postfix execution.
+
+### Native qualification: returning opens and bare native retirement
+
+Replay42102652996 atb28bcd66 passes57/58 cases individually and reversed, with production parsing green and all E2E flags unselected. It qualifies the original Prompt retry2, four analogous PiEd/model cases and all three Paths bare-window controls. After actual B Close, reentry retains windows2/gui0/pending0; no returning request creates C or a native model fallback. Paths recognizes actual destruction even when its observer throws afterward, and retries retained live A without overwriting a newer B Close.
+
+### AHK-141: IPv6 upstream proxy socket family
+
+The only replay58 failure establishes a separate upstream-address defect. An explicitly IPv6-only private listener and AFIPv6 oracle work; the genuine IPv4 route returns200 with two authenticated requests, but the admitted genuine IPv6 route returns502 and never reaches its proxy (only the oracle connection/auth/frame/request1 remains). Setup is qualified, native callbacks retire, both peers join and neither reports a protocol failure. Windows Framework TcpClient() selects IPv4 before BeginConnect receives the normalized IPv6 relay host. The register reaches141 distinct findings.
+
+The correction is still under preparation. Tests will distinguish the Framework default constructor from the native route, preserve IPv4/DNS behavior and acquire every localhost address/port endpoint used by a dual-family compatibility control. No external DNS rewriting, TLS or zone-identifier qualification is inferred.
+
+### Unicode135 correction awaiting native verification
+
+Commit0297471b integrates V4 framing, compact numeric omission history and single-use delay carry, with exact Backspace counters and canonical AHK/shared Lua replay. Invalidating assembly does not erase the numeric history or time of an accepted omitted unit. Source lifecycle/context/privacy boundaries remain separate from ordinary flush/detach. The actual root shared Lua walker passes11 corpus cases, both driver consumers parse, and local source gates pass. The124-case targeted Windows cohort and90 selected native hotstring cases are running; no postfix success or complete macOS/Linux runtime suite is claimed.
