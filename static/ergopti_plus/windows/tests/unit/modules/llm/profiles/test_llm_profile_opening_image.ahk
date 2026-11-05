@@ -185,6 +185,8 @@ _PFI_Run(Mode) {
 		; bless the old live profile array as the source of those newer bytes.
 		if Mode == "edit-preopen-external"
 			_PFI_External(State)
+		if Mode == "edit-preopen-nav"
+			_PFI_ExternalNavigation(State)
 		if Mode == "edit-preopen-unrepresentable"
 			_PFI_ExternalUnknownProfileField(State)
 		MenuBefore := _LLM_Menu
@@ -224,7 +226,7 @@ _PFI_Run(Mode) {
 			Result := LLM_Menu_OnUserProfileClick(Profiles[1], Port)
 		Accepted := Mode == "edit-current" || Mode == "create-current" || Mode == "delete-current"
 			|| Mode == "web-current" || Mode == "use-current"
-			|| (Mode == "edit-preopen-external" && World.ApplyCalls == 1)
+			|| ((Mode == "edit-preopen-external" || Mode == "edit-preopen-nav") && World.ApplyCalls == 1)
 			|| Mode == "edit-native-paste" || Mode == "edit-native-single"
 		Cancelled := InStr(Mode, "cancel") > 0
 		if Mode == "edit-preopen-external" {
@@ -236,6 +238,14 @@ _PFI_Run(Mode) {
 				. " physical_sibling_preserved=" . Preserved
 				. " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
 			AssertTrue(Preserved, "Opening the editor after replacement cannot bless stale RAM and erase the newer independent profile")
+		}
+		if Mode == "edit-preopen-nav" {
+			Observed := TOML_ParseDocument(FSReadUtf8Exact(World.ConfigPath))
+			NavPreserved := _LLM_Menu_ModifiersArrayToString(State.ExternalNav)
+				== _LLM_Menu_ModifiersArrayToString(Observed["llm"]["navigation"]["nav_modifiers"])
+			_TestPrint("# profile-preopen-navigation apply_calls=" . World.ApplyCalls . " input_calls=" . State.Inputs
+				. " physical_nav_preserved=" . NavPreserved . " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
+			AssertTrue(NavPreserved, "Editing a profile cannot erase an independent navigation preference written before opening")
 		}
 		AssertEqual(Accepted, World.ApplyCalls, "Only an owned accepted image may publish the real profile action.")
 		HandledChooser := InStr(Mode, "chooser-edit") || InStr(Mode, "use")
@@ -260,7 +270,7 @@ _PFI_Run(Mode) {
 			AssertEqual("user_profile_b", Sibling["id"])
 			AssertEqual(Mode == "edit-preopen-external" ? "external-b-must-survive" : "original-b",
 				Sibling["system_single"], "Successful edits preserve the independent sibling profile.")
-			if Mode == "edit-current" || Mode == "web-current" || Mode == "edit-preopen-external" {
+			if Mode == "edit-current" || Mode == "web-current" || Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
 				AssertEqual("edited-a", Saved[1]["system_single"])
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
@@ -284,7 +294,7 @@ _PFI_Run(Mode) {
 			AssertEqual(0, State.Inputs, "The public editor must refuse before authorizing native inputs from a lossy profile projection")
 			AssertEqual(0, State.Collects, "No complete profile-array effect may be built from an unrepresentable source")
 			AssertTrue(State.Notices.Length > 0, "The actual public failure must visibly explain the refused source")
-		} else if Mode == "edit-preopen-external" {
+		} else if Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
 			AssertTrue(State.Inputs <= 2, "A refused stale opening may stop before the native inputs")
 			if Accepted
 				AssertEqual(2, State.Inputs, "A source-reconciled successful edit must still consume both actual inputs")
@@ -296,7 +306,7 @@ _PFI_Run(Mode) {
 			AssertEqual(1, State.Confirms)
 			AssertEqual(2, State.Inputs, "The chooser must carry its original image into the subsequent editor.")
 		}
-		if Mode == "edit-preopen-external" {
+		if Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
 			AssertTrue(State.Collects <= 1, "A refused stale image must never retry its full projection automatically")
 			if Accepted
 				AssertEqual(1, State.Collects, "A successful reconciled edit must serialize its actual candidate")
@@ -384,3 +394,23 @@ _PFI_ExternalUnknownProfileField(State) {
 
 Test("LLM profile opening source: unknown JSON profile members refuse without projection loss (llm-profile-source-representation)",
 	_PFI_Run.Bind("edit-preopen-unrepresentable"))
+
+; Preserve a different scalar projection written before the profile source is
+; captured. The actual profile collector also serializes this navigation row.
+_PFI_ExternalNavigation(State) {
+	global _LLM_Menu
+	State.ExternalNav := _LLM_Menu_ModifiersStringToArray(StrLower(_LLM_Menu[ConfigLeaf.NAV_MODIFIERS]) == "alt" ? "ctrl" : "alt")
+	Built := TOML_BuildConfigUpdatedContent(State.World.ConfigPath,
+		[{Section: "llm.navigation", Key: "nav_modifiers", Value: State.ExternalNav}])
+	AssertTrue(Built is Map && Built.Get("status", "") == "ok")
+	State.ExternalImage := Built["content"]
+	AssertTrue(StrCompare(State.ExternalImage, State.InitialImage, true) != 0,
+		"The external native write must change the actual navigation leaf")
+	AssertTrue(FSWriteDurable(State.World.ConfigPath, State.ExternalImage))
+	AssertTrue(ConfigFullStateCanPersist(), "The real READY schema admits the independent external navigation choice")
+	Observed := TOML_ParseDocument(FSReadUtf8Exact(State.World.ConfigPath))
+	AssertTrue(ManifestValuesEqual(State.ExternalNav, Observed["llm"]["navigation"]["nav_modifiers"]))
+}
+
+Test("LLM profile opening source: prior external navigation edit survives (llm-profile-preopen-navigation)",
+	_PFI_Run.Bind("edit-preopen-nav"))

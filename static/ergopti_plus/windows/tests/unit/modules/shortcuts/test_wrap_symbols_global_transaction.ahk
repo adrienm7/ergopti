@@ -923,3 +923,121 @@ for _WSC_Mode in ["literal", "multiline-basic", "multiline-literal", "one-line-m
 	"multiline-basic-semicolon-data", "multiline-literal-semicolon-data", "legacy-comment-control",
 	"legacy-inline-comment-control", "legacy-disabled-map", "symmetric-custom", "bad-disabled-type", "bad-custom-type"]
 	Test("wrap symbols canonical owned source: " . _WSC_Mode, _WSC_RecognizedSource.Bind(_WSC_Mode))
+
+_WSSA_WithOwnedSource(Body) {
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed, _WS_StateEpoch
+	global _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS
+	Saved := {path: _WS_Config_Path, disabled: _WS_Disabled, custom: _WS_Custom,
+		failed: _WS_LoadFailed, epoch: _WS_StateEpoch, active: _WS_ACTIVE_PAIRS,
+		builtins: _WS_BUILTIN_PAIRS, groups: _WS_BUILTIN_GROUPS}
+	Root := A_Temp . "\ergopti_wrap_source_admission_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\wrap_symbols.toml", Created := false
+	try {
+		AssertFalse(A_IsSuspended)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "a wrap fixture must affirmatively acquire its directory")
+		Source := '[[disabled]]`nchar = "["`n[[custom]]`nleft = "a"`nright = "b"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		AssertTrue(WrapSymbols_Init(Root . "\"))
+		Body.Call(Root, Path, Source)
+	} finally {
+		_WS_Config_Path := Saved.path, _WS_Disabled := Saved.disabled, _WS_Custom := Saved.custom
+		_WS_LoadFailed := Saved.failed, _WS_StateEpoch := Saved.epoch, _WS_ACTIVE_PAIRS := Saved.active
+		_WS_BUILTIN_PAIRS := Saved.builtins, _WS_BUILTIN_GROUPS := Saved.groups
+		if Created
+			DirDelete(Root, true)
+	}
+}
+_WSSA_ExternalSource(Mode, Root, Path, SourceA) {
+	global _WS_Disabled, _WS_Custom, _WS_ACTIVE_PAIRS, _WS_StateEpoch
+	SourceB := SourceA . '[[disabled]]`nchar = "("`n[[custom]]`nleft = "e"`nright = "f"`n'
+	AssertTrue(FSWriteDurable(Path, SourceB))
+	IndependentB := _WSIC_Document(FSReadUtf8Exact(Path))
+	AssertTrue(_WSIC_HasPair(IndependentB["custom"], "e", "f"))
+	AssertTrue(_WSIC_DiskDisabled(IndependentB, "("))
+	Reloaded := InStr(Mode, "reload-") == 1
+	if Reloaded
+		AssertTrue(WrapSymbols_Init(Root . "\"))
+	Before := {custom: _WS_Custom, disabled: _WS_Disabled, active: _WS_ACTIVE_PAIRS, epoch: _WS_StateEpoch}
+	IsAdd := InStr(Mode, "add") > 0
+	Result := IsAdd ? WrapSymbols_AddCustom("c", "d") : WrapSymbols_Toggle("(")
+	if !Reloaded {
+		AssertFalse(Result, "a full-state writer must refuse a source no longer represented by its loaded RAM")
+		AssertEqual(SourceB, FSReadUtf8Exact(Path), "an unrelated mutation cannot erase an external custom pair or disabled choice")
+		AssertTrue(_WS_Custom == Before.custom && _WS_Disabled == Before.disabled && _WS_ACTIVE_PAIRS == Before.active)
+		AssertEqual(Before.epoch, _WS_StateEpoch)
+	} else {
+		AssertTrue(Result, "reloading the actual B owner must admit a subsequent ordinary public mutation")
+		Disk := _WSIC_Document(FSReadUtf8Exact(Path))
+		AssertTrue(_WSIC_HasPair(Disk["custom"], "a", "b"))
+		AssertTrue(_WSIC_HasPair(Disk["custom"], "e", "f"))
+		if IsAdd
+			AssertTrue(_WSIC_HasPair(Disk["custom"], "c", "d"))
+		else
+			AssertFalse(_WSIC_DiskDisabled(Disk, "("))
+		AssertTrue(WrapSymbols_Init(Root . "\"))
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "e", "f"))
+		if IsAdd
+			AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		else
+			AssertTrue(WrapSymbols_IsEnabled("("))
+	}
+}
+for _WSSA_Mode in ["stale-add", "stale-toggle", "reload-add-control", "reload-toggle-control"]
+	Test("wrap source ownership: " . _WSSA_Mode, _WSSA_WithOwnedSource.Bind(_WSSA_ExternalSource.Bind(_WSSA_Mode)))
+
+_WSSA_NativeForward(State, This, Args*) {
+	AssertEqual(9, Args.Length, "the actual public mutation must reach the existing private save ABI")
+	Args.Push(_WSSA_NativeCutpoint.Bind(State))
+	return Func.Prototype.Call.Call(This, Args*)
+}
+_WSSA_NativeCutpoint(State) {
+	global _WS_Custom, _WS_Disabled, _WS_ACTIVE_PAIRS, _WS_StateEpoch
+	State.Fired += 1
+	AssertEqual(1, State.Fired)
+	AssertFalse(A_IsCritical, "the native boundary must remain outside the preceding memory-only Critical span")
+	Stages := []
+	Loop Files, State.path . ".*.tmp"
+		Stages.Push(A_LoopFileFullPath)
+	AssertEqual(1, Stages.Length, "a genuine complete private stage must exist before revocation")
+	Stage := _WSIC_Document(FSReadUtf8Exact(Stages[1]))
+	AssertTrue(_WSIC_HasPair(Stage["custom"], "c", "d"))
+	if State.mode == "suspend"
+		Suspend(true)
+	else if State.mode == "reinitialize"
+		AssertTrue(WrapSymbols_Init(State.root . "\"), "a genuine successor init retires the old publication epoch")
+	State.retained := {custom: _WS_Custom, disabled: _WS_Disabled, active: _WS_ACTIVE_PAIRS, epoch: _WS_StateEpoch}
+}
+_WSSA_FinalNative(Mode, Root, Path, Source) {
+	global _WS_Custom, _WS_Disabled, _WS_ACTIVE_PAIRS, _WS_StateEpoch
+	State := {mode: Mode, root: Root, path: Path, Fired: 0, retained: 0}
+	Owner := _WS_Save
+	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
+	WasSuspended := A_IsSuspended
+	try {
+		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _WSSA_NativeForward.Bind(State)})
+		Result := WrapSymbols_AddCustom("c", "d")
+		AssertEqual(1, State.Fired, "the actual public mutation must reach the private final native observation")
+		if Mode == "live-control" {
+			AssertTrue(Result)
+			AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+			AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		} else {
+			AssertEqual(Source, FSReadUtf8Exact(Path), "a retired publication cannot alter its native durable source")
+			AssertFalse(Result)
+			AssertTrue(_WS_Custom == State.retained.custom && _WS_Disabled == State.retained.disabled && _WS_ACTIVE_PAIRS == State.retained.active,
+				"the actual retained or successor RAM projection must remain attached")
+			AssertEqual(State.retained.epoch, _WS_StateEpoch)
+		}
+	} finally {
+		if HadCall
+			Object.Prototype.DefineProp.Call(Owner, "Call", SavedCall)
+		else if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			Object.Prototype.DeleteProp.Call(Owner, "Call")
+		Suspend(WasSuspended)
+	}
+}
+for _WSSA_NativeMode in ["suspend", "reinitialize", "live-control"]
+	Test("wrap final native admission: " . _WSSA_NativeMode, _WSSA_WithOwnedSource.Bind(_WSSA_FinalNative.Bind(_WSSA_NativeMode)))
