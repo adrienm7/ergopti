@@ -193,7 +193,8 @@ local function copy_file_selection(admitted)
 		return false
 	end
 	Logger.success(LOG, "Copied the path of %d selected item(s) from the file manager.", #paths)
-	local message = (tostring(deps.message("shortcuts.copy_path_notif")):gsub("%%s", function() return text end))
+	-- The notifier can fall back to logging its message; keep file paths out.
+	local message = (tostring(deps.message("shortcuts.copy_path_notif")):gsub("%%s", "…"))
 	if deps.notify_success(message) ~= true then
 		Logger.warn(LOG, "The copied-path notice was not shown.")
 	end

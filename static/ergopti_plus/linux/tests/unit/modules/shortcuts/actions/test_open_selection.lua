@@ -90,6 +90,40 @@ helpers.describe("opening selected content notifier privacy", function()
 	end
 end)
 
+helpers.describe("copied path notifier privacy", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("keeps copied file paths out of the real notifier fallback when " .. mode, function()
+			local names = { "logger.shim", "modules.shortcuts.open_selection", "adapters.notifier", "adapters.shell_runner" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs, written = {}, nil
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["modules.shortcuts.open_selection"] = nil
+			local ok, err = xpcall(function()
+				local subject = require("modules.shortcuts.open_selection")
+				subject._set_deps_for_test({ focused_context = function() return "nautilus", "window:one" end,
+					read_uri_list = function() return true, "file:///tmp/secretmarker\n" end,
+					write_clipboard = function(text) written = text; return true end,
+					message = function() return "Copied %s" end })
+				helpers.assert_true(subject.copy_selected_path(function() return "" end))
+				helpers.assert_eq(written, "/tmp/secretmarker")
+				local output = table.concat(logs, "\n")
+				helpers.assert_true(not output:find("secretmarker", 1, true), "notifier fallback must not expose the path")
+				helpers.assert_true(output:find("Copied", 1, true) ~= nil)
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 --- Runs body with the session PRIMARY reader answering `selection`.
 local function with_selection(selection, body)
 	local previous = package.loaded["adapters.clipboard"]
@@ -369,7 +403,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		Subject._set_deps_for_test(nil)
 		helpers.assert_true(done)
 		helpers.assert_eq(world.written, { "/home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
-		helpers.assert_eq(world.successes, { "Path copied: /home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
+		helpers.assert_eq(world.successes, { "Path copied: …" }, "the notice must not leak paths through fallback logs")
 		helpers.assert_eq(world.opened, {}, "a file manager's selection is copied, never opened or searched")
 		helpers.assert_eq(world.primary_reads, 0)
 	end)
