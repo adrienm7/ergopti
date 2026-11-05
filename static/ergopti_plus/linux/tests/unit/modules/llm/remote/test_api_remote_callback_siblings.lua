@@ -174,16 +174,17 @@ helpers.describe("api_remote_callback_siblings: protected public wrappers", func
 			helpers.assert_eq(listed, { state = "listed", ids = { "gemini-2.0-flash" } })
 		end)
 	end)
-	helpers.it("rejects a null Gemini model list but accepts an empty array", function()
+	helpers.it("rejects non-array Gemini model lists but accepts an empty array", function()
 		isolated(function(remote, calls)
 			local results = {}
 			local entry = { provider = "gemini", model = "fixture-model", token = "fixture-key", base_url = "" }
-			for index, body in ipairs({ '{"models":null}', '{"models":[]}' }) do
+			for index, body in ipairs({ '{"models":null}', '{"models":{}}', '{"models":[]}' }) do
 				helpers.assert_true(remote.list_models(entry, function(state) results[index] = state end))
 				calls[index].callback({ ok = true, status = 200, body = body })
 			end
 			helpers.assert_eq(results[1], { state = "failed", reason = "unreadable" })
-			helpers.assert_eq(results[2], { state = "listed", ids = {} })
+			helpers.assert_eq(results[2], { state = "failed", reason = "unreadable" })
+			helpers.assert_eq(results[3], { state = "listed", ids = {} })
 		end)
 	end)
 	helpers.it("withholds listing callback failures containing private output", function()
