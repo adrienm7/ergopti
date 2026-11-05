@@ -279,8 +279,52 @@ jobs:
 
       - run: npm ci
 
+      # The browsers' 114 MB of Ubuntu archives outlasted a 20-minute install on
+      # the slow Azure mirror three runs in a row (2026-11-05). Like the Linux
+      # rows, this job keeps the archives it fetched, completed ones included
+      # when the install stops, and reuses a file only when it matches the
+      # signed index (tools/ci/ubuntu_apt.py).
+      - name: Create the Ubuntu archive cache directory
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /var/cache/ergopti-ubuntu-apt-debs
+
+      - name: Restore the Ubuntu archive cache
+        id: ubuntu-apt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/ergopti-ubuntu-apt-debs/used
+          key: ubuntu-apt-debs-shared-ui-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: ubuntu-apt-debs-shared-ui-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Prepare the Ubuntu archive cache
+        run: |
+          set -euo pipefail
+          cache=/var/cache/ergopti-ubuntu-apt-debs
+          mkdir -p "$cache/used"
+          mv "$cache/used" "$cache/restored"
+          mkdir "$cache/used"
+          echo "restored archives: $(find "$cache/restored" -maxdepth 1 -name '*.deb' | wc -l)"
+
       - name: Install shared UI browsers
         run: node tools/ci/install-playwright.cjs chromium webkit
+
+      # Saved even when the install failed, so the next run resumes the download
+      - name: Name the used Ubuntu archive set
+        id: ubuntu-apt-used
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          used=/var/cache/ergopti-ubuntu-apt-debs/used
+          count="$(find "$used" -maxdepth 1 -name '*.deb' | wc -l)"
+          digest="$(find "$used" -maxdepth 1 -name '*.deb' -printf '%f %s\n' | sort | sha256sum | cut -c1-16)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "key=ubuntu-apt-debs-shared-ui-${{ runner.os }}-${{ runner.arch }}-$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Save the Ubuntu archive cache
+        if: ${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}
+        uses: actions/cache/save@v4
+        with:
+          path: /var/cache/ergopti-ubuntu-apt-debs/used
+          key: ${{ steps.ubuntu-apt-used.outputs.key }}
 
       - name: Test shared layer editor rendering
         run: npm run test:browser:layer-editor

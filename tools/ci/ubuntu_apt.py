@@ -463,10 +463,18 @@ def import_cached_archives(plan, digests, restored, archives):
     print("Ubuntu archive cache: %d of %d planned archives reused" % (admitted, len(plan)))
 
 
-def export_used_archives(plan, archives, used):
-    """Keep exactly the archives this call installed for the next run's cache."""
+def export_used_archives(plan, archives, used, *, downloaded_only=False):
+    """Keep the archives this call installed for the next run's cache.
+
+    With downloaded_only, an install stopped mid-download keeps the archives it
+    completed (partial ones stay in archives/partial): on 2026-11-05 a slow
+    mirror stopped the same install three runs in a row, each from zero. The
+    next run's import admits a kept file only when it matches the signed index.
+    """
     for name, _size in plan:
         source, target = archives / name, used / name
+        if downloaded_only and not source.is_file():
+            continue
         if not target.exists():
             target.write_bytes(source.read_bytes())
 
@@ -540,7 +548,14 @@ def acquire(
             archives = directory / "cache" / "archives"
             (archives / "partial").mkdir(mode=0o755, parents=True)
             import_cached_archives(plan, digests, restored, archives)
-        execute(prefix + ["install", *arguments], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS)
+        try:
+            execute(
+                prefix + ["install", *arguments], check=True, timeout=APT_COMMAND_TIMEOUT_SECONDS
+            )
+        except BaseException:
+            if deb_cache is not None:
+                export_used_archives(plan, archives, used, downloaded_only=True)
+            raise
         if deb_cache is not None:
             export_used_archives(plan, archives, used)
     except BaseException as error:
