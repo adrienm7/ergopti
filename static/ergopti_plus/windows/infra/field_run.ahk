@@ -261,9 +261,12 @@ FieldRun_Json(Value) {
 	throw TypeError("A field run document holds a value JSON cannot carry.")
 }
 
-; The current UTC time, as the macOS field run writes it.
-_FieldRun_IsoNow() {
-	return FormatTime(A_NowUTC, "yyyy-MM-dd") . "T" . FormatTime(A_NowUTC, "HH:mm:ss") . "Z"
+; One UTC snapshot, as the macOS field run writes it. An optional captured
+; instant lets boundary tests format a deterministic value without changing the OS clock.
+_FieldRun_IsoNow(NowUtc := unset) {
+	if !IsSet(NowUtc)
+		NowUtc := A_NowUTC
+	return FormatTime(NowUtc, "yyyy-MM-dd") . "T" . FormatTime(NowUtc, "HH:mm:ss") . "Z"
 }
 
 
