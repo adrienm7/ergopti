@@ -19,9 +19,9 @@ _SFS_Require(Condition, Message) {
 	if !Condition
 		throw Error(Message)
 }
-_SFS_Target(Window, Edit) {
+_SFS_Target(Window, Receiver) {
 	_SFS_Require(DllCall("GetForegroundWindow", "Ptr") == Window.Hwnd
-		&& DllCall("GetFocus", "Ptr") == Edit.Hwnd
+		&& DllCall("GetFocus", "Ptr") == Receiver.Hwnd
 		&& WinGetPID("ahk_id " . Window.Hwnd) == DllCall("GetCurrentProcessId", "UInt"),
 		"The same child-owned Edit must retain native foreground and focus.")
 }
@@ -30,18 +30,18 @@ _SFS_Main(Mode) {
 	Window := 0, HookStopped := false
 	try {
 		Window := Gui(, "Ergopti owned native secure-field style probe")
-		Edit := Window.AddEdit("w320", "non_sensitive_probe")
+		Receiver := Window.AddEdit("w320", "non_sensitive_probe")
 		Window.Show("w360 h100")
 		WinActivate("ahk_id " . Window.Hwnd)
 		_SFS_Require(WinWaitActive("ahk_id " . Window.Hwnd, , 2), "The private receiver must become active.")
-		Edit.Focus()
+		Receiver.Focus()
 		_SFS_Require(SFD_EnsureFocusTracking(), "The actual native WinEvent focus hook must be acquired.")
 		Sleep(100)
-		_SFS_Target(Window, Edit)
-		NativeBefore := SFD_DetectNative(Edit.Hwnd, &ConclusiveBefore)
+		_SFS_Target(Window, Receiver)
+		NativeBefore := SFD_DetectNative(Receiver.Hwnd, &ConclusiveBefore)
 		_SFS_Require(ConclusiveBefore && !NativeBefore, "The initial Edit must be conclusively normal.")
-		_SFS_Require(!SFD_IsSecureField(Edit.Hwnd), "The actual adapter must establish the initial normal verdict.")
-		OriginalHwnd := Edit.Hwnd
+		_SFS_Require(!SFD_IsSecureField(Receiver.Hwnd), "The actual adapter must establish the initial normal verdict.")
+		OriginalHwnd := Receiver.Hwnd
 		OriginalGeneration := SFD_FIELD_CACHE["focus_generation"]
 		OriginalElement := SFD_FIELD_CACHE["current_element_id"]
 		OriginalAt := SFD_FIELD_CACHE["at"]
@@ -52,26 +52,26 @@ _SFS_Main(Mode) {
 			"The negative cache receipt must belong to the real acquired focus hook and exact Edit.")
 		Password := Mode != "normal-current"
 		if Password
-			Edit.Opt("+Password")
+			Receiver.Opt("+Password")
 		; Let ordinary native focus notifications run before the second read. A
 		; focus/identity change is a setup refusal, never evidence of a cache bug.
 		Sleep(50)
-		_SFS_Target(Window, Edit)
-		NativeNow := SFD_DetectNative(Edit.Hwnd, &ConclusiveNow)
-		_SFS_Require(Edit.Hwnd == OriginalHwnd && ConclusiveNow
-			&& NativeNow == Password && !!(WinGetStyle("ahk_id " . Edit.Hwnd) & 0x20) == Password,
+		_SFS_Target(Window, Receiver)
+		NativeNow := SFD_DetectNative(Receiver.Hwnd, &ConclusiveNow)
+		_SFS_Require(Receiver.Hwnd == OriginalHwnd && ConclusiveNow
+			&& NativeNow == Password && !!(WinGetStyle("ahk_id " . Receiver.Hwnd) & 0x20) == Password,
 			"The same HWND must have the requested real ES_PASSWORD state.")
 		if Mode == "password-expired" {
 			while TickElapsed64(OriginalAt) < SFD_FIELD_CACHE_TTL_MS + 25
 				Sleep(10)
 		}
-		_SFS_Target(Window, Edit)
+		_SFS_Target(Window, Receiver)
 		Age := TickElapsed64(OriginalAt)
 		GenerationSame := SFD_FIELD_CACHE["focus_generation"] == OriginalGeneration
 		ElementSame := SFD_FIELD_CACHE["current_element_id"] == OriginalElement
 		AtSame := SFD_FIELD_CACHE["at"] == OriginalAt
 		ExpectedExpired := Mode == "password-expired"
-		FileAppend("# SFD_STYLE_NATIVE phase=receipt mode=" . Mode . " same_hwnd=" . (Edit.Hwnd == OriginalHwnd)
+		FileAppend("# SFD_STYLE_NATIVE phase=receipt mode=" . Mode . " same_hwnd=" . (Receiver.Hwnd == OriginalHwnd)
 			. " native_conclusive=" . ConclusiveNow . " native_password=" . NativeNow
 			. " focus_same=" . GenerationSame . " element_same=" . ElementSame . " cache_at_same=" . AtSame
 			. " cache_age_ms=" . Age . " ttl_ms=" . SFD_FIELD_CACHE_TTL_MS
@@ -80,7 +80,7 @@ _SFS_Main(Mode) {
 			"The mutation must preserve the original native focus and cache receipt.")
 		_SFS_Require(ExpectedExpired ? Age >= SFD_FIELD_CACHE_TTL_MS : Age < SFD_FIELD_CACHE_TTL_MS,
 			"The observation must belong to its real current/expired TTL domain.")
-		Actual := SFD_IsSecureField(Edit.Hwnd)
+		Actual := SFD_IsSecureField(Receiver.Hwnd)
 		FileAppend("# SFD_STYLE_NATIVE phase=business mode=" . Mode
 			. " actual_secure=" . Actual . " expected_secure=" . Password
 			. " diagnostic_errors=" . _SFS_DiagnosticErrors . "`n", "*")
