@@ -12,6 +12,23 @@ _KCNP_Position() {
 	_KCNP.Samples += 1
 	return {x: (_KCNP.Samples - 1) * 3, y: (_KCNP.Samples - 1) * 4}
 }
+; Test-only observation around the real window-switch producer; no result is
+; substituted and no clock or owner is changed by this observer.
+_KCNP_ObserveWindow(Values*) {
+	global _KCNP
+	if !IsSet(_KCNP) || _KCNP.Mode != "abc-deferred-sameapp-shift" || Values.Length < 3
+		return
+	if Values[2] == "Public prepare A" && Values[3] == _KCNP.B.Title
+		_KCNP.BOrigin := KLHook.app_entered_at
+	else if Values[2] == _KCNP.B.Title && Values[3] == _KCNP.C.Title {
+		Frame := KLHook.context_transition
+		_KSD_Require(IsObject(Frame) && Frame.NewTitle == _KCNP.C.Title && !Frame.App.Required,
+			"The genuine promoted B-to-C frame must retain the shared app clock")
+		_KCNP.SameAppPromotionSeen += 1
+		_KCNP.PromotedAppOrigin := KLHook.app_entered_at
+		_KCNP.PromotionObservedAt := A_TickCount
+	}
+}
 _KCNP_Timer() {
 	global _KCNP
 	try {
@@ -43,15 +60,21 @@ _KCNP_Timer() {
 			_KSD_Require(!_KCNP.CRefreshReturned && Keystats._flush_in_progress
 				&& IsObject(KLHook.context_transition),
 				"The prior B frame must still be deferred when C input arrives")
-			if _KCNP.Mode == "abc-deferred-shift" {
+			if _KCNP.Mode == "abc-deferred-shift" || _KCNP.Mode == "abc-deferred-sameapp-shift" {
 				_KSD_Require(KLHook.context_observation_head <= KLHook.context_observations.Length,
 					"The real deferred C refresh must own an observation before compensation")
 				Last := KLHook.context_observations[-1]
+				if _KCNP.Mode == "abc-deferred-sameapp-shift"
+					Sleep(25) ; produce a nonzero observed interval, without changing the OS clock
 				Now := A_TickCount
 				KL_Hook_AdvanceContextWatermarks(100000, Now)
 				KL_Hook_AdvanceContextWatermarks(100000, Now)
 				_KSD_Require(Last.Shift == TickElapsed64(Last.EndTick, Now),
 					"Repeated overlapping gap compensation must not move C into the future")
+				if _KCNP.Mode == "abc-deferred-sameapp-shift" {
+					_KSD_Require(Last.Shift > 0, "The shared-app promotion must exercise a nonzero bounded shift")
+					_KCNP.ObservedShift := Last.Shift
+				}
 			}
 			_KCNP.SessionAtCInput := Keystats.session_app
 			BeforeC := Keystats.mouse_distance
@@ -103,6 +126,8 @@ _KCNP_Main() {
 	A := {App: "fixture-prepare-a.exe", Title: "Public prepare A", Hwnd: 1801}
 	_KCNP.B := {App: "fixture-prepare-b.exe", Title: "Public prepare B", Hwnd: 1802}
 	_KCNP.C := {App: "fixture-prepare-c.exe", Title: "Public prepare C", Hwnd: 1803}
+	if _KCNP.Mode == "abc-deferred-sameapp-shift"
+		_KCNP.C.App := _KCNP.B.App
 	if InStr(_KCNP.Mode, "abc-deferred")
 		_KCNP.ExpectedSamples := 4
 	KLAppCat.file_path := _KSD.Log . ".categories"
@@ -153,7 +178,12 @@ _KCNP_Main() {
 			SeedSeen := Entry["app"] == A.App && Entry["mouse_distance_px"] == 5
 		if Entry["app"] == A.App
 			AUnits += Entry["mouse_distance_px"]
-		else if Entry["app"] == _KCNP.B.App
+		else if _KCNP.Mode == "abc-deferred-sameapp-shift" {
+			if Entry["app"] == _KCNP.B.App && Entry["title"] == _KCNP.B.Title
+				BUnits += Entry["mouse_distance_px"]
+			else if Entry["app"] == _KCNP.C.App && Entry["title"] == _KCNP.C.Title
+				CUnits += Entry["mouse_distance_px"]
+		} else if Entry["app"] == _KCNP.B.App
 			BUnits += Entry["mouse_distance_px"]
 		else if Entry["app"] == _KCNP.C.App
 			CUnits += Entry["mouse_distance_px"]
@@ -164,6 +194,15 @@ _KCNP_Main() {
 		. " c_refresh_returned=" . _KCNP.CRefreshReturned . " a_units=" . AUnits . " b_units=" . BUnits . " c_units=" . CUnits
 		. " typing_rows=" . Rows . " samples=" . _KCNP.Samples . " seed_id=" . _KCNP.SeedId . " seed_seen=" . SeedSeen . " errors=" . _KSD.Errors . "`n", "*")
 	_KSD_Require(_KSD.Errors == 0 && !IsObject(_KSD.Failure), "No dependency failure may impersonate a context transition refusal")
+	if _KCNP.Mode == "abc-deferred-sameapp-shift" {
+		FileAppend("OBSERVATION sameapp-shift b_origin=" . _KCNP.BOrigin . " shift=" . _KCNP.ObservedShift
+			. " promoted_origin=" . _KCNP.PromotedAppOrigin . " observed_at=" . _KCNP.PromotionObservedAt
+			. " promotions=" . _KCNP.SameAppPromotionSeen . "`n", "*")
+		_KSD_Require(_KCNP.SameAppPromotionSeen == 1 && _KCNP.BOrigin > 0 && _KCNP.ObservedShift > 0
+			&& _KCNP.PromotedAppOrigin == _KCNP.BOrigin + _KCNP.ObservedShift
+			&& _KCNP.PromotedAppOrigin <= _KCNP.PromotionObservedAt,
+			"The unchanged app clock must receive the bounded shift exactly once at C promotion")
+	}
 	if _KCNP.Mode == "existing-retry-stop"
 		_KSD_Require(SeedSeen, "The original retry identity and payload must survive staging and Stop without adoption")
 	if InStr(_KCNP.Mode, "abc-deferred")
@@ -174,12 +213,13 @@ _KCNP_Main() {
 			"A new public B input admitted during nonempty preparation must never be flushed under the older A context after Stop or retry")
 }
 if A_Args.Length != 2 || !(A_Args[1] == "ordinary-control" || A_Args[1] == "stop-during-prepare"
-	|| A_Args[1] == "existing-retry-stop" || A_Args[1] == "external-active" || A_Args[1] == "abc-deferred" || A_Args[1] == "abc-deferred-stop" || A_Args[1] == "abc-deferred-shift")
+	|| A_Args[1] == "existing-retry-stop" || A_Args[1] == "external-active" || A_Args[1] == "abc-deferred" || A_Args[1] == "abc-deferred-stop" || A_Args[1] == "abc-deferred-shift" || A_Args[1] == "abc-deferred-sameapp-shift")
 	throw Error("The private nonempty context probe requires its exact mode and owned source directory")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 global _KCNP := {Mode: A_Args[1], B: 0, Armed: false, Samples: 0, Cutpoints: 0, TimerDone: false,
 	FirstStop: false, FinalStop: false, RefreshReturned: false, SessionAtInput: "", Failure: 0,
 	C: 0, CRefreshReturned: false, SessionAtCInput: "",
+	BOrigin: 0, ObservedShift: 0, PromotedAppOrigin: 0, PromotionObservedAt: 0, SameAppPromotionSeen: 0,
 	ExpectedSamples: 3, ExpectedAUnits: 5, ExpectedRows: 2, SeedId: 0, SeedAttemptTick: 0}
 try {
 	_KCNP_Main()
