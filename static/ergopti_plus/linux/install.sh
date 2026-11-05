@@ -124,6 +124,9 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--prefix)
 			[ "$#" -ge 2 ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
+			# A following option is not a prefix. A relative path beginning in
+			# '-' remains available as ./-name (or as an absolute path).
+			case "$2" in ''|-*) ergopti_msg uninstall.missing_prefix_value >&2; exit 64 ;; esac
 			PREFIX="$2"
 			shift 2
 			;;
