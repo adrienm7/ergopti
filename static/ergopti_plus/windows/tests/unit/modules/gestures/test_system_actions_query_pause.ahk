@@ -202,7 +202,7 @@ class _QEFF_Folder {
 	}
 	ParseName(Name) {
 		this.Sys.PauseAt("rename_item")
-		return {Name: Name}
+		return {Name: Name, Path: this.Sys.FolderPath . "\" . Name}
 	}
 }
 class _QEFF_Document {
