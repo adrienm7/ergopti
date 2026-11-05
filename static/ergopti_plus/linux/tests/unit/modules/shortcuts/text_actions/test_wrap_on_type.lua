@@ -767,7 +767,8 @@ local function with_daemon_wrap(body, options)
 		assert(shortcuts.set_wrap_on_type_enabled(true))
 		local noop = function() end
 		local env = {
-			type = type, math = math, tostring = tostring, require = require, package = { loaded = {} },
+			type = type, math = math, tostring = tostring, pcall = pcall, error = error,
+			require = require, package = { loaded = {} },
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
