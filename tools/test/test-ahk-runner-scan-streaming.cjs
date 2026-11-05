@@ -67,7 +67,14 @@ function run(runners, files, { tracked = Object.keys(files), streaming = false }
 				require(name) {
 					if (name === 'fs') return fakeFs;
 					if (name === 'path') return path;
-					if (name === 'child_process') return { execSync: () => tracked.join('\n') };
+					if (name === '../lib/git-paths.cjs')
+						return {
+							gitPaths(cwd, args) {
+								assert.equal(cwd, root);
+								assert.deepEqual(Array.from(args), ['ls-files', '--cached', '-z']);
+								return [...tracked];
+							}
+						};
 					throw new Error('Unexpected dependency: ' + name);
 				},
 				console: {

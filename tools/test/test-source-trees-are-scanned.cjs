@@ -35,7 +35,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { gitPaths } = require('../lib/git-paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_PREFIX = 'static/ergopti_plus/';
@@ -85,13 +85,9 @@ function treesIn(literal) {
 	return CANONICAL_TREES.filter((t) => new RegExp(`["']${t}/?["']`).test(literal));
 }
 
-const trackedPaths = execFileSync('git', ['ls-files', '--cached', '-z'], {
-	cwd: ROOT,
-	encoding: 'utf8'
-})
-	.split('\0')
-	.filter(Boolean)
-	.map((rel) => rel.split(path.sep).join('/'));
+const trackedPaths = gitPaths(ROOT, ['ls-files', '--cached', '-z']).map((rel) =>
+	rel.split(path.sep).join('/')
+);
 
 const tracked = trackedPaths
 	.filter((f) => /\.(ahk|lua|cjs|js|mjs)$/.test(f))

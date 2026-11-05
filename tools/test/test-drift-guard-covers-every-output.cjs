@@ -38,7 +38,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawnSync, execFileSync } = require('child_process');
+const { spawnSync } = require('child_process');
+const { gitPaths } = require('../lib/git-paths.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREVIOUSLY_UNGUARDED = [
 	'static/ergopti_plus/macos/_generated/config_template.toml',
@@ -167,12 +168,7 @@ function runIsolatedCoverage({ files, probe = runCoverage } = {}) {
 	try {
 		const selected =
 			files ||
-			execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--'], {
-				cwd: ROOT,
-				encoding: 'utf8'
-			})
-				.split('\0')
-				.filter(Boolean);
+			gitPaths(ROOT, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--']);
 		for (const relative of new Set(selected)) {
 			const source = path.resolve(ROOT, relative);
 			const destination = path.resolve(temporary, relative);
