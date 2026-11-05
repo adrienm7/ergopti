@@ -388,3 +388,37 @@ helpers.describe("Conflicts — the detector reports, it never acts", function()
 			"the detector must be stateless across calls — the placeholder this replaces ran the same 200 iterations and asserted nothing about them")
 	end)
 end)
+
+-- Field report 2026-11-05: ShellRunner.spawn only prepares a task, and the read
+-- was never started, so no gesture macOS claims was greyed or held back.
+helpers.describe("Conflicts — the macOS settings read is started", function()
+	helpers.it("starts every prepared read and greys the four-finger swipe macOS uses", function()
+		local started, pending = 0, {}
+		package.loaded["modules.gestures.conflicts"] = nil
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(_, _, callback)
+				local settled = false
+				local handle = { isSettled = function() return settled end }
+				handle.start = function()
+					started = started + 1
+					pending[#pending + 1] = function()
+						settled = true
+						callback(0, "{\n    TrackpadFourFingerVertSwipeGesture = 2;\n}\n", "")
+					end
+					return true
+				end
+				return handle
+			end,
+		}
+		local conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
+		conflicts.refresh()
+		helpers.assert_eq(started, 4, "each prepared read must be started")
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "free", "nothing is held before the read ends")
+		for _, finish in ipairs(pending) do finish() end
+		helpers.assert_eq(conflicts.slot_system_state("swipe_4_up"), "taken")
+		package.loaded["modules.gestures.conflicts"] = nil
+		package.loaded["infra.logger"] = nil
+		package.loaded["adapters.shell_runner"] = nil
+	end)
+end)
