@@ -39,6 +39,10 @@ global _LLM_ModelBrowser_Epoch := 0
 global _LLM_ModelBrowser_Visibility := 0
 global _LLM_ModelBrowser_VisibilityTimer := 0
 global _LLM_ModelBrowser_VisibilityTimerRevision := 0
+; A failed unpublished native constructor keeps exact cleanup custody until
+; its timer, native window and owned properties have all retired.
+global _LLM_ModelBrowser_FailedNativeWindows := []
+
 
 
 ; Column index of "params" in the ListView — kept as a constant so the
@@ -71,6 +75,7 @@ global LLM_MB_COL_STATUS    := 7
  */
 LLM_ModelBrowser_Show() {
 	global _LLM_ModelBrowser_Gui, _LLM_Menu
+	_LLM_ModelBrowser_RetryFailedNativeWindows()
 	; Prefer the shared web table (sortable/filterable, identical to the macOS
 	; browser) when WebView2 is available and there is enough free RAM to boot it;
 	; fall back to the native ListView below when WebView2 is unavailable, the
@@ -134,57 +139,136 @@ _LLM_ModelBrowser_Build() {
 	; fires. ``g`` (matching the convention used elsewhere in the driver)
 	; sidesteps the collision entirely.
 	g := Gui_Create("+Resize +MinSize720x420", t("menu.llm.browse_models_window_title"))
-	g.OnEvent("Close", _LLM_ModelBrowser_OnClose)
-	g.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
-	g.MarginX := 10
-	g.MarginY := 10
+	Host := {window: g, hwnd: 0, timer: 0, listview: 0, closing: false}
+	try {
+		Host.hwnd := g.Hwnd
+		g.OnEvent("Close", _LLM_ModelBrowser_OnClose)
+		g.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
+		g.MarginX := 10
+		g.MarginY := 10
 
-	g.SetFont("s10")
+		g.SetFont("s10")
 
-	; Filter row — search the table by typing a substring. Live filter on
-	; every keystroke so the list narrows as the user thinks, no Apply
-	; button needed. The hint label is dimmed to make the intent obvious.
-	g.Add("Text",, t("menu.llm.browse_models_filter"))
-	filter_edit := g.Add("Edit", "w560 vFilter")
-	; Debounce the refresh: it re-runs the two-key sort over the full catalogue.
-	; Installed tags are an in-memory snapshot; never probe Ollama from a GUI
-	; open/filter callback because its synchronous HTTP fallback can freeze input.
-	; The timer reference is stored
-	; on the Gui so SetTimer can cancel-by-identity across keystrokes.
-	g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
-	filter_edit.OnEvent("Change", (*) => (
-		SetTimer(g.FilterDebounce, 0),
-		SetTimer(g.FilterDebounce, -TimingsGet("ui", "model_browser_filter_debounce_ms"))
-	))
+		; Filter row — search the table by typing a substring. Live filter on
+		; every keystroke so the list narrows as the user thinks, no Apply
+		; button needed. The hint label is dimmed to make the intent obvious.
+		g.Add("Text",, t("menu.llm.browse_models_filter"))
+		filter_edit := g.Add("Edit", "w560 vFilter")
+		; Debounce the refresh: it re-runs the two-key sort over the full catalogue.
+		; Installed tags are an in-memory snapshot; never probe Ollama from a GUI
+		; open/filter callback because its synchronous HTTP fallback can freeze input.
+		; The timer reference is stored
+		; on the Gui so SetTimer can cancel-by-identity across keystrokes.
+		g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
+		Host.timer := g.FilterDebounce
+		filter_edit.OnEvent("Change", (*) => (
+			SetTimer(g.FilterDebounce, 0),
+			SetTimer(g.FilterDebounce, -TimingsGet("ui", "model_browser_filter_debounce_ms"))
+		))
 
-	; ListView — columns mirror the metadata extracted in
-	; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
-	; tell installed vs available at a glance, but the column is filled
-	; lazily on refresh to avoid blocking the Gui at construction.
-	; RefreshRows owns family/parameter order. Automatic lexical insertion would
-	; both undo that order and shift its remembered active-row index.
-	lv := g.Add("ListView",
-		"r18 w780 vListView -Multi",
-		[ t("menu.llm.browse_col_name")
-		, t("menu.llm.browse_col_family")
-		, t("menu.llm.browse_col_params")
-		, t("menu.llm.browse_col_ram")
-		, t("menu.llm.browse_col_speed")
-		, t("menu.llm.browse_col_type")
-		, t("menu.llm.browse_col_status") ])
-	lv.OnEvent("DoubleClick", (LV, RowNumber) => _LLM_ModelBrowser_PickRow(LV, RowNumber))
-	g.ListView := lv
+		; ListView — columns mirror the metadata extracted in
+		; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
+		; tell installed vs available at a glance, but the column is filled
+		; lazily on refresh to avoid blocking the Gui at construction.
+		; RefreshRows owns family/parameter order. Automatic lexical insertion would
+		; both undo that order and shift its remembered active-row index.
+		lv := g.Add("ListView",
+			"r18 w780 vListView -Multi",
+			[ t("menu.llm.browse_col_name")
+			, t("menu.llm.browse_col_family")
+			, t("menu.llm.browse_col_params")
+			, t("menu.llm.browse_col_ram")
+			, t("menu.llm.browse_col_speed")
+			, t("menu.llm.browse_col_type")
+			, t("menu.llm.browse_col_status") ])
+		lv.OnEvent("DoubleClick", (LV, RowNumber) => _LLM_ModelBrowser_PickRow(LV, RowNumber))
+		g.ListView := lv
+		Host.listview := lv
 
-	; Action footer — Pick the current selection, Close. Pick mirrors a
-	; double-click so users used to right-clicking lists still discover
-	; the action.
-	g.Add("Button", "w120 Default", t("menu.llm.browse_pick"))
-		.OnEvent("Click", (*) => _LLM_ModelBrowser_PickRow(lv, lv.GetNext(0)))
-	g.Add("Button", "x+10 w120", t("button.close"))
-		.OnEvent("Click", _LLM_ModelBrowser_OnClose)
+		; Action footer — Pick the current selection, Close. Pick mirrors a
+		; double-click so users used to right-clicking lists still discover
+		; the action.
+		g.Add("Button", "w120 Default", t("menu.llm.browse_pick"))
+			.OnEvent("Click", (*) => _LLM_ModelBrowser_PickRow(lv, lv.GetNext(0)))
+		g.Add("Button", "x+10 w120", t("button.close"))
+			.OnEvent("Click", _LLM_ModelBrowser_OnClose)
 
-	_LLM_ModelBrowser_RefreshRows(lv)
-	return g
+		_LLM_ModelBrowser_RefreshRows(lv)
+		return g
+	} catch Any as Primary {
+		; Queue before cancellation/Destroy can reenter. Never replace the
+		; actual constructor error with a secondary cleanup error.
+		_LLM_ModelBrowser_QueueFailedNativeWindow(Host)
+		try _LLM_ModelBrowser_RetryFailedNativeWindows()
+		throw Primary
+	}
+}
+
+
+_LLM_ModelBrowser_QueueFailedNativeWindow(Host) {
+	global _LLM_ModelBrowser_FailedNativeWindows
+	PreviousCritical := Critical("On")
+	try {
+		for Pending in _LLM_ModelBrowser_FailedNativeWindows
+			if Pending == Host
+				return
+		_LLM_ModelBrowser_FailedNativeWindows.Push(Host)
+	} finally Critical(PreviousCritical)
+}
+
+; A callback reentering Show may open B independently, but cannot recursively
+; retry A or consume A's retained debt. Only constructor-created properties
+; are removed, and a refused Destroy keeps the record for the next opening.
+_LLM_ModelBrowser_RetryFailedNativeWindows() {
+	global _LLM_ModelBrowser_FailedNativeWindows, _LLM_ModelBrowser_Gui
+	PreviousCritical := Critical("On")
+	try Pending := _LLM_ModelBrowser_FailedNativeWindows.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.closing || (IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Host.window)
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false
+		try {
+			Window := Host.window
+			if Window.HasOwnProp("FilterDebounce") && Window.FilterDebounce != Host.timer
+				throw Error("The failed native constructor no longer owns its filter callback.")
+			if Window.HasOwnProp("ListView") && Window.ListView != Host.listview
+				throw Error("The failed native constructor no longer owns its ListView reference.")
+			if IsObject(Host.timer)
+				SetTimer(Host.timer, 0)
+			if Window.HasOwnProp("FilterDebounce")
+				Window.DeleteProp("FilterDebounce")
+			Window.Destroy()
+			if Host.hwnd && DllCall("IsWindow", "Ptr", Host.hwnd, "Int") {
+				Remaining := GuiFromHwnd(Host.hwnd)
+				if !IsObject(Remaining) || Remaining == Window
+					throw Error("The failed native constructor window has not retired.")
+			}
+			if Window.HasOwnProp("ListView")
+				Window.DeleteProp("ListView")
+			Host.timer := 0, Host.listview := 0, Host.window := 0
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("LLM.browser", "Failed native browser cleanup remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled {
+					Count := _LLM_ModelBrowser_FailedNativeWindows.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _LLM_ModelBrowser_FailedNativeWindows[Index] == Host
+							_LLM_ModelBrowser_FailedNativeWindows.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+	}
 }
 
 /**

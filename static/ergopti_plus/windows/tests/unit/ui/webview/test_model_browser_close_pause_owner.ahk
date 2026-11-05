@@ -350,3 +350,7 @@ for _MBBK_ReentryMode in ["native-show-current", "native-show-close", "native-hi
 for _MBBK_CloseVisibilityMode in ["native-hide-native-current", "native-hide-native-reopen"]
 	Test("Native model Close event: " . _MBBK_CloseVisibilityMode . " retains latest visibility (model-browser-native-close-visibility-owner)",
 		_MBPT_Case.Bind(_MBBK_CloseVisibilityMode))
+
+for _MBBK_CtorRetirementMode in ["native-ctor-retire-pre", "native-ctor-retire-post"]
+	Test("Native failed constructor retirement: " . _MBBK_CtorRetirementMode . " preserves primary and exact debt (model-browser-native-failed-constructor-retirement)",
+		_MBPT_Case.Bind(_MBBK_CtorRetirementMode))
