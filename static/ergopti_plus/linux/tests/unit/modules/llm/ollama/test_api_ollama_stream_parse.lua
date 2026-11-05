@@ -296,6 +296,21 @@ helpers.describe("local model presence: native consent and download owner", func
 		if not ok then error(err, 0) end
 	end
 
+	helpers.it("handles a refused confirmation even if its fallback notification raises", function()
+		local installs = 0
+		with_offer({
+			confirm = function() return nil end,
+			notify = function() error("native notification unavailable") end,
+			install = function() installs = installs + 1; return true end,
+		}, function(Offer)
+			local ok, handled = pcall(Offer.handle, require("llm.local_model_policy").failure(
+				"qwen:2b", "http://127.0.0.1:11434"))
+			helpers.assert_true(ok, "a notification failure must not escape the consent handler")
+			helpers.assert_true(handled)
+			helpers.assert_eq(installs, 0)
+		end)
+	end)
+
 	helpers.it("never installs without an explicit affirmative confirmation", function()
 		for _, choice in ipairs({ "cancel", "unavailable", "throws" }) do
 			local confirmations, installations, notifications = 0, 0, 0
