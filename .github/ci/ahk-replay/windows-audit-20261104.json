@@ -1,79 +1,23 @@
 {
-	"expected_count": 67,
+	"expected_count": 13,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "tap-hold-external-source",
+			"contains": "layout-settings-close-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "layout-early-show",
+			"expected_count": 3
+		},
+		{
+			"contains": "clipboard-paste-title-owner",
 			"expected_count": 4
 		},
 		{
-			"contains": "tap-hold-native-inheritance",
-			"expected_count": 2
-		},
-		{
-			"contains": "tap-hold-native-first-save",
-			"expected_count": 1
-		},
-		{
-			"contains": "tap-hold-source-intent",
-			"expected_count": 2
-		},
-		{
-			"contains": "tap-hold-source-successor",
-			"expected_count": 2
-		},
-		{
-			"contains": "tap-hold-stage-ownership",
-			"expected_count": 2
-		},
-		{
-			"contains": "tap-hold-global-transaction",
-			"expected_count": 11
-		},
-		{
-			"contains": "loader-toml-injection-readfile-hotpath",
-			"expected_count": 3
-		},
-		{
-			"contains": "tap-hold: failed persistence cannot publish partial live state",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-native-admission-order",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-debounce-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-password-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-private-retyped-context",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-typing-source-privacy",
-			"expected_count": 10
-		},
-		{
-			"contains": "prefix-scalar-framing",
-			"expected_count": 16
-		},
-		{
-			"contains": "LLM live mode: expansion observers require an unchanged verified typing target",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-instant-word-end-trigger",
-			"expected_count": 1
-		},
-		{
-			"contains": "tooltip-teardown-on-keyboard-thread",
-			"expected_count": 1
+			"contains": "clipboard-source-title-owner",
+			"expected_count": 4
 		}
 	]
 }
