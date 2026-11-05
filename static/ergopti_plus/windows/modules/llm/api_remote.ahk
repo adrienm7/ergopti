@@ -203,8 +203,8 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     ; A key exchanged for an access token waits for it, reservation held: the
     ; first request never reaches the provider without one
     if resolved.Has("StoredKey") && _LLMRemote_NeedsAccess(resolved) {
-        _LLMRemote_WithAccess(resolved, _LLMRemote_ResumeAfterAccess.Bind(req_id, reservation, on_fail,
-            _LLMRemote_DispatchCurl.Bind(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, 0, reservation)))
+        _LLMRemote_WaitForAccess(req_id, reservation, resolved, on_fail,
+            _LLMRemote_DispatchCurl.Bind(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, 0, reservation))
         return req_id
     }
 
@@ -261,9 +261,9 @@ LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs 
     ; Re-read the access slot even when it is already usable: NeedsAccess also
     ; replaces a stale token retained by a thinking retry or screen-reading body.
     if Resolved.Has("StoredKey") && _LLMRemote_NeedsAccess(Resolved) {
-        _LLMRemote_WithAccess(Resolved, _LLMRemote_ResumeAfterAccess.Bind(req_id, reservation, on_fail,
+        _LLMRemote_WaitForAccess(req_id, reservation, Resolved, on_fail,
             _LLMRemote_DispatchCurl.Bind(req_id, Resolved, Url, Payload, on_success, on_fail,
-                timeout_ms, TransportPort, reservation)))
+                timeout_ms, TransportPort, reservation))
         return req_id
     }
     if (_LLMRemote_DispatchCurl(req_id, Resolved, Url, Payload, on_success,
@@ -567,6 +567,8 @@ _LLMRemote_DeleteOwned(req_id, reservation, DeliveryPending := false) {
             Deleted := true
         }
     } finally Critical(PreviousCritical)
+    if Deleted
+        _LLMRemote_StopAccessDeadline(reservation)
     if Deleted && (!DeliveryPending || reservation["cancelled"])
         _LLMRemote_BackboardChildRetired(req_id, reservation)
     return Deleted
@@ -1366,7 +1368,11 @@ _LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
     if (model == "" or !LLM_REMOTE_MODEL_PRICES.Has(model))
         return 0.0
     p := LLM_REMOTE_MODEL_PRICES[model]
-    return (Float(in_tokens) * p["in"] + Float(out_tokens) * p["out"]) / 1000000.0
+    ; Counters are native nonnegative Integers. Scale them first: multiplying
+    ; a large finite price before division can overflow even for a finite USD
+    ; result; scaling a tiny price first could instead underflow it to zero.
+    Cost := (Float(in_tokens) / 1000000.0) * p["in"] + (Float(out_tokens) / 1000000.0) * p["out"]
+    return _LLMRemote_CatalogPriceIsValid(Cost) ? Cost : 0.0
 }
 
 _LLMRemote_TrimAsyncRegistry() {
@@ -1384,6 +1390,7 @@ _LLMRemote_TrimAsyncRegistry() {
     ; Detach before cleanup or callbacks: either boundary can re-enter dispatch,
     ; and the terminated owner must no longer participate in successor trimming.
     _LLM_Remote_Async.Delete(oldest_id)
+    _LLMRemote_StopAccessDeadline(oldest_entry)
         ; Abort the live WinHTTP request so the COM object + socket are
         ; released now rather than lingering until WinHTTP's own timeout.
         if oldest_entry.Has("http")
@@ -1508,11 +1515,85 @@ _LLMRemote_AccessFailInfo(Failure) {
     return _LLMRemote_FailInfo("token_exchange", Failure is Map ? Failure.Get("status", 0) : 0, "", Report)
 }
 
+; The shared exchange can outlive any one requester. Its own transport budget
+; must not extend this reservation's original deadline while access is pending.
+_LLMRemote_WaitForAccess(req_id, reservation, Resolved, on_fail, Dispatch) {
+    if !_LLMRemote_RequestAdmitted(req_id, reservation) {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return
+    }
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"])
+    if Remaining <= 0 {
+        _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+        return
+    }
+    try {
+        Delay := TimerRequireDelayMs(Remaining, "LLM access wait deadline")
+        Deadline := _LLMRemote_AccessDeadline.Bind(req_id, reservation, on_fail)
+        PreviousCritical := Critical("On")
+        try {
+            if !_LLMRemote_RequestOwns(req_id, reservation)
+                return
+            reservation["access_deadline"] := Deadline
+            SetTimer(Deadline, -Max(1, Delay))
+        } finally Critical(PreviousCritical)
+    } catch as Err {
+        ; Invalid/native-refused timer preparation cannot leave an unpublished
+        ; request in the registry. The shared credential lease remains intact.
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        throw Err
+    }
+    if !_LLMRemote_RequestAdmitted(req_id, reservation) {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return
+    }
+    _LLMRemote_WithAccess(Resolved,
+        _LLMRemote_ResumeAfterAccess.Bind(req_id, reservation, on_fail, Dispatch))
+}
+
+; One access wait owns one timer per reservation. Removing the field also breaks
+; the bound callback's reference cycle; no shared exchange is cancelled here.
+_LLMRemote_StopAccessDeadline(reservation) {
+    PreviousCritical := Critical("On")
+    try {
+        if !reservation.Has("access_deadline")
+            return false
+        Deadline := reservation.Delete("access_deadline")
+        SetTimer(Deadline, 0)
+        return true
+    } finally Critical(PreviousCritical)
+}
+
+_LLMRemote_AccessDeadline(req_id, reservation, on_fail) {
+    if !_LLMRemote_RequestOwns(req_id, reservation) || !reservation.Has("access_deadline")
+        return
+    if !_LLMRemote_RequestAdmitted(req_id, reservation) {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return
+    }
+    Remaining := _HTTP_CurlRemaining(reservation["start_tick"], reservation["timeout_ms"])
+    if Remaining > 0 {
+        Delay := TimerRequireDelayMs(Remaining, "LLM access wait deadline")
+        PreviousCritical := Critical("On")
+        try {
+            if _LLMRemote_RequestOwns(req_id, reservation) && reservation.Has("access_deadline")
+                SetTimer(reservation["access_deadline"], -Max(1, Delay))
+        } finally Critical(PreviousCritical)
+        return
+    }
+    _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
+}
+
 ; A reserved request resumes once its access token settled, unless it was
 ; cancelled, trimmed or retired meanwhile.
 _LLMRemote_ResumeAfterAccess(req_id, reservation, on_fail, Dispatch, Ok, Failure) {
+    _LLMRemote_StopAccessDeadline(reservation)
     if !_LLMRemote_RequestAdmitted(req_id, reservation) {
         _LLMRemote_DeleteOwned(req_id, reservation)
+        return
+    }
+    if _LLM_DeadlineExpired(reservation["start_tick"], reservation["timeout_ms"]) {
+        _LLMRemote_FailReserved(req_id, reservation, on_fail, "timeout")
         return
     }
     if !Ok {
@@ -1939,7 +2020,10 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
-    Temp := Format("{:.2f}", Temperature)
+    ; Messages sampling has a narrower protocol domain than the shared
+    ; diversity policy; a valid configured temperature must still fit its wire.
+    SamplingTemperature := Fmt == "anthropic" ? Min(1.0, Max(0.0, Temperature)) : Temperature
+    Temp := Format("{:.2f}", SamplingTemperature)
     ; Output-token cap threaded from the shared PromptBuilder budget. The number
     ; is never re-declared here: an unset ("") or out-of-range value resolves to
     ; PB_DEFAULT_MAX_TOKENS — the single shared constant (codegen'd from the

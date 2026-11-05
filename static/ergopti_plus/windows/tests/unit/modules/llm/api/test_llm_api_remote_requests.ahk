@@ -738,3 +738,58 @@ _NUF_Timings(ViaPoll) {
 }
 Test("Remote usage cost: finite domain through actual classifier (usage-finite-cost)", _NUF_Timings.Bind(false))
 Test("Remote usage cost: finite domain through actual managed Poll (usage-finite-cost)", _NUF_Timings.Bind(true))
+
+; Add after _NUF_* finite-cost probes. Native AHK UNRUN.
+; Protect tiny admitted prices against price/1e6 underflow in a numeric fix.
+_NUFT_PriceScale() {
+    global LLM_REMOTE_MODEL_PRICES
+    Saved := LLM_REMOTE_MODEL_PRICES, Observed := []
+    Tiny := JsonParse("1e-320")
+    if Tiny == 0.0 {
+        _TestPrint("# FINITE_COST_TINY " . KL_JsonEncode(Map("supported", false,
+            "reason", "this runtime does not represent the finite subnormal fixture")))
+        return
+    }
+    Count := 4000000000000000000
+    Reference := (Float(Count) * Tiny) / 1000000.0
+    AssertTrue(Reference > 0.0 && _LLMRemote_CatalogPriceIsValid(Reference),
+        "the represented tiny price and integer count have a positive finite reference USD result")
+    try {
+        Model := "owned-tiny-price"
+        LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map(Model, Map("in", Tiny, "out", 0.0)))
+        AssertTrue(LLM_REMOTE_MODEL_PRICES.Has(Model))
+        Body := '{"choices":[{"message":{"content":"owned-finite-cost-ok"}}],"usage":{"prompt_tokens":'
+            . Count . ',"completion_tokens":0}}'
+        for ViaPoll in [false, true] {
+            if ViaPoll {
+                Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai_compat", "Model", Model,
+                    "Token", "owned-fixture-secret", "BaseUrl", "https://finite-cost-fixture.invalid/v1"))
+                Result := _NUF_Poll(Resolved, Body)
+            } else {
+                Result := _LLMRemoteClassifyResponse("openai", Body, Model)
+                AssertTrue(Result["ok"] && Result["text"] == "owned-finite-cost-ok")
+            }
+            Cost := Result["usage"]["est_cost_usd"]
+            Finite := _LLMRemote_CatalogPriceIsValid(Cost)
+            Seen := Map("via_poll", ViaPoll, "supported", true, "price_text", String(Tiny),
+                "reference_text", String(Reference), "cost_text", String(Cost), "finite", Finite,
+                "positive", Finite && Cost > 0.0,
+                "matches_reference", Finite && Cost > 0.0 && Abs(Cost / Reference - 1.0) < 0.000000001)
+            if ViaPoll {
+                Seen["callbacks"] := Result["callbacks"]
+                Seen["reservation_present"] := Result["reservation_present"]
+                Seen["http_handle_retired"] := Result["http_handle_retired"]
+            }
+            Observed.Push(Seen)
+        }
+    } finally LLM_REMOTE_MODEL_PRICES := Saved
+    _TestPrint("# FINITE_COST_TINY " . KL_JsonEncode(Observed))
+    for Seen in Observed {
+        AssertTrue(Seen["finite"] && Seen["positive"], "scaling an admitted positive tiny price must not erase its representable estimated cost")
+        AssertTrue(Seen["matches_reference"], "cost remains consistent with the nonoverflowing original operation order")
+    }
+}
+_NUFT_Run() {
+    _ManagedRemoteFixtureWithLlmTimings(_NUFT_PriceScale)
+}
+Test("Remote usage cost: tiny finite price keeps positive USD across scaling (usage-finite-cost)", _NUFT_Run)
