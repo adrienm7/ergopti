@@ -126,6 +126,20 @@ local function gsettings_children(world)
 end
 
 helpers.describe("diagnostics probes (linux)", function()
+	helpers.it("(healthcheck-probe-admission) stops launching after an inline answer revokes its page", function()
+		with_probes(true, function(Probes, world)
+			local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
+			local current = true
+			local run = Probes.start(schema, { logs_dir = "/tmp" }, {}, function(id)
+				if id == "ai_health" then current = false end
+			end, { current = function() return current end })
+			helpers.assert_eq(#world.requests, 1, "only the earlier GitHub probe was launched")
+			helpers.assert_eq(#world.children, 0, "later system probes must not start")
+			helpers.assert_eq(world.cancelled_owners, { "diagnostics.github" })
+			helpers.assert_true(run.cancelled)
+		end)
+	end)
+
 	helpers.it("reads GitHub's rate limit under the probe's own owner", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
