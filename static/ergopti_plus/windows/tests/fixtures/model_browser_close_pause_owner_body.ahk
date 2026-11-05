@@ -85,11 +85,14 @@ _MBPO_Log(Line) {
 		if HasProp(_MBPO, "AdmissionArmed") && _MBPO.AdmissionArmed && !_MBPO.AdmissionActorFired {
 			FirstConfirmed := InStr(Line, "[LLMObservation.mutation-return.returned]") && InStr(Line, "status=confirmed")
 			SecondSchemaMode := _MBPO.Mode == "native-backend-second-schema-pause"
-			if SecondSchemaMode && FirstConfirmed
+			SecondWriterMode := _MBPO.Mode == "native-backend-second-writer-replaced"
+			DeferredMode := SecondSchemaMode || SecondWriterMode
+			if DeferredMode && FirstConfirmed
 				_MBPO.FirstModelAckObserved := true
-			else if (!SecondSchemaMode && FirstConfirmed) || (SecondSchemaMode
+			else if (!DeferredMode && FirstConfirmed) || (DeferredMode
 					&& HasProp(_MBPO, "FirstModelAckObserved") && _MBPO.FirstModelAckObserved
-					&& InStr(Line, "[LLMObservation.schema-admission.enter]")) {
+					&& InStr(Line, SecondWriterMode ? "[LLMObservation.durable-writer.enter]" : "[LLMObservation.schema-admission.enter]")) {
+				_MBPO.AtSecondWriter := SecondWriterMode
 				_MBPO.AtSecondSchema := SecondSchemaMode
 				_MBPO.AdmissionActorFired := true
 				_MBPO_BackendAdmissionActor()
@@ -363,7 +366,7 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
-	if _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" {
+	if _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced" {
 		_MBPO_BackendAdmission()
 		return
 	}
@@ -434,7 +437,7 @@ _MBPO_Main() {
 		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0, InitialBackend: "", BackendPickReturns: 0}
 	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
-		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause",
+		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -578,7 +581,7 @@ _MBPO_BackendAdmissionActor() {
 	if _MBPO.Mode == "native-backend-second-refused" {
 		_MBPO.AdmissionLease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "native-backend-second-admission")
 		_MBPO_Require(_MBPO.AdmissionLease is Object, "A real lease must own the second, not the first, configuration refusal")
-	} else if _MBPO.Mode == "native-backend-replaced" {
+	} else if _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-second-writer-replaced" {
 		_LLM_ModelBrowser_OnClose()
 		_MBPO.ReplacementWindow := _LLM_ModelBrowser_Build()
 		_LLM_ModelBrowser_Gui := _MBPO.ReplacementWindow
@@ -688,6 +691,13 @@ _MBPO_BackendAdmission() {
 				&& DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
 				"The genuine second lease refusal alone must keep the chosen native row visible")
 			_ConfigWriteLeaseRelease(_MBPO.AdmissionLease), _MBPO.AdmissionLease := 0
+		} else if _MBPO.Mode == "native-backend-second-writer-replaced" {
+			_MBPO_Require(_MBPO.AtSecondWriter && _MBPO.MutationReturns == 2 && _MBPO.MutationConfirmed == 1
+				&& _MBPO.Errors.Length == 1 && InStr(_MBPO.Errors[1], "borrowed configuration writer")
+				&& IsObject(_MBPO.ReplacementWindow) && _LLM_ModelBrowser_Gui == _MBPO.ReplacementWindow
+				&& DllCall("IsWindowVisible", "Ptr", _MBPO.ReplacementHwnd, "Int"),
+				"The original receipt must refuse the durable writer after its real mutator/collector without hiding B")
+			return
 		} else if _MBPO.Mode == "native-backend-second-schema-pause" {
 			_MBPO_Require(_MBPO.AtSecondSchema && _MBPO.NativePaused && _MBPO.NativeResumed && !A_IsSuspended
 				&& _MBPO.MutationReturns == 2 && _MBPO.MutationConfirmed == 1 && _MBPO.Errors.Length == 1
