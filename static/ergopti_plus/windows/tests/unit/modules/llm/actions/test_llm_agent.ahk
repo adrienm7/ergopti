@@ -900,3 +900,75 @@ for _LAG_LB_Connector in ["calendar", "mail"] {
 		Test("LLM agent payload line breaks: " . _LAG_LB_Connector . "/" . _LAG_LB_Mode . " (agent-payload-line-breaks)",
 			_LAG_LineBreakPayload.Bind(_LAG_LB_Connector, _LAG_LB_Mode))
 }
+
+; Simulates two sequential clock observations across a second boundary; it
+; does not change the Windows clock, registry or configured time zone.
+class _TZF_ClockProbe {
+	__New(UtcStamp) {
+		this.UtcStamp := UtcStamp, this.LocalCalls := 0, this.UtcCalls := 0, this.OffsetCalls := 0
+	}
+	Local() {
+		this.LocalCalls += 1
+		return "20261104150059"
+	}
+	Utc() {
+		this.UtcCalls += 1
+		return this.UtcStamp
+	}
+	OffsetMinutesEast() {
+		this.OffsetCalls += 1
+		return 60
+	}
+}
+_TZF_ContextFromMissingRegistry(Probe) {
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		; No key is created. The actual registry adapter must observe this missing
+		; value before the real context producer follows its fallback branch.
+		RegistryKey := "HKCU\Software\ErgoptiMissingTimeZone-" . DllCall("GetCurrentProcessId")
+			. "-" . A_TickCount . "-" . Random(100000, 999999)
+		Critical("Off")
+		AssertFalse(Reg_TryRead(RegistryKey, "TimeZoneKeyName", &Ignored := ""),
+			"the native registry read confirms the fallback value is absent")
+		return _LLM_Agent_SystemContext(Probe, RegistryKey)
+	} finally {
+		Critical("On")
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_TZF_ContextCase(UtcStamp, Label) {
+	Probe := _TZF_ClockProbe(UtcStamp)
+	Context := _TZF_ContextFromMissingRegistry(Probe)
+	_TestAppendProgress("# agent timezone " . Label . " zone=" . Context["timezone"]
+		. " local_reads=" . Probe.LocalCalls . " utc_reads=" . Probe.UtcCalls . " offset_reads=" . Probe.OffsetCalls)
+	AssertTrue((Probe.LocalCalls == 1 && Probe.UtcCalls == 1 && Probe.OffsetCalls == 0)
+		|| (Probe.LocalCalls == 0 && Probe.UtcCalls == 0 && Probe.OffsetCalls == 1),
+		"the producer consulted exactly one clock strategy")
+	AssertEqual("UTC+01:00", Context["timezone"], "the simulated UTC+1 offset remains one hour")
+}
+Test("agent context: same-second timezone fallback (agent-timezone-native-fallback-control)",
+	_TZF_ContextCase.Bind("20261104140059", "same-second"))
+Test("agent context: timezone fallback across sampled second (agent-timezone-native-fallback-boundary)",
+	_TZF_ContextCase.Bind("20261104140100", "boundary"))

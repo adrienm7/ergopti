@@ -737,7 +737,7 @@ _LLM_Agent_Context(Config) {
 
 ; The frontmost application, its window, the local time and the time zone.
 ; @returns {Map}
-_LLM_Agent_SystemContext() {
+_LLM_Agent_SystemContext(ClockProbe := 0, RegistryKey := unset) {
 	global LLM_AGENT_WEEKDAYS
 	Focused := WIGetFocused()
 	Stamp := A_Now
@@ -746,15 +746,25 @@ _LLM_Agent_SystemContext() {
 		"window", Focused.Get("windowTitle", ""),
 		"now", FormatTime(Stamp, "yyyy-MM-dd") . "T" . FormatTime(Stamp, "HH:mm"),
 		"weekday", LLM_AGENT_WEEKDAYS[Integer(FormatTime(Stamp, "WDay"))],
-		"timezone", _LLM_Agent_TimeZone())
+		"timezone", IsSet(RegistryKey) ? _LLM_Agent_TimeZone(ClockProbe, RegistryKey) : _LLM_Agent_TimeZone(ClockProbe))
 }
 
 ; The Windows time zone id ("Romance Standard Time"), else the UTC offset.
-_LLM_Agent_TimeZone() {
+_LLM_Agent_TimeZone(ClockProbe := 0, RegistryKey := unset) {
 	global LLM_AGENT_TIMEZONE_KEY
-	if Reg_TryRead(LLM_AGENT_TIMEZONE_KEY, "TimeZoneKeyName", &Name) && (Name is String) && Name != ""
+	Key := IsSet(RegistryKey) ? RegistryKey : LLM_AGENT_TIMEZONE_KEY
+	if Reg_TryRead(Key, "TimeZoneKeyName", &Name) && (Name is String) && Name != ""
 		return Name
-	Minutes := DateDiff(A_Now, A_NowUTC, "Minutes")
+	; Optional per-call clock port leaves the existing two native observations
+	; unchanged in production while allowing a boundary to be observed in tests.
+	if HasMethod(ClockProbe, "Local") && HasMethod(ClockProbe, "Utc") {
+		LocalStamp := ClockProbe.Local()
+		UtcStamp := ClockProbe.Utc()
+	} else {
+		LocalStamp := A_Now
+		UtcStamp := A_NowUTC
+	}
+	Minutes := DateDiff(LocalStamp, UtcStamp, "Minutes")
 	LoggerDebug("LLM", "AI agent: no Windows time zone id, the UTC offset stands in.")
 	return Format("UTC{1}{2:02d}:{3:02d}", Minutes < 0 ? "-" : "+", Abs(Minutes) // 60, Mod(Abs(Minutes), 60))
 }
