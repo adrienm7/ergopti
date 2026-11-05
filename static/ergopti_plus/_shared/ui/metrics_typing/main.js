@@ -308,6 +308,16 @@ function find_in_page(forward) {
 // Generated media labels are rendered again after the actual locale changes.
 document.addEventListener('i18n:applied', render_media_keys);
 
+// The remaining record labels are rendered from accepted data rather than
+// data-i18n attributes. Refresh them after a late native locale delivery.
+document.addEventListener('i18n:applied', () => {
+	render_lexical_kpi();
+	render_rhythm_kpi();
+	render_sessions_kpi();
+	render_records_kpi();
+	render_apps_kpi();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
 	// Set Chart.js default tick/label color based on system color scheme.
 	// The default rgba(0,0,0,0.6) is nearly invisible in dark mode.

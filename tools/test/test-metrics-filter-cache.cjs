@@ -4872,4 +4872,85 @@ test('apps transition diagram keeps prototype-named applications on both sides',
 	assert.ok(container.innerHTML.includes('__proto__ → Editor (1)'));
 	assert.doesNotMatch(container.innerHTML, /NaN|\[object Object\]/);
 });
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} typing session record localizes character units`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.window._i18n_strings['ui_typing.col_chars'] = '<chars-local>';
+		page.context.window._i18n_strings['ui_typing.unit_richness'] = '<rich-local>';
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: {
+					chars: 10,
+					session_count_total: 1,
+					session_longest_ms: 60000,
+					session_longest_chars: 10,
+					session_total_active_ms: 60000,
+					burst_count_total: 1,
+					burst_max_chars: 10,
+					burst_length_buckets: { 10: 1 }
+				}
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_sessions_kpi();
+		const record = page.elements.get('sessions_longest_chars').innerHTML;
+		assert.match(record, /&lt;chars-local&gt;/);
+		assert.doesNotMatch(record, /<chars-local>/);
+		vm.runInContext('app_state.data.w = { hello: { count: 2 } };', page.context);
+		page.context.render_lexical_kpi();
+		assert.match(page.elements.get('lexical_val').innerHTML, /&lt;rich-local&gt;/);
+		page.context.render_rhythm_kpi();
+		page.context.render_records_kpi();
+		page.context.render_apps_kpi();
+		for (const id of [
+			'lexical_avg_len',
+			'lexical_distribution_container',
+			'rhythm_max_chars',
+			'rhythm_distribution_container',
+			'records_burst_chars',
+			'records_best_day',
+			'apps_top_volume'
+		]) {
+			const html = page.elements.get(id).innerHTML;
+			assert.match(html, /&lt;chars-local&gt;/, `${id} uses the localized unit`);
+			assert.doesNotMatch(html, /<chars-local>/, `${id} escapes its localized unit`);
+		}
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} late locale delivery redraws typing record units`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		assert.doesNotThrow(() =>
+			page.context.window.i18n_apply({ 'ui_typing.col_chars': 'Initial-unit' })
+		);
+
+		publishTypingPage(page, host, {
+			'2026-10-01': {
+				Editor: {
+					chars: 10,
+					session_count_total: 1,
+					session_longest_chars: 10,
+					session_total_active_ms: 60000
+				}
+			}
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_sessions_kpi();
+		assert.doesNotMatch(page.elements.get('sessions_longest_chars').innerHTML, /New-unit/);
+		page.context.window.i18n_apply({ 'ui_typing.col_chars': 'New-unit' });
+		assert.match(page.elements.get('sessions_longest_chars').innerHTML, /New-unit/);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);
