@@ -1214,7 +1214,7 @@ for (const fault of ['refuseUnitWrite', 'refuseUnitMode', 'refuseUnitPublish']) 
 }
 
 // An update must preserve a choice already made through the startup menu.
-for (const format of ['plain', 'crlf', 'spaced']) {
+for (const format of ['plain', 'crlf', 'spaced', 'numeric']) {
 	const run = runInstaller({
 		desktopProvided: true,
 		systemdEnabled: true,
@@ -1223,6 +1223,7 @@ for (const format of ['plain', 'crlf', 'spaced']) {
 			fs.mkdirSync(directory, { recursive: true });
 			let entry = `[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`;
 			if (format === 'crlf') entry = entry.replaceAll('\n', '\r\n');
+			if (format === 'numeric') entry = entry.replace('Hidden=true', 'Hidden=1  ').replace('X-Ergopti-Startup=true', 'X-Ergopti-Startup=1');
 			if (format === 'spaced') entry = entry.replace('Hidden=true', ' Hidden = true').replace('X-Ergopti-Startup=true', ' X-Ergopti-Startup = true');
 			fs.writeFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), entry);
 		}

@@ -57,6 +57,7 @@ ergopti_desktop_entry_owned() {
 					commands=$((commands + 1))
 					value="${trimmed#*=}"
 					value="${value#"${value%%[![:space:]]*}"}"
+					value="${value%"${value##*[![:space:]]}"}"
 					case "Exec=$value" in
 						"$expected"|"Exec=$launcher --tray"|"Exec=$launcher --session-start --tray") ;;
 						*) return 1 ;;
@@ -85,6 +86,7 @@ ergopti_desktop_entry_state() {
 				key="${key%"${key##*[![:space:]]}"}"
 				value="${trimmed#*=}"
 				value="${value#"${value%%[![:space:]]*}"}"
+				value="${value%"${value##*[![:space:]]}"}"
 				case "$key" in
 					Hidden) hidden="$value" ;;
 					X-GNOME-Autostart-enabled) gnome="$value" ;;
@@ -93,8 +95,8 @@ ergopti_desktop_entry_state() {
 		esac
 	done < "$file"
 	case "$wanted" in
-		disabled) [ "$hidden" = true ] || [ "$gnome" = false ] ;;
-		managed) [ "$managed" = true ] ;;
+		disabled) [[ "$hidden" = true || "$hidden" = 1 || "$gnome" = false || "$gnome" = 0 ]] ;;
+		managed) [[ "$managed" = true || "$managed" = 1 ]] ;;
 		*) return 1 ;;
 	esac
 }
