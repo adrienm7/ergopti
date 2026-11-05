@@ -70,7 +70,7 @@ local function with_system(body, options)
 				return true
 			end,
 		}
-		package.loaded["adapters.mouse_control"] = {
+		package.loaded["adapters.mouse_control"] = options.mouse_adapter or {
 			screen_frame_under_cursor = function() return options.frame end,
 			setPos = function(x, y)
 				record.moved[#record.moved + 1] = { x = x, y = y }
@@ -270,6 +270,24 @@ helpers.describe("macOS system actions start their exact native command", functi
 			helpers.assert_eq(System.center_mouse(), false)
 			helpers.assert_eq(#record.moved, 0)
 		end)
+	end)
+
+	helpers.it("center_mouse reports a refused native warp and accepts a real move", function()
+		local position = { x = 110, y = 60 }
+		local refuses = true
+		local mouse = helpers.load_with_stubs("adapters.mouse_control", {
+			mouse = { absolutePosition = function(point)
+			if point and not refuses then position = { x = point.x, y = point.y } end
+			return { x = position.x, y = position.y }
+		end },
+		})
+		mouse.screen_frame_under_cursor = function() return { x = 100, y = 50, w = 800, h = 600 } end
+		with_system(function(System)
+			helpers.assert_eq(System.center_mouse(), false, "an unchanged native position is not a completed warp")
+			refuses = false
+			helpers.assert_eq(System.center_mouse(), true)
+			helpers.assert_eq(position, { x = 500, y = 350 })
+		end, { mouse_adapter = mouse })
 	end)
 
 	helpers.it("mic_mute_toggle mutes, then restores the level it had", function()

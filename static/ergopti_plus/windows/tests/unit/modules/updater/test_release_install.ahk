@@ -292,6 +292,13 @@ Test("Release install: observer failure logs one failure terminal",
 ; ===================================
 ; ===================================
 
+_RIT_BackupPreservesDriveRoot() {
+	AssertEqual("C:\", _ConfigBackup_Root("C:\"))
+	AssertEqual("D:\", _ConfigBackup_Root("D:/"))
+	AssertEqual("C:\config", _ConfigBackup_Root("C:\config\"))
+}
+Test("Config backup: preserves the absolute drive root", _RIT_BackupPreservesDriveRoot)
+
 _RIT_WriteFile(Path, Text) {
 	SplitPath(Path, , &Dir)
 	DirCreate(Dir)

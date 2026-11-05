@@ -95,6 +95,13 @@ end
 local function file_ports()
 	return {
 		list = list,
+		directory_identity = NativeDirectory.directory_identity,
+		directory_status = function(path)
+			local kind, detail, code = NativeDirectory.target_kind(path)
+			if kind == "directory" then return "present" end
+			if kind == nil and code == "ENOENT" then return "absent" end
+			return "error", detail or "not a folder"
+		end,
 		read = function(path)
 			local content, status, detail = Writer.read_classified(path)
 			if status == "ok" then return content end

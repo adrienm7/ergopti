@@ -140,6 +140,14 @@ local function included(rules, name)
 	return false
 end
 
+--- Only compare identities represented exactly on every supported Lua runtime.
+local function valid_identity(identity)
+	local function component(value)
+		return type(value) == "number" and value >= 0 and value < 9007199254740992 and value % 1 == 0
+	end
+	return type(identity) == "table" and component(identity.dev) and component(identity.ino)
+end
+
 
 
 
@@ -155,6 +163,8 @@ end
 ---   rules = M.rules() result,
 ---   roots = array of { id, dir } (the first holds the backups) or { id, file },
 ---   io = { list(dir) -> entries|nil, err (entries: { name, kind = "file"|"dir"|"other" }),
+---          directory_status(path) -> "present"|"absent"|"error", detail,
+---          directory_identity(path) -> { dev, ino }|nil, err,
 ---          read(path) -> content|nil, status ("absent" or an error),
 ---          make_dir(path) -> true|nil, err, create(path, content) -> true|nil, err
 ---          (create-only), replace(path, content) -> true|nil, err (atomic) },
@@ -168,6 +178,8 @@ function M.new(options)
 	local io_port, json, clock = options.io, options.json, options.clock
 	assert(type(io_port) == "table" and type(io_port.list) == "function" and type(io_port.read) == "function"
 		and type(io_port.make_dir) == "function" and type(io_port.make_dir_exclusive) == "function" and type(io_port.create) == "function"
+		and type(io_port.directory_status) == "function"
+		and type(io_port.directory_identity) == "function"
 		and type(io_port.replace) == "function", "config_backup needs its file ports")
 	assert(type(json) == "table" and type(json.encode) == "function" and type(json.decode) == "function",
 		"config_backup needs a JSON codec")
@@ -183,7 +195,9 @@ function M.new(options)
 		assert((type(root.dir) == "string" and root.dir:sub(1, 1) == "/")
 			or (type(root.file) == "string" and root.file:sub(1, 1) == "/"), "config_backup roots are absolute")
 		assert(index > 1 or root.dir ~= nil, "the first config_backup root is the configuration folder")
-		local entry = { id = root.id, dir = root.dir and (root.dir:gsub("/+$", "")) or nil, file = root.file }
+		local dir = root.dir and (root.dir:gsub("/+$", "")) or nil
+		if dir == "" then dir = "/" end
+		local entry = { id = root.id, dir = dir, file = root.file }
 		roots[#roots + 1] = entry
 		by_id[root.id] = entry
 	end
@@ -207,6 +221,12 @@ function M.new(options)
 				if relative == "" and err == "absent" then return files, nil, skipped end
 				return nil, "cannot list " .. dir .. ": " .. tostring(err), skipped
 			end
+			local present = {}
+			if relative == "" then
+				for _, entry in ipairs(entries) do
+					if type(entry.name) == "string" then present[entry.name] = true end
+				end
+			end
 			table.sort(entries, function(a, b) return a.name < b.name end)
 			for _, entry in ipairs(entries) do
 				local name = entry.name
@@ -214,7 +234,28 @@ function M.new(options)
 				if type(name) ~= "string" or not contained(name) then
 					return nil, "unexpected entry name in " .. dir, skipped
 				elseif entry.kind == "dir" then
-					if not (relative == "" and rules.excluded[name]) then pending[#pending + 1] = path end
+					local excluded = relative == "" and rules.excluded[name] == true
+					if relative == "" and not excluded then
+						for canonical in pairs(rules.excluded) do
+							if not present[canonical] and name:lower() == canonical:lower() then
+								local status, detail = io_port.directory_status(join(root.dir, canonical))
+								if status == "present" then
+									local actual, actual_err = io_port.directory_identity(join(root.dir, name))
+									local expected, expected_err = io_port.directory_identity(join(root.dir, canonical))
+									if not valid_identity(actual) or not valid_identity(expected) then
+										return nil, "cannot establish excluded folder identity: "
+											.. tostring(actual_err or expected_err), skipped
+									end
+									if actual.dev == expected.dev and actual.ino == expected.ino then excluded = true; break end
+									status = "absent" -- the probed directory is a distinct entry
+								end
+								if status ~= "absent" then
+									return nil, "cannot classify excluded folder " .. canonical .. ": " .. tostring(detail), skipped
+								end
+							end
+						end
+					end
+					if not excluded then pending[#pending + 1] = path end
 				elseif entry.kind == "file" then
 					if included(rules, name) then files[#files + 1] = { root = root.id, path = path } end
 				else
@@ -230,7 +271,7 @@ function M.new(options)
 	--- @param file string
 	--- @return boolean
 	local function inside_config(file)
-		local prefix = roots[1].dir .. "/"
+		local prefix = NativePath.with_trailing_separator(roots[1].dir)
 		return file:sub(1, #prefix) == prefix
 	end
 

@@ -636,6 +636,21 @@ helpers.describe("shortcuts.bindings: exact system-pixel child composition", fun
 end)
 
 helpers.describe("bindings effective URL snapshot", function()
+	helpers.it("keeps the configured conversation URL out of diagnostics", function()
+		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+		local logger = require("infra.logger")
+		local original, logs = logger.debug, {}
+		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
+		local ok, result = pcall(subject.set_chatgpt_url, url)
+		logger.debug = original
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(subject.get_chatgpt_url(), url)
+		helpers.assert_true(not table.concat(logs, " "):find("private", 1, true),
+			"diagnostics must not contain the private conversation or prompt")
+	end)
+
 	helpers.it("reads the exact URL consumed by dispatch and settles its setter", function()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
 		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)

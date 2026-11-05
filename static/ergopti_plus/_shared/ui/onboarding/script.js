@@ -1095,9 +1095,16 @@ window.setGestureRegisterStatus = function (ok) {
 // ======================================
 // ======================================
 
+/** Reads an absolute Unix path literally: trailing spaces are valid names. */
+function _configInputValue() {
+	var value = document.getElementById('config-input').value || '';
+	if ((_platform === 'macos' || _platform === 'linux') && value.charAt(0) === '/') return value;
+	return value.trim();
+}
+
 /** Leaves the config step: the folder's configuration and metrics store. */
 function _leaveConfig() {
-	_configDir = (document.getElementById('config-input').value || '').trim();
+	_configDir = _configInputValue();
 	if (_configPending || _configDir !== _loadedDir) {
 		// A requested folder is not an admitted configuration. Retire prior
 		// values and choices now, and allow the config step to retry the same
@@ -1166,7 +1173,7 @@ document.getElementById('btn-next').addEventListener('click', function () {
 
 document.getElementById('btn-back').addEventListener('click', function () {
 	if (_steps[_stepIndex] === STEP_CONFIG) {
-		_configDir = (document.getElementById('config-input').value || '').trim();
+		_configDir = _configInputValue();
 	}
 	if (_stepIndex > 0) _go(_stepIndex - 1);
 });

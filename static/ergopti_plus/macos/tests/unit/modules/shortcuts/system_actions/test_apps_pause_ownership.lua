@@ -635,3 +635,19 @@ helpers.describe("Apps composite owner: parent scopes", function()
 		helpers.assert_eq(f.subject.open_settings("gestures"), true)
 	end)
 end)
+
+helpers.describe("ChatGPT URL diagnostics", function()
+	helpers.it("opens the exact conversation URL without logging it", function()
+		local fixture = fresh_apps()
+		local logger = require("infra.logger")
+		local original, logs = logger.debug, {}
+		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
+		local ok, result = pcall(fixture.subject.open_chatgpt, url)
+		logger.debug = original
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(fixture.urls[1], url)
+		helpers.assert_true(not table.concat(logs, " "):find("private", 1, true))
+	end)
+end)

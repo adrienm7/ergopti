@@ -833,7 +833,7 @@ end
 --- @param parent string|nil Stable action parent.
 function M.open_chatgpt(url, parent)
 	if not apps_admission_open(apps_scope(parent)) then return false end
-	Logger.debug(LOG, "Opening ChatGPT URL: %s.", url)
+	Logger.debug(LOG, "Opening configured ChatGPT URL.")
 	local ok, opened = pcall(urlevent.openURL, url)
 	return ok and opened ~= false
 end
