@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **104 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **106 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1672,7 +1672,7 @@ Observation: Run41962516263 reaches the real private source in all5 malformed mo
 
 Regression: Validate the entire catalogue inside the existing protected parse boundary; refuse before any cache publication, and retire v1 TSV files whose serialization erased bad source types. Eight cases include a genuine newer legacy cache.
 
-The correction is integrated; post-fix native qualification is pending.
+Post-fix native run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a passes all8 cases individually and reversed. The mixed250-case cohort remains red and does not qualify the full suite.
 
 ## AHK-101: Program providers reject an absolute UNC share root
 
@@ -1686,7 +1686,7 @@ Observation: Run41962516263 returns false for both complete UNC roots while driv
 
 Regression: Nine independent real route/admission cases admit complete UNC roots and preserve all malformed/device refusals; the path policy permits an optional descendant suffix.
 
-The correction is integrated; post-fix native qualification is pending.
+Post-fix native run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a passes all9 cases individually and reversed. The mixed250-case cohort remains red and does not qualify the full suite.
 
 ## Additional integrated corrections awaiting qualification
 
@@ -1737,3 +1737,19 @@ The hook tick, public flush and snapshot publisher each test only events, clicks
 Run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a drives the genuine sampler from0,0 to3,4. Both direct and periodic flush report `samples=2 pending_rows=0 remaining_distance=5 errors=0`; cold canonical SQL contains no distance. Both failures repeat in inverse order. The with-click control is not qualified by this run: its child omits the genuine JsonStringLiteral dependency and fails on that binding before its comparison.
 
 The correction includes distance in all three empty guards. The control composition now includes the actual JSON owner; no serializer or SQL oracle is replaced. The same three native cases await post-fix qualification.
+
+## AHK-105: Unblocking a selected folder mutates an external junction target
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The recursive FilesUnder iterator follows a real NTFS junction below the selected folder. Run41967942121 at1152bd8815094b59581f62a65c663fbf7b089f6a removes both the ordinary inside file's Zone.Identifier and the stream of the separate outside target: `inside_stream=0 outside_stream=0`. The outside-preservation assertion fails in both orders.
+
+The action now uses its own bounded native iterator and excludes encountered file and directory reparse points. The explicitly selected root remains the chosen starting point. The generic FilesUnder contract is unchanged. This is cooperative pathname confinement, not an identity guarantee against concurrent component replacement. Native post-fix qualification is pending.
+
+## AHK-106: Incomplete unblock enumeration reports successful completion
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The generic recursive loop silently omits a real ACL-denied subtree. The same native run proves Win32 error5, removal of the accessible stream and preservation of the inaccessible stream, yet the action records `error_log=0 success_log=1`. The required partial-failure assertion fails in both orders.
+
+The action-specific iterator now reports native FindFirst/FindNext/FindClose failures and entry/path-budget exhaustion, while retaining already enumerated ordinary files. The caller logs incomplete processing as an error. Existing genuine junction/ACL tests and a native bounds control await post-fix qualification. A native FindClose refusal is reported but its handle retirement has not been measured; no zero-leak guarantee is asserted.
