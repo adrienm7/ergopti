@@ -88,6 +88,30 @@ end)
 
 
 helpers.describe("native script storage cohorts", function()
+	helpers.it("refuses malformed UTF-8 in source or updates without changing real storage", function()
+		local malformed = { "\195", "\128", "\192\128", "\237\160\128", "\244\144\128\128" }
+		for _, bytes in ipairs(malformed) do
+			local source = '{"foreign":"' .. bytes .. '","setting":"old"}'
+			storage_cohort_fixture(source, function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set("setting", "new"), false)
+				helpers.assert_eq(read(path), source)
+			end)
+			local valid = '{"setting":"old"}'
+			storage_cohort_fixture(valid, function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set("setting", bytes), false)
+				helpers.assert_eq(read(path), valid)
+				helpers.assert_eq(storage.set(bytes, "value"), false)
+				helpers.assert_eq(read(path), valid)
+					helpers.assert_eq(storage.set("setting", { [bytes] = "value" }), false)
+					helpers.assert_eq(read(path), valid)
+			end)
+		end
+		storage_cohort_fixture('{"setting":"old"}', function(storage)
+			helpers.assert_true(storage.set("setting", "café 日本語 🎉"))
+			helpers.assert_eq(storage.get("setting"), "café 日本語 🎉")
+		end)
+	end)
+
 	helpers.it("script-storage-cohort exact alias gates and primary pending admission", function()
 		storage_cohort_fixture('{"a":false,"foreign":4}', function(storage, _, path, _, _, read)
 			local owner, other = { pending = function() return false end }, {}
