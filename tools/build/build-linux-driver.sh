@@ -456,7 +456,9 @@ else
 
 	# Test 1: --help must exit 0
 	echo "  Test: --help exits 0..."
-	if ${LUA_BIN} "${BUILD_DIR}/linux/ergopti_hotstrings.lua" --help >/dev/null 2>&1; then
+	LUA_HELP_COMMAND="$(command -v "$LUA_BIN")"
+	case "$LUA_HELP_COMMAND" in /*) ;; */*) LUA_HELP_COMMAND="$PWD/$LUA_HELP_COMMAND" ;; esac
+	if (cd -- "${BUILD_DIR}/linux" && "$LUA_HELP_COMMAND" ergopti_hotstrings.lua --help) >/dev/null 2>&1; then
 		echo "    OK — --help exits 0"
 	else
 		echo "    FAIL — --help exited non-zero"
