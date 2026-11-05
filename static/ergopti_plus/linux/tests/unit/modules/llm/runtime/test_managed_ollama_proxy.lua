@@ -53,6 +53,7 @@ local function world(options)
 		probe = function(host, port, timeout_ms, callback)
 			w.tcp_probes = w.tcp_probes or {}
 			w.tcp_probes[#w.tcp_probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
+			if w.on_tcp_probe then w.on_tcp_probe(w, host, port) end
 			local probe_child = { settled = false }
 			function probe_child.is_settled() return probe_child.settled end
 			function probe_child.on_settled(listener) probe_child.listener = listener; return true end
@@ -596,4 +597,36 @@ end)
 it("the shared probe deadline is the timings registry's one second", function()
 	local Timings = require("infra.timings")
 	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
+end)
+
+it("bounds PAC probes by the remaining startup budget (pac-probe-budget)", function()
+	local w = world({ remaining = 75, receipt = { ok = true,
+		proxies = { "http://down.corp.example:3128", "direct://" } } })
+	assert(w:run().ok)
+	eq(w.tcp_probes[1].timeout_ms, 75)
+end)
+
+it("does not try another PAC relay once startup expires (pac-probe-budget)", function()
+	local w = world({ receipt = { ok = true, proxies = {
+		"http://down.corp.example:3128", "http://other.corp.example:3128", "direct://" } },
+		on_tcp_probe = function(state) state.remaining = 0; state.authorized = false end })
+	local result = w:run()
+	eq(#w.tcp_probes, 1)
+	eq(result.ok, false)
+end)
+
+it("does not launch a PAC probe when reading the budget revokes its owner (pac-probe-budget)", function()
+	local w = world()
+	local revoke, operation, results = false, nil, {}
+	local budget = { remaining_ms = function()
+		if revoke then operation:cancel(); return 0 end
+		return 1000
+	end }
+	operation = w.port(budget, function() return true end, function(result) results[#results + 1] = result end)
+	revoke = true
+	w.callback({ ok = true, proxies = { "http://down.corp.example:3128", "direct://" } })
+	eq(w.tcp_probes, nil)
+	eq(#results, 0, "the revoked owner must not publish")
+	eq(w.child.cancelled, true)
+	eq(operation:is_settled(), false, "the original lookup still owns its retirement")
 end)

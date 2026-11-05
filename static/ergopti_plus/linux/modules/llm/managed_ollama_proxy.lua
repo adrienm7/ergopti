@@ -316,7 +316,25 @@ function M.new(deps)
 		--- @param index number Origin index.
 		--- @param choices table Ordered selections of the shared policy.
 		--- @param at number Entry to try.
+		local function probe_budget()
+			if operation.finished then return nil end
+			local remaining = budget.remaining_ms()
+			-- Reading the master budget can synchronously revoke this operation.
+			if operation.finished then return nil end
+			if type(remaining) ~= "number" or remaining <= 0 then
+				finish({ ok = false, error = "proxy_timeout" })
+				return nil
+			end
+			if not authorized() then
+				if not operation.finished then finish({ ok = false, error = "proxy_cancelled" }) end
+				return nil
+			end
+			if operation.finished then return nil end
+			return remaining
+		end
 		choose = function(index, choices, at)
+			local remaining = probe_budget()
+			if not remaining then return end
 			local choice = choices[at]
 			local function keep(route)
 				entries[index] = { origin = origins[index], route = route }
@@ -333,11 +351,12 @@ function M.new(deps)
 			end
 			step = step + 1
 			local mine = step
-			local child, probe_error = deps.probe(host, port, deps.probe_timeout_ms, function(reachable, reason)
-				if operation.finished then return end
+			local timeout = math.ceil(math.min(deps.probe_timeout_ms, remaining))
+			local child, probe_error = deps.probe(host, port, timeout, function(reachable, reason)
+				if not probe_budget() then return end
 				if reachable then keep(choice.proxy); return end
 				Logger.warn(LOG, "Managed Ollama proxy entry %d of origin %d unreachable (%s within %d ms): next PAC entry.",
-					at, index, tostring(reason), deps.probe_timeout_ms)
+					at, index, tostring(reason), timeout)
 				choose(index, choices, at + 1)
 			end)
 			if not child then
