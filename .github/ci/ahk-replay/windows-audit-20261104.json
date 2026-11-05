@@ -1,11 +1,75 @@
 {
-	"expected_count": 46,
-	"native_http_client_e2e": true,
+	"expected_count": 58,
+	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
-	"native_proxy_relay_owner_e2e": true,
+	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
+			"contains": "prompt-native-subscription-retirement-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-web-native-subscription-retirement-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "prompt-startup-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "prompt-startup-repoint-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "prompt-navigation-custody",
+			"expected_count": 4
+		},
+		{
+			"contains": "Model browser startup: current preserves its native owner (model-browser-startup-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Model browser startup: factory preserves its native owner (model-browser-startup-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Model browser startup: settings preserves its native owner (model-browser-startup-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Model browser startup: subscription preserves its native owner (model-browser-startup-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Model browser startup: teardown-reopen preserves its native owner (model-browser-startup-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "model_browser: WebMessageReceived subscription handle is captured into _LLM_MBW_MsgSub, not discarded",
+			"expected_count": 1
+		},
+		{
+			"contains": "prompt-subscription-sdk-failure-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-subscription-sdk-failure-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "model-subscription-sdk-reset-close-owner",
+			"expected_count": 1
+		},
+		{
 			"contains": "prompt-native-initial-retirement-reentry",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-info-native-initial-retirement-reentry",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-native-initial-retirement-reentry",
 			"expected_count": 2
 		},
 		{
@@ -15,26 +79,6 @@
 		{
 			"contains": "personal-info-subscription-owner",
 			"expected_count": 6
-		},
-		{
-			"contains": "action-picker-startup-owner",
-			"expected_count": 5
-		},
-		{
-			"contains": "action-picker-reset-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "action-picker-reset-scalar",
-			"expected_count": 1
-		},
-		{
-			"contains": "action-picker-native-subscription-retirement-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "action-picker-subscription-sdk-owner",
-			"expected_count": 3
 		},
 		{
 			"contains": "paths-editor-startup-owner",
@@ -49,23 +93,11 @@
 			"expected_count": 6
 		},
 		{
-			"contains": "keystats-native-high-backspace",
-			"expected_count": 2
-		},
-		{
-			"contains": "keystats-native-revoked-high-backspace",
+			"contains": "paths-bare-retirement-owner",
 			"expected_count": 3
 		},
 		{
-			"contains": "native-ipv6-http-socks1",
-			"expected_count": 1
-		},
-		{
-			"contains": "native-ipv6-http-socks-port1",
-			"expected_count": 1
-		},
-		{
-			"contains": "native-winhttp-ipv6-host1",
+			"contains": "native-ipv6-relay-upstream1",
 			"expected_count": 1
 		},
 		{
