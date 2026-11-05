@@ -583,3 +583,356 @@ _RUAG_Case(Mode) {
 for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three", "cost-three", "integer-three-independent"]
     Test("Request usage aggregate: " . _RUAG_Mode . " preserves the final consumer domain (request-usage-aggregate-domain)",
         _RUAG_Case.Bind(_RUAG_Mode))
+
+; Actual native fallback InputHook -> Bridge -> OnKeystroke -> native timer ->
+; FirePrediction -> genuine managed HTTP. No provider service or fake subject.
+global _LDP_Debt := []
+_LDP_Char(State, IH, Char) {
+    if !State.InputActive
+        return
+    try {
+        State.InputChars .= Char
+        State.InputCallbacks += 1
+        AssertEqual(State.TypedHwnd, WIGetForegroundHwnd())
+        AssertEqual(State.TypedControl, WIGetFocusedControlToken())
+        _LLM_Bridge_OnDispatcherChar(IH, Char)
+    } catch Any as Err {
+        State.Failure := Err
+    }
+}
+_LDP_Down(State, IH, VK, SC) {
+    if !State.InputActive
+        return
+    try {
+        State.InputDowns += 1
+        _LLM_Bridge_OnDispatcherKey(IH, VK, SC)
+    } catch Any as Err {
+        State.Failure := Err
+    }
+}
+_LDP_Join(State, Role) {
+    Owner := Role == "peer" ? State.Peer : State.App
+    Stop := Role == "peer" ? State.PeerStop : State.AppStop
+    if !(Owner is Map) || Owner.Get("released", false)
+        return
+    AssertTrue(State.DirectoryOwned)
+    AssertTrue(FSWrite(Stop, "owned stop"))
+    Started := A_TickCount
+    while !_LLM_CurlProcessExited(Owner) && TickElapsed64(Started) < 5000
+        Sleep(10)
+    AssertTrue(_LLM_CurlProcessExited(Owner), Role . " must acknowledge its private stop")
+    ExitCode := -1, Diagnostic := ""
+    AssertTrue(_SR_TreeReadExitCode(Owner["handle"], &ExitCode, &Diagnostic))
+    AssertEqual(0, ExitCode, Role . " must acknowledge a normal native exit")
+    AssertTrue(_LLM_CurlReleaseProcess(Owner))
+}
+_LDP_Cleanup(State) {
+    global _LLM_Engine, _LLM_Bridge_Active, _LLM_Remote_Async
+    Errors := []
+    State.InputActive := false
+    try {
+        if IsObject(State.Hook)
+            State.Hook.Stop()
+        AssertTrue(!IsObject(State.Hook) || !State.Hook.InProgress)
+    } catch Any as Err
+        Errors.Push(Err)
+    try {
+        if State.Engine is Map && _LLM_Engine == State.Engine {
+            for Id, Entry in _LLM_Remote_Async {
+                Http := Entry.Get("http", 0)
+                AssertTrue(IsObject(Http) && Http.Url == State.Endpoint,
+                    "a private engine scope cannot adopt a foreign endpoint for cleanup")
+                State.OwnEntries[Id] := Entry
+            }
+            _LLM_Bridge_Active := false
+            LLM_Engine_StopGeneration()
+        } else if State.Engine is Map {
+            Pending := State.Engine.Get("pending_timer", 0)
+            if HasMethod(Pending, "Call")
+                SetTimer(Pending, 0)
+            if State.Engine.Get("request_plan", 0) is LLMRequestPlan
+                State.Engine["request_plan"].OnCancel()
+            State.Engine["pending_timer"] := "", State.Engine["timer_active"] := false
+        }
+        if State.Entry is Map
+            State.OwnEntries[State.Id] := State.Entry
+        for Id, Entry in State.OwnEntries {
+            if _LLM_Remote_Async.Get(Id, 0) == Entry {
+                LLM_RemoteCancelAsync(Id)
+                _LLMRemote_PollRequest(Id)
+            }
+            Http := Entry.Get("http", 0)
+            if IsObject(Http)
+                AssertTrue(Http.Abort(), "each exact native request must acknowledge retirement")
+            AssertFalse(_LLM_Remote_Async.Get(Id, 0) == Entry)
+        }
+        AssertFalse(State.Engine["timer_active"])
+    } catch Any as Err
+        Errors.Push(Err)
+    for Role in ["peer", "app"] {
+        try _LDP_Join(State, Role)
+        catch Any as Err
+            Errors.Push(Err)
+    }
+    try {
+        if IsObject(State.GuiA) {
+            State.GuiA.Destroy()
+            State.GuiA := 0
+        }
+    } catch Any as Err
+        Errors.Push(Err)
+    try {
+        if Errors.Length == 0 && State.DirectoryOwned && DirExist(State.Directory)
+            DirDelete(State.Directory, true)
+    } catch Any as Err
+        Errors.Push(Err)
+    if Errors.Length {
+        for Err in Errors
+            _TestPrint("# LLM_DEBOUNCE_SOURCE_CLEANUP " . KL_JsonEncode(Map("error", Type(Err), "message", Err.Message)))
+        throw Errors[1]
+    }
+}
+_LDP_DrainDebt() {
+    global _LDP_Debt
+    Remaining := []
+    for State in _LDP_Debt {
+        try _LDP_Cleanup(State)
+        catch Any as Err
+            Remaining.Push(State)
+    }
+    _LDP_Debt := Remaining
+    AssertEqual(0, Remaining.Length, "new cases cannot hide exact native retirement debt")
+}
+_LDP_Native(Mode, Calls, Lines) {
+    global _DriverDir, _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport
+    global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
+    global _LLM_Bridge_AgentBuffer, _LLM_Bridge_LastLogTick, _LLM_Bridge_PrefixObserver
+    global _LLM_Agent_Generation, _LLM_Agent_Auto, _PrefixInputHook, HSE_Buffer, _PrefixBuffer
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LDP_Debt, _LLM_Live
+    global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+    AssertFalse(A_IsCritical)
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    AssertFalse(_LLM_Bridge_Active, "do not borrow an active bridge")
+    AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "do not replace an armed prefix observer")
+    AssertFalse(_LLM_Agent_Auto is Map && HasMethod(_LLM_Agent_Auto.Get("timer", 0), "Call"),
+        "do not replace a foreign automatic-agent pause")
+    AssertFalse(IsObject(_PrefixInputHook), "do not replace a live prefix watcher")
+    OldHook := HookDispatcher._ih
+    AssertTrue(!IsObject(OldHook) || !OldHook.InProgress, "do not borrow a foreign native dispatcher hook")
+    Saved := {Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_Buffer,
+        Content: _LLM_Bridge_ContentGeneration, AgentBuffer: _LLM_Bridge_AgentBuffer,
+        LogTick: _LLM_Bridge_LastLogTick, Observer: _LLM_Bridge_PrefixObserver,
+        AgentGeneration: _LLM_Agent_Generation, AgentAuto: _LLM_Agent_Auto,
+        Hse: HSE_Buffer, Prefix: _PrefixBuffer, Live: _LLM_Live}
+    State := {Directory: "", DirectoryOwned: false, Peer: 0, PeerStop: "", App: 0, AppStop: "",
+        GuiA: 0, Hook: 0, InputActive: false, InputChars: "", InputCallbacks: 0, InputDowns: 0,
+        TypedHwnd: 0, TypedControl: 0, Failure: 0, Id: 0, Entry: 0, Engine: _LLM_Engine,
+        Endpoint: "", OwnEntries: Map()}
+    Primary := 0
+    try {
+        State.Directory := A_Temp . "\ergopti_llm_source_" . A_TickCount . "_" . Random(1, 1000000)
+        Ack := FSCreateDirectoryExclusiveStrict(State.Directory)
+        AssertTrue(Ack is Integer && Ack == 1)
+        State.DirectoryOwned := true
+        Nonce := String(A_TickCount) . "_" . Random(1, 1000000)
+        PeerReady := State.Directory . "\peer.txt", Receipt := State.Directory . "\http.jsonl"
+        AppReady := State.Directory . "\app.txt"
+        State.PeerStop := State.Directory . "\peer.stop", State.AppStop := State.Directory . "\app.stop"
+        Runtime := State.Directory . "\ergopti_allowed_" . Nonce . ".exe"
+        FileCopy(A_AhkPath, Runtime, false)
+        AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath)), CryptoSha256Bytes(FSReadBytesStrict(Runtime)))
+        AppScript := _DriverDir . "\tests\fixtures\llm_debounce_privacy_app.ahk"
+        PeerScript := _DriverDir . "\tests\fixtures\llm_debounce_privacy_peer.ahk"
+        AssertTrue(FileExist(AppScript) && FileExist(PeerScript))
+        Pid := 0
+        _LLM_CurlArtifactRun(_SR_BuildDirectCommandLine(Runtime, ["/ErrorStdOut", AppScript, AppReady, State.AppStop, Nonce]),
+            State.Directory, "", &Pid, &AppOwner)
+        State.App := AppOwner
+        AppPid := Pid
+        _LLM_CurlArtifactRun(_SR_BuildDirectCommandLine(A_AhkPath,
+            ["/ErrorStdOut", PeerScript, PeerReady, Receipt, "200", "done", State.PeerStop]),
+            State.Directory, "Hide", &Pid, &PeerOwner)
+        State.Peer := PeerOwner
+        Started := A_TickCount
+        while (!FileExist(AppReady) || !FileExist(PeerReady)) && TickElapsed64(Started) < 5000
+            Sleep(10)
+        AssertTrue(FileExist(AppReady) && FileExist(PeerReady))
+        AppRecord := FileRead(AppReady, "UTF-8-RAW")
+        AssertTrue(RegExMatch(AppRecord, "^([0-9]+)\|([0-9]+)\|([0-9]+)\|" . Nonce . "`n\z", &Match))
+        AssertEqual(AppPid, Integer(Match[1]))
+        BHwnd := Integer(Match[2]), BControl := Integer(Match[3])
+        ActualPid := 0
+        AssertTrue(DllCall("User32\GetWindowThreadProcessId", "Ptr", BHwnd, "UInt*", &ActualPid, "UInt") > 0)
+        AssertEqual(AppPid, ActualPid)
+        AssertTrue(DllCall("User32\IsChild", "Ptr", BHwnd, "Ptr", BControl, "Int"))
+        PortRecord := FileRead(PeerReady, "UTF-8-RAW")
+        AssertTrue(RegExMatch(PortRecord, "^[0-9]{1,5}`n\z"))
+        Port := Integer(SubStr(PortRecord, 1, -1))
+        AssertTrue(Port > 0 && Port <= 65535)
+        State.GuiA := Gui(, "Owned excluded source " . Nonce)
+        EditA := State.GuiA.AddEdit("w360 h100")
+        State.GuiA.Show("w400 h150")
+        AHwnd := State.GuiA.Hwnd, AControl := EditA.Hwnd
+        AApp := WinGetProcessName("ahk_id " . AHwnd), BApp := WinGetProcessName("ahk_id " . BHwnd)
+        AssertTrue(AApp != "" && BApp != "" && StrCompare(AApp, BApp, false) != 0)
+        Entry := Map("Id", "source-owned", "Provider", "openai_compat", "Model", "fixture-model",
+            "Token", "owned-fixture-key", "BaseUrl", "http://127.0.0.1:" . Port . "/v1")
+        State.Endpoint := Entry["BaseUrl"] . "/chat/completions"
+        _LLM_Menu["api_entries"] := [Entry], _LLM_Menu["api_entry_id"] := "source-owned"
+        _LLM_Menu["agent_mode"] := "off"
+        _LLM_Bridge_Active := true, _LLM_Bridge_Buffer := "", _LLM_Bridge_AgentBuffer := ""
+        _LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
+        _Stub_LlmTooltipVisible := false, _Stub_LlmTooltipLoading := false
+        _Stub_LlmTooltipText := "", _Stub_LlmPresentedRecord := 0
+        _LLM_Bridge_PrefixObserver := 0, HSE_Buffer := "", _PrefixBuffer := ""
+        _LLM_Agent_Auto := Map("timer", 0, "offer", "", "triaged", Map(), "order", [])
+        _LLM_Engine_RemoteTransport := 0
+        LLM_Engine_Init(Map("backend", "api", "api_entries", [Entry], "api_entry_id", "source-owned",
+            "profile_id", "basic", "n_predictions", 1, "disabled_apps", [AApp],
+            "debounce_ms", 1000, "instant_on_word_end", false, "show_info_bar", false))
+        State.TypedHwnd := Mode == "allowed-stays" ? BHwnd : AHwnd
+        State.TypedControl := Mode == "allowed-stays" ? BControl : AControl
+        WinActivate("ahk_id " . State.TypedHwnd)
+        AssertTrue(WinWaitActive("ahk_id " . State.TypedHwnd, , 2))
+        ControlFocus(State.TypedControl)
+        AssertEqual(State.TypedControl, WIGetFocusedControlToken())
+        AssertEqual(Mode != "allowed-stays", _LLM_Engine_ShouldSuppressForDisabledApps(),
+            "native app identity establishes the real excluded/allowed precondition")
+        Canary := Mode == "allowed-stays" ? "allowed_context_b_canary" : "private_context_a_canary"
+        State.Hook := InputHook("V L0 I1")
+        State.Hook.KeyOpt("{All}", "+N")
+        State.Hook.OnChar := _LDP_Char.Bind(State)
+        State.Hook.OnKeyDown := _LDP_Down.Bind(State)
+        HookDispatcher._ih := State.Hook
+        State.InputActive := true
+        State.Hook.Start()
+        AssertTrue(State.Hook.InProgress)
+        PreviousSendLevel := A_SendLevel
+        try {
+            SendLevel(2)
+            SendEvent("{Text}" . Canary)
+        } finally SendLevel(PreviousSendLevel)
+        Started := A_TickCount
+        while (State.InputChars != Canary || !_LLM_Engine["timer_active"]) && TickElapsed64(Started) < 2000
+            Sleep(5)
+        if IsObject(State.Failure)
+            throw State.Failure
+        AssertEqual(Canary, State.InputChars, "the actual I1 native callback observes the complete typed canary")
+        AssertEqual(Canary, ControlGetText(State.TypedControl), "the same actual text is present in the original native Edit")
+        SnapshotCritical := Critical("On")
+        try {
+            AssertEqual(Canary, _LLM_Bridge_Buffer)
+            AssertEqual(Canary, _LLM_Engine["last_buffer"])
+            AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending),
+                "the genuine callback must arm its unmodified native debounce timer while the original native app is active")
+            ArmToken := _LLM_Engine_Plan().Pending["token"]
+            InputCount := State.InputCallbacks, DownCount := State.InputDowns
+            BeforeCounter := _LLM_Remote_AsyncCounter
+        } finally Critical(SnapshotCritical)
+        if Mode == "excluded-switches" {
+            ; No Send/keys/click: this is an application's ordinary activation.
+            AssertTrue(DllCall("User32\SetForegroundWindow", "Ptr", BHwnd, "Int"),
+                "the current foreground owner transfers activation through the real native API")
+            AssertTrue(WinWaitActive("ahk_id " . BHwnd, , 2))
+            AssertEqual(BControl, WIGetFocusedControlToken())
+            AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(), "the live B app is genuinely allowed")
+        }
+        PendingAfterSwitch := IsObject(_LLM_Engine_Plan().Pending)
+        Started := A_TickCount
+        loop {
+            Id := BeforeCounter + 1
+            if _LLM_Remote_Async.Has(Id) {
+                State.Id := Id, State.Entry := _LLM_Remote_Async[Id]
+            }
+            if !_LLM_Engine["timer_active"] && !IsObject(_LLM_Engine_Plan().Pending) && _LLM_Remote_Async.Count == 0
+                break
+            if TickElapsed64(Started) >= 20000
+                throw Error("The actual debounce/request owner did not settle.")
+            _SR_TreePoll()
+            Sleep(10)
+        }
+        if IsObject(State.Failure)
+            throw State.Failure
+        AssertEqual(InputCount, State.InputCallbacks, "activation introduces no new characters to replace the source buffer")
+        AssertEqual(DownCount, State.InputDowns, "native activation introduces no new keydown that could cancel the old timer")
+        State.InputActive := false
+        State.Hook.Stop()
+        AssertFalse(State.Hook.InProgress)
+        NativeDelta := _LLM_Remote_AsyncCounter - BeforeCounter
+        Source := _LLM_Engine.Get("request_accept_source", Map())
+        SourceApp := Source is Map ? Source.Get("app_name", "") : ""
+        FocusApp := WIGetFocused()["appId"]
+        _LDP_Join(State, "peer")
+        Posts := 0, SourceA := 0, SourceB := 0
+        if FileExist(Receipt) {
+            for Line in StrSplit(FileRead(Receipt, "UTF-8-RAW"), "`n", "`r") {
+                if Line == ""
+                    continue
+                Row := JsonParse(Line)
+                AssertEqual("POST", Row["method"]), AssertEqual("/v1/chat/completions", Row["path"])
+                AssertEqual(200, Row["status"])
+                Posts += 1, SourceA += Row["source_a"] == true, SourceB += Row["source_b"] == true
+            }
+        }
+        _TestPrint("# LLM_DEBOUNCE_SOURCE " . KL_JsonEncode(Map("mode", Mode, "arm_token", ArmToken,
+            "pending_after_switch", PendingAfterSwitch, "native_chars", State.InputCallbacks, "native_keydowns", State.InputDowns,
+            "source_app", SourceApp, "focus_app", FocusApp, "a_app", AApp, "b_app", BApp,
+            "typed_hwnd", State.TypedHwnd, "typed_control", State.TypedControl,
+            "captured_source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
+            "captured_source_control", Source is Map ? Source.Get("control", 0) : 0,
+            "focus_hwnd", WIGetForegroundHwnd(),
+            "native_request_delta", NativeDelta, "http_posts", Posts, "source_a_received", SourceA,
+            "source_b_received", SourceB, "remaining_requests", _LLM_Remote_Async.Count)))
+        ExpectedPosts := Mode == "allowed-stays" ? 1 : 0
+        AssertEqual(ExpectedPosts, Posts, "the excluded source's captured context must never reach HTTP after another app gains focus")
+        if ExpectedPosts
+            AssertEqual(1, NativeDelta, "the live control creates its genuine remote reservation once")
+        if Posts {
+            AssertTrue(Source is Map)
+            AssertEqual(State.TypedHwnd, Source.Get("hwnd", 0))
+            AssertEqual(State.TypedControl, Source.Get("control", 0))
+        }
+        AssertEqual(0, SourceA, "the private A canary is never admitted")
+        AssertEqual(ExpectedPosts, SourceB)
+        AssertEqual(0, Calls.Length, "the probe never invokes the fake remote transport")
+    } catch Any as Err {
+        Primary := Err
+    } finally {
+        try _LDP_Cleanup(State)
+        catch Any as Err {
+            _LDP_Debt.Push(State)
+            if !IsObject(Primary)
+                Primary := Err
+        }
+        if IsObject(State.Hook) && IsObject(HookDispatcher._ih) && ObjPtr(HookDispatcher._ih) == ObjPtr(State.Hook)
+            HookDispatcher._ih := OldHook
+        _LLM_Bridge_Active := Saved.Active, _LLM_Bridge_Buffer := Saved.Buffer
+        _LLM_Bridge_ContentGeneration := Saved.Content, _LLM_Bridge_AgentBuffer := Saved.AgentBuffer
+        _LLM_Bridge_LastLogTick := Saved.LogTick, _LLM_Bridge_PrefixObserver := Saved.Observer
+        _LLM_Agent_Generation := Saved.AgentGeneration, _LLM_Agent_Auto := Saved.AgentAuto
+        HSE_Buffer := Saved.Hse, _PrefixBuffer := Saved.Prefix, _LLM_Live := Saved.Live
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LDP_Fixture(Mode) {
+    global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+    Saved := {Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
+        Text: _Stub_LlmTooltipText, Presented: _Stub_LlmPresentedRecord}
+    try _LPP_Run(_LPP_Menu(), "", _LDP_Native.Bind(Mode), true)
+    finally {
+        _Stub_LlmTooltipVisible := Saved.Visible, _Stub_LlmTooltipLoading := Saved.Loading
+        _Stub_LlmTooltipText := Saved.Text, _Stub_LlmPresentedRecord := Saved.Presented
+    }
+}
+_LDP_Run(Mode) {
+    PreviousCritical := Critical("Off")
+    try {
+        _LDP_DrainDebt()
+        _ManagedRemoteFixtureWithLlmTimings(_LATHTTP_HostScope.Bind(_LDP_Fixture.Bind(Mode)))
+    } finally Critical(PreviousCritical)
+}
+for _LDP_Mode in ["excluded-stays", "allowed-stays", "excluded-switches"]
+    Test("Debounce source privacy: " . _LDP_Mode . " retains native typed provenance (llm-debounce-source-privacy)",
+        _LDP_Run.Bind(_LDP_Mode))
