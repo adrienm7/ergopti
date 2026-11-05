@@ -143,7 +143,10 @@ local function with_action(session, action, change, body)
 			if action == "wrap_selection" then helpers.assert_true(Gestures.set_action_parameter("tap_3", action, "(")) end
 			helpers.assert_true(Gestures.execute_action(action, "tap_3"))
 			world.original_current = original.current()
-			helpers.assert_eq(world.clipboard, "saved clipboard", "retirement must still restore the saved clipboard")
+			-- During the copy wait, a different clipboard value has not yet been
+			-- observed as ours. Preserve it: it may be a concurrent user copy.
+			local expected_clipboard = change == "copy-wait" and "source selection" or "saved clipboard"
+			helpers.assert_eq(world.clipboard, expected_clipboard, "retirement must respect clipboard ownership")
 			helpers.assert_eq(next(world.held), nil, "retirement must still release every owned key")
 			body(world)
 		end)
