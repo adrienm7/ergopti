@@ -28,7 +28,9 @@ local function fixture(body)
 		spawn = function(bin, args, callback)
 			local task = { bin = bin, args = args, done = callback, cancelled = false }
 			pending[#pending + 1] = task
+			-- Like the real handle: prepared by spawn, running only once started
 			return { isSettled = function() return task.cancelled end,
+				start = function() task.started = true; return true end,
 				terminate = function() task.cancelled = true; callback(1, "", "cancelled") end }
 		end,
 	}

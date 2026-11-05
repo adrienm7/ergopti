@@ -288,7 +288,14 @@ function M.refresh(on_done)
 		end
 		local ok, handle = pcall(ShellRunner.spawn, "/usr/bin/defaults", args, complete)
 		if ok and type(handle) == "table" then probe.handles[#probe.handles + 1] = handle end
-		if not ok or type(handle) ~= "table" or handle.isSettled() then complete(-1, "") end
+		if not ok or type(handle) ~= "table" or handle.isSettled() then
+			complete(-1, "")
+		-- spawn only prepares the task: unstarted, no read ever completed, so no
+		-- gesture macOS claims was greyed or held back (field report 2026-11-05)
+		elseif handle.start() ~= true then
+			Logger.warn(LOG, "System gesture settings read '%s' could not start.", tostring(args[2]))
+			complete(-1, "")
+		end
 	end
 	return true
 end
