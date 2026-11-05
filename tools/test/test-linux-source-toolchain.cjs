@@ -61,32 +61,64 @@ try {
 		fs.mkdirSync(unusualSource);
 		for (const name of ['archive_publication.c', 'archive_publication.h'])
 			fs.copyFileSync(path.join(sourceDirectory, name), path.join(unusualSource, name));
-		const built = spawnSync(bashExecutable(), [bashPath(copiedBuilder), '--source-directory',
-			bashPath(unusualSource), '--output-directory', bashPath(unusualOutput)],
-			{ encoding: 'utf8', timeout: 30000 });
+		const built = spawnSync(
+			bashExecutable(),
+			[
+				bashPath(copiedBuilder),
+				'--source-directory',
+				bashPath(unusualSource),
+				'--output-directory',
+				bashPath(unusualOutput)
+			],
+			{ encoding: 'utf8', timeout: 30000 }
+		);
 		assert.equal(built.status, 0, built.stderr || built.error?.message);
 		assert.ok(fs.existsSync(path.join(unusualOutput, 'libergopti_archive_publication.so')));
 		assert.equal(fs.existsSync(unusualOutput.trimEnd()), false);
 	}
 	if (process.platform === 'linux') {
-		const stageLine = /^\s*NATIVE_OUTPUT_STAGE="\$\([^\n]+\)"[\s\S]*?(?=\n\s*# A failed\/uncertain compiler)/m.exec(installer);
+		const stageLine =
+			/^\s*NATIVE_OUTPUT_STAGE="\$\([^\n]+\)"[\s\S]*?(?=\n\s*# A failed\/uncertain compiler)/m.exec(
+				installer
+			);
 		assert.ok(stageLine, 'actual native output stage allocation');
 		const relativeTemp = path.join(scratch, 'relative-tmp');
 		fs.mkdirSync(relativeTemp);
-		const result = run(`set -euo pipefail\ncd ${quote(bashPath(scratch))}\nexport TMPDIR=relative-tmp\n${stageLine[0]}\nbash ${quote(bashPath(copiedBuilder))} --source-directory ${quote(bashPath(sourceDirectory))} --output-directory "$NATIVE_OUTPUT_STAGE"`);
-		assert.equal(result.status, 0, `relative TMPDIR must permit source compilation: ${result.stderr}`);
+		const result = run(
+			`set -euo pipefail\ncd ${quote(bashPath(scratch))}\nexport TMPDIR=relative-tmp\n${stageLine[0]}\nbash ${quote(bashPath(copiedBuilder))} --source-directory ${quote(bashPath(sourceDirectory))} --output-directory "$NATIVE_OUTPUT_STAGE"`
+		);
+		assert.equal(
+			result.status,
+			0,
+			`relative TMPDIR must permit source compilation: ${result.stderr}`
+		);
 	}
 	if (process.platform === 'linux') {
 		const fakeCompiler = path.join(scratch, 'bad-compiler');
 		const foreign = path.join(scratch, 'foreign-file');
 		fs.writeFileSync(foreign, 'personal bytes', { mode: 0o600 });
-		fs.writeFileSync(fakeCompiler, '#!/bin/bash\nwhile [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then shift; output="$1"; break; fi; shift; done\ncase "$BAD_OUTPUT" in invalid) printf non-elf > "$output" ;; empty) : > "$output" ;; link) ln -s "$FOREIGN_FILE" "$output" ;; fifo) mkfifo "$output" ;; esac\n', { mode: 0o755 });
+		fs.writeFileSync(
+			fakeCompiler,
+			'#!/bin/bash\nwhile [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then shift; output="$1"; break; fi; shift; done\ncase "$BAD_OUTPUT" in invalid) printf non-elf > "$output" ;; empty) : > "$output" ;; link) ln -s "$FOREIGN_FILE" "$output" ;; fifo) mkfifo "$output" ;; esac\n',
+			{ mode: 0o755 }
+		);
 		for (const kind of ['empty', 'link', 'fifo', 'invalid']) {
 			const output = path.join(scratch, `bad-native-${kind}`);
-			const result = spawnSync(bashExecutable(), [bashPath(copiedBuilder), '--source-directory', bashPath(sourceDirectory), '--output-directory', bashPath(output)], {
-				encoding: 'utf8', timeout: 10000,
-				env: { ...process.env, CC: fakeCompiler, BAD_OUTPUT: kind, FOREIGN_FILE: foreign }
-			});
+			const result = spawnSync(
+				bashExecutable(),
+				[
+					bashPath(copiedBuilder),
+					'--source-directory',
+					bashPath(sourceDirectory),
+					'--output-directory',
+					bashPath(output)
+				],
+				{
+					encoding: 'utf8',
+					timeout: 10000,
+					env: { ...process.env, CC: fakeCompiler, BAD_OUTPUT: kind, FOREIGN_FILE: foreign }
+				}
+			);
 			assert.notEqual(result.status, 0, `${kind} compiler output must be refused`);
 			assert.equal(fs.existsSync(path.join(output, 'libergopti_archive_publication.so')), false);
 			assert.equal(fs.readFileSync(foreign, 'utf8'), 'personal bytes');
@@ -160,6 +192,16 @@ ${acquisition}`;
 	}
 	console.log('Actual checkout capability controls: 8 passed; compiler seam is a model.');
 	if (process.platform === 'linux') {
+		const lifecycle = spawnSync(
+			'python3',
+			[path.join(root, 'tools/test/test-linux-archive-native-lifecycle.py')],
+			{ encoding: 'utf8', timeout: 30000 }
+		);
+		assert.equal(lifecycle.status, 0, lifecycle.stderr || lifecycle.error?.message);
+		assert.match(
+			lifecycle.stdout,
+			/complete publication, independent readers and retirement passed/
+		);
 		const clone = path.join(scratch, 'genuine-git-clone');
 		const cloned = spawnSync(
 			'git',
