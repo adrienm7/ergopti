@@ -260,6 +260,28 @@ helpers.describe("caps word auto-off: the manager session", function()
 		end)
 	end)
 
+	helpers.it("caps word auto-off, a timer from a lost source cannot end the next session", function()
+		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 3\n', function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			local old_loss = c.hook.on_lost
+			c.now = 2000
+			c.hook.lose("keyboard source retired")
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			old_loss("stale source notification")
+			helpers.assert_true(c.manager.is_caps_word_active(), "the old source callback must not retire the new hold")
+			c.now = 4000
+			c.run_due()
+			helpers.assert_true(c.manager.is_caps_word_active(), "the old source timer must not unlock the new session")
+			helpers.assert_true(c.hook.held)
+			helpers.assert_eq(c.hook.releases, 0)
+			c.now = 5000
+			c.run_due()
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_eq(c.hook.releases, 1)
+		end)
+	end)
+
 	helpers.it("caps word auto-off, a key after the delay ends CapsWord before it is read", function()
 		with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 1\n', function(c)
 			helpers.assert_true(c.manager.toggle_caps_word())
