@@ -2962,12 +2962,19 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
 	local configured_entries, stored_token = _entries, entry.token
+	local stored_id, stored_base, stored_model = entry.id, entry.base_url, entry.model
+	local function entry_current()
+		local selected = find_provider_entry(provider_id)
+		return _entries == configured_entries and selected ~= nil
+			and selected.id == stored_id and selected.token == stored_token
+			and selected.base_url == stored_base and selected.model == stored_model
+	end
 	--- Hands over the request once its key is known.
 	--- @param token string The cleartext key, "" for a local server given none.
 	local function with_token(token)
 		-- Agent/vision requests are independent of the prediction selection, but
 		-- a late Keychain read cannot retain credentials removed from configuration.
-		if _entries ~= configured_entries or entry.token ~= stored_token then
+		if not entry_current() then
 			fail("stale_identity")
 			return
 		end
@@ -2979,6 +2986,11 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 		end
 		-- The stored key is exchanged for the short-lived token the requests carry
 		M.prepare_access(provider_id, token, function(ok, reason, access)
+			-- Token exchange can outlive account removal or an endpoint/key edit.
+			if not entry_current() then
+				fail("stale_identity")
+				return
+			end
 			if not ok then
 				Logger.error(LOG, "%s request for provider '%s' has no access token: %s.", label, provider_id, tostring(reason))
 				fail("access_token_unavailable")
