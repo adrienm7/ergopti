@@ -1,9 +1,53 @@
 {
-	"expected_count": 24,
+	"expected_count": 75,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
+		{
+			"contains": "prefix-fresh-native-privacy",
+			"expected_count": 8
+		},
+		{
+			"contains": "llm-prefix-native-style-privacy",
+			"expected_count": 2
+		},
+		{
+			"contains": "secure-field-native-style-change",
+			"expected_count": 3
+		},
+		{
+			"contains": "secure-field-native-style-cache",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-typing-source-privacy",
+			"expected_count": 10
+		},
+		{
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-native-admission-order",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-native-entry-lifecycle",
+			"expected_count": 4
+		},
+		{
+			"contains": "prefix-scalar-framing",
+			"expected_count": 16
+		},
 		{
 			"contains": "model-browser-close-pause-owner",
 			"expected_count": 6
@@ -33,12 +77,8 @@
 			"expected_count": 2
 		},
 		{
-			"contains": "managed-bootstrap-constructor-failure-lifetime",
-			"expected_count": 2
-		},
-		{
-			"contains": "open-app-original-nul",
-			"expected_count": 3
+			"contains": "brightness-timer-successor",
+			"expected_count": 1
 		}
 	]
 }
