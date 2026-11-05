@@ -77,6 +77,24 @@ local function preserve_corrupt(path)
 	return CorruptAside.preserve(path) ~= nil
 end
 
+--- Refuse partial maps: dropping an invalid entry before the next save would
+--- silently overwrite the only copy of that application's learning.
+local function valid_root(root)
+	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table"
+		or Json.is_array(root.apps) or Json.is_null(root.apps) then return false end
+	for app, entry in pairs(root.apps) do
+		if type(app) ~= "string" or type(entry) ~= "table" or Json.is_array(entry)
+			or type(entry.used) ~= "number" or type(entry.thresholds) ~= "table"
+			or Json.is_array(entry.thresholds) or Json.is_null(entry.thresholds) then return false end
+		for intent, value in pairs(entry.thresholds) do
+			if type(intent) ~= "string" or type(value) ~= "number" or value < 0 or value > 1 then
+				return false
+			end
+		end
+	end
+	return true
+end
+
 --- Reads the file into memory once.
 local function load()
 	if _map and not _load_blocked then return end
@@ -100,7 +118,7 @@ local function load()
 	-- An overflowing persisted sequence becomes infinity in the legacy decoder,
 	-- leaving LRU eviction without any oldest entry. Admit exact JSON instead.
 	local root = Json.decode_lossless(text or "")
-	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table" then
+	if not valid_root(root) then
 		_load_blocked = not preserve_corrupt(path)
 		if _load_blocked then
 			Logger.error(LOG, "The agent's learning source could not be preserved; mutations are blocked.")
