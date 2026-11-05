@@ -194,6 +194,17 @@ it("preserves the interface scope discarded by libuv DNS results", function()
 	helpers.assert_true(child.is_settled())
 end)
 
+it("settles a real link-local relay whose interface scope does not exist", function()
+	local answer
+	local child = assert(Probe.probe("fe80::1%4294967295", 80, 1000, function(reachable, reason)
+		answer = { reachable, reason }
+	end, luv))
+	run_until(function() return child.is_settled() end)
+	helpers.assert_true(child.is_settled(), "the invalid native scope must not strand the probe")
+	helpers.assert_eq(answer[1], false)
+	helpers.assert_true(answer[2] == "resolve" or answer[2] == "connect" or answer[2] == "timeout", tostring(answer[2]))
+end)
+
 it("publishes the answer only after its native timer and socket retire", function()
 	local server, port = listener()
 	local owned = {}
@@ -246,6 +257,58 @@ it("isolates throwing callbacks and delivers all settlement listeners", function
 	helpers.assert_eq(late, 1, "a settled child invokes late listeners immediately")
 end)
 
+it("retires real sockets when both a callback and its diagnostic throw", function()
+	local logger = require("logger.shim")
+	local old_error = logger.error
+	local server, port = listener()
+	local child = assert(Probe.probe("127.0.0.1", port, 1000, function()
+		error("controlled callback failure")
+	end, luv))
+	local notified = 0
+	child.on_settled(function() notified = notified + 1 end)
+	logger.error = function() error("controlled diagnostic failure") end
+	local tested, reason = pcall(run_until, function() return child.is_settled() end)
+	logger.error = old_error
+	server:close()
+	luv.run("nowait")
+	helpers.assert_true(tested, tostring(reason))
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(notified, 1)
+end)
+
+it("continues socket retirement when a refused timer close and its diagnostic throw", function()
+	local logger = require("logger.shim")
+	local old_error = logger.error
+	local resolve, connect, allow_close, socket_closed = nil, nil, false, false
+	local function handle(is_timer)
+		return {
+			is_closing = function() return false end,
+			close = function(_, done)
+				if is_timer and not allow_close then return false, "controlled refusal" end
+				if not is_timer then socket_closed = true end
+				done(); return true
+			end,
+			connect = function(_, _, _, callback) connect = callback; return true end,
+		}
+	end
+	local backend = {
+		new_timer = function() return handle(true) end, new_tcp = function() return handle(false) end,
+		update_time = function() end, timer_start = function() return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return {} end,
+	}
+	local child = assert(Probe.probe("example", 80, 1000, function() end, backend))
+	resolve(nil, { { addr = "127.0.0.1", port = 80 } })
+	logger.error = function() error("controlled diagnostic failure") end
+	local called, reason = pcall(connect, nil)
+	logger.error = old_error
+	helpers.assert_true(called, tostring(reason))
+	helpers.assert_true(socket_closed, "a timer diagnostic must not prevent socket close")
+	helpers.assert_eq(child.is_settled(), false)
+	allow_close = true
+	child.cancel()
+	helpers.assert_true(child.is_settled())
+end)
+
 it("a cancel answers nothing and still settles the child", function()
 	local server, port = listener()
 	local called = false
@@ -256,6 +319,57 @@ it("a cancel answers nothing and still settles the child", function()
 	run_until(function() return server:is_closing() end)
 	helpers.assert_eq(called, false)
 	helpers.assert_eq(child.is_settled(), true)
+end)
+
+it("waits for a late DNS callback after timeout without starting a stale connection", function()
+	local expire, resolve, cancelled, sockets = nil, nil, 0, 0
+	local timer = {
+		is_closing = function() return false end,
+		close = function(_, done) done() end,
+	}
+	local request = {}
+	local backend = {
+		new_timer = function() return timer end,
+		update_time = function() end,
+		timer_start = function(_, _, _, callback) expire = callback; return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return request end,
+		cancel = function(value) helpers.assert_eq(value, request); cancelled = cancelled + 1; return true end,
+		new_tcp = function() sockets = sockets + 1; error("stale DNS must not connect") end,
+	}
+	local answers = {}
+	local child = assert(Probe.probe("relay.invalid", 80, 1000, function(ok, reason)
+		answers[#answers + 1] = { ok, reason }
+	end, backend))
+	expire()
+	helpers.assert_eq(cancelled, 1)
+	helpers.assert_eq(child.is_settled(), false, "resolver still owns its callback")
+	helpers.assert_eq(#answers, 0)
+	resolve(nil, { { addr = "127.0.0.1", port = 80 } })
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(answers, { { false, "timeout" } })
+	helpers.assert_eq(sockets, 0)
+end)
+
+it("returns the DNS refusal after its timer has closed", function()
+	local resolve, closed, sockets = nil, false, 0
+	local backend = {
+		new_timer = function() return {
+			is_closing = function() return false end,
+			close = function(_, done) closed = true; done() end,
+		} end,
+		update_time = function() end,
+		timer_start = function() return true end,
+		getaddrinfo = function(_, _, _, callback) resolve = callback; return {} end,
+		new_tcp = function() sockets = sockets + 1; error("failed DNS must not connect") end,
+	}
+	local answer
+	local child = assert(Probe.probe("relay.invalid", 80, 1000, function(ok, reason)
+		answer = { ok, reason, closed }
+	end, backend))
+	resolve("EAI_NONAME", nil)
+	helpers.assert_true(child.is_settled())
+	helpers.assert_eq(answer, { false, "resolve", true })
+	helpers.assert_eq(sockets, 0)
 end)
 
 it("refuses invalid arguments without starting a handle", function()

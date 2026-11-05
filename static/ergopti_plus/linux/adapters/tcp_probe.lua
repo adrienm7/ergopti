@@ -23,6 +23,7 @@ local M = {}
 local NativeTimer = require("infra.native_timer")
 local Logger = require("logger.shim")
 local LOG = "adapters.tcp_probe"
+local function diagnostic(message) pcall(Logger.error, LOG, message) end
 
 --- Starts one probe.
 --- @param host string Host name or address (brackets already removed).
@@ -51,11 +52,11 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		-- Publish only after the resolver and both exact handles have retired.
 		if not cancelled then
 			local ok = pcall(callback, result.reachable, result.reason)
-			if not ok then Logger.error(LOG, "TCP probe completion callback raised.") end
+			if not ok then diagnostic("TCP probe completion callback raised.") end
 		end
 		for _, listener in ipairs(pending) do
 			local ok = pcall(listener)
-			if not ok then Logger.error(LOG, "TCP probe settlement callback raised.") end
+			if not ok then diagnostic("TCP probe settlement callback raised.") end
 		end
 	end
 
@@ -70,11 +71,11 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		if entry.closed or entry.closing then return end
 		local inspected, closing = pcall(handle.is_closing, handle)
 		if not inspected then
-			Logger.error(LOG, "TCP probe handle inspection failed; retirement remains pending.")
+			diagnostic("TCP probe handle inspection failed; retirement remains pending.")
 			return
 		end
 		if closing ~= false then
-			if closing ~= true then Logger.error(LOG, "TCP probe handle inspection was inconclusive.") end
+			if closing ~= true then diagnostic("TCP probe handle inspection was inconclusive.") end
 			return
 		end
 		entry.closing = true
@@ -86,7 +87,7 @@ function M.probe(host, port, timeout_ms, callback, luv)
 			settle()
 		end)
 		if not entry.closed and (not called or ack == false or detail ~= nil) then
-			Logger.error(LOG, "TCP probe handle close was refused; retirement remains pending.")
+			diagnostic("TCP probe handle close was refused; retirement remains pending.")
 			local observed, scheduled = pcall(handle.is_closing, handle)
 			-- A close that may already be scheduled is never issued twice.
 			if observed and scheduled == false then entry.closing = false end
@@ -169,7 +170,7 @@ function M.probe(host, port, timeout_ms, callback, luv)
 		if type(listener) ~= "function" then return false end
 		if settled then
 			local ok = pcall(listener)
-			if not ok then Logger.error(LOG, "TCP probe settlement callback raised.") end
+			if not ok then diagnostic("TCP probe settlement callback raised.") end
 		else listeners[#listeners + 1] = listener end
 		return true
 	end
