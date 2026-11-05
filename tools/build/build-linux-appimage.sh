@@ -285,14 +285,26 @@ echo ""
 echo "Building AppImage..."
 # -u embeds the update information; appimagetool then writes the .zsync into its
 # working directory, so it runs in the build directory with a relative output.
-(cd "$BUILD_DIR" && ARCH="$ARCH" appimagetool -u "$UPDATE_INFORMATION" "$APPDIR" "$APPIMAGE_ASSET")
+APPIMAGE_STAGE="$(mktemp -d "$BUILD_DIR/.ergopti-appimage.XXXXXX")"
+cleanup_appimage_stage() {
+  status=$?
+  trap - EXIT
+  rm -f -- "$APPIMAGE_STAGE/$APPIMAGE_ASSET" "$APPIMAGE_STAGE/$APPIMAGE_ASSET.zsync" || status=1
+  rmdir -- "$APPIMAGE_STAGE" || status=1
+  exit "$status"
+}
+trap cleanup_appimage_stage EXIT
+(cd "$APPIMAGE_STAGE" && ARCH="$ARCH" appimagetool -u "$UPDATE_INFORMATION" "$APPDIR" "$APPIMAGE_ASSET")
 
-# A missing or mismatched .zsync would ship an AppImage that never updates.
-if [ ! -s "$APPIMAGE_FILE.zsync" ]; then
-  echo "[ERR] appimagetool produced no $APPIMAGE_ASSET.zsync."
+# Validate fresh outputs before replacing either previously published artifact.
+if [ ! -s "$APPIMAGE_STAGE/$APPIMAGE_ASSET" ] || [ -L "$APPIMAGE_STAGE/$APPIMAGE_ASSET" ] \
+  || [ ! -s "$APPIMAGE_STAGE/$APPIMAGE_ASSET.zsync" ] || [ -L "$APPIMAGE_STAGE/$APPIMAGE_ASSET.zsync" ]; then
+  echo "[ERR] appimagetool did not produce a direct image and $APPIMAGE_ASSET.zsync." >&2
   exit 1
 fi
-node "$APPIMAGE_CHECK" "$APPIMAGE_FILE" "$APPIMAGE_FILE.zsync"
+node "$APPIMAGE_CHECK" "$APPIMAGE_STAGE/$APPIMAGE_ASSET" "$APPIMAGE_STAGE/$APPIMAGE_ASSET.zsync"
+mv -T -- "$APPIMAGE_STAGE/$APPIMAGE_ASSET" "$APPIMAGE_FILE"
+mv -T -- "$APPIMAGE_STAGE/$APPIMAGE_ASSET.zsync" "$APPIMAGE_FILE.zsync"
 
 if [ -f "$APPIMAGE_FILE" ]; then
   appimage_size=$(du -h "$APPIMAGE_FILE" | cut -f1)

@@ -513,6 +513,31 @@ if (process.platform === 'linux') {
 		assert.notEqual(stagingOnly.status, 69, 'staging alone does not require appimagetool');
 		assert.match(stagingOnly.stdout, /Driver bundle not found/);
 
+		// Replaying the real producer tail must retain the last good output on failure.
+		const publicationRoot = path.join(sandbox, 'appimage-publication');
+		fs.mkdirSync(publicationRoot);
+		const artifact = path.join(publicationRoot, 'ergopti.AppImage');
+		fs.writeFileSync(artifact, 'previous image\n');
+		fs.writeFileSync(`${artifact}.zsync`, 'previous metadata\n');
+		const publicationStart = builder.indexOf('echo "Building AppImage..."');
+		const publicationEnd = builder.indexOf('\nif [ -f "$APPIMAGE_FILE" ]; then', publicationStart);
+		assert.ok(publicationStart >= 0 && publicationEnd > publicationStart);
+		const publication = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\nappimagetool() { printf partial > "$4"; return 42; }\n${builder.slice(publicationStart, publicationEnd)}`], {
+			encoding: 'utf8', timeout: 10000,
+			env: { ...process.env, BUILD_DIR: publicationRoot, APPDIR: '/unused-appdir', ARCH: 'x86_64', UPDATE_INFORMATION: 'fixture', APPIMAGE_ASSET: 'ergopti.AppImage', APPIMAGE_FILE: artifact, APPIMAGE_CHECK: '/unused-check' }
+		});
+		assert.notEqual(publication.status, 0);
+		assert.equal(fs.readFileSync(artifact, 'utf8'), 'previous image\n');
+		assert.equal(fs.readFileSync(`${artifact}.zsync`, 'utf8'), 'previous metadata\n');
+		const success = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\nappimagetool() { printf image > "$4"; printf metadata > "$4.zsync"; }\nnode() { :; }\n${builder.slice(publicationStart, publicationEnd)}`], {
+			encoding: 'utf8', timeout: 10000,
+			env: { ...process.env, BUILD_DIR: publicationRoot, APPDIR: '/unused-appdir', ARCH: 'x86_64', UPDATE_INFORMATION: 'fixture', APPIMAGE_ASSET: 'ergopti.AppImage', APPIMAGE_FILE: artifact, APPIMAGE_CHECK: '/unused-check' }
+		});
+		assert.equal(success.status, 0, success.stderr);
+		assert.equal(fs.readFileSync(artifact, 'utf8'), 'image');
+		assert.equal(fs.readFileSync(`${artifact}.zsync`, 'utf8'), 'metadata');
+		assert.deepEqual(fs.readdirSync(publicationRoot).sort(), ['ergopti.AppImage', 'ergopti.AppImage.zsync']);
+
 		const appDir = path.join(sandbox, 'AppDir\n');
 		const write = (relative, text, mode = 0o755) => {
 			fs.mkdirSync(path.dirname(path.join(appDir, relative)), { recursive: true });
@@ -769,7 +794,7 @@ passed++;
 const packager = read('tools/build/build-linux-appimage.sh');
 assert.match(packager, /--print-update-information/);
 assert.match(packager, /appimagetool -u "\$UPDATE_INFORMATION" "\$APPDIR" "\$APPIMAGE_ASSET"/);
-assert.match(packager, /node "\$APPIMAGE_CHECK" "\$APPIMAGE_FILE" "\$APPIMAGE_FILE\.zsync"/);
+assert.match(packager, /node "\$APPIMAGE_CHECK" "\$APPIMAGE_STAGE\/\$APPIMAGE_ASSET" "\$APPIMAGE_STAGE\/\$APPIMAGE_ASSET\.zsync"/);
 assert.ok(
 	!/Ergopti-\$\{VERSION\}/.test(packager),
 	'the AppImage keeps the release name from the start'
