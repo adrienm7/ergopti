@@ -194,7 +194,8 @@ set -eu
 # An AppImage is mounted at a fresh temporary path on every run, so nothing
 # inside it may be resolved from an absolute /usr prefix the way the .deb
 # wrapper can. HERE is that mount point.
-HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
+SELF="$(readlink -f "$0")"
+HERE="${SELF%/*}"
 
 # Every bundled program needs the recipient's glibc. A musl system (Alpine)
 # cannot run them and has no bash either, and an older glibc fails in the
@@ -231,7 +232,8 @@ cat > "$APPDIR/usr/bin/ergopti" << 'WRAPPER_EOF'
 # Two entry points that each built their own LUA_PATH would drift apart, and the
 # one nobody launches by hand is the one that would ship broken.
 set -euo pipefail
-BIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
+SELF="$(readlink -f "$0")"
+BIN_DIR="${SELF%/*}"
 exec "$BIN_DIR/../../AppRun" "$@"
 WRAPPER_EOF
 chmod 755 "$APPDIR/usr/bin/ergopti"
