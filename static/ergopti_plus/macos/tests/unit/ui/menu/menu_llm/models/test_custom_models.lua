@@ -22,7 +22,7 @@ local function with_models(opts, body)
 			return opts.confirm == "cancel" and "Cancel" or require("infra.i18n").get("button.remove")
 		end }
 		local Custom = require("ui.menu.menu_llm.custom_models")
-		local state = { llm_backend = "ollama", llm_model = opts.model or "", llm_user_models = opts.list }
+		local state = { llm_backend = opts.backend or "ollama", llm_model = opts.model or "", llm_user_models = opts.list }
 		local calls = { saves = 0, updates = 0, changed = 0 }
 		local ops = Custom.new({
 			state = state,
@@ -103,6 +103,38 @@ helpers.describe("custom model list transactions", function()
 			end)
 		end)
 	end
+
+	helpers.it("keeps the active Ollama model when removing the same MLX identifier", function()
+		local identifiers = require("llm.model_identifier")
+		helpers.assert_true(identifiers.valid("ollama", "owner/model"))
+		helpers.assert_true(identifiers.valid("mlx", "owner/model"))
+		local list = { { backend = "mlx", name = "owner/model" } }
+		with_models({ list = list, model = "owner/model" }, function(ops, state, calls)
+			helpers.assert_true(ops.remove("mlx", "owner/model"))
+			helpers.assert_nil(calls.disabled, "a different backend must not disable the active model")
+			helpers.assert_eq(calls.saves, 1, "the removal must still be persisted")
+			helpers.assert_eq(#state.llm_user_models, 0)
+		end)
+	end)
+
+	helpers.it("keeps the active MLX model when removing the same Ollama identifier", function()
+		local list = { { backend = "ollama", name = "owner/model" } }
+		with_models({ list = list, model = "owner/model", backend = "mlx" }, function(ops, state, calls)
+			helpers.assert_true(ops.remove("ollama", "owner/model"))
+			helpers.assert_nil(calls.disabled)
+			helpers.assert_eq(calls.saves, 1)
+			helpers.assert_eq(#state.llm_user_models, 0)
+		end)
+	end)
+
+	helpers.it("disables the active MLX model when its own entry is removed", function()
+		local list = { { backend = "mlx", name = "owner/model" } }
+		with_models({ list = list, model = "owner/model", backend = "mlx" }, function(ops, state, calls)
+			helpers.assert_true(ops.remove("mlx", "owner/model"))
+			helpers.assert_true(calls.disabled)
+			helpers.assert_eq(#state.llm_user_models, 0)
+		end)
+	end)
 
 	helpers.it("disables the active model before removing it", function()
 		local list = { { backend = "ollama", name = "a" } }
