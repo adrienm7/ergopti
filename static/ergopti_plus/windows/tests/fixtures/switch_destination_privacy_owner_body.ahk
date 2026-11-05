@@ -146,10 +146,50 @@ _KSD_Observe(Stage) {
 	return [PrivateApps, PrivateTitles]
 }
 
+
+; Equal caption text is not equal window ownership when the application changes.
+; Only native focus acquisition is a port; refresh, flush, append and clocks stay real.
+_KSD_SameCaptionAppOwner(SameCaption) {
+	global _KSD
+	A := {App: "fixture-caption-a.exe", Title: "Fixture shared caption", Hwnd: 201}
+	B := {App: "fixture-caption-b.exe", Title: SameCaption ? A.Title : "Fixture distinct caption", Hwnd: 202}
+	C := {App: B.App, Title: "Fixture later caption", Hwnd: 203}
+	_KSD_Acquire(A)
+	_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == 0,
+		"The genuine initial focus must establish its own app and title clocks.")
+	FirstOrigin := KLHook.title_entered_at
+	Sleep(40)
+	_KSD_Acquire(B)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The second app must be genuinely published.")
+	SecondOrigin := KLHook.title_entered_at
+	RowsAfterApp := Keystats._pending_entries.Length
+	Sleep(40)
+	_KSD_Acquire(C)
+	_KSD_Require(KL_Hook_RefreshContext(true), "The second app's later title change must publish normally.")
+	if IsObject(_KSD.Failure)
+		throw _KSD.Failure
+	Windows := []
+	for Row in Keystats._pending_entries
+		if Row["type"] == "window_switch"
+			Windows.Push(Row)
+	FileAppend("RECEIPT caption-app-owner same_caption=" . SameCaption . " rows_after_app=" . RowsAfterApp
+		. " window_rows=" . Windows.Length . " title_origin_advanced=" . (SecondOrigin > FirstOrigin)
+		. " errors=" . _KSD.Errors . "`n", "*", "UTF-8")
+	_KSD_Require(_KSD.Errors == 0, "A swallowed producer exception cannot explain a missing interval.")
+	_KSD_Require(Windows.Length == 2, "Every outgoing app/title interval needs its own canonical row, even when the caption is unchanged.")
+	_KSD_Require(Windows[1]["app"] == A.App && Windows[1]["prev_title"] == A.Title
+		&& Windows[1]["duration_ms"] > 0, "App A must retain its own observed caption duration.")
+	_KSD_Require(Windows[2]["app"] == B.App && Windows[2]["prev_title"] == B.Title
+		&& Windows[2]["duration_ms"] > 0, "App B must retain its separate observed caption duration.")
+	_KSD_Require(SecondOrigin > FirstOrigin, "The actual second app acquisition must restart title ownership rather than adopt A's origin.")
+}
+
 _KSD_Exercise() {
 	global _KSD
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
+	if InStr(_KSD.Mode, "caption-app-") == 1
+		return _KSD_SameCaptionAppOwner(_KSD.Mode == "caption-app-same")
 	_KSD.A := {App: "fixture-public-a.exe", Title: "Fixture public A", Hwnd: 102}
 	_KSD.B := {App: _KSD.AppPrivate ? "fixture-excluded-b.exe"
 		: _KSD.TitlePrivate ? _KSD.A.App : "fixture-public-b.exe",

@@ -82,3 +82,103 @@ _WSA_WrapsWithTheBindingPair() {
 	}
 }
 Test("wrap_selection: wraps with the pair stored for its binding", _WSA_WrapsWithTheBindingPair)
+
+_WRCF_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
+	ClipboardOwner := _DriverProductionFileForSymbol("CB_Write")
+	AssertTrue(ClipboardOwner != "")
+	ClipboardSource := FSReadStrict(ClipboardOwner)
+	ClipboardSource := StrReplace(ClipboardSource, "CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {",
+		"_WRF_ActualWriteTextWithReceipt(Text, &OwnedSequence := 0) {", true, &Receipts)
+	AssertEqual(1, Receipts, "Only the actual authenticated publication receipt boundary may be observed")
+	Code .= ClipboardSource . "`n"
+	for Symbol in ["_TextTailCodeUnits"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The real native wrap dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TickElapsed", "TickElapsed64", "WrapTextIfSelected", "WrapSymbols_IsEnabled", "GetUIASelection",
+		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "WIGetForegroundHwnd",
+		"WIGetFocusedControlToken", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "_SendInstantReport", "_SendInstant_RestoreClipboard"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "The complete original wrap owner must exist: " . Name)
+		if Name == "_SendInstant_RestoreClipboard" {
+			Definition := StrReplace(Definition, "_SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {",
+				"_WRF_ActualRestoreClipboard(OldClip, OwnedSequence, OwnerToken) {", true, &Restores)
+			AssertEqual(1, Restores, "The exact restore helper may only receive a passive fire observer")
+		}
+		Code .= Definition . "`n"
+	}
+	Body := _DriverFuncBody("SendInstant")
+	AssertTrue(Body != "")
+	Body := StrReplace(Body, "SetTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)",
+		"_WRF_ObserveRestoreTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)", true, &Timers)
+	AssertEqual(1, Timers, "The real timer registration must delegate unchanged and retain its exact callback for owned teardown")
+	Masked := _DriverMaskNonCode(&Body)
+	Position := 1, Overlaid := "", Count := 0
+	while RegExMatch(Masked, "\bSendInput(?=[ `t]*\()", &Site, Position) {
+		Overlaid .= SubStr(Body, Position, Site.Pos - Position) . "_WRF_NativeSend"
+		Position := Site.Pos + Site.Len
+		Count += 1
+	}
+	AssertEqual(3, Count, "Only the native paste/direct transports may be decorated with owned-window guards")
+	Code .= Overlaid . SubStr(Body, Position) . "`n"
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\wrap_clipboard_render_focus_body.ahk")
+}
+
+_WRCF_Complete(State, Code, Output, ErrorText) {
+	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_WRCF_Case(Mode) {
+	global SEND_INSTANT_PASTE_DELAY_MS, UIA_SELECTION_MAX_AGE_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired owned clipboard probe prevents another native publisher.")
+	Root := A_Temp . "\ergopti_wrap_render_focus_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Primary := 0, Retired := false
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The fixture must exclusively own its script and evidence directory.")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WRCF_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-clipboard-render-focus", Mode,
+				String(SEND_INSTANT_PASTE_DELAY_MS), String(UIA_SELECTION_MAX_AGE_MS)], _WRCF_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native clipboard/render subject must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 12000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		_TestPrint("# wrap-render-focus " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(1, State.Calls, "The actual clipboard and native paste owner must settle exactly once.")
+		AssertEqual(0, State.Code, "The native wrap render focus probe failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS wrap-render-focus " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := {Handle: Handle, Root: Root}
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact clipboard subject must retire before its script directory is removed.")
+}
+
+for _WRCF_Mode in ["current", "redirect"]
+	Test("wrap selection native clipboard renderer: " . _WRCF_Mode . " (wrap-native-render-focus)", _WRCF_Case.Bind(_WRCF_Mode))

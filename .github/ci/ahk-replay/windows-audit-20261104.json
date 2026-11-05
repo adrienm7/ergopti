@@ -1,43 +1,79 @@
 {
-	"expected_count": 94,
+	"expected_count": 98,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "HotstringsConfig legacy default durable ACK:",
-			"expected_count": 8
+			"contains": "key chord boot settings:",
+			"expected_count": 7
 		},
 		{
-			"contains": "HotstringsConfig public base upper duration:",
+			"contains": "key chord boot enabled admission:",
+			"expected_count": 3
+		},
+		{
+			"contains": "raw boot cache lone-tap admission:",
 			"expected_count": 4
 		},
 		{
-			"contains": "idle-delay-decimal-domain",
+			"contains": "raw boot cache CapsWord admission:",
+			"expected_count": 6
+		},
+		{
+			"contains": "Updater actual boot interval admission:",
+			"expected_count": 5
+		},
+		{
+			"contains": "gesture actual boot marker admission:",
 			"expected_count": 3
 		},
 		{
-			"contains": "ui-decimal-sibling-domain",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-integer-input-domain",
-			"expected_count": 3
-		},
-		{
-			"contains": "token-margin-integer-domain",
-			"expected_count": 1
-		},
-		{
-			"contains": "Log openers: daylog",
-			"expected_count": 3
-		},
-		{
-			"contains": "worker-unicode-sibling070",
+			"contains": "window-caption-app-owner",
 			"expected_count": 2
 		},
 		{
-			"contains": "layout-row-native-flags",
+			"contains": "llm-slot-display-stale-parser",
+			"expected_count": 2
+		},
+		{
+			"contains": "layout-stage-native-refusal-retry",
 			"expected_count": 3
+		},
+		{
+			"contains": "wrap-native-render-focus",
+			"expected_count": 2
+		},
+		{
+			"contains": "window-title-app-attribution",
+			"expected_count": 4
+		},
+		{
+			"contains": "title-cap-count-conservation",
+			"expected_count": 4
+		},
+		{
+			"contains": "title-replay-native-failure",
+			"expected_count": 3
+		},
+		{
+			"contains": "walker-title-cap-declared-but-dead",
+			"expected_count": 5
+		},
+		{
+			"contains": "klr-readonly-image",
+			"expected_count": 4
+		},
+		{
+			"contains": "KLR cache stages: retain unknown content despite a matching name",
+			"expected_count": 1
+		},
+		{
+			"contains": "KLR cache stages: retire a dead producer and preserve live ownership",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-profile-opening-image",
+			"expected_count": 18
 		},
 		{
 			"contains": "native-profile-paste-owner",
@@ -48,67 +84,7 @@
 			"expected_count": 2
 		},
 		{
-			"contains": "key chord boot settings:",
-			"expected_count": 7
-		},
-		{
-			"contains": "HotstringsConfig: override file publication is atomic",
-			"expected_count": 1
-		},
-		{
-			"contains": "HotstringsConfig: durable exact stage validation gates override publish",
-			"expected_count": 1
-		},
-		{
-			"contains": "reload parses outside Critical and revalidates path before coupled publication",
-			"expected_count": 1
-		},
-		{
-			"contains": "capsword-idle-domain",
-			"expected_count": 3
-		},
-		{
-			"contains": "capsword-tiny-positive",
-			"expected_count": 1
-		},
-		{
-			"contains": "capsword-idle-store-domain",
-			"expected_count": 2
-		},
-		{
-			"contains": "capsword auto-off:",
-			"expected_count": 24
-		},
-		{
-			"contains": "new-file-document-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "config-candidate-publication-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "parameter and assignment share one commit",
-			"expected_count": 1
-		},
-		{
-			"contains": "AHK-15-persistence: first related update failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "AHK-15-persistence: second related update failure",
-			"expected_count": 1
-		},
-		{
-			"contains": "AHK-15-persistence: successful related batch",
-			"expected_count": 1
-		},
-		{
-			"contains": "Gestures: parameterized action values persist",
-			"expected_count": 1
-		},
-		{
-			"contains": "gesture-binding-identity-refusal",
+			"contains": "llm-profile-source-representation",
 			"expected_count": 1
 		},
 		{
@@ -116,12 +92,24 @@
 			"expected_count": 6
 		},
 		{
-			"contains": "window-title-app-attribution",
+			"contains": "native-editor-cross-process",
 			"expected_count": 2
 		},
 		{
-			"contains": "native-editor-cross-process",
+			"contains": "config-candidate-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "capsword-idle-store-domain",
 			"expected_count": 2
+		},
+		{
+			"contains": "capsword auto-off: a menu change",
+			"expected_count": 1
+		},
+		{
+			"contains": "capsword auto-off: refused or invalid changes",
+			"expected_count": 1
 		}
 	]
 }

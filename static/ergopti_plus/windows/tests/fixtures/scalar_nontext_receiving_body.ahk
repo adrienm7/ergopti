@@ -9,7 +9,7 @@ if !(A_Args[2] == "one-shot" || A_Args[2] == "dead-key") || !(A_Args[3] == "lett
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 global _SharedDir := A_Args[4], _TapHoldOneShotCache := 0, _TH_SyntheticEpoch := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605)), OneShotShiftEnabled := false, InDeadKeySequence := false
-global _SNR := {Owner: A_Args[2], Mode: A_Args[3], Window: 0, Edit: 0, Sends: [], Controls: [], Keys: [], Logs: [], Delivered: 0, Failure: 0}
+global _SNR := {Owner: A_Args[2], Mode: A_Args[3], Window: 0, Edit: 0, Sends: [], Controls: [], Keys: [], Logs: [], Delivered: 0, Failure: 0, ReadyAt: 0, ReadyRetries: 0, Hook: 0}
 
 _SNR_Require(Condition, Message) {
 	if !Condition
@@ -56,18 +56,26 @@ _SNR_Send() {
 		_SNR_Target()
 		ExpectedOwner := _SNR.Owner == "one-shot" ? "one-shot-shift" : "dead-key"
 		Active := 0
-		for Token, Record in _SIHO_Owners
-			if Record["owner"] == ExpectedOwner && Record["hook"].InProgress
+		for Token, Record in _SIHO_Owners {
+			if Record["owner"] == ExpectedOwner && Record["hook"].InProgress {
 				Active += 1
-		_SNR_Require(Active == 1, "Original input must reach the exact genuine admitted scalar hook.")
+				_SNR.Hook := Record["hook"]
+			}
+		}
+		if Active == 0 && A_TickCount - _SNR.ReadyAt < 1500 {
+			_SNR.ReadyRetries += 1
+			SetTimer(_SNR_Send, -5)
+			return
+		}
+		_SNR_Require(Active == 1, "Original input requires the exact admitted, InProgress scalar hook within the bounded readiness window.")
 		SendLevel(0)
 		SendEvent(_SNR.Mode == "letter" ? "a" : (_SNR.Mode == "enter" ? "{Enter}" : "{BackSpace}"))
+		_SNR.Delivered += 1
 	} catch as Err {
 		_SNR.Failure := Err
 		SIHO_StopAll()
 	} finally {
 		SendLevel(PreviousLevel)
-		_SNR.Delivered += 1
 	}
 }
 _SNR_Main() {
@@ -82,6 +90,11 @@ _SNR_Main() {
 		_SNR_Target()
 		DllCall("SendMessageW", "Ptr", _SNR.Edit.Hwnd, "UInt", 0xB1, "Ptr", -1, "Ptr", -1)
 		OnMessage(0x100, _SNR_KeyMessage)
+		; Production boot prewarms both canonical tables before capture can run.
+		; The isolated child must do the same before arming original injection.
+		_SIHO_ScalarEndKeys()
+		_TapHoldOneShotTable()
+		_SNR.ReadyAt := A_TickCount
 		SetTimer(_SNR_Send, -1)
 		if _SNR.Owner == "one-shot"
 			OneShotShift()
@@ -92,7 +105,11 @@ _SNR_Main() {
 		Sleep(30)
 		_SNR_Target()
 		_SNR_Require(_SNR.Delivered == 1, "One native batch must reach the genuine scalar capture.")
-		ExpectedKey := _SNR.Mode == "letter" ? "a" : (_SNR.Mode == "enter" ? "Enter" : "BackSpace")
+		FileAppend("OBSERVATION scalar-nontext owner=" . _SNR.Owner . " mode=" . _SNR.Mode . " original_keydowns=" . _SNR.Keys.Length
+			. " ready_retries=" . _SNR.ReadyRetries . " end_reason=" . (IsObject(_SNR.Hook) ? _SNR.Hook.EndReason : "none")
+			. " end_key=" . (IsObject(_SNR.Hook) ? _SNR.Hook.EndKey : "none") . " first_output=" . (_SNR.Sends.Length ? _SNR.Sends[1] : "none")
+			. " first_control=" . (_SNR.Controls.Length ? _SNR.Controls[1] : "none") . " edit_length=" . StrLen(_SNR.Edit.Value) . " outputs=" . _SNR.Sends.Length . " controls=" . _SNR.Controls.Length . "`n", "*")
+		ExpectedKey := _SNR.Mode == "letter" ? "a" : (_SNR.Mode == "enter" ? "Enter" : "Backspace")
 		if _SNR.Owner == "one-shot" {
 			Expected := _SNR.Mode == "letter" ? "A" : "{" . ExpectedKey . "}"
 			_SNR_Require(_SNR.Sends.Length == 1 && _SNR.Sends[1] == Expected && _SNR.Controls.Length == 0,
@@ -105,8 +122,7 @@ _SNR_Main() {
 			if _SNR.Mode != "letter"
 				_SNR_Require(_SNR.Controls[1] == "{" . ExpectedKey . "}", "The consumed named key must be replayed unchanged.")
 		}
-		FileAppend("OBSERVATION scalar-nontext owner=" . _SNR.Owner . " mode=" . _SNR.Mode . " original_keydowns=" . _SNR.Keys.Length
-			. " edit_length=" . StrLen(_SNR.Edit.Value) . " outputs=" . _SNR.Sends.Length . " controls=" . _SNR.Controls.Length . "`n", "*")
+
 		_SNR_Require(_SNR.Keys.Length == 0, "The original unmodified key must be suppressed before its scalar replay.")
 		_SNR_Require(_SNR.Edit.Value == (_SNR.Mode == "backspace" ? "keepX" : ""),
 			"The captured original key must not modify the owned Edit before scalar output.")

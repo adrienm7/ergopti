@@ -116,3 +116,8 @@ _KSD_Case(Mode) {
 for _KSD_Mode in ["app-third", "title-third", "app-live", "title-live", "outgoing-private", "outgoing-title-private", "public"]
 	Test("Keystats switch destinations: " . _KSD_Mode . " respects captured privacy (switch-destination-privacy-owner)",
 		_KSD_Case.Bind(_KSD_Mode))
+
+
+for _KSD_CaptionMode in ["caption-app-distinct", "caption-app-same"]
+	Test("Keystats window caption ownership: " . _KSD_CaptionMode . " closes each application interval (window-caption-app-owner)",
+		_KSD_Case.Bind(_KSD_CaptionMode))
