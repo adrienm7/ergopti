@@ -21,6 +21,7 @@ class KLHook {
 	static registered := false
 	static capture_generation := 1
 	static capture_stopping := false
+	static control_char_echo := false
 }
 
 ; No physical hook is installed by the fixture. Any unexpected removal or

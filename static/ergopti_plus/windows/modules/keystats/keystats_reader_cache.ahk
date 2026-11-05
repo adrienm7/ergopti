@@ -57,7 +57,8 @@
 ; Version 17 preserves the first duplicate within a forward-executed rebuild span.
 ; Version 18 rebuilds tuples previously merged by literal NUL or separator keys.
 ; Version 19 rebuilds title keystrokes from their accepted typing owner.
-global KLR_CACHE_FORMAT_VERSION := "19"
+; Version 20 rebuilds Wi-Fi mobility from canonical network_change rows.
+global KLR_CACHE_FORMAT_VERSION := "20"
 ; The last image in the old keys is kept once, renamed, not discarded: the
 ; ledgers stay the source, and this keeps what the dashboard showed until now.
 global KLR_PRE_ENCODING_FORMAT_VERSION := "15"
@@ -421,7 +422,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = "16" || Version = "17" || Version = "18" || Version = KLR_PRE_ENCODING_FORMAT_VERSION || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = "14" || Version = "16" || Version = "17" || Version = "18" || Version = "19" || Version = KLR_PRE_ENCODING_FORMAT_VERSION || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 

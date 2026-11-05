@@ -72,7 +72,11 @@ KL_SuspendCollection(FlushFn := 0) {
 		}
 	}
 	PreviousCritical := Critical("On")
-	try KLCollection.suspended := true
+	try {
+		KLCollection.suspended := true
+		if IsSet(KL_Roi_DiscardWord)
+			KL_Roi_DiscardWord()
+	}
 	finally Critical(PreviousCritical)
 	try LoggerInfo("Keystats", "Metrics collection suspended by the user.")
 	return true

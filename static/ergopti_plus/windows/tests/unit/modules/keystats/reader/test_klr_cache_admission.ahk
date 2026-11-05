@@ -269,3 +269,6 @@ Test("KLR durable cache: ambiguous tuple image forces rebuild (walker-composite-
 
 Test("KLR durable cache: window visit counts force reconstruction as typing counts (window-title-app-attribution)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("18")))
+
+Test("KLR durable cache: missing canonical Wi-Fi mobility forces rebuild (wifi-dashboard-kpi-owner)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("19")))

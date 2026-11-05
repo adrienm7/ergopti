@@ -44,6 +44,18 @@ _KID_Down(Ih, Vk, Sc) {
 		_KID.TargetDown += 1
 	KL_Hook_OnKeyDown(Ih, Vk, Sc, , , _KID_NoShortcut, KL_Ergo_OnKeystroke)
 }
+_KID_Up(Ih, Vk, Sc) {
+	global _KID
+	if !_KID.Active
+		return
+	try _KID_Target()
+	catch Any as Failure {
+		_KID.Failure := Failure
+		return
+	}
+	_KID.LastCallback := A_TickCount
+	KL_Hook_OnKeyUp(Ih, Vk, Sc)
+}
 _KID_Char(Ih, Text) {
 	global _KID
 	if !_KID.Active
@@ -95,6 +107,7 @@ _KID_Exercise() {
 		Hook.NotifyNonText := true
 		Hook.OnKeyDown := _KID_Down
 		Hook.OnChar := _KID_Char
+		Hook.OnKeyUp := _KID_Up
 		OnMessage(0x100, _KID_KeyMessage)
 		_KID.Active := true
 		Hook.Start()

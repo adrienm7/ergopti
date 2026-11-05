@@ -936,3 +936,139 @@ _KLRMedia_CheckedCloseRefusesLiveStatement() {
 Test("Semantic media history: checked native close refuses live statement", _KLRMedia_CheckedCloseRefusesLiveStatement)
 
 Test("Semantic media history: upgraded image persists for future worker", _KLRMedia_CompatibleWarmCache.Bind(false))
+
+
+; Resolve the actual declaration once by authored-source identity, not a pinned path.
+_KFCD_ClassOwner(ClassName) {
+	global _DriverDir
+	Owners := []
+	for Path in _DriverProductionSourceCensus(_DriverDir).Paths {
+		Text := FileRead(Path, "UTF-8")
+		Mask := _DriverMaskNonCode(&Text)
+		if RegExMatch(Mask, "m)^\h*class\h+" . ClassName . "\b\s*\{")
+			Owners.Push(Path)
+	}
+	AssertEqual(1, Owners.Length, "The actual native dispatcher constants must have exactly one authored class declaration")
+	return Owners[1]
+}
+
+; Actual public context and stop bodies retain canonical privacy and append.
+_KFCD_ChildSource() {
+	global _DriverDir
+	Source := _KSD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	Common := RTrim(FileRead(_DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk", "UTF-8"), "`r`n")
+	Entry := "_KSD_Main()"
+	AssertEqual(Entry, SubStr(Common, StrLen(Common) - StrLen(Entry) + 1))
+	Source .= SubStr(Common, 1, StrLen(Common) - StrLen(Entry)) . "`n"
+	for Spec in [["KL_CommitPwCache", "KLPasswordCache"], ["", "HookDispatcherConst"]] {
+		Owner := Spec[1] == "" ? _KFCD_ClassOwner(Spec[2]) : _DriverProductionFileForSymbol(Spec[1], _DriverDir)
+		AssertTrue(Owner != "")
+		AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^class " . Spec[2] . " \{.*?^\}", &Definition) > 0)
+		Source .= Definition[0] . "`n"
+	}
+	Source .= 'class HookDispatcher {`nstatic Unregister(*) {`nthrow Error("Unexpected physical hook removal.")`n}`n}`n'
+	Owner := _DriverProductionFileForSymbol("KL_JsonEncode", _DriverDir)
+	AssertTrue(Owner != "")
+	Source .= "#Include " . Owner . "`n"
+	for Symbol in ["KL_Hook_Stop", "KL_Hook_InvalidateCapture", "KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "")
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+}
+
+_KFCD_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_final_context_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KFCD_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# final-context-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS final-context-duration " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KFCD_DurableCase(Mode) {
+	Output := _KFCD_Case(Mode)
+	Rows := []
+	for Line in StrSplit(Output, "`n", "`r")
+		if SubStr(Line, 1, 4) == "ROW "
+			Rows.Push(JsonParse(SubStr(Line, 5)))
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Row in Rows {
+			Statements := KL_BuildInserts(Row)
+			for Sql in Statements
+				AssertTrue(SQLite_Exec(Db, Sql), "Every actual producer row must enter canonical SQLite unchanged")
+		}
+		AssertTrue(KLR_PrepareTypingProjection(Db), "The real rebuild requires its actual typing projection table even for no typing rows")
+		AssertTrue(KLR_RebuildAggregates(Db), "The actual aggregate rebuild must accept the producer rows")
+		Actual := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app='fixture-final-context-a.exe'")[1]["ms"]
+		_TestPrint("# final-context-durable mode=" . Mode . " app_time_ms=" . Actual . " canonical_rows=" . Rows.Length)
+		AssertTrue(Actual >= 40, "A completed foreground interval must survive its public stop and a cold SQL rebuild")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KFCD_Mode in ["switch-control", "terminal"]
+	Test("Keystats final context: " . _KFCD_Mode . " survives cold durable aggregation (final-context-duration-owner)",
+		_KFCD_DurableCase.Bind(_KFCD_Mode))

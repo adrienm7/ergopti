@@ -196,3 +196,57 @@ for _KSD_WifiChanged in [false, true]
 
 Test("Keystats window caption ownership: case-only title change closes its exact interval (window-caption-case-owner)",
 	_KSD_Case.Bind("caption-case-only"))
+
+
+_KSD_WifiConnectivityKpi(Scoped) {
+	global KLRLastReplayFailure
+	Output := _KSD_Case("wifi-report-connectivity-flow")
+	SavedDevice := Keystats.device_id, SavedLiteral := Keystats._device_id_lit
+	SavedFailure := KLRLastReplayFailure
+	Db := _WJFM_OpenMemory()
+	try {
+		Keystats.device_id := "wifi-connectivity-device"
+		Keystats._device_id_lit := SQLite_Q(Keystats.device_id)
+		AssertTrue(KLR_LoadSchema(Db))
+		Count := 0, Dates := [], SeenDates := Map()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if InStr(Line, "WIFIFLOW ") != 1
+				continue
+			Fields := StrSplit(SubStr(Line, 10), "|")
+			AssertEqual(8, Fields.Length)
+			Entry := Map("type", "network_change", "_event_id", Integer(Fields[1]),
+				"timestamp", Fields[2], "app", Fields[3], "ssid_hash", Fields[4],
+				"signal", Fields[6], "connection_state", Fields[7], "prev_connection_state", Fields[8])
+			if Fields[5] != ""
+				Entry["prev_ssid_hash"] := Fields[5]
+			Day := SubStr(Fields[2], 1, 10)
+			if !SeenDates.Has(Day) {
+				SeenDates[Day] := true
+				Dates.Push(Day)
+			}
+			for Sql in KL_BuildInserts(Entry)
+				AssertTrue(SQLite_Exec(Db, Sql), "Canonical producer metadata must reach native SQLite unchanged")
+			Count += 1
+		}
+		AssertEqual(5, Count)
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		Scope := Scoped ? Dates : 0
+		Loop 2 {
+			AssertTrue(KLR_RebuildAggregates(Db, Scope))
+			AssertTrue(KLR_RebuildWalkerAggregates(Db, true, Scope) >= 0)
+			Wifi := 0
+			for _, Apps in KLR_ReadManifestBase(Db)
+				if Apps.Has("_system")
+					Wifi += Apps["_system"].Get("wifi_changes", 0)
+			_TestPrint("# wifi-connectivity-kpi scoped=" . Scoped . " pass=" . A_Index . " raw_rows=" . Count . " wifi_changes=" . Wifi)
+			AssertEqual(3, Wifi, "SSID change, disconnect and reconnect count; baseline, signal and unknown do not")
+		}
+	} finally {
+		SQLite_Close(Db)
+		Keystats.device_id := SavedDevice, Keystats._device_id_lit := SavedLiteral
+		KLRLastReplayFailure := SavedFailure
+	}
+}
+for _KSD_WifiFlowScoped in [false, true]
+	Test("Keystats Wi-Fi connectivity: " . (_KSD_WifiFlowScoped ? "day-scoped" : "full") . " rebuild preserves actual transitions (wifi-connectivity-kpi-owner)",
+		_KSD_WifiConnectivityKpi.Bind(_KSD_WifiFlowScoped))
