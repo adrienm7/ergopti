@@ -281,15 +281,15 @@ _STSP_FloatBits(Value) {
 	return Format("{:016x}", NumGet(Bytes, 0, "Int64"))
 }
 
-_STSP_ActualPayload(Mode) {
+_STSP_ActualPayload(Mode, FloatShape := "") {
 	global STORAGE_REG_BASE
 	SavedBase := STORAGE_REG_BASE
 	Subkey := "Software\Ergopti_StorageScalarAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Path := "HKCU\" . Subkey, Owned := false, Handle := 0
-	if Mode == "float-wide" || Mode == "float-exact-control" {
-		Requested := JsonParse(Mode == "float-wide" ? '{"value":0.30000000000000004}' : '{"value":42.5}')["value"]
+	if Mode == "float-wide" || Mode == "float-exact-control" || Mode == "float-digits-control" {
+		Requested := JsonParse(Mode == "float-wide" ? '{"value":0.30000000000000004}' : Mode == "float-digits-control" ? '{"value":1.2345678901234567}' : '{"value":42.5}')["value"]
 		AssertTrue(Requested is Float)
-		AssertEqual(Mode == "float-wide" ? "3fd3333333333334" : "4045400000000000", _STSP_FloatBits(Requested),
+		AssertEqual(Mode == "float-wide" ? "3fd3333333333334" : Mode == "float-digits-control" ? "3ff3c0ca428c59fb" : "4045400000000000", _STSP_FloatBits(Requested),
 			"the genuine JSON producer must first retain the independent expected binary64 value")
 	} else {
 		Payload := JsonParse('{"value":"A\u0000B"}')
@@ -298,6 +298,12 @@ _STSP_ActualPayload(Mode) {
 		AssertEqual(0, NumGet(StrPtr(Scalar), 2, "UShort"))
 		AssertEqual(66, NumGet(StrPtr(Scalar), 4, "UShort"))
 		Requested := Mode == "nul-map-control" ? Payload : Scalar
+	}
+	if FloatShape != "" {
+		AssertTrue(FloatShape == "map" || FloatShape == "array")
+		AssertTrue(Requested is Float)
+		ExpectedFloat := Requested
+		Requested := FloatShape == "map" ? Map("value", Requested) : [Requested]
 	}
 	try {
 		Disposition := 0
@@ -313,13 +319,22 @@ _STSP_ActualPayload(Mode) {
 		Result := ST_Set("payload", Requested)
 		Actual := ST_Get("payload", "missing")
 		Observed := Mode == "nul-map-control" && (Actual is Map) && Actual.Has("value") ? Actual["value"] : Actual
-		_TestPrint("# storage-scalar-persistence mode=" . Mode . " disposition=" . Disposition . " result=" . Result
-			. " actual_type=" . Type(Actual) . " actual_float_bits=" . _STSP_FloatBits(Actual)
+		if FloatShape == "map" && (Actual is Map) && Actual.Has("value")
+			Observed := Actual["value"]
+		else if FloatShape == "array" && (Actual is Array) && Actual.Length == 1
+			Observed := Actual[1]
+		_TestPrint("# storage-scalar-persistence mode=" . Mode . " float_shape=" . FloatShape . " disposition=" . Disposition . " result=" . Result
+			. " actual_type=" . Type(Actual) . " actual_float_bits=" . _STSP_FloatBits(Observed)
 			. " actual_string_units=" . (Observed is String ? StrLen(Observed) : -1))
-		if Mode == "float-wide" || Mode == "float-exact-control" {
+		if Mode == "float-wide" || Mode == "float-exact-control" || Mode == "float-digits-control" {
 			AssertTrue(Result)
-			AssertTrue(Actual is Float)
-			AssertEqual(_STSP_FloatBits(Requested), _STSP_FloatBits(Actual), "a successful persistent numeric value must retain every original binary64 bit")
+			if FloatShape == "map"
+				AssertTrue(Actual is Map)
+			else if FloatShape == "array"
+				AssertTrue(Actual is Array)
+			AssertTrue(Observed is Float)
+			AssertEqual(_STSP_FloatBits(FloatShape != "" ? ExpectedFloat : Requested), _STSP_FloatBits(Observed),
+				"a successful persistent numeric value must retain every original binary64 bit")
 		} else if Result {
 			if Mode == "nul-map-control"
 				AssertTrue(Actual is Map, "the ordinary JSON envelope remains a genuine supported nested-value control")
@@ -507,3 +522,8 @@ _STQ_PublicInvalidEnvelope(Kind) {
 for _STQ_Kind in ["syntax", "type"]
 	Test("storage quoted scalar public refusal: " . _STQ_Kind
 		. " (storage-quoted-scalar-invalid)", _STQ_PublicInvalidEnvelope.Bind(_STQ_Kind))
+
+for _STNF_Shape in ["map", "array"]
+	for _STNF_Mode in ["float-wide", "float-digits-control"]
+		Test("storage nested binary64 persistence: " . _STNF_Shape . "/" . _STNF_Mode
+			. " (storage-native-nested-float)", _STSP_ActualPayload.Bind(_STNF_Mode, _STNF_Shape))
