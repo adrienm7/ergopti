@@ -458,7 +458,8 @@ _OSPC_Case(Mode) {
 	PreviousCritical := Critical("Off")
 	try {
 		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
-		DeclaredSpent := !!RegExMatch(Policy, "m)^local SPENT_UNSHIFTED\s*=\s*\{[^}\r\n]*\b" . Mode . "\s*=\s*true")
+		PolicyMode := Mode == "escape-native" ? "escape" : Mode
+		DeclaredSpent := !!RegExMatch(Policy, "m)^local SPENT_UNSHIFTED\s*=\s*\{[^}\r\n]*\b" . PolicyMode . "\s*=\s*true")
 		AssertEqual(Mode != "left", DeclaredSpent,
 			"The canonical policy must distinguish spent controls from native navigation which remains armed.")
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
@@ -509,6 +510,76 @@ _OSPC_Case(Mode) {
 		throw Primary
 	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
 }
-for _OSPC_Mode in ["enter", "tab", "escape", "left"]
+for _OSPC_Mode in ["enter", "tab", "escape", "left", "escape-native"]
 	Test("one-shot native spent control: " . _OSPC_Mode . " retains its native control and following-letter policy (one-shot-native-spent-controls)",
 		_OSPC_Case.Bind(_OSPC_Mode))
+
+_OSCF_ChildSource() {
+	global _DriverDir
+	Code := _OSPC_ChildSource()
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_spent_controls_body.ahk")
+	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the owned receiving fixture may change; real capture and replay remain intact")
+	return SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
+		. FSReadStrict(_DriverDir . "\tests\fixtures\one_shot_control_flags_body.ahk")
+}
+_OSCF_Case(Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_one_shot_control_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Policy := FSReadStrict(_SharedDir . "\lua\tap_hold\one_shot_shift.lua")
+		AssertTrue(InStr(Policy, "without changing that key"), "The shared control policy must preserve the captured key's flags")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native one-shot fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _OSCF_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-one-shot-control-flags", Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine one-shot control child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned one-shot control child must settle once.")
+		_TestPrint("# one-shot-control-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native one-shot spent-control contract failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS one-shot-control-flags " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _OSCF_Mode in ["plain", "ctrl"]
+	Test("one-shot native captured control flags: " . _OSCF_Mode . " (one-shot-native-control-flags)", _OSCF_Case.Bind(_OSCF_Mode))

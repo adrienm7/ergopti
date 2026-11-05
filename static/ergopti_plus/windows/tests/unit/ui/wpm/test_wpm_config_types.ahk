@@ -165,7 +165,7 @@ _WPMCO_RefusedConfig(Kind, Successor) {
 	RegistryPath := "HKCU\" . Subkey
 	Root := A_Temp . "\ergopti_wpm_compensation_" . Nonce
 	Path := Root . "\config.toml"
-	Handle := 0, OwnedKey := false, CreatedRoot := false, Lease := 0
+	Handle := 0, OwnedKey := false, CreatedRoot := false, FileHold := 0
 	State := {notices: 0, bCalls: 0, bAck: false, bX: "unset", bY: "unset"}
 	Notify(Message, Options) {
 		State.notices += 1
@@ -201,8 +201,18 @@ _WPMCO_RefusedConfig(Kind, Successor) {
 		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
 		AssertEqual(10, ST_Get(WPMWidgetConst.STORE_X, "missing"))
 		AssertEqual(20, ST_Get(WPMWidgetConst.STORE_Y, "missing"))
-		Lease := _ConfigWriteLeaseTryAcquire(Path, "wpm-native-compensation-proof")
-		AssertTrue(Lease is Object, "the real competing configuration owner must be acquired")
+		; A genuine unrelated Windows reader allows ordinary source reads but
+		; withholds delete sharing, so the actual default replacement refuses.
+		FileHold := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(FileHold != 0 && FileHold != -1, "acquire the genuine no-delete-share handle")
+		ProbeStage := Root . "\native-sharing-probe.tmp"
+		AssertTrue(FSWriteCreateDurable(ProbeStage, "owned probe"))
+		AssertFalse(FSAtomicMoveReplace(ProbeStage, Path, &LockError))
+		AssertEqual(32, LockError, "the actual native target replacement must produce ERROR_SHARING_VIOLATION")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the native lock probe never replaced its private config source")
+		AssertTrue(FSDeleteStrict(ProbeStage))
+		AssertFalse(MenuCommandConfigBusy(), "no pre-existing config owner can prevent the actual menu action from entering")
 		if Kind == "graph-toggle"
 			Result := WPMWidget_ToggleGraphConfig(0, Notify)
 		else
@@ -213,9 +223,9 @@ _WPMCO_RefusedConfig(Kind, Successor) {
 			. " notices=" . State.notices . " b_calls=" . State.bCalls . " b_ack=" . State.bAck
 			. " b_stored_x=" . State.bX . " b_stored_y=" . State.bY
 			. " a_result=" . Result . " ram_x=" . WPMWidget.pos_x . " ram_y=" . WPMWidget.pos_y
-			. " final_stored_x=" . ActualX . " final_stored_y=" . ActualY)
-		AssertFalse(Result, "the actual config lease refuses A's configuration mutation")
-		AssertTrue(_ConfigWriteLeaseOwns(Lease, Path))
+			. " final_stored_x=" . ActualX . " final_stored_y=" . ActualY . " native_replace_error=" . LockError)
+		AssertFalse(Result, "the actual native sharing violation refuses A's configuration mutation")
+		AssertFalse(_ConfigWriteLeaseCurrent(Path) is Object, "the actual refused writer must release its native transaction owner")
 		AssertEqual(1, State.notices, "the real failure-notification boundary must run once")
 		AssertEqual(Successor ? 1 : 0, State.bCalls)
 		if Successor {
@@ -229,11 +239,13 @@ _WPMCO_RefusedConfig(Kind, Successor) {
 		AssertEqual(ExpectedX, WPMWidget.pos_x)
 		AssertEqual(ExpectedY, WPMWidget.pos_y)
 		AssertFalse(WPMWidget.show_graph, "A's refused graph change stays unpublished")
-		AssertEqual(Source, FSReadUtf8Exact(Path), "the competing config lease leaves the real source unchanged")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the native sharing refusal leaves the real source unchanged")
 	} finally {
 		try {
-			if Lease is Object
-				_ConfigWriteLeaseRelease(Lease)
+			if FileHold && FileHold != -1 {
+				DllCall("Kernel32\CloseHandle", "Ptr", FileHold, "Int")
+				FileHold := 0
+			}
 			ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
 			WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
 			WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors

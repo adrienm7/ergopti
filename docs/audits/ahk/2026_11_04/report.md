@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **89 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **99 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1493,3 +1493,149 @@ Regression: Four actual JSON/discovery/connector/native-launch cases preserve co
 ## Discovery refusal at da9fc06
 
 Run41953170311 stops with AutoHotkey exit2 before discovery: the new gesture child-source builder still uses legacy doubled-quote escaping in three string constructions. None of the96 selected subjects executes. Those constructions are rewritten with valid v2 literals; the other new builders are inspected for the same mistake. Production compilation passes, optional E2E groups are not selected, and no behavioral result is attributed to this run. The next replay preserves the previously unexecuted cases and adds eight unqualified WPM, ROI-context and same-window selection probes. The register remains89 distinct confirmed findings.
+
+## Native qualification at f51d742
+
+Run41954012438 executes104 selected cases in each order:77 pass and27 fail, with identical failing names. The production entry compiles; optional E2E groups remain unselected. Native argument NUL guards4/4, launcher controls6/6, title ownership3/3 and all45 selected Wrap cases pass. This selection does not repeat the scalar, updater, typed-chord or layout-retry groups qualified at b70dd87.
+
+The run establishes090–099 below. It also reproduces the existing082 typed-boot and081 WPM compensation families. Spent-control observers and native Changelog Show notification fixtures do not establish new product defects. Several clipboard positive cases reach correct receiver assertions but fail because the fixture mistakenly retains its cleanup owner; those cleanup calls are repaired without adopting a newer clipboard sequence. Post-fix native qualification of090–099 remains pending.
+
+## AHK-090: Diagnostics acknowledge an empty buffered replacement
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+FSWriteUtf8ReplaceStrict uses buffered FileOpen writing without requiring the native write receipt before replacement.
+
+Reproduction: Collect a real diagnostic replacement through a handle whose write rights are refused, then inspect the acknowledged target bytes.
+
+Observation: Run41954012438 in both orders acknowledges Result1 with publishedBytes0; the genuine skipped-collection control passes.
+
+Regression: Use the owned native replacement stage, require WriteFile and flush acknowledgement, preserve foreign stages, and assert refusal with Win32 error5.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-091: Mistral typed text content is discarded as an empty answer
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The canonical choices.message.content reader admits only String, although the provider contract also admits typed text arrays.
+
+Reproduction: Feed official OpenAI-compatible Mistral content arrays containing typed text, with and without a preceding thinking chunk, through actual request completion.
+
+Observation: Run41954012438 classifies both actual answers canonical_empty, invokes one empty callback and retires the real request; string and reasoning-only controls pass.
+
+Regression: Concatenate ordered strictly typed text chunks; ignore reasoning and nontext chunks, refuse malformed text arrays, preserve no-decoy fallback and exactly-once request retirement.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-092: A second agent action deletes a calendar file before its handler reads it
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+LLM_AgentConnector_Execute deletes previous temporary files without any consumption acknowledgement from the asynchronous native handler.
+
+Reproduction: Start an independently owned delayed calendar reader, execute a second real connector action, then release the first reader.
+
+Observation: Run41954012438 observes existsbefore_release0 and MISSING in the joined real reader; the single-action reader control reads the complete calendar bytes.
+
+Regression: Retain each calendar handoff in an exclusively created user-private directory; delayed-reader and independent native ACL, collision, UTF-8 and NUL controls cover publication.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-093: The Wi-Fi dashboard ignores actual network change events
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+KLR_RebuildAggregates counts legacy events_system wifi_change rows while the active producer writes events_network network_change.
+
+Reproduction: Produce canonical baseline, network-switch and signal rows through the genuine Wi-Fi poll, ingest them into real SQLite and rebuild the manifest.
+
+Observation: Run41954012438 retains three genuine network rows but exposes manifest wifi_changes0 instead of1; signal-only control passes.
+
+Regression: Count known connectivity and SSID transitions from canonical metadata, preserve legacy events, exclude startup/signal/unknown observations, and invalidate obsolete cache/checkpoint versions.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-094: ROI joins word fragments across application contexts
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The in-progress ROI word has no canonical focus owner and survives context discontinuities.
+
+Reproduction: Type abc in application A, switch context without a delimiter, type def and space in application B through actual context and ROI producers.
+
+Observation: Run41954012438 reports compound_count5 and a compound candidate across applications, with zero hook errors; same-application continuity control passes.
+
+Regression: Bind fragments to immutable app/title/HWND identity; discard on context, caret, privacy, synthetic and lifecycle gaps without promoting incomplete words; preserve same-context refresh continuity.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-095: Enter and Tab are each recorded twice by the real InputHook
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The key intent records the named control event and the following character intent records its control-code echo as another text unit.
+
+Reproduction: Deliver one native Enter or Tab to an owned receiver while observing the actual installed InputHook key and character callbacks.
+
+Observation: Run41954012438 observes one receiver keydown, one hook keydown and one LF or TAB callback, but two canonical events and text units in both orders; letter and Backspace controls pass.
+
+Regression: Associate an echo with its exact hook, lifecycle, generation and successfully recorded predecessor; preserve genuine OnChar-only Unicode packets and unrelated-key release behavior.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-096: Storage clearing acknowledges denied native enumeration as an empty store
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+Reg_EnumValues collapses registry enumeration refusal into an empty array, which ST_Clear treats as complete discovery.
+
+Reproduction: Create a private registry subtree, deny value-query permission with a reversible native DACL, and call the real storage clear path.
+
+Observation: Run41954012438 measures native query5 and enum5 while ST_Clear returns1; accessible and genuinely empty controls pass and the exact original ACL is restored.
+
+Regression: Use an explicit complete-enumeration receipt, publish no partial names on error, distinguish absent keys from denied access, and grow buffers for legal long names.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-097: SendInstant pastes a foreign copy made after its clipboard receipt
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+SendInstant does not revalidate the original owned sequence at the final native paste boundary.
+
+Reproduction: Let an independent clipboard writer replace the published payload after its authentic sequence receipt and before the actual paste.
+
+Observation: Run41954012438 independently verifies payload sequence23/40 changes to28/45 and the actual Edit receives foreign text while ok remains1; inverse repeats the defect.
+
+Regression: Reject a changed sequence immediately before paste, retain the original cleanup ownership, and test actual receiver bytes plus a stable positive control. The initial positive case reached correct receiving assertions but failed fixture cleanup, repaired separately.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-098: A clipboard renderer redirects SendInstant output into another control
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+SendInstant captures no native window/process/control authority across the yielding clipboard snapshot and final injection.
+
+Reproduction: During the real ClipboardAll rendering callback, focus another native Edit before the pending wrap or gesture emits its text.
+
+Observation: Run41954012438 records wrong_target1, one emission and transformed old text in EditB for both wrap and gesture in both orders.
+
+Regression: Capture and revalidate native target identity across clipboard and send boundaries; refuse the wrap fallback after focus loss. Initial unchanged-target cases receive the correct output but require the separate fixture cleanup repair.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-099: Selection capture transforms another control within the same window
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+GetSelectionAsync binds foreground identity and physical generation but not the focused control before its first clipboard call.
+
+Reproduction: During the initial real ClipboardAll renderer, move focus from EditA to EditB inside one foreground HWND, then complete selection transformation.
+
+Observation: Run41954012438 records wrong_control1 and transforms bravo in EditB instead of the original selection in both orders.
+
+Regression: Bind every real capture to a nonzero native control token, revalidate after callouts and before delivery, preserve manually built legacy jobs, and retain exact owner cleanup. The stable positive receiver case initially fails cleanup only.
+
+The production correction is integrated; post-fix native qualification is pending.
