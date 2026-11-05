@@ -1914,12 +1914,9 @@ LLM_Bridge_OnBackspace() {
 		if !IsObject(Source)
 			return false
 		CapturedSecure := _LLM_Bridge_CachedTypingSecure(Source, FreshFocus)
-		NativePrivate := FreshFocus.Has("NativeConclusive") && FreshFocus.Has("NativeSecure")
-			&& FreshFocus.Get("NativeConclusive", false) is Integer
-			&& FreshFocus.Get("NativeConclusive", false) == true
-			&& FreshFocus.Get("NativeSecure", true) is Integer
-			&& FreshFocus.Get("NativeSecure", true) == true
-		if NativePrivate && _LLM_Engine.Get("disable_password_fields", true) {
+		; A refused Backspace breaks the same context continuity as a refused
+		; character. Purge before a later normal arrival can reuse this buffer.
+		if CapturedSecure && _LLM_Engine.Get("disable_password_fields", true) {
 			_LLM_Bridge_RejectPrivateTyping(true, Source, _LLM_Bridge_ContentGeneration)
 		} else {
 			_LLM_Bridge_ApplyBufferEdit(_TextTailCodeUnits(_LLM_Bridge_Buffer, 1), "")
