@@ -694,7 +694,7 @@ _native_luv_stage_create() {
 }
 _prepare_source_network_runtime() {
 	local repository manager packages package_name builder
-	repository="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
+	IFS= read -r -d '' repository < <(CDPATH= cd -Pe -- "${SRC_DRIVER}/../../.." && printf '%s\0' "$PWD") || return 1
 	if [ "$SRC_DRIVER" != "${repository}/static/ergopti_plus/linux" ]; then return 0; fi
 	if _network_runtime_available; then return 0; fi
 	manager="$(_detect_pkg_manager)"
@@ -1044,7 +1044,7 @@ _native_output_bin_parents || exit 1
 command -v tar >/dev/null || { ergopti_msg install.tar_required >&2; exit 1; }
 NATIVE_OUTPUT_STAGE=""
 NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"
-NATIVE_OUTPUT_REPO="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
+IFS= read -r -d '' NATIVE_OUTPUT_REPO < <(CDPATH= cd -Pe -- "${SRC_DRIVER}/../../.." && printf '%s\0' "$PWD")
 if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 	NATIVE_OUTPUT_BUILD="${NATIVE_OUTPUT_REPO}/tools/build/build-linux-native-output.sh"
 	[ -f "$NATIVE_OUTPUT_BUILD" ] && [ ! -L "$NATIVE_OUTPUT_BUILD" ] || {

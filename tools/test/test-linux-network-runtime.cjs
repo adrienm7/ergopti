@@ -295,7 +295,7 @@ function portable() {
 				}
 			}
 			const sourceBranch = installer.slice(
-				installer.indexOf('NATIVE_OUTPUT_REPO='),
+				installer.indexOf("IFS= read -r -d '' NATIVE_OUTPUT_REPO"),
 				installer.indexOf('# Create destination directories.')
 			);
 			assert.match(
