@@ -429,17 +429,12 @@ MenuReloadReplay_Publish(FilePath := "") {
 	}
 	if FilePath == ""
 		FilePath := MenuReloadReplay_FilePath()
-	StagePath := FilePath . ".stage"
 	try LoggerStart("MenuDispatcher", "Handing {1} menu command(s) to the reload successor…", Paths.Length)
 	try {
-		if !FSWriteDurable(StagePath, _MenuReloadReplayEncode(Paths))
-			throw Error("the staged file could not be written")
-		if !FSAtomicMoveReplace(StagePath, FilePath, &NativeError)
-			throw OSError(NativeError, A_ThisFunc, "the staged file could not be published")
+		; Keep creation ownership through publication and failed-attempt cleanup.
+		if !FSWriteReplaceOwned(FilePath, _MenuReloadReplayEncode(Paths), ".stage", &Detail)
+			throw Error("the staged hand-off could not be published: " . Detail)
 	} catch as Err {
-		try FSDeleteStrict(StagePath)
-		catch as CleanupErr
-			try LoggerError("MenuDispatcher", "The staged menu hand-off '{1}' could not be removed: {2}.", StagePath, CleanupErr.Message)
 		try LoggerError("MenuDispatcher", "The menu commands could not be handed to the reload successor: {1}.", Err.Message)
 		return false
 	}
@@ -499,13 +494,9 @@ MenuReloadReplay_Consume(FilePath := "", NotifyFn := 0) {
 	_MenuReloadReplayConsumed := true
 	if FilePath == ""
 		FilePath := MenuReloadReplay_FilePath()
-	; A stage never crossed the accepted reload: it carries no intent.
-	StagePath := FilePath . ".stage"
+	; The successor owns only the published receipt. A sibling stage may belong
+	; to another producer; its name grants no cleanup authority.
 	try {
-		if FSStrictExists(StagePath) {
-			FSDeleteStrict(StagePath)
-			try LoggerWarn("MenuDispatcher", "An unpublished menu hand-off stage from an interrupted exit was discarded.")
-		}
 		Present := FSStrictExists(FilePath)
 	} catch as Err {
 		; Startup goes on without the replay; the user is told the clicks were lost.
