@@ -496,6 +496,18 @@ function M.capture_owned(owner)
 	return type(captured) == "table" and captured or nil, cells
 end
 
+--- Verifies that a capture is the live, unused receipt of this exact owner.
+--- @param owner table Acquired alias owner.
+--- @param receipt table Opaque receipt from capture_owned.
+--- @return boolean admitted
+function M.validate_owned_capture(owner, receipt)
+	local gate, record = owned_authority(owner, receipt, true)
+	if not gate then return false end
+	return owned_guard(gate, function()
+		return owned_native_current(record, owned_native_cells(record.keys))
+	end) == true
+end
+
 --- Settles only actual native backup cleanup before another settings effect.
 --- @param record table
 --- @return boolean settled
