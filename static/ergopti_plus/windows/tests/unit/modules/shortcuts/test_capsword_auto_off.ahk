@@ -454,6 +454,17 @@ _CWAOD_Case(Name, Seconds) {
         Accepted := CapsWordAutoOffValidateIdleTimeout(Seconds, &Reason)
         Receipt["validator_accepted"] := Accepted
         Receipt["validator_reason"] := Reason
+        NativeAccepted := Accepted
+        if NativeAccepted && Seconds > 0 {
+            NativeMs := TimerDelayMsFromSeconds(Seconds)
+            NativeAccepted := NativeMs is Number
+            if NativeAccepted {
+                try TimerRequireDelayMs(NativeMs, "CapsWord domain fixture expectation")
+                catch ValueError
+                    NativeAccepted := false
+            }
+        }
+        Receipt["native_period_supported"] := NativeAccepted
         Values := CapsWordAutoOffReadValues(Cache)
         Receipt["read_seconds"] := String(Values["idle_timeout_seconds"])
         ReadError := 0, ArmError := 0
@@ -484,12 +495,13 @@ _CWAOD_Case(Name, Seconds) {
         }
         _TestPrint("# CAPSWORD_IDLE_DOMAIN " . KL_JsonEncode(Receipt))
         AssertFalse(IsObject(ReadError), "a value admitted or explicitly defaulted by the public reader must compile")
-        if Accepted {
+        if NativeAccepted {
             AssertEqual(Seconds, Values["idle_timeout_seconds"], "an accepted value must reach the real policy unchanged")
             AssertTrue(Receipt["idle_positive_finite"], "a positive accepted configuration must not overflow into disabled/negative/nonfinite policy")
             AssertFalse(Receipt["expires_after_one_ms"], "a positive accepted duration above one millisecond cannot immediately expire")
         } else {
-            AssertEqual("invalid_idle_timeout", Reason, "unsupported values must be refused at validation with the stable reason")
+            if !Accepted
+                AssertEqual("invalid_idle_timeout", Reason, "shared validation retains its stable refusal reason")
             DefaultSeconds := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
             AssertEqual(DefaultSeconds, Values["idle_timeout_seconds"], "the existing reader explicitly defaults a refused duration")
             DefaultPolicy := CapsWordAutoOffCompileConfig(Map())
@@ -532,3 +544,91 @@ Test("CapsWord idle domain: finite integer seconds cannot wrap into disabled pol
     _CWAOD_Case.Bind("integer_overflow", 1 << 62))
 Test("CapsWord idle domain: finite float seconds cannot overflow its compiled delay (capsword-idle-domain)",
     _CWAOD_Case.Bind("float_overflow", 1e308))
+
+; Append one independent case beside the existing domain probes.
+_CWAOD_TinyPositive() {
+    global CapsWordEnabled, _TimingsCache
+    AssertFalse(CapsWordAutoOff.Armed is Map, "do not borrow an active CapsWord")
+    Saved := {Enabled: CapsWordEnabled, Configured: CapsWordAutoOff.Configured,
+        Values: CapsWordAutoOff.Values, Critical: A_IsCritical, Suspended: A_IsSuspended}
+    Results := [], Primary := 0
+    try {
+        Critical("Off"), Suspend(false)
+        if !IsSet(_TimingsCache) || !(_TimingsCache is Map)
+            TimingsLoadShared()
+        Pointer := Map()
+        for Kind in CapsWordAutoOffPointerKinds()
+            Pointer[Kind] := 0
+        for Seconds in [0, 0.0001] {
+            State := Map("ends", 0, "reason", "")
+            CapsWordAutoOffReadConfig(Map("shortcuts.caps_word", Map("idle_timeout_seconds", Seconds, "terminators", []),
+                "shortcuts.caps_word.pointer", Pointer))
+            Delay := CapsWordAutoOffIdleDelayMs(CapsWordAutoOffCurrentPolicy())
+            CapsWordEnabled := true
+            CapsWordAutoOffArm(_CWAOD_End.Bind(State))
+            Started := A_TickCount
+            if Seconds == 0
+                Sleep(30)
+            else {
+                while State["ends"] == 0 && TickElapsed(Started) < 500
+                    Sleep(1)
+            }
+            Results.Push(Map("seconds", Seconds, "idle_ms", String(Delay), "ends", State["ends"],
+                "idle_running_after_wait", CapsWordAutoOff.IdleRunning, "enabled_after_wait", CapsWordEnabled))
+            CapsWordEnabled := false
+            CapsWordAutoOffDisarm()
+        }
+        _TestPrint("# CAPSWORD_TINY_POSITIVE " . KL_JsonEncode(Results))
+        AssertEqual("0", Results[1]["idle_ms"], "exact zero alone explicitly disables inactivity")
+        AssertEqual(0, Results[1]["ends"], "the zero control has no timer callback")
+        AssertFalse(Results[1]["idle_running_after_wait"])
+        AssertTrue(Results[1]["enabled_after_wait"], "zero leaves the activation enabled")
+        AssertTrue(Number(Results[2]["idle_ms"]) > 0, "a positive stored duration cannot silently disable inactivity")
+        AssertEqual(1, Results[2]["ends"], "the tiny positive duration must actually deliver its real native timer once")
+        AssertFalse(Results[2]["enabled_after_wait"])
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            CapsWordEnabled := false
+            CapsWordAutoOffDisarm()
+            AssertEqual(0, CapsWordAutoOff.Subscriptions.Length)
+            AssertFalse(CapsWordAutoOff.IdleRunning)
+        } catch Any as Failure {
+            _TestPrint("# CAPSWORD_TINY_CLEANUP " . Type(Failure) . ": " . Failure.Message)
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+        CapsWordAutoOff.Configured := Saved.Configured
+        CapsWordAutoOff.Values := Saved.Values
+        CapsWordEnabled := Saved.Enabled
+        Suspend(Saved.Suspended), Critical(Saved.Critical)
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+Test("CapsWord idle domain: positive submillisecond delay differs from explicit zero (capsword-tiny-positive)", _CWAOD_TinyPositive)
+
+; Append two independent public writer regressions; reuses owned existing fixture.
+_CWAODS_Body(Seconds, Fixture) {
+    BeforeBytes := FSReadUtf8Exact(Fixture.path)
+    BeforePolicy := CapsWordAutoOff.Configured, BeforeValues := CapsWordAutoOff.Values
+    Raised := 0, Returned := "unset"
+    try Returned := CapsWordAutoOffStore("shortcuts.caps_word.idle_timeout_seconds", Seconds, Fixture.path)
+    catch Any as Failure
+        Raised := Failure
+    _TestPrint("# CAPSWORD_IDLE_STORE " . KL_JsonEncode(Map("seconds", String(Seconds),
+        "error", IsObject(Raised) ? Type(Raised) : "", "returned", Returned,
+        "file_unchanged", FSReadUtf8Exact(Fixture.path) == BeforeBytes,
+        "policy_unchanged", CapsWordAutoOff.Configured == BeforePolicy,
+        "values_unchanged", CapsWordAutoOff.Values == BeforeValues)))
+    AssertTrue(IsObject(Raised) && Raised is ValueError, "an unsupported intrinsic timer delay is refused before writer publication")
+    AssertTrue(InStr(Raised.Message, "invalid_idle_timeout", true) > 0, "keep the exact existing stable refusal reason")
+    AssertEqual(BeforeBytes, FSReadUtf8Exact(Fixture.path), "the source-owned writer must not persist unarmable settings")
+    AssertTrue(CapsWordAutoOff.Configured == BeforePolicy && CapsWordAutoOff.Values == BeforeValues)
+}
+_CWAODS_Run(Seconds) {
+    _CWAO_WithDefaultSettings(_CWAODS_Body.Bind(Seconds))
+}
+Test("CapsWord idle store: integer overflow is refused before publication (capsword-idle-store-domain)", _CWAODS_Run.Bind(1 << 62))
+Test("CapsWord idle store: float overflow is refused before publication (capsword-idle-store-domain)", _CWAODS_Run.Bind(1e308))

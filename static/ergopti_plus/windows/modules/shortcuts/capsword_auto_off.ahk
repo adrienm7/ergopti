@@ -83,15 +83,48 @@ CapsWordAutoOffPointerKinds() {
 	return Kinds
 }
 
-; The stored delay, or its default when absent or not a number of seconds.
+; The shared policy admits finite seconds; Windows can arm only its native
+; timer domain. Zero alone disables the timer; a smaller positive duration
+; still receives the native minimum one millisecond.
+_CapsWordAutoOffNativeIdleMs(Seconds, &Reason := "") {
+	if !CapsWordAutoOffValidateIdleTimeout(Seconds, &Reason)
+		return ""
+	if Seconds == 0
+		return 0
+	Milliseconds := TimerDelayMsFromSeconds(Seconds)
+	if Milliseconds is Number {
+		try {
+			TimerRequireDelayMs(Milliseconds, "CapsWord auto-off")
+			return Max(1, Round(Milliseconds))
+		} catch ValueError {
+			; An unsupported native period is refused before publication.
+		}
+	}
+	Reason := "invalid_idle_timeout"
+	return ""
+}
+
+; Validates the Windows period before the shared compiler's arithmetic, then
+; retains the portable delimiter/pointer policy with the admitted native delay.
+_CapsWordAutoOffCompileNativePolicy(Values, &Reason := "") {
+	Delay := _CapsWordAutoOffNativeIdleMs(Values.Get("idle_timeout_seconds", ""), &Reason)
+	if !(Delay is Number)
+		return ""
+	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	if Policy is Map
+		Policy["idle_ms"] := Delay
+	return Policy
+}
+
+; The stored delay, or its default when absent or not a native timer duration.
 _CapsWordAutoOffReadIdle(Cache) {
 	Default := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
 	Raw := IniCacheGet(Cache, ConfigKey.SHORTCUTS_CAPS_WORD, ConfigLeaf.IDLE_TIMEOUT_SECONDS)
 	if Raw == "_"
 		return Default
-	if CapsWordAutoOffValidateIdleTimeout(Raw)
+	if _CapsWordAutoOffNativeIdleMs(Raw) is Number
 		return Raw
-	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
+	LoggerWarn("CapsWord", "shortcuts.caps_word.idle_timeout_seconds '{1}' is not a supported native inactivity delay — using {2} s.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
 }
@@ -157,7 +190,7 @@ CapsWordAutoOffReadValues(Cache) {
 
 ; Compiles settings that passed the reader. A refusal is a driver defect.
 _CapsWordAutoOffCompileValues(Values) {
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw Error("CapsWord auto-off settings refused after validation: " . Reason)
 	return Policy
@@ -229,7 +262,7 @@ CapsWordAutoOffStore(Path, Value, ConfigPath := "") {
 	} else {
 		throw ValueError("No CapsWord auto-off setting at '" . Path . "'.")
 	}
-	Policy := CapsWordAutoOffCompile(Values, CapsWordAutoOffPointerKinds(), &Reason)
+	Policy := _CapsWordAutoOffCompileNativePolicy(Values, &Reason)
 	if !(Policy is Map)
 		throw ValueError("CapsWord auto-off: '" . Path . "' refused (" . Reason . ").")
 	if !ConfigCommitUpdates(ConfigPath != "" ? ConfigPath : ConfigurationFile,
