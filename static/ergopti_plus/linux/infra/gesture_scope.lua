@@ -75,16 +75,37 @@ function M.new(options)
 			state.enabled = settings.enabled
 			if state.enabled == nil then state.enabled = Manifest.default_for(ConfigKeys.KEY.GESTURES_ENABLED) end
 			state.reading = state.enabled
-			return gestures.apply_scope_state(state)
+			return gestures.apply_scope_state_provisional(state)
 		end,
-		restore = gestures.apply_scope_state,
+		restore = gestures.apply_scope_state_provisional,
 	})
+	local click_retirement
 	return {
-		apply = function(mode) return transaction.apply("gestures", mode) end,
+		apply = function(mode)
+			local captured = gestures.capture_scope_click_retirement()
+			if not captured then return false, "gesture click ownership is busy" end
+			click_retirement = captured
+			local accepted, detail = transaction.apply("gestures", mode)
+			if not accepted and not transaction.pending() then click_retirement = nil; captured(false) end
+			return accepted, detail
+		end,
 		pending = transaction.pending,
-		retry_restore = transaction.retry_restore,
-		revert = transaction.revert,
-		release = transaction.release,
+		retry_restore = function()
+			local accepted, detail = transaction.retry_restore()
+			if accepted and click_retirement then local finish = click_retirement; click_retirement = nil; finish(false) end
+			return accepted, detail
+		end,
+		revert = function()
+			local accepted, detail = transaction.revert()
+			if accepted and click_retirement then local finish = click_retirement; click_retirement = nil; finish(false) end
+			return accepted, detail
+		end,
+		release = function()
+			transaction.release()
+			local finish = click_retirement
+			click_retirement = nil
+			if finish then finish(true) end
+		end,
 	}
 end
 
