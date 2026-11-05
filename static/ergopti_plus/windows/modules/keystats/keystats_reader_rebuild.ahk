@@ -64,7 +64,7 @@ class KLRRebuildConst {
 	; both that write volume and the work a killed worker can lose.
 	static CHECKPOINT_INTERVAL_MS := 60000
 	; Bump when the checkpoint tables or the meaning of their columns change.
-	static CHECKPOINT_FORMAT := "6"
+	static CHECKPOINT_FORMAT := "7"
 	; A peer rebuilding the same store is polled at this cadence.
 	static PEER_POLL_MS := 1000
 	static BATCH_MARKER := "`n-- === ingest batch "

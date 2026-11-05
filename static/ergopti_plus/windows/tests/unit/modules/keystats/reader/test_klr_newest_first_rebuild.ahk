@@ -501,3 +501,7 @@ _KLRNF_GuardRefusalKeepsPublishedImage() {
 }
 Test("KLR rebuild: refused guard preserves the exact published image (klr-rebuild-guard-caller)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_GuardRefusalKeepsPublishedImage))
+
+
+Test("KLR thinking pauses: old format6 checkpoints restart through actual replay (klr-thinking-pause-checkpoint)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes.Bind("6")))

@@ -1467,3 +1467,85 @@ _KTPR_CorpusCase(VectorId) {
 for _KTPR_Id in ["simple_typing_3_chars", "typing_with_think_pause"]
 	Test("Keystats reader shared think-pause corpus: " . _KTPR_Id . " survives canonical SQL projection (reader-think-pause-corpus)",
 		_KTPR_CorpusCase.Bind(_KTPR_Id))
+
+
+; Numeric migration and threshold semantics use the real reader and canonical schema.
+_KLRTP_NumericMigration(Db) {
+	SavedThink := KLWConst.THINK_PAUSE_MS
+	try {
+		KLWConst.THINK_PAUSE_MS := 100
+		AssertTrue(KLR_LoadSchema(Db))
+		Events := [["a",100,Map()], ["b",101,Map()], ["[BS]",201,Map()],
+			["c",501,Map("s",1,"st","hotstring")], ["d",601,Map("sc","Ctrl+D")], ["e",20,Map()]]
+		AssertTrue(SQLite_Exec(Db,
+			"INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json,pause_before_ms) "
+			. "VALUES('pause-owner',1,'2026-01-01 10:00:00.000','2026-01-01','pause.exe',0,0,0,0,0,'ace',"
+			. SQLite_Q(KL_JsonEncode(Events)) . ",9000);"
+			. "CREATE TABLE klr_reader_typing_counts(device_id TEXT NOT NULL,event_id INTEGER NOT NULL,chars INTEGER NOT NULL,PRIMARY KEY(device_id,event_id)) WITHOUT ROWID;"
+			. "INSERT INTO klr_reader_typing_counts VALUES('pause-owner',1,5);"
+			. "CREATE TRIGGER pause_count_delete_refusal BEFORE DELETE ON klr_reader_typing_counts BEGIN SELECT RAISE(ABORT,'no count deletion');END;"))
+		AssertTrue(KLR_PrepareTypingProjection(Db, 0, false), "The actual old chars-only table must migrate and compute missing event-level numbers")
+		Row := SQLite_Query(Db, "SELECT chars,pauses,think_time_ms,think_pause_ms FROM klr_reader_typing_counts;")[1]
+		AssertEqual(5, Row["chars"], "The pre-existing chars projection policy remains unchanged")
+		AssertEqual(2, Row["pauses"], "Strict threshold excludes equality; manual Backspace counts; synthetic and shortcut entries do not")
+		AssertEqual(302, Row["think_time_ms"])
+		AssertEqual(100, Row["think_pause_ms"])
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_schema WHERE name='pause_count_delete_refusal';")[1]["n"],
+			"Migration must preserve existing refusal triggers rather than replace the numeric owner")
+		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"], "Counts-only preparation must not retain clear replay payloads")
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Cell := KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["pause.exe"]
+		AssertEqual(2, Cell["pauses"])
+		AssertEqual(302, Cell["think_time"], "The deliberately unrelated pause_before_ms=9000 is not the event-level source")
+		KLWConst.THINK_PAUSE_MS := 200
+		AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], false), "A changed real walker threshold must invalidate the numeric row even with no TEMP payload")
+		Row := SQLite_Query(Db, "SELECT pauses,think_time_ms,think_pause_ms FROM klr_reader_typing_counts;")[1]
+		AssertEqual(1, Row["pauses"])
+		AssertEqual(201, Row["think_time_ms"])
+		AssertEqual(200, Row["think_pause_ms"])
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertEqual(201, KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["pause.exe"]["think_time"])
+		_SQLRD_AssertNoStatements(Db)
+	} finally KLWConst.THINK_PAUSE_MS := SavedThink
+}
+Test("KLR thinking pauses: legacy numeric rows and changed thresholds preserve actual manual semantics (klr-thinking-pause-numeric)",
+	_SQLRD_WithDatabase.Bind(_KLRTP_NumericMigration))
+
+
+; These are real canonical JSON numbers through SQLite and public projection,
+; not a direct call to the arithmetic helper or invented append verdicts.
+_KLRTP_NumericBoundary(Spec, Db) {
+	SavedThink := KLWConst.THINK_PAUSE_MS
+	try {
+		KLWConst.THINK_PAUSE_MS := 0
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db,
+			"INSERT INTO events_typing(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json,pause_before_ms) "
+			. "VALUES('numeric-pause',1,'2026-01-01 10:00:00.000','2026-01-01','number.exe',0,0,0,0,0,'ab',"
+			. SQLite_Q(Spec[2]) . ",0);"))
+		Result := KLR_PrepareTypingProjection(Db, 0, false)
+		AssertEqual(Spec[3], Result, "Only a representable finite thinking-time sum may prepare its numeric projection: " . Spec[1])
+		if !Spec[3] {
+			AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+				"An invalid row sum must fail before that page publishes even a wrapped numeric count")
+			AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"])
+		} else {
+			Actual := SQLite_Query(Db, "SELECT think_time_ms FROM klr_reader_typing_counts;")[1]["think_time_ms"]
+			AssertTrue(Actual = Spec[4], "Integer exactness and ordinary IEEE Float results must survive the actual SQL literal unchanged")
+			AssertTrue(KLR_RebuildAggregates(Db))
+			Cell := KLR_ReadManifest(Db, "2026-01-01", "2026-01-01")["2026-01-01"]["number.exe"]
+			AssertTrue(Cell["think_time"] = Spec[4], "The actual manifest must expose the same finite native sum")
+			AssertEqual(2, Cell["pauses"])
+		}
+		_SQLRD_AssertNoStatements(Db)
+	} finally KLWConst.THINK_PAUSE_MS := SavedThink
+}
+for _KLRTP_Spec in [
+	["int64-limit", '[["a",9223372036854775806,{}],["b",1,{}]]', true, 0x7FFFFFFFFFFFFFFF],
+	["int64-overflow", '[["a",9223372036854775807,{}],["b",1,{}]]', false, 0],
+	["binary-float", '[["a",1.25,{}],["b",2.5,{}]]', true, 3.75],
+	["ordinary-float", '[["a",0.1,{}],["b",0.2,{}]]', true, 0.1 + 0.2],
+	["float-overflow", '[["a",1e308,{}],["b",1e308,{}]]', false, 0]
+]
+	Test("KLR thinking pauses numeric domain: " . _KLRTP_Spec[1] . " retains finite projection semantics (klr-thinking-pause-numeric-domain)",
+		_SQLRD_WithDatabase.Bind(_KLRTP_NumericBoundary.Bind(_KLRTP_Spec)))
