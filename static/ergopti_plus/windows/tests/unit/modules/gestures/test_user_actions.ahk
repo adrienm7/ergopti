@@ -388,3 +388,5 @@ _UAFP_Work() {
 }
 Test("User command first-line work at the actual capture limit retains its prefix (user-command-firstline-work-observation)",
 	_UAFP_Work)
+
+#Include test_user_command_lifecycle_owner.ahk
