@@ -434,6 +434,40 @@ end)
 
 helpers.describe("system metrics: network changes", function()
 
+	helpers.it("keeps network changes readable under a translated nmcli locale", function()
+		local real_shell = require("adapters.shell_runner")
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(real_shell.run("mkdir -- " .. real_shell.quote(dir)))
+		local executable = dir .. "/nmcli"
+		local file = assert(io.open(executable, "w"))
+		-- nmcli translates ACTIVE even in terse mode; its shell pipeline must
+		-- receive a machine locale before filtering the English yes token.
+		file:write('#!/bin/sh\ncase "${LC_ALL-}" in C) active=yes;; *) active=oui;; esac\n',
+			'printf "%s:%s\\n" "$active" "$ERGOPTI_TEST_SSID"\n')
+		assert(file:close())
+		assert(real_shell.run("chmod +x -- " .. real_shell.quote(executable)))
+		local okay, detail = pcall(function()
+			local ssid = "maison"
+			with_shell({ missing = { iwgetid = true } }, function(metrics, sample)
+				local shell = package.loaded["adapters.shell_runner"]
+				shell.exec_line = function(command)
+					if not command:find("nmcli", 1, true) then return "" end
+					return real_shell.exec_line("PATH=" .. real_shell.quote(dir .. ":/usr/bin:/bin")
+						.. " LC_ALL=fr_FR.UTF-8 ERGOPTI_TEST_SSID=" .. real_shell.quote(ssid) .. " " .. command)
+				end
+				metrics._set_wireless_path(dir .. "/no-wireless")
+				sample(0, "2026-08-06")
+				ssid = "bureau"
+				sample(metrics._sample_interval_ms(), "2026-08-06")
+				helpers.assert_eq(metrics.current().wifi_changes, 1)
+			end)
+		end)
+		os.remove(executable)
+		assert(real_shell.run("rmdir -- " .. real_shell.quote(dir)))
+		helpers.assert_true(okay, tostring(detail))
+	end)
+
 	helpers.it("counts a change of network", function()
 		with_shell({
 			{ match = "power_supply", out = "50" },
