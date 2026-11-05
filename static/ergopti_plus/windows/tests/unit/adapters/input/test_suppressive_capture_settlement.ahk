@@ -583,3 +583,6 @@ _OSCF_Case(Mode) {
 }
 for _OSCF_Mode in ["plain", "ctrl", "shift", "ctrl-shift"]
 	Test("one-shot native captured control flags: " . _OSCF_Mode . " (one-shot-native-control-flags)", _OSCF_Case.Bind(_OSCF_Mode))
+
+for _OSCF_TabMode in ["tab", "tab-shift"]
+	Test("one-shot native captured Tab flags: " . _OSCF_TabMode . " (one-shot-native-tab-flags)", _OSCF_Case.Bind(_OSCF_TabMode))

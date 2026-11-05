@@ -1,12 +1,12 @@
 ﻿; tests/fixtures/one_shot_control_flags_body.ahk
 
-; Real OneShotShift/SIHO and SendNewResult. Native Backspace (plain or Ctrl)
+; Real OneShotShift/SIHO and SendNewResult. Native Backspace or Tab with captured flags
 ; is captured, then its real replay reaches only this private owned Edit.
 ; The oracle reads Win32 queue modifier flags at the receiver's actual keydown,
 ; never just the generated payload. No physical keyboard claim is made.
 if A_Args.Length != 3 || A_Args[1] != "--allow-explicit-owned-one-shot-control-flags"
 	throw Error("Explicit owned native one-shot control opt-in is required.")
-if !(A_Args[2] == "plain" || A_Args[2] == "ctrl" || A_Args[2] == "shift" || A_Args[2] == "ctrl-shift")
+if !(A_Args[2] == "plain" || A_Args[2] == "ctrl" || A_Args[2] == "shift" || A_Args[2] == "ctrl-shift" || A_Args[2] == "tab" || A_Args[2] == "tab-shift")
 	throw Error("Unknown spent-control case.")
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0, _TH_SyntheticEpoch := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605)), OneShotShiftEnabled := false
@@ -56,7 +56,7 @@ _OSPC_Message(WParam, LParam, Message, Hwnd) {
 		_OSPC.FocusSteps.Push(Hwnd)
 	if Message == 0x100 {
 		_OSPC.NativeKeys.Push(WParam)
-		if WParam == 8
+		if WParam == (InStr(_OSPC.Mode, "tab") == 1 ? 9 : 8)
 			_OSPC.Backspaces.Push({Ctrl: !!(DllCall("User32\GetKeyState", "Int", 0x11, "Short") & 0x8000),
 				Shift: !!(DllCall("User32\GetKeyState", "Int", 0x10, "Short") & 0x8000)})
 	}
@@ -104,7 +104,7 @@ _OSPC_Control() {
 			_OSPC.ShiftAttempted := true
 			SendEvent("{LShift down}")
 		}
-		try SendEvent("{Backspace}")
+		try SendEvent(InStr(_OSPC.Mode, "tab") == 1 ? "{Tab}" : "{Backspace}")
 		finally {
 			if _OSPC.ShiftAttempted {
 				SendEvent("{LShift up}")
@@ -152,7 +152,7 @@ _OSPC_Main() {
 		Captured := IsObject(_OSPC.Hook) ? _OSPC.Hook.EndMods : ""
 		FileAppend("OBSERVATION one-shot-control-flags mode=" . _OSPC.Mode . " captured_mods=" . Captured
 			. " control_sent=" . _OSPC.ControlSent . " outputs=" . _OSPC.Outputs.Length
-			. " receiver_backspaces=" . _OSPC.Backspaces.Length
+			. " receiver_vkey=" . (InStr(_OSPC.Mode, "tab") == 1 ? 9 : 8) . " receiver_backspaces=" . _OSPC.Backspaces.Length
 			. " receiver_ctrl=" . (_OSPC.Backspaces.Length ? _OSPC.Backspaces[1].Ctrl : -1)
 			. " receiver_shift=" . (_OSPC.Backspaces.Length ? _OSPC.Backspaces[1].Shift : -1)
 			. " ctrl_released=" . !(DllCall("User32\GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000)
@@ -167,7 +167,7 @@ _OSPC_Main() {
 			"The true native capture must witness exactly the intended original modifier flags.")
 		_OSPC_Require(_OSPC.Backspaces.Length == 1 && _OSPC.Backspaces[1].Shift == ExpectedShift
 			&& _OSPC.Backspaces[1].Ctrl == ExpectedCtrl,
-			"A spent-unshifted control must preserve its captured Ctrl flag at the actual receiving native keydown.")
+			"A spent-unshifted control must preserve its captured modifier flags at its actual receiving native keydown.")
 	} finally {
 		SetTimer(_OSPC_Control, 0)
 		if _OSPC.ShiftAttempted {

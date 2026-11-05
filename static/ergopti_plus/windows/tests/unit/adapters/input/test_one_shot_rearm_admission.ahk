@@ -189,3 +189,79 @@ _BRPT_Case(KeyId, Mode) {
 for _BRPT_Key in ["left_alt", "right_ctrl"]
 	for _BRPT_Mode in ["current", "paused", "resume"]
 		Test("plain backspace repeat lifecycle: " . _BRPT_Key . " " . _BRPT_Mode . " (backspace-repeat-native-epoch)", _BRPT_Case.Bind(_BRPT_Key, _BRPT_Mode))
+
+
+_RMPT_ChildSource(KeyId := "right_ctrl") {
+	global _DriverDir
+	Code := _BRPT_ChildSource(KeyId)
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\backspace_repeat_epoch_body.ahk")
+	AssertEqual(Fixture, SubStr(Code, -StrLen(Fixture)), "Only the unrelated repeat fixture entry may be replaced")
+	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
+	Code := StrReplace(Code, "TextPressKey(*) {", "_RMP_UnusedKeyboardPort(*) {", true, &Replacements)
+	AssertEqual(1, Replacements, "The old refusing keyboard port must not mask the actual adapter")
+	Owner := _DriverProductionFileForSymbol("HS_RunSyntheticInputTransaction")
+	AssertTrue(Owner != "", "The real synthetic transaction must have an owner")
+	Code .= "#Include " . Owner . "`n"
+	for Name in ["TextPressKey", "_TextSenderNormalizeModifierKey", "_TextSenderModifierPrefix", "_TextSenderKeystroke",
+		"_TextSenderModifierWords", "_TextSenderSustainedKey", "_TextSenderSendInput", "_TextSenderAtSendLevel",
+		"_SendVerdictSucceeded", "HSE_WordResetFlagCurrent"] {
+		Body := _DriverFuncBody(Name)
+		AssertTrue(Body != "", "The actual unchanged sender dependency must exist: " . Name)
+		Code .= Body . "`n"
+	}
+	if KeyId == "left_alt" {
+		Body := _DriverFuncBody("BackSpaceLogic")
+		AssertTrue(Body != "", "The actual LAlt modifier-aware producer must exist")
+		Code .= Body . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\rctrl_modified_epoch_body.ahk")
+}
+_RMPT_Case(Mode, KeyId := "right_ctrl") {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired modified-key owner prevents another probe")
+	Root := A_Temp . "\ergopti_rctrl_modified_epoch_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Retired := false, Primary := 0
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native child requires an exclusively owned source directory")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _RMPT_ChildSource(KeyId)))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, _SharedDir, KeyId], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact private modified-key owner must start")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 8000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		_TestPrint("# rctrl-modified-epoch " . KeyId . " " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(1, State.Calls)
+		AssertEqual(0, State.Code, State.Output . State.ErrorText)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS rctrl-modified-epoch " . Mode)
+	} catch as Failure {
+		Primary := Failure
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Failure {
+		if !IsObject(Primary)
+			Primary := Failure
+	}
+	try {
+		if Created && !Retired
+			RetirementDebt := {Root: Root, Handle: Handle}
+		else if Created && Retired && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact native owner must retire before source removal")
+}
+for _RMPT_Mode in ["current", "paused", "resume"]
+	Test("RCtrl modified output lifecycle: " . _RMPT_Mode . " (rctrl-modified-native-epoch)", _RMPT_Case.Bind(_RMPT_Mode))
+
+for _RMPT_LAltMode in ["current", "paused", "resume"]
+	Test("LAlt modified output lifecycle: " . _RMPT_LAltMode . " (lalt-modified-native-epoch)", _RMPT_Case.Bind(_RMPT_LAltMode, "left_alt"))
