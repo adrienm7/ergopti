@@ -153,7 +153,6 @@ function checkClosure(roots, readDynamic, recipient) {
 		dynamics.set(file, dynamic);
 		if (sharedFiles.has(file)) {
 			provided.add(path.basename(file));
-			if (dynamic.soname) provided.add(dynamic.soname);
 		}
 	}
 	const violations = [];
