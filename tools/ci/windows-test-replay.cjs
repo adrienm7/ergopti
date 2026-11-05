@@ -38,10 +38,43 @@ function failureDiagnostic(file, limit = 16384) {
 	}
 }
 
+function failureManifest(file) {
+	// This optional console diagnostic must not exhaust memory on runaway output.
+	const bytes = fs.statSync(file).size;
+	if (bytes > 16 * 1024 * 1024) return { skipped: 'TAP exceeds diagnostic parse budget', bytes };
+	return validateAhkSuiteManifest(fs.readFileSync(file, 'utf8'));
+}
+
 function reportFailure(directory, label) {
 	for (const kind of ['tap', 'stdout', 'stderr']) {
 		const file = path.join(directory, `${label}.${kind}.txt`);
 		try {
+			if (kind === 'tap' && fs.existsSync(file)) {
+				const manifest = failureManifest(file);
+				const { executed = [], errors = [] } = manifest;
+				const counts = Object.fromEntries(
+					[
+						'complete',
+						'planned',
+						'executed_count',
+						'timed_count',
+						'passed',
+						'failed',
+						'not_executed',
+						'skipped',
+						'bytes'
+					]
+						.filter((key) => Object.hasOwn(manifest, key))
+						.map((key) => [key, manifest[key]])
+				);
+				console.log(
+					`Native failure manifest: ${JSON.stringify({ label, ...counts, errors: errors.slice(0, 20).map((error) => error.slice(0, 2048)), omitted_cases: Math.max(0, executed.length - 512) })}`
+				);
+				for (const entry of executed.slice(0, 512))
+					console.log(
+						`Native failure case: ${JSON.stringify({ label, ...entry, name: entry.name.slice(0, 2048) })}`
+					);
+			}
 			if (fs.existsSync(file))
 				console.log(
 					`Native failure diagnostic: ${JSON.stringify({ label, kind, ...failureDiagnostic(file) })}`
@@ -420,6 +453,21 @@ async function selfTest() {
 			assert.equal(complete.omitted_bytes, 0);
 			assert.equal(complete.head + complete.tail, text);
 		}
+		const failedTap = tap(['Alpha', 'Beta'])
+			.replace('ok 1', 'not ok 1')
+			.replace('# 2 passed, 0 failed.', '# 1 passed, 1 failed.');
+		fs.writeFileSync(diagnosticFile, failedTap);
+		const failedManifest = failureManifest(diagnosticFile);
+		assert.equal(failedManifest.complete, true);
+		assert.deepEqual(
+			failedManifest.executed.map(({ name, status }) => [name, status]),
+			[
+				['Alpha', 'not ok'],
+				['Beta', 'ok']
+			]
+		);
+		fs.truncateSync(diagnosticFile, 16 * 1024 * 1024 + 1);
+		assert.equal(failureManifest(diagnosticFile).skipped, 'TAP exceeds diagnostic parse budget');
 		const fake = (mode) => async (_, args, context) => {
 			fs.writeFileSync(context.stdout, '');
 			fs.writeFileSync(context.stderr, '');
