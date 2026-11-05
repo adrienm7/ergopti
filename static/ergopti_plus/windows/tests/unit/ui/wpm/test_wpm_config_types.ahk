@@ -154,3 +154,104 @@ TestWPMAutoPositionRequiresBothCoordinates() {
 }
 Test("WPM config: one negative-one coordinate is a position (wpm-anchor-sentinel)",
 	TestWPMAutoPositionRequiresBothCoordinates)
+
+_WPMCO_RefusedConfig(Kind, Successor) {
+	global ConfigurationFile, STORAGE_REG_BASE, _SharedDir
+	Saved := {path: ConfigurationFile, store: STORAGE_REG_BASE, x: WPMWidget.pos_x,
+		y: WPMWidget.pos_y, graph: WPMWidget.show_graph, colors: WPMWidget.use_colors,
+		keyX: WPMWidgetConst.STORE_X, keyY: WPMWidgetConst.STORE_Y}
+	Nonce := A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Subkey := "Software\Ergopti_WpmCompensationAudit_" . Nonce
+	RegistryPath := "HKCU\" . Subkey
+	Root := A_Temp . "\ergopti_wpm_compensation_" . Nonce
+	Path := Root . "\config.toml"
+	Handle := 0, OwnedKey := false, CreatedRoot := false, Lease := 0
+	State := {notices: 0, bCalls: 0, bAck: false, bX: "unset", bY: "unset"}
+	Notify(Message, Options) {
+		State.notices += 1
+		if Successor {
+			State.bCalls += 1
+			State.bAck := WPMWidget_SavePosition(700, 800, 0, (*) => 0)
+			State.bX := ST_Get(WPMWidgetConst.STORE_X, "missing")
+			State.bY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		}
+	}
+	try {
+		AssertFalse(A_IsSuspended)
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 3,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		OwnedKey := Status == 0 && Disposition == 1
+		AssertTrue(OwnedKey, "acquire a genuinely new private storage key before any value write")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		CreatedRoot := (Creation is Integer) && Creation == 1
+		AssertTrue(CreatedRoot)
+		Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[metrics]`nwpm_widget_graph = false`n"
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		ConfigurationFile := Path
+		Boot := ConfigMigrateBoot(Path)
+		AssertEqual("current", Boot["status"])
+		STORAGE_REG_BASE := RegistryPath
+		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		WPMWidgetConst.STORE_X := Canon["position"]["storage_x"]
+		WPMWidgetConst.STORE_Y := Canon["position"]["storage_y"]
+		AssertTrue(WPMWidgetConst.STORE_X != WPMWidgetConst.STORE_Y)
+		WPMWidget.show_graph := false, WPMWidget.use_colors := false
+		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))
+		AssertEqual(10, ST_Get(WPMWidgetConst.STORE_X, "missing"))
+		AssertEqual(20, ST_Get(WPMWidgetConst.STORE_Y, "missing"))
+		Lease := _ConfigWriteLeaseTryAcquire(Path, "wpm-native-compensation-proof")
+		AssertTrue(Lease is Object, "the real competing configuration owner must be acquired")
+		if Kind == "graph-toggle"
+			Result := WPMWidget_ToggleGraphConfig(0, Notify)
+		else
+			Result := WPMWidget_SaveConfig(false, true, 30, 40, 0, Notify)
+		ActualX := ST_Get(WPMWidgetConst.STORE_X, "missing")
+		ActualY := ST_Get(WPMWidgetConst.STORE_Y, "missing")
+		_TestPrint("# wpm-compensation kind=" . Kind . " successor=" . Successor
+			. " notices=" . State.notices . " b_calls=" . State.bCalls . " b_ack=" . State.bAck
+			. " b_stored_x=" . State.bX . " b_stored_y=" . State.bY
+			. " a_result=" . Result . " ram_x=" . WPMWidget.pos_x . " ram_y=" . WPMWidget.pos_y
+			. " final_stored_x=" . ActualX . " final_stored_y=" . ActualY)
+		AssertFalse(Result, "the actual config lease refuses A's configuration mutation")
+		AssertTrue(_ConfigWriteLeaseOwns(Lease, Path))
+		AssertEqual(1, State.notices, "the real failure-notification boundary must run once")
+		AssertEqual(Successor ? 1 : 0, State.bCalls)
+		if Successor {
+			AssertTrue(State.bAck, "the independent public B position change must genuinely acknowledge native storage")
+			AssertEqual(700, State.bX)
+			AssertEqual(800, State.bY)
+		}
+		ExpectedX := Successor ? 700 : 10, ExpectedY := Successor ? 800 : 20
+		AssertEqual(ExpectedX, ActualX, "refused A cannot compensate over an acknowledged successor's durable X position")
+		AssertEqual(ExpectedY, ActualY)
+		AssertEqual(ExpectedX, WPMWidget.pos_x)
+		AssertEqual(ExpectedY, WPMWidget.pos_y)
+		AssertFalse(WPMWidget.show_graph, "A's refused graph change stays unpublished")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "the competing config lease leaves the real source unchanged")
+	} finally {
+		try {
+			if Lease is Object
+				_ConfigWriteLeaseRelease(Lease)
+			ConfigurationFile := Saved.path, STORAGE_REG_BASE := Saved.store
+			WPMWidget.pos_x := Saved.x, WPMWidget.pos_y := Saved.y
+			WPMWidget.show_graph := Saved.graph, WPMWidget.use_colors := Saved.colors
+			WPMWidgetConst.STORE_X := Saved.keyX, WPMWidgetConst.STORE_Y := Saved.keyY
+			if CreatedRoot {
+				try _TOML_InvalidateParseCache(Path)
+				finally DirDelete(Root, true)
+			}
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+			if OwnedKey
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647,
+					"Str", Subkey, "UInt"), "delete only this exclusively created storage key")
+		}
+	}
+}
+for _WPMCO_Kind in ["save-config", "graph-toggle"] {
+	Test("WPM compensation ownership: " . _WPMCO_Kind . " successor", _WPMCO_RefusedConfig.Bind(_WPMCO_Kind, true))
+	Test("WPM compensation ownership: " . _WPMCO_Kind . " ordinary-refusal-control", _WPMCO_RefusedConfig.Bind(_WPMCO_Kind, false))
+}
