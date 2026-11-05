@@ -273,13 +273,13 @@
 			}
 		},
 		{
-			"id": "anthropic_multiblock_uses_first",
-			"description": "Anthropic response with multiple content blocks — parser must use only the first text block.",
+			"id": "anthropic_multiblock_joins_text",
+			"description": "All ordered Anthropic text blocks belong to the completion.",
 			"parser": "remote",
 			"format": "anthropic",
 			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"premier bloc\"},{\"type\":\"text\",\"text\":\"second bloc\"}]}",
 			"expected": {
-				"text": "premier bloc",
+				"text": "premier blocsecond bloc",
 				"ok": true
 			}
 		},
@@ -489,13 +489,13 @@
 			}
 		},
 		{
-			"id": "gemini_multipart_uses_first",
-			"description": "Gemini candidates array with multiple ordinary text parts uses the first eligible text part.",
+			"id": "gemini_multipart_joins_text",
+			"description": "All ordered ordinary Gemini text parts belong to the completion.",
 			"parser": "remote",
 			"format": "gemini",
 			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"premiere partie\"},{\"text\":\"seconde partie\"}]}}]}",
 			"expected": {
-				"text": "premiere partie",
+				"text": "premiere partieseconde partie",
 				"ok": true
 			}
 		},
@@ -519,6 +519,204 @@
 			"expected": {
 				"text": "",
 				"ok": false
+			}
+		},
+		{
+			"id": "openai_multipart_order",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"first\"},{\"type\":\"text\",\"text\":\" then\"}]}}]}",
+			"expected": {
+				"text": "first then",
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_empty_first_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"\"},{\"type\":\"text\",\"text\":\"second\"}]}}]}",
+			"expected": {
+				"text": "second",
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_thinking_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"thinking\",\"text\":\"private thought\"},{\"type\":\"text\",\"text\":\"answer\"}]}}]}",
+			"expected": {
+				"text": "answer",
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_malformed_later_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"partial\"},{\"type\":\"text\",\"text\":42}]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_null_later_chunk",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"partial\"},null]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_ordinary_single_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"ordinary\"}]}}]}",
+			"expected": {
+				"text": "ordinary",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_multipart_order",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"first\"},{\"type\":\"text\",\"text\":\" then\"}]}",
+			"expected": {
+				"text": "first then",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_empty_first_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"\"},{\"type\":\"text\",\"text\":\"second\"}]}",
+			"expected": {
+				"text": "second",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_thinking_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"thinking\",\"text\":\"private thought\"},{\"type\":\"text\",\"text\":\"answer\"}]}",
+			"expected": {
+				"text": "answer",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_malformed_later_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"partial\"},{\"type\":\"text\",\"text\":42}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_null_later_chunk",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"partial\"},null]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_ordinary_single_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"ordinary\"}]}",
+			"expected": {
+				"text": "ordinary",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_multipart_order",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"first\"},{\"text\":\" then\"}]}}]}",
+			"expected": {
+				"text": "first then",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_empty_first_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"\"},{\"text\":\"second\"}]}}]}",
+			"expected": {
+				"text": "second",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_thinking_then_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"private thought\"},{\"text\":\"answer\"}]}}]}",
+			"expected": {
+				"text": "answer",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_malformed_later_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"partial\"},{\"text\":42}]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_null_later_chunk",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"partial\"},null]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_ordinary_single_text",
+			"description": "Preserve ordered provider text and refuse malformed partial output.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ordinary\"}]}}]}",
+			"expected": {
+				"text": "ordinary",
+				"ok": true
 			}
 		}
 	]
