@@ -116,5 +116,6 @@
 		"exit_code": 0,
 		"evidence": "site-build-tail.txt",
 		"qualification": "Root observed the complete production build exit0; retained compact real terminal tail includes static output and completed compression. Full stdout remains in original root scratch evidence."
-	}
+	},
+	"subsequent_final_candidate": "final-receipt.json"
 }

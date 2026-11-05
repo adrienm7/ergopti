@@ -174,3 +174,13 @@ physical-editor receiving, latency or memory-growth certificate is claimed.
 The original aggregate also rejected formatting in two audit evidence files;
 those files were subsequently formatted with the pinned repository formatter.
 That correction is recorded separately from the unsuccessful aggregate result.
+
+The subsequent [final candidate receipt](../2026-11-05-word-reset/validation/delivery/final-receipt.json) records a successful full
+format check, both source-claim checks after rebase, and an actual Linux archive
+rerun on integrated candidate `07299374d0176f33188d7fe42c935fe99f92c513`: three cases, fifteen checks, zero
+skipped. It supersedes only the earlier native snapshot qualification, not the
+unsuccessful aggregate verification or the native keyboard receiving gaps.
+The three-OS CI preflight was dispatched for this candidate and remained
+pending at receipt capture; it is not reported as green. The final receipt
+commit changes audit documentation only. Delivery to dev follows the explicit
+maintainer workflow exception recorded in the receipt.
