@@ -620,8 +620,8 @@ local BUILTIN_HANDLERS = {
 		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
 			table.concat(SETTINGS_APPLICATIONS, ", "))
 	end,
-	["left_click_toggle"] = function() return _click_holds.toggle("1") end,
-	["right_click_toggle"] = function() return _click_holds.toggle("3") end,
+	["left_click_toggle"] = function(binding) return _click_holds.toggle("1", binding) end,
+	["right_click_toggle"] = function(binding) return _click_holds.toggle("3", binding) end,
 	["open_chatgpt"] = function()
 		return require("modules.shortcuts.chatgpt").open()
 	end,
@@ -1166,6 +1166,16 @@ for k, v in pairs(M.DEFAULT_GESTURES) do
 	_actions[k] = v
 end
 
+-- Retire only clicks acquired by gesture bindings that no longer name them.
+local function retire_changed_click_bindings(previous, candidate)
+	for slot, old in pairs(previous) do
+		if candidate[slot] ~= old then
+			if old == "left_click_toggle" then _click_holds.retire_binding("1", slot)
+			elseif old == "right_click_toggle" then _click_holds.retire_binding("3", slot) end
+		end
+	end
+end
+
 -- =========================================
 -- =========================================
 -- ======= 4/ Public API ===================
@@ -1283,7 +1293,8 @@ function M.set_action(slot, action_name)
 			tostring(action_name), tostring(slot))
 		return false
 	end
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	staged[slot] = action_name
 	if not M._persist_updates({ { section = CONFIG_SECTION, key = slot, value = action_name } }) then
 		Logger.error(LOG, "Gesture assignment was not persisted — nothing changed.")
@@ -1291,6 +1302,7 @@ function M.set_action(slot, action_name)
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
 	return true
 end
@@ -1896,7 +1908,8 @@ end
 --- Resets all gesture actions to defaults.
 --- @return boolean True only after every default is durable when persistence is enabled.
 function M.reset_defaults()
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	local updates = {}
 	for k, v in pairs(M.RECOMMENDED_GESTURES) do
 		staged[k] = v
@@ -1908,6 +1921,7 @@ function M.reset_defaults()
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Gestures reset to defaults.")
 	return true
 end
@@ -1916,7 +1930,8 @@ end
 --- master enable flag.
 --- @return boolean True only after every empty binding is durable when persistence is enabled.
 function M.disable_all_actions()
-	local staged = copy_state(_actions)
+	local previous = _actions
+	local staged = copy_state(previous)
 	local updates = {}
 	for slot in pairs(M.DEFAULT_GESTURES) do
 		staged[slot] = "none"
@@ -1928,6 +1943,7 @@ function M.disable_all_actions()
 	end
 	_actions = staged
 	_program_revision = _program_revision + 1
+	retire_changed_click_bindings(previous, staged)
 	Logger.info(LOG, "Every gesture binding was set to none.")
 	return true
 end
