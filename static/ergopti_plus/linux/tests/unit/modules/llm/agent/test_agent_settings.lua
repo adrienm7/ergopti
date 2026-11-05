@@ -55,6 +55,24 @@ helpers.it("refuses a malformed Jev triage configuration", function()
 	end
 end)
 
+helpers.it("refuses malformed action schemas before accepting agent output", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, damage in ipairs({
+		function(config) config.actions.calendar = false end,
+		function(config) config.actions.calendar.start = nil end,
+		function(config) config.actions.calendar.start.required = false end,
+		function(config) config.actions.mail.body.max = false end,
+		function(config) config.actions.mail.body.type = "unsupported" end,
+	}) do
+		local config = assert(Json.decode(source)); damage(config)
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "an unusable action schema must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
