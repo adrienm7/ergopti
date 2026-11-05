@@ -1,86 +1,162 @@
 {
-	"expected_count": 63,
+	"expected_count": 134,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "toml-decoded-key-nul",
-			"expected_count": 8
+			"contains": "reader-think-pause-corpus",
+			"expected_count": 2
 		},
 		{
-			"contains": "config-migrate-record-refusal",
+			"contains": "klr-thinking-pause-numeric)",
 			"expected_count": 1
 		},
 		{
-			"contains": "i18n-native-norwegian",
+			"contains": "klr-thinking-pause-encrypted",
+			"expected_count": 2
+		},
+		{
+			"contains": "klr-thinking-pause-checkpoint",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-thinking-pause-numeric-domain",
+			"expected_count": 5
+		},
+		{
+			"contains": "klr-cache-encryption)",
+			"expected_count": 5
+		},
+		{
+			"contains": "klr-cache-encryption-toggle",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-cold-projection-failure",
+			"expected_count": 2
+		},
+		{
+			"contains": "klr-projection-paging",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-projection-key-ownership",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-projection-scoped-work",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-reader-durable-cache",
+			"expected_count": 9
+		},
+		{
+			"contains": "klr-newest-first-rebuild",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-rebuild-resume",
+			"expected_count": 3
+		},
+		{
+			"contains": "klr-executed-round-ownership",
+			"expected_count": 5
+		},
+		{
+			"contains": "final-context-duration-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "context-clock-ack-owner",
 			"expected_count": 4
 		},
 		{
-			"contains": "i18n-native-ui-region",
+			"contains": "context-tail-retry-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "context-nonempty-prepare-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "context-native64-origin-contract",
 			"expected_count": 1
 		},
 		{
-			"contains": "i18n-native-ui-default",
-			"expected_count": 1
+			"contains": "switch-destination-privacy-owner",
+			"expected_count": 7
 		},
 		{
-			"contains": "tap-keys-kana-native",
-			"expected_count": 3
+			"contains": "keystats-session-close-retry",
+			"expected_count": 5
 		},
 		{
-			"contains": "tap-keys-kana-admission",
-			"expected_count": 1
-		},
-		{
-			"contains": "wrap-scalar-admission",
-			"expected_count": 3
-		},
-		{
-			"contains": "toml-write-scalar",
+			"contains": "keystats-idle-resume-retry",
 			"expected_count": 6
-		},
-		{
-			"contains": "toml-string-codec-single-source",
-			"expected_count": 4
-		},
-		{
-			"contains": "toml-numeric-string-control",
-			"expected_count": 1
 		},
 		{
 			"contains": "keystats-shutdown-close-chain",
 			"expected_count": 1
 		},
 		{
-			"contains": "open-app-native-folder",
-			"expected_count": 1
+			"contains": "focus-refresh-bounded-resident",
+			"expected_count": 9
 		},
 		{
-			"contains": "system actions: open_app launches the application stored for its binding",
-			"expected_count": 1
-		},
-		{
-			"contains": "open-app-native-quoted-path",
-			"expected_count": 1
-		},
-		{
-			"contains": "open-app-native-shortcut",
-			"expected_count": 1
-		},
-		{
-			"contains": "open-app-probe-pause",
-			"expected_count": 1
-		},
-		{
-			"contains": "open-app-probe-resume",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-debounce-source-privacy",
+			"contains": "AHK-22 deferred-hotstring-lifecycle:",
 			"expected_count": 3
 		},
 		{
-			"contains": "personal-output-scalar",
+			"contains": "keystats-critical-restore",
+			"expected_count": 5
+		},
+		{
+			"contains": "keystats-flush-race-condition",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-info-typing-row-leak",
+			"expected_count": 12
+		},
+		{
+			"contains": "keystats-fire-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-accepted-metrics)",
+			"expected_count": 5
+		},
+		{
+			"contains": "llm-accepted-metrics-clock",
+			"expected_count": 1
+		},
+		{
+			"contains": "mouse-distance-flush-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "kl-payload-privacy-filter-scoped",
+			"expected_count": 2
+		},
+		{
+			"contains": "KL_FlushBuffer called before KL_LogWindowSwitch",
+			"expected_count": 1
+		},
+		{
+			"contains": "(toml-update-name-scalar)",
+			"expected_count": 3
+		},
+		{
+			"contains": "(config-migration-stage-ownership)",
+			"expected_count": 2
+		},
+		{
+			"contains": "(registry-pending-source-ownership)",
+			"expected_count": 2
+		},
+		{
+			"contains": "paths-generation-ownership",
 			"expected_count": 2
 		},
 		{
@@ -92,24 +168,12 @@
 			"expected_count": 1
 		},
 		{
-			"contains": "onboarding-open-generation",
-			"expected_count": 6
-		},
-		{
-			"contains": "onboarding-show-native-close",
-			"expected_count": 2
-		},
-		{
-			"contains": "onboarding-reset-host-close",
+			"contains": "agent-timezone-native-bias",
 			"expected_count": 1
 		},
 		{
-			"contains": "proxy-boot-seal-source",
-			"expected_count": 4
-		},
-		{
-			"contains": "proxy-full-save-persistence",
-			"expected_count": 3
+			"contains": "agent-timezone-offset-refusal",
+			"expected_count": 1
 		}
 	]
 }
