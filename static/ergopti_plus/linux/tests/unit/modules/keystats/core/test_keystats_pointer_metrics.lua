@@ -30,6 +30,15 @@ local function move(observe, dx, dy)
 end
 
 helpers.describe("pointer metrics: what one evdev report adds", function()
+	helpers.it("drops only empty committed distance remainders", function()
+		local tracker = PointerMetrics.new()
+		tracker.commit_fractions({ old = { zero = 0, partial = 0.25 }, empty = { only = 0 } })
+		local saved = tracker.snapshot_fractions()
+		helpers.assert_eq(saved.old.partial, 0.25, "older dates can receive delayed events")
+		helpers.assert_nil(saved.old.zero)
+		helpers.assert_nil(saved.empty)
+	end)
+
 	helpers.it("counts a left or right press as a click, no other button", function()
 		local tracker = PointerMetrics.new()
 		helpers.assert_eq(tracker.observe("press", EvdevCodes.BTN_LEFT, 1).clicks, 1)
