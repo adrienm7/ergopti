@@ -1,14 +1,15 @@
 ﻿; tests/unit/platform/network/test_native_ipv6_http_socks.ahk
 ; A real remote API URL retains its IPv6 host and default HTTP port through SOCKS.
-_NativeIpv6HttpSocks_Controls() {
+_NativeIpv6HttpSocks_Controls(TargetPort := 80) {
 	global _DriverDir, _VendorDir, _SharedDir
+	BaseUrl := "http://[2001:db8::123]" . (TargetPort == 80 ? "" : ":" . TargetPort) . "/v1"
 	Resolved := _LLMRemoteResolveEntry(Map("Provider", "openai", "Token", "owned-provider-key",
-		"Model", "owned-model", "BaseUrl", "http://[2001:db8::123]/v1"))
+		"Model", "owned-model", "BaseUrl", BaseUrl))
 	AssertTrue(Resolved is Map, "The actual API resolver must admit a nonloopback IPv6 HTTP base")
 	Endpoint := _LLMRemoteBuildUrl(Resolved["BaseUrl"], Resolved["Format"], Resolved["Token"], Resolved["Model"])
-	AssertEqual("http://[2001:db8::123]/v1/chat/completions", Endpoint)
+	AssertEqual(BaseUrl . "/chat/completions", Endpoint)
 	AssertFalse(SystemProxy_IsLoopbackUrl(Endpoint), "The admitted IPv6 provider must reach proxy routing")
-	AssertEqual("http://[2001:db8::123]/v1/models", RTrim(Resolved["BaseUrl"], "/") . "/models")
+	AssertEqual(BaseUrl . "/models", RTrim(Resolved["BaseUrl"], "/") . "/models")
 	Observed := [], Handle := 0
 	try {
 		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
@@ -17,7 +18,7 @@ _NativeIpv6HttpSocks_Controls() {
 				"-RoutesPath", _VendorDir . "\ergopti_network_routes.ps1",
 				"-TransportPath", _VendorDir . "\ergopti_winhttp_transport.ps1",
 				"-PolicyPath", _SharedDir . "\modules\network\proxy_policy.json",
-				"-UpdaterDefaultsPath", _SharedDir . "\modules\updater\defaults.json"],
+				"-UpdaterDefaultsPath", _SharedDir . "\modules\updater\defaults.json", "-TargetPort", String(TargetPort)],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start(), "The private IPv6 SOCKS fixture must start")
 		Started := A_TickCount
@@ -50,13 +51,13 @@ _NativeIpv6HttpSocks_Controls() {
 		AssertEqual(200, Receipt.Get("oracle_status", 0))
 		AssertTrue(Receipt.Get("oracle_body_exact", false) && Receipt.Get("route_admitted", false)
 			&& Receipt.Get("native_retired", false) && Receipt.Get("proxy_joined", false))
-		AssertEqual(80, Receipt.Get("target_port", 0))
+		AssertEqual(TargetPort, Receipt.Get("target_port", 0))
 		AssertEqual(2, Receipt.Get("greetings", 0))
 		AssertEqual(0, Receipt.Get("proxy_failures", -1))
 		AssertTrue(Receipt.Get("connect_frames", 0) == 2 && Receipt.Get("requests", 0) == 2
 			&& Receipt.Get("early_close", -1) == 0 && Receipt.Get("actual_status", 0) == 200
 			&& Receipt.Get("actual_body_exact", false),
-			"An IPv6 colon must not replace the default HTTP port; native receipt=" . Observed[1]["stdout"])
+			"The IPv6 authority must preserve its actual HTTP port; native receipt=" . Observed[1]["stdout"])
 		AssertEqual(0, Observed[1]["exit"])
 	} finally {
 		if IsObject(Handle)
@@ -65,3 +66,5 @@ _NativeIpv6HttpSocks_Controls() {
 }
 Test("network: admitted IPv6 HTTP API retains default port through real SOCKS (native-ipv6-http-socks1)",
 	_NativeIpv6HttpSocks_Controls)
+Test("network: admitted IPv6 HTTP API preserves explicit nondefault destination port through SOCKS (native-ipv6-http-socks-port1)",
+	_NativeIpv6HttpSocks_Controls.Bind(18080))
