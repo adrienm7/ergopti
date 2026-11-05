@@ -1467,7 +1467,9 @@ for (const host of ['windows', 'macos', 'linux']) {
 				publishTypingPage(page, host, manifest);
 				assert.equal(
 					page.elements.get('records_streak').innerHTML,
-					vector.expected ? `${vector.expected} jour${vector.expected > 1 ? 's' : ''}` : '—'
+					vector.expected
+						? `${page.context.escape_html(page.context._t('ui_apps.label_days'))} ${vector.expected}`
+						: '—'
 				);
 				assert.equal(
 					page.diagnostics.some((entry) => entry.level === 'error'),
@@ -5039,4 +5041,33 @@ for (const host of ['linux', 'macos', 'windows']) {
 		assert.match(container.innerHTML, />aq<\/td>.*?100\.00%<\/td>/);
 	});
 }
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} typing records and calendar format dates in the active locale`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-05-01T12:00:00Z');
+		page.context.window._i18n_locale = 'fr';
+		publishTypingPage(page, host, {
+			'2026-04-01': {
+				Editor: { chars: 10, session_longest_ms: 60000 }
+			}
+		});
+		page.context.render_records_kpi();
+		page.context._render_activity_calendar();
+		assert.match(page.elements.get('records_session').innerHTML, /avr/);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		page.context.window._i18n_locale = 'en';
+		page.context.window.i18n_apply({ 'ui_apps.label_days': 'Days:' });
+		assert.match(page.elements.get('records_session').innerHTML, /Apr/);
+		assert.match(page.elements.get('records_streak').innerHTML, /Days: 1/);
+		assert.match(page.elements.get('activity_calendar_container').innerHTML, /April 1, 2026/);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);
