@@ -117,7 +117,8 @@ _MBPO_Prepare() {
 	global _LLM_MenuBuildCoordinator, _LLM_MBW_Gui, _LLM_MBW_SessionEpoch
 	global _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub, _LLM_MBW_ResetDone, _LLM_MBW_Ready
 	Directory := A_Args[2] . "\config"
-	FSCreateDirectoryExclusiveStrict(Directory)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	_MBPO_Require((Creation is Integer) && Creation == 1, "The private configuration directory must be acquired exclusively")
 	ConfigurationFile := Directory . "\config.toml"
 	Index := LLM_GetModelIndex()
 	_MBPO.ModelA := _MBPO.Mode == "native-sort" ? "Qwen3.5-9B" : LLM_Defaults["llm_model"]
@@ -130,8 +131,10 @@ _MBPO_Prepare() {
 	}
 	_MBPO_Require(_MBPO.ModelB != "" && _LLM_MBW_IsCatalogueModelName(_MBPO.ModelB),
 		"A distinct real catalogue model must pass the actual SDK value admission.")
+	_MBPO.InitialBackend := _MBPO.Mode == "native-backend-current" ? "ollama" : "api"
 	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion()
-		. '`n[script]`nlocale = "fr"`n[llm]`nenabled = false`n[llm.models]`nselected = "api"`nollama = '
+		. '`n[script]`nlocale = "fr"`n[llm]`nenabled = false`n[llm.models]`nselected = '
+		. JsonStringLiteral(_MBPO.InitialBackend) . '`nollama = '
 		. JsonStringLiteral(_MBPO.ModelA) . '`n[llm.profiles]`nauto_profile_for_model = false`n'
 	_MBPO_Require(FSWriteCreateDurable(ConfigurationFile, Source), "The private source must be created exclusively and durably.")
 	Boot := ConfigMigrateBoot(ConfigurationFile)
@@ -146,9 +149,9 @@ _MBPO_Prepare() {
 	MetricsFiltersApplyManifestDefaults()
 	_MBPO_Require(_LLM_Menu_RestoreSavedOptsOnce(LLM_Menu_BuildSavedOpts(_IniCache)),
 		"The genuine menu restore must consume options derived from the actual boot features/cache.")
-	_MBPO_Require(!_LLM_Menu["enabled"] && _LLM_Menu["backend"] == "api"
+	_MBPO_Require(!_LLM_Menu["enabled"] && _LLM_Menu["backend"] == _MBPO.InitialBackend
 		&& _LLM_Menu["model"] == _MBPO.ModelA && !_LLM_Menu["auto_profile_for_model"],
-		"The private disabled/API state must avoid backend bootstrap without replacing mutation or persistence.")
+		"The private disabled state must preserve its actual backend/model without starting network dependencies.")
 	_MBPO_Require(!_LLM_Menu_Loaded, "Candidate collection must use its real explicit menu source, not a fabricated loaded flag.")
 	_MBPO.Original := FSReadBytesStrict(ConfigurationFile)
 	_MBPO.OriginalHash := CryptoSha256Bytes(_MBPO.Original)
@@ -330,6 +333,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api" {
+		_MBPO_NativeBackendPick()
+		return
+	}
 	if _MBPO.Mode == "native-sort" {
 		_MBPO_NativeSort()
 		return
@@ -390,8 +397,9 @@ _MBPO_Main() {
 		OriginalHash: "", ReadyReads: 0, PauseImage: 0, PauseHash: "", ModelA: "", ModelB: "", CommandIssued: false,
 		DestroyCalls: 0, PauseObserved: false, WriterEntries: 0, WriterConfirmed: 0,
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
-		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0}
-	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort",
+		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0, InitialBackend: "", BackendPickReturns: 0}
+	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
+		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -446,6 +454,76 @@ _MBPO_Main() {
 	}
 	FileAppend("PASS model-browser-close-pause-owner " . _MBPO.Mode . "`n", "*", "UTF-8-RAW")
 	ExitApp(0)
+}
+
+_MBPO_BackendPickReturned(This, Args*) {
+	global _MBPO
+	try return Func.Prototype.Call.Call(This, Args*)
+	finally _MBPO.BackendPickReturns += 1
+}
+
+_MBPO_NativeBackendPick() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _LLM_Menu, Features, ConfigurationFile
+	Picker := _LLM_ModelBrowser_PickRow
+	HadCall := Picker.HasOwnProp("Call")
+	if HadCall
+		OldCall := Picker.GetOwnPropDesc("Call")
+	Installed := false
+	try {
+		_MBPO.Window := _LLM_ModelBrowser_Build()
+		_MBPO.Hwnd := _MBPO.Window.Hwnd
+		_LLM_ModelBrowser_Gui := _MBPO.Window
+		_MBPO.Window.Show("NA")
+		List := _MBPO.Window.ListView, Selected := 0, ButtonHwnd := 0
+		Loop List.GetCount() {
+			if List.GetText(A_Index, 1) == _MBPO.ModelB
+				Selected := A_Index
+		}
+		_MBPO_Require(Selected > 0, "The actual catalogue ListView must contain selected model B")
+		List.Modify(0, "-Select"), List.Modify(Selected, "Select Focus")
+		for Control in _MBPO.Window {
+			if Control.Type == "Button" && Control.Text == t("menu.llm.browse_pick")
+				ButtonHwnd := Control.Hwnd
+		}
+		_MBPO_Require(ButtonHwnd != 0, "The genuine native Pick button must be identified")
+		_MBPO.NativePick := ButtonHwnd
+		BeforeCommands := _MBPO.NativeCommands
+		Picker.DefineProp("Call", {Call: _MBPO_BackendPickReturned}), Installed := true
+		DllCall("User32\SendMessageW", "Ptr", ButtonHwnd, "UInt", 0xF5, "Ptr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while _MBPO.BackendPickReturns == 0 && !IsObject(_MBPO.Failure) && TickElapsed64(Started) < 3000
+			Sleep(10)
+		_MBPO_Observe()
+		_MBPO_Require(!IsObject(_MBPO.Failure) && _MBPO.BackendPickReturns == 1 && _MBPO.NativeCommands == BeforeCommands + 1,
+			"Exactly one genuine BM_CLICK must return from the real production Pick handler")
+		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Caption := _LLM_Menu_ModelDisplayText()
+		FileAppend("RECEIPT native-model-backend mode=" . _MBPO.Mode . " before=" . _MBPO.InitialBackend
+			. " live_backend=" . _LLM_Menu["backend"] . " feature_backend=" . Features["llm"]["models"]["selected"]
+			. " durable_backend=" . Parsed["llm"]["models"]["selected"]
+			. " model_b=" . (_LLM_Menu["model"] == _MBPO.ModelB) . " caption_b=" . (Caption == _MBPO.ModelB)
+			. " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int")
+			. " writers=" . _MBPO.WriterConfirmed . " mutation_returns=" . _MBPO.MutationReturns
+			. " mutation_confirmed=" . _MBPO.MutationConfirmed . "`n", "*", "UTF-8-RAW")
+		_MBPO_Require(_MBPO.WriterConfirmed >= 1 && _MBPO.MutationReturns >= 1
+			&& _MBPO.MutationReturns == _MBPO.MutationConfirmed && _MBPO.Errors.Length == 0,
+			"Actual schema/collector/native writer and acknowledged model mutation must complete without errors")
+		_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
+			&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB,
+			"The chosen row must actually publish model B in the real menu, features and durable file")
+		_MBPO_Require(_LLM_Menu["backend"] == "ollama" && Features["llm"]["models"]["selected"] == "ollama"
+			&& Parsed["llm"]["models"]["selected"] == "ollama" && Caption == _MBPO.ModelB,
+			"Selecting a catalogue Ollama model through the sole model-selector must activate it, including from API backend")
+		_MBPO_Require(!DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+			"Only the acknowledged actual active selection may hide its native selector")
+	} finally {
+		if Installed {
+			if HadCall
+				Picker.DefineProp("Call", OldCall)
+			else
+				Picker.DeleteProp("Call")
+		}
+	}
 }
 
 _MBPO_Main()
