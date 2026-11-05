@@ -386,6 +386,9 @@ _UAFP_Work() {
 			. " encoding_calls=" . State.Calls . " encoded_utf16_units=" . State.Units
 			. " elapsed_ms=" . Elapsed . " result_units=" . StrLen(Actual))
 		AssertTrue(State.Calls > 0, "The actual first-line owner must invoke the byte boundary being measured")
+		; One full capture scan and work bounded by the notice width may size the prefix.
+		AssertTrue(State.Units <= Limit + (Maximum + 1) ** 2,
+			"A short notification must not repeatedly size the complete command capture")
 		AssertEqual(SubStr(Input, 1, Maximum) . "…", Actual, "The observation must retain the complete established first-line behavior")
 		; Deliberately no elapsed-time threshold: this is native evidence, not a
 		; hardware-dependent pass/fail performance budget or a new product policy.
