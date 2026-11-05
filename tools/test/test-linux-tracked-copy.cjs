@@ -380,7 +380,12 @@ try {
 		const helperStart = subject.indexOf('\t_lua_with_path() {');
 		const helperEnd = subject.indexOf('\n\t# Test 1:', helperStart);
 		assert.ok(helperStart >= 0 && helperEnd > helperStart, 'the production Lua probe must exist');
-		for (const name of ["bundle's source", 'bundle\\source', 'bundle\nsource']) {
+		const relativeBin = path.join(scratch, 'relative-bin');
+		fs.mkdirSync(relativeBin);
+		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v lua'], { encoding: 'utf8' });
+		assert.equal(realLua.status, 0, realLua.stderr);
+		fs.symlinkSync(realLua.stdout.trim(), path.join(relativeBin, 'lua'));
+		for (const name of ["bundle's source", 'bundle\\source', 'bundle\nsource', 'bundle;source', 'bundle?source']) {
 			const buildRoot = path.join(scratch, name);
 			const moduleFile = path.join(buildRoot, '_shared/lua/packaging_path_probe.lua');
 			fs.mkdirSync(path.dirname(moduleFile), { recursive: true });
@@ -391,7 +396,9 @@ try {
 					subject.slice(helperStart, helperEnd) +
 					"\n_lua_with_path \"assert(require('packaging_path_probe') == 'exact staged bytes'); print('staged module loaded')\"\n",
 				encoding: 'utf8',
-				timeout: 15000
+				timeout: 15000,
+				cwd: scratch,
+				env: { ...process.env, PATH: 'relative-bin:/usr/bin:/bin' }
 			});
 			assert.equal(
 				checked.status,
