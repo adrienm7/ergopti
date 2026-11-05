@@ -1375,6 +1375,10 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		_LLM_Bridge_InvalidateIncompleteTyping(false)
 		return false
 	}
+	; Privacy may discard the raw unit before it enters the mirror. An empty
+	; mirror still cannot authorize an orphan/incomplete character observer.
+	if BridgeBuffer == "" && ch != "" && _TextCompleteTailScalar(ch) == ""
+		return false
 	ObservedChar := ch
 	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(BridgeBuffer)) == 2
 		ObservedChar := _TextCompleteTailScalar(BridgeBuffer)
