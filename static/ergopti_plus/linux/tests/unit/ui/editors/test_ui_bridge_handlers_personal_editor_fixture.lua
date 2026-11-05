@@ -14,6 +14,105 @@ local helpers, OPENING_SOURCE, OPENING_FOREIGN, opening_model, with_opening_file
 
 
 
+helpers.describe("personal editor row origins", function()
+	helpers.it("preserves source metadata and comment across move, rename and later save", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"café" = { output = "résumé", future = "keep", priority = 73, is_case_sensitive = true, is_case_sensitive_strict = true } # retained\n[second]\n')
+			helpers.assert_true(f.ready())
+			local script = f.seen.deliveries[1]
+			local opening = require("json").decode(assert(script:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]
+			row.trigger, row.output = "été", "changed"
+			local data = { sections_order = { "english", "second" }, sections = {
+				english = { description = "english", entries = {} },
+				second = { description = "second", entries = { row } },
+			} }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.second["été"].future, "keep")
+			helpers.assert_eq(parsed.second["été"].output, "changed")
+			helpers.assert_eq(parsed.second["été"].priority, 73)
+			helpers.assert_eq(parsed.second["été"].is_case_sensitive_strict, true)
+			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
+			row.trigger, row.output = "été2", "again"
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.second["été2"].future, "keep")
+			helpers.assert_eq(parsed.second["été2"].output, "again")
+			data.sections_order = { "english", "second", "third" }
+			data.sections.second.entries = {}
+			data.sections.third = { description = "third", entries = { row } }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			parsed = assert(require("toml_codec").decode(f.read()))
+			local third = parsed.third[1] or parsed.third
+			helpers.assert_eq(third["été2"].future, "keep")
+			helpers.assert_eq(select(2, f.read():gsub("# retained", "")), 1)
+		end)
+	end)
+	helpers.it("does not attach a removed row's metadata to a new row with the same trigger", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "a", future = "secret" } # comment\n')
+			helpers.assert_true(f.ready())
+			local row = { origin_id = "new:1", trigger = "old", output = "new", is_word = false, auto_expand = false,
+				is_case_sensitive = false, final_result = false, is_case_sensitive_strict = false }
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_nil(parsed.english.old.future)
+			helpers.assert_eq(parsed.english.old.output, "new")
+		end)
+	end)
+	helpers.it("refuses duplicated or unrecognized snapshot identities", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]
+			local second = {}; for key, value in pairs(row) do second[key] = value end
+			second.trigger = "different"
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row, second } } } }
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+			row.origin_id = "row:999"; data.sections.english.entries = { row }
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			helpers.assert_eq(f.read(), OPENING_SOURCE)
+		end)
+	end)
+
+	helpers.it("retains the opening origin after a refused save", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "a", future = "retained" }\n')
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local row = opening.sections[1].entries[1]; row.trigger = "renamed"
+			local data = { sections_order = { "english" }, sections = { english = { description = "english", entries = { row } } } }
+			local write = f.publisher.write; f.publisher.write = function() return false, "refused" end
+			helpers.assert_eq(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved, false)
+			f.publisher.write = write
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.english.renamed.future, "retained")
+		end)
+	end)
+
+	helpers.it("keeps identities distinct for matching triggers in different sections", function()
+		with_opening_file(function(f)
+			f.put('[_meta]\nsections_order = ["english", "second"]\n[english]\n"same" = { output = "one", future = "first" }\n[second]\n"same" = { output = "two", future = "second" }\n')
+			helpers.assert_true(f.ready())
+			local opening = require("json").decode(assert(f.seen.deliveries[1]:match("window.initData%((.*)%)")))
+			local first, second = opening.sections[1].entries[1], opening.sections[2].entries[1]
+			local data = { sections_order = { "english", "second" }, sections = {
+				english = { description = "english", entries = { second } },
+				second = { description = "second", entries = { first } },
+			} }
+			helpers.assert_true(f.handler.on_message({ action = "save", data = data }, f.state, f.context).saved)
+			local parsed = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(parsed.english.same.future, "second")
+			helpers.assert_eq(parsed.second.same.future, "first")
+		end)
+	end)
+
+end)
+
 helpers.describe("personal editor fixture process ABI", function()
 	local function with_real_shell(body)
 		local prior = package.loaded["adapters.shell_runner"]

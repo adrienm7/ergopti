@@ -36,6 +36,8 @@ let autoClose = false;
 let defaultSec = null;
 let defaultPrio = null;
 let openMode = 'menu';
+let rowIdentityMode = false;
+let nextNewRowId = 0;
 
 // Lower-cased, trimmed live filter applied to the entry list (trigger + output).
 let searchQuery = '';
@@ -1284,6 +1286,12 @@ function saveEntry(andNew) {
 			// personal "sru" -> "SRU" still fired on a typed "SRU".
 			is_case_sensitive_strict: document.getElementById('cb-case').checked
 		};
+		if (rowIdentityMode) {
+			entry.origin_id =
+				edEntry.ei === null
+					? 'new:' + ++nextNewRowId
+					: D.sections[edEntry.si].entries[edEntry.ei].origin_id;
+		}
 		// Optional collision-priority override; omitted when the field is blank
 		// so the entry inherits the personal source default.
 		const prio = parsePrio(document.getElementById('e-prio').value);
@@ -1447,6 +1455,7 @@ function persist() {
 					final_result: !!e.final_result,
 					is_case_sensitive_strict: !!e.is_case_sensitive_strict
 				};
+				if (rowIdentityMode && typeof e.origin_id === 'string') o.origin_id = e.origin_id;
 				// Carry an explicit per-hotstring priority through the save.
 				if (typeof e.priority === 'number') o.priority = e.priority;
 				return o;
@@ -1462,6 +1471,8 @@ function persist() {
 }
 
 window.initData = function (d) {
+	rowIdentityMode = d.row_identity === true;
+	nextNewRowId = 0;
 	D = d;
 	TRIGGER_CHAR = d.trigger_char || '★';
 	STAR = d.star || '★';

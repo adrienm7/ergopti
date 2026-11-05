@@ -31,7 +31,7 @@ function element(value = '') {
 	};
 }
 
-function runModel(seed, editIndex, caseChecked = true) {
+function runModel(seed, editIndex, caseChecked = true, identityMode = false) {
 	const fields = {
 		'e-trig': element(editIndex === null ? 'New' : 'Case'),
 		'e-out': element(editIndex === null ? 'new output' : 'edited output'),
@@ -55,6 +55,7 @@ function runModel(seed, editIndex, caseChecked = true) {
 		clearTimeout() {},
 		__seed: seed,
 		__editIndex: editIndex,
+		__identityMode: identityMode,
 		__payloads: []
 	});
 	context.window = context;
@@ -64,6 +65,7 @@ function runModel(seed, editIndex, caseChecked = true) {
 		`
 		D = JSON.parse(JSON.stringify(__seed));
 		edEntry = { si: 0, ei: __editIndex };
+		rowIdentityMode = __identityMode;
 		clearEntryErrors = function () {};
 		serializeTrigEditor = function (el) { return el.value; };
 		serializeEditor = function (el) { return el.value; };
@@ -297,6 +299,46 @@ test('opening and saving output retains explicit trailing Enter tokens', () => {
 		context
 	);
 	assert.strictEqual(context.result, '{Enter}', 'a new Enter at the end is explicit');
+});
+
+test('legacy hosts never receive Linux row identities, including unedited rows', () => {
+	const seed = {
+		sections: [
+			{
+				name: 'strict',
+				description: 'Strict',
+				entries: [
+					{ trigger: 'Case', output: 'old', origin_id: 'row:7' },
+					{ trigger: 'Other', output: 'other', origin_id: 'row:8' }
+				]
+			}
+		]
+	};
+	for (const editIndex of [undefined, 0, null]) {
+		const result = runModel(seed, editIndex, true, false);
+		for (const row of result.payload.sections.strict.entries) {
+			assert.strictEqual(Object.hasOwn(row, 'origin_id'), false);
+		}
+	}
+});
+
+test('editing retains the snapshot identity, while new rows receive their own identity', () => {
+	const seed = {
+		sections: [
+			{
+				name: 'strict',
+				description: 'Strict',
+				entries: [{ trigger: 'Case', output: 'old', origin_id: 'row:7' }]
+			}
+		]
+	};
+	const edited = runModel(seed, 0, true, true);
+	assert.strictEqual(edited.payload.sections.strict.entries[0].origin_id, 'row:7');
+	const created = runModel(seed, null, true, true);
+	assert.strictEqual(
+		created.payload.sections.strict.entries.find((entry) => entry.trigger === 'New').origin_id,
+		'new:1'
+	);
 });
 
 console.log(`\nResults: ${passed} passed, 0 failed.`);
