@@ -221,7 +221,7 @@ try {
 	stub('id', 'if [ "$1" = -u ]; then echo 0; else exit 1; fi');
 	stub(
 		'getent',
-		'if [ "$1" = passwd ]; then echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; elif [ "$2" = "${FAIL_GROUP:-}" ]; then exit "${FAIL_STATUS:-1}"; else exit 2; fi'
+		'if [ "$1" = passwd ]; then echo "desktop:x:1000:1000::/home/desktop:/bin/bash"; [ "${AMBIGUOUS_PASSWD:-0}" = 1 ] && echo "other:x:1000:1000::/home/other:/bin/bash"; true; elif [ "$2" = "${FAIL_GROUP:-}" ]; then exit "${FAIL_STATUS:-1}"; else exit 2; fi'
 	);
 	stub(
 		'loginctl',
@@ -254,6 +254,12 @@ show-session) case "$2" in
 			.replace('[ -S /run/udev/control ]', 'true')
 			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
 	);
+	const ambiguous = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
+		encoding: 'utf8', timeout: 15000,
+		env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog), AMBIGUOUS_PASSWD: '1' }
+	});
+	assert.notEqual(ambiguous.status, 0, 'ambiguous NSS identity must be refused');
+	assert.equal(fs.existsSync(callLog), false, 'no privileged mutation before identity admission');
 	for (const [group, status] of ['input', 'uinput'].flatMap((name) => [
 		[name, 1],
 		[name, 3]
