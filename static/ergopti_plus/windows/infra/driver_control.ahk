@@ -599,13 +599,10 @@ class DriverControlSession {
 	; Each file is replaced whole, so a reader never sees half a result.
 	Publish(Kind, Text) {
 		Target := this.Path(Kind)
-		Stage := Target . ".tmp-" . this.Pid
-		if !FSWriteDurable(Stage, Text)
-			throw Error("The driver control " . Kind . " file could not be staged.")
-		if !FSAtomicMoveReplace(Stage, Target, &NativeError) {
-			FSDelete(Stage)
-			throw OSError(NativeError, -1, "The driver control " . Kind . " file could not be published.")
-		}
+		; A deterministic sibling name does not grant ownership of its occupant.
+		; Retain the exclusively created stage through publication and cleanup.
+		if !FSWriteReplaceOwned(Target, Text, ".tmp-" . this.Pid, &Detail)
+			throw Error("The driver control " . Kind . " file could not be published: " . Detail)
 	}
 }
 
