@@ -52,21 +52,18 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_eq(#offenders, 0, "hs.alert banner outside the allowlist:\n" .. table.concat(offenders, "\n"))
 	end)
 
-	helpers.it("the boot's Accessibility wait opens the permission dialog", function()
-		local unit, err = helpers.read_driver_unit("local function show_accessibility_guidance()")
+	helpers.it("the boot's Accessibility wait leaves the guidance to macOS's own prompt", function()
+		-- A second dialog asking to find the app with Cmd+Shift+G and + competed
+		-- with the macOS prompt, whose button adds the right entry (field report 2026-11-05).
+		local unit, err = helpers.read_driver_unit("AccessibilityWait.start({")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
-		local at = body:find("local function show_accessibility_guidance()", 1, true)
-		local stop = body:find("\nend\n", at, true)
-		local fn = body:sub(at, stop)
-		helpers.assert_true(fn:find('require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)',
-			1, true) ~= nil, "the wait must show the native dialog")
-		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a dialog failure must never stop the boot")
-		helpers.assert_true(body:find("show_guidance = function() close_guidance = show_accessibility_guidance() end",
-			1, true) ~= nil, "the wait must own the dialog it closes on the grant")
+		helpers.assert_true(body:find("guide_accessibility", 1, true) == nil,
+			"the boot must not open Ergopti's own Accessibility dialog")
+		helpers.assert_true(body:find("show_guidance", 1, true) == nil, "the wait takes no guidance dialog")
 	end)
 
-	helpers.it("reopening ErgoptiPlus during the wait shows the steps again", function()
+	helpers.it("reopening ErgoptiPlus during the wait asks for the prompt again", function()
 		local unit, err = helpers.read_driver_unit("local function watch_launcher_reopen(on_reopen)")
 		helpers.assert_true(unit ~= nil, tostring(err))
 		local body = table.concat(code_lines(unit), "\n")
@@ -77,7 +74,7 @@ helpers.describe("permission guidance is a dialog, not a banner (permission-dial
 		helpers.assert_true(fn:find("xpcall(", 1, true) ~= nil, "a watch failure must never stop the boot")
 		local wait_at = body:find("AccessibilityWait.start({", 1, true)
 		helpers.assert_true(wait_at ~= nil and body:find("watch_reopen = watch_launcher_reopen,", wait_at, true) ~= nil,
-			"the wait must be given the reopen watch, or a closed dialog cannot come back")
+			"the wait must be given the reopen watch, or a dismissed prompt cannot come back")
 	end)
 
 	-- The unit suite never runs init.lua, so the one registration that makes
