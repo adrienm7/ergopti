@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../../../support/filesystem_write_lock.ahk
 
 
 
@@ -258,3 +259,61 @@ Test("Diagnostics collection preserves malformed progress refusal after sharing 
 Test("Diagnostics collection keeps its deadline behind exclusive progress (groups247-collection)", _TestHC_CollectionExclusiveProgress.Bind("deadline"))
 
 #Include test_healthcheck_collection_publish_owner.ahk
+
+
+; A lock that shares delete must not itself cause the stage rename to fail.
+_TestHC_LockedStageRenameControl(Root) {
+	Lock := _FSWL_Lock()
+	Stage := Root . "\rename-stage", Target := Root . "\rename-target"
+	try {
+		File := Lock.Open(Stage, "w", "UTF-8-RAW")
+		File.Close()
+		Moved := false
+		try {
+			FileMove(Stage, Target, true)
+			Moved := true
+		}
+		AssertTrue(Lock.Acquired, "the native byte-range lock was acquired")
+		AssertTrue(Moved, "the lock shares DELETE and permits rename")
+		AssertTrue(FileExist(Target) != "", "the rename really occurred while locked")
+	} finally Lock.Release()
+}
+
+_TestHC_CollectionLockedOpen(State, Path, Mode, Encoding) {
+	State["path"] := Path
+	return State["lock"].Open(Path, Mode, Encoding)
+}
+
+; Drive the actual user action and the default writer with a native denied flush.
+_TestHC_GuidedWriteRejectsBufferedFlush() {
+	Root := _FSWL_Path(), Lock := _FSWL_Lock()
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("The proof could not acquire its exclusive scratch directory")
+	try {
+		_TestHC_LockedStageRenameControl(Root)
+		D := DiagnosticCollectionWindows()
+		D.Directory := Root
+		Refused := false, Result := false
+		OpenState := Map("lock", Lock, "path", "")
+		try Result := D.SkipGuided(_TestHC_CollectionLockedOpen.Bind(OpenState))
+		catch
+			Refused := true
+		Published := Root . "\physical.json"
+		PublishedBytes := FileExist(Published) ? FileGetSize(Published) : -1
+		FileAppend("OBS collection-guided LockAcquired=" . Lock.Acquired . " Refused=" . Refused
+			. " Result=" . Result . " publishedBytes=" . PublishedBytes . "`n", "*")
+		AssertEqual(Root . "\physical.json.tmp", OpenState["path"], "the lock owns the actual guided stage")
+		AssertTrue(Lock.Acquired, "the production stage was byte-range locked")
+		AssertTrue(Refused || !Result, "a refused native write must not acknowledge guided completion")
+		AssertFalse(FileExist(Root . "\physical.json"), "a failed write cannot publish a control receipt")
+	} finally {
+		try Lock.Release()
+		finally {
+			if Created && DirExist(Root)
+				DirDelete(Root, true)
+		}
+	}
+}
+Test("Diagnostics collection: guided receipt requires an OS write (collection-guided-native-write)",
+	_TestHC_GuidedWriteRejectsBufferedFlush)

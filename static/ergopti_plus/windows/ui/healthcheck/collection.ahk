@@ -136,12 +136,12 @@ class DiagnosticCollectionWindows {
 		}
 	}
 
-	Write(Name, Value) {
+	Write(Name, Value, OpenFn := 0) {
 		Text := _HC_ValueToJson(Value)
 		if StrPut(Text, "UTF-8") - 1 > this.Contract["max_output_bytes"]
 			throw Error("Diagnostic control payload exceeded its contract.")
 		Path := this.Directory . "\" . Name
-		FSWriteUtf8ReplaceStrict(Path, Text . "`n")
+		FSWriteUtf8ReplaceStrict(Path, Text . "`n", OpenFn)
 	}
 
 	Tick(*) {
@@ -382,10 +382,10 @@ class DiagnosticCollectionWindows {
 		return true
 	}
 
-	SkipGuided() {
+	SkipGuided(OpenFn := 0) {
 		if this.Terminal || this.Cancelled
 			return false
-		this.Write("physical.json", Map("session_id", this.Id, "physical_text", "SKIP", "physical_display", "SKIP"))
+		this.Write("physical.json", Map("session_id", this.Id, "physical_text", "SKIP", "physical_display", "SKIP"), OpenFn)
 		this.CloseGuided()
 		return true
 	}
