@@ -1096,7 +1096,7 @@ for (const kind of ['duplicate', 'key-space', 'key-tab', 'key-return', 'key-form
 				{ mode: 0o700 }
 			);
 			fs.writeFileSync(unit, `ExecStart=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
-			fs.writeFileSync(desktop, `Exec=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
+			fs.writeFileSync(desktop, `[Desktop Entry]\nExec=${bashPath(wrapper)} --tray\n`, { mode: 0o600 });
 		}
 	});
 	try {
@@ -1244,11 +1244,44 @@ for (const format of ['plain', 'crlf', 'spaced', 'numeric']) {
 			path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'),
 			'utf8'
 		);
-		if ((receipt.match(/\t@autostart\n/g) || []).length !== 1)
-			errors.push('startup receipt must have exactly one owner row');
+		if (/\t@autostart\n/.test(receipt))
+			errors.push('a preexisting unowned startup entry must not be adopted');
 	} finally {
 		run.cleanup();
 	}
+}
+
+// Reinstallation must not claim a user-customized startup entry.
+for (const kind of ['unowned', 'modified', 'owned']) {
+	let oldDigest;
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const library = path.join(home, '.local/lib/ergopti');
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			const original = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`;
+			oldDigest = createHash('sha256').update(original).digest('hex');
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.writeFileSync(desktop, kind === 'owned' ? original : `${original}# personal startup setting\n`);
+			if (kind !== 'unowned') {
+				fs.mkdirSync(library, { recursive: true });
+				fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${oldDigest}\t@autostart\n`);
+			}
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		if (kind !== 'owned') assert.match(fs.readFileSync(desktop, 'utf8'), /^# personal startup setting$/m);
+		const receipt = fs.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8');
+		const row = receipt.split('\n').find((value) => value.endsWith('\t@autostart'));
+		if (kind === 'unowned') assert.equal(row, undefined);
+		else if (kind === 'modified') assert.equal(row, `${oldDigest}\t@autostart`);
+		else {
+			const digest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
+			assert.equal(row, `${digest}\t@autostart`);
+		}
+	} finally { run.cleanup(); }
 }
 
 if (errors.length > 0) {

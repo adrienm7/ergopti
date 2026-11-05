@@ -970,11 +970,15 @@ _section install.section_files
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
-# --no-service leaves the previous startup files untouched. Carry their old
-# receipts into the replacement manifest so a later uninstall can still remove
-# unchanged entries and refuse modified ones.
+# Carry prior startup receipts when their files remain under the menu owner.
+# The menu compares the old desktop digest before renewing ownership.
 PRESERVED_STARTUP_RECEIPTS=()
-if ! $INSTALL_SERVICE; then
+preserve_desktop_choice=false
+if $INSTALL_SERVICE && [ -f "${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop" ] \
+	&& ergopti_desktop_entry_managed "${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop"; then
+	preserve_desktop_choice=true
+fi
+if ! $INSTALL_SERVICE || "$preserve_desktop_choice"; then
 	prior_manifest="${LIB_DIR}/.ergopti-owned-files"
 	if [ -e "$prior_manifest" ] || [ -L "$prior_manifest" ]; then
 		[ -f "$prior_manifest" ] && [ ! -L "$prior_manifest" ] || exit 1
@@ -982,6 +986,7 @@ if ! $INSTALL_SERVICE; then
 		while IFS=$'\t' read -r prior_digest prior_relative || [ -n "$prior_digest$prior_relative" ]; do
 			case "$prior_relative" in
 				@unit|@autostart)
+					if [ "$prior_relative" = @unit ] && $INSTALL_SERVICE; then continue; fi
 					[[ "$prior_digest" =~ ^[0-9a-f]{64}$ ]] || exit 1
 					[ -z "${preserved_startup_seen[$prior_relative]:-}" ] || exit 1
 					preserved_startup_seen["$prior_relative"]=1
@@ -1363,6 +1368,9 @@ for kind in wrapper unit autostart; do
 		autostart) owned="${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop" ;;
 	esac
 	if [ "$kind" != wrapper ] && ! $INSTALL_SERVICE; then continue; fi
+	# The startup helper alone decides whether a preexisting choice was owned;
+	# do not adopt an unrecorded user file at the end of reinstallation.
+	if [ "$kind" = autostart ] && [ "${STARTUP_OWNER:-}" = user-choice ]; then continue; fi
 	if [ -f "$owned" ]; then
 		# The startup-choice helper may already have recorded the new desktop.
 		if grep -q $'\t@'"$kind"'$' "${LIB_DIR}/.ergopti-owned-files"; then continue; fi
