@@ -201,7 +201,7 @@ function bindDelay(field, cat, sec) {
 	// When the TOML default is 0, fall back to the global default as the hint
 	// so the user understands what value will actually be applied.
 	const defaultMs =
-		(sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms || 750;
+		((sec ? sec.delay_default_ms : cat.delay_default_ms) || state.global_default_delay_ms) ?? 750;
 	const input = field.querySelector('input');
 	const reset = field.querySelector('.reset');
 
