@@ -18,7 +18,7 @@ function M.new(logger, log)
 		and type(logger.debug) == "function", "payload cleanup needs the canonical logger")
 	assert(type(log) == "string" and log ~= "", "payload cleanup needs a backend log identity")
 	local files = require("adapters.file_system")
-	assert(type(files) == "table" and type(files.remove_exact) == "function"
+	assert(type(files) == "table" and type(files.remove_if_unchanged) == "function"
 		and type(files.classify_no_follow) == "function", "payload cleanup needs exact file cleanup ports")
 	local pending, settling = {}, false
 	local registry = {}
@@ -52,32 +52,66 @@ function M.new(logger, log)
 			end
 			if settled ~= true then return retain(receipt) end
 		end
-		local removed_ok, removed = pcall(files.remove_exact, receipt.path)
-		local absent = false
-		if not removed_ok or removed ~= true then
-			local inspected, attributes, status = pcall(files.classify_no_follow, receipt.path)
-			absent = inspected and attributes == nil and status == "absent"
-		end
-		if (removed_ok and removed == true) or absent then
-			-- Clear delete authority before diagnostics can reenter a successor.
+		local function consume()
 			receipt.path, receipt.task_provider, receipt.busy = nil, nil, false
 			pending[receipt] = nil
 			if receipt.reported then logger.debug(log, "Retained streaming payload cleanup settled.") end
 			return true
 		end
-		-- Business completion may retire its task now; this registry still owns
-		-- the exact pathname when the fallback timer also refuses or finishes.
+		if receipt.uncertain then
+			local ok, attributes, status = pcall(files.classify_no_follow, receipt.path)
+			if ok and attributes == nil and status == "absent" then return consume() end
+			return retain(receipt, "unlink outcome unknown")
+		end
+		if receipt.release then
+			local ok, released = pcall(receipt.release)
+			if not ok or released ~= true then return retain(receipt, "cleanup release refused") end
+			receipt.release = nil
+			if receipt.removed then return consume() end
+		end
+		local inspected, attributes, status = pcall(files.classify_no_follow, receipt.path)
+		if inspected and attributes == nil and status == "absent" then return consume() end
+		local expected = receipt.identity
+		if not inspected or status ~= "ok" or type(attributes) ~= "table" or attributes.mode ~= "file"
+			or type(expected) ~= "table" or type(expected.dev) ~= "number" or math.tointeger(expected.dev) == nil
+			or type(expected.ino) ~= "number" or math.tointeger(expected.ino) == nil
+			or attributes.dev ~= expected.dev or attributes.ino ~= expected.ino
+			or type(receipt.content) ~= "string" then
+			return retain(receipt, "source identity unavailable or changed")
+		end
+		-- The adapter serializes cooperating writers and rechecks bytes. This
+		-- admission catches an already-replaced inode, but cannot make the later
+		-- pathname unlink atomic against a noncooperating external process.
+		local function same_identity()
+			local ok, current, current_status = pcall(files.classify_no_follow, receipt.path)
+			return ok and current_status == "ok" and type(current) == "table" and current.mode == "file"
+				and current.dev == expected.dev and current.ino == expected.ino
+		end
+		local called, removed, _, physical, release = pcall(files.remove_if_unchanged,
+			receipt.path, { status = "ok", content = receipt.content }, function() end, same_identity)
+		if not called or type(removed) ~= "boolean" then
+			receipt.uncertain = true
+			return retain(receipt, "unlink outcome unknown")
+		end
+		if removed == true then return consume() end
+		if type(release) == "function" then
+			receipt.release = release
+			receipt.removed = type(physical) == "table" and physical.removed == true
+		end
 		return retain(receipt, "unlink refused")
 	end
 
 	--- Captures only a fully admitted payload, never a failed writer's pathname.
 	--- @param path string Acknowledged payload pathname.
 	--- @param task_provider function Exact ShellRunner handle, or nil before construction.
+	--- @param identity table|nil Original allocation device and inode.
+	--- @param content string|nil Exact admitted payload bytes.
 	--- @return function cleanup Exact request's idempotent cleanup operation.
-	function registry.capture(path, task_provider)
+	function registry.capture(path, task_provider, identity, content)
 		assert(type(path) == "string" and path ~= "", "payload cleanup needs a pathname")
 		assert(type(task_provider) == "function", "payload cleanup needs its exact task provider")
-		local receipt = { path = path, task_provider = task_provider }
+		local captured_identity = type(identity) == "table" and { dev = identity.dev, ino = identity.ino } or nil
+		local receipt = { path = path, task_provider = task_provider, identity = captured_identity, content = content }
 		return function() return retire(receipt) end
 	end
 

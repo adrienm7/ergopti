@@ -17,7 +17,7 @@
 ; 3. Prompt, tag and token budget live in _shared/modules/llm/translate.json,
 ;    read once and validated whole, like vision.json.
 ; 4. The answer is read like the screen answers: the text after the tag, over
-;    any number of lines, without bold markers (LLM_Vision_Extract).
+;    any number of lines, preserving formatting in the translated text.
 ;
 ; Pinned with the Lua module by _shared/tests/corpus/llm/translate_vectors.json.
 ; ==============================================================================
@@ -165,7 +165,17 @@ LLM_Translate_UserText(Config, Text) {
  * @returns {String} The translation, "" when the tag is missing or nothing follows it.
  */
 LLM_Translate_Extract(Config, Block) {
-	return LLM_Vision_Extract(Block, Config["tag"])
+	global LLM_VISION_SPACE_CLASS
+	if !(Block is String)
+		return ""
+	Tag := Config["tag"]
+	At := InStr(Block, Tag, false)
+	if !At
+		return ""
+	Text := SubStr(Block, At + StrLen(Tag))
+	if At > 2 && SubStr(Block, At - 2, 2) == "**" && SubStr(Text, 1, 2) == "**"
+		Text := SubStr(Text, 3)
+	return RegExReplace(Text, "^" . LLM_VISION_SPACE_CLASS . "+|" . LLM_VISION_SPACE_CLASS . "+\z", "")
 }
 
 

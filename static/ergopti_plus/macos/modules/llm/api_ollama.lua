@@ -1753,8 +1753,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Retain the private file created by the allocator. Removing it and opening
 	-- a suffixed pathname would lose its owner-only mode under a normal umask.
 	-- Declare the path before callbacks so they capture this exact request file.
-	local tmp_path, allocation_error = FileSystem.create_secure_temp_file()
-	if type(tmp_path) ~= "string" or tmp_path == "" then
+	local tmp_path, allocation_error, allocation_identity = FileSystem.create_secure_temp_file()
+	if type(tmp_path) ~= "string" or tmp_path == "" or type(allocation_identity) ~= "table"
+		or type(allocation_identity.dev) ~= "number" or math.tointeger(allocation_identity.dev) == nil
+		or type(allocation_identity.ino) ~= "number" or math.tointeger(allocation_identity.ino) == nil then
 		Logger.error(LOG, "Failed to allocate a private Ollama streaming payload: %s.", tostring(allocation_error))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
@@ -1767,7 +1769,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	local task = nil
-	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end, allocation_identity, encoded)
 
 	local accumulated = ""
 	local line_buf    = ""

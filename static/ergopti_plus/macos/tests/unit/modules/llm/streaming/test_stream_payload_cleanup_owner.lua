@@ -8,8 +8,9 @@ local function with_owner(callback)
 	helpers.with_fresh_modules({ "adapters.file_system" }, function()
 		local state = { attempts = 0, errors = {}, debug = {}, present = true, remove_args = {}, inspect_args = {} }
 		package.loaded["adapters.file_system"] = {
-			remove_exact = function(...)
-				state.remove_args[#state.remove_args + 1] = table.pack(...)
+			remove_if_unchanged = function(path, expected, _, admission)
+				state.remove_args[#state.remove_args + 1] = table.pack(path)
+				assert(expected.content == "payload" and admission())
 				state.attempts = state.attempts + 1
 				if state.remove then return state.remove() end
 				state.present = false
@@ -18,7 +19,7 @@ local function with_owner(callback)
 			classify_no_follow = function(...)
 				state.inspect_args[#state.inspect_args + 1] = table.pack(...)
 				if state.classify then return state.classify() end
-				if state.present then return { mode = "file" }, "ok" end
+				if state.present then return { mode = "file", dev = 1, ino = 2 }, "ok" end
 				return nil, "absent"
 			end,
 		}
@@ -43,7 +44,7 @@ end
 helpers.describe("stream payload cleanup owner", function()
 	helpers.it("(stream-payload-owner) consumes delete authority after success", function()
 		with_owner(function(registry, state)
-			local cleanup = registry.capture("/owned/payload", function() return state.task end)
+			local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 			helpers.assert_eq(cleanup(), true)
 			state.present = true
 			helpers.assert_eq(cleanup(), true)
@@ -56,7 +57,7 @@ helpers.describe("stream payload cleanup owner", function()
 	for _, refusal in ipairs({ "nil", "false", "throw", "foreign" }) do
 		helpers.it("(stream-payload-owner) retains and retries " .. refusal .. " unlink receipts", function()
 			with_owner(function(registry, state)
-				local cleanup = registry.capture("/owned/payload", function() return state.task end)
+				local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 				state.remove = function()
 					if refusal == "throw" then error("PRIVATE_NATIVE_DETAIL") end
 					if refusal == "false" then return false, "PRIVATE_NATIVE_DETAIL" end
@@ -68,6 +69,14 @@ helpers.describe("stream payload cleanup owner", function()
 				helpers.assert_eq(#state.errors, 1, "the exact refusal episode is reported once")
 				helpers.assert_nil(state.errors[1]:find("PRIVATE_NATIVE_DETAIL", 1, true))
 				state.remove = nil
+				if refusal ~= "false" then
+					helpers.assert_eq(registry.settle_pending(), false, "unknown unlink effect must remain quarantined")
+					helpers.assert_eq(state.attempts, 1, "an uncertain unlink must never be repeated")
+					state.present = false
+					helpers.assert_eq(registry.settle_pending(), true, "proven absence retires the uncertain receipt")
+					helpers.assert_eq(state.attempts, 1)
+					return
+				end
 				helpers.assert_eq(registry.settle_pending(), true)
 				helpers.assert_eq(state.present, false)
 				helpers.assert_eq(#state.debug, 1)
@@ -82,11 +91,11 @@ helpers.describe("stream payload cleanup owner", function()
 		with_owner(function(registry, state)
 			state.remove = function() return false, "already absent" end
 			state.present = false
-			local cleanup = registry.capture("/owned/payload", function() return state.task end)
+			local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 			helpers.assert_eq(cleanup(), true)
 			state.present = true
 			helpers.assert_eq(cleanup(), true)
-			helpers.assert_eq(state.attempts, 1)
+			helpers.assert_eq(state.attempts, 0, "confirmed absence must not attempt unlink")
 			helpers.assert_eq(#state.errors, 0)
 		end)
 	end)
@@ -99,7 +108,7 @@ helpers.describe("stream payload cleanup owner", function()
 					if refusal == "contradictory" then return { mode = "file" }, "absent" end
 					return nil, "error", "inspection refused"
 				end
-				local cleanup = registry.capture("/owned/payload", function() return state.task end)
+				local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 				helpers.assert_eq(cleanup(), false)
 				helpers.assert_eq(registry.settle_pending(), false)
 				helpers.assert_eq(state.present, true)
@@ -114,7 +123,7 @@ helpers.describe("stream payload cleanup owner", function()
 				state.reentry_result = registry.settle_pending()
 				state.reentry_attempts = state.attempts
 			end
-			local cleanup = registry.capture("/owned/payload", function() return state.task end)
+			local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 			helpers.assert_eq(cleanup(), false)
 			helpers.assert_eq(state.reentry_result, false)
 			helpers.assert_eq(state.reentry_attempts, 1, "the in-progress unlink cannot be reentered")
@@ -127,7 +136,7 @@ helpers.describe("stream payload cleanup owner", function()
 		with_owner(function(registry, state)
 			state.remove = function() return false end
 			state.on_error = function() error("diagnostic failure") end
-			local cleanup = registry.capture("/owned/payload", function() return state.task end)
+			local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 			local ok, detail = pcall(cleanup)
 			helpers.assert_eq(ok, false)
 			helpers.assert_contains(tostring(detail), "diagnostic failure")
@@ -143,7 +152,7 @@ helpers.describe("stream payload cleanup exact task ownership", function()
 		with_owner(function(registry, state)
 			local settled = false
 			state.task = { isSettled = function() return settled end }
-			local cleanup = registry.capture("/owned/payload", function() return state.task end)
+			local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 			helpers.assert_eq(cleanup(), false)
 			helpers.assert_eq(registry.settle_pending(), false)
 			helpers.assert_eq(state.attempts, 0)
@@ -161,7 +170,7 @@ helpers.describe("stream payload cleanup exact task ownership", function()
 					if receipt == "throw" then error("PRIVATE_TASK_DETAIL") end
 					if receipt == "foreign" then return {} end
 				end }
-				local cleanup = registry.capture("/owned/payload", function() return state.task end)
+				local cleanup = registry.capture("/owned/payload", function() return state.task end, { dev = 1, ino = 2 }, "payload")
 				helpers.assert_eq(cleanup(), false)
 				helpers.assert_eq(registry.settle_pending(), false)
 				helpers.assert_eq(state.attempts, 0)
@@ -175,13 +184,56 @@ helpers.describe("stream payload cleanup exact task ownership", function()
 	end
 end)
 
+helpers.describe("stream payload conditional removal", function()
+	for _, case in ipairs({ "missing identity", "symbolic link" }) do
+		helpers.it("never unlinks with " .. case, function()
+			helpers.with_fresh_modules({ "adapters.file_system" }, function()
+				local attempts = 0
+				package.loaded["adapters.file_system"] = {
+					classify_no_follow = function()
+						return { mode = case == "symbolic link" and "link" or "file", dev = 1, ino = 2 }, "ok"
+					end,
+					remove_if_unchanged = function() attempts = attempts + 1; return true end,
+				}
+				local owner = Cleanup.new(helpers.make_logger_stub(), "fixture")
+				local identity = nil
+				if case ~= "missing identity" then identity = { dev = 1, ino = 2 } end
+				local retire = owner.capture("/owned/payload", function() return nil end, identity, "payload")
+				helpers.assert_eq(retire(), false)
+				helpers.assert_eq(owner.settle_pending(), false)
+				helpers.assert_eq(attempts, 0)
+			end)
+		end)
+	end
+	helpers.it("retries release only after unlink committed and never removes a successor", function()
+		helpers.with_fresh_modules({ "adapters.file_system" }, function()
+			local attempts, release_allowed = 0, false
+			package.loaded["adapters.file_system"] = {
+				classify_no_follow = function() return { mode = "file", dev = 1, ino = 2 }, "ok" end,
+				remove_if_unchanged = function(_, _, _, admission)
+					attempts = attempts + 1
+					helpers.assert_true(admission())
+					return false, "lock release refused", { removed = true }, function() return release_allowed end
+				end,
+			}
+			local owner = Cleanup.new(helpers.make_logger_stub(), "fixture")
+			local retire = owner.capture("/owned/payload", function() return nil end, { dev = 1, ino = 2 }, "payload")
+			helpers.assert_eq(retire(), false)
+			helpers.assert_eq(owner.settle_pending(), false)
+			release_allowed = true
+			helpers.assert_eq(owner.settle_pending(), true)
+			helpers.assert_eq(attempts, 1, "release retry must not unlink a replacement")
+		end)
+	end)
+end)
+
 helpers.describe("stream payload cleanup constructor admission", function()
-	for _, missing in ipairs({ "remove_exact", "classify_no_follow" }) do
+	for _, missing in ipairs({ "remove_if_unchanged", "classify_no_follow" }) do
 		helpers.it("(stream-payload-owner) refuses missing " .. missing .. " before native work", function()
 			helpers.with_fresh_modules({ "adapters.file_system" }, function()
 				local calls = 0
 				local files = {
-					remove_exact = function() calls = calls + 1; return true end,
+					remove_if_unchanged = function() calls = calls + 1; return true end,
 					classify_no_follow = function() calls = calls + 1; return nil, "absent" end,
 				}
 				files[missing] = nil

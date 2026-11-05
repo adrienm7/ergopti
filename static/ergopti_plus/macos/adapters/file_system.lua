@@ -1517,6 +1517,7 @@ end
 --- Callers own the returned pathname and must remove it explicitly.
 --- @return string|nil path Owned regular-file pathname.
 --- @return string|nil detail Concrete allocation or classification failure.
+--- @return table|nil identity Device and inode observed without following links.
 function M.create_secure_temp_file()
 	local call_ok, path = pcall(os.tmpname)
 	if not call_ok or type(path) ~= "string" or path == "" then
@@ -1526,7 +1527,7 @@ function M.create_secure_temp_file()
 	if status ~= "ok" or type(attributes) ~= "table" or attributes.mode ~= "file" then
 		return nil, tostring(detail or "os.tmpname did not create a regular file")
 	end
-	return path
+	return path, nil, { dev = attributes.dev, ino = attributes.ino }
 end
 
 --- Acquires the stable adjacent writer locks for several paths in canonical
