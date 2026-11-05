@@ -57,7 +57,7 @@ class _OWOC_Environment {
 		this.Controllers.Push(Ctrl)
 		if this.Calls > 1
 			return Promise.resolve(Ctrl)
-		if this.Mode == "cold-success" || InStr(this.Mode, "show-") == 1
+		if this.Mode == "cold-success" || this.Mode == "reset-then-close" || InStr(this.Mode, "show-") == 1
 			return Promise.resolve(Ctrl)
 		Pending := Promise((Resolve, Reject) => SetTimer(this.Act.Bind(this, Resolve, Reject, Ctrl), -1))
 		; The effect port observes its terminal outcome; await still receives the
@@ -218,10 +218,29 @@ _OWOC_OpenGeneration(Mode) {
 				_OWOC_Equal(Environment.Controllers[1], _OnbWeb_Controller)
 				_OWOC_Equal(1, Environment.Calls)
 			}
-		} else if Mode == "cold-success" {
+		} else if Mode == "cold-success" || Mode == "reset-then-close" {
 			_OWOC_Require(_ob_gui is Gui)
 			_OWOC_Equal(Environment.Controllers[1], _OnbWeb_Controller)
 			_OWOC_Equal(0, Environment.Controllers[1].Closed)
+			if Mode == "reset-then-close" {
+				Window := _ob_gui, Hwnd := Window.Hwnd, Controller := _OnbWeb_Controller
+				_OnbWeb_Reset()
+				_OWOC_Require(_ob_gui == Window && DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"),
+					"The genuine BeforeReload plumbing reset must retain its exact native host")
+				_OWOC_Equal(1, Controller.Closed, "The default reset closes the old controller once")
+				_OWOC_Refuse(IsSet(_OnbWeb_Controller) || IsSet(_OnbWeb_WebView))
+				RetiredEpoch := _OnbWeb_SessionEpoch
+				_OnbWeb_OnClose(Window)
+				_OWOC_Refuse(DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"),
+					"Manual Close of the exact retained host must still destroy its native HWND")
+				_OWOC_Refuse(!!_ob_gui)
+				_OWOC_Equal(1, Controller.Closed, "Host retirement cannot double-close already retired COM plumbing")
+				_OWOC_Equal(RetiredEpoch, _OnbWeb_SessionEpoch)
+				_OnbWeb_OnClose(Window)
+				_OWOC_Equal(1, Controller.Closed, "A duplicate old host Close remains inert")
+				_OWOC_Equal(RetiredEpoch, _OnbWeb_SessionEpoch)
+				_OWOC_Phase("reset-then-close native_alive=0 sentinel=0 controller_closes=" . Controller.Closed)
+			}
 		} else {
 			_OWOC_Require(Environment.ActorDone, "the real Promise await must pump the native timer")
 			if InStr(Mode, "reopen") {
@@ -238,7 +257,7 @@ _OWOC_OpenGeneration(Mode) {
 			if !InStr(Mode, "refusal")
 				_OWOC_Equal(1, Environment.Controllers[1].Closed, "the exact late-created controller must retire once")
 		}
-		_OWOC_Equal(Mode == "cold-success" || Mode == "show-current", !!Started, "a stale open cannot claim a successful active window")
+		_OWOC_Equal(Mode == "cold-success" || Mode == "show-current" || Mode == "reset-then-close", !!Started, "a stale open cannot claim a successful active window")
 	} finally {
 		if InStr(Mode, "show-") == 1
 			Gui.Prototype.DefineProp("OnEvent", PreviousRegister)
