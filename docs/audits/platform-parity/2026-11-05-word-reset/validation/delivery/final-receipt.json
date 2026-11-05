@@ -1,0 +1,51 @@
+{
+	"validated_source_sha": "07299374d0176f33188d7fe42c935fe99f92c513",
+	"qualification": "Exact integrated code and metadata candidate. The subsequent receipt commit changes audit documentation only; historical aggregate failures remain unchanged.",
+	"format": {
+		"command": ["node", "tools/lint/format.cjs", "--check"],
+		"exit_code": 0,
+		"evidence": "final-format-stable.txt"
+	},
+	"source_claims": {
+		"undo_repeat": {
+			"claims": 145,
+			"distinct_paths": 83
+		},
+		"word_reset": {
+			"claims": 110,
+			"distinct_paths": 87
+		},
+		"reviewed_implementation_paths": 40,
+		"all_passed": true
+	},
+	"native_archive": {
+		"command": ["npm", "run", "test:linux:updater-archive-native"],
+		"source_head": "07299374d0176f33188d7fe42c935fe99f92c513",
+		"exit_code": 0,
+		"qualification": "Native archive receiving and cleanup, not native keyboard input.",
+		"cases": 3,
+		"checks": 15,
+		"skipped": 0,
+		"evidence": "native-archive-final.txt"
+	},
+	"preflight": {
+		"conclusion": "",
+		"databaseId": 42067194964,
+		"headSha": "07299374d0176f33188d7fe42c935fe99f92c513",
+		"status": "queued",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/42067194964",
+		"os_lanes": "all",
+		"qualification": "Status captured when retaining this receipt. This is not a completed CI pass."
+	},
+	"delivery_policy": {
+		"source": "docs/memory/maintainer-decisions.md",
+		"rule": "Maintainer workflow: partial work is delivered into dev after the feasible container or CI work, with native or device gaps documented rather than holding a branch.",
+		"authorization": "The user explicitly requested committing and pushing all work to dev."
+	},
+	"remaining_limits": [
+		"Windows audit evidence is source-only; no AutoHotkey execution is claimed.",
+		"Controlled Lua ports and the native archive gate do not certify keyboard receiving in real desktop applications.",
+		"The generated catalogue covers declared and reviewed capabilities; it cannot discover every undeclared behavior automatically.",
+		"No final aggregate verify-change pass is claimed."
+	]
+}
