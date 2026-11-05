@@ -1,59 +1,71 @@
 {
-	"expected_count": 42,
+	"expected_count": 40,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "clipboard-paste-title-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "clipboard-source-title-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "layout-settings-close-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "layout-early-show",
-			"expected_count": 3
-		},
-		{
-			"contains": "layout-settings-successor-owner",
+			"contains": "one-shot-native-failed-down",
 			"expected_count": 1
 		},
 		{
-			"contains": "llm-native-entry-lifecycle",
+			"contains": "one-shot-native-kana-balancing",
 			"expected_count": 4
 		},
 		{
-			"contains": "model-browser-native-backend",
+			"contains": "one-shot-native-kana-flags",
 			"expected_count": 2
 		},
 		{
-			"contains": "tap-hold-stage-ownership",
-			"expected_count": 2
+			"contains": "synthetic-down-effect-refusal",
+			"expected_count": 9
 		},
 		{
-			"contains": "tap-hold-global-transaction",
-			"expected_count": 11
-		},
-		{
-			"contains": "loader-toml-injection-readfile-hotpath",
+			"contains": "synthetic-lifted-down-refusal",
 			"expected_count": 3
 		},
 		{
-			"contains": "tap-hold: failed persistence cannot publish partial live state",
+			"contains": "taphold-synthetic-refcount",
+			"expected_count": 4
+		},
+		{
+			"contains": "synthetic-user-held-2026-09-25",
+			"expected_count": 5
+		},
+		{
+			"contains": "tap-holds AHK-03: synthetic ownership uses short transactional Critical spans",
 			"expected_count": 1
 		},
 		{
-			"contains": "layout-subscription-close-owner",
-			"expected_count": 2
+			"contains": "tap-holds AHK-03: every synthetic Down caller consumes the ownership verdict",
+			"expected_count": 1
 		},
 		{
-			"contains": "secure-field-native-style-change",
-			"expected_count": 3
+			"contains": "tap-holds AHK-03: synthetic key-Up is not injected while the driver is suspended",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed-bootstrap-lifetime",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed-bootstrap-timer-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed-bootstrap-graph-lifetime",
+			"expected_count": 4
+		},
+		{
+			"contains": "managed bootstrap: cancellation keeps private cleanup debt",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed bootstrap: READY keeps source withdrawal retirement",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed bootstrap: exact committed enable hands off READY source",
+			"expected_count": 1
 		}
 	]
 }
