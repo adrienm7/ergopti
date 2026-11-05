@@ -17,15 +17,38 @@
 
 
 
-_LAG_WithBridgeOff(Body) {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
+; Keep the fake SFD verdict aligned with the existing fixture's live privacy
+; port. This uses only the isolated RAM cache established by the wrapper.
+_LAG_SyncBridgePrivacy(Fx) {
+	global SFD_FIELD_CACHE, _LLM_Bridge_PrivacyAppCache
+	SFD_FIELD_CACHE["secure"] := !!Fx.Secure
+	SFD_FIELD_CACHE["at"] := A_TickCount
+	_LLM_Bridge_PrivacyAppCache["app"] := Fx.App
+	_LLM_Bridge_PrivacyAppCache["at"] := A_TickCount
+}
+
+_LAG_WithBridgeOff(Fx, Body) {
+	global _LLM_Engine, _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
 	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentFeedErrorTick
+	global _LLM_Bridge_PrefixObserver, _LLM_Bridge_ReadLiveFocus
+	AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "The bridge fixture cannot borrow another prefix timer")
 	Saved := {
 		Active: _LLM_Bridge_Active, Buffer: _LLM_Bridge_Buffer, Generation: _LLM_Bridge_ContentGeneration,
-		Agent: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding, ErrorTick: _LLM_Bridge_AgentFeedErrorTick
+		Agent: _LLM_Bridge_AgentBuffer, Feeding: _LLM_Bridge_AgentFeeding, ErrorTick: _LLM_Bridge_AgentFeedErrorTick,
+		Engine: _LLM_Engine
 	}
+	Privacy := _LLM_TestPrivacyEnter(Map("hwnd", 101, "control", 102))
 	try {
+		; The newly guarded bridge may cancel its engine timer. Isolate the
+		; fixture engine before any actual feed can touch a borrowed owner.
+		_LLM_Engine := Saved.Engine.Clone()
+		_LLM_Engine["pending_timer"] := "", _LLM_Engine["timer_active"] := false
+		if _LLM_Engine.Has("request_plan")
+			_LLM_Engine.Delete("request_plan")
 		_LLM_Bridge_Active := false
+		_LAG_SyncBridgePrivacy(Fx)
+		AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), false)),
+			"The agent-only fixture must bind its exact source before seeding context")
 		_LLM_Bridge_Buffer := "earlier prediction context"
 		_LLM_Bridge_AgentBuffer := ""
 		_LLM_Bridge_AgentFeeding := false
@@ -37,6 +60,8 @@ _LAG_WithBridgeOff(Body) {
 		_LLM_Bridge_AgentBuffer := Saved.Agent
 		_LLM_Bridge_AgentFeeding := Saved.Feeding
 		_LLM_Bridge_AgentFeedErrorTick := Saved.ErrorTick
+		_LLM_Engine := Saved.Engine
+		_LLM_TestPrivacyExit(Privacy)
 	}
 }
 
@@ -45,8 +70,10 @@ _LAG_WithBridgeOff(Body) {
 _LAG_TypeThroughBridge(Fx, Text) {
 	global LLM_AGENT_LEARNING_SAVE_DELAY_MS
 	Before := Fx.Scheduled.Length
-	for Char in StrSplit(Text)
+	for Char in StrSplit(Text) {
+		_LAG_SyncBridgePrivacy(Fx)
 		LLM_Bridge_FeedCharIfActive(Char)
+	}
 	Index := Fx.Scheduled.Length
 	while (Index > Before) {
 		Entry := Fx.Scheduled[Index]
@@ -85,7 +112,7 @@ _LAG_AutoWithBridgeOff() {
 	_Body(Fx, Lines, Sent) {
 		Fx.App := "Slack"
 		TooltipHide("AgentTest", true)
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Before := _LAG_PredictionSnapshot(Fx)
@@ -123,7 +150,7 @@ _LAG_ActionModeWithBridgeOff() {
 	_LAG_Run(_LAG_Menu("action", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Before := _LAG_PredictionSnapshot(Fx)
@@ -142,7 +169,7 @@ _LAG_ModeChangesStopTheFeed() {
 	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Menu, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Old := _LAG_TypeThroughBridge(Fx, "Envoie le devis")
@@ -178,7 +205,7 @@ _LAG_PauseStopsTheFeed() {
 		TooltipHide("AgentTest", true)
 		AssertTrue(InStr(_DriverFuncBody("Ergopti_OnSuspendEnter"), '"llm-agent-typing", LLM_Agent_OnSuspend') > 0,
 			"pausing runs the agent's typing step")
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Old := _LAG_TypeThroughBridge(Fx, LAG_TYPED)
@@ -210,7 +237,7 @@ _LAG_AiOffDisarmsAuto() {
 	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding, _LLM_Agent_Generation
 			Before := _LAG_PredictionSnapshot(Fx)
@@ -234,7 +261,7 @@ _LAG_SwitchOffDropsThePause() {
 	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		TooltipHide("AgentTest", true)
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Menu, _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeeding
 			Old := _LAG_TypeThroughBridge(Fx, LAG_TYPED)
@@ -365,9 +392,10 @@ _LAG_UnicodePhysicalBackspace(Active) {
 	_LAG_Run(Menu, _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
 		_Typing() {
-			global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer, _LLM_Engine
+			global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer, _LLM_Engine, _LLM_Bridge_PrefixObserver
 			Before := _LAG_PredictionSnapshot(Fx)
 			SavedEnabled := _LLM_Engine["enabled"]
+			OwnedObserver := 0
 			Window := Gui()
 			EditControl := Window.AddEdit(, "A" . Chr(0x1F600))
 			Window.Show("Hide")
@@ -377,10 +405,13 @@ _LAG_UnicodePhysicalBackspace(Active) {
 				if Active
 					_LLM_Bridge_ClearBuffer()
 				_LLM_Engine["enabled"] := false
+				_LAG_SyncBridgePrivacy(Fx)
 				LLM_Bridge_FeedCharIfActive("A")
 				LLM_Bridge_FeedCharIfActive(Chr(0x1F600))
 				ControlSend("{BackSpace}", EditControl)
 				LLM_Bridge_FeedKeyDownIfActive(0x08, true)
+				if Active
+					OwnedObserver := _LLM_Bridge_PrefixObserver
 				Sleep(30)
 				AssertEqual("A", EditControl.Value, "one native Backspace removes the complete surrogate pair")
 				Actual := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
@@ -389,11 +420,13 @@ _LAG_UnicodePhysicalBackspace(Active) {
 				if !Active
 					_LAG_AssertNoPrediction(Fx, Before)
 			} finally {
+				if IsObject(OwnedObserver) && _LLM_Bridge_PrefixObserver == OwnedObserver
+					LLM_Bridge_CancelPrefixObserver()
 				Window.Destroy()
 				_LLM_Engine["enabled"] := SavedEnabled
 			}
 		}
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 	}
 }
 Test("LLM agent: active prediction context matches native Unicode Backspace (unicode-erase)",
@@ -449,7 +482,7 @@ Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 _LAG_CaretContext(Key, Reset) {
 	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _Body)
 	_Body(Fx, Lines, Sent) {
-		_LAG_WithBridgeOff(_Typing)
+		_LAG_WithBridgeOff(Fx, _Typing)
 		_Typing() {
 			global _LLM_Bridge_AgentBuffer
 			Before := _LAG_PredictionSnapshot(Fx)
