@@ -1,0 +1,40 @@
+[
+	{
+		"id": "OSL-001",
+		"os": "linux",
+		"title": "CapsLock plus physical Shift defeats one-shot title-case optimization",
+		"severity": "medium",
+		"confidence": "high",
+		"basis": "original-owner runtime over qualified recording native ports plus production inverse source contract",
+		"property": "title-case result correctness",
+		"root": "tap_hold_engine.take_one_shot accepts same-key Shift plan without live CapsLock qualification",
+		"paths": [
+			"static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"static/ergopti_plus/linux/adapters/xkb_capture.lua"
+		],
+		"expected": "First letter is title A",
+		"observed": "aB with CapsLock ON and either physical Shift; arm spent",
+		"proof": "public-probe.lua: caps-lock-plus-held-shift and caps-lock-plus-right-shift",
+		"qualification": "Actual XKB adapter; explicit recording keysym/case backend and inverse table; no native inverse or receiving-app proof",
+		"dedup": "No exact prior root found in docs/audits and TODO; existing fixed macOS fast-roll is different"
+	},
+	{
+		"id": "OSL-002",
+		"os": "linux",
+		"title": "Ordinary one-shot wrapped-letter repeat unexpectedly retires the keyboard channel",
+		"severity": "medium",
+		"confidence": "high",
+		"basis": "original Reader/Hook/Manager/Engine/broker/Writer with recording native ports",
+		"property": ["valid input session continuity", "matching original output ownership for repeat"],
+		"root": "wrapped EV_KEY repeat gets holder identity only if input_arms[self], absent on ordinary physical tap arming",
+		"paths": [
+			"static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"static/ergopti_plus/linux/adapters/keyboard_hook.lua"
+		],
+		"expected": "Repeat belongs to original wrapped output holder and input session remains active",
+		"observed": "broker refuses code30/value2; emergency log; Hook inactive, debt, original output retired and sources closed before fixture teardown",
+		"proof": "channel-probe.lua: repeat-real-channel versus no-repeat-real-channel",
+		"qualification": "Loud fail-safe; no native stuck-key/app receipt; physical standalone tap route, not unsupported legacy logical-pair admission",
+		"dedup": "No exact prior root found; expansion magic-key RepeatKey findings concern different owner and event"
+	}
+]

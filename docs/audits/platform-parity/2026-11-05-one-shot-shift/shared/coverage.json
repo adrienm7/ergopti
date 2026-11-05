@@ -1,0 +1,187 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"rows": [
+		{
+			"aspect": "Seven shared special outputs",
+			"outcome": "All seven JSON mappings return literal output and never probe native Shift",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt", "policy-luajit.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Accepted live magic characters",
+			"outcome": "★,§ and astral😀 return shared J result",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Abstract priority overlap",
+			"outcome": "Magic-first lookup wins over all special rows when given abstract overlapping magic input",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Current canonical magic validation rejects those ASCII table keys; not a reachable new user setting."
+		},
+		{
+			"aspect": "Unchanged characters spend",
+			"outcome": "Uncased digits/emoji and already-title text return no extra output after the state owner spends its deadline",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-luajit.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Unicode full title mappings",
+			"outcome": "Lua uses shared full Unicode title, including ß→Ss, digraph titlecase and Turkish I plus combining dot",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Windows native Format title behavior for these scalars was not executed or assumed identical."
+		},
+		{
+			"aspect": "Native same-key choice",
+			"outcome": "Actual shared resolver chooses shift only when its supplied native-planning predicate approves the title",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This proves the resolver contract, not that every platform predicate accounts for all physical flags."
+		},
+		{
+			"aspect": "Literal Unicode fallback",
+			"outcome": "When same-key Shift cannot produce title, actual resolver returns literal text",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-luajit.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Multi-scalar text scope",
+			"outcome": "Whole payloads use title semantics; x-y→X-Y, decomposed accents remain multi-scalar, NNBSP% is not the scalar % special",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Actual producer delivery of an IME/French carrier is outside this shared-owner probe."
+		},
+		{
+			"aspect": "Five editing-control spends",
+			"outcome": "Backspace,Enter,Delete,Tab,Escape spend without changing the control",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Other controls retain deadline",
+			"outcome": "Shared Mac owner preserves modifier,capslock,arrow,home,function,shortcut,nontext classifications",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Public adapters and earlier action consumers determine which classification they supply."
+		},
+		{
+			"aspect": "Inclusive deadline",
+			"outcome": "Actual Mac owner accepts text at exactly deadline and refuses after it; Linux source uses same <= comparison",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. No native Windows timeout boundary measured."
+		},
+		{
+			"aspect": "Fast roll is single-use",
+			"outcome": "Actual state owner spends at first a; rolled b and c do not borrow shifted ownership",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "policy-lua54.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This is state-owner execution, not native eventtap sequencing."
+		},
+		{
+			"aspect": "Same press repeat ownership",
+			"outcome": "A shifted press owns its own repeats/release; literal special claim consumes repeats only after commit",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Rearm versus existing claim",
+			"outcome": "Actual state owner refreshes deadline and an old absorbed repeat does not spend that new deadline",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Windows exclusive capture and Linux input lease admission are separate source mechanisms."
+		},
+		{
+			"aspect": "Decision is not output ACK",
+			"outcome": "No claimed physical key before owner.commit; disarm preserves absorbed release debt and reset retires identities",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Duplicate-data refusal and narrow guard",
+			"outcome": "Actual Mac owner rejects duplicate chars; actual narrow CJS source guard accepts a duplicate but rejects other malformed rows",
+			"basis": "actual-owner",
+			"evidence": ["policy-probe.lua", "catalogue-guard.cjs", "catalogue-guard.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Not a new false-green finding: registered Mac real-data tests invoke validating Owner.new and cover this candidate."
+		},
+		{
+			"aspect": "Action aliases and scope",
+			"outcome": "Windows one_shot_shift and Mac sticky_shift are explicit equivalents; Linux generic catalogue entries absent",
+			"basis": "actual-owner",
+			"evidence": ["declaration-probe.cjs", "declarations.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Generic catalogue absence does not erase Linux reserved tap support."
+		},
+		{
+			"aspect": "Linux reserved tap support",
+			"outcome": "Actual source tap namespace contains one_shot_shift independently of generated generic actions",
+			"basis": "source",
+			"evidence": ["source-contract.py", "source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Recommended carriers",
+			"outcome": "Shared PC/Linux right_ctrl tap maps to one_shot_shift; Mac right_option maps sticky_shift",
+			"basis": "actual-owner",
+			"evidence": ["declaration-probe.cjs", "declarations.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "Canonical default timeout",
+			"outcome": "One shared registry value is2000ms; Mac defaults read that same registry",
+			"basis": "actual-owner",
+			"evidence": ["declaration-probe.cjs", "declarations.txt", "source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		},
+		{
+			"aspect": "User timeout surface",
+			"outcome": "Mac hs-only timings menu and config-key extra expose sticky_timeout_ms; no same feature-model property",
+			"basis": "actual-owner",
+			"evidence": ["declaration-probe.cjs", "declarations.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This is an explicit per-driver menu construction, not proof that another OS could never offer configuration."
+		},
+		{
+			"aspect": "Zero and historical infinite wording",
+			"outcome": "Current Mac setter/arm requires positive timeout; Windows nonpositive/uninitialized constant falls back2s",
+			"basis": "source",
+			"evidence": ["source-contract.py", "source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. The old checked TODO description of possible infinite timeout is not taken as current behavior."
+		},
+		{
+			"aspect": "Magic-setting lifetime",
+			"outcome": "Windows snapshots at activation; Linux/Mac consumers read live magic on text decision",
+			"basis": "source",
+			"evidence": ["source-contract.py", "source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Actual UI mutation during a pending capture may consume/cancel it; no user-facing live-change bug is inferred."
+		},
+		{
+			"aspect": "Table load failures",
+			"outcome": "Windows logs once and caches empty mapping; Linux read/parse raises; Mac construction asserts",
+			"basis": "source",
+			"evidence": ["source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. No current shipped data failure; only source failure contracts, not full startup outcomes."
+		},
+		{
+			"aspect": "CapsWord sibling attribution refuted",
+			"outcome": "Windows DisableCapsWord in one_shot_shift.ahk belongs to ToggleCapsLock, not OneShotShift activation",
+			"basis": "source",
+			"evidence": ["source-contract.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Public other producers remain driver reviewer scope; do not generalize this refutation to every action path."
+		},
+		{
+			"aspect": "Locale and public projections",
+			"outcome": "Actual generator guard/model and all21 locale required strings pass",
+			"basis": "actual-owner",
+			"evidence": ["declaration-probe.cjs", "declarations.txt"],
+			"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+		}
+	]
+}

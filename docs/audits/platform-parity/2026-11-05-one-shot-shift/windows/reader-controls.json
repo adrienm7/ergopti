@@ -1,0 +1,25 @@
+{
+	"qualification": "Source-reader fixtures only, not AHK parser/native tests",
+	"controls": [
+		{
+			"name": "literal-and-comment-braces",
+			"passed": true
+		},
+		{
+			"name": "missing",
+			"rejected": true
+		},
+		{
+			"name": "empty",
+			"rejected": true
+		},
+		{
+			"name": "unclosed",
+			"rejected": true
+		},
+		{
+			"name": "duplicate",
+			"rejected": true
+		}
+	]
+}

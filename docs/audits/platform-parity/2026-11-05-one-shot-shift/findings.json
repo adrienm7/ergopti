@@ -1,0 +1,186 @@
+{
+	"schema_version": 1,
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"created_at": "2026-11-05",
+	"module": "one-shot-shift",
+	"findings": [
+		{
+			"id": "OSW-001",
+			"title": "Named-control capture replay does not retain the original modifier chord",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["modified_control_identity"],
+			"basis": "source",
+			"qualification": "Authenticated executable Windows source only; no AHK or native input/editor ran. The conditional reproduction requires a genuine configured named-control completion. Native suppression/pass-through and final receiving are explicitly unmeasured; no duplicate delivery is claimed.",
+			"reproduction": "Use a blank scratch editor, CapsWord/hotstrings/Enter remaps off, and arm one_shot_shift via an independent configured action. After arming hold LCtrl (independently Shift) and press Enter within the2s timeout, retaining the modifier during replay. Conditional on the explicit native named-control completion, the producer requests SendNewResult(\"{Enter}\",False,False) with no original modifier attribution. Its default non-atomic nonliteral path uses ordinary SendEvent, which the existing tap sender contract documents as lifting external modifiers. The request is bare Enter rather than the captured Ctrl/Shift+Enter. Test Ctrl+Backspace/Delete similarly. This is source-derived, not a native event trace.",
+			"root_cause": "_SIHO_ReadScalar publishes a named control without its completing modifier chord. OneShotShift replays only Capture.Name via normal SendNewResult/SendEvent, unlike the guarded tap-key producer which explicitly retains modifiers. DeadKey uses the same decoder and ordinary Send for its sibling control branch.",
+			"silent_failure": "The control name and plain-key send are individually accepted; no diagnostic detects lost chord identity. Existing end-key meta checks pin the named list/order, while native scalar fixtures require physical modifiers released and settlement/rearm probes assert unmodified controls or emitter calls.",
+			"regression_test": "Execute actual capture and public replay for unmodified and Ctrl/Shift/Alt/Win-modified Backspace/Enter/Delete; retain the completing modifier identity and final destination/admission through Wait and output. Include modifier release between capture and replay, pause/rearm and native refusal, exactly-once receiving and sibling DeadKey controls. Adding Blind alone preserves current modifiers, which may differ from the original capture. Genuine AHK/native application execution is still needed.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "windows/source-contract.py",
+					"sha256": "ef7ddc0dae3a3e1b58f2fa0c88a736c95bab4c49520449efad5bd9b0f52ea1e1"
+				},
+				{
+					"path": "windows/source-contract.json",
+					"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+				}
+			],
+			"role": "windows",
+			"source_report": "windows/report.md"
+		},
+		{
+			"id": "OSM-001",
+			"title": "Caps Lock plus held Shift loses requested one-shot title",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["title-case result correctness"],
+			"basis": "actual-owner",
+			"qualification": "Actual public Keymap callback and original adapter/state/policy with original parser of shipped layout. Translation, clock, events and collector are recording ports; no Quartz, native CapsWord activation or receiving-application proof.",
+			"reproduction": "With Caps Lock and physical Shift held, arm one-shot and send keycode 0. The shipped first-four-map projection translates to a; shared policy requests A; callback retains flags 196608 and spends the deadline without replacement. Matched no-modifier, Caps-only and Shift-only controls produce A.",
+			"root_cause": "Adapter validates Shift alone against the requested title, then ORs Shift into original flags already containing Caps Lock and Shift. The actual prospective flag combination still translates to lowercase.",
+			"silent_failure": "Activation is spent and the callback returns an accepted unchanged event without diagnosing that the requested title was not produced. Actual application receipt is unmeasured.",
+			"regression_test": "Run original public callback with Caps Lock and either held Shift, verify translation under complete prospective flags equals the requested title or choose serialized title output. Preserve physical flags and matching release ownership; add native application receiving separately.",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "490ab6c9737c2defb0b9514b7da44a6b8115b0a1e72dd574aba8267571ced4f8"
+				},
+				{
+					"path": "macos/public-probe.lua",
+					"sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1"
+				},
+				{
+					"path": "macos/public-current.txt",
+					"sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d"
+				}
+			],
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "OSM-002",
+			"title": "Programmatic timeout validation publishes values rejected by arming",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["positive timeout configuration invariant"],
+			"basis": "actual-owner",
+			"qualification": "Actual Remap setter/transaction with acknowledged persistence port and actual public Keymap arm executed separately, linked by real getter/setter contract. No actual disk, ordinary-menu failure, simultaneous full-app instance or native application failure. Supplemental setter still uses acknowledged persistence/no-op logger ports; actual shared formatter is independently executed over a recorded sink. No full real Config persistence or native logger transport is claimed.",
+			"reproduction": "Call public Remap.set_sticky_timeout with 0.1 or 0.9 milliseconds while remapping is disabled in the registered transaction fixture. The real setter accepts, publishes getter zero and sends zero to acknowledged save port. Separately original Keymap.arm_one_shot_shift with that getter value raises invalid one-shot Shift timeout. Controls include 0, 1, 2.5 and 2000; the ordinary menu floors first and rejects zero. Supplement: original setter with numeric NaN returns true and publishes NaN through live getter/acknowledged save payload; independent original public arm with NaN raises invalid one-shot Shift timeout. Positive infinity is accepted by both owners and stays active at recorded clock1e12; this is characterization, not proof of a supported unlimited menu choice.",
+			"root_cause": "Setter tests positivity before flooring, allowing a positive fraction to become zero after validation; public arming requires strictly positive timeout. The value <= 0 guard also admits numeric NaN, which the arm timeout > 0 contract rejects.",
+			"silent_failure": "Transaction reports accepted mutation and acknowledged zero save payload despite the published value violating the arm precondition; arming raises explicitly rather than silently succeeding.",
+			"regression_test": "Validate after flooring or require integer milliseconds before mutation, assert rejected fractions preserve live and persistence values, and run actual setter/getter-to-arm contract plus loaded configuration validation. Keep ordinary menu rejection as control. Include numeric NaN, numeric strings, finite values around one, both infinities and transaction refusals; define infinity policy explicitly.",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "490ab6c9737c2defb0b9514b7da44a6b8115b0a1e72dd574aba8267571ced4f8"
+				},
+				{
+					"path": "macos/config-probe.lua",
+					"sha256": "c8b1bf899ba9b27df70c0f8a91069b2d25d57d60f3a1891ae3ab5f7e53f97459"
+				},
+				{
+					"path": "macos/sweep-2-config.log",
+					"sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392"
+				},
+				{
+					"path": "macos/public-probe.lua",
+					"sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1"
+				},
+				{
+					"path": "macos/public-current.txt",
+					"sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d"
+				},
+				{
+					"path": "validation/config-domain-receipt.json",
+					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				}
+			],
+			"submitted_title": "Fractional positive API timeout publishes zero rejected by arming",
+			"role": "macos",
+			"source_report": "macos/report.md"
+		},
+		{
+			"id": "OSL-001",
+			"title": "CapsLock plus physical Shift defeats one-shot title-case optimization",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["title-case result correctness"],
+			"basis": "actual-owner",
+			"qualification": "Actual XKB adapter; explicit recording keysym/case backend and inverse table; no native inverse or receiving-app proof. Original owners over explicitly recording native ports; this role does not execute native inverse generation or native receiving.",
+			"reproduction": "Toggle CapsLock on; quick-tap RightCtrl; hold left or right Shift; type A, release Shift, type B. Original public owners produce aB, expected first title A. CapsLock-only AB and Shift-only Ab are matched controls.",
+			"root_cause": "tap_hold_engine.take_one_shot accepts same-key Shift plan without live CapsLock qualification",
+			"silent_failure": "Arm is spent with an accepted same-key Shift plan even though live CapsLock changes the result.",
+			"regression_test": "Drive original Hook/Engine under CapsLock plus each held Shift; validate requested title against live flags while preserving physical modifier ownership. Test native inverse independently.",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "6c11b10108876031ec6be1cc711182f5fa1b653ab42a84f8c596181222cc6a6a"
+				},
+				{
+					"path": "linux/public-probe.lua",
+					"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+				}
+			],
+			"role": "linux",
+			"source_report": "linux/report.md"
+		},
+		{
+			"id": "OSL-002",
+			"title": "Ordinary one-shot wrapped-letter repeat unexpectedly retires the keyboard channel",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": [
+				"valid input session continuity",
+				"matching original output ownership for repeat"
+			],
+			"basis": "actual-owner",
+			"qualification": "Loud fail-safe; no native stuck-key/app receipt; physical standalone tap route, not unsupported legacy logical-pair admission. Original owners over explicitly recording native ports; this role does not execute native inverse generation or native receiving. The supplementary transport constructs an unused legacy owner/base before actual Manager replacement; no declaration override, unavailable fixture load or generic action occurs during events. Reachability concerns the enabled shipped preset, not neutral defaults.",
+			"reproduction": "Quick-tap default physical RightCtrl; press A; send legitimate EV_KEY repeat value 2 before release through original Reader/Hook/broker/Writer. Broker refuses code30/value2; Hook inactive, debt and output/source retirement are observed before teardown. No-repeat control remains active and produces Aa. Additional original-channel control uses unchanged production declarations, empty valid config.toml and explicitly enabled shipped preset; both runtimes still reproduce repeat retirement and healthy Aa without repeat.",
+			"root_cause": "wrapped EV_KEY repeat gets holder identity only if input_arms[self], absent on ordinary physical tap arming",
+			"silent_failure": "Failure is loud: emergency raw ownership settlement refusal retires the input channel. No native stuck-key or receiving-app outcome is established.",
+			"regression_test": "Drive ordinary physical tap, repeat and release through original broker and Writer lifetime; retain original output holder and active session. Preserve guarded logical-arm, refusal and no-repeat controls.",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "6c11b10108876031ec6be1cc711182f5fa1b653ab42a84f8c596181222cc6a6a"
+				},
+				{
+					"path": "linux/channel-probe.lua",
+					"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+				},
+				{
+					"path": "validation/public-channel-admission-receipt.json",
+					"sha256": "58721906d077e48ab7e750bb677eab590d603158c879eddbd1eaf687972e3a2a"
+				}
+			],
+			"role": "linux",
+			"source_report": "linux/report.md"
+		}
+	]
+}

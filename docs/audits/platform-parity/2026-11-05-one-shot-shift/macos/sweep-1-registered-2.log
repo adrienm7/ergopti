@@ -1,0 +1,12 @@
+
+=== one-shot native boundary ===
+  ok   keeps native translation probes private to the synthetic adapter (one-shot-probe)
+  ok   keeps command shortcuts intact without excluding printable Option input (one-shot-shortcut)
+  ok   rolls back only the provisional key when callback handoff fails (one-shot-handoff)
+  ok   preserves unrelated flags and native repetition until the original release (one-shot-native)
+  ok   serializes an unavailable capital once and swallows its repeats and release (one-shot-native)
+  ok   types a fresh press whose earlier release was missed (one-shot-stale-claim)
+  ok   drops a missed Shift release at the key's next fresh press (one-shot-stale-claim)
+  ok   does not invent physical Shift for an IME or explicit Unicode event (one-shot-native)
+  ok   cannot claim a press when the serializer refuses its output (one-shot-native)
+AUDIT_RESULT	9	0

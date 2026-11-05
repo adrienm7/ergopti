@@ -1,0 +1,19 @@
+{
+	"observation": {
+		"name": "linux-lua-public-probe.lua",
+		"command": [
+			"lua",
+			"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/public-probe.lua",
+			"/workspace/ergopti"
+		],
+		"program_sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57",
+		"exit_code": 0,
+		"stdout": "initial-transient-linux-lua-public-probe.lua.stdout.txt",
+		"stderr": "linux-lua-public-probe.lua.stderr.txt",
+		"stdout_sha256": "6574473df60f1a341cffcd727421ce1c8322386765f13cc4ebecb0925c38c19a",
+		"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+		"private_TMPDIR": true,
+		"error": "Replay differs from frozen observation"
+	},
+	"qualification": "First37-process run had all process exit codes0 but one semantic comparison differed because physical-shift-alone emitted an extra actual20.27ms HotPath diagnostic; receiving character/wire observations remained equal. Original warning stdout retained exactly. Later full37-process replay passes exact parsed baseline comparison after only declared checkout-error/timestamp normalization. No timing threshold or G4 conclusion; warning was not suppressed. Initial whole receipt is retained as historical context; its other output filenames were reused by the final replay."
+}

@@ -1,0 +1,55 @@
+
+=== keymap start: exact native commitment ===
+  ok   acknowledges effective replacement transitions to the existing ordinary owner
+  ok   (terminator-stop-settle-fence) retains context guards until replay settles, teardown=false
+  ok   (terminator-stop-settle-fence) retains context guards until replay settles, teardown=true
+  ok   revives the keyDown tap without invalidating context while PAUSED
+  ok   exports the exact LLM runtime getter and setter result through the real facade
+  ok   forwards exact registry transactions to feature starters
+  ok   rolls back tap 1 after throw start
+  ok   rolls back tap 1 after disabled start
+  ok   rolls back tap 2 after throw start
+  ok   rolls back tap 2 after disabled start
+  ok   rolls back tap 3 after throw start
+  ok   rolls back tap 3 after disabled start
+  ok   rolls back tap 4 after throw start
+  ok   rolls back tap 4 after disabled start
+  ok   rolls back all taps after throw watchdog start
+  ok   rolls back all taps after disabled watchdog start
+  ok   fences a watchdog whose chainable stop leaves it running
+  ok   retains and fences a context reconcile timer after false stop
+  ok   retains and fences a context reconcile timer after nil stop
+  ok   retains and fences a context reconcile timer after throw stop
+  ok   retains a due reconcile timer whose self-stop returns false
+  ok   retains a due reconcile timer whose self-stop returns nil
+  ok   retains a due reconcile timer whose self-stop returns throw
+  ok   retains the exact context reconcile timer when STOP returns false
+  ok   retains the exact context reconcile timer when STOP returns nil
+  ok   retains the exact context reconcile timer when STOP returns throw
+  ok   rolls back a false reconcile acquisition during RESUME
+  ok   rolls back a nil reconcile acquisition during RESUME
+  ok   rolls back a throw reconcile acquisition during RESUME
+  ok   rolls back a listener registration throw before starting taps
+  ok   rejects a listener registration returning false
+  ok   rejects a listener registration returning nil
+  ok   repairs an externally disabled tap instead of trusting the started latch
+  ok   refuses key capture when the diagnostic pump returns false
+  ok   refuses key capture when the diagnostic pump returns nil
+  ok   refuses key capture when the diagnostic pump returns throw
+  ok   keeps the diagnostic pump alive across pause and restarts it after stop
+  ok   retains diagnostic ownership when pump stop returns false
+  ok   retains diagnostic ownership when pump stop returns nil
+  ok   retains diagnostic ownership when pump stop returns throw
+
+=== ordinary stale input before transformations (stale-physical-transform) ===
+  ok   does not add native Shift to an already-late physical key
+  ok   does not emit a Unicode replacement or own the stale key's release
+  ok   retires only the passed stale key's consumed claim, repeat=0
+  ok   retires only the passed stale key's consumed claim, repeat=1
+  ok   retains preexisting consumed repeats and releases while paused
+  ok   retains preexisting consumed repeats and releases while admission-closed
+  ok   keeps reserved stale controls consumed and publishes their existing signals
+  ok   keeps stale fast-exit controls outside ordinary context invalidation
+  ok   keeps the physical replay exemption when an armed key has an old stamp
+  ok   does not rewrite a late configured physical magic key
+AUDIT_RESULT	50	0

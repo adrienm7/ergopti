@@ -1,0 +1,1590 @@
+{
+	"schema_version": 1,
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"created_at": "2026-11-05",
+	"module": "one-shot-shift",
+	"roles": [
+		{
+			"role": "windows",
+			"report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "windows/coverage.json",
+					"sha256": "8c7c094ea13ea16dd5bb69927f51955aa336e2dca59e1eed26f48965eb072f66"
+				},
+				{
+					"path": "windows/findings.json",
+					"sha256": "946e23677465d8d773119f7d40879bc0244fe9f5565de9777af38aece2ade3a1"
+				}
+			],
+			"ids": ["OSW-001"],
+			"coverage": [
+				{
+					"id": "OSW-C001",
+					"aspect": "entry refuses native suspended state before arming",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C002",
+					"aspect": "capture is exclusive and current scalar decoder based",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C003",
+					"aspect": "positive timeout uses shared constant, otherwise finite2s",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C004",
+					"aspect": "shared timeout source is2000ms",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C005",
+					"aspect": "magic key and table prepared before native capture",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C006",
+					"aspect": "complete scalar capture, named controls exactly Backspace Enter Delete",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C007",
+					"aspect": "refused rearm cannot change incumbent logical state",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C008",
+					"aspect": "exact-token publication and suspend guard share Critical",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C009",
+					"aspect": "Wait always settles exact token before dispatch",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C010",
+					"aspect": "timeout and invalid capture do not emit",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C011",
+					"aspect": "invalid scalar produces warning",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C012",
+					"aspect": "named control branch replays key before text transform",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C013",
+					"aspect": "OSW001 control replay lacks modifier attribution",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C014",
+					"aspect": "non-atomic nonliteral replay uses ordinary SendEvent",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C015",
+					"aspect": "runtime primitive send hook defaults disabled",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C016",
+					"aspect": "other native tap owner explicitly preserves held modifiers with Blind",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C017",
+					"aspect": "control completion is not an inferred Tab or Escape result",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C018",
+					"aspect": "ordinary scalar path titlecases through native AHK Format",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C019",
+					"aspect": "shared table contains seven explicit punctuation/space replacements",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C020",
+					"aspect": "chosen magic key result precedes fixed punctuation lookup",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C021",
+					"aspect": "fixed chord cancellation changes only enable bit",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C022",
+					"aspect": "one-shot owner does not itself cancel CapsWord",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C023",
+					"aspect": "gesture catalogue directly exposes character one-shot action",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C024",
+					"aspect": "Windows/Linux action aliases macOS sticky Shift",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C025",
+					"aspect": "suspended start and competing exclusivity checked inside Critical",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C026",
+					"aspect": "start rollback retains failed native cleanup owner",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C027",
+					"aspect": "only actual current terminal retirement permits producer output",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C028",
+					"aspect": "decoder distinguishes timeout controls complete BMP and surrogate pair",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C029",
+					"aspect": "named controls require exact explicit token list",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C030",
+					"aspect": "shared EndChars excludes high halves but admits remaining BMP units",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C031",
+					"aspect": "lifecycle stop and logical latch cleanup coexist",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C032",
+					"aspect": "key-combination non-one-shot action cancels pending shift",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C033",
+					"aspect": "native scalar fixture refuses held modifiers",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C034",
+					"aspect": "named end-key regression is a source check, not modified receiving",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C035",
+					"aspect": "existing rearm fixture distinguishes disabled incumbent",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C036",
+					"aspect": "existing settlement fixture covers successor inserted during Stop",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C037",
+					"aspect": "OSW001 sibling dead-key capture replays named key without modifier attribution",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C038",
+					"aspect": "LAlt dedicated producer captures immediately then enters a bounded Shift hold",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C039",
+					"aspect": "RCtrl dedicated producer distinguishes tap from long Shift hold",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C040",
+					"aspect": "control decoder returns named identity without captured modifier fields",
+					"outcome": "Authenticated source relationship; no Windows runtime result",
+					"basis": "source",
+					"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+					"evidence": [
+						{
+							"path": "windows/source-contract.json",
+							"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+						},
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C041",
+					"aspect": "native-modified-control-receiving",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "OSW-001 requested chord is source-derived; actual named-end admission, suppression and receiver counts unexecuted.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C042",
+					"aspect": "tab-escape-endkey-representation",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "BMP control membership does not establish native EndKey E/C representation or pass-through.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C043",
+					"aspect": "native-physical-producer-priority",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "HotIf admission and competing remapped keys remain source-qualified, not native keyboard traces.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C044",
+					"aspect": "post-retirement-reentry",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "Possible successful retirement-to-replay generation window is a hypothesis, not a confirmed root.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C045",
+					"aspect": "rapid-editor-abc-order",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "No real editor or delayed-thread rapid typing receipt; do not equate emitter order with receiving order.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C046",
+					"aspect": "native-latency-memory",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "No G4 constructor cost or long-duration RSS measurement; existing prototype code only inspected.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				},
+				{
+					"id": "OSW-C047",
+					"aspect": "arbitrary-control-shortcut-spending",
+					"outcome": "unverified",
+					"basis": "source",
+					"qualification": "Explicit cancellation paths are traced; general Ctrl-letter/AltGr/native transcription needs actual hook observation.",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "macos",
+			"report": "macos/report.md",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "macos/coverage.json",
+					"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+				},
+				{
+					"path": "macos/findings.json",
+					"sha256": "490ab6c9737c2defb0b9514b7da44a6b8115b0a1e72dd574aba8267571ced4f8"
+				},
+				{
+					"path": "validation/config-domain-receipt.json",
+					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				}
+			],
+			"ids": ["OSM-001", "OSM-002"],
+			"coverage": [
+				{
+					"aspect": "Catalogue and sentinel routing",
+					"basis": "actual-owner",
+					"qualification": "source + registered actions/lifecycle. No native F20 or Karabiner delivery measurement",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "CapsLock plus held Shift",
+					"basis": "actual-owner",
+					"qualification": "actual public Keymap callback and actual adapter/state/shared policy, original parser/shipped layout projection. OSM-001; recorded stateless translation port, no native receiving",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "First fresh key, controls, repeats, release, rearm, expiry, pause and Cmd",
+					"basis": "actual-owner",
+					"qualification": "22 public callback scenarios + original state/adapter suites. Explicit monotonic clock, translation, event and collector ports; no whole-app/native proof",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "Settings",
+					"basis": "actual-owner",
+					"qualification": "actual Remap transaction setter + actual public arm separately. OSM-002; acknowledged persistence, not real disk; ordinary menu rejects zero",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "Refusal/rollback/missed releases",
+					"basis": "actual-owner",
+					"qualification": "9 registered original adapter cases. No native serializer receiver proof",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "Stale callbacks, admission, startup, tap repair, shutdown ownership",
+					"basis": "actual-owner",
+					"qualification": "50 registered original public lifecycle cases + source reset/disarm routes. Existing fixture native lifecycle ports, no actual Hammerspoon taps",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "Live magic and Unicode fallback",
+					"basis": "actual-owner",
+					"qualification": "7 registered state cases +9 registered adapter cases + action source. Public physical geometry disabled in new probe; no native magic key certification",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "CapsWord generated delimiter interaction",
+					"basis": "source",
+					"qualification": "source path reviewed. Unresolved missing-relay candidate; combined actual serializer/watcher and native order not executed",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				},
+				{
+					"aspect": "Layout carriers and special punctuation",
+					"basis": "actual-owner",
+					"qualification": "original shared policy plus shipped layout parser projection and five public cases. Exact full-string lookup; raw policy payload differs from native multi-codepoint carrier; unsupported magic carriers not tested",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508"
+						},
+						{
+							"path": "macos/report.md",
+							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "linux",
+			"report": "linux/report.md",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				},
+				{
+					"path": "linux/coverage.json",
+					"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+				},
+				{
+					"path": "linux/findings.json",
+					"sha256": "6c11b10108876031ec6be1cc711182f5fa1b653ab42a84f8c596181222cc6a6a"
+				},
+				{
+					"path": "validation/public-channel-admission-receipt.json",
+					"sha256": "58721906d077e48ab7e750bb677eab590d603158c879eddbd1eaf687972e3a2a"
+				}
+			],
+			"ids": ["OSL-001", "OSL-002"],
+			"coverage": [
+				{
+					"aspect": "next key controls modifiers",
+					"basis": "actual-owner",
+					"qualification": "20-stream public probe and registered owner cases. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "physical vs synthetic",
+					"basis": "actual-owner",
+					"qualification": "actual physical recorded trigger and real wrapped output owner; registered logical guarded producer only invariant qualification. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "punctuation magic",
+					"basis": "actual-owner",
+					"qualification": "shared source/registered original Engine and integration tests, no bespoke native receipt. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "capslock held shift",
+					"basis": "actual-owner",
+					"qualification": "OSL-001 left/right matched controls; CapsWord downstream CapsLock ownership is source-derived, combined actual producer not executed. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "retrigger timeout",
+					"basis": "actual-owner",
+					"qualification": "asserted native capture public producer streams, inclusive2000ms and expired2001ms. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "pause stop stale partial ack refusal",
+					"basis": "actual-owner",
+					"qualification": "asserted original-channel ordinary tap pause/resume, reload and stop clear arm; registered guarded-owner stale/ACK/refusal tests; OSL-002 unexpected channel retirement. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "settings",
+					"basis": "source",
+					"qualification": "real private tap_hold TOML loader and defaults; timing from shipped shared constant; no user file edited. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				},
+				{
+					"aspect": "intentional difference",
+					"basis": "source",
+					"qualification": "generic gesture catalogue Linux exclusion vs implemented tap-hold route. Original owners over recording native ports; no real evdev/uinput or receiving application. This is a subject summary, not one executable scenario.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "f390d16394a2db85037a45273af8edb0512c7a77ab924de420d6cb4358932d71"
+						},
+						{
+							"path": "linux/report.md",
+							"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+						},
+						{
+							"path": "linux/public-probe.lua",
+							"sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57"
+						},
+						{
+							"path": "linux/channel-probe.lua",
+							"sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "shared",
+			"report": "shared/report.md",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/coverage.json",
+					"sha256": "65699905e9fd939629a6849f5ce675864dd941948f41f40ec0c39837d9b3da2f"
+				},
+				{
+					"path": "shared/findings.json",
+					"sha256": "768727e19b8aa67ea092b45d3e4dd3d9be890ada26f9ce1ca057629edef0e30f"
+				}
+			],
+			"ids": [],
+			"coverage": [
+				{
+					"aspect": "Seven shared special outputs",
+					"outcome": "All seven JSON mappings return literal output and never probe native Shift",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						},
+						{
+							"path": "shared/policy-luajit.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Accepted live magic characters",
+					"outcome": "★,§ and astral😀 return shared J result",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Abstract priority overlap",
+					"outcome": "Magic-first lookup wins over all special rows when given abstract overlapping magic input",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Current canonical magic validation rejects those ASCII table keys; not a reachable new user setting."
+				},
+				{
+					"aspect": "Unchanged characters spend",
+					"outcome": "Uncased digits/emoji and already-title text return no extra output after the state owner spends its deadline",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-luajit.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Unicode full title mappings",
+					"outcome": "Lua uses shared full Unicode title, including ß→Ss, digraph titlecase and Turkish I plus combining dot",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Windows native Format title behavior for these scalars was not executed or assumed identical."
+				},
+				{
+					"aspect": "Native same-key choice",
+					"outcome": "Actual shared resolver chooses shift only when its supplied native-planning predicate approves the title",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This proves the resolver contract, not that every platform predicate accounts for all physical flags."
+				},
+				{
+					"aspect": "Literal Unicode fallback",
+					"outcome": "When same-key Shift cannot produce title, actual resolver returns literal text",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-luajit.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Multi-scalar text scope",
+					"outcome": "Whole payloads use title semantics; x-y→X-Y, decomposed accents remain multi-scalar, NNBSP% is not the scalar % special",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Actual producer delivery of an IME/French carrier is outside this shared-owner probe."
+				},
+				{
+					"aspect": "Five editing-control spends",
+					"outcome": "Backspace,Enter,Delete,Tab,Escape spend without changing the control",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Other controls retain deadline",
+					"outcome": "Shared Mac owner preserves modifier,capslock,arrow,home,function,shortcut,nontext classifications",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Public adapters and earlier action consumers determine which classification they supply."
+				},
+				{
+					"aspect": "Inclusive deadline",
+					"outcome": "Actual Mac owner accepts text at exactly deadline and refuses after it; Linux source uses same <= comparison",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. No native Windows timeout boundary measured."
+				},
+				{
+					"aspect": "Fast roll is single-use",
+					"outcome": "Actual state owner spends at first a; rolled b and c do not borrow shifted ownership",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/policy-lua54.txt",
+							"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This is state-owner execution, not native eventtap sequencing."
+				},
+				{
+					"aspect": "Same press repeat ownership",
+					"outcome": "A shifted press owns its own repeats/release; literal special claim consumes repeats only after commit",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Rearm versus existing claim",
+					"outcome": "Actual state owner refreshes deadline and an old absorbed repeat does not spend that new deadline",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Windows exclusive capture and Linux input lease admission are separate source mechanisms."
+				},
+				{
+					"aspect": "Decision is not output ACK",
+					"outcome": "No claimed physical key before owner.commit; disarm preserves absorbed release debt and reset retires identities",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Duplicate-data refusal and narrow guard",
+					"outcome": "Actual Mac owner rejects duplicate chars; actual narrow CJS source guard accepts a duplicate but rejects other malformed rows",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+						},
+						{
+							"path": "shared/catalogue-guard.cjs",
+							"sha256": "f2941261793bc30d3adc76a7afd6d267e59a3387defcf1d68af64d7a22df8a08"
+						},
+						{
+							"path": "shared/catalogue-guard.txt",
+							"sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Not a new false-green finding: registered Mac real-data tests invoke validating Owner.new and cover this candidate."
+				},
+				{
+					"aspect": "Action aliases and scope",
+					"outcome": "Windows one_shot_shift and Mac sticky_shift are explicit equivalents; Linux generic catalogue entries absent",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Generic catalogue absence does not erase Linux reserved tap support."
+				},
+				{
+					"aspect": "Linux reserved tap support",
+					"outcome": "Actual source tap namespace contains one_shot_shift independently of generated generic actions",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/source-contract.py",
+							"sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Recommended carriers",
+					"outcome": "Shared PC/Linux right_ctrl tap maps to one_shot_shift; Mac right_option maps sticky_shift",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "Canonical default timeout",
+					"outcome": "One shared registry value is2000ms; Mac defaults read that same registry",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				},
+				{
+					"aspect": "User timeout surface",
+					"outcome": "Mac hs-only timings menu and config-key extra expose sticky_timeout_ms; no same feature-model property",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. This is an explicit per-driver menu construction, not proof that another OS could never offer configuration."
+				},
+				{
+					"aspect": "Zero and historical infinite wording",
+					"outcome": "Current Mac setter/arm requires positive timeout; Windows nonpositive/uninitialized constant falls back2s",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/source-contract.py",
+							"sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. The old checked TODO description of possible infinite timeout is not taken as current behavior."
+				},
+				{
+					"aspect": "Magic-setting lifetime",
+					"outcome": "Windows snapshots at activation; Linux/Mac consumers read live magic on text decision",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/source-contract.py",
+							"sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Actual UI mutation during a pending capture may consume/cancel it; no user-facing live-change bug is inferred."
+				},
+				{
+					"aspect": "Table load failures",
+					"outcome": "Windows logs once and caches empty mapping; Linux read/parse raises; Mac construction asserts",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. No current shipped data failure; only source failure contracts, not full startup outcomes."
+				},
+				{
+					"aspect": "CapsWord sibling attribution refuted",
+					"outcome": "Windows DisableCapsWord in one_shot_shift.ahk belongs to ToggleCapsLock, not OneShotShift activation",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. Public other producers remain driver reviewer scope; do not generalize this refutation to every action path."
+				},
+				{
+					"aspect": "Locale and public projections",
+					"outcome": "Actual generator guard/model and all21 locale required strings pass",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+						}
+					],
+					"qualification": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified. "
+				}
+			]
+		}
+	]
+}

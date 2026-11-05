@@ -1,0 +1,1 @@
+[{"called":true,"name":"nan","result":"recorded-time [DEBUG] [domain-probe] Sticky timeout: %d ms."},{"called":true,"name":"positive-infinity","result":"recorded-time [DEBUG] [domain-probe] Sticky timeout: %d ms."}]
