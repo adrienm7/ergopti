@@ -1,39 +1,31 @@
 {
-	"expected_count": 20,
+	"expected_count": 29,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "hcw-native-numeric-domain-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "hcw-native-numeric-companion",
-			"expected_count": 4
-		},
-		{
-			"contains": "config-window-delay-write-per-keystroke",
-			"expected_count": 4
-		},
-		{
-			"contains": "llm-integer-input-domain",
-			"expected_count": 3
-		},
-		{
-			"contains": "hotstrings_config_window: numeric debounce preserves distinct fields",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstrings_config_window: field reset cancels only its matching debounce",
-			"expected_count": 1
-		},
-		{
-			"contains": "hotstrings_config_window: refused numeric drafts remain retryable",
-			"expected_count": 1
-		},
-		{
 			"contains": "System action in-flight lifecycle: eject",
+			"expected_count": 8
+		},
+		{
+			"contains": "system-action-sibling-lifecycle",
+			"expected_count": 10
+		},
+		{
+			"contains": "driver-control-owned-stage",
+			"expected_count": 4
+		},
+		{
+			"contains": "menu-numeric-prompt-domain",
+			"expected_count": 4
+		},
+		{
+			"contains": "chord-delay-numeric-domain",
+			"expected_count": 1
+		},
+		{
+			"contains": "tap-hold-prompt-numeric-domain",
 			"expected_count": 2
 		}
 	]
