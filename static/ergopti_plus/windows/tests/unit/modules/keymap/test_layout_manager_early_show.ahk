@@ -90,3 +90,7 @@ for _LMSO_SettingsMode in ["settings-current", "settings-close"]
 
 Test("Layout native settings continuation: settings-reopen preserves the exact successor (layout-settings-successor-owner)",
 	_LMSO_Case.Bind("settings-reopen"))
+
+for _LMSO_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Layout native subscription continuation: " . _LMSO_SubscriptionMode . " retires its exact handle (layout-subscription-close-owner)",
+		_LMSO_Case.Bind(_LMSO_SubscriptionMode))

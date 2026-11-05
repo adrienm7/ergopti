@@ -66,11 +66,55 @@ class _LMSO_Core {
 			return this.SettingsValue
 		}
 	}
-	WebMessageReceived(Callback) => {Callback: Callback}
+	WebMessageReceived(Callback) {
+		global _LMSO, _LayMgrWeb_Controller
+		if !HasProp(_LMSO, "SettingsMode") || !InStr(_LMSO.SettingsMode, "subscription-")
+			return {Callback: Callback}
+		Controller := _LayMgrWeb_Controller
+		_LMSO_SubscriptionBoundary()
+		return _LMSO_Subscription(Callback, Controller)
+	}
 	NavigationCompleted(Callback) => {Callback: Callback}
 	SetVirtualHostNameToFolderMapping(*) => 0
 	Navigate(Url) => 0
 }
+
+; Passive subscription deletion observes the same unsubscribe-before-Close
+; contract as the SDK handle. It does not invoke or simulate a native COM call.
+class _LMSO_Subscription {
+	__New(Callback, Controller) {
+		this.Callback := Callback, this.Controller := Controller
+	}
+	__Delete() {
+		global _LMSO
+		_LMSO.Unsubscribed += 1
+		if this.Controller.Closed
+			_LMSO.UnsubscribedAfterClose += 1
+	}
+}
+_LMSO_SubscriptionBoundary() {
+	global _LMSO, _LayMgrWeb_SessionEpoch
+	_LMSO.SubscriptionCalls += 1
+	if _LMSO.SettingsMode != "subscription-close"
+		return
+	_LMSO_Require(_LMSO.SubscriptionCalls == 1 && !_LMSO.ClosePosted,
+		"The one subscription effect may post exactly one native Close")
+	_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+		&& WinGetPID("ahk_id " . _LMSO.Hwnd) == ProcessExist(),
+		"The subscription cutpoint must still name its exact owned native GUI")
+	_LMSO.ClosePosted := true
+	Before := _LayMgrWeb_SessionEpoch
+	_LMSO_Require(DllCall("PostMessageW", "Ptr", _LMSO.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"),
+		"The real GUI must accept native WM_CLOSE while its subscription call is pending")
+	Started := A_TickCount
+	while _LayMgrWeb_SessionEpoch == Before && A_TickCount - Started < 1000
+		Sleep(1)
+	; Logical retirement is required here; physical Close/Destroy may correctly
+	; wait for the subscription to return before its exact unsubscribe.
+	_LMSO.CloseObserved := _LayMgrWeb_SessionEpoch != Before
+	_LMSO.AliveAtSubscriptionReturn := !!DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+}
+
 class _LMSO_Controller {
 	__New(Hwnd) {
 		_LMSO_Require(DllCall("IsWindow", "ptr", Hwnd, "int"), "the actual SDK call must name a genuine native control")
@@ -224,7 +268,8 @@ _LMSO_SettingsGeneration(Mode) {
 	_LMSO_Refuse(!!_LayMgrWeb_Gui, "A settings opening starts without a foreign native host")
 	PreviousEnv := _WebView_SharedEnv, PreviousRetired := _WebView_SharedEnvRetired
 	PreviousCritical := Critical("Off"), Environment := _LMSO_Environment()
-	_LMSO := {SettingsMode: Mode, SettingsCalls: 0, Window: 0, Hwnd: 0, ClosePosted: false, CloseObserved: false}
+	_LMSO := {SettingsMode: Mode, SettingsCalls: 0, Window: 0, Hwnd: 0, ClosePosted: false, CloseObserved: false,
+		SubscriptionCalls: 0, Unsubscribed: 0, UnsubscribedAfterClose: 0, AliveAtSubscriptionReturn: false}
 	Started := false, OpeningFailure := 0
 	try {
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
@@ -237,6 +282,22 @@ _LMSO_SettingsGeneration(Mode) {
 			. " close_posted=" . _LMSO.ClosePosted . " close_observed=" . _LMSO.CloseObserved
 			. " controllers=" . Environment.Controllers.Length . " started=" . Started
 			. " caught=" . (IsObject(OpeningFailure) ? Type(OpeningFailure) : "none") . "`n", "*")
+		if InStr(Mode, "subscription-")
+			_LMSO_Equal(1, _LMSO.SubscriptionCalls, "The actual host must reach its real subscription boundary exactly once")
+		if Mode == "subscription-close" {
+			_LMSO_Require(_LMSO.SubscriptionCalls == 1 && _LMSO.ClosePosted && _LMSO.CloseObserved,
+				"The pending real-subscription boundary must observe the original native Close handler")
+			StartedRetirement := A_TickCount
+			while (DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int") || !Environment.Controllers[1].Closed)
+				&& A_TickCount - StartedRetirement < 1000
+				Sleep(1)
+			FileAppend("OBSERVATION layout-subscription calls=" . _LMSO.SubscriptionCalls
+				. " close_observed=" . _LMSO.CloseObserved . " native_alive_at_return=" . _LMSO.AliveAtSubscriptionReturn
+				. " unsubscribed=" . _LMSO.Unsubscribed . " unsubscribe_after_close=" . _LMSO.UnsubscribedAfterClose
+				. " controller_closed=" . Environment.Controllers[1].Closed . "`n", "*")
+			_LMSO_Require(_LMSO.Unsubscribed == 1 && _LMSO.UnsubscribedAfterClose == 0,
+				"The late returned handle must unsubscribe exactly once while its controller is still live")
+		}
 		ExpectedControllers := Mode == "settings-reopen" ? 2 : 1
 		_LMSO_Equal(ExpectedControllers, _LMSO.SettingsCalls, "Every real host must reach its actual settings property exactly once")
 		_LMSO_Equal(ExpectedControllers, Environment.Controllers.Length, "The settings cutpoint requires genuine SDK controller creation")
@@ -253,10 +314,11 @@ _LMSO_SettingsGeneration(Mode) {
 			_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.SuccessorGui.Hwnd, "Int")
 				&& _LMSO.SuccessorController.Closed == 0 && _LMSO.SuccessorController.Fills == 1,
 				"Only the successor may fill its live controller exactly once")
-		} else if Mode == "settings-close" {
+		} else if Mode == "settings-close" || Mode == "subscription-close" {
 			_LMSO_Require(_LMSO.ClosePosted && _LMSO.CloseObserved,
 				"A genuine native Close must retire its exact GUI and epoch before judging the older opening")
 			_LMSO_Equal(1, Environment.Controllers[1].Closed, "The exact admitted controller must close once")
+			_LMSO_Refuse(DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int"), "Physical retirement must finish after pending subscriptions settle")
 			_LMSO_Refuse(IsObject(OpeningFailure), "A retired settings continuation must return cancellation rather than dereferencing withdrawn globals")
 			_LMSO_Refuse(!!Started || !!_LayMgrWeb_Gui || IsSet(_LayMgrWeb_Controller) || IsSet(_LayMgrWeb_WebView),
 				"A genuinely closed host cannot report a live opening or republish its controller")
@@ -269,6 +331,8 @@ _LMSO_SettingsGeneration(Mode) {
 		}
 	} finally {
 		_LayMgrWeb_Close()
+		if InStr(Mode, "subscription-") && IsSet(_LayMgrWeb_MsgSub)
+			_LayMgrWeb_MsgSub := unset
 		for Controller in Environment.Controllers
 			if !Controller.Closed
 				Controller.Close()
@@ -289,6 +353,7 @@ try {
 		"The isolated UI role must remain genuinely outside primary configuration admission.")
 	LoggerInit()
 	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close" || A_Args[1] == "settings-reopen"
+		|| A_Args[1] == "subscription-current" || A_Args[1] == "subscription-close"
 		_LMSO_SettingsGeneration(A_Args[1])
 	else
 		_LMSO_OpenGeneration(A_Args[1])
