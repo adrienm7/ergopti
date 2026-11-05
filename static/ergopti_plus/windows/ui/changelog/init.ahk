@@ -200,8 +200,30 @@ _CLW_BuildWindow(Channel, Request) {
 	g.OnEvent("Escape", _CLW_OnClose)
 	g.OnEvent("Size",   _CLW_OnResize)
 
-	g.Show("w860 h580")
-	_CLW_Gui := g
+	; Show pumps a real Close before it returns. Publish this native host first
+	; so Close can retire it, and never let its old opening republish afterward.
+	Published := false
+	PreviousCritical := Critical("On")
+	try {
+		if WindowEpoch == _CLW_WindowEpoch && !IsSet(_CLW_Gui) {
+			_CLW_Gui := g
+			_CLW_ResetDone := false
+			Published := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		try g.Destroy()
+		return false
+	}
+	try g.Show("w860 h580")
+	catch as Err {
+		; Native destruction during Show is an ordinary retired opening.
+		if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+			return false
+		throw Err
+	}
+	if WindowEpoch != _CLW_WindowEpoch || !IsSet(_CLW_Gui) || _CLW_Gui != g
+		return false
 	if !_Updater_RequestMayPublish(Request) {
 		_CLW_OnClose()
 		return false

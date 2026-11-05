@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **107 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **110 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1763,3 +1763,35 @@ The real model JSON and action schema admit standalone carriage returns. Both co
 Run41971633136 at7a7e1e8ec8d4aeb252a8d2456b12c115ca190abb fails all four carriage/mixed calendar/mail cases in both orders. Calendar records `exact_record=0 lone_break=1`; mail emits `first%0Dsecond`. The six LF, CRLF and literal-backslash controls pass. These receipts qualify payload conformance, not an external application import.
 
 The Windows correction normalizes CRLF and then standalone CR to LF before the existing destination encoding. All ten original tests remain. The shared Lua homologues retain this edge and are explicit parity debt outside the requested Windows scope. Post-fix native qualification is pending.
+
+## Native qualification of the latest corrections
+
+Run41971226185 at639de1fcae98920d622bf345ee2e675d4c7b146b passes the six102 cache cases, four103 fresh-selection cases plus nine cleanup-continuation controls, all three104 distance cases and the genuine105/106 junction/ACL/bounds cases individually and reversed. All seven strict personal source-encoding cases and the complete27-vector decoder contract pass. The full production parse and90/90 hotstring E2E pass, while the mixed122-case cohort remains red at109 passes/13 failures per order; this does not qualify the full suite.
+
+The same run proves six091 Anthropic/Gemini response siblings while four ordinary/reasoning controls pass. Complete text concatenation and refusal of malformed partial data are integrated and await postfix qualification. Run41971633136 also proves a068 public-writer NUL sibling (result1/parsed1, bytes98 to97) with both legal controls passing. The writer now checks the original UTF-16 scalar span before String operations; public and direct-owner qualification is pending.
+
+## AHK-108: A copy made after SendInstant snapshots the clipboard is overwritten and lost
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+SendInstant captures ClipboardAll A, then unconditionally publishes its payload after another native process has copied B. The later restore legitimately owns the payload sequence but restores stale A over the user's newer copy. This precedes publication and differs from097's missing post-publication guard.
+
+Run41971226185 authenticates the independent HWND, exact transferred HGLOBAL, full native UTF-16 bytes and stable sequences28/50 before the actual publication. Both real pastes succeed, yet final sequences39/61 have another owner and `clipboard_original_a=1`. Both different-text and same-payload-text copies are lost, including in inverse order; the stable control passes.
+
+A correction using the existing native snapshot/CAS/owned-restore primitives is in progress. Its original ClipboardAll, exact debt, prior097 attacks and receiving/cleanup oracles must remain. Post-fix qualification is pending.
+
+## AHK-109: Closing the initial changelog Show leaves its native window alive
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The window builder publishes its GUI only after Show. A real Close during Show therefore invalidates the epoch but cannot destroy the local host; the old opening then republishes it and calls the WebView factory. Run41971226185 observes `close_entered=1 native_closes=1 critical_at_show=0`, followed by `native_alive=1 gui_global=1 factory_calls=1`. The ordinary Show control passes, and inverse order reproduces the failure.
+
+The proposed correction claims the exact native GUI before Show and validates its epoch/identity after Show before factory creation. Abandoned local hosts are destroyed without touching a successor. The correction is integrated; native postfix qualification is pending.
+
+## AHK-110: Stopping keystats discards the final foreground interval
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+Stop invalidates capture and its privacy tracker, then flushes existing rows without closing the active app/title clocks. Runs41967942121 and41971226185 observe terminal `rows=0 elapsed=46-47 errors=0` and cold SQL app time0. The corrected positive control emits two switch rows and47ms of canonical app time in the latter run. Both results repeat in inverse order.
+
+The pending correction must close accepted origins through independent acknowledgements, preserve privacy refusals and retain transition ownership across native Stop reentrancy. Four extra accepted-row/Stop cutpoint controls are integrated for the next native run. Implementation and postfix qualification remain pending.
