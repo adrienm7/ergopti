@@ -1714,7 +1714,7 @@ The correction escapes both fields with the same codec, decodes complete keys, d
 
 ## Personal-information encoding follow-up for AHK-068
 
-The same10-case native run proves an additional source-fidelity failure in the existing068 family: an unrelated public edit acknowledges success over invalid UTF-8 (92 original bytes become98) and an odd UTF-16 BOM image (191 become101). Neither reader latches refusal. All three genuine UTF-8, UTF-8 BOM and UTF-16 BOM controls pass, and both failures repeat in inverse order. Strict decoding of the same captured Buffer is being implemented; no extra distinct count is assigned to these source-preservation siblings.
+The same10-case native run proves an additional source-fidelity failure in the existing068 family: an unrelated public edit acknowledges success over invalid UTF-8 (92 original bytes become98) and an odd UTF-16 BOM image (191 become101). Neither reader latches refusal. All three genuine UTF-8, UTF-8 BOM and UTF-16 BOM controls pass, and both failures repeat in inverse order. Strict decoding of the same captured Buffer is integrated and awaiting native qualification; no extra distinct count is assigned to these source-preservation siblings.
 
 ## AHK-103: A physical wrapping trigger invalidates its own prewarmed selection capability
 
