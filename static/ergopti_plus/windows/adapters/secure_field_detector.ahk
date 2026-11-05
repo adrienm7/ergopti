@@ -116,7 +116,7 @@ SFD_IsSecureField(KnownFocusedHwnd := unset) {
 	}
 	CachedSecure := true
 	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
-			&CachedSecure) && (CachedSecure || Focus.ElementId !== NativeElement)
+			&CachedSecure, , false)
 		return CachedSecure
 	; A failed native read cannot reuse an old native negative verdict. Unknown
 	; remains fail-closed until the asynchronous UIA owner confirms its field.
@@ -145,7 +145,7 @@ SFD_ConfigureUiaWorker(RequestFn, StartFn, ContextMatchFn) {
 ; Positive verdicts may be conservatively reused for the same HWND, but a
 ; negative verdict requires both a live focus invalidator and the UIA RuntimeId
 ; that produced it. Unknown always leaves Secure=true.
-SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?) {
+SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?, AllowNativeNegative := true) {
 	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	Secure := true
 	; This map is updated in place. Copy the verdict and identity before sampling
@@ -172,6 +172,10 @@ SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure, NowTick?) {
 			or VerdictGeneration != FocusGeneration
 			or ElementId == ""
 			or CachedElementId != ElementId)
+		return false
+	; A caller which just obtained an inconclusive native read may still use
+	; an exact UIA verdict, but cannot revive an earlier native style receipt.
+	if !AllowNativeNegative && CachedElementId == "hwnd:" . Hwnd
 		return false
 	Secure := false
 	return true
