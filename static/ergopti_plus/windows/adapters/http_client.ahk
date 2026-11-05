@@ -1001,6 +1001,28 @@ SystemProxy_IsBypassed(Bypass, Host) {
 	return false
 }
 
+; WinHTTP leaves an undeclared protocol direct. Only validated, unique maps
+; for the other HTTP protocol may explain an empty strict selection.
+_SystemProxy_StaticSchemeAbsent(List, Scheme) {
+	Seen := Map()
+	for Entry in StrSplit(Trim(List), [";", " "]) {
+		Entry := Trim(Entry)
+		if Entry == ""
+			continue
+		if !RegExMatch(Entry, "i)^(https?)=(.+)$", &Match)
+			return false
+		Key := StrLower(Match[1])
+		if Key == Scheme || Seen.Has(Key)
+			return false
+		Proxy := _SystemProxy_NormalizeEndpoint(Match[2], "http")
+		if Proxy == "" || (RegExMatch(Proxy, ":(\d+)$", &Port)
+				&& (Integer(Port[1]) < 1 || Integer(Port[1]) > 65535))
+			return false
+		Seen[Key] := true
+	}
+	return Seen.Count > 0
+}
+
 ; Static selection for one URL. "pac" reports that a PAC script governs the
 ; URL; its answer then overrides the static proxy once resolved.
 SystemProxy_SelectStatic(Config, Url, IncludeAutoDetect := false) {
@@ -1008,7 +1030,7 @@ SystemProxy_SelectStatic(Config, Url, IncludeAutoDetect := false) {
 	Proxy := ""
 	if (Config["proxy"] != "" && !SystemProxy_IsBypassed(Config["bypass"], Parts["host"])) {
 		Proxy := SystemProxy_ParseProxyList(Config["proxy"], Parts["scheme"])
-		if IncludeAutoDetect && Proxy == ""
+		if IncludeAutoDetect && Proxy == "" && !_SystemProxy_StaticSchemeAbsent(Config["proxy"], Parts["scheme"])
 			throw ValueError("The system proxy configuration cannot be used by curl.")
 	}
 	return Map("proxy", Proxy, "pac", Config["pac_url"] != "" || (IncludeAutoDetect && Config.Get("auto_detect", false)))

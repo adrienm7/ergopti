@@ -67,6 +67,15 @@ foreach($Scheme in @('http','https')) {
         $Actual.Routes[0].Authentication -ceq 'none'
     if($Scheme -ceq 'http'){$HttpDirect=[bool]$Direct}else{$HttpsDirect=[bool]$Direct}
 }
-$Receipt=@{schema_version=1;oracle=$true;http_direct=$HttpDirect;https_direct=$HttpsDirect;servers_retired=$true}
+$InvalidRefused=$true
+foreach($Invalid in @('http=proxy.invalid:notaport','https=proxy.invalid:notaport','ftp=proxy.invalid:21')) {
+    $Config=@{Ok=$true;Absent=$false;AutoDetect=$false;PacUrl='';Proxy=$Invalid;Bypass='';NativeError=0;FailureOrigin=''}
+    $Reader={param($MaximumBytes) $Config}.GetNewClosure()
+    $Actual=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl 'http://example.invalid/' `
+        -BudgetMs 5000 -ReadConfig $Reader -ReadEnvironment $EmptyEnvironment `
+        -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+    if($Actual.Ok){$InvalidRefused=$false}
+}
+$Receipt=@{schema_version=1;oracle=$true;http_direct=$HttpDirect;https_direct=$HttpsDirect;invalid_refused=$InvalidRefused;servers_retired=$true}
 [Console]::WriteLine('STATIC_SCHEME_RECEIPT:'+($Receipt|ConvertTo-Json -Compress))
-if(-not $HttpDirect -or -not $HttpsDirect){exit 1}
+if(-not $HttpDirect -or -not $HttpsDirect -or -not $InvalidRefused){exit 1}
