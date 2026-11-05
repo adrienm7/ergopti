@@ -183,3 +183,167 @@ _UA_Registered() {
 	AssertContains(GestureActionParameterPrompt("run_command"), "cmd.exe")
 }
 Test("user actions: both actions are registered on Windows (user-actions)", _UA_Registered)
+
+
+
+; A separate strict scope leaves the historical helper untouched. No foreign
+; binding is stopped: only the exact acquired command handle may be retired.
+_UAN_Effect(Record, State, Kind, Text) {
+	_UAN_Observe(State, Kind, Text)
+	Record[Kind == "notify" ? "notices" : (Kind == "copy" ? "copied" : "typed")].Push(Text)
+	return true
+}
+_UAN_Run(Command, Output, State) {
+	global _UserActionPorts, GestureActionParameters, _UserCommandEntries
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unacknowledged exact command must retain its source and ports before any successor test")
+	AssertEqual(0, _UserCommandEntries.Count, "Global effect recorders require an idle command owner; no foreign command may be observed or stopped")
+	Record := Map("notices", [], "copied", [], "typed", [], "started", false, "finished", false)
+	SavedPorts := _UserActionPorts, SavedParameters := GestureActionParameters
+	State.Retired := false
+	_UserActionPorts := Map(
+		"notify", _UAN_Effect.Bind(Record, State, "notify"),
+		"copy", _UAN_Effect.Bind(Record, State, "copy"),
+		"type", _UAN_Effect.Bind(Record, State, "type"),
+		"open_terminal", (*) => true, "shell_open", (*) => true)
+	try {
+		GestureActionParameters := Map(GestureActionParameterKey(State.Binding, "run_command"),
+			UserActionSpellCommand(Command, "hidden", Output))
+		Record["started"] := UserActions_RunCommand(State.Binding)
+		if _UserCommandEntries.Has(State.Binding)
+			State.Entry := _UserCommandEntries[State.Binding]
+		Started := A_TickCount
+		while _UserCommandEntries.Has(State.Binding) && TickElapsed64(Started) < 30000
+			Sleep(20)
+		; Retiring a timeout afterward cannot turn the original deadline green.
+		Record["finished"] := !_UserCommandEntries.Has(State.Binding)
+	} finally {
+		if !IsObject(State.Entry) && _UserCommandEntries.Has(State.Binding)
+			State.Entry := _UserCommandEntries[State.Binding]
+		Receipt := 0
+		if State.Entry is Map && State.Entry.Has("handle") {
+			try Receipt := State.Entry["handle"].terminate()
+		}
+		if Receipt is Integer && Receipt == 1 {
+			State.Retired := true
+			try {
+				if State.Entry is Map && !State.Entry["finished"]
+					_UserCommandFinish(State.Entry)
+			} finally {
+				_UserActionPorts := SavedPorts
+				GestureActionParameters := SavedParameters
+			}
+		} else {
+			; Keep the live observer, exact process/captures, private source root
+			; and prior state strongly reachable. Late completion must not use
+			; restored foreign effect ports; the next probe must not replace it.
+			RetirementDebt := {State: State, Ports: _UserActionPorts, Parameters: GestureActionParameters,
+				SavedPorts: SavedPorts, SavedParameters: SavedParameters}
+		}
+	}
+	AssertTrue(State.Retired, "The exact native command tree must acknowledge retirement before ports or private source cleanup")
+	return Record
+}
+
+_UAN_Hex(Bytes) {
+	Hex := ""
+	loop Bytes.Size
+		Hex .= Format("{:02X}", NumGet(Bytes, A_Index - 1, "UChar"))
+	return Hex
+}
+_UAN_Observe(State, Kind, Text) {
+	global _UserCommandEntries
+	try {
+		State.Reads += 1
+		if !_UserCommandEntries.Has(State.Binding)
+			throw Error("The exact public command must still own its capture at the delivery/refusal port")
+		Entry := _UserCommandEntries[State.Binding]
+		State.Entry := Entry
+		if Entry["finished"]
+			throw Error("No retired capture may prove the original command output")
+		Bytes := FSReadBytesStrict(Entry["out"])
+		State.CaptureHex := _UAN_Hex(Bytes)
+		State.DeliveredUnits := StrLen(Text)
+		State.Kind := Kind
+	} catch Any as Failure {
+		if !IsObject(State.Failure)
+			State.Failure := Failure
+	}
+}
+_UAN_Case(Mode) {
+	Raw := Mode == "unicode" ? [0xC3, 0xA9, 0xF0, 0x9F, 0x98, 0x80]
+		: (Mode == "invalid-utf8" ? [0xC3, 0x28] : [0x41, 0, 0x42])
+	Bytes := Buffer(Raw.Length)
+	for Index, Byte in Raw
+		NumPut("UChar", Byte, Bytes, Index - 1)
+	ExpectedHex := _UAN_Hex(Bytes)
+	IsNul := Mode == "nul-copy" || Mode == "nul-type"
+	ValidUtf8 := HTTPIsValidUtf8(Bytes, Bytes.Size)
+	AssertEqual(Mode != "invalid-utf8", !!ValidUtf8, "The native decoder precondition must distinguish valid UTF-8 containing NUL from malformed bytes")
+	if IsNul {
+		Positive := StrGet(Bytes, Bytes.Size, "UTF-8"), Counted := StrGet(Bytes, -Bytes.Size, "UTF-8")
+		AssertEqual(1, StrLen(Positive), "The actual positive-length AHK conversion must exhibit its first-NUL boundary")
+		AssertEqual(3, StrLen(Counted), "The negative-length native control must retain all original units")
+		AssertEqual(0, NumGet(StrPtr(Counted), 2, "UShort"))
+		AssertEqual(0x42, NumGet(StrPtr(Counted), 4, "UShort"))
+	}
+	Directory := A_Temp . "\ergopti_command_bytes_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Created is Integer && Created == 1, "The raw stdout witness directory must be acquired exclusively before any write or cleanup")
+	Path := Directory . "\stdout.raw", Handle := 0, OwnedFile := false
+	State := {Reads: 0, CaptureHex: "", DeliveredUnits: -1, Kind: "", Failure: 0,
+		Binding: "ua_counted_output", Entry: 0, Retired: true, Root: Directory}
+	try {
+		Handle := DllCall("Kernel32\CreateFileW", "WStr", Path, "UInt", 0x40000000, "UInt", 1,
+			"Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Handle && Handle != -1, "The raw witness itself must be acquired by native CREATE_NEW")
+		OwnedFile := true
+		Written := 0
+		AssertTrue(DllCall("Kernel32\WriteFile", "Ptr", Handle, "Ptr", Bytes, "UInt", Bytes.Size,
+			"UInt*", &Written, "Ptr", 0, "Int") && Written == Bytes.Size,
+			"The private raw witness must acknowledge every original byte")
+		AssertTrue(DllCall("Kernel32\FlushFileBuffers", "Ptr", Handle, "Int"), "The native raw fixture must flush before the real shell reads it")
+		AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "The exact writer must retire before running the public command")
+		Handle := 0
+		AssertEqual(ExpectedHex, _UAN_Hex(FSReadBytesStrict(Path)), "The independent source file must retain every original byte")
+		Output := Mode == "nul-type" ? "type" : "copy"
+		Record := _UAN_Run('type "' . Path . '"', Output, State)
+		_TestPrint("# user-command-counted mode=" . Mode . " started=" . Record["started"]
+			. " finished=" . Record["finished"] . " expected_hex=" . ExpectedHex . " capture_hex=" . State.CaptureHex
+			. " valid_utf8=" . !!ValidUtf8 . " observations=" . State.Reads . " port=" . State.Kind
+			. " delivered_units=" . State.DeliveredUnits . " copies=" . Record["copied"].Length
+			. " types=" . Record["typed"].Length . " notices=" . Record["notices"].Length)
+		AssertTrue(Record["started"] && Record["finished"], "The genuine public command must run through the actual owned cmd process to completion")
+		if IsObject(State.Failure)
+			throw State.Failure
+		AssertEqual(1, State.Reads, "The real producer capture must be independently observed at its one final effect/refusal port")
+		AssertEqual(ExpectedHex, State.CaptureHex, "The actual cmd capture must retain the original bytes at the final effect/refusal port after decoding and before cleanup")
+		AssertEqual(ExpectedHex, _UAN_Hex(FSReadBytesStrict(Path)), "The command cannot mutate its exclusively owned raw source witness")
+		if Mode == "unicode" {
+			ExpectedText := Chr(0xE9) . Chr(0x1F600)
+			AssertEqual(0, Record["notices"].Length)
+			AssertEqual(1, Record["copied"].Length)
+			AssertEqual(ExpectedText, Record["copied"][1], "Ordinary accented and supplementary UTF-8 must retain complete output")
+			AssertEqual(3, StrLen(Record["copied"][1]))
+		} else {
+			AssertEqual(0, Record["copied"].Length, "Binary/invalid stdout must never publish a silently shortened copy")
+			AssertEqual(0, Record["typed"].Length, "Binary/invalid stdout must never publish a silently shortened typed prefix")
+			AssertEqual(1, Record["notices"].Length, "Refused output must use the existing explicit not-text receipt")
+			AssertEqual(t("user_actions.output_not_text"), Record["notices"][1])
+		}
+	} finally {
+		if Handle && Handle != -1 {
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "An acquired fixture writer must retire before exact cleanup")
+			Handle := 0
+		}
+		if State.Retired {
+			if OwnedFile
+				FileDelete(Path)
+			DirDelete(Directory)
+		} else
+			_TestPrint("# user-command-counted retirement UNACKNOWLEDGED; exact source/captures/ports retained")
+	}
+}
+for _UAN_Mode in ["nul-copy", "nul-type", "unicode", "invalid-utf8"]
+	Test("Public command counted stdout: " . _UAN_Mode . " preserves or explicitly refuses the complete capture (user-command-counted-output)",
+		_UAN_Case.Bind(_UAN_Mode))
