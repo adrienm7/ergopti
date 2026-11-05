@@ -658,3 +658,62 @@ Test("screen brightness: rejected spawn releases reservation (brightness-acquisi
 	_SBT_AcquisitionRefusal.Bind(false))
 Test("screen brightness: throwing spawn releases reservation (brightness-acquisition-refusal)",
 	_SBT_AcquisitionRefusal.Bind(true))
+
+
+; Real AHK timer dispatch at the terminal owner cutpoint. Only process IO is a
+; passive port; no physical monitor or native worker completion is claimed.
+_SBT_TimerSuccessorStart(State) {
+	ScreenBrightnessOwner.spawn_fn := ObjBindMethod(State.Second, "spawn")
+	State.Started := ScreenBrightnessRequest("brightness_down", (Result) => State.Results.Push(Result))
+	if State.Started {
+		State.Job := ScreenBrightnessOwner.job
+		State.Job["data"] := State.Job["data"].Clone()
+		State.Job["data"]["worker_timeout_ms"] := 10
+	}
+	State.Fired := true
+}
+_SBT_TimerAtTerminal(State) {
+	State.Callback := _SBT_TimerSuccessorStart.Bind(State)
+	State.CriticalAtCut := !!A_IsCritical
+	SetTimer(State.Callback, -1)
+	; A legitimate atomic detach+stop must not be interrupted by the probe.
+	if !A_IsCritical {
+		Started := A_TickCount
+		while !State.Fired && TickElapsed64(Started) < 2000
+			Sleep(5)
+	}
+}
+_SBT_OldTerminalMustNotDisarmSuccessor(Fake, Observed, Notices) {
+	State := {Second: _SBT_Process(), Results: [], Started: false, Fired: false,
+		Job: 0, Callback: 0, CriticalAtCut: false}
+	First := ScreenBrightnessOwner.job
+	PreviousCritical := Critical("Off")
+	try {
+		ScreenBrightnessCompleted(First["id"], 1, "", "", _SBT_TimerAtTerminal.Bind(State))
+		Started := A_TickCount
+		while !State.Fired && TickElapsed64(Started) < 2000
+			Sleep(5)
+		AssertTrue(State.Fired && State.Started && IsObject(State.Job),
+			"the actual AHK timer must admit the successor either at the open cutpoint or after an atomic claim")
+		Started := A_TickCount
+		while State.Results.Length == 0 && TickElapsed64(Started) < 600
+			Sleep(10)
+		_TestPrint("# brightness timer successor critical_at_cut=" . State.CriticalAtCut
+			. " fired=" . State.Fired . " started=" . State.Started
+			. " retirements=" . State.Second.retirements . " completions=" . State.Results.Length
+			. " still_owned=" . (ScreenBrightnessOwner.job == State.Job))
+		AssertEqual(1, State.Results.Length, "the successor's real periodic timeout must eventually retire its exact worker")
+		AssertEqual(1, State.Second.retirements, "the successor's own timeout must reach its actual retirement port")
+		AssertFalse(State.Results[1], "the timeout cannot acknowledge physical screen brightness")
+		AssertFalse(IsObject(ScreenBrightnessOwner.job))
+	} finally {
+		if IsObject(State.Callback)
+			SetTimer(State.Callback, 0)
+		State.Callback := 0
+		State.Job := 0
+		Critical(PreviousCritical)
+	}
+}
+
+Test("screen brightness: old terminal cannot disarm successor timeout (brightness-timer-successor)",
+	() => _SBT_Owned("brightness_up", _SBT_OldTerminalMustNotDisarmSuccessor))
