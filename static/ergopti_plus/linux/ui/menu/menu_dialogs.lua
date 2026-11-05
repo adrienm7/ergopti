@@ -72,26 +72,28 @@ end
 --- Shows a message the user must acknowledge.
 --- @param message string Already-localised text.
 --- @param title string|nil Already-localised window title.
-local function show_error(message, title)
+--- @param fallback string|nil Safe diagnostic for a failed dialog.
+local function show_error(message, title, fallback)
 	local command = NativeDialog.command() .. " --error"
 		.. " --title=" .. shell_quote(WindowTitles.compose(title == nil and i18n_safe("common.error_title") or title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- No dialog could open: the refusal still has to reach someone, and a
 		-- silent rejection reads as a menu row that does nothing when clicked.
-		Logger.error(LOG, "%s", tostring(message))
+		Logger.error(LOG, "%s", tostring(fallback or message))
 	end
 end
 
 --- Shows an informational message the user must acknowledge.
 --- @param title string Already-localised window title.
 --- @param message string Already-localised text.
-local function show_info(title, message)
+--- @param fallback string|nil Safe diagnostic for a failed dialog.
+local function show_info(title, message, fallback)
 	local command = NativeDialog.command() .. " --info --title=" .. shell_quote(WindowTitles.compose(title))
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- No dialog could open: the outcome is still recorded where a user can find it.
-		Logger.info(LOG, "%s", tostring(message))
+		Logger.info(LOG, "%s", tostring(fallback or message))
 	end
 end
 

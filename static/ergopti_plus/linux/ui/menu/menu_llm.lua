@@ -739,8 +739,12 @@ local function _build_llm(ctx)
 		prompt = function(title, text, initial, hidden, choices)
 			return prompt_text(title, plain_markup(text), initial, hidden, choices)
 		end,
-		error = function(message, title) return show_error(plain_markup(message), title) end,
-		info = function(title, message) return show_info(title, plain_markup(message)) end,
+		error = function(message, title)
+			return show_error(plain_markup(message), title, "Model selector error dialog unavailable.")
+		end,
+		info = function(title, message)
+			return show_info(title, plain_markup(message), "Model selector information dialog unavailable.")
+		end,
 		confirm = function(title, text)
 			return ask_yes_no(title, plain_markup(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		end,

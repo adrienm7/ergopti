@@ -147,6 +147,8 @@ h.describe("native menu dialog captions", function()
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local original_execute, original_checked = os.execute, Shell.exec_checked
+		local logger = require("logger.shim")
+		local original_error, original_info = logger.error, logger.info
 		local commands, accepted, modals, dialogs = {}, nil, 0, nil
 		package.loaded["ui.menu.llm_backend_rows"] = {
 			bind_page = function(_, options) dialogs = options.dialogs end,
@@ -199,8 +201,18 @@ h.describe("native menu dialog captions", function()
 			Shell.exec_checked = function(command) commands[#commands + 1] = command; return true, "" end
 			dialogs.prompt("Prompt", "Provider <name>&value", "")
 			h.assert_true(commands[8]:find("Provider &lt;name&gt;&amp;value", 1, true) ~= nil)
+			local logs = {}
+			logger.error = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+			logger.info = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
+			os.execute = function() return 1 end
+			dialogs.error("URL https://user:synthetic-secret@example.invalid")
+			dialogs.info("Result", "synthetic-private-response")
+			h.assert_eq(#logs, 2)
+			h.assert_true(not logs[1]:find("synthetic-secret", 1, true))
+			h.assert_true(not logs[2]:find("synthetic-private-response", 1, true))
 		end, debug.traceback)
 		os.execute, Shell.exec_checked = original_execute, original_checked
+		logger.error, logger.info = original_error, original_info
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
 	end)
