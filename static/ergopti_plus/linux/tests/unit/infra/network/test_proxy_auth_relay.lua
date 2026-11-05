@@ -116,3 +116,44 @@ it("a relay that is not installed answers not_installed without a child", functi
 	eq(select(2, policy.read_probe(0, '{"schema":1,"status":"not_installed"}\n')), "relay_unavailable")
 	eq(operation.is_settled(), true)
 end)
+
+it("a synchronous native dispatch refusal cannot deliver a callback and a refusal", function()
+	local Binding = helpers.load_module("infra.proxy_auth_relay")
+	local original = Binding.executable
+	Binding.executable = function() return "/bin/true" end
+	local answers = 0
+	local ok, operation, reason = pcall(Binding.probe, "http://proxy:3128", "registry.ollama.ai:443",
+		{ owner = "", timeout_ms = 100, authorized = function() return true end },
+		function() answers = answers + 1 end)
+	Binding.executable = original
+	assert(ok, operation)
+	eq(operation, nil)
+	eq(reason, "proxy-auth-relay-probe-unavailable")
+	eq(answers, 0, "a dispatch refusal must not also deliver completion")
+end)
+
+it("a refused start retains pending native cleanup until its completion", function()
+	local Binding = helpers.load_module("infra.proxy_auth_relay")
+	local original_executable, original_process = Binding.executable, package.loaded["adapters.owned_process"]
+	local complete, settled = nil, false
+	Binding.executable = function() return "/bin/true" end
+	package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+		complete = callback
+		return { started = false, is_settled = function() return settled end,
+			on_settled = function() return true end, cancel = function() return false end }
+	end }
+	local answers = 0
+	local ok, err = pcall(function()
+		local operation, reason = Binding.probe("http://proxy:3128", "registry.ollama.ai:443",
+			{ owner = "relay-cleanup-test", timeout_ms = 100 }, function() answers = answers + 1 end)
+		assert(operation and not reason, "pending native cleanup must retain its operation")
+		eq(operation.is_settled(), false)
+		eq(answers, 0)
+		settled = true
+		complete({ exit_code = -1, stdout = "" })
+		eq(answers, 1)
+		eq(operation.is_settled(), true)
+	end)
+	Binding.executable, package.loaded["adapters.owned_process"] = original_executable, original_process
+	assert(ok, err)
+end)
