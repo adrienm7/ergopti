@@ -1077,3 +1077,96 @@ _G4LG_InlineCancel() {
 }
 Test("managed bootstrap lifetime: inline READY cancellation cannot rearm the returning Start frame (managed-bootstrap-timer-control)",
 	_G4LG_InlineCancel)
+
+; Closing logical observers is terminal for the exact port, while ordinary
+; Stop/Cancel remain usable and cannot mistake a live record for a closed one.
+_G4LOR_CallbackRetirementContract() {
+	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL, _LLM_Deps_Epoch
+	AssertFalse(OllamaNativeIdentityHasDebt())
+	State := {StopAck: false, Done: 0, Task: 0}
+	Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+		"runtime", {Stop: (*) => true, HasOwner: (*) => false})
+	Flow := OllamaManagedBootstrap("", _LLM_Deps_Epoch, 0, 0, Port)
+	Roots := _G4LG_BindProductionPorts(Flow, State)
+	RuntimeFixture := _ORT_Fixture()
+	PreviousCritical := Critical("On")
+	try {
+		AssertTrue(Roots[1].Run("inspect", Map(),
+			Map("authorize", (*) => true, "is_current", (*) => true), (*) => true))
+		Observer := Roots[1].Options["on_physical"]
+		AssertFalse(Roots[1].RetireCallbacks(), "a live file task keeps its physical observer")
+		AssertTrue(Roots[1].HasOwner())
+		AssertTrue(Roots[1].Options["on_physical"] == Observer)
+		State.Done.Call(0, '{"ok":true}', "")
+		AssertFalse(Roots[1].HasOwner())
+		AssertTrue(Flow.Cancel())
+		AssertTrue(Flow.Cancel(), "the bootstrap's repeated cancellation still acknowledges retirement")
+		AssertTrue(Flow.CanReplace(), "closed logical observers leave replacement admission intact")
+		State.Task := 0
+		AssertFalse(Roots[1].Run("inspect", Map(),
+			Map("authorize", (*) => true, "is_current", (*) => true), (*) => true),
+			"a permanently retired file port must not acquire a new task")
+		AssertEqual(0, State.Task, "closed-port refusal happens before the native spawn port")
+		AssertTrue(Roots[1].Cancel())
+		AssertFalse(Roots[1].HasOwner())
+
+		; The real runtime record, task and strict retirement observer are owned
+		; by the existing passive native-IO fixture, never injected as Records.
+		AssertTrue(RuntimeFixture.Run())
+		Runtime := RuntimeFixture.Owner
+		Record := Runtime.Record, Observer := Runtime.Options["on_retired"]
+		AssertFalse(Runtime.RetireCallbacks(), "a live runtime retains exact lease retirement authority")
+		AssertTrue(Runtime.Record == Record && Runtime.HasOwner())
+		AssertTrue(Runtime.Options["on_retired"] == Observer)
+		AssertTrue(Runtime.Stop())
+		AssertFalse(Runtime.HasOwner())
+		AssertTrue(Runtime.RetireCallbacks(&Retired))
+		AssertTrue(Retired is Array && Retired.Length == 2)
+		AssertTrue(Retired[1] == Observer, "the caller can retain the exact callbacks through an outer RAM claim")
+		AssertTrue(Runtime.RetireCallbacks(), "observer retirement is idempotent")
+		Starts := RuntimeFixture.Starts
+		AssertFalse(Runtime.Start(RuntimeFixture.Target, RuntimeFixture.Authority))
+		AssertEqual(Starts, RuntimeFixture.Starts, "a closed runtime never reacquires its native task")
+		AssertTrue(Runtime.Stop())
+		AssertFalse(Runtime.HasOwner())
+
+		SavedBootstrap := _LLM_ManagedBootstrap
+		try {
+			_LLM_ManagedBootstrap := Flow
+			AssertEqual(LLM_OLLAMA_BASE_URL, LLM_OllamaRequestOrigin(),
+				"a retired bootstrap still resolves the ordinary configured origin")
+		} finally _LLM_ManagedBootstrap := SavedBootstrap
+	} finally {
+		try {
+			if Roots[1].HasOwner() && HasMethod(State.Done, "Call")
+				State.Done.Call(0, '{"ok":true}', "")
+			Flow.Cancel()
+			RuntimeFixture.Owner.Stop()
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("managed bootstrap observers: live debt, closed-port refusal and ordinary APIs remain exact (managed-bootstrap-observer-retirement)",
+	_G4LOR_CallbackRetirementContract)
+
+; Runtime diagnostics are optional in the genuine constructor contract.
+_G4LOR_NoErrorObserver() {
+	AssertFalse(OllamaNativeIdentityHasDebt())
+	Fixture := _ORT_Fixture()
+	Options := Fixture.Owner.Options.Clone()
+	Options.Delete("on_error")
+	Owner := OllamaRuntimeOwner(Options)
+	try {
+		AssertFalse(Owner.Options.Has("on_error"), "the genuine constructor accepts an absent diagnostic observer")
+		AssertFalse(Owner.HasOwner())
+		AssertTrue(Owner.RetireCallbacks(&Retired))
+		AssertTrue(Retired is Array && Retired.Length == 2)
+		AssertEqual(0, Retired[2], "absence of the optional observer contributes no retained callback")
+		AssertTrue(Owner.RetireCallbacks(), "an idle owner without diagnostics still retires idempotently")
+		AssertTrue(Owner.Stop())
+		AssertFalse(Owner.Start(Fixture.Target, Fixture.Authority))
+		AssertEqual(0, Fixture.Starts, "the retired owner cannot reach its native spawn port")
+		AssertFalse(Owner.HasOwner())
+	} finally Owner.Stop()
+}
+Test("managed bootstrap observers: valid runtime without optional diagnostics still retires (managed-bootstrap-observer-retirement)",
+	_G4LOR_NoErrorObserver)
