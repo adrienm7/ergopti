@@ -1467,3 +1467,9 @@ Observation: Native run41947380519 resolves all three malformed values to0 inste
 Regression: Five actual boot snapshot/loader cases preserve legitimate disabled and hourly settings while malformed source types fall to the canonical default; runtime guards cover strings, negative and huge values.
 
 The production correction is integrated; post-fix native qualification is pending.
+
+## Discovery refusal at 3189ef7
+
+Run41950173319 stops before discovery with AutoHotkey exit2: a test assertion and its following else share line570 of test_key_combination_chord_engine.ahk. None of the86 selected subjects executes, so this run qualifies no behavioral fix. The production entry compiles and both optional E2E groups remain explicitly unselected. The fixture syntax is repaired before replay. The next selection adds uncounted source-ownership, final-publication, argument-representation, boot-admission, case-only caption, native-window-close and profile-navigation-source probes; they remain hypotheses until the actual production path reaches its business assertion.
+
+Cross-driver inspection for086 finds no equivalent mutable global display store: Linux and macOS retain the parser display metadata in result records. No Lua correction is justified by the demonstrated Windows store race. Argument-representation probes separately retain the actual JSON-decoded input length before native dispatch; the Linux process adapter already rejects embedded NUL, while macOS shortcut input travels in a file rather than as a native argument. These comparisons establish scope, not unexecuted Windows success.

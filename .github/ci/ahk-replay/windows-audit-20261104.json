@@ -1,5 +1,5 @@
 {
-	"expected_count": 86,
+	"expected_count": 113,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
@@ -90,6 +90,38 @@
 		{
 			"contains": "wifi-dashboard-kpi-owner",
 			"expected_count": 2
+		},
+		{
+			"contains": "wrap source ownership:",
+			"expected_count": 4
+		},
+		{
+			"contains": "wrap final native admission:",
+			"expected_count": 3
+		},
+		{
+			"contains": "agent-native-nul-input",
+			"expected_count": 4
+		},
+		{
+			"contains": "Feature-state real boot source admission:",
+			"expected_count": 6
+		},
+		{
+			"contains": "window-caption-case-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "changelog-show-native-close",
+			"expected_count": 2
+		},
+		{
+			"contains": "changelog-open-generation",
+			"expected_count": 6
+		},
+		{
+			"contains": "llm-profile-preopen-navigation",
+			"expected_count": 1
 		}
 	]
 }
