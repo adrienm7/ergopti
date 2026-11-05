@@ -120,7 +120,10 @@ function parseVersionNeeds(output) {
 function exceedsCeiling(name, ceiling = GLIBC_CEILING) {
 	if (name === 'GLIBC_PRIVATE') return true;
 	const match = name.match(/^GLIBC_(\d+)\.(\d+)(?:\.(\d+))?$/);
-	if (!match) return false;
+	// Named glibc ABI requirements have their own introduction versions. An
+	// unrecognised one cannot be proved available on the oldest supported host
+	// (in particular GLIBC_ABI_DT_RELR needs glibc 2.36).
+	if (!match) return name.startsWith('GLIBC_');
 	const limit = ceiling.split('.').map(Number);
 	const version = [Number(match[1]), Number(match[2]), Number(match[3] || 0)];
 	for (let index = 0; index < 3; index++) {
