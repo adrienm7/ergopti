@@ -771,6 +771,8 @@ for (const [what, badImage, badZsync, expected] of [
 	],
 	['a zsync of another size', image, zsyncFor(image.length + 1), /Length/],
 	['a zsync without a hash', image, zsyncFor(image.length, { 'SHA-1': null }), /SHA-1/],
+	['a zsync with zero block size', image, zsyncFor(image.length, { Blocksize: '0' }), /Blocksize/],
+	['a zsync with malformed block size', image, zsyncFor(image.length, { Blocksize: 'NaN' }), /Blocksize/],
 	['a zsync for different bytes', image, zsyncFor(image.length, { 'SHA-1': '0'.repeat(40) }), /SHA-1.*match/],
 	[
 		'a zsync with no blocks',
