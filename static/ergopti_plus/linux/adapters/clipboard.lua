@@ -682,11 +682,12 @@ function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 		return write_backend_checked(b, saved)
 	end
 	local function fail(reason)
-		if owned ~= nil then
-			local ok, content = read_backend_checked(b)
-			if not ok then return false, "clipboard_ownership_unknown" end
-			if content ~= owned and content ~= previous_owned then return false, reason end
-		end
+		-- Before the sentinel is written we own no clipboard change to undo.
+		-- A copy made after the snapshot must not be overwritten on refusal.
+		if owned == nil then return false, reason end
+		local ok, content = read_backend_checked(b)
+		if not ok then return false, "clipboard_ownership_unknown" end
+		if content ~= owned and content ~= previous_owned then return false, reason end
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
 	end
