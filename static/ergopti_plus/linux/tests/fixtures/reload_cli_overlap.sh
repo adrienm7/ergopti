@@ -27,7 +27,9 @@ code=$?
 set -e
 [ "$code" -eq 1 ]
 grep -q '"reason":"busy"' "$dir/second.out"
-cmp "$dir/original" "$folder/reload.request"
+original_hash=$(sha256sum "$dir/original")
+current_hash=$(sha256sum "$folder/reload.request")
+[ "${original_hash%% *}" = "${current_hash%% *}" ]
 kill -KILL "$first"
 wait "$first" 2>/dev/null || :
 first=
@@ -40,4 +42,5 @@ code=$?
 set -e
 [ "$code" -eq 2 ]
 grep -q '"state":"unknown"' "$dir/third.out"
-! cmp -s "$dir/original" "$folder/reload.request"
+current_hash=$(sha256sum "$folder/reload.request")
+[ "${original_hash%% *}" != "${current_hash%% *}" ]

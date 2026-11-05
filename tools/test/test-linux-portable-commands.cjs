@@ -314,6 +314,7 @@ const PROGRAMS = {
 	cp: coreutils,
 	cut: coreutils,
 	date: coreutils,
+	dd: coreutils,
 	df: coreutils,
 	dirname: coreutils,
 	env: coreutils,
@@ -410,7 +411,14 @@ const PROGRAMS = {
 	pkexec: declaredByDeb('pkexec', 'privileged permission setup'),
 	modprobe: declaredByDeb('kmod', 'loads the uinput module'),
 	udevadm: declaredByDeb('udev', 'reloads the uinput rules'),
-	flock: declaredByDeb('util-linux', 'single-instance lock', DRIVER_HOST),
+	flock: why(
+		'single-instance lock; declared by the package, test fixtures probe it explicitly',
+		ALL,
+		{
+			proof: { file: DEB_RECIPE, token: 'Depends:.*\\butil-linux\\b', scopes: DRIVER_HOST },
+			probed: TEST
+		}
+	),
 	xdotool: recommendedByDeb('xdotool', 'focused window and screen geometry on X11', DRIVER_HOST),
 	wmctrl: recommendedByDeb('wmctrl', 'window list on X11'),
 	'wl-copy': why(
