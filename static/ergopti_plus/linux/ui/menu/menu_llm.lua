@@ -770,9 +770,20 @@ local function _build_llm(ctx)
 	end
 	--- Removes one installed model after the same confirmation Windows and macOS ask.
 	--- @param model string Ollama-native tag.
+	--- @param page_current function|nil Exact page projection owner.
 	--- @return boolean dispatched
-	local function delete_model(model)
-		if ctx.paused == true then return false end
+	local function delete_model(model, page_current)
+		local function admitted()
+			if ctx.paused == true then return false end
+			if type(ctx.is_paused) == "function" then
+				local ok, paused = pcall(ctx.is_paused)
+				if not ok or paused ~= false then return false end
+			end
+			if page_current == nil then return true end
+			local ok, current = pcall(page_current)
+			return ok and current == true
+		end
+		if not admitted() then return false end
 		if type(llm.delete_model) ~= "function" then
 			Logger.error(LOG, "The AI engine cannot delete models — '%s' was kept.", model)
 			return false
@@ -780,7 +791,7 @@ local function _build_llm(ctx)
 		local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
 			plain_markup(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
 			i18n_safe("button.delete"), i18n_safe("button.cancel"))
-		if confirmed ~= true then return false end
+		if confirmed ~= true or not admitted() then return false end
 		return llm.delete_model(model, function(succeeded, tag, reason)
 			deletion_notice(succeeded, tag, reason)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

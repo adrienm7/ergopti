@@ -420,7 +420,7 @@ function M.on_message(payload, state, context)
 	end
 	if payload.action == "delete_model" or payload.action == "remove_custom_model" then
 		if row.installed ~= true or not _bound or type(_bound.delete_model) ~= "function" then return { deleted = false } end
-		return { deleted = _bound.delete_model(row.runtime_name) == true }
+		return { deleted = _bound.delete_model(row.runtime_name, function() return projection_current(frame) end) == true }
 	end
 
 	if payload.action == "open_url" and type(payload.url) == "string" then
