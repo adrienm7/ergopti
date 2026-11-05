@@ -45,8 +45,14 @@ _TNLC_RunLifecycle() {
  Suspend(false)
  _LCPC_Require(!A_IsSuspended, "Native Resume must precede the actual lifecycle resume")
  Resume := Ergopti_OnSuspendResume()
- _LCPC_Require(Resume == 1 && LifecycleTransitionDebtSnapshot("resume").Length == 0
-  && !_UserProgramPaused, "The real resume transition must settle before old note work continues")
+ ResumeDebt := LifecycleTransitionDebtSnapshot("resume")
+ for Debt in ResumeDebt
+  FileAppend("OBSERVATION takenote-resume-debt owner=" . Debt.owner . " message=" . Debt.message . "`n", "*")
+ FileAppend("OBSERVATION takenote-resume result=" . Resume . " debt=" . ResumeDebt.Length
+  . " keyboard_port=" . _LCPC_World.Ports.Get("keyboard-ledger", 0) . "`n", "*")
+ _LCPC_Require(Resume == 1 && ResumeDebt.Length == 0 && !_UserProgramPaused
+  && _LCPC_World.Ports.Get("keyboard-ledger", 0) == 1 && _LCPC_World.Ports.Count == 17,
+  "The real resume transition and counted unrelated keyboard port must settle before old note work continues")
 }
 _TNLC_Main() {
  global _LCPC_World, _ConfigDir, _UserProgramPaused, _TakeNotePending, _TakeNoteNextId
@@ -69,7 +75,7 @@ _TNLC_Main() {
    FileAppend("OBSERVATION takenote-acquire-in-flight id=" . JobId . " pause=" . _TNLC_Ops.PauseCompleted
     . " pending=" . _TakeNotePending.Count . " timers=" . _TakeNoteFakeOps.timers.Length
     . " launch=" . _TakeNoteFakeOps.launch_count . " errors=" . _TakeNoteFakeOps.errors.Length . "`n", "*")
-   _LCPC_Require(_TNLC_Ops.PauseCompleted && _LCPC_World.Ports.Count == 16,
+   _LCPC_Require(_TNLC_Ops.PauseCompleted && _LCPC_World.Ports.Count == 17,
     "The real suspend and resume must complete within the genuine acquisition callout")
    _LCPC_Require(JobId == 0 && _TakeNotePending.Count == 0 && _TakeNoteFakeOps.timers.Length == 0
     && _TakeNoteFakeOps.launch_count == 0 && _TakeNoteFakeOps.errors.Length == 0,
