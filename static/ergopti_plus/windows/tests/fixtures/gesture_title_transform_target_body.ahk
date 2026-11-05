@@ -12,7 +12,7 @@ global SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[3]), _SendHook := 0
 global Features := Map("shortcuts", Map(ConfigLeaf.WRAP_TEXT_IF_SELECTED, true)), _WS_Disabled := Map()
 global UIA_SELECTION_MAX_AGE_MS := Integer(A_Args[4]), _UIA_SelectionCache := 0
 global _WRF := {Mode: A_Args[2], A: 0, B: 0, EditA: 0, EditB: 0, Armed: false, RenderCalls: 0,
-	Mutated: false, OwnSequence: 0, OwnToken: 0, RestoreCallback: 0, RestoreFired: false, Sends: [], Fallbacks: [], Rings: [], ManagerPublications: 0, CopyCalls: 0, Transforming: false, TransformDone: false, MoveCalls: 0, MovedInsideTransform: false, Initial: "", Seed: "owned renderer seed", Payload: "[alpha]", Failure: 0}
+	Mutated: false, OwnSequence: 0, OwnToken: 0, RestoreCallback: 0, RestoreFired: false, Sends: [], Fallbacks: [], Rings: [], ManagerPublications: 0, CopyCalls: 0, Transforming: false, TransformDone: false, TransformElapsed: -1, TransformCritical: -1, MoveCalls: 0, MovedInsideTransform: false, Initial: "", Seed: "owned renderer seed", Payload: "[alpha]", Failure: 0}
 LoggerWarn(*) => 0
 LoggerError(*) => 0
 LoggerDebug(*) => 0
@@ -141,15 +141,15 @@ _WRF_Main() {
 	Incoming := CB_SaveAll(), Primary := 0
 	_WRF_Require(Type(Incoming) != "String", "The incoming all-formats clipboard snapshot must be available before any mutation.")
 	try {
-		; 22k units fit the native Edit limit and make the real title-case loop
-		; span at least one normal AHK message-pump opportunity on the runner.
+		; A larger valid selection measures the real transform's scheduling
+		; behavior. No extra wait or artificial callout enters its production loop.
 		_WRF.Payload := ""
-		loop 2000 {
+		loop 30000 {
 			_WRF.Initial .= "alpha beta "
 			_WRF.Payload .= "Alpha Beta "
 		}
 		_WRF.A := Gui(, "Ergopti original selection owner")
-		_WRF.EditA := _WRF.A.AddEdit("w320 r3", _WRF.Initial)
+		_WRF.EditA := _WRF.A.AddEdit("w320 r3 Limit1000000", _WRF.Initial)
 		_WRF.B := Gui(, "Ergopti independent receiver")
 		_WRF.EditB := _WRF.B.AddEdit("w320 r3")
 		_WRF.A.Show()
@@ -159,6 +159,8 @@ _WRF_Main() {
 		_WRF.EditA.Focus()
 		DllCall("SendMessageW", "Ptr", _WRF.EditA.Hwnd, "UInt", 0xB1, "Ptr", 0, "Ptr", -1)
 		Before := _WRF_OwnedFocus()
+		_WRF_Require(_WRF.EditA.Value == _WRF.Initial,
+			"The actual native Edit must retain the complete private larger selection before copy.")
 		_WRF_Require(CB_WriteTextWithReceipt(_WRF.Seed, &SeedSequence) && SeedSequence,
 			"The initial native seed must supply its actual publication receipt.")
 		_WRF.Mutated := true
@@ -175,7 +177,8 @@ _WRF_Main() {
 		if IsObject(_WRF.Failure)
 			throw _WRF.Failure
 		FileAppend("OBSERVATION gesture-title-transform-target mode=" . _WRF.Mode . " moved_inside_transform=" . _WRF.MovedInsideTransform . " move_calls=" . _WRF.MoveCalls
-			. " manager_publications=" . _WRF.ManagerPublications . " copy_calls=" . _WRF.CopyCalls . " sends=" . _WRF.Sends.Length
+			. " input_units=" . StrLen(_WRF.Initial) . " transform_ms=" . _WRF.TransformElapsed
+			. " transform_critical=" . _WRF.TransformCritical . " manager_publications=" . _WRF.ManagerPublications . " copy_calls=" . _WRF.CopyCalls . " sends=" . _WRF.Sends.Length
 			. " wrong_target=" . (_WRF.Sends.Length ? _WRF.Sends[1]["hwnd"] != Before["hwnd"] : false)
 			. " a_wrapped=" . (_WRF.EditA.Value == _WRF.Payload) . " b_wrapped=" . (_WRF.EditB.Value == _WRF.Payload)
 			. " fallbacks=" . _WRF.Fallbacks.Length . "`n", "*")
@@ -231,9 +234,13 @@ KL_MarkSynthetic(Source, IsPrivate := false) {
 }
 TextCaseTitle(Text) {
 	global _WRF
+	_WRF_Require(Text == _WRF.Initial, "The genuine async capture must deliver the complete private source to the actual title-case transform.")
+	Started := A_TickCount
+	_WRF.TransformCritical := A_IsCritical
 	_WRF.Transforming := true
 	try return _GTTL_ActualTextCaseTitle(Text)
 	finally {
+		_WRF.TransformElapsed := A_TickCount - Started
 		_WRF.Transforming := false
 		_WRF.TransformDone := true
 	}

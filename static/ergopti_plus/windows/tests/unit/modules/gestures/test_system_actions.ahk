@@ -770,3 +770,236 @@ _SNFO_Run(Navigate) {
 for _SNFO_Navigation in [false, true]
 	Test("new text file rename owns its original Explorer folder: navigation=" . _SNFO_Navigation . " (new-file-document-owner)",
 		_SNFO_Run.Bind(_SNFO_Navigation))
+
+
+; A selected directory must not lend authority to an external junction target.
+class _SAJ_NativeControl extends _SysActionsFake {
+	__New(Selected) {
+		super.__New()
+		this.Native := SystemControl()
+		this.Active := { Hwnd: 0x42, Pid: 7, Class: "CabinetWClass" }
+		this.Shell := _SysActions_Shell(0x42, Selected, [Selected])
+	}
+	IsDirectory(Path) => this.Native.IsDirectory(Path)
+	FilesUnder(Path) => this.Native.FilesUnder(Path)
+	DeleteZoneIdentifier(Path) => this.Native.DeleteZoneIdentifier(Path)
+}
+_SAJ_RunIsolated(Control) {
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_INFO_ENABLED := true, _LOGGER_ERROR_ENABLED := true
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		Lines := []
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		Critical("Off")
+		GestureSysUnblockFileSelection(Control)
+		return Lines
+	} finally {
+		Critical("On")
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_SAJ_StreamExists(Path) {
+	try Stream := FileOpen(Path . ":Zone.Identifier", "r")
+	catch as Err {
+		if Err is OSError && Err.Number == 2
+			return false
+		throw Err
+	}
+	Stream.Close()
+	return true
+}
+_SAJ_JunctionDoesNotUnblockOutside() {
+	Root := A_Temp . "\ergopti-action-junction-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	Link := Root . "\selected\outside-link"
+	try {
+		DirCreate(Root . "\selected\nested")
+		DirCreate(Root . "\outside")
+		Inside := Root . "\selected\nested\inside.txt", Outside := Root . "\outside\outside.txt"
+		FileAppend("inside", Inside), FileAppend("outside", Outside)
+		FileAppend("[ZoneTransfer]`r`nZoneId=3`r`n", Inside . ":Zone.Identifier")
+		FileAppend("[ZoneTransfer]`r`nZoneId=3`r`n", Outside . ":Zone.Identifier")
+		AssertTrue(_SAJ_StreamExists(Inside) && _SAJ_StreamExists(Outside), "NTFS fixture streams exist before action")
+		ExitCode := RunWait('"' . A_ComSpec . '" /D /C mklink /J "' . Link . '" "' . Root . '\outside"', , "Hide")
+		AssertEqual(0, ExitCode, "native junction creation succeeded")
+		AssertTrue(InStr(FileExist(Link), "L") > 0, "selected child is a reparse point")
+		AssertEqual("outside", FileRead(Link . "\outside.txt"), "junction reaches the owned external sibling")
+		_SAJ_RunIsolated(_SAJ_NativeControl(Root . "\selected"))
+		InsideAfter := _SAJ_StreamExists(Inside), OutsideAfter := _SAJ_StreamExists(Outside)
+		_TestAppendProgress("# unblock junction inside_stream=" . InsideAfter . " outside_stream=" . OutsideAfter)
+		AssertFalse(InsideAfter, "ordinary nested selected file is unblocked")
+		AssertTrue(OutsideAfter, "external target retains its Zone.Identifier")
+	} finally {
+		; Never recursively clean the root until the exact owned junction is detached.
+		if DirExist(Link)
+			DirDelete(Link)
+		DirDelete(Root, true)
+	}
+}
+Test("system actions: selected directory does not unblock external junction target (unblock-native-junction)", _SAJ_JunctionDoesNotUnblockOutside)
+
+
+; The real Explorer-selection action must report an inaccessible subtree.
+class _SAA_NativeControl extends _SysActionsFake {
+	__New(Selected) {
+		super.__New()
+		this.Native := SystemControl()
+		this.Active := { Hwnd: 0x42, Pid: 7, Class: "CabinetWClass" }
+		this.Shell := _SysActions_Shell(0x42, Selected, [Selected])
+	}
+	IsDirectory(Path) => this.Native.IsDirectory(Path)
+	FilesUnder(Path) => this.Native.FilesUnder(Path)
+	DeleteZoneIdentifier(Path) => this.Native.DeleteZoneIdentifier(Path)
+}
+_SAA_RunIsolated(Control) {
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_INFO_ENABLED := true, _LOGGER_ERROR_ENABLED := true
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		Lines := []
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		Critical("Off")
+		GestureSysUnblockFileSelection(Control)
+		return Lines
+	} finally {
+		Critical("On")
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_SAA_StreamExists(Path) {
+	try Stream := FileOpen(Path . ":Zone.Identifier", "r")
+	catch as Err {
+		if Err is OSError && Err.Number == 2
+			return false
+		throw Err
+	}
+	Stream.Close()
+	return true
+}
+_SAA_InaccessibleSubtreeReported() {
+	Root := A_Temp . "\ergopti-action-acl-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	Handle := 0, Descriptor := 0, OriginalDacl := 0, RestoreFlags := 0, Changed := false
+	try {
+		Selected := Root . "\selected", Blocked := Selected . "\blocked"
+		DirCreate(Blocked), DirCreate(Selected . "\accessible")
+		BlockedFile := Blocked . "\blocked.txt", OpenFile := Selected . "\accessible\open.txt"
+		FileAppend("blocked", BlockedFile), FileAppend("open", OpenFile)
+		FileAppend("[ZoneTransfer]`r`nZoneId=3`r`n", BlockedFile . ":Zone.Identifier")
+		FileAppend("[ZoneTransfer]`r`nZoneId=3`r`n", OpenFile . ":Zone.Identifier")
+		AssertTrue(_SAA_StreamExists(BlockedFile) && _SAA_StreamExists(OpenFile), "both streams exist before the action")
+		; Retain WRITE_DAC and READ_CONTROL on the exact directory before denying access.
+		Handle := DllCall("Kernel32\CreateFileW", "Str", Blocked, "UInt", 0x60000, "UInt", 7,
+			"Ptr", 0, "UInt", 3, "UInt", 0x02000000, "Ptr", 0, "Ptr")
+		if Handle == -1
+			throw OSError(A_LastError, -1, "open owned ACL directory")
+		Status := DllCall("Advapi32\GetSecurityInfo", "Ptr", Handle, "UInt", 1, "UInt", 4,
+			"Ptr", 0, "Ptr", 0, "Ptr*", &OriginalDacl, "Ptr", 0, "Ptr*", &Descriptor, "UInt")
+		if Status
+			throw OSError(Status, -1, "get original DACL")
+		Control := 0, Revision := 0
+		if !DllCall("Advapi32\GetSecurityDescriptorControl", "Ptr", Descriptor, "UShort*", &Control, "UInt*", &Revision)
+			throw OSError(A_LastError, -1, "get original DACL control")
+		RestoreFlags := 4 | ((Control & 0x1000) ? 0x80000000 : 0x20000000)
+		Sid := Buffer(68, 0), SidSize := Sid.Size, Acl := Buffer(128, 0)
+		if !DllCall("Advapi32\CreateWellKnownSid", "Int", 1, "Ptr", 0, "Ptr", Sid, "UInt*", &SidSize)
+			throw OSError(A_LastError, -1, "create world SID")
+		if !DllCall("Advapi32\InitializeAcl", "Ptr", Acl, "UInt", Acl.Size, "UInt", 2)
+			throw OSError(A_LastError, -1, "initialize deny ACL")
+		if !DllCall("Advapi32\AddAccessDeniedAceEx", "Ptr", Acl, "UInt", 2, "UInt", 0, "UInt", 1, "Ptr", Sid)
+			throw OSError(A_LastError, -1, "add list-directory deny")
+		Changed := true ; restore even if the native setter reports an error after touching metadata
+		Status := DllCall("Advapi32\SetSecurityInfo", "Ptr", Handle, "UInt", 1, "UInt", 0x80000004,
+			"Ptr", 0, "Ptr", 0, "Ptr", Acl, "Ptr", 0, "UInt")
+		if Status
+			throw OSError(Status, -1, "apply private deny ACL")
+		FindData := Buffer(592, 0)
+		Find := DllCall("Kernel32\FindFirstFileW", "Str", Blocked . "\*", "Ptr", FindData, "Ptr")
+		FindError := A_LastError
+		if Find != -1
+			DllCall("Kernel32\FindClose", "Ptr", Find)
+		AssertEqual(-1, Find, "real blocked enumeration is refused")
+		AssertEqual(5, FindError, "refusal is ERROR_ACCESS_DENIED")
+		Lines := _SAA_RunIsolated(_SAA_NativeControl(Selected))
+		OpenAfter := _SAA_StreamExists(OpenFile)
+		Status := DllCall("Advapi32\SetSecurityInfo", "Ptr", Handle, "UInt", 1, "UInt", RestoreFlags,
+			"Ptr", 0, "Ptr", 0, "Ptr", OriginalDacl, "Ptr", 0, "UInt")
+		if Status
+			throw OSError(Status, -1, "restore original DACL")
+		Changed := false
+		BlockedAfter := _SAA_StreamExists(BlockedFile), Reported := false, Success := false
+		for Line in Lines {
+			if InStr(Line, "[ERROR]") && InStr(Line, "unblock_file_selection")
+				Reported := true
+			if InStr(Line, "[INFO]") && InStr(Line, "unblock_file_selection:")
+				Success := true
+		}
+		_TestAppendProgress("# unblock acl error=" . FindError . " open_stream=" . OpenAfter
+			. " blocked_stream=" . BlockedAfter . " error_log=" . Reported . " success_log=" . Success)
+		AssertFalse(OpenAfter, "accessible nested file is unblocked")
+		AssertTrue(BlockedAfter, "the inaccessible file remains blocked")
+		AssertTrue(Reported, "incomplete enumeration must be reported")
+		AssertFalse(Success, "partial enumeration cannot be reported as complete")
+	} finally {
+		if Changed {
+			Status := DllCall("Advapi32\SetSecurityInfo", "Ptr", Handle, "UInt", 1, "UInt", RestoreFlags,
+				"Ptr", 0, "Ptr", 0, "Ptr", OriginalDacl, "Ptr", 0, "UInt")
+			if Status
+				throw OSError(Status, -1, "restore original DACL; private fixture retained")
+			Changed := false
+		}
+		if Descriptor
+			DllCall("Kernel32\LocalFree", "Ptr", Descriptor, "Ptr")
+		if Handle && Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+		DirDelete(Root, true)
+	}
+}
+Test("system actions: inaccessible selected subtree is reported (unblock-native-acl)", _SAA_InaccessibleSubtreeReported)

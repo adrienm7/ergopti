@@ -581,5 +581,5 @@ _OSCF_Case(Mode) {
 		throw Primary
 	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
 }
-for _OSCF_Mode in ["plain", "ctrl"]
+for _OSCF_Mode in ["plain", "ctrl", "shift", "ctrl-shift"]
 	Test("one-shot native captured control flags: " . _OSCF_Mode . " (one-shot-native-control-flags)", _OSCF_Case.Bind(_OSCF_Mode))

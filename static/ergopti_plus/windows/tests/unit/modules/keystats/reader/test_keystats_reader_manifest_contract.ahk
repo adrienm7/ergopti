@@ -1072,3 +1072,125 @@ _KFCD_DurableCase(Mode) {
 for _KFCD_Mode in ["switch-control", "terminal"]
 	Test("Keystats final context: " . _KFCD_Mode . " survives cold durable aggregation (final-context-duration-owner)",
 		_KFCD_DurableCase.Bind(_KFCD_Mode))
+
+_KMD_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	; Remove only the inherited test wrapper whose empty-buffer-only contract
+	; deliberately does not load the full publication graph. SUT bodies are not
+	; rewritten: replace its exact alias by the genuine default public definition.
+	Source := RegExReplace(Source, "ms)^KL_FlushBuffer\(.*?^\}\r?\n", "", &Removed)
+	AssertEqual(1, Removed)
+	Body := _DriverFuncBody("KL_FlushBuffer")
+	Alias := RegExReplace(Body, "^KL_FlushBuffer", "_KSD_NativeFlush")
+	Source := StrReplace(Source, Alias, "", true, &Removed)
+	AssertEqual(1, Removed)
+	Source .= Body . "`n"
+	Source .= "#Include " . _KFCD_ClassOwner("KeystatsConst") . "`n"
+	for Spec in [["KL_Mouse_ParkTick", "KLMouseConst"], ["KL_Mouse_ParkTick", "KLMouse"], ["KL_AppCat_Get", "KLAppCat"]] {
+		Owner := _DriverProductionFileForSymbol(Spec[1], _DriverDir)
+		AssertTrue(Owner != "")
+		AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^class " . Spec[2] . " \{.*?^\}", &Definition) > 0)
+		Source .= Definition[0] . "`n"
+	}
+	for Symbol in ["_KL_PublishBufferSnapshot", "_KL_RestoreBufferSnapshot", "KL_AppCat_Get",
+		"KL_AppCat_RequireInit", "_KL_AppCat_RecordLabel", "KL_Mouse_ParkTick", "_KL_Mouse_ProcessParkSample",
+		"_KL_Mouse_ShouldFilter", "KL_BumpMouseDistance", "KL_BumpMouseClick", "KL_Hook_Tick", "KL_Hook_LivePush"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "", "The complete actual public distance-to-flush graph must resolve: " . Symbol)
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\mouse_distance_flush_owner_body.ahk`n"
+}
+
+_KMD_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_mouse_distance_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KMD_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# mouse-distance-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS mouse-distance-flush " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KMD_DurableCase(Mode) {
+	Output := _KMD_Case(Mode)
+	Db := 0, Rows := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			Entry := JsonParse(SubStr(Line, 5))
+			for Sql in KL_BuildInserts(Entry)
+				AssertTrue(SQLite_Exec(Db, Sql))
+			Rows += 1
+		}
+		Distance := SQLite_Query(Db, "SELECT COALESCE(SUM(mouse_distance_px),0) AS n FROM events_typing WHERE app='fixture-distance-owner.exe'")[1]["n"]
+		_TestPrint("# mouse-distance-durable mode=" . Mode . " rows=" . Rows . " distance_px=" . Distance)
+		AssertEqual(5, Distance, "Accepted pointer movement must reach the canonical SQL distance column even without a key or click")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KMD_Mode in ["with-click-control", "direct-movement-only", "periodic-movement-only"]
+	Test("Keystats pointer distance: " . _KMD_Mode . " survives actual flush to canonical SQL (mouse-distance-flush-owner)",
+		_KMD_DurableCase.Bind(_KMD_Mode))
