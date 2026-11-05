@@ -591,3 +591,139 @@ _LAG_SchedulerIsOneShot() {
 	AssertThrows(() => _LLM_Agent_Schedule((*) => 0, "-5"), "a period is an integer")
 }
 Test("LLM agent: the agent's timers are one-shots", _LAG_SchedulerIsOneShot)
+
+/** Observes native launch identity while delegating the complete genuine argv. */
+_LAGNN_Launch(State, Argv) {
+	State.Attempts += 1
+	State.Vector := Argv.Clone()
+	State.Pid := AL_LaunchArgvStrict(Argv)
+}
+
+_LAGNN_ArgvReceipt(Text) {
+	Receipt := "1|" . StrLen(Text) . ":"
+	Loop StrLen(Text)
+		Receipt .= Format("{:04X}", NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"))
+	return Receipt
+}
+
+/** The exact JSON producer and connector dispatch reach the real native launcher. */
+_LAGNN_Run(Position) {
+	global _ConfigDir, _DriverDir, _LLM_AgentConnector_Tools, _LLM_AgentConnector_TempFiles
+	global _LLM_AgentConnector_LaunchFn, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
+	static Debt := 0
+	AssertFalse(IsObject(Debt), "SETUP: a previous exact native tool still owns retirement debt")
+	Saved := {ConfigDir: _ConfigDir, Tools: _LLM_AgentConnector_Tools, Temp: _LLM_AgentConnector_TempFiles,
+		Launch: _LLM_AgentConnector_LaunchFn, List: _LLM_AgentConnector_ListFn,
+		Ensure: _LLM_AgentConnector_EnsureDirFn, Critical: A_IsCritical, Suspended: A_IsSuspended}
+	Root := A_Temp . "\ergopti_agent_native_input_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	State := {Attempts: 0, Pid: 0, Vector: 0, Process: 0, Ready: false, Joined: false, ExitKnown: false, ExitCode: -1}
+	Primary := 0, Passed := false, HandleClosed := false, Result := 0, Created := false
+	try {
+		Critical("Off"), Suspend(false)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "SETUP: own the exact native-tool directory")
+		DirCreate(Root . "\agent_tools")
+		FileCopy(_DriverDir . "\tests\fixtures\agent_native_tool_input.ahk", Root . "\agent_tools\Native receiver.ahk")
+		AssertTrue(FSWriteCreateDurable(Root . "\parent", String(ProcessExist())), "SETUP: parent identity receipt")
+		_ConfigDir := Root
+		_LLM_AgentConnector_Tools := "", _LLM_AgentConnector_TempFiles := []
+		_LLM_AgentConnector_ListFn := 0, _LLM_AgentConnector_EnsureDirFn := 0
+		_LLM_AgentConnector_LaunchFn := _LAGNN_Launch.Bind(State)
+		Config := LLM_Agent_Config()
+		Tools := LLM_AgentConnector_Tools(Config, true)
+		AssertTrue(Tools["paths"].Has("Native receiver"), "SETUP: genuine native tool discovery must find the copied tool")
+		Left := Position == "head" ? "" : "prefix"
+		Right := Position == "tail" ? "" : "suffix"
+		Legal := Position == "legal"
+		InputJson := Legal ? JsonStringLiteral("é漢 " . Chr(0x1F642) . ' tail\"')
+			: '"' . Left . '\u0000' . Right . '"'
+		Raw := Config["system2"]["tag"] . '[{"type":"shortcut","name":"Native receiver","input":' . InputJson . '}]'
+		Actions := LLM_Agent_ParseActions(Config, Raw, Tools["names"], &Rejected)
+		AssertTrue(Actions is Array && Actions.Length == 1, "SETUP: actual System2 JSON action is admitted")
+		AssertEqual(0, Rejected.Length, "SETUP: actual producer has no action rejection")
+		Input := Actions[1]["input"]
+		if !Legal {
+			AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Input), "SETUP: admitted producer retains its complete NUL input")
+			AssertEqual(0, NumGet(StrPtr(Input), StrLen(Left) * 2, "UShort"), "SETUP: actual admitted input contains NUL")
+		}
+		Result := LLM_AgentConnector_Execute(Actions[1], Config)
+		AssertEqual(1, State.Attempts, "BUSINESS: genuine connector reaches the real launcher once")
+		if State.Pid {
+			; Acquire only query/wait rights. Never kill a PID which could be reused.
+			State.Process := DllCall("Kernel32\OpenProcess", "UInt", 0x101000,
+				"Int", false, "UInt", State.Pid, "Ptr")
+			AssertTrue(State.Process != 0, "SETUP: retain the actual native child for independent joining")
+			Started := A_TickCount
+			while !FileExist(Root . "\ready") && TickElapsed(Started) < 5000
+				Sleep(10)
+			AssertTrue(FileExist(Root . "\ready") != "", "SETUP: the actual tool script must run and report readiness")
+			Identity := StrSplit(FSReadUtf8Exact(Root . "\ready"), "|")
+			AssertEqual(2, Identity.Length, "SETUP: complete native tool identity receipt")
+			AssertEqual(State.Pid, Integer(Identity[1]), "SETUP: returned PID and actual child PID agree")
+			Times := Buffer(32, 0)
+			AssertTrue(DllCall("Kernel32\GetProcessTimes", "Ptr", State.Process, "Ptr", Times,
+				"Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int"), "SETUP: exact child creation FILETIME")
+			AssertEqual(Integer(Identity[2]), NumGet(Times, 0, "Int64"), "SETUP: retained process is the reporting tool, not a reused PID")
+			State.Ready := true
+			Observed := FSReadUtf8Exact(Root . "\argv")
+			_TestPrint("# agent-native-input position=" . Position . " admitted_units=" . StrLen(Input)
+				. " native_argv=" . Observed . " connector_ok=" . Result["ok"])
+			if Legal
+				AssertEqual(_LAGNN_ArgvReceipt(Input), Observed, "BUSINESS: native legal Unicode input arrives exactly once and whole")
+		}
+		if Legal {
+			AssertTrue(Result["ok"] && State.Ready, "BUSINESS: legal Unicode tool dispatch remains successful")
+		} else {
+			AssertFalse(Result["ok"], "BUSINESS: native argument NUL must refuse rather than report a truncated tool input as complete")
+			AssertEqual(0, State.Pid, "BUSINESS: refusal must precede native child creation")
+			AssertFalse(FileExist(Root . "\ready"), "BUSINESS: refused NUL cannot run the tool")
+			AssertContains(Result["reason"], "NUL", "BUSINESS: refusal explains the unsupported native argument boundary")
+		}
+		Passed := true
+	} catch Any as Err {
+		Primary := Err
+	} finally {
+		try {
+			if State.Pid {
+				; This private path is the only control signal; no PID-based kill exists.
+				if !FileExist(Root . "\stop")
+					AssertTrue(FSWriteCreateDurable(Root . "\stop", "stop"), "RETIREMENT: signal only the owned tool fixture")
+				if State.Process
+					State.Joined := DllCall("Kernel32\WaitForSingleObject", "Ptr", State.Process, "UInt", 5000, "UInt") == 0
+				if State.Joined {
+					State.ExitKnown := DllCall("Kernel32\GetExitCodeProcess", "Ptr", State.Process, "UInt*", &Code := 0, "Int") != 0
+					State.ExitCode := Code
+					HandleClosed := DllCall("Kernel32\CloseHandle", "Ptr", State.Process, "Int") != 0
+					if HandleClosed
+						State.Process := 0
+				}
+			} else
+				State.Joined := true, HandleClosed := true
+		} catch Any as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		if !State.Joined || !HandleClosed
+			Debt := {State: State, Root: Root}
+		_ConfigDir := Saved.ConfigDir
+		_LLM_AgentConnector_Tools := Saved.Tools, _LLM_AgentConnector_TempFiles := Saved.Temp
+		_LLM_AgentConnector_LaunchFn := Saved.Launch, _LLM_AgentConnector_ListFn := Saved.List
+		_LLM_AgentConnector_EnsureDirFn := Saved.Ensure
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(State.Joined && HandleClosed, "RETIREMENT: exact native tool and handle debt must retire")
+	if State.Pid {
+		AssertTrue(State.ExitKnown, "RETIREMENT: query exact child exit status")
+		AssertEqual(0, State.ExitCode, "RETIREMENT: exact child exited normally")
+		AssertEqual("done", FSReadUtf8Exact(Root . "\done"), "RETIREMENT: actual child observed the stop signal and exited")
+	}
+	if Passed && Created
+		DirDelete(Root, true)
+}
+
+for _LAGNN_Position in ["head", "middle", "tail", "legal"]
+	Test("LLM agent: " . _LAGNN_Position . " native shortcut input survives JSON and obeys argv admission (agent-native-nul-input)",
+		_LAGNN_Run.Bind(_LAGNN_Position))
