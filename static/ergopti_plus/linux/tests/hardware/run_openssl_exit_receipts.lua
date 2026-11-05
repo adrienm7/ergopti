@@ -65,6 +65,15 @@ local function check(name, test)
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
 end
+-- Public synthetic machine ID only. Reference generated independently with
+-- PBKDF2-HMAC-SHA256, 600000 rounds and the first eight salt bytes.
+check("historical CLI KDF remains readable with the eight-byte salt", function()
+	mode(0)
+	local output = assert(OpenSSL.exec(assert(Codec.derive_key_command("file:" .. root .. "/machine-id"))))
+	local derived = assert(Codec.parse_derived_key(output))
+	local reference = "060ACFFC9DBC932EDC05FB8D6651DABF8A2A60803749D19D0C71AB3DD34C6AF3"
+	assert(derived == reference, "historical synthetic KDF answer changed")
+end)
 for _, fault in ipairs({ 1, 7, 23, "TERM", "KILL" }) do
 	check("failed native derivation refuses useful key stdout " .. fault, function()
 		mode(fault); cipher = fresh()
