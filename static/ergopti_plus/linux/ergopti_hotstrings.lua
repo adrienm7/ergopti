@@ -2477,7 +2477,8 @@ local function main()
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and
 			-- reloaded nothing.
-			on_reload     = function() perform_reload("the tray menu") end,
+			on_reload     = function() return perform_reload("the tray menu") end,
+			reload_in_flight = reload_in_flight,
 			-- Opens one category's TOML in the user's editor. The category submenu
 			-- offers it because a pack is a file people edit, and finding it by
 			-- hand means knowing whether it came from the bundle or the user's own
