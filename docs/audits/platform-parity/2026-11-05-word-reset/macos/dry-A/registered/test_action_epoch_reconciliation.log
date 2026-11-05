@@ -1,0 +1,48 @@
+Selecting exact test module: "tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation
+
+=== keymap action epochs ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"passes physical input without engine mutation while pause owns admission","status":"pass","elapsed_ms":26.544533,"timing_error":""}
+  ok   passes physical input without engine mutation while pause owns admission
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"passes unreadable keyDown without context invalidation while PAUSED","status":"pass","elapsed_ms":3.044644,"timing_error":""}
+  ok   passes unreadable keyDown without context invalidation while PAUSED
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"does not defer shift diagnostics after PAUSED is published","status":"pass","elapsed_ms":4.619425,"timing_error":""}
+  ok   does not defer shift diagnostics after PAUSED is published
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"an action with no following key clears the buffer and hides predictions","status":"pass","elapsed_ms":4.036211,"timing_error":""}
+  ok   an action with no following key clears the buffer and hides predictions
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"the per-event backstop reconciles before reversed-order physical input","status":"pass","elapsed_ms":3.857563,"timing_error":""}
+  ok   the per-event backstop reconciles before reversed-order physical input
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"claims older output before processing the overtaking physical key","status":"pass","elapsed_ms":10.083437,"timing_error":""}
+  ok   claims older output before processing the overtaking physical key
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"consumes a physical key already owned by paced output when the wrapper aborts","status":"pass","elapsed_ms":3.632586,"timing_error":""}
+  ok   consumes a physical key already owned by paced output when the wrapper aborts
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"claims older output before a focus-changing click without keystats","status":"pass","elapsed_ms":4.070232,"timing_error":""}
+  ok   claims older output before a focus-changing click without keystats
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"passes clicks without context mutation or deferred reset while PAUSED","status":"pass","elapsed_ms":3.567708,"timing_error":""}
+  ok   passes clicks without context mutation or deferred reset while PAUSED
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"a click cancels pre-click preview recovery even when buffer reset is disabled","status":"pass","elapsed_ms":3.738014,"timing_error":""}
+  ok   a click cancels pre-click preview recovery even when buffer reset is disabled
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"a permanent reset failure quarantines only LLM while ordinary typing accumulates","status":"pass","elapsed_ms":4.341018,"timing_error":""}
+  ok   a permanent reset failure quarantines only LLM while ordinary typing accumulates
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"pause cancels a preview catch-up recorded before reconciliation","status":"pass","elapsed_ms":3.781138,"timing_error":""}
+  ok   pause cancels a preview catch-up recorded before reconciliation
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"resume starts from fresh text after unobserved paused typing","status":"pass","elapsed_ms":4.177142,"timing_error":""}
+  ok   resume starts from fresh text after unobserved paused typing
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"tap_states reads each tap's native state without changing it","status":"pass","elapsed_ms":9.336568,"timing_error":""}
+  ok   tap_states reads each tap's native state without changing it
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"start and stop register the stable listener exactly once","status":"pass","elapsed_ms":4.166646,"timing_error":""}
+  ok   start and stop register the stable listener exactly once
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"stop uses the teardown reset even while the ordinary runtime is quarantined","status":"pass","elapsed_ms":3.945023,"timing_error":""}
+  ok   stop uses the teardown reset even while the ordinary runtime is quarantined
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","name":"tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation","status":"pass","elapsed_ms":98.269809,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  16
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

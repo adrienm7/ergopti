@@ -1,0 +1,53 @@
+{
+  "audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+  "basis": "source authentication and lexical chains; no AHK execution, no timing measurement or behavioral translation",
+  "source_receipts": [
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+      "sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_match.ahk",
+      "sha256": "e9cf27cd2b56669a388dbae15146a462db50d482412d7393b24c8eb0ff5249b8"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+      "sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+      "sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk",
+      "sha256": "d244ef367fe7fc4e2ee519e07a79587d0868c1cdd11d69c2765f8ef5ea8937ea"
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+      "sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "docs/memory/text-input-and-config.md",
+      "sha256": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf"
+    }
+  ],
+  "checks": {
+    "repeat_spec_has_no_activation_seconds_or_reference_key": true,
+    "dispatch_gate_requires_positive_spec_metadata": true,
+    "idle_zero_disables_reset": true,
+    "registry_matcher_has_no_activation_time_gate": true,
+    "live_repeat_precedes_dispatch": true,
+    "live_registry_match_only_falls_back_if_empty": true,
+    "dispatch_refusal_does_not_retry_repeat": true,
+    "oracle_matches_before_gate_and_fallback_only_if_empty": true,
+    "oracle_uses_same_ungated_repeat_spec": true,
+    "live_programmed_suffix_expires_before_claim": true,
+    "preview_programmed_suffix_defers_time_gate_to_oracle": true,
+    "historical_memory_names_windows_repeat_ungated": true,
+    "mac_public_fallback_has_a_separate_star_time_gate": true
+  }
+}

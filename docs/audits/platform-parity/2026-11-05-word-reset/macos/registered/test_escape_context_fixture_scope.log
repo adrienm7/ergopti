@@ -1,0 +1,28 @@
+Selecting exact test module: "tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope
+
+=== Escape context fixture isolation ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after none","status":"pass","elapsed_ms":27.059121,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after none
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after construction","status":"pass","elapsed_ms":15.035904,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after construction
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after callback","status":"pass","elapsed_ms":19.083225,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after callback
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after stop","status":"pass","elapsed_ms":17.272163,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after stop
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after stop_refusal","status":"pass","elapsed_ms":16.567516,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after stop_refusal
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"(escape-fixture-scope) restores owners after global_replacement","status":"pass","elapsed_ms":19.327031,"timing_error":""}
+  ok   (escape-fixture-scope) restores owners after global_replacement
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","name":"tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope","status":"pass","elapsed_ms":115.282660,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  6
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

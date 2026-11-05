@@ -1,0 +1,197 @@
+{
+	"schema_version": 1,
+	"module": "word-reset",
+	"platform": "windows",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"aspect": "physical-entry",
+			"status": "available",
+			"observation": "Physical generation then pause/end-claim/idle/current modifiers and canonical branch routing",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1746",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "synthetic-entry",
+			"status": "available",
+			"observation": "Public parameterized shortcut and actual TextPressKey funnel use atomic declaration plus send",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:262",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "arrow-reset-toggle",
+			"status": "available",
+			"observation": "Default/recommended true; physical and synthetic arrows share live flag under every modifier",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1786",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "shortcut-reset-toggle",
+			"status": "available",
+			"observation": "Default true; off intentionally retains across CtrlV/CtrlZ; AltGr/Shift typing excluded",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:113",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "tap-hold-origin-toggle",
+			"status": "available",
+			"observation": "Current command tap, owned Ctrl/Alt/Win or active layer; separate setting on Windows/Linux",
+			"source": "static/ergopti_plus/windows/platform/remap/constants.ahk:1364",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "macos-tap-hold-limitation",
+			"status": "intentional",
+			"observation": "Explicit shared platform reason; Karabiner output follows normal shortcut policy; preexisting TODO",
+			"source": "static/ergopti_plus/_shared/modules/features/manifest.toml:595",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "home-end-page-navigation",
+			"status": "policy-ambiguity",
+			"observation": "Bare navigation resets; modified versions follow shortcut/tap-hold flag; manifest scope ambiguous",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1804",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "insert-delete",
+			"status": "available",
+			"observation": "Always reset and never assume precise text or word boundary for physical deletion",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1802",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "plain-backspace",
+			"status": "available",
+			"observation": "One complete scalar decrement; empty buffer changes start knowledge except known empty-line state",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:940",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "ctrl-backspace",
+			"status": "available",
+			"observation": "Real Ctrl without Alt/Win resets HSE at known prior-word start regardless flags",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1341",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "alt-win-backspace-physical",
+			"status": "available",
+			"observation": "Unknown-start reset; physical behavioral test names no word-start promise",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1790",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "alt-win-backspace-synthetic",
+			"status": "partial",
+			"observation": "WRSW001: generic successful synthetic edit incorrectly establishes known true",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:204",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "select-all",
+			"status": "available",
+			"observation": "CtrlA nonterminal records known empty replacement line; terminal retains distinct command semantics",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1810",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "ctrl-find-location",
+			"status": "available",
+			"observation": "Explicit CtrlF/L focus invalidation to unbound token; AltGr fake Ctrl excluded",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1321",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "enter-terminal-multiline",
+			"status": "available",
+			"observation": "Bare terminal Enter promises empty line; ShiftEnter does not; end-completion owner preserves input ordering",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1843",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "escape-tab",
+			"status": "available",
+			"observation": "Physical reset focus unknown and forward AI flush; accepted end keys owned before ordinary path",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1837",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "idle-default-zero",
+			"status": "available",
+			"observation": "Shared3s and zero disabled; finite nonnegative validation and native 64-bit tick differences",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1048",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "idle-backspace-recovery",
+			"status": "available",
+			"observation": "Forgotten exact buffer restored only if generation/content unchanged and matcher empty; no fragment restoration",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2026",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "ai-navigation-policy",
+			"status": "available",
+			"observation": "Default reset_on_nav true; ordinary physical navigation reaches reset while explicit false retains context",
+			"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1688",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "ai-shortcut-continuity",
+			"status": "partial",
+			"observation": "WRSW002: complete context survives physical modifiedBackspace/selectAll early branches",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1790",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "agent-only-continuity",
+			"status": "partial",
+			"observation": "Same WRSW002 complete-context preservation and next fresh-char observer while predictions off",
+			"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1158",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "ai-synthetic-continuity",
+			"status": "partial",
+			"observation": "Same WRSW002: no complete-context mutation in synthetic key declaration; send-level echo intentionally excluded",
+			"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:152",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "stale-ai-observer-admission",
+			"status": "available",
+			"observation": "Physical/content/focus/lifecycle guards reject old owners; do not repair semantic buffer on fresh observer",
+			"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1224",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "incomplete-utf16-revocation",
+			"status": "available",
+			"observation": "Caret/input boundaries revoke dangling units; complete-string retention is why WRSW002 survives",
+			"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:166",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "config-persist-runtime",
+			"status": "available",
+			"observation": "Validated shared defaults; persist-before-publish; read live without reload; failure visibly retained",
+			"source": "static/ergopti_plus/windows/ui/editors.ahk:642",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "lifecycle",
+			"status": "available",
+			"observation": "Deferred owner invalidation and global HSE hard reset; bridge stop retires observer/typing state",
+			"source": "static/ergopti_plus/windows/infra/lifecycle.ahk:682",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		},
+		{
+			"aspect": "native-receiving-performance-memory",
+			"status": "unmeasured",
+			"observation": "No AHK parser/InputHook/real CtrlAltWin operation, app Undo, request, benchmark or memory qualification",
+			"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1287",
+			"basis": "Exact-source review, no AutoHotkey execution or native receiving"
+		}
+	]
+}

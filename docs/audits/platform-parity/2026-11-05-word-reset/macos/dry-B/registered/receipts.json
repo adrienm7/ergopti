@@ -1,0 +1,122 @@
+[
+	{
+		"module": "tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset"
+		],
+		"exit_code": 0,
+		"passed": 37,
+		"failed": 0,
+		"log": "test_arrow_shortcut_word_reset.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.terminators.test_word_reset_policy",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.terminators.test_word_reset_policy"
+		],
+		"exit_code": 0,
+		"passed": 26,
+		"failed": 0,
+		"log": "test_word_reset_policy.log"
+	},
+	{
+		"module": "tests.unit.infra.preferences.test_preferences_word_reset",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.infra.preferences.test_preferences_word_reset"
+		],
+		"exit_code": 0,
+		"passed": 14,
+		"failed": 0,
+		"log": "test_preferences_word_reset.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.terminators.test_nav_invalidates_hotstring_buffer"
+		],
+		"exit_code": 0,
+		"passed": 1,
+		"failed": 0,
+		"log": "test_nav_invalidates_hotstring_buffer.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.terminators.test_escape_invalidates_hotstring_buffer"
+		],
+		"exit_code": 0,
+		"passed": 2,
+		"failed": 0,
+		"log": "test_escape_invalidates_hotstring_buffer.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.terminators.test_escape_context_fixture_scope"
+		],
+		"exit_code": 0,
+		"passed": 6,
+		"failed": 0,
+		"log": "test_escape_context_fixture_scope.log"
+	},
+	{
+		"module": "tests.unit.modules.llm.vectors.test_context_buffer_vectors",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.llm.vectors.test_context_buffer_vectors"
+		],
+		"exit_code": 0,
+		"passed": 26,
+		"failed": 0,
+		"log": "test_context_buffer_vectors.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context"
+		],
+		"exit_code": 0,
+		"passed": 9,
+		"failed": 0,
+		"log": "test_tap_outage_invalidates_context.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.synthetic.test_action_epoch_reconciliation"
+		],
+		"exit_code": 0,
+		"passed": 16,
+		"failed": 0,
+		"log": "test_action_epoch_reconciliation.log"
+	},
+	{
+		"module": "tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted",
+		"command": [
+			"lua",
+			"tests/run.lua",
+			"--only=tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted"
+		],
+		"exit_code": 0,
+		"passed": 8,
+		"failed": 0,
+		"log": "test_private_expansion_never_prompted.log"
+	}
+]

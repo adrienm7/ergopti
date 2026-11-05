@@ -1,0 +1,68 @@
+{
+	"label": "B",
+	"started_at": "2026-11-05T14:29:57.534603+00:00",
+	"commands": [
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/public-context.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "dry-B/public-context.lua.log",
+			"sha256": "804c00864aa104e56c5798c8f717c44101cfc85c7d92d3faf49e33504078c48b"
+		},
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/context-request.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "dry-B/context-request.lua.log",
+			"sha256": "a2db177ffa5d20961ff89fdc85bd5e0bea3667e733cda4c85c205e5880992928"
+		},
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/public-edits.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "dry-B/public-edits.lua.log",
+			"sha256": "55411c4b1d63157b6eeecc992c89c00250c453fe3b0aaadb0838ed0ed210027c"
+		},
+		{
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/keypad-enter.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "dry-B/keypad-enter.lua.log",
+			"sha256": "39bf2d01ad409150e85b81eb594cb7af97421495ca3c21282d63ee88cbec8066"
+		},
+		{
+			"command": [
+				"python3",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/run-isolated.py",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos",
+				"/workspace/scratch/parity-word-reset-2026-11-05/macos/dry-B/registered"
+			],
+			"exit_code": 0,
+			"log": "dry-B/registered-summary.json"
+		}
+	],
+	"axes": [
+		"Public arrow/shortcut/click and next-edit independent AI option crossproduct",
+		"Actual prediction request serialization over fake HTTP and directcaller qualification",
+		"Bare/main/keypad Enter identity and conditional empty-promptBackspace owner",
+		"Idle, deletion modifiers, selectedfield, browserlocation and multiline controls",
+		"Escape visibility/quarantine/deferral, native eventprovenance and lifecycle",
+		"Defaults, sparsepreferences, menus and explicit crossOSintent",
+		"Privatebaseline, sharedcontextvectors, knownrootdedup and hypothesisrefutations"
+	],
+	"new_roots": 0,
+	"root_discovery_basis": "Manual bounded source review; zero is not inferred mechanically from green probes",
+	"completed_at": "2026-11-05T14:30:06.050804+00:00"
+}

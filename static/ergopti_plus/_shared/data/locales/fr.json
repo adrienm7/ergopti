@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Pas de bascule sous Linux : GNOME et KDE choisissent Dupliquer dans leur propre sélecteur d’affichage Super+P ; associez cette touche comme combinaison de touches.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Ce système a des touches rémanentes dans ses réglages d’accessibilité, qui rendent chaque modificateur rémanent ; activez-les là.",
 	"platform_reason.action_take_note_uses_notepad": "Windows uniquement : cette action ouvre le fichier de notes du jour dans le Bloc-notes, l’éditeur livré avec tout Windows. macOS a sa propre Note rapide (Fn+Q), et Linux n’a pas d’éditeur livré avec tous les bureaux.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "Sous macOS, Texte en direct lit le texte de toute capture ou image : prenez-en une avec l’action équivalente, puis sélectionnez son texte."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "Sous macOS, Texte en direct lit le texte de toute capture ou image : prenez-en une avec l’action équivalente, puis sélectionnez son texte.",
+	"inventory.behavior.backspace_restore": "Restaurer une expansion avec Retour arrière",
+	"inventory.behavior.repeat_condition": "Répète un caractère au milieu d’un mot si aucune expansion ne correspond et si la répétition par touche magique est activée.",
+	"inventory.behavior.repeat_linux": "La répétition par touche magique existe, mais les répétitions consécutives perdent actuellement leur contexte après la première expansion. Les corrections suivant une répétition sont aussi affectées.",
+	"inventory.behavior.backspace_linux": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
+	"inventory.behavior.backspace_other": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
+	"inventory.behavior.repeat_activation_window": "Délai d’activation de la répétition par touche magique",
+	"inventory.behavior.repeat_window_untimed": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant.",
+	"inventory.behavior.repeat_window_macos": "Utilise le délai effectif de la touche magique, avec les règles de temporisation des modificateurs ; zéro désactive ce délai. Le début d’un nouveau mot après une pause est indépendant."
 }

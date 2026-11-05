@@ -1,0 +1,2 @@
+[32m[OK] macOS bundle payload: 1264 staged files, 5408 runtime references resolve, no excluded group is shipped, and the self-check caught every seeded regression.[0m
+

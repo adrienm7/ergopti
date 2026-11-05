@@ -1,0 +1,18 @@
+Selecting exact test module: "tests.unit.modules.keymap.preview.test_no_repeat_preview"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.preview.test_no_repeat_preview
+
+=== the bubble never proposes a key doubling (no-repeat-preview) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.preview.test_no_repeat_preview","name":"paints no doubling row, still doubles on the magic key, still offers a symbol","status":"pass","elapsed_ms":40.141243,"timing_error":""}
+  ok   paints no doubling row, still doubles on the magic key, still offers a symbol
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.preview.test_no_repeat_preview","name":"tests.unit.modules.keymap.preview.test_no_repeat_preview","status":"pass","elapsed_ms":40.412520,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

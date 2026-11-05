@@ -1,0 +1,12 @@
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+(node:1846432) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Prerendering
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+Compressing assets and pages
+Wrote site to "build"
+✔ done

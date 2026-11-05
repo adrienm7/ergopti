@@ -1,0 +1,20 @@
+[
+	{
+		"os": "windows",
+		"script": "test-windows-bundle-manifest.cjs",
+		"phase": "before packaging fix",
+		"exit_code": 1
+	},
+	{
+		"os": "macos",
+		"script": "test-macos-bundle-payload.cjs",
+		"phase": "before packaging fix",
+		"exit_code": 1
+	},
+	{
+		"os": "linux",
+		"script": "test-linux-package-options.cjs",
+		"phase": "before packaging fix",
+		"exit_code": 1
+	}
+]

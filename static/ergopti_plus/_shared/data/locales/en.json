@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "No toggle on Linux: GNOME and KDE choose Duplicate in their own Super+P display switcher; bind that key as a keystroke.",
 	"platform_reason.action_sticky_keys_are_the_systems": "This system has Sticky Keys in its accessibility settings, which make every modifier one-shot; turn them on there.",
 	"platform_reason.action_take_note_uses_notepad": "Windows only: this opens the day's notes file in Notepad, the editor every Windows ships. macOS has its own Quick Note (Fn+Q), and Linux has no editor every desktop ships.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "On macOS, Live Text reads the text of any capture or image: take one with the equivalent action, then select its text.",
+	"inventory.behavior.backspace_restore": "Restore an expansion with Backspace",
+	"inventory.behavior.repeat_condition": "Repeats a mid-word character when no expansion matches and magic-key repeat is enabled.",
+	"inventory.behavior.repeat_linux": "Magic-key repeat exists, but consecutive repeats currently lose their context after the first expansion. Following repeat-correction mappings are also affected.",
+	"inventory.behavior.backspace_linux": "An immediate unmodified Backspace can restore an eligible plain-text expansion; native text-field behavior remains unqualified.",
+	"inventory.behavior.backspace_other": "No automatic trigger restoration with Backspace; the application’s Undo is separate.",
+	"inventory.behavior.repeat_activation_window": "Magic-key repeat activation window",
+	"inventory.behavior.repeat_window_untimed": "No separate activation window for fallback repetition; idle word reset is independent.",
+	"inventory.behavior.repeat_window_macos": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent."
 }

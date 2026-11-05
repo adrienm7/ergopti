@@ -1,0 +1,152 @@
+[
+  {
+    "path": "docs/behavior-inventory.md",
+    "previous_sha256": "68877141049d32cc1491f4896d84dbe3fd0844ea336f57a4bb573980086feeae",
+    "sha256": "664697af56361677f14ed2e75025d45c1d6ff85edcbfe91c50df8cd833c4fc83",
+    "bytes": 6082
+  },
+  {
+    "path": "src/routes/ergopti-plus/behavior-inventory.json",
+    "previous_sha256": "1352ea8b7fbb50c53925d9cc633f9ce83afc7f38e94465927d1e63e40eddec2e",
+    "sha256": "7f9033bb5d3c9410dd8c0d2b694eee96291e7d81aa2a89102dc8b211a936cbfb",
+    "bytes": 6249
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/ar.json",
+    "previous_sha256": "971e79738b453e6fdec24e275347366c5595ca1ba126c835ebec7445997f9522",
+    "sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72",
+    "bytes": 385569
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/cs.json",
+    "previous_sha256": "c6491001a10f70473f7fbded9692c611aab3422b9a27b34e058cf226695310f4",
+    "sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd",
+    "bytes": 322278
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/da.json",
+    "previous_sha256": "afa4ad154ac5c53a9f26965a80f40c722fae25fb558113c95d769fc241997597",
+    "sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49",
+    "bytes": 311312
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/de.json",
+    "previous_sha256": "4d1342d343862310c87d88dc6a9d5ae6422e2f1521408afc87ef677d25676974",
+    "sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc",
+    "bytes": 330737
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/en.json",
+    "previous_sha256": "d5a9fe7ab967aaf23254070764c0c44a2a0e01977a6290c5288b1e2f0dbbf9af",
+    "sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+    "bytes": 301743
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/es.json",
+    "previous_sha256": "436ba2446af5154fc0f6ed5ec7ae0fa1d71b03814eca71daec0fbc7c2bf6828d",
+    "sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0",
+    "bytes": 326065
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/fr.json",
+    "previous_sha256": "35d9710f71afab29b7d3b75607c7107f947b970c26e6e517653ee24bfac27709",
+    "sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a",
+    "bytes": 333768
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/he.json",
+    "previous_sha256": "5d448305303bd9728d95b0193ff116b96d818b70845898ff2785877941329c58",
+    "sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b",
+    "bytes": 360167
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/hi.json",
+    "previous_sha256": "9e65e41874f8cc35e0d1f314db593b4d7c00d2cc6833132ca1f68715029acd4d",
+    "sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23",
+    "bytes": 513505
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/it.json",
+    "previous_sha256": "f3c260b852970e374f6b2ac8eee59498627b42a7b93472dd77e2418feca98ae1",
+    "sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca",
+    "bytes": 324844
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/ja.json",
+    "previous_sha256": "b1358c4f30f8c3eae06bbdc24fa137cb7bc1dbdbb16a42d4692becb33913918f",
+    "sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c",
+    "bytes": 371947
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/ko.json",
+    "previous_sha256": "38e129fda097bc60b005a58f5f79d38b9d05fab405e70e4c68280dc59dd11a66",
+    "sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08",
+    "bytes": 335974
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/nl.json",
+    "previous_sha256": "fe172fb9cae8ba5163aa2ba10a6c15b8134d41b229527097450b70b589607b98",
+    "sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54",
+    "bytes": 321199
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/no.json",
+    "previous_sha256": "c6ec804378c7931717cd99bbb5dc2f47447761d4745badecbe2e2fc9267c32d7",
+    "sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3",
+    "bytes": 311327
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/pl.json",
+    "previous_sha256": "ffc711504ed1bdf221360ee2763608f2a30a42f9d4a12b3e119af62c9515cd98",
+    "sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78",
+    "bytes": 324481
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/pt.json",
+    "previous_sha256": "880b684d04fb0aa661ac8193c55e4b86fd0de075332164d79ff97a1427665c99",
+    "sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9",
+    "bytes": 325581
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/ru.json",
+    "previous_sha256": "8d6066aaf6a7faefcb6dfd6875810544068cfe4155e608ae7c7026812aa78ed8",
+    "sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1",
+    "bytes": 435640
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/sv.json",
+    "previous_sha256": "4940c67c268cf71803d988c368054f38331574c18b76cfbb5ad24fc0557259c3",
+    "sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607",
+    "bytes": 316499
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/tr.json",
+    "previous_sha256": "a9d9a991fcb248d0cc19855b477602bcd3e623fbc3819dcb9f7a8268c67e40dd",
+    "sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0",
+    "bytes": 323152
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/uk.json",
+    "previous_sha256": "33d811ed3a7b242ba7cfa9956b4952a5677f06ca49910cd5d29bba3830a3a067",
+    "sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1",
+    "bytes": 431385
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/locales/zh.json",
+    "previous_sha256": "7cb635e751c63b75e5aac433ef5d28cc2ff39a44fc5b743bcfcf985966bf1502",
+    "sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50",
+    "bytes": 296007
+  },
+  {
+    "path": "static/ergopti_plus/_shared/modules/features/README.md",
+    "previous_sha256": "3015aef398dbe37d1d4244af5ef1321cc07c70be7658ba357edbd2131eeb87df",
+    "sha256": "5d20cff6ba9f94ca08c8b1caedd45431c0e528d6d4ff5c84407a03af6705454a",
+    "bytes": 3969
+  },
+  {
+    "path": "static/ergopti_plus/_shared/modules/features/behaviors.json",
+    "previous_sha256": "56def349b06335ec239a39ac2423c85a3a24986e075e357fcb1e58d119b1ac5a",
+    "sha256": "b048c72aa23c6f2bcbf061fd5a1e59946e50bed87cc063f4cfc10d688c89dd7d",
+    "bytes": 3336
+  }
+]

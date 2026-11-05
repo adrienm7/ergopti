@@ -1,0 +1,9 @@
+{
+	"parameters": {
+		"ERGOPTI_MANAGED_NATIVE_MODERN_CURL": "/usr/bin/curl",
+		"ERGOPTI_MANAGED_NATIVE_MODERN_SHA256": "52e9ceef96bd7c7dd4c2c9d8ac4c5f466c563dc0d16817720518b430da7a94b7",
+		"ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+		"ERGOPTI_NATIVE_LUA_CPATH": "/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/workspace/scratch/parity-toolchain/modules51/?.so;;"
+	},
+	"qualification": "Actual expected Git HEAD, source-built ELF LuaJIT directory and genuine luv/lfs C modules; no response or command stubs."
+}

@@ -1,0 +1,9 @@
+
+=== output transaction: commit ===
+  ok   commits only after balanced output and exact modifier restoration
+
+=== output transaction: every emission can fail ===
+  ok   never commits and always balances state after one failed step
+  ok   releases partial synthetic presses after a false return or exception
+  ok   reports cleanup failure instead of claiming a balanced state
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":4}

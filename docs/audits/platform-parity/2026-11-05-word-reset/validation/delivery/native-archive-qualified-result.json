@@ -1,0 +1,5 @@
+{
+	"exit_code": 0,
+	"command": ["npm", "run", "test:linux:updater-archive-native"],
+	"qualification": "Native archive gate, not desktop input receiving."
+}

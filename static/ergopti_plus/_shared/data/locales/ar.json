@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "لا يوجد مفتاح تبديل في Linux: يختار GNOME وKDE «تكرار» من مبدّل الشاشات الخاص بهما Super+P؛ عيّن ذلك المفتاح كتركيبة مفاتيح.",
 	"platform_reason.action_sticky_keys_are_the_systems": "لهذا النظام «المفاتيح الثابتة» في إعدادات إمكانية الوصول، فتجعل كل مفتاح تعديل يعمل لمفتاح واحد؛ فعّلها هناك.",
 	"platform_reason.action_take_note_uses_notepad": "Windows فقط: يفتح هذا الإجراء ملف ملاحظات اليوم في المفكرة، المحرر المرفق بكل Windows. لدى macOS «ملاحظة سريعة» خاصة به (Fn+Q)، ولا يملك Linux محرراً مرفقاً بكل بيئات سطح المكتب.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "في macOS يقرأ «النص المباشر» نص أي لقطة أو صورة: التقط واحدة بالإجراء المكافئ ثم حدّد نصها."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "في macOS يقرأ «النص المباشر» نص أي لقطة أو صورة: التقط واحدة بالإجراء المكافئ ثم حدّد نصها.",
+	"inventory.behavior.backspace_restore": "استعادة النص قبل التوسيع بمفتاح Backspace",
+	"inventory.behavior.repeat_condition": "يكرر حرفًا داخل الكلمة عندما لا يطابق أي توسيع ويكون التكرار بالمفتاح السحري مفعّلًا.",
+	"inventory.behavior.repeat_linux": "التكرار بالمفتاح السحري متاح، لكن التكرارات المتتالية تفقد سياقها حاليًا بعد التوسيع الأول. تتأثر أيضًا قواعد التصحيح التالية للتكرار.",
+	"inventory.behavior.backspace_linux": "قد يعيد Backspace الفوري بلا مفاتيح تعديل توسيع نص عادي مؤهلًا؛ لم يُتحقق بعد من السلوك في حقول النص الأصلية.",
+	"inventory.behavior.backspace_other": "لا توجد استعادة تلقائية لنص التشغيل باستخدام Backspace؛ تراجع التطبيق وظيفة مستقلة.",
+	"inventory.behavior.repeat_activation_window": "نافذة تفعيل التكرار بالمفتاح السحري",
+	"inventory.behavior.repeat_window_untimed": "لا توجد نافذة تفعيل مستقلة للتكرار الاحتياطي؛ بدء كلمة جديدة بعد الخمول قاعدة مستقلة.",
+	"inventory.behavior.repeat_window_macos": "يستخدم نافذة التفعيل الفعلية للمفتاح السحري، بما فيها قواعد التوقيت لمفاتيح التعديل؛ الصفر يعطل هذه النافذة. بدء كلمة جديدة بعد الخمول قاعدة مستقلة."
 }

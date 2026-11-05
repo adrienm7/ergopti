@@ -1,0 +1,54 @@
+
+=== word reset events: the word-start fixture ===
+  ok   word reset events, fires the word-start entry only at a word start
+  ok   word reset events, fires the entry that is not word-start in every state
+
+=== word reset events: an event its option owns ===
+  ok   word reset events, starts a word after a physical Left when arrow_resets_word is on
+  ok   word reset events, keeps the word across a physical Left when arrow_resets_word is off
+  ok   word reset events, starts a word after Up when arrow_resets_word is on
+  ok   word reset events, keeps the word across Up when arrow_resets_word is off
+  ok   word reset events, starts a word after Shift+Right when arrow_resets_word is on
+  ok   word reset events, keeps the word across Shift+Right when arrow_resets_word is off
+  ok   word reset events, starts a word after Ctrl+Down when arrow_resets_word is on
+  ok   word reset events, keeps the word across Ctrl+Down when arrow_resets_word is off
+  ok   word reset events, starts a word after a navigation-layer Left when arrow_resets_word is on
+  ok   word reset events, keeps the word across a navigation-layer Left when arrow_resets_word is off
+  ok   word reset events, starts a word after Ctrl+V when shortcut_resets_word is on
+  ok   word reset events, keeps the word across Ctrl+V when shortcut_resets_word is off
+  ok   word reset events, starts a word after Ctrl+Shift+V when shortcut_resets_word is on
+  ok   word reset events, keeps the word across Ctrl+Shift+V when shortcut_resets_word is off
+  ok   word reset events, starts a word after Super+Shift+S when shortcut_resets_word is on
+  ok   word reset events, keeps the word across Super+Shift+S when shortcut_resets_word is off
+  ok   word reset events, starts a word after Ctrl+Alt+V when shortcut_resets_word is on
+  ok   word reset events, keeps the word across Ctrl+Alt+V when shortcut_resets_word is off
+  ok   word reset events, starts a word after Ctrl+Enter when shortcut_resets_word is on
+  ok   word reset events, keeps the word across Ctrl+Enter when shortcut_resets_word is off
+  ok   word reset events, starts a word after a physical Ctrl+V beside the tap-holds when shortcut_resets_word is on
+  ok   word reset events, keeps the word across a physical Ctrl+V beside the tap-holds when shortcut_resets_word is off
+  ok   word reset events, starts a word after the tap-hold paste tap when tap_hold_resets_word is on
+  ok   word reset events, keeps the word across the tap-hold paste tap when tap_hold_resets_word is off
+  ok   word reset events, starts a word after V under the tap-hold Ctrl when tap_hold_resets_word is on
+  ok   word reset events, keeps the word across V under the tap-hold Ctrl when tap_hold_resets_word is off
+  ok   word reset events, keeps a word start a word start when the option is off
+  ok   word reset events, gives a tap-hold shortcut to the tap-hold option, not the shortcut one
+
+=== word reset events: typing and the unconditional keys ===
+  ok   word reset events, types an AltGr character as text, never a shortcut
+  ok   word reset events, types Shift+letter as text, never a shortcut
+  ok   word reset events, starts a word on Ctrl+Backspace whatever the options (bs-word-start)
+  ok   word reset events, keeps the unconditional reset of Home whatever the options
+
+=== word reset events: who produced the chord ===
+  ok   word reset events, flags a chord under a tap-hold Ctrl and not one under the hand's
+  ok   word reset events, names the owner of each control event
+  ok   word reset events, leaves an action another owner ran to that owner
+
+=== word reset events: erasing what was typed (bs-word-start) ===
+  ok   bs-word-start: the Backspace that erases every typed letter starts a word
+  ok   bs-word-start: a correction keeps the word open
+  ok   bs-word-start: a Backspace past the typed letters leaves an unknown start
+  ok   bs-word-start: a terminal prompt after Enter keeps its word start
+  ok   bs-word-start: Ctrl+A and a browser's Ctrl+L leave an empty field
+  ok   bs-word-start: names terminals and the delete-word chord
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":43}

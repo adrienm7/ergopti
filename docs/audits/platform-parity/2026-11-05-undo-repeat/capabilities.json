@@ -1,0 +1,628 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "undo-repeat",
+	"capabilities": [
+		{
+			"id": "repeat-toggle",
+			"contract": "Magic-key fallback is an opt-in independent feature",
+			"windows": "Default false, recommended true; rebuild fences.",
+			"macos": "Same canonical defaults; transactional registry preferences.",
+			"linux": "Same canonical defaults; persist before runtime publication.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "repeat-eligibility",
+			"contract": "Repeat only an eligible mid-word scalar under live boundary/delimiter policy",
+			"windows": "Complete UTF-16 scalar and predecessor checked.",
+			"macos": "Actual Unicode/French carrier and delimiter controls.",
+			"linux": "Production pure repeat owner and 19 common decision vectors.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "priority",
+			"contract": "A real registered/dynamic decision precedes fallback",
+			"windows": "Registry, personal combo, programmable source, then repeat.",
+			"macos": "Public keydown/registry validation precedes fallback.",
+			"linux": "Main resolves actual engine and delay before fallback.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "post-repeat-context",
+			"contract": "Keep the emitted word available to a following key",
+			"windows": "Transient repeat FinalResult=false.",
+			"macos": "Public po★ retains poo; following actual correction fires.",
+			"linux": "ACK resets matcher; second repeat/correction loses context.",
+			"classification": "observed_defect",
+			"finding_ids": ["URL-001"],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "word-boundary",
+			"contract": "Repeat must not invent a start of word",
+			"windows": "Retains prior matcher word.",
+			"macos": "Public po★x remains poox with enabled word-only x→z rule.",
+			"linux": "Public Main callbacks produce pooz; manual poox remains poox.",
+			"classification": "observed_defect",
+			"finding_ids": ["URL-001"],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "private-derived-output",
+			"contract": "A derived scalar retains its original private classification",
+			"windows": "Supported nonfinal programmable private output loses classification on repeat; shipped final personal output blocks that path.",
+			"macos": "Actual personal SSN producer then repeat publishes one derived scalar as public; actual fake-transport request includes it.",
+			"linux": "Actual personal SSN prefix then repeat publishes derived 9 as public; TRACE explicitly enabled for payload log observation.",
+			"classification": "observed_defect",
+			"finding_ids": ["URW-001", "URM-001", "URL-002"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "preview-policy",
+			"contract": "Keep repeat doubling out of the advance bubble",
+			"windows": "Oracle keeps decision; candidate UI withholds IsRepeat.",
+			"macos": "File-based preview excludes fallback.",
+			"linux": "File-based preview excludes fallback.",
+			"classification": "explicit_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Explicit maintainer policy project-the-bubble-never-offers-a-doubling; corrections are separately registered mappings.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "repeat-corrections",
+			"contract": "Independent shipped repeat-correction feature remains usable",
+			"windows": "Fourteen entries, separate feature/delay; repeat spec not final.",
+			"macos": "Actual shipped ccê→ccu after ac★ gives accu.",
+			"linux": "Same shipped rows work manually; fallback retirement prevents immediate chained correction.",
+			"classification": "observed_defect",
+			"finding_ids": ["URL-001"],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "backspace-restoration",
+			"contract": "Immediate Backspace restores an eligible expansion trigger",
+			"windows": "No specialized hotstring receipt in inspected control owners.",
+			"macos": "No specialized receipt; public control edits EXPANDED→EXPANDE.",
+			"linux": "Owned conditional receipt restores original private/destination authority; empty/key/control/lifecycle cases qualified.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "absent",
+				"macos": "absent",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Positive Linux owner and bounded negative Windows/macOS source review; no policy permanently excluding the other OS located.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "application-undo",
+			"contract": "Ctrl/Cmd+Z remains an application-owned shortcut",
+			"windows": "Ctrl+Z follows shortcut/reset policy.",
+			"macos": "Public Cmd+Z passes through; native editor result unmeasured.",
+			"linux": "Ctrl+Z follows shortcut/reset policy.",
+			"classification": "native_alternative",
+			"finding_ids": [],
+			"availability": {
+				"windows": "native-alternative",
+				"macos": "native-alternative",
+				"linux": "native-alternative"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Separate from automatic Backspace restoration; no certification of native grouping, formatting or redo.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "native-output",
+			"contract": "Equivalent visible repeat uses distinct physical transports",
+			"windows": "Erase/retype preceding scalar and magic in atomic or deferred host owner.",
+			"macos": "Suppress admitted event and emit scalar; ignored carrier requires deletion.",
+			"linux": "Erase already typed magic key and emit one scalar.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Explicit input/host transport contracts; mechanism differences do not establish equal app Undo or grapheme deletion.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "wpm-repeat-classification",
+			"contract": "Repeat stays neutral rather than a colored correction",
+			"windows": "Atomic caller normalizes repeat_key; deferred Notepad/terminal retain magickey/repeat_corrections.",
+			"macos": "Repeat publishes repeat_key variant; shared neutral policy applies.",
+			"linux": "Repeat publishes repeat_key group; shared neutral policy applies.",
+			"classification": "observed_defect",
+			"finding_ids": ["URW-002"],
+			"availability": {
+				"windows": "partial",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows exact-source sink chain; Lua publication/neutral policy; native widget receiving not recertified. Canonical row has no category field.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "inventory-domain",
+			"contract": "Always-on conditional behaviors can be represented without fake toggles",
+			"windows": "Absent from original configuration/action/menu projection.",
+			"macos": "Same original projection domain.",
+			"linux": "Linux receipt had no authored behavioral row.",
+			"classification": "observed_defect",
+			"finding_ids": ["URS-001"],
+			"availability": {
+				"windows": "absent",
+				"macos": "absent",
+				"linux": "absent"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Historical b17 baseline. Delivery adds shared behavior catalogue and site/docs projection; source hashes prompt explicit review, not semantic certification.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				}
+			]
+		},
+		{
+			"id": "english-inventory",
+			"contract": "English UI inventory headings resolve through the exported dictionary",
+			"windows": "Shared website dictionary mappings inside JSDoc are absent from exports.",
+			"macos": "Same website consumer.",
+			"linux": "Same website consumer.",
+			"classification": "observed_defect",
+			"finding_ids": ["URS-002"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Historical pinned actual JS import establishes URS-002. Root repair moves the existing mappings into the real dictionary export; final-dictionary.json confirms all thirteen inventory mappings. The dated availability cells describe the audited pin, not a remaining delivery defect.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				},
+				{
+					"path": "validation/final-dictionary.json",
+					"sha256": "c05dc3d5c902051048c1a20668c9d6bbe2759e10dce20fcc4b9e24f52cc791ce"
+				},
+				{
+					"path": "validation/final-dictionary-check.mjs",
+					"sha256": "d44dc38216421dd5ede587ef3b9e12941023f86cb5ed513413de447374f060e1"
+				}
+			]
+		},
+		{
+			"id": "repeat-activation-window",
+			"contract": "Fallback has a separate activation window, independently of idle",
+			"windows": "Absent: untimed transient Spec, source-only canonical preflight.",
+			"macos": "Present: public caller bounds repeat by effective STAR_TRIGGER and modifier factor; zero disables the window.",
+			"linux": "Absent: actual Main repeat remains eligible beyond ordinary delay.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "absent",
+				"macos": "present",
+				"linux": "absent"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Four-reviewer timing countercheck; no policy authorizing permanent asymmetry located. False describes this variant, not parent feature absence. Controlled clocks, not latency measurement.",
+			"evidence": [
+				{
+					"path": "timing-followup/report.md",
+					"sha256": "26f437d9aa66584d372c0a0c0a218c4f5e9b4f1b13f0dddeb2745b20231bf172"
+				},
+				{
+					"path": "timing-followup/windows/note.md",
+					"sha256": "0f4b374eeaea97c8237c92229a9db60ed4c91d619a0b213f59bc6f3b0ef7a8e2"
+				},
+				{
+					"path": "timing-followup/macos/note.md",
+					"sha256": "01adeaac1b2a9c4f3d24b84069258b0b960d1dd04dbc87f20acf7e0d55caa30e"
+				},
+				{
+					"path": "timing-followup/linux/note.md",
+					"sha256": "970246ec6f7d0fd66540f869770b08a2a2bfff6454d3d0fbc0a70028c66771ea"
+				},
+				{
+					"path": "timing-followup/shared/source-note.md",
+					"sha256": "64aedad3cfa0328ec4685940164a834e6ca92f890210d0474539546383e107a7"
+				}
+			]
+		},
+		{
+			"id": "expired-candidate-fallback",
+			"contract": "Candidate refusal and repeat fallback have qualified timing order",
+			"windows": "Raw registered winner can mask repeat after time refusal; user-code is a distinct path.",
+			"macos": "Validated true-star mappings bypass speed delay; unmatched repeat keeps its separate window.",
+			"linux": "Expired timed ordinary result becomes nil before repeat; actual admitted/complex/unlimited controls.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Observations retain mapping-kind and empty-catalogue qualifications; not a forced cross-kind equivalence or another G2 finding.",
+			"evidence": [
+				{
+					"path": "timing-followup/report.md",
+					"sha256": "26f437d9aa66584d372c0a0c0a218c4f5e9b4f1b13f0dddeb2745b20231bf172"
+				},
+				{
+					"path": "timing-followup/windows/note.md",
+					"sha256": "0f4b374eeaea97c8237c92229a9db60ed4c91d619a0b213f59bc6f3b0ef7a8e2"
+				},
+				{
+					"path": "timing-followup/macos/note.md",
+					"sha256": "01adeaac1b2a9c4f3d24b84069258b0b960d1dd04dbc87f20acf7e0d55caa30e"
+				},
+				{
+					"path": "timing-followup/linux/note.md",
+					"sha256": "970246ec6f7d0fd66540f869770b08a2a2bfff6454d3d0fbc0a70028c66771ea"
+				}
+			]
+		}
+	]
+}

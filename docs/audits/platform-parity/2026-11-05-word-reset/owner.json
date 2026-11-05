@@ -1,0 +1,2616 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "word-reset",
+	"roles": {
+		"windows": {
+			"report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "windows/coverage.json",
+					"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"coverage": [
+				{
+					"aspect": "physical-entry",
+					"status": "available",
+					"observation": "Physical generation then pause/end-claim/idle/current modifiers and canonical branch routing",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1746",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "synthetic-entry",
+					"status": "available",
+					"observation": "Public parameterized shortcut and actual TextPressKey funnel use atomic declaration plus send",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:262",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "arrow-reset-toggle",
+					"status": "available",
+					"observation": "Default/recommended true; physical and synthetic arrows share live flag under every modifier",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1786",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "shortcut-reset-toggle",
+					"status": "available",
+					"observation": "Default true; off intentionally retains across CtrlV/CtrlZ; AltGr/Shift typing excluded",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:113",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "tap-hold-origin-toggle",
+					"status": "available",
+					"observation": "Current command tap, owned Ctrl/Alt/Win or active layer; separate setting on Windows/Linux",
+					"source": "static/ergopti_plus/windows/platform/remap/constants.ahk:1364",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "macos-tap-hold-limitation",
+					"status": "intentional",
+					"observation": "Explicit shared platform reason; Karabiner output follows normal shortcut policy; preexisting TODO",
+					"source": "static/ergopti_plus/_shared/modules/features/manifest.toml:595",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "home-end-page-navigation",
+					"status": "policy-ambiguity",
+					"observation": "Bare navigation resets; modified versions follow shortcut/tap-hold flag; manifest scope ambiguous",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1804",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "insert-delete",
+					"status": "available",
+					"observation": "Always reset and never assume precise text or word boundary for physical deletion",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1802",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "plain-backspace",
+					"status": "available",
+					"observation": "One complete scalar decrement; empty buffer changes start knowledge except known empty-line state",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:940",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "ctrl-backspace",
+					"status": "available",
+					"observation": "Real Ctrl without Alt/Win resets HSE at known prior-word start regardless flags",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1341",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "alt-win-backspace-physical",
+					"status": "available",
+					"observation": "Unknown-start reset; physical behavioral test names no word-start promise",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1790",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "alt-win-backspace-synthetic",
+					"status": "partial",
+					"observation": "WRSW001: generic successful synthetic edit incorrectly establishes known true",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:204",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "select-all",
+					"status": "available",
+					"observation": "CtrlA nonterminal records known empty replacement line; terminal retains distinct command semantics",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1810",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "ctrl-find-location",
+					"status": "available",
+					"observation": "Explicit CtrlF/L focus invalidation to unbound token; AltGr fake Ctrl excluded",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1321",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "enter-terminal-multiline",
+					"status": "available",
+					"observation": "Bare terminal Enter promises empty line; ShiftEnter does not; end-completion owner preserves input ordering",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1843",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "escape-tab",
+					"status": "available",
+					"observation": "Physical reset focus unknown and forward AI flush; accepted end keys owned before ordinary path",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1837",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "idle-default-zero",
+					"status": "available",
+					"observation": "Shared3s and zero disabled; finite nonnegative validation and native 64-bit tick differences",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1048",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "idle-backspace-recovery",
+					"status": "available",
+					"observation": "Forgotten exact buffer restored only if generation/content unchanged and matcher empty; no fragment restoration",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2026",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "ai-navigation-policy",
+					"status": "available",
+					"observation": "Default reset_on_nav true; ordinary physical navigation reaches reset while explicit false retains context",
+					"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1688",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "ai-shortcut-continuity",
+					"status": "partial",
+					"observation": "WRSW002: complete context survives physical modifiedBackspace/selectAll early branches",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1790",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "agent-only-continuity",
+					"status": "partial",
+					"observation": "Same WRSW002 complete-context preservation and next fresh-char observer while predictions off",
+					"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1158",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "ai-synthetic-continuity",
+					"status": "partial",
+					"observation": "Same WRSW002: no complete-context mutation in synthetic key declaration; send-level echo intentionally excluded",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk:152",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "stale-ai-observer-admission",
+					"status": "available",
+					"observation": "Physical/content/focus/lifecycle guards reject old owners; do not repair semantic buffer on fresh observer",
+					"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1224",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "incomplete-utf16-revocation",
+					"status": "available",
+					"observation": "Caret/input boundaries revoke dangling units; complete-string retention is why WRSW002 survives",
+					"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:166",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "config-persist-runtime",
+					"status": "available",
+					"observation": "Validated shared defaults; persist-before-publish; read live without reload; failure visibly retained",
+					"source": "static/ergopti_plus/windows/ui/editors.ahk:642",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "lifecycle",
+					"status": "available",
+					"observation": "Deferred owner invalidation and global HSE hard reset; bridge stop retires observer/typing state",
+					"source": "static/ergopti_plus/windows/infra/lifecycle.ahk:682",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				},
+				{
+					"aspect": "native-receiving-performance-memory",
+					"status": "unmeasured",
+					"observation": "No AHK parser/InputHook/real CtrlAltWin operation, app Undo, request, benchmark or memory qualification",
+					"source": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk:1287",
+					"basis": "source",
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request. Submitted basis: Exact-source review, no AutoHotkey execution or native receiving",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "ecffdeb672a960d97431916af52ca7c6279aa6639b78ff40352e1db91db9ef18"
+						}
+					]
+				}
+			],
+			"findings": [
+				{
+					"id": "WRSW-001",
+					"title": "Synthetic Alt and Win Backspace invent a known word start",
+					"severity": "medium",
+					"confidence": "high",
+					"guarantees": [],
+					"additional_properties": ["physical_synthetic_word_boundary_parity"],
+					"reproduction": "SOURCE-ONLY: public send_shortcut alt+backspace passes real parsing/emission/TextPressKey into successful canonical synthetic edit, clearing HSE with KnownBoundary=true; equivalent physical Alt+Backspace sets unknown false. Unbound focus re-admission preserves the synthetic true, so a word-only mapping can fire after the unknown undo/delete position.",
+					"root_cause": "HS_CommitSyntheticEffect uses one successful-edit boundary verdict for every generic edit; unlike the physical modified-Backspace branch it does not distinguish known Ctrl word deletion from unknown Alt/Win undo/delete semantics.",
+					"silent_failure": "The sender and context commit both succeed, and the diagnostic only says buffers reset. No exception identifies the invented boundary. Existing physical Alt+Backspace behavioral test explicitly requires unknown but does not compare the public synthetic sibling.",
+					"regression_test": "Actual AHK parsed send_shortcut/TextPressKey/canonical effect and real physical keydown: compare Ctrl/Alt/Win/Shift Backspace boundary and subsequent word-only/in-word matcher decisions, with settings on/off, focus rebinding, Unicode fragments, send refusal. Retain atomic declaration/send and fail-closed unknown contexts.",
+					"basis": "source",
+					"source_report": "docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/findings.json",
+							"sha256": "f0bd1dd6212549a2bfddb151d8a9614bf268831d187e616c4b36f3c61005677c"
+						},
+						{
+							"path": "validation/root-replay/receipts.json",
+							"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+						}
+					],
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request."
+				},
+				{
+					"id": "WRSW-002",
+					"title": "Physical editing shortcut branches preserve obsolete complete AI context",
+					"severity": "medium",
+					"confidence": "high",
+					"guarantees": [],
+					"additional_properties": ["ai_context_continuity_after_unknown_edit"],
+					"reproduction": "SOURCE-ONLY: complete active prediction context OLD_WORD with reset_on_nav=true, or agent-only context with active typing feed; Ctrl+Backspace deletes the word (or Ctrl+A then x replaces selection), then type x in stable focus. Real prefix-hook early branch resets only HSE/preview; incomplete-only bridge discard preserves complete AI context. Next char appends x, fresh observer captures current physical generation and forwards obsolete OLD_WORDx to engine/agent.",
+					"root_cause": "LLM key forwarding sits below the physical shortcut/modified-Backspace early returns. Prefix context mutation only discards incomplete UTF16; bridge dispatcher fallback intentionally returns while prefix hook exists. Synthetic key declarations similarly have no complete AI-context edit while SendLevel0 prevents hook echo.",
+					"silent_failure": "All strings and newly captured generation/focus receipts are valid. Old observer/output fences work but do not detect a new owner carrying obsolete semantic text. Length diagnostics and direct bridge navigation tests do not cover real prefix shortcut branching. No actual network or persistence measured.",
+					"regression_test": "Genuine AHK real prefix keydown and actual bridge/agent owners: complete contexts after Ctrl+Backspace and Ctrl+A replacement must match empty/known edited text before next real engine/agent observer. Include inactive requests, CtrlZ/Y/V/F/L, Alt/Win, reset_on_nav policy, tap-hold modifier and command/synthetic sources, stale/focus/pause/refused output; keep self-echo disabled and stale-owner admission intact.",
+					"basis": "source",
+					"source_report": "docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+						},
+						{
+							"path": "windows/findings.json",
+							"sha256": "f0bd1dd6212549a2bfddb151d8a9614bf268831d187e616c4b36f3c61005677c"
+						},
+						{
+							"path": "validation/root-replay/receipts.json",
+							"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+						}
+					],
+					"qualification": "22 authenticated source files and 24 lexical relationships; no AutoHotkey execution, native application or actual model request."
+				}
+			]
+		},
+		"macos": {
+			"report": "macos/report.md",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "macos/coverage.json",
+					"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"coverage": [
+				{
+					"id": "MAC-WRS-01",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Defaults and runtime gates",
+					"status": "available",
+					"description": "Idle defaults to three seconds; click, arrow, shortcut and AI navigation reset default on. Finite and boolean setters update the live owners.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Source and executed registered owners"
+				},
+				{
+					"id": "MAC-WRS-02",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Sparse preferences and reload",
+					"status": "available",
+					"description": "Word-reset values roundtrip through canonical TOML; defaults are stored as absent and invalid source types are refused.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: executed actual registered preferences owner"
+				},
+				{
+					"id": "MAC-WRS-03",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Menu setting ownership",
+					"status": "available",
+					"description": "Word-reset commands use their runtime setter and persistence owner; AI reset uses a runtime-getter transaction. Native menu receiving was not executed.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: source-only menu boundary"
+				},
+				{
+					"id": "MAC-WRS-04",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Arrow reset on",
+					"status": "available",
+					"description": "Arrows with every modifier family follow the arrow option: reset on empties the buffer and opens a word.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: actual public and registered control"
+				},
+				{
+					"id": "MAC-WRS-05",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Arrow reset off",
+					"status": "available",
+					"description": "Turning arrow reset off deliberately keeps the word across cursor movement; AI lifetime is configured separately.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Manifest explicitly keeps the word when off",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit shared manifest and actual public owner"
+				},
+				{
+					"id": "MAC-WRS-06",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Shortcut reset on/off",
+					"status": "available",
+					"description": "Cmd/Ctrl shortcut families follow the shortcut option. Option and Shift alone remain typing.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner and registered 37-case module"
+				},
+				{
+					"id": "MAC-WRS-07",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Modified arrow precedence",
+					"status": "available",
+					"description": "Cmd plus an arrow follows the arrow option, rather than the shortcut option.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed registered Keymap owner"
+				},
+				{
+					"id": "MAC-WRS-08",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Foreign remapper chord",
+					"status": "available",
+					"description": "A foreign source PID 4242 Cmd+Z event follows ordinary shortcut reset; AI retention is observed immediately.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed public owner over native ports"
+				},
+				{
+					"id": "MAC-WRS-09",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Independent tap-hold reset option",
+					"status": "intentional_difference",
+					"description": "macOS lacks this independent option because Karabiner output arrives like keyboard input. Ordinary shortcut and arrow options govern it; this is already documented.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Manifest explicitly excludes macOS and names Karabiner ownership",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit shared manifest"
+				},
+				{
+					"id": "MAC-WRS-10",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Mouse click reset",
+					"status": "available",
+					"description": "A click always drops the cursor-relative buffer. Turning click reset off marks the next run as midword. Native quarantine cleanup is deferred.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Explicit shared manifest click policy",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Source policy and public click control"
+				},
+				{
+					"id": "MAC-WRS-11",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Scroll behavior",
+					"status": "intentional_difference",
+					"description": "Scroll is excluded because it does not move the text cursor. The source gives an event-frequency rationale; no performance measurement is claimed.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Source explicitly excludes scrollWheel",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit source policy"
+				},
+				{
+					"id": "MAC-WRS-12",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Idle ordinary typing",
+					"status": "available",
+					"description": "An ordinary key after three seconds resets the previous word and AI context. Zero disables idle reset.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner and registered policy controls"
+				},
+				{
+					"id": "MAC-WRS-13",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Idle bare Backspace",
+					"status": "available",
+					"description": "Bare Backspace after idle retains the editable previous word. The observed AI mirror contains bonjou; no additional root is counted.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Sharedmanifest explicitly keeps the word for Backspace after a pause",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit shared manifest and public owner"
+				},
+				{
+					"id": "MAC-WRS-14",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Option Backspace",
+					"status": "intentional_difference",
+					"description": "Option+Backspace is macOS previous-word deletion: it clears the word and opens a boundary. It corresponds to Ctrl+Backspace elsewhere. AI context is retained immediately when requested.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "OS modifier semantics in the shared manifest",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit shared manifest and public owner"
+				},
+				{
+					"id": "MAC-WRS-15",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Command/Control Backspace",
+					"status": "available",
+					"description": "Cmd/Ctrl+Backspace delete an unknown amount and reset to an unknown boundary regardless of the word-reset checkboxes. AI context is retained immediately when requested.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit shared manifest and public owner"
+				},
+				{
+					"id": "MAC-WRS-16",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Bare Backspace observed start",
+					"status": "available",
+					"description": "Deleting all observed text opens a word start. An extra Backspace beyond that start makes the boundary unknown unless an empty line is known.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner and registered controls"
+				},
+				{
+					"id": "MAC-WRS-17",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Main terminal Return",
+					"status": "available",
+					"description": "Bare Return in a classified terminal publishes an empty-line receipt that supports blank-prompt Backspace. Native Terminal receiving is unmeasured.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public identity port and explicit shared manifest"
+				},
+				{
+					"id": "MAC-WRS-18",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Keypad terminal Enter",
+					"status": "partial",
+					"description": "WRM-002: keypad keycode 76 omits the empty-line receipt under both CR and ETX payloads when the host submits. Native binding and receiving are explicit conditions.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner, with conditional native effect"
+				},
+				{
+					"id": "MAC-WRS-19",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Enter end-character spellings",
+					"status": "qualified_observation",
+					"description": "CR expands the qq mapping with keycode 36 or 76; ETX with keycode 76 does not. Actual native event spelling is unmeasured; this is not an additional root.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed public payload controls"
+				},
+				{
+					"id": "MAC-WRS-20",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Shift Return / multiline Return",
+					"status": "available",
+					"description": "Terminal Shift+Return and TextEdit Return retain multiline word context instead of promising an empty prompt.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public app identity ports"
+				},
+				{
+					"id": "MAC-WRS-21",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Select All field vs terminal",
+					"status": "intentional_difference",
+					"description": "Cmd+A in a field promises a whole-field selection; Cmd+A in a terminal selects scrollback and does not promise an empty field.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Source documents selected-field and scrollback distinction",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Shared manifest, source app heuristic and public owner"
+				},
+				{
+					"id": "MAC-WRS-22",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Browser location selection",
+					"status": "intentional_difference",
+					"description": "Cmd+L in Safari promises whole-address selection; Cmd+L in TextEdit does not promise an empty field.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": "Source explicitly scopes browser location selection",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Source app heuristic and public owner"
+				},
+				{
+					"id": "MAC-WRS-23",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Home End Page Delete",
+					"status": "available",
+					"description": "Home, End, Page navigation and forward Delete clear the word at an unknown boundary independently of the arrow option.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Source and executed registered controls"
+				},
+				{
+					"id": "MAC-WRS-24",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "AI retention immediately after navigation",
+					"status": "available",
+					"description": "The shared retained_after_navigation function correctly keeps or clears AI text at the control boundary.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed public 12-case option cross product"
+				},
+				{
+					"id": "MAC-WRS-25",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "AI context after next ordinary edit",
+					"status": "partial",
+					"description": "WRM-001: five public scenarios override the independent AI lifetime. Actual request serialization has two mismatches and two positive controls.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed public owner and separate request owner"
+				},
+				{
+					"id": "MAC-WRS-26",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Escape no-tooltip",
+					"status": "qualified_observation",
+					"description": "Without a tooltip, the AI preference currently clears or retains the hotstring buffer; tested AI continuation works. Linux differs, but no separate settled product rule was located.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner and source comparison across OS"
+				},
+				{
+					"id": "MAC-WRS-27",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Escape visible/quarantined/refused deferral",
+					"status": "available",
+					"description": "Consumed visible Escape revokes cursor eligibility. Refused deferral preserves prior state. No native application effect is inferred.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed registered Bridge controls"
+				},
+				{
+					"id": "MAC-WRS-28",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Pause and resume",
+					"status": "available",
+					"description": "Pause revokes both contexts. A paused physical key passes through without mutation. Resume begins a new observed run.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Executed public Keymap owner"
+				},
+				{
+					"id": "MAC-WRS-29",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Stop/lifecycle generation",
+					"status": "available",
+					"description": "Stop revokes both contexts and the private-prefix mark. Actual public stop and registered generation reconciliation controls execute.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual public owner and registered controls"
+				},
+				{
+					"id": "MAC-WRS-30",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Observation gaps, focus and privacy",
+					"status": "available",
+					"description": "Source fences and registered action-epoch, outage and private-context baseline controls cover withdrawal. Native focus receiving is unexecuted.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Actual Lua owners and nine structural source controls"
+				},
+				{
+					"id": "MAC-WRS-31",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Context capacity",
+					"status": "qualified_observation",
+					"description": "macOS mirrors a byte-gated hotstring buffer that trims to 500 codepoints above 2000 bytes. Linux has a separate 2048-codepoint context. No additional configured lower-bound promise was established.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Source comparison only"
+				},
+				{
+					"id": "MAC-WRS-32",
+					"os": "macos",
+					"module": "word-reset",
+					"aspect": "Native editor/network and performance",
+					"status": "unmeasured",
+					"description": "Actual desktop selection, undo, terminal binding and HTTP delivery are unexecuted. There is no G4 measurement or long-running memory claim.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "ccdbbc8580ec16ff77288c9d8b42a0f2b1f0b702b034aa8094208182940eeeaa"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Submitted basis: Explicit coverage gap"
+				}
+			],
+			"findings": [
+				{
+					"id": "WRM-001",
+					"title": "Next typing replaces the independent AI navigation policy with the hotstring lifetime",
+					"severity": "medium",
+					"confidence": "high",
+					"guarantees": [],
+					"additional_properties": ["independent_ai_context_policy"],
+					"reproduction": "Actual public Keymap: type bonjour, navigate, type x. AIreset=false+wordreset=true retains context immediately then loses it to x; AIreset=true+wordreset=false clears immediately then resurrects bonjourx. Arrow and shortcut crossproducts plus click. Separate actual request serializer confirms omission/resurrection over fake HTTP.",
+					"root_cause": "Bridge.check_nav_reset applies independent retention correctly, but update_preview_body subsequently sets llm_buffer from ai_context_of(cursor-relative hotstring buffer), overriding the independent lifetime on the next edit.",
+					"silent_failure": "Typing and requests succeed without diagnostics; registered navigation regression checks immediate retention but not next ordinary-character continuity.",
+					"regression_test": "Actual public arrow/shortcut/click followed by ordinary typing and edits under both preference crossproducts; independently retain or clear AI text through actual request serialization while keeping private redaction and cursor-safe hotstring resets.",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/findings.json",
+							"sha256": "3540af1233093ce18601b747c1c573d6183909150896d723f7827bc38b55c348"
+						},
+						{
+							"path": "validation/root-replay/receipts.json",
+							"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+						}
+					],
+					"basis": "actual-owner",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving."
+				},
+				{
+					"id": "WRM-002",
+					"title": "Terminal empty-prompt receipt recognizes main Return but excludes keypad Enter",
+					"severity": "low",
+					"confidence": "high",
+					"guarantees": [],
+					"additional_properties": ["enter_key_identity"],
+					"reproduction": "Condition: classified terminal accepts bare keypadEnter as submission and later Backspaces at empty prompt. Actual public Keymap/TOML fixture: a,submit,a,Backspacex2,r. MainReturn36 emits word-only r→R; keypad76 CR/ETX controls retain pre-submit word and emitno expansion. Native receiving is unexecuted.",
+					"root_cause": "Main Keymap terminal-empty-prompt and no-prediction reset branches check only Keycodes.RETURN36, although generated HID identity and Bridge explicitly support keypadEnter76 as equivalent Enter-family identity.",
+					"silent_failure": "No exception or diagnostic; mainReturn-only registered empty-prompt regressions pass, and keypad state is treated as ordinary retained typed text.",
+					"regression_test": "Actual public main/keypad Enter family, supported native payloads, conditional terminal-submit+empty-prompt deletion and subsequent word-only rules; preserve multiline/ShiftReturn, predictions, pause/focus refusal and terminals with different keypad bindings.",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+						},
+						{
+							"path": "macos/findings.json",
+							"sha256": "3540af1233093ce18601b747c1c573d6183909150896d723f7827bc38b55c348"
+						},
+						{
+							"path": "validation/root-replay/receipts.json",
+							"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+						}
+					],
+					"basis": "actual-owner",
+					"qualification": "Actual public Lua Keymap/Bridge controls over recorded native ports; separate actual serializer over fake HTTP corroborates transitions. No native terminal/input payload or network receiving. Conditional on terminal accepting bare keypad Enter as submission and later Backspaces at an empty prompt; no unconditional G2 claim."
+				}
+			]
+		},
+		"linux": {
+			"report": "linux/report.md",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "linux/coverage.json",
+					"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"coverage": [
+				{
+					"id": "L01",
+					"aspect": "Defaults and platform ownership",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Idle threshold 3 seconds; click, arrow, shortcut and tap reset enabled; AI navigation reset enabled. Tap reset is declared only on Windows/Linux.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Mac Karabiner outputs follow ordinary shortcut ownership per explicit manifest rationale",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: source+registered runtime"
+				},
+				{
+					"id": "L02",
+					"aspect": "Canonical preference/menu/live publication",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Menu calls WordReset setters; a sparse conditional canonical write must be acknowledged before the cached runtime value changes.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: source+registered runtime"
+				},
+				{
+					"id": "L03",
+					"aspect": "Read/outdated/write/scope refusal and restoration",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Configuration readers classify malformed/outdated values; setters refuse invalid types, external source changes and acquired preference scopes. Scope owners adopt and restore WordReset state.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: registered runtime"
+				},
+				{
+					"id": "L04",
+					"aspect": "Physical four arrows and next-key context independence",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "The actual next letter and predictor receiver retain prior AI context with navigation reset off even when the word resets. Independently, navigation reset on clears the AI context when the word is retained.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/engine/context"
+				},
+				{
+					"id": "L05",
+					"aspect": "Nonarrow Home/End/Page/Insert/Delete",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Home, End, Page Up/Down, Insert and Delete reset the matcher at an unknown position even with arrow/shortcut reset disabled. Navigation reset off retains AI context.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Explicit manifest distinction for nonarrow navigation",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/engine/context"
+				},
+				{
+					"id": "L06",
+					"aspect": "Catalogue action arrow semantic notification",
+					"status": "defect WRSL-001 submechanism A",
+					"basis": "actual-owner",
+					"detail": "An acknowledged Left DOWN/UP pair leaves matcher and AI context ab despite both reset settings being enabled; the next c feeds abc.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual manager/emitter/Writer/Broker"
+				},
+				{
+					"id": "L07",
+					"aspect": "Own tap-hold arrow governing option",
+					"status": "defect WRSL-001 submechanism B",
+					"basis": "actual-owner",
+					"detail": "With arrow reset off and tap reset on the word wrongly resets; with the inverse settings it wrongly remains. The actual catalogue allows arrow_left and the native event pair is acknowledged.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual TapHoldEngine/Main/manager/emitter/Writer/Broker"
+				},
+				{
+					"id": "L08",
+					"aspect": "Held tap-hold modifier shortcut provenance",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "A held tap-hold Ctrl+S reports tap_hold=true and follows tap reset off even while ordinary shortcut reset is enabled.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/TapHoldEngine/Main"
+				},
+				{
+					"id": "L09",
+					"aspect": "Direct undo/redo chords and AI unknown-edit clearing",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z forget unknown-edit AI context regardless of navigation reset off. The word deliberately remains when shortcut reset is disabled.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Explicit Main unknown-edit policy independent of word setting",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/context"
+				},
+				{
+					"id": "L10",
+					"aspect": "Direct CtrlV versus ordinary shortcut",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Ctrl+V clears unknown-edit AI context; Ctrl+S preserves it with navigation reset off. No actual clipboard operation runs.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/context"
+				},
+				{
+					"id": "L11",
+					"aspect": "Terminal conservative movement/edit chords",
+					"status": "intentional qualification",
+					"basis": "actual-owner",
+					"detail": "Terminal Alt+B clears AI context with navigation reset off; the same GUI chord retains it. Main explicitly applies a conservative rule to selected Readline chords.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: source+actual reader/Main/context"
+				},
+				{
+					"id": "L12",
+					"aspect": "Own tap paste context granularity",
+					"status": "unresolved policy qualification",
+					"basis": "actual-owner",
+					"detail": "The generic tap-navigation policy retains AI context with navigation reset off, unlike direct Ctrl+V. The action receiver records dispatch; clipboard data is not pasted.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Source explicitly classifies all tap commands as navigation; no extra confirmed finding",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual TapHoldEngine/Main/context"
+				},
+				{
+					"id": "L13",
+					"aspect": "Ordinary Backspace after idle",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "A long idle before Backspace does not wipe the preceding word. Typing ab, Backspace and c produces ac in both matcher and context.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Fixed shared backspace policy",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/context"
+				},
+				{
+					"id": "L14",
+					"aspect": "Ctrl/Alt/Super word deletions",
+					"status": "present with native qualification",
+					"basis": "actual-owner",
+					"detail": "Ctrl+Backspace establishes a word start and clears AI context. Alt+Backspace establishes an unknown start and clears it. Super follows the same source branch; native application bindings were not measured.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: source+actual Ctrl/Alt controls"
+				},
+				{
+					"id": "L15",
+					"aspect": "Known empty line after SelectAll/browser address chord",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Ctrl+A in an editor and Ctrl+L in a browser preserve known empty-line authority through Backspace. Terminal Ctrl+A lacks that authority and the boundary becomes unknown.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Source logical whole-field contracts; actual selected-range receipt unmeasured",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/engine"
+				},
+				{
+					"id": "L16",
+					"aspect": "Idle pause before ordinary input",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "After the three-second threshold, an ordinary c forgets the old word and AI context. Zero disables idle reset; registered cases cover shared resolution and bounds.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual Main clock/engine/context+registered runtime"
+				},
+				{
+					"id": "L17",
+					"aspect": "Escape independent AI navigation setting",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Escape establishes a word start. With navigation reset off the AI context retains ab and the next c produces abc.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/context"
+				},
+				{
+					"id": "L18",
+					"aspect": "Bare Enter GUI versus terminal and control Enter",
+					"status": "behavior qualification",
+					"basis": "actual-owner",
+					"detail": "GUI typed newline retains ab\\nc even with navigation reset enabled. A terminal resets the word to its prompt and clears AI context only with navigation reset on. Ctrl+Enter uses the control route.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Typed multiline versus control/navigation policy; no universal Enter reset obligation inferred",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/WordReset/context"
+				},
+				{
+					"id": "L19",
+					"aspect": "ShiftEnter terminal modifier admission",
+					"status": "known limitation",
+					"basis": "actual-owner",
+					"detail": "Shift+Enter uses the bare typed-newline route and terminal prompt reset. This modifier limitation is already documented in routed memory.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Known limitation, not asserted deliberate behavior",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main"
+				},
+				{
+					"id": "L20",
+					"aspect": "Pointer privacy reset with navigation retention",
+					"status": "conservative qualification",
+					"basis": "actual-owner",
+					"detail": "A click invalidates field authority and clears AI context before the navigation reset, so disabling navigation reset does not preserve that text. Click word reset off establishes an unknown boundary.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"intent": "Privacy owner supersedes navigation preference; preserve this guard",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual Main pointer/FocusGuard/reset_text/context"
+				},
+				{
+					"id": "L21",
+					"aspect": "Raw Tab and focus invalidation",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Raw Tab and a changed field invalidate and clear old context. This does not certify input reception by a native successor field.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual reader/Main/FocusGuard/reset_text"
+				},
+				{
+					"id": "L22",
+					"aspect": "Pause reset and AI off",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "The actual Main pause-reset callback clears both buffers; disabled AI retains nothing. The runtime pause controller and native desktop resume are outside this role's execution.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual Main pause reset callback/context"
+				},
+				{
+					"id": "L23",
+					"aspect": "Synthetic provenance and native issuance",
+					"status": "guarded boundary with missing semantic publication",
+					"basis": "actual-owner",
+					"detail": "The actual Writer acknowledgments are recorded; source policy excludes the own uinput device. Feeding synthetic output back into the matcher is not a valid repair for the missing owned notification.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: actual Writer/Broker plus source device policy"
+				},
+				{
+					"id": "L24",
+					"aspect": "Physical gesture acquisition/native editor/model response/latency/memory",
+					"status": "unmeasured",
+					"basis": "source",
+					"detail": "Public action dispatch executes. Physical touchpad acquisition, native caret/text/selection, IME, a model request, runtime latency and heap behavior were not measured.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "31026d32199b82a046031d90106942b3a53211a10eddb50ca54966e8ba7be843"
+						}
+					],
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request. Submitted basis: coverage gap"
+				}
+			],
+			"findings": [
+				{
+					"id": "WRSL-001",
+					"title": "Synthetic action arrows bypass the governing arrow and context policy",
+					"severity": "medium",
+					"confidence": "high",
+					"guarantees": ["G2"],
+					"additional_properties": [
+						"governing_arrow_ownership",
+						"ai_context_navigation_publication"
+					],
+					"reproduction": "Run continuity-probe.lua against the audited tree. Catalogue arrow_left with arrow reset and AI navigation reset enabled emits acknowledged 105 DOWN/UP through the real Manager/Emitter/Writer/Broker, yet keeps the word and AI context ab; the following physical c produces abc and Main passes abc to its predictor receiver. An actual own tap arrow with arrow reset off and tap reset on resets the word to c; the inverse settings keep abc. Physical-arrow controls independently exercise the enabled word and AI reset effects.",
+					"root_cause": "Two explicitly separate action-origin submechanisms share the absence of canonical arrow semantic effect publication. (A) Public catalogue _execute_action sends its generated combo through ComboEmitter/Writer with no WordReset/engine notification; Main gestures.init supplies no such observer and synthetic output is deliberately excluded from keyboard input. (B) Main own tap-action callback invokes generic WordReset.apply_tap_action(engine,binding), classifying every catalogue action by tap_hold_resets_word and discarding whether its effect is an arrow. Physical control_owner correctly gives arrows precedence. Shared manifest explicitly requires arrow_resets_word regardless of source.",
+					"silent_failure": "Native output succeeds. No diagnostic names the missing/wrong logical reset effect or ignored governing setting. Separately green physical-word-reset and emitter-order tests do not join these action origins to their canonical semantic owner.",
+					"regression_test": "Cover both independent admission paths: public catalogue arrow dispatch and actual TapHoldEngine own arrow actions through Main, using the real engine/context and Writer acknowledgments. Cover all four arrows, modifiers, arrow/tap/AI settings on and off, the next typed key and predictor context, native refusal and lifecycle/privacy guards. Preserve self-synthetic filtering. A fix in one caller must not close the sibling path.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+						},
+						{
+							"path": "linux/findings.json",
+							"sha256": "4cb550f57c6934f0fd04cc1f30b4967302d9e4c75712b3d9241105fd337277d8"
+						},
+						{
+							"path": "validation/root-replay/receipts.json",
+							"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+						}
+					],
+					"basis": "actual-owner",
+					"qualification": "Actual hook/Main/WordReset/engine/context and action manager/emitter/Writer/Broker; controlled syscall/preference/predictor ports, no native editor or completed request."
+				}
+			]
+		},
+		"shared": {
+			"report": "shared/report.md",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				},
+				{
+					"path": "shared/coverage.json",
+					"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3baee7a334bbb42ff3607532820ee2e122a324945cdacdb8b830977ea24c63fc"
+				}
+			],
+			"coverage": [
+				{
+					"id": "S01",
+					"aspect": "Canonical declarations and effective defaults",
+					"status": "present",
+					"detail": "Actual model: idle3; click/arrow/shortcut/tap-hold/reset_on_nav true; Mac raw false state fields are overridden placeholders.",
+					"basis": "actual-owner",
+					"intent": "Manifest source defines defaults; no inferred OS policy.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual model+source"
+				},
+				{
+					"id": "S02",
+					"aspect": "Idle predicate and configurable disabled value",
+					"status": "present",
+					"detail": "Seven shared vectors plus invalid finite/range and coarse-clock boundaries; zero disables idle.",
+					"basis": "actual-owner",
+					"intent": "Clock-resolution subtraction is explicitly conservative on Linux fallback.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual shared Lua54+JIT"
+				},
+				{
+					"id": "S03",
+					"aspect": "Idle versus user Backspace caller ownership",
+					"status": "different",
+					"detail": "Windows forgotten-word restore; Mac skips bare-Backspace wipe; Linux control timestamps do not idle-reset.",
+					"basis": "actual-owner",
+					"intent": "Explicit memory policy: pause must not discard the word being corrected.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: source+actual shared engine"
+				},
+				{
+					"id": "S04",
+					"aspect": "Arrow classification including modified/tap-hold arrow",
+					"status": "present",
+					"detail": "Arrow owner wins over shortcut/tap-hold; option independently retains or resets word.",
+					"basis": "actual-owner",
+					"intent": "Manifest explicitly governs arrows whatever modifiers/origin.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux owner+source otherOS"
+				},
+				{
+					"id": "S05",
+					"aspect": "Shortcut modifiers and unconditional controls",
+					"status": "different",
+					"detail": "Windows/Linux Ctrl/Alt/Win/Super versus Mac Cmd/Ctrl; Option/AltGr typing semantics differ.",
+					"basis": "actual-owner",
+					"intent": "Explicit native modifier semantics in manifest.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux owner+source otherOS"
+				},
+				{
+					"id": "S06",
+					"aspect": "Tap-hold-origin option and unsupported Mac identity",
+					"status": "known-restriction",
+					"detail": "Dedicated setting on Windows/Linux only; Mac Karabiner events follow ordinary shortcut/arrow owners.",
+					"basis": "actual-owner",
+					"intent": "Explicit platform reason; existing TODO, no new finding.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual model+source"
+				},
+				{
+					"id": "S07",
+					"aspect": "Independent AI and word immediate policy",
+					"status": "present-with-peer-gap",
+					"detail": "Linux all flags×AI preference retain independent states; Mac immediate policy works.",
+					"basis": "actual-owner",
+					"intent": "Shared context module explicitly says navigation preference is sole AI policy.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux owners+actual Mac peer snapshot"
+				},
+				{
+					"id": "S08",
+					"aspect": "Next-key continuation after navigation",
+					"status": "peer-owned-gap",
+					"detail": "Linux continuation passes208scenarios; Mac peer actual12cases reproduce5 policy mismatches.",
+					"basis": "actual-owner",
+					"intent": "Mac root owned by peer; not counted again as shared finding.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Lua54/JIT+Mac public-owner replay"
+				},
+				{
+					"id": "S09",
+					"aspect": "Escape fresh-run behavior",
+					"status": "different",
+					"detail": "Linux clears hotstring buffer with AI independently gated; Mac can retain hotstring buffer when AI-nav reset off.",
+					"basis": "actual-owner",
+					"intent": "Observed asymmetry; no separately confirmed wrong-action root or intentional exclusivity inferred.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux control+source/actual Mac peer"
+				},
+				{
+					"id": "S10",
+					"aspect": "Modified Backspace word boundary and AI reset",
+					"status": "different",
+					"detail": "Ctrl Linux/Windows and Option Mac delete previous word; siblings revoke known boundary; AI retention differs.",
+					"basis": "actual-owner",
+					"intent": "Modifier action equivalence deliberate; AI-lifetime asymmetry qualified without inferred intent.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux control+source otherOS"
+				},
+				{
+					"id": "S11",
+					"aspect": "Terminal newline and known empty line",
+					"status": "qualified",
+					"detail": "Linux actual terminal newline preserves empty-line Backspace boundary; Mac ShiftReturn distinguishable; Linux modifier loss known.",
+					"basis": "actual-owner",
+					"intent": "Already documented Linux ShiftEnter limitation and terminal recognition bounds.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual Linux owner+source otherOS"
+				},
+				{
+					"id": "S12",
+					"aspect": "Idle empty-line promise and Unicode Backspace",
+					"status": "present",
+					"detail": "Actual empty-line pause no-op preserves boundary; erasing final Unicode scalar gives word start, extra BS revokes it.",
+					"basis": "actual-owner",
+					"intent": "Codepoint semantics; native grapheme/inline-autocomplete limits remain.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual shared/Linux owners"
+				},
+				{
+					"id": "S13",
+					"aspect": "Shared rolling-context and private-mark oracle",
+					"status": "present",
+					"detail": "13 context cases and9 private cases execute actual shared module, including keep-typing-after-navigation.",
+					"basis": "actual-owner",
+					"intent": "Bounded context/private handling, not heap or native receiving proof.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: actual shared Lua54+JIT"
+				},
+				{
+					"id": "S14",
+					"aspect": "Menu/getter/configuration and source adoption",
+					"status": "qualified",
+					"detail": "Canonical declaration/menu/getter owners inspected; actual config adoption/cache restoration used without userIO.",
+					"basis": "actual-owner",
+					"intent": "Native menu clicks and publication race checks not re-certified here.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: source+actual runtime config owner"
+				},
+				{
+					"id": "S15",
+					"aspect": "Native runtime, latency, memory and source provenance",
+					"status": "unmeasured",
+					"detail": "20 exact files authenticated; no AHK native, live desktop/device, latency or heap measurement.",
+					"basis": "source",
+					"intent": "Explicit evidence boundaries rather than inferred runtime parity.",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1"
+						}
+					],
+					"qualification": "Actual shared/Linux policy owners and declaration model; 1388 assertions per Lua runtime. Source comparisons and peer replay remain qualified, not native parity certification. Submitted basis: source receipts"
+				}
+			],
+			"findings": []
+		}
+	},
+	"capabilities": [
+		{
+			"id": "defaults",
+			"contract": "Resolve effective defaults through canonical feature model",
+			"windows": "Idle3s; arrow/shortcut/click/tap-hold true; AI nav true.",
+			"macos": "Same applicable settings; raw state false values are placeholders.",
+			"linux": "Same applicable defaults confirmed by actual model/owners.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "independent-ai-context",
+			"contract": "Navigation word policy and AI context have separate lifetimes",
+			"windows": "Complete AI context can survive physical edit/shortcut early returns.",
+			"macos": "Next character overrides independent nav policy from hotstring buffer.",
+			"linux": "Actual helper cross-product and Main next-key controls preserve independence.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-002", "WRM-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "keep-ai-next-key",
+			"contract": "Retain opted-in AI context through the next character",
+			"windows": "Some physical editing routes retain obsolete complete text instead of a known edit.",
+			"macos": "Keep-AI/reset-word loses old sentence; reset-AI/keep-word resurrects it.",
+			"linux": "Physical arrows plus next key keep/reset the actual Main predictor argument correctly.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-002", "WRM-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "synthetic-unknown-edit",
+			"contract": "Synthetic modified Backspace must not invent known position",
+			"windows": "Alt/Win+Backspace successful synthetic effect asserts start; physical counterpart explicitly refuses.",
+			"macos": "Exact synthetic chord/native semantics not recertified in this scope.",
+			"linux": "Physical AltBackspace clears unknown context; exact synthetic counterpart not recertified.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSW-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "all-arrow-origins",
+			"contract": "Arrow policy applies regardless of input origin",
+			"windows": "Canonical synthetic classifier uses arrow switch by source.",
+			"macos": "Public physical controls run; synthetic-origin counterpart remains source-qualified.",
+			"linux": "Catalogue arrows omit notification; tap arrows use generic tap switch, contrary explicit all-arrow policy.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSL-001"],
+			"availability": {
+				"windows": "present",
+				"macos": "unverified",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "tap-origin",
+			"contract": "Separate tap-hold attribution where qualified",
+			"windows": "Command tap/owned CtrlAltWin/layer identities distinct.",
+			"macos": "Independent tap-hold-reset option explicitly unavailable; shortcut policy is alternative.",
+			"linux": "Actual held modifier provenance works; action-arrow path wrong-owner in WRSL-001.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "absent",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Explicit shared manifest/platform reason for macOS origin limitation, already tracked before this campaign. Linux action defect separately confirmed.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "terminal-empty-line",
+			"contract": "Bare submission establishes empty-prompt Backspace authority",
+			"windows": "Main Enter records known empty line; ShiftEnter differs.",
+			"macos": "Main Return works; keypad Enter misses terminal receipt under stated native condition.",
+			"linux": "Bare terminal typed newline records empty-line authority; Shift provenance limitation qualified.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRM-002"],
+			"availability": {
+				"windows": "present",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows source only; actual Lua owner controls where stated; native application receiving unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "newline-origin",
+			"contract": "GUI newline and terminal submission remain distinct",
+			"windows": "Terminal bare Enter versus multiline ShiftEnter owner.",
+			"macos": "Main Return versus ShiftReturn and keypad/payload controls qualified.",
+			"linux": "GUI typed newline remains text; terminal reset path differs; hook lacks Shift on typed newline.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Observed driver input routes and documented Linux Shift/typed-newline limitation; no universal native Enter guarantee.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "idle-backspace",
+			"contract": "Idle reset preserves qualified editing recovery",
+			"windows": "Forgets word then can restore exact forgotten word for immediate Backspace.",
+			"macos": "Avoids bareBackspace idle wipe; AI rebuilding falls under WRM-001.",
+			"linux": "Idle evaluated on typed chars; bareBackspace edits retained known word.",
+			"classification": "explicit_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Routed project-backspace-word-start memory documents these architecture differences; no latency claim.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "home-modifiers",
+			"contract": "Document modified non-arrow navigation policy ambiguity",
+			"windows": "Shortcut-off can preserve modified Home/End/Page keys; bare forms reset.",
+			"macos": "Modified-key global parity is source-qualified, not decided from an isolated label.",
+			"linux": "Actual control tests forget bare Home/End/Page/Insert/Delete; CtrlHome helper is ungoverned.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Broad shortcut scope and other-navigation manifest wording do not explicitly settle every modified-key case. No extra confirmed finding.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "privacy-retirement",
+			"contract": "Unknown focus/private/pause transitions override stale context",
+			"windows": "Physical generations and stale observer fences remain effective; WRSW-002 is fresh wrong text.",
+			"macos": "Pause/stop/public edited controls qualified; no claim keep-context overrides field privacy.",
+			"linux": "Real focus guard resets on click/focus, and pause clears even with nav retention.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Conservative privacy/field-identity retirement is preserved; do not weaken admission merely to keep context.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "shared-pure-policy",
+			"contract": "Shared helper policy itself handles following typing",
+			"windows": "Source counterpart only; AHK runtime unexecuted.",
+			"macos": "Caller can defeat correct helper, demonstrated WRM-001.",
+			"linux": "208 option scenarios plus actual common vectors pass; caller action publication still needs WRSL-001.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "1388 actual assertions per Lua54/LuaJIT; 7 idle, 13 context, 9 private vectors. Passing a helper does not certify callers.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		},
+		{
+			"id": "native-receiving",
+			"contract": "Keep host receiving outside source/native-port claims",
+			"windows": "AHK/editor execution unexecuted.",
+			"macos": "Actual Hammerspoon native service/editor/terminal unexecuted.",
+			"linux": "Actual device/compositor/editor/model request unexecuted.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No native clipboard/input device or user configuration accessed; no G4 or long-duration memory measurement.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "d61f3e33d69fad988f0868550d5d9709d60168d48e5f5f23b551158e742f8532"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "9e7ffeb84b2090bb9d79c03d5d2f29e70b045a7b6ee87707121c9419697d023e"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "9295c66c377f7b558cb5099c7b7930baaa394111e65fb046c4f8e060f801ac75"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "c39a9720089de74b561b215392dbc8b0eca5b4627b1371a4cb84c10b16438ddc"
+				}
+			]
+		}
+	]
+}

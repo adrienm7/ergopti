@@ -10,23 +10,26 @@
  * French until re-translated — no stale text.
  *
  * Keep keys byte-identical to the French in the components (including the
- * typographic apostrophe ’). Placeholders like `{
+ * typographic apostrophe ’). Placeholders like `{n}` must be preserved.
+ * ==============================================================================
+ */
+
+export default {
 	'Options de menu propres à certains systèmes': 'Platform-specific menu options',
 	Option: 'Option',
 	'Touches tap-hold par système': 'Tap-hold keys by system',
 	'Inventaire des actions configurables': 'Bindable actions inventory',
 	Action: 'Action',
 	'Trois systèmes, un projet.': 'Three systems, one project.',
-	'Les entrées ci-dessous proviennent du manifeste partagé. Une entrée absente peut avoir un équivalent sous un autre nom ; sa présence ne garantit pas son fonctionnement en conditions réelles.': 'The entries below come from the shared manifest. An absent entry may have an equivalent under another name; its presence does not guarantee real-world operation.',
+	'Les entrées ci-dessous proviennent du manifeste partagé. Une entrée absente peut avoir un équivalent sous un autre nom ; sa présence ne garantit pas son fonctionnement en conditions réelles.':
+		'The entries below come from the shared manifest. An absent entry may have an equivalent under another name; its presence does not guarantee real-world operation.',
 	'Inventaire des réglages et fonctionnalités': 'Settings and features inventory',
 	'Fonctionnalité ou réglage': 'Feature or setting',
 	'✓ déclaré pour ce système': '✓ declared for this system',
 	'— entrée non déclarée pour ce système': '— entry not declared for this system',
-n}` must be preserved.
- * ==============================================================================
- */
-
-export default {
+	'Comportements examinés dans le code': 'Behaviors reviewed in the source',
+	'Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.':
+		'This supplementary catalogue covers reviewed behaviors. It is not an exhaustive inventory or a guarantee of operation in every application.',
 	// ── Top bar ────────────────────────────────────────────────────────────
 	'Ancienne version de cette page →': 'Previous version of this page →',
 

@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "module": "word-reset",
+  "platform": "shared",
+  "role": "shared",
+  "audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+  "rows": [
+    {
+      "id": "S01",
+      "aspect": "Canonical declarations and effective defaults",
+      "status": "present",
+      "detail": "Actual model: idle3; click/arrow/shortcut/tap-hold/reset_on_nav true; Mac raw false state fields are overridden placeholders.",
+      "basis": "actual model+source",
+      "intent": "Manifest source defines defaults; no inferred OS policy.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S02",
+      "aspect": "Idle predicate and configurable disabled value",
+      "status": "present",
+      "detail": "Seven shared vectors plus invalid finite/range and coarse-clock boundaries; zero disables idle.",
+      "basis": "actual shared Lua54+JIT",
+      "intent": "Clock-resolution subtraction is explicitly conservative on Linux fallback.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S03",
+      "aspect": "Idle versus user Backspace caller ownership",
+      "status": "different",
+      "detail": "Windows forgotten-word restore; Mac skips bare-Backspace wipe; Linux control timestamps do not idle-reset.",
+      "basis": "source+actual shared engine",
+      "intent": "Explicit memory policy: pause must not discard the word being corrected.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S04",
+      "aspect": "Arrow classification including modified/tap-hold arrow",
+      "status": "present",
+      "detail": "Arrow owner wins over shortcut/tap-hold; option independently retains or resets word.",
+      "basis": "actual Linux owner+source otherOS",
+      "intent": "Manifest explicitly governs arrows whatever modifiers/origin.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S05",
+      "aspect": "Shortcut modifiers and unconditional controls",
+      "status": "different",
+      "detail": "Windows/Linux Ctrl/Alt/Win/Super versus Mac Cmd/Ctrl; Option/AltGr typing semantics differ.",
+      "basis": "actual Linux owner+source otherOS",
+      "intent": "Explicit native modifier semantics in manifest.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S06",
+      "aspect": "Tap-hold-origin option and unsupported Mac identity",
+      "status": "known-restriction",
+      "detail": "Dedicated setting on Windows/Linux only; Mac Karabiner events follow ordinary shortcut/arrow owners.",
+      "basis": "actual model+source",
+      "intent": "Explicit platform reason; existing TODO, no new finding.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S07",
+      "aspect": "Independent AI and word immediate policy",
+      "status": "present-with-peer-gap",
+      "detail": "Linux all flags\u00d7AI preference retain independent states; Mac immediate policy works.",
+      "basis": "actual Linux owners+actual Mac peer snapshot",
+      "intent": "Shared context module explicitly says navigation preference is sole AI policy.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S08",
+      "aspect": "Next-key continuation after navigation",
+      "status": "peer-owned-gap",
+      "detail": "Linux continuation passes208scenarios; Mac peer actual12cases reproduce5 policy mismatches.",
+      "basis": "actual Lua54/JIT+Mac public-owner replay",
+      "intent": "Mac root owned by peer; not counted again as shared finding.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S09",
+      "aspect": "Escape fresh-run behavior",
+      "status": "different",
+      "detail": "Linux clears hotstring buffer with AI independently gated; Mac can retain hotstring buffer when AI-nav reset off.",
+      "basis": "actual Linux control+source/actual Mac peer",
+      "intent": "Observed asymmetry; no separately confirmed wrong-action root or intentional exclusivity inferred.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S10",
+      "aspect": "Modified Backspace word boundary and AI reset",
+      "status": "different",
+      "detail": "Ctrl Linux/Windows and Option Mac delete previous word; siblings revoke known boundary; AI retention differs.",
+      "basis": "actual Linux control+source otherOS",
+      "intent": "Modifier action equivalence deliberate; AI-lifetime asymmetry qualified without inferred intent.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S11",
+      "aspect": "Terminal newline and known empty line",
+      "status": "qualified",
+      "detail": "Linux actual terminal newline preserves empty-line Backspace boundary; Mac ShiftReturn distinguishable; Linux modifier loss known.",
+      "basis": "actual Linux owner+source otherOS",
+      "intent": "Already documented Linux ShiftEnter limitation and terminal recognition bounds.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S12",
+      "aspect": "Idle empty-line promise and Unicode Backspace",
+      "status": "present",
+      "detail": "Actual empty-line pause no-op preserves boundary; erasing final Unicode scalar gives word start, extra BS revokes it.",
+      "basis": "actual shared/Linux owners",
+      "intent": "Codepoint semantics; native grapheme/inline-autocomplete limits remain.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S13",
+      "aspect": "Shared rolling-context and private-mark oracle",
+      "status": "present",
+      "detail": "13 context cases and9 private cases execute actual shared module, including keep-typing-after-navigation.",
+      "basis": "actual shared Lua54+JIT",
+      "intent": "Bounded context/private handling, not heap or native receiving proof.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S14",
+      "aspect": "Menu/getter/configuration and source adoption",
+      "status": "qualified",
+      "detail": "Canonical declaration/menu/getter owners inspected; actual config adoption/cache restoration used without userIO.",
+      "basis": "source+actual runtime config owner",
+      "intent": "Native menu clicks and publication race checks not re-certified here.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    },
+    {
+      "id": "S15",
+      "aspect": "Native runtime, latency, memory and source provenance",
+      "status": "unmeasured",
+      "detail": "20 exact files authenticated; no AHK native, live desktop/device, latency or heap measurement.",
+      "basis": "source receipts",
+      "intent": "Explicit evidence boundaries rather than inferred runtime parity.",
+      "evidence": [
+        "report.md",
+        "source-receipt.json",
+        "context-controls-lua54.txt",
+        "context-controls-luajit.txt",
+        "macos-peer-replay.txt"
+      ]
+    }
+  ],
+  "dry_receipts": "dry-receipts.json",
+  "new_shared_findings": 0,
+  "native_receiving_executed": false
+}

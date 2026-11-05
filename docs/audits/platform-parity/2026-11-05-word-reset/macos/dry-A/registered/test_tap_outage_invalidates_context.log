@@ -1,0 +1,38 @@
+Selecting exact test module: "tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context
+
+=== keymap tap watchdog: the polling interval bounds the outage ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"polls at most once per second","status":"pass","elapsed_ms":287.208798,"timing_error":""}
+  ok   polls at most once per second
+
+=== keymap tap recovery: a revived tap must not trust the old buffer ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"declares an invalidation routine","status":"pass","elapsed_ms":1.033119,"timing_error":""}
+  ok   declares an invalidation routine
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the routine drops only context inferred from observed physical input","status":"pass","elapsed_ms":3.116712,"timing_error":""}
+  ok   the routine drops only context inferred from observed physical input
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the routine revokes a held terminator whose target became unknowable","status":"pass","elapsed_ms":4.335330,"timing_error":""}
+  ok   the routine revokes a held terminator whose target became unknowable
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"external synthetic transactions never force an earlier replay","status":"pass","elapsed_ms":4.123212,"timing_error":""}
+  ok   external synthetic transactions never force an earlier replay
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the watchdog invalidates when it revives the keyDown tap","status":"pass","elapsed_ms":2.843292,"timing_error":""}
+  ok   the watchdog invalidates when it revives the keyDown tap
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the in-callback error handler invalidates too","status":"pass","elapsed_ms":0.815783,"timing_error":""}
+  ok   the in-callback error handler invalidates too
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the routine is declared above every caller","status":"pass","elapsed_ms":1.462232,"timing_error":""}
+  ok   the routine is declared above every caller
+
+=== keymap: tagged events are filtered before ignored-window exits ===
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"the explicit ownership gate precedes the window query","status":"pass","elapsed_ms":1.507419,"timing_error":""}
+  ok   the explicit ownership gate precedes the window query
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","name":"tests.unit.modules.keymap.eventtap.test_tap_outage_invalidates_context","status":"pass","elapsed_ms":307.161350,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

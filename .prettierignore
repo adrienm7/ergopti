@@ -18,6 +18,8 @@ yarn.lock
 **/_generated/
 # Feature inventory projections are owned by codegen-feature-inventory.cjs.
 docs/feature-inventory.md
+docs/behavior-inventory.md
+src/routes/ergopti-plus/behavior-inventory.json
 src/routes/ergopti-plus/feature-inventory.json
 src/routes/ergopti-plus/action-inventory.json
 src/routes/ergopti-plus/menu-gaps.json

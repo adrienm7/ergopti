@@ -60,6 +60,11 @@
 	],
 	"exclude": [
 		{
+			"name": "behavior-review-metadata",
+			"globs": ["static/ergopti_plus/_shared/modules/features/behaviors.json"],
+			"why": "Reviewed source-owner declarations feed the website and documentation generator only; the driver never reads this contributor metadata."
+		},
+		{
 			"name": "shared-tests",
 			"globs": ["static/ergopti_plus/_shared/tests/**"],
 			"why": "Cross-driver corpora and fixtures read only by the JS, Lua and AutoHotkey test suites, which run from the checkout."

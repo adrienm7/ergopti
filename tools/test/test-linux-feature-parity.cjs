@@ -15,10 +15,45 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
+const { pathToFileURL } = require('node:url');
 const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 const { buildParityRows, summarize } = require('./linux-feature-parity.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
+// Import the actual dictionary: apparent mappings inside JSDoc are not exports.
+const inventoryText = [
+	'Options de menu propres à certains systèmes',
+	'Option',
+	'Touches tap-hold par système',
+	'Inventaire des actions configurables',
+	'Action',
+	'Trois systèmes, un projet.',
+	'Inventaire des réglages et fonctionnalités',
+	'Fonctionnalité ou réglage',
+	'✓ déclaré pour ce système',
+	'— entrée non déclarée pour ce système'
+];
+const dictionaryUrl = pathToFileURL(path.join(ROOT, 'src/routes/ergopti-plus/locales/en.js')).href;
+const dictionaryResult = spawnSync(
+	process.execPath,
+	[
+		'--input-type=module',
+		'-e',
+		`import dictionary from ${JSON.stringify(dictionaryUrl)}; console.log(JSON.stringify(${JSON.stringify(inventoryText)}.map(key => [key, dictionary[key] ?? null])));`
+	],
+	{ cwd: ROOT, encoding: 'utf8', timeout: 60000 }
+);
+assert.ifError(dictionaryResult.error);
+assert.strictEqual(dictionaryResult.status, 0, dictionaryResult.stderr);
+const exportedInventoryText = Object.fromEntries(JSON.parse(dictionaryResult.stdout));
+for (const key of inventoryText)
+	assert.ok(
+		typeof exportedInventoryText[key] === 'string' && exportedInventoryText[key].length > 0,
+		`The actual English dictionary must export the inventory label: ${key}`
+	);
+assert.strictEqual(exportedInventoryText['Fonctionnalité ou réglage'], 'Feature or setting');
 const inventory = require('../codegen/codegen-feature-inventory.cjs');
+const { CATALOGUE, projectBehaviors } = require('../lib/behavior-capabilities.cjs');
 inventory.check();
 // Both projections must react to a change in a platform declaration.
 const featureModel = require('../build/build-features-manifest.js').loadFeatureModel();
@@ -109,7 +144,9 @@ for (const file of Object.keys(beforeInventory).filter(
 	(name) =>
 		!name.endsWith('action-inventory.json') &&
 		!name.endsWith('menu-gaps.json') &&
-		!name.endsWith('input-inventory.json')
+		!name.endsWith('input-inventory.json') &&
+		!name.endsWith('behavior-inventory.json') &&
+		!name.endsWith('behavior-inventory.md')
 )) {
 	assert.notStrictEqual(
 		beforeInventory[file],
@@ -117,6 +154,181 @@ for (const file of Object.keys(beforeInventory).filter(
 		`${file} must reflect platform changes`
 	);
 }
+
+// Behavioral declarations are independent of configuration paths. Changes to
+// either source must reach its own projections without silently changing the other.
+const behaviorCatalogue = JSON.parse(fs.readFileSync(path.join(ROOT, CATALOGUE), 'utf8'));
+const behaviorRows = projectBehaviors(behaviorCatalogue, ROOT, inventoryLocales);
+const behaviorOutputs = [
+	'src/routes/ergopti-plus/behavior-inventory.json',
+	'docs/behavior-inventory.md'
+];
+for (const file of behaviorOutputs) assert.strictEqual(beforeInventory[file], afterInventory[file]);
+assert.ok(behaviorRows.length >= 2);
+assert.deepStrictEqual(
+	behaviorRows.find((row) => row.path === 'hotstrings.backspace_restore').platforms,
+	{
+		windows: false,
+		macos: false,
+		linux: true
+	}
+);
+for (const behavior of behaviorCatalogue.behaviors) {
+	const projected = behaviorRows.find((row) => row.path === behavior.id);
+	for (const os of ['windows', 'macos', 'linux']) {
+		for (const lang of ['en', 'fr']) {
+			const expected = inventoryLocales[lang][behavior.platforms[os].note_key];
+			assert.strictEqual(projected.notes[os][lang], expected);
+			assert.strictEqual(
+				JSON.parse(beforeInventory[behaviorOutputs[0]]).find((row) => row.path === behavior.id)
+					.notes[os][lang],
+				expected
+			);
+			if (lang === 'en') assert.ok(beforeInventory[behaviorOutputs[1]].includes(expected));
+		}
+	}
+}
+const changedBehavior = structuredClone(behaviorCatalogue);
+changedBehavior.behaviors[1].platforms.linux.declared = false;
+const afterBehavior = inventory.render(
+	inventoryModel,
+	inventoryLocales,
+	inventoryActions,
+	inventoryMenu,
+	{},
+	{},
+	projectBehaviors(changedBehavior, ROOT, inventoryLocales)
+);
+for (const file of behaviorOutputs)
+	assert.notStrictEqual(beforeInventory[file], afterBehavior[file]);
+assert.strictEqual(
+	beforeInventory['src/routes/ergopti-plus/feature-inventory.json'],
+	afterBehavior['src/routes/ergopti-plus/feature-inventory.json']
+);
+for (const [mutate, message] of [
+	[
+		(doc) => {
+			doc.schema_version = 2;
+		},
+		/catalogue metadata/
+	],
+	[
+		(doc) => {
+			doc.extra = true;
+		},
+		/catalogue fields/
+	],
+	[
+		(doc) => {
+			doc.owners = [];
+		},
+		/catalogue metadata/
+	],
+	[
+		(doc) => {
+			doc.behaviors = [];
+		},
+		/catalogue metadata/
+	],
+	[
+		(doc) => {
+			doc.owners.push(doc.owners[0]);
+		},
+		/duplicate behavior owner/
+	],
+	[
+		(doc) => {
+			doc.owners[0].file = 'static/ergopti_plus/windows/../private.ahk';
+		},
+		/behavior owner/
+	],
+	[
+		(doc) => {
+			doc.owners[0].file = 'static/ergopti_plus/windows/missing-owner.ahk';
+		},
+		/Missing behavior owner/
+	],
+	[
+		(doc) => {
+			doc.owners[0].sha256 = '0'.repeat(64);
+		},
+		/needs source review/
+	],
+	[
+		(doc) => {
+			doc.owners[0].symbol = 'NonexistentBehaviorOwnerMustFail';
+		},
+		/needs source review/
+	],
+	[
+		(doc) => {
+			doc.behaviors.push(doc.behaviors[0]);
+		},
+		/duplicate behavior id/
+	],
+	[
+		(doc) => {
+			delete doc.behaviors[0].platforms.linux;
+		},
+		/platforms fields/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.android = doc.behaviors[0].platforms.linux;
+		},
+		/platforms fields/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.linux.declared = 'true';
+		},
+		/Invalid behavior state/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.linux.owners = [];
+		},
+		/Invalid behavior state/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.linux.owners = ['windows-repeat'];
+		},
+		/Unknown behavior owner/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.linux.note_key = 'inventory.behavior.missing';
+		},
+		/Missing behavior translation/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].label_key = 'inventory.behavior.missing';
+		},
+		/Missing behavior translation/
+	],
+	[
+		(doc) => {
+			doc.behaviors[0].platforms.windows.owners.push('windows-repeat');
+		},
+		/Invalid behavior state/
+	]
+]) {
+	const candidate = structuredClone(behaviorCatalogue);
+	mutate(candidate);
+	assert.throws(() => projectBehaviors(candidate, ROOT, inventoryLocales), message);
+}
+const missingTranslation = structuredClone(inventoryLocales);
+assert.throws(
+	() => projectBehaviors(behaviorCatalogue, ROOT, {}),
+	/Missing behavior translation locales/
+);
+delete missingTranslation.fr['inventory.behavior.backspace_restore'];
+assert.throws(
+	() => projectBehaviors(behaviorCatalogue, ROOT, missingTranslation),
+	/Missing behavior translation/
+);
 
 const EVIDENCE_PATH = path.join(
 	ROOT,

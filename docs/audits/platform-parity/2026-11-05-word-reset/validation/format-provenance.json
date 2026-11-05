@@ -1,0 +1,45 @@
+{
+	"qualification": "Worker hashes describe original submission bytes; pinned Prettier changes JSON presentation only. Original bytes are retained as .txt; current canonical evidence hashes use formatted archive bytes. No worker receipt was rewritten.",
+	"rows": [
+		{
+			"worker_receipt": "shared/handoff.json",
+			"worker_pointer": "/files/3",
+			"worker_expected_sha256": "c76a1053dddec1a4c2cc4132facc0b790e1b3711e59dabcb5296b36001438cb1",
+			"original_bytes": "validation/original-submissions/shared/coverage.json.txt",
+			"original_sha256": "c76a1053dddec1a4c2cc4132facc0b790e1b3711e59dabcb5296b36001438cb1",
+			"formatted_archive": "shared/coverage.json",
+			"formatted_sha256": "4c44dc599f880446633dc771cbefd60088fa22a4d8941242f550a72d6cfa10b1",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "shared/handoff.json",
+			"worker_pointer": "/files/12",
+			"worker_expected_sha256": "8d9e170e468159df226e6232029569c85b7a2626e5baed5b8249e77748a015ff",
+			"original_bytes": "validation/original-submissions/shared/dry-receipts.json.txt",
+			"original_sha256": "8d9e170e468159df226e6232029569c85b7a2626e5baed5b8249e77748a015ff",
+			"formatted_archive": "shared/dry-receipts.json",
+			"formatted_sha256": "bbbd53900c2094153dcc1516a9b1ea67748634172caa16c00555e8c215812666",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "shared/handoff.json",
+			"worker_pointer": "/files/14",
+			"worker_expected_sha256": "d56566c614f3fc53c0950bc92a3add2161232525db8b4c123df0b239f39309cc",
+			"original_bytes": "validation/original-submissions/shared/findings.json.txt",
+			"original_sha256": "d56566c614f3fc53c0950bc92a3add2161232525db8b4c123df0b239f39309cc",
+			"formatted_archive": "shared/findings.json",
+			"formatted_sha256": "e556bcb2cb0ddf362826e0bc2a923735f95b457f84dabcb9ca9d44c8ea933a55",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "shared/handoff.json",
+			"worker_pointer": "/files/21",
+			"worker_expected_sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918",
+			"original_bytes": "validation/original-submissions/shared/source-receipt.json.txt",
+			"original_sha256": "21615248f8f6d249e2713f375fa3ef1f791c87d96c4bb23f2f44bf64ca0fa918",
+			"formatted_archive": "shared/source-receipt.json",
+			"formatted_sha256": "060aba4e23fc97a3f7a5b8a09988d48ce1728bccffe615314c6ca12c85ef6f75",
+			"json_values_equal": true
+		}
+	]
+}

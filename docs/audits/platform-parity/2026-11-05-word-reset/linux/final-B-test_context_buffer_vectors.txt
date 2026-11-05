@@ -1,0 +1,33 @@
+
+=== AI context buffer corpus ===
+  ok   declares the window the module implements
+  ok   append-accumulates
+  ok   backspace-drops-one-codepoint
+  ok   backspace-on-empty-is-noop
+  ok   expansion-replaces-trigger
+  ok   expansion-keeps-replayed-terminator
+  ok   expansion-deleting-more-than-known-empties-first
+  ok   expansion-multibyte-tail
+  ok   set-replaces-everything
+  ok   clear-forgets
+  ok   navigation-clears-when-preferred
+  ok   navigation-keeps-when-not-preferred
+  ok   navigation-keeps-typing-after
+  ok   window-keeps-newest-codepoints
+
+=== AI context buffer strictness ===
+  ok   rejects non-text and invalid UTF-8 instead of drifting from the field
+  ok   answers the navigation rule without a buffer
+
+=== AI context buffer private mirror corpus ===
+  ok   (private-ai-context) no-private-expansion-shows-everything
+  ok   (private-ai-context) text-typed-after-the-secret-is-visible
+  ok   (private-ai-context) nothing-after-the-secret-shows-nothing
+  ok   (private-ai-context) backspace-into-the-secret-keeps-the-rest-marked
+  ok   (private-ai-context) typing-after-a-backspace-is-visible
+  ok   (private-ai-context) backspace-far-back-keeps-the-surviving-prefix-marked
+  ok   (private-ai-context) another-field-releases-the-mark
+  ok   (private-ai-context) divergence-inside-the-secret-keeps-the-common-part
+  ok   (private-ai-context) never-cuts-inside-a-codepoint
+  ok   (private-ai-context) rejects a malformed text or mark
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":26}

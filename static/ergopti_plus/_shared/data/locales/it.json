@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Nessun interruttore su Linux: GNOME e KDE scelgono Duplica nel proprio selettore degli schermi Super+P; assegna quel tasto come combinazione di tasti.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Questo sistema ha i Tasti permanenti nelle impostazioni di accessibilità, che rendono ogni modificatore valido per un solo tasto; attivali lì.",
 	"platform_reason.action_take_note_uses_notepad": "Solo Windows: questa azione apre il file di note del giorno nel Blocco note, l'editor incluso in ogni Windows. macOS ha la propria Nota rapida (Fn+Q) e Linux non ha un editor incluso in ogni desktop.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "Su macOS, Testo attivo legge il testo di qualsiasi istantanea o immagine: fanne una con l'azione equivalente, poi seleziona il suo testo."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "Su macOS, Testo attivo legge il testo di qualsiasi istantanea o immagine: fanne una con l'azione equivalente, poi seleziona il suo testo.",
+	"inventory.behavior.backspace_restore": "Ripristinare un’espansione con Backspace",
+	"inventory.behavior.repeat_condition": "Ripete un carattere all’interno di una parola se nessuna espansione corrisponde e la ripetizione con il tasto magico è attiva.",
+	"inventory.behavior.repeat_linux": "La ripetizione con il tasto magico esiste, ma le ripetizioni consecutive perdono attualmente il contesto dopo la prima espansione. Sono interessate anche le correzioni successive a una ripetizione.",
+	"inventory.behavior.backspace_linux": "Un Backspace immediato senza modificatori può ripristinare un’espansione di testo semplice idonea; il comportamento nei campi nativi resta da verificare.",
+	"inventory.behavior.backspace_other": "Nessun ripristino automatico del testo di attivazione con Backspace; Annulla dell’applicazione è separato.",
+	"inventory.behavior.repeat_activation_window": "Finestra di attivazione della ripetizione con il tasto magico",
+	"inventory.behavior.repeat_window_untimed": "Nessuna finestra di attivazione separata per la ripetizione di riserva; il riavvio della parola dopo una pausa è indipendente.",
+	"inventory.behavior.repeat_window_macos": "Usa la finestra effettiva del tasto magico, incluse le regole temporali dei modificatori; zero disattiva questa finestra. Il riavvio della parola dopo una pausa è indipendente."
 }
