@@ -706,19 +706,23 @@ function M.capture_image(flags, parent, max_edge, on_image)
 		if math.max(width, height) <= max_edge then return deliver(data) end
 		local started = start_task(operation, SIPS_BIN, { "-Z", tostring(math.floor(max_edge)), target },
 			function(sips_exit_code, _, sips_stderr)
-				if sips_exit_code ~= 0 and not _downscale_failure_logged then
+				local resized, resize_error
+				if sips_exit_code == 0 then resized, resize_error = read_capture(target) end
+				if not resized and not _downscale_failure_logged then
 					_downscale_failure_logged = true
 					Logger.info(LOG, "The screenshot could not be downscaled (sips exit %s: %s); "
-						.. "the original is sent.", tostring(sips_exit_code), tostring(sips_stderr))
+						.. "the original is sent.", tostring(sips_exit_code), tostring(resize_error or sips_stderr))
 				end
-				return deliver()
+				-- sips edits the file in place, even when its conversion fails.
+				-- The original capture was read before handing that file to it.
+				return deliver(resized or data)
 			end, "downscale")
 		if started then return true end
 		if not _downscale_failure_logged then
 			_downscale_failure_logged = true
 			Logger.info(LOG, "The screenshot downscale could not start; the original is sent.")
 		end
-		return deliver()
+		return deliver(data)
 	end, "capture")
 end
 
