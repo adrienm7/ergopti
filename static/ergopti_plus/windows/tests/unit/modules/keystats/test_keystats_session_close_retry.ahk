@@ -258,7 +258,8 @@ _KLSCR_ShutdownCloseNativeChain() {
 				"each native-chain class must come from actual production source")
 			Source .= NativeClass[0] . "`n"
 		}
-		for Name in ["KL_AppendLog", "KL_CaptureHeld", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
+		for Name in ["KL_AppendLog", "KL_LogAppSwitch", "KL_LogWindowSwitch",
+			"KL_CaptureHeld", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
 			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
 			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
 			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
