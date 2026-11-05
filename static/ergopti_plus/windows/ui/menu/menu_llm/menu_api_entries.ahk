@@ -969,7 +969,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 			ReqId := LLM_RemoteDecisions_Async(Resolved, LLM_REMOTE_DECISIONS_TEST["state"],
 				LLM_REMOTE_DECISIONS_TEST["questions"],
 				(Answers, Usage := "") => OnSucc(LLM_RemoteFormats_Encode(Answers), Usage),
-				OnFail, LLM_REMOTE_KIND_API_TEST, LLM_API_TEST_TIMEOUT_MS)
+				OnFail, LLM_REMOTE_KIND_API_TEST, LLM_API_TEST_TIMEOUT_MS, RequestCurrent)
 		} else {
 			ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
 				spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
