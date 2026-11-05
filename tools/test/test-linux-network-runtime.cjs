@@ -46,6 +46,30 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check('private runtime staging refuses linked source directories before removing a launcher', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-linked-source-'));
+		try {
+			for (const linked of ['bin', 'lib', 'share']) {
+				const root = path.join(scratch, linked);
+				const app = path.join(root, 'AppDir');
+				const usr = path.join(app, 'usr');
+				for (const name of ['bin', 'lib/ergopti', 'share']) fs.mkdirSync(path.join(usr, name), { recursive: true });
+				fs.writeFileSync(path.join(usr, 'bin/luajit'), '#!/bin/sh\n', { mode: 0o755 });
+				fs.writeFileSync(path.join(usr, 'bin/ergopti'), 'owned source launcher\n');
+				fs.writeFileSync(path.join(usr, 'lib/ergopti/network-runtime-env.sh'), ':\n');
+				const external = path.join(root, 'external');
+				fs.renameSync(path.join(usr, linked), external);
+				fs.symlinkSync(external, path.join(usr, linked));
+				const destination = path.join(root, 'runtime');
+				const result = spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'), app, destination, '/usr/lib/ergopti'], { encoding: 'utf8', timeout: 10000 });
+				assert.notEqual(result.status, 0, linked);
+				assert.match(result.stderr, /not a direct directory/);
+				assert.equal(fs.readFileSync(path.join(usr, 'bin/ergopti'), 'utf8'), 'owned source launcher\n');
+				assert.equal(fs.existsSync(destination), false);
+			}
+		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+	});
 	check('private runtime staging copies double-dot hidden library entries', () => {
 		if (process.platform !== 'linux') return;
 		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-hidden-'));

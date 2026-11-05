@@ -28,6 +28,12 @@ APPDIR="$1"
 DESTINATION="$2"
 SOURCE="$APPDIR/usr"
 
+for directory in "$SOURCE" "$SOURCE/bin" "$SOURCE/lib" "$SOURCE/share"; do
+	if [ ! -d "$directory" ] || [ -L "$directory" ]; then
+		echo "[ERR] Private runtime source directory is not a direct directory: $directory" >&2
+		exit 1
+	fi
+done
 if [ ! -x "$SOURCE/bin/luajit" ] || [ ! -f "$SOURCE/lib/ergopti/network-runtime-env.sh" ]; then
 	echo "[ERR] No staged private runtime in $APPDIR: run tools/build/build-linux-appimage.sh first." >&2
 	exit 1
