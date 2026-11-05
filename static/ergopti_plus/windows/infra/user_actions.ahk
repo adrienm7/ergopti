@@ -382,6 +382,10 @@ _UserCommandRead(Path) {
 		return ""
 	if !HTTPIsValidUtf8(Bytes, Bytes.Size)
 		return false
+	; Valid UTF-8 can contain NUL, which this native text conversion would
+	; silently truncate. Refuse the complete capture through the existing ABI.
+	if DllCall("msvcrt\memchr", "Ptr", Bytes, "Int", 0, "UPtr", Bytes.Size, "CDecl Ptr")
+		return false
 	return StrGet(Bytes, Bytes.Size, "UTF-8")
 }
 
