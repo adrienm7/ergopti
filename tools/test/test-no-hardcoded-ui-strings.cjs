@@ -97,6 +97,24 @@ const ALLOWED = [
 		reason: 'these lines are the Exec keys of the desktop entry and unit files it writes'
 	},
 	{
+		file: 'linux/install/launch.sh',
+		sink: 'printf',
+		text: 'missing-program pkexec',
+		reason: 'the missing-program protocol is consumed by the input-access diagnostic'
+	},
+	{
+		file: 'linux/install/start_at_login.sh',
+		sink: 'printf',
+		text: 'Hidden=%s\\nX-Ergopti-Startup=true\\n',
+		reason: 'desktop entry keys emitted by the startup file serializer'
+	},
+	...['linux/bin/libergopti_archive_publication.so', 'linux/native_modules/luv.so'].map((file) => ({
+		file: 'linux/install.sh',
+		sink: 'printf',
+		text: '%s\\t' + file + '\\n',
+		reason: 'digest and installed path emitted by the ownership manifest serializer'
+	})),
+	{
 		file: 'linux/install.sh',
 		sink: 'echo',
 		text: '  systemctl --user status ergopti-hotstrings',
@@ -627,6 +645,13 @@ function scanShell(source) {
 			const parts = shellCommand(line, command.index + command[0].length);
 			if (parts.piped || (parts.redirect !== null && !/^&[12]\b/.test(parts.redirect))) continue;
 			for (const text of parts.quoted) {
+				// Structured stderr records carry machine codes and typed fields, not prose.
+				if (
+					command[2] === 'printf' &&
+					/^&2\b/.test(parts.redirect || '') &&
+					/^\[[a-z_]+\] code=[a-z0-9_-]+(?: [a-z_]+=%[sqd])*\\n$/.test(text)
+				)
+					continue;
 				const words = text.replace(/\\./g, ' ').replace(/\$\{[^}]*\}|\$\w+|\$\(.*?\)/g, ' ');
 				if (isProse(words, 2)) findings.push({ sink: command[2], text, line: index + 1 });
 			}
@@ -793,7 +818,10 @@ function selfTest() {
 			'echo "two words" | sha256sum',
 			'printf \'%s two words\\n\' "$digest" \\',
 			'\t\t>> "$MANIFEST"',
-			'label=$(printf "%s and more" "$x")'
+			'label=$(printf "%s and more" "$x")',
+			'printf "[install] code=invalid-parent path=%q\\n" "$path" >&2',
+			'printf "[install] code=invalid-parent path=%q\\n" "$path"',
+			'printf "[install] code=invalid-parent Please try again\\n" >&2'
 		].join('\n')
 	);
 	assert.deepEqual(
@@ -801,7 +829,9 @@ function selfTest() {
 		[
 			['echo', '=== Installation terminée ==='],
 			['echo', '  ✔  ${cmd} — déjà installé'],
-			['echo', 'Missing value given']
+			['echo', 'Missing value given'],
+			['printf', '[install] code=invalid-parent path=%q\\n'],
+			['printf', '[install] code=invalid-parent Please try again\\n']
 		],
 		'the shell scan reports messages and spares values, captures, pipes, files and comments'
 	);
