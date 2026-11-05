@@ -16,7 +16,7 @@ KS_IsDown(Name) {
 	_BRP_Require(Name == "LShift" || Name == "SC038", "The real repeat branch may only query its own held key and its two modifier guards.")
 	return false
 }
-BackSpaceLogic() => false
+BackSpaceLogic(ExpectedEpoch := unset) => false
 TapHoldEmitKeyTap(Key, Mods := unset) {
 	global _BRP
 	_BRP_Require(Key == "BackSpace" && !IsSet(Mods), "Only the producer's unmodified synthetic Backspace belongs to this port.")
