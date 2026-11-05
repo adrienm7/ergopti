@@ -17,6 +17,11 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+public sealed class RelayDefaultClientObservation {
+ public string FamilyBefore="", FamilyAfter="", Stage="construct", FailureType="";
+ public int NativeError;
+ public bool Connected, BodyExact, Closed, DualMode;
+}
 public sealed class RelayBranchPeer : IDisposable {
  const string Host="hop-component.invalid";
  const string Ipv4Authority="192.0.2.123:18080";
@@ -31,10 +36,12 @@ public sealed class RelayBranchPeer : IDisposable {
  public bool Joined;
  public int Port {get{return ((IPEndPoint)listener.LocalEndpoint).Port;}}
  public bool StrictIpv6 {get{return listener.Server.AddressFamily==AddressFamily.InterNetworkV6&&!listener.Server.DualMode&&((IPEndPoint)listener.LocalEndpoint).Address.Equals(IPAddress.IPv6Loopback);}}
- public RelayBranchPeer(bool socks) : this(socks,false) { }
- public RelayBranchPeer(bool socks,bool ipv6) {
-  this.socks=socks;listener=new TcpListener(ipv6?IPAddress.IPv6Loopback:IPAddress.Loopback,0);
-  try{if(ipv6)listener.Server.DualMode=false;listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();}
+ public bool Exclusive {get{return listener.Server.ExclusiveAddressUse;}}
+ public RelayBranchPeer(bool socks) : this(socks,false,0) { }
+ public RelayBranchPeer(bool socks,bool ipv6) : this(socks,ipv6,0) { }
+ public RelayBranchPeer(bool socks,bool ipv6,int port) {
+  this.socks=socks;listener=new TcpListener(ipv6?IPAddress.IPv6Loopback:IPAddress.Loopback,port);
+  try{listener.Server.ExclusiveAddressUse=true;if(ipv6)listener.Server.DualMode=false;listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();}
   catch{listener.Stop();throw;}
  }
  static void Require(bool value){if(!value)throw new InvalidDataException("Owned protocol control refused");}
@@ -72,6 +79,20 @@ public sealed class RelayBranchPeer : IDisposable {
  public static void Oracle(int port,bool socks,bool ipv4,bool ipv6Proxy){using(TcpClient client=new TcpClient(ipv6Proxy?AddressFamily.InterNetworkV6:AddressFamily.InterNetwork)){client.Connect(ipv6Proxy?IPAddress.IPv6Loopback:IPAddress.Loopback,port);client.ReceiveTimeout=5000;client.SendTimeout=5000;using(NetworkStream stream=client.GetStream()){
   if(socks)SocksClient(stream,ipv4);else{Write(stream,"CONNECT "+Host+":443 HTTP/1.1\r\nHost: "+Host+":443\r\n"+Auth+"\r\n\r\n");Require(Head(stream).StartsWith("HTTP/1.1 200 ",StringComparison.Ordinal));}Write(stream,Request(ipv4));CheckReply(stream,socks?"SC":"HC");
  }}}
+ // Use the same default constructor and string BeginConnect as production.
+ // The outer exact Job bounds EndConnect if the host violates its local premise.
+ public static RelayDefaultClientObservation DefaultClient(int port){return ClientProbe("::1",port,false);}
+ public static RelayDefaultClientObservation DualClient(string host,int port){return ClientProbe(host,port,true);}
+ static RelayDefaultClientObservation ClientProbe(string host,int port,bool dual){
+  RelayDefaultClientObservation result=new RelayDefaultClientObservation();TcpClient client=null;
+  try{client=dual?new TcpClient(AddressFamily.InterNetworkV6):new TcpClient();if(dual)client.Client.DualMode=true;result.DualMode=dual&&client.Client.DualMode;result.FamilyBefore=client.Client.AddressFamily.ToString();result.Stage="begin_connect";
+   IAsyncResult pending=client.BeginConnect(host,port,null,null);result.Stage="end_connect";client.EndConnect(pending);result.Connected=true;
+   client.ReceiveTimeout=5000;client.SendTimeout=5000;result.Stage="protocol";
+   using(NetworkStream stream=client.GetStream()){SocksClient(stream,false);Write(stream,Request(false));CheckReply(stream,"SC");result.BodyExact=true;}result.Stage="complete";
+  }catch(Exception error){Exception cause=error.GetBaseException();result.FailureType=cause.GetType().Name;SocketException socket=cause as SocketException;if(socket!=null)result.NativeError=socket.NativeErrorCode;}
+  finally{if(client!=null){try{result.FamilyAfter=client.Client==null?"absent":client.Client.AddressFamily.ToString();}catch(ObjectDisposedException){result.FamilyAfter="closed";}finally{client.Close();result.Closed=true;}}}
+  return result;
+ }
  public static void ThroughHop(string endpoint,bool connect,bool ipv4){Uri hop=new Uri(endpoint);using(TcpClient client=new TcpClient(AddressFamily.InterNetwork)){client.Connect(IPAddress.Loopback,hop.Port);client.ReceiveTimeout=5000;client.SendTimeout=5000;using(NetworkStream stream=client.GetStream()){
   if(connect){Write(stream,"CONNECT "+Host+":443 HTTP/1.1\r\nHost: "+Host+":443\r\n\r\n");Require(Head(stream).StartsWith("HTTP/1.1 200 ",StringComparison.Ordinal));Write(stream,Request(false));}
   else{string target=ipv4?Ipv4Authority:Host;Write(stream,"GET http://"+target+"/control HTTP/1.1\r\nHost: "+target+"\r\nConnection: close\r\n\r\n");}
@@ -81,13 +102,13 @@ public sealed class RelayBranchPeer : IDisposable {
 }
 '@
 # This alternate mode reuses the canonical protocol peer; only its upstream
-# listener family changes. Both real routes still use native HTTP to a DNS URL.
+# listener family changes. Every real route uses native HTTP to the same DNS URL.
 function Invoke-Ipv6RelayUpstreamControl {
     if($TransportPath -ceq '' -or $UpdaterDefaultsPath -ceq ''){throw 'The native upstream probe requires explicit transport and defaults sources.'}
     . $TransportPath
     $Directory=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-ipv6-upstream-'+[Guid]::NewGuid().ToString('N'))
-    $Created=$false;$Ipv4Peer=$null;$Ipv6Peer=$null;$Ipv4Oracle=$false;$Ipv6Oracle=$false
-    $Ipv6Strict=$false;$Witness=$null;$Subject=$null;$SetupFailure=@{};$script:RelayIpv6NativeDebt=$false
+    $Created=$false;$Ipv4Peer=$null;$Ipv6Peer=$null;$DnsIpv6Peer=$null;$Ipv4Oracle=$false;$Ipv6Oracle=$false
+    $Ipv6Strict=$false;$DnsPairOwned=$false;$DnsOnlyOwned=$false;$DualIpv4=$null;$DualIpv6=$null;$DualDns=$null;$Witness=$null;$DnsWitness=$null;$DnsIpv4Loopback=$false;$Subject=$null;$DefaultClient=$null;$SetupFailure=@{};$script:RelayIpv6NativeDebt=$false
     function Invoke-UpstreamNative($Override,$BodyPath,$HeaderPath) {
         $ReadEnvironment={param($Name) if($Name -ceq 'ERGOPTI_PROXY_OVERRIDE'){return $Override};return ''}.GetNewClosure()
         $Destination=[Uri]'http://hop-component.invalid/control'
@@ -120,10 +141,27 @@ function Invoke-Ipv6RelayUpstreamControl {
         $Ipv4Oracle=$true
         $Witness=Invoke-UpstreamNative ('socks5h://owned:fixture@127.0.0.1:'+$Ipv4Peer.Port) $BodyPath $HeaderPath
         if(-not $Witness.retired){throw 'The IPv4 witness retained native callback debt.'}
+        # Own both possible localhost endpoints at one exclusive port before DNS.
+        $DnsIpv6Peer=[RelayBranchPeer]::new($true,$true,$Ipv4Peer.Port)
+        $DnsPairOwned=$Ipv4Peer.Exclusive -and $DnsIpv6Peer.Exclusive -and $DnsIpv6Peer.StrictIpv6 -and $DnsIpv6Peer.Port -eq $Ipv4Peer.Port
+        if(-not $DnsPairOwned){throw 'The DNS witness could not own both exact loopback endpoints.'}
+        $DnsAddresses=[Net.Dns]::GetHostAddresses('localhost')
+        foreach($Address in $DnsAddresses) {
+            if(-not $Address.Equals([Net.IPAddress]::Loopback) -and -not $Address.Equals([Net.IPAddress]::IPv6Loopback)){throw 'The DNS witness resolved outside its two exact owned addresses.'}
+            if($Address.Equals([Net.IPAddress]::Loopback)){$DnsIpv4Loopback=$true}
+        }
+        $DnsOnlyOwned=$DnsAddresses.Count -gt 0
+        if(-not $DnsOnlyOwned -or -not $DnsIpv4Loopback){throw 'The DNS proxy witness lacks its exact owned IPv4 address.'}
+        $DualIpv4=[RelayBranchPeer]::DualClient('127.0.0.1',$Ipv4Peer.Port)
+        $DualIpv6=[RelayBranchPeer]::DualClient('::1',$DnsIpv6Peer.Port)
+        $DualDns=[RelayBranchPeer]::DualClient('localhost',$Ipv4Peer.Port)
+        $DnsWitness=Invoke-UpstreamNative ('socks5h://owned:fixture@localhost:'+$Ipv4Peer.Port) $BodyPath $HeaderPath
+        if(-not $DnsWitness.retired){throw 'The DNS witness retained native callback debt.'}
         $Ipv6Peer=[RelayBranchPeer]::new($true,$true)
         $Ipv6Strict=$Ipv6Peer.StrictIpv6
         [RelayBranchPeer]::Oracle($Ipv6Peer.Port,$true,$false,$true)
         $Ipv6Oracle=$true
+        $DefaultClient=[RelayBranchPeer]::DefaultClient($Ipv6Peer.Port)
         $Subject=Invoke-UpstreamNative ('socks5h://owned:fixture@[::1]:'+$Ipv6Peer.Port) $BodyPath $HeaderPath
     } catch {
         $Cause=$_.Exception.GetBaseException()
@@ -132,14 +170,32 @@ function Invoke-Ipv6RelayUpstreamControl {
     } finally {
         if($null -ne $Ipv4Peer){$Ipv4Peer.Dispose()}
         if($null -ne $Ipv6Peer){$Ipv6Peer.Dispose()}
+        if($null -ne $DnsIpv6Peer){$DnsIpv6Peer.Dispose()}
         if($Created -and -not $script:RelayIpv6NativeDebt) {
             foreach($Path in @($BodyPath,$HeaderPath)){if([IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}
             [IO.Directory]::Delete($Directory,$false)
         }
     }
+    function Get-ClientObservation($Client) {
+        if($null -eq $Client){return @{observed=$false}}
+        return @{observed=$true;family_before=$Client.FamilyBefore;family_after=$Client.FamilyAfter;dual_mode=$Client.DualMode
+            stage=$Client.Stage;error_type=$Client.FailureType;native_error=$Client.NativeError
+            connected=$Client.Connected;body_exact=$Client.BodyExact;closed=$Client.Closed}
+    }
+    $Constructor=Get-ClientObservation $DefaultClient
+    $Ipv4Observation=Get-UpstreamPeerObservation $Ipv4Peer
+    $DnsIpv6Observation=Get-UpstreamPeerObservation $DnsIpv6Peer
+    $DnsPair=@{}
+    foreach($Name in @('connections','authenticated','requests','domain_frames','failures')) {
+        $DnsPair[$Name]=[int]$Ipv4Observation[$Name]+[int]$DnsIpv6Observation[$Name]
+    }
     $Receipt=@{schema_version=1;ipv4_oracle=$Ipv4Oracle;ipv6_oracle=$Ipv6Oracle;ipv6_listener_strict=$Ipv6Strict
-        setup_failure=$SetupFailure;witness=$Witness;subject=$Subject
-        ipv4_peer=(Get-UpstreamPeerObservation $Ipv4Peer);ipv6_peer=(Get-UpstreamPeerObservation $Ipv6Peer)}
+        ps_edition=[string]$PSVersionTable.PSEdition;ps_major=$PSVersionTable.PSVersion.Major;clr_major=[Environment]::Version.Major
+        tcpclient_assembly=[Net.Sockets.TcpClient].Assembly.GetName().Name;default_constructor=$Constructor
+        dual_controls=@{ipv4=(Get-ClientObservation $DualIpv4);ipv6=(Get-ClientObservation $DualIpv6);dns=(Get-ClientObservation $DualDns)}
+        dns_pair_owned=$DnsPairOwned;dns_only_owned_addresses=$DnsOnlyOwned;dns_pair=$DnsPair
+        dns_ipv4_loopback=$DnsIpv4Loopback;setup_failure=$SetupFailure;witness=$Witness;dns_witness=$DnsWitness;subject=$Subject
+        ipv4_peer=$Ipv4Observation;dns_ipv6_peer=$DnsIpv6Observation;ipv6_peer=(Get-UpstreamPeerObservation $Ipv6Peer)}
     [Console]::WriteLine('IPV6_RELAY_UPSTREAM_RECEIPT:'+($Receipt|ConvertTo-Json -Compress -Depth 5))
     return $null -ne $Subject -and $Subject.completed -and $Subject.status -eq 200 -and $Subject.body_exact -and $Subject.retired
 }

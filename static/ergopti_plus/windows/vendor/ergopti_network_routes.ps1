@@ -371,7 +371,7 @@ public sealed class ErgoptiRelayHop {
     }
 
     private void Serve(TcpClient client) {
-        TcpClient relay = new TcpClient();
+        TcpClient relay = null;
         try {
             if (!PeerIsThisProcess(((IPEndPoint)client.Client.RemoteEndPoint).Port)) return;
             client.ReceiveTimeout = timeoutMs;
@@ -400,6 +400,14 @@ public sealed class ErgoptiRelayHop {
                     : ForwardHead(head);
             } else { Write(local, NotAllowed); return; }
             if (authority.LastIndexOf(':') < 1) { Write(local, Refused); return; }
+            // Literal hosts select their own family. DNS keeps both supported
+            // families available without adding a synchronous lookup here.
+            IPAddress relayAddress;
+            bool literal = IPAddress.TryParse(relayHost, out relayAddress);
+            AddressFamily family = literal ? relayAddress.AddressFamily
+                : (Socket.OSSupportsIPv6 ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork);
+            relay = new TcpClient(family);
+            if (!literal && family == AddressFamily.InterNetworkV6) relay.Client.DualMode = true;
             Stream remote = Dial(relay, authority, tunnel);
             if (remote == null) { Write(local, Refused); return; }
             if (replay == null) Write(local, Established); else Write(remote, replay);
@@ -414,7 +422,7 @@ public sealed class ErgoptiRelayHop {
             try { Write(client.GetStream(), Refused); } catch (Exception) { }
         } finally {
             client.Close();
-            relay.Close();
+            if (relay != null) relay.Close();
         }
     }
 }
