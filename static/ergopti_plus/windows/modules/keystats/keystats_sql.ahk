@@ -31,9 +31,19 @@ KL_SqlJson(obj) {
 }
 
 KL_AllocEventId() {
-    id := Keystats.next_event_id
-    Keystats.next_event_id := id + 1
-    return id
+    PreviousCritical := Critical("On")
+    try {
+        id := Keystats.next_event_id
+        if !(id is Integer) || id <= 0
+            throw ValueError("The next event identity must be a positive signed integer.")
+        NextId := id + 1
+        ; Do not publish a wrapped counter or acknowledge the terminal identity
+        ; when its positive next checkpoint can no longer be represented.
+        if !(NextId is Integer) || NextId <= id
+            throw ValueError("The event identity capacity is exhausted.")
+        Keystats.next_event_id := NextId
+        return id
+    } finally Critical(PreviousCritical)
 }
 
 ; Assigns the identity before JSONL publication. Reusing an already-reserved id
