@@ -420,3 +420,87 @@ for _PIENC_Kind in ["invalid-utf8", "odd-utf16", "utf8-control", "utf8-bom-contr
 
 for _PIENC_ExtraKind in ["lone-surrogate-utf16", "embedded-nul-utf8"]
 	Test("personal info encoding admission: " . _PIENC_ExtraKind . " (personal-info-encoding)", _PIENC_Case.Bind(_PIENC_ExtraKind))
+
+; The WebView bridge forwards JsonParse(...)["values"] directly to the public
+; commit route. JSON string values may contain NUL, unlike native Map keys.
+_PIWS_Case(Kind) {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	global ScriptInformation, _TomlUnreadableFiles, HSE_RuntimeDecisionGeneration
+	Saved := {hadInfo: IsSet(PersonalInformation), hadLetters: IsSet(PersonalInformationLetters),
+		cache: _ReadPersonalInfoTomlCache, generation: HSE_RuntimeDecisionGeneration,
+		hadPath: ScriptInformation.Has("PersonalInfoTomlPath"), path: ScriptInformation.Get("PersonalInfoTomlPath", "")}
+	Saved.info := Saved.hadInfo ? PersonalInformation : 0
+	Saved.letters := Saved.hadLetters ? PersonalInformationLetters : 0
+	Root := A_Temp . "\ergopti_personal_info_write_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\personal_info.toml", Created := false
+	try {
+		AssertFalse(A_IsSuspended)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		PersonalInformation := Map("first_name", "Placeholder", "last_name", "Before")
+		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
+		_ReadPersonalInfoTomlCache := false
+		ScriptInformation["PersonalInfoTomlPath"] := Path
+		AssertEqual(1, FSWriteDurable(Path, _PISW_Image("Initial", "Untouched")))
+		ReadPersonalInfoToml(Path)
+		AssertEqual("Initial", PersonalInformation["first_name"])
+		Before := FSReadBytesStrict(Path)
+		OpeningInformation := PersonalInformation, OpeningLetters := PersonalInformationLetters
+		OpeningGeneration := HSE_RuntimeDecisionGeneration
+		Opening := _PersonalInfoCaptureEditorSource(Path)
+		Encoded := Kind == "nul" ? 'A\u0000B' : Kind == "control" ? 'A\u0001B' : 'A\\u0000B'
+		Payload := JsonParse('{"action":"save","values":{"first_name":"' . Encoded . '"}}')
+		Value := Payload["values"]["first_name"]
+		AssertTrue(Value is String)
+		if Kind != "literal" {
+			AssertEqual(3, StrLen(Value), "the actual bridge parser retains all three UTF-16 units")
+			AssertEqual(65, NumGet(StrPtr(Value), 0, "UShort"))
+			AssertEqual(Kind == "nul" ? 0 : 1, NumGet(StrPtr(Value), 2, "UShort"))
+			AssertEqual(66, NumGet(StrPtr(Value), 4, "UShort"))
+		} else
+			AssertEqual('A\u0000B', Value, "literal backslash spelling is ordinary representable text")
+		Result := PersonalInfoCommitValues(Path, Payload["values"], 0, 0, 0, 0, Opening)
+		After := FSReadBytesStrict(Path)
+		DiskAccepted := false
+		try {
+			Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+			DiskAccepted := true
+		}
+		_TestPrint("# personal-info-write-scalar kind=" . Kind . " result=" . Result
+			. " parsed=" . DiskAccepted . " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Kind == "nul" {
+			AssertFalse(Result, "a public edit must refuse a value its canonical reader cannot represent")
+			_PISW_Bytes(Before, After, "refusing an unsupported value must preserve the original durable identity")
+			AssertTrue(PersonalInformation == OpeningInformation)
+			AssertTrue(PersonalInformationLetters == OpeningLetters)
+			AssertEqual(OpeningGeneration, HSE_RuntimeDecisionGeneration)
+		} else {
+			AssertTrue(Result, "representable escaped controls and literal backslashes remain writable")
+			AssertTrue(DiskAccepted, "an acknowledged personal-information image must be readable")
+			AssertEqual(StrLen(Value), StrLen(Document["info"]["first_name"]))
+			AssertEqual(Value, Document["info"]["first_name"])
+			AssertEqual("Untouched", Document["info"]["last_name"])
+		}
+		_ReadPersonalInfoTomlCache := false
+		ReadPersonalInfoToml(Path)
+		AssertFalse(_TomlUnreadableFiles.Has(Path), "refused edits and acknowledged controls must remain reloadable")
+		AssertEqual(Kind == "nul" ? "Initial" : Value, PersonalInformation["first_name"])
+		AssertEqual("Untouched", PersonalInformation["last_name"])
+	} finally {
+		PersonalInformation := Saved.hadInfo ? Saved.info : unset
+		PersonalInformationLetters := Saved.hadLetters ? Saved.letters : unset
+		_ReadPersonalInfoTomlCache := Saved.cache
+		HSE_RuntimeDecisionGeneration := Saved.generation
+		if Saved.hadPath
+			ScriptInformation["PersonalInfoTomlPath"] := Saved.path
+		else
+			ScriptInformation.Delete("PersonalInfoTomlPath")
+		if _TomlUnreadableFiles.Has(Path)
+			_TomlUnreadableFiles.Delete(Path)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _PIWS_Kind in ["nul", "control", "literal"]
+	Test("personal info write scalar admission: " . _PIWS_Kind . " (personal-info-write-scalar)", _PIWS_Case.Bind(_PIWS_Kind))
