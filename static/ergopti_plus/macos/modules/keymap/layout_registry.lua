@@ -191,6 +191,7 @@ local function default_deps(settings)
 		encode_json = Json.encode,
 		read = FileSystem.read,
 		write = FileSystem.write,
+		create = FileSystem.create_if_absent,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
 		prepare_parent = FileSystem.prepare_parent_for_create,
@@ -469,22 +470,42 @@ end
 --- @param deps table
 --- @param entry table
 --- @param text string
+--- @param previous table|nil Previously registered entry for this id.
 --- @return string|nil installed_path
 --- @return string|nil failure_code
 --- @return string|nil detail
-local function publish(deps, entry, text)
+local function publish(deps, entry, text, previous)
 	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
+	local created_paths = {}
+	local function retained(detail)
+		if #created_paths == 0 then return tostring(detail) end
+		return tostring(detail) .. "; created copies retained at " .. table.concat(created_paths, ", ")
+	end
+	if previous == nil and type(deps.create) ~= "function" then
+		return nil, M.FAILURE_WRITE, "exclusive layout creation is unavailable"
+	end
 	for _, step in ipairs({
 		{ deps.local_dir .. entry.id .. ".keylayout", text },
 		{ installed_path, text },
 	}) do
-		local ok, err = write_file(deps, step[1], step[2])
-		if not ok then return nil, M.FAILURE_WRITE, err end
+		if previous == nil then
+			local prepared, prepare_err = deps.prepare_parent(step[1])
+			if not prepared then return nil, M.FAILURE_WRITE, retained(prepare_err) end
+			local created, status, detail = deps.create(step[1], step[2])
+			if created ~= true then
+				local code = status == "exists" and M.FAILURE_FOREIGN_FILE or M.FAILURE_WRITE
+				return nil, code, retained("cannot create " .. step[1] .. ": " .. tostring(detail or status))
+			end
+			created_paths[#created_paths + 1] = step[1]
+		else
+			local ok, err = write_file(deps, step[1], step[2])
+			if not ok then return nil, M.FAILURE_WRITE, err end
+		end
 	end
 	local record, record_err = read_installed(deps)
-	if not record then return nil, M.FAILURE_RECORD, record_err end
+	if not record then return nil, M.FAILURE_RECORD, retained(record_err) end
 	local ok, err = write_installed(deps, Catalogue.with_installed(record, entry))
-	if not ok then return nil, M.FAILURE_RECORD, err end
+	if not ok then return nil, M.FAILURE_RECORD, retained(err) end
 	return installed_path, nil, nil
 end
 
@@ -577,7 +598,7 @@ function M.install(id, on_done, deps)
 				})
 				if not staged then finish(false, M.FAILURE_WRITE, stage_err) return end
 			end
-			local path, code, publish_err = publish(deps, entry, detail.text)
+			local path, code, publish_err = publish(deps, entry, detail.text, record.layouts[id])
 			if not path then
 				finish(false, code, publish_err)
 				return
@@ -751,7 +772,7 @@ function M.install_local(entry, text, on_done, deps)
 			finish(false, M.FAILURE_INVALID, reason or digest_err)
 			return
 		end
-		local path, code, publish_err = publish(deps, entry, text)
+		local path, code, publish_err = publish(deps, entry, text, record.layouts[id])
 		if not path then
 			finish(false, code, publish_err)
 			return

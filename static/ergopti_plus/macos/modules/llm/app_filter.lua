@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local km_utils = require("modules.keymap.utils")
+local TextUtils = require("text_utils")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 
 local LOG = "llm.app_filter"
@@ -276,26 +277,38 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 		return true
 	end
 	local path_known = type(path) == "string" and path ~= ""
-	bid, path, name = bid or "", path or "", (name or ""):lower()
+	bid, path, name = bid or "", path or "", TextUtils.trig_fold(name or "")
 
 	for _, app in ipairs(excluded_apps) do
-		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
-		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
-		local configured_name = type(app.name) == "string" and app.name:lower() or ""
-		if has_path and not path_known then
+		if type(app) ~= "string" and type(app) ~= "table" then
+			Logger.warn(LOG, "Invalid application exclusion — LLM request skipped.")
+			return true
+		end
+		-- Shared configuration also admits a plain application identifier.
+		-- Keep structured entries' path / bundle priority unchanged.
+		local item = type(app) == "table" and app or {}
+		local plain = type(app) == "string" and app or ""
+		local plain_path = plain ~= "" and plain:sub(1, 1) == "/"
+		local has_path = type(item.appPath) == "string" and item.appPath ~= ""
+		local has_bid  = type(item.bundleID) == "string" and item.bundleID ~= ""
+		local configured_name = TextUtils.trig_fold(type(item.name) == "string" and item.name or plain)
+		if (has_path or plain_path) and not path_known then
 			Logger.debug(LOG, "Focused application path is unavailable — LLM request skipped.")
 			return true
 		end
 		-- Guard: name must also be non-empty. Without this, an empty name (app
 		-- whose hs:name() returns nil) causes ("slack"):find("", 1, true) = 1,
 		-- so every name-only exclusion entry would match any nameless app.
-		local same_name = (not has_path and not has_bid
+		local same_name = (not has_path and not has_bid and not plain_path
 			and configured_name ~= "" and name ~= ""
-			and (configured_name == name
-			or name:find(configured_name, 1, true)
-			or configured_name:find(name, 1, true)))
-		local path_match = has_path and (app.appPath == path)
-		local bid_match  = (not has_path and has_bid and app.bundleID == bid)
+			and (configured_name == name or (plain == "" and
+				(name:find(configured_name, 1, true)
+				or configured_name:find(name, 1, true)))))
+		local path_match = (has_path and item.appPath == path)
+			or (plain_path and plain == path)
+		local bid_match  = (not has_path and has_bid and item.bundleID == bid)
+			or (plain ~= "" and not plain_path and bid ~= ""
+				and TextUtils.trig_fold(plain) == TextUtils.trig_fold(bid))
 
 		if path_match or bid_match or same_name then
 			Logger.debug(LOG, "App excluded: '%s' — LLM request skipped.", front:name() or bid)

@@ -372,13 +372,28 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	-- Sort a shallow copy by display name so the list is always alphabetical
 	local sorted_apps = {}
 	for _, a in ipairs(apps) do table.insert(sorted_apps, a) end
+	local function display_name(entry)
+		if type(entry) == "string" then return entry end
+		return type(entry) == "table" and type(entry.name) == "string" and entry.name or ""
+	end
 	table.sort(sorted_apps, function(a, b)
-		return (a.name or ""):lower() < (b.name or ""):lower()
+		return display_name(a):lower() < display_name(b):lower()
 	end)
 	local menu = {}
 
 	for _, app in ipairs(sorted_apps) do
-		if type(app) == "table" then
+		if type(app) == "string" and app ~= "" then
+			local value = app
+			local styled = hs.styledtext.new(value .. "\t✗",
+				{ paragraphStyle = { tabStops = {{location = 260, alignment = "right"}} } })
+			table.insert(menu, { label = styled, action = function()
+				local new_apps = {}
+				for _, entry in ipairs(apps) do
+					if entry ~= value then table.insert(new_apps, entry) end
+				end
+				on_change(new_apps)
+			end })
+		elseif type(app) == "table" then
 			local icon = nil
 			if app.bundleID then
 				local ok, img = pcall(hs.image.imageFromAppBundle, app.bundleID)
@@ -392,6 +407,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			local app_path   = app.appPath
 			local app_bundle = app.bundleID
 			local has_path = type(app_path) == "string" and app_path ~= ""
+			local has_bundle = type(app_bundle) == "string" and app_bundle ~= ""
 			local styled = hs.styledtext.new(
 				(app.name or "?") .. "\t✗",
 				{ paragraphStyle = { tabStops = {{location = 260, alignment = "right"}} } }
@@ -403,8 +419,9 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 				action = function()
 					local new_apps = {}
 					for _, a in ipairs(apps) do
-						local same = has_path and a.appPath == app_path
-							or (not has_path and app_bundle and a.bundleID == app_bundle)
+						local same = type(a) == "table" and (has_path and a.appPath == app_path
+							or (not has_path and has_bundle and a.bundleID == app_bundle)
+							or (not has_path and not has_bundle and a == app))
 						if not same then table.insert(new_apps, a) end
 					end
 					on_change(new_apps)
