@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **130 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **131 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1951,3 +1951,13 @@ Sourceefda9c0a requires both persistence acknowledgements and current native own
 ### AHK-130: Unknown power status becomes a definite offline reading
 
 The sensor receives documented AC255/battery73 bytes through an explicit native power port and publishes on_ac0. The genuine central publication and known AC/DC controls execute in both orders. Sourcec2787b90 omits the unknown AC field, preserving known values and the existing unknown-battery policy. Native postfix qualification is pending. The test does not claim these bytes came from runner hardware.
+
+### Native qualification: replay75
+
+Replay42065111326 at e152e4ed passes74/75 selected cases in each order, with production parsing and90 native hotstring E2E cases passing. It qualifies the character-input correction128, including zero retained private units in the actual password-style prefix composition, and all selected scalar/lifecycle/privacy controls. It also qualifies the two original-admission fixes129 and the power-status correction130. This remains a selected cohort; Backspace, late durable-writer replacement and natural Show/Hide probes are newly added hypotheses.
+
+### AHK-131: Old brightness completion disables a successor timer
+
+The original completion detaches A, an actual AHK timer admits B at the open cutpoint, then A stops the shared poller. B remains owned with0 retirements and0 completions after619ms despite its expired10ms fixture deadline. Both orders reproduce. Native scheduling is real; the process is an explicit passive port and no physical display effect is claimed. The same source separation exists at9154723b.
+
+Commit632b4b35 makes detach/disarm atomic and carries the observed id from poll to cancellation, keeping process retirement outside the short claim. A stale-poll successor control accompanies the original real-timer regression. Postfix native qualification is pending.
