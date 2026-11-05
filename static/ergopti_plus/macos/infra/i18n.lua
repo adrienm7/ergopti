@@ -178,14 +178,13 @@ function M.format(key, ...)
 	local text = M.get(key)
 	if type(text) ~= "string" then return text end
 	local args = table.pack(...)
-	for n = 1, args.n do
-		local value = tostring(args[n])
-		-- The replacement is outside-world data (a filesystem path), and a "%" in
-		-- a gsub replacement raises. Escape it rather than trusting the input.
-		value = value:gsub("%%", "%%%%")
-		text = text:gsub("{" .. n .. "}", value)
-	end
-	return text
+	-- Substitution values are data, not templates: formatting a later argument
+	-- must never rewrite a placeholder that appeared inside an earlier value.
+	return (text:gsub("{([1-9]%d*)}", function(index)
+		local position = tonumber(index)
+		if position and position <= args.n then return tostring(args[position]) end
+		return nil
+	end))
 end
 
 --- @return string

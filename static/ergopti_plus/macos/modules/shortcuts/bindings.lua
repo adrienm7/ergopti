@@ -1142,7 +1142,7 @@ end
 --- @param url string|nil The configured URL, or nil to fall back to the default.
 function M.set_chatgpt_url(url)
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
-	Logger.debug(LOG, "chatgpt_url updated: %s.", tostring(_chatgpt_url))
+	Logger.debug(LOG, "ChatGPT URL updated.")
 	return true
 end
 

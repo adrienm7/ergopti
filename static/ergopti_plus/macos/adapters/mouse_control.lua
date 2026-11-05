@@ -41,10 +41,13 @@ function M.setPos(x, y)
 		or x == math.huge or x == -math.huge or y == math.huge or y == -math.huge then
 		return false
 	end
-	local ok = pcall(function()
-		hs.mouse.absolutePosition({ x = x, y = y })
-	end)
-	return ok
+	-- Hammerspoon ignores CGWarpMouseCursorPosition's status, but its setter
+	-- returns the position read back from Quartz. Allow sub-point rounding.
+	local ok, position = pcall(hs.mouse.absolutePosition, { x = x, y = y })
+	if not ok or type(position) ~= "table" then return false end
+	local actual_x, actual_y = tonumber(position.x), tonumber(position.y)
+	return actual_x ~= nil and actual_y ~= nil and actual_x == actual_x and actual_y == actual_y
+		and math.abs(actual_x - x) < 1 and math.abs(actual_y - y) < 1
 end
 
 --- Returns the current absolute cursor position.

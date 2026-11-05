@@ -108,6 +108,14 @@ _ConfigBackup_Join(Dir, Relative) {
 	return RTrim(Dir, "\/") . "\" . StrReplace(Relative, "/", "\")
 }
 
+; A bare drive designator (C:) resolves relative to that drive's current
+; directory; retain the separator when the configuration root is C:\.
+_ConfigBackup_Root(Dir) {
+	if RegExMatch(Dir, "i)^[a-z]:[\\/]+$")
+		return SubStr(Dir, 1, 2) . "\"
+	return RTrim(Dir, "\/")
+}
+
 _ConfigBackup_Included(Rules, Name) {
 	Lower := StrLower(Name)
 	for _, Extension in Rules["extensions"] {
@@ -143,7 +151,7 @@ _ConfigBackup_Walk(ConfigDir, Rules) {
 	Pending := [""]
 	while (Pending.Length > 0) {
 		Relative := Pending.RemoveAt(1)
-		Dir := (Relative == "") ? RTrim(ConfigDir, "\/") : _ConfigBackup_Join(ConfigDir, Relative)
+		Dir := (Relative == "") ? _ConfigBackup_Root(ConfigDir) : _ConfigBackup_Join(ConfigDir, Relative)
 		for _, Path in FSListDirectoryStrict(Dir, true) {
 			SplitPath(Path, &Name)
 			if FSIsReparsePoint(Path) {

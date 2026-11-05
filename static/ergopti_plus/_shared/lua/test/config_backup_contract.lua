@@ -10,11 +10,13 @@ local M = {}
 --- An in-memory file tree implementing the owner's I/O ports.
 --- @return table fs { files, dirs, io, writes, refuse }
 local function memory_fs()
-	local fs = { files = {}, dirs = { ["/"] = true }, writes = {}, refuse = {} }
+	local fs = { files = {}, dirs = { ["/"] = 1 }, writes = {}, refuse = {} }
+	local next_inode = 1
 	local function parent(path) return path:match("^(.*)/[^/]+$") or "/" end
 	function fs.add_dir(path)
 		while path ~= "" and path ~= "/" and not fs.dirs[path] do
-			fs.dirs[path] = true
+			next_inode = next_inode + 1
+			fs.dirs[path] = next_inode
 			path = parent(path)
 		end
 	end
@@ -23,6 +25,11 @@ local function memory_fs()
 		fs.files[path] = content
 	end
 	fs.io = {
+		directory_status = function(path) return fs.dirs[path] and "present" or "absent" end,
+		directory_identity = function(path)
+			if not fs.dirs[path] then return nil, "absent" end
+			return { dev = 1, ino = fs.dirs[path] }
+		end,
 		list = function(dir)
 			dir = dir:gsub("/+$", "")
 			if not fs.dirs[dir] then return nil, "absent" end
@@ -163,6 +170,100 @@ function M.register(helpers, env)
 	end
 
 	helpers.describe("shared configuration backup (config_backup)", function()
+		helpers.it("backs up the filesystem root when it is the configuration directory", function()
+			local owner, fs = fixture({ roots = {
+				{ id = "config", dir = "/" },
+				{ id = "settings_store", file = "/root.toml" },
+			} })
+			fs.add_file("/root.toml", "important configuration")
+			local list = fs.io.list
+			fs.io.list = function(path)
+				if path == "/" then return { { name = "root.toml", kind = "file" } } end
+				return list(path)
+			end
+			local record = assert(owner.create("pre_install"))
+			helpers.assert_eq(paths_of(record), "config/root.toml")
+			helpers.assert_eq(fs.files[record.path .. "/config/root.toml"], "important configuration")
+		end)
+		helpers.it("excludes case aliases of backup and metrics folders on insensitive filesystems", function()
+			local owner, fs = fixture()
+			for path in pairs(fs.files) do
+				if path:sub(1, 13) == "/cfg/backups/" or path:sub(1, 13) == "/cfg/metrics/" then fs.files[path] = nil end
+			end
+			for path in pairs(fs.dirs) do
+				if path:sub(1, 12) == "/cfg/backups" or path:sub(1, 12) == "/cfg/metrics" then fs.dirs[path] = nil end
+			end
+			fs.add_file("/cfg/Backups/old/config.toml", "old backup")
+			fs.add_file("/cfg/Metrics/private.toml", "private metrics")
+			local list = fs.io.list
+			local directory_status = fs.io.directory_status
+			local directory_identity = fs.io.directory_identity
+			fs.io.directory_status = function(path)
+				if path == "/cfg/backups" then return directory_status("/cfg/Backups") end
+				if path == "/cfg/metrics" then return directory_status("/cfg/Metrics") end
+				return directory_status(path)
+			end
+			fs.io.directory_identity = function(path)
+				if path == "/cfg/backups" then return directory_identity("/cfg/Backups") end
+				if path == "/cfg/metrics" then return directory_identity("/cfg/Metrics") end
+				return directory_identity(path)
+			end
+			fs.io.list = function(path)
+				if path == "/cfg/backups" then return list("/cfg/Backups") end
+				if path == "/cfg/metrics" then return list("/cfg/Metrics") end
+				return list(path)
+			end
+			local record = assert(owner.create("pre_install"))
+			local paths = paths_of(record)
+			helpers.assert_nil(paths:find("config/Backups/", 1, true))
+			helpers.assert_nil(paths:find("config/Metrics/", 1, true))
+		end)
+
+		helpers.it("backs up distinct differently cased folders on sensitive filesystems", function()
+			local owner, fs = fixture()
+			fs.add_file("/cfg/Backups/personal.toml", "personal")
+			fs.add_file("/cfg/Metrics/personal.toml", "personal")
+			local record = assert(owner.create("pre_install"))
+			local paths = paths_of(record)
+			helpers.assert_true(paths:find("config/Backups/personal.toml", 1, true) ~= nil)
+			helpers.assert_true(paths:find("config/Metrics/personal.toml", 1, true) ~= nil)
+		end)
+
+		helpers.it("keeps a distinct folder when the canonical name appears after enumeration", function()
+			local owner, fs = fixture()
+			fs.files["/cfg/backups/pre-install-20260101-000000/backup.json"] = nil
+			fs.dirs["/cfg/backups/pre-install-20260101-000000"] = nil
+			fs.dirs["/cfg/backups"] = nil
+			fs.add_file("/cfg/Backups/personal.toml", "keep")
+			local status = fs.io.directory_status
+			fs.io.directory_status = function(path)
+				if path == "/cfg/backups" then fs.add_dir(path) end
+				return status(path)
+			end
+			local record = assert(owner.create("pre_install"))
+			helpers.assert_true(paths_of(record):find("config/Backups/personal.toml", 1, true) ~= nil,
+				"a concurrent distinct canonical folder cannot hide user data")
+		end)
+
+		helpers.it("refuses when a possible excluded-folder alias cannot be classified", function()
+			local owner, fs = fixture()
+			fs.dirs["/cfg/metrics"] = nil
+			fs.files["/cfg/metrics/metrics.toml"] = nil
+			fs.add_file("/cfg/Metrics/private.toml", "private")
+			fs.io.directory_status = function() return "error", "permission denied" end
+			local record = owner.create("pre_install")
+			helpers.assert_nil(record)
+		end)
+
+		helpers.it("refuses when a possible alias lacks reliable directory identity", function()
+			local owner, fs = fixture()
+			fs.dirs["/cfg/metrics"] = nil
+			fs.files["/cfg/metrics/metrics.toml"] = nil
+			fs.add_file("/cfg/Metrics/private.toml", "private")
+			fs.io.directory_status = function() return "present" end
+			fs.io.directory_identity = function() return nil, "identity unavailable" end
+			helpers.assert_nil(owner.create("pre_install"))
+		end)
 		helpers.it("refuses a backup whose published manifest cannot be read back", function()
 			local owner, fs = fixture()
 			local create = fs.io.create

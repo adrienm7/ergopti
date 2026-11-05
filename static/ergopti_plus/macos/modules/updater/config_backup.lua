@@ -94,6 +94,14 @@ end
 local function file_ports()
 	return {
 		list = list,
+		directory_status = FileSystem.directory_status,
+		directory_identity = function(path)
+			local attrs, status, detail = FileSystem.classify_no_follow(path)
+			if status ~= "ok" or type(attrs) ~= "table" or attrs.mode ~= "directory" then
+				return nil, detail or status or "not a directory"
+			end
+			return { dev = attrs.dev, ino = attrs.ino }
+		end,
 		read = function(path)
 			local content, status, detail = FileSystem.read_with_status(path)
 			if status == "ok" then return content end

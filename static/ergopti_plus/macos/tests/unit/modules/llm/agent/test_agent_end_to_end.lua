@@ -72,6 +72,21 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		helpers.assert_eq(world.notices[#world.notices], "Ajouté au calendrier : Devis avec Paul")
 	end)
 
+	helpers.it("shows a calendar title with literal placeholder braces before acceptance", function()
+		local previous = package.loaded["infra.i18n"]
+		package.loaded["infra.i18n"] = nil
+		local real_i18n = require("infra.i18n")
+		package.loaded["infra.i18n"] = previous
+		local world = build_world()
+		real_i18n.get = world.i18n.get
+		world.i18n.format = real_i18n.format
+		trigger(world, "llm_agent_selection")
+		answer(world.posts[1], 'ACTIONS: [{"type":"calendar","title":"Sprint {2}","start":"2026-10-01T14:00"}]')
+		helpers.assert_eq(world.renders[#world.renders].texts[1], "📅 Sprint {2} — 2026-10-01 14:00")
+		helpers.assert_eq(accept(world, 1), true)
+		helpers.assert_eq(world.runs[1].action.title, "Sprint {2}")
+	end)
+
 	helpers.it("runs the mail candidate with its own action", function()
 		local world = build_world()
 		trigger(world, "llm_agent_selection")

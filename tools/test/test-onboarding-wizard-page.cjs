@@ -2818,3 +2818,49 @@ console.log(
 		'Unicode trigger validation must invalidate the previous script'
 	);
 })();
+
+(function absoluteUnixFolderNamesRetainTrailingSpaces() {
+	for (const platform of ['macos', 'linux']) {
+		const page = openWizard({ platform });
+		page.platform = platform;
+		page.click('btn-next');
+		page.messages.splice(0);
+		const chosen = '/tmp/config-folder ';
+		const input = page.el('config-input');
+		input.value = chosen;
+		input.dispatch('input');
+		page.click('btn-back');
+		page.click('btn-next');
+		page.messages.splice(0);
+		assert.equal(
+			page.el('config-input').value,
+			chosen,
+			platform + ': returning from language retains the folder'
+		);
+		page.click('btn-next');
+		assert.deepEqual(
+			page.messages.splice(0),
+			[
+				{ action: 'loadExistingConfig', config_dir: chosen, request: 1 },
+				{ action: 'resolveMetricsPath', config_dir: chosen, request: 1 }
+			],
+			platform + ': the native owners must see the exact selected folder'
+		);
+		page.window.applyCurrentValues({ request: 1, values: {} });
+		page.click('btn-back');
+		assert.equal(page.el('config-input').value, chosen, platform + ': Back preserves the folder');
+		assert.equal(
+			finish(page).answers.config_dir,
+			chosen,
+			platform + ': Finish preserves the folder'
+		);
+	}
+})();
+
+(function literalUnixFolderInvalidatesCachedScript() {
+	const match = html.match(/src="script\.js\?v=(\d+)"/);
+	assert.ok(
+		match && Number(match[1]) > 11,
+		'literal Unix folders must invalidate the previous script'
+	);
+})();

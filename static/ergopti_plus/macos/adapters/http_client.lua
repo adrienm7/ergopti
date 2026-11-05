@@ -248,8 +248,21 @@ local function request_refusal(url, headers, body)
 	if scheme ~= "http" and scheme ~= "https" then return "the URL must be absolute HTTP or HTTPS" end
 	if not parse_http_url(url) then return "the URL must have a valid HTTP authority and path" end
 	if headers ~= nil and type(headers) ~= "table" then return "headers must be a table" end
+	local captured = nil
+	if headers ~= nil then
+		local ok, result = pcall(function()
+			local policy = require("infra.http_header_policy")
+			for name, value in pairs(headers) do
+				if type(name) ~= "string" or type(value) ~= "string" then error("header is not a string") end
+			end
+			local _, view = require("network.http_headers").capture(headers, policy.validate)
+			return view
+		end)
+		if not ok then return "headers cannot be represented by the native HTTP bridge" end
+		captured = result
+	end
 	if body ~= nil and type(body) ~= "string" then return "the body must be a string" end
-	return nil
+	return nil, captured
 end
 
 --- Longest native failure reason kept in a result; the system text is one sentence.
@@ -927,7 +940,7 @@ local function new(options)
 	--- @param callback function Completion callback.
 	--- @return boolean accepted
 	local function _request(method, url, headers, body, callback)
-		local refusal = request_refusal(url, headers, body)
+		local refusal, captured_headers = request_refusal(url, headers, body)
 		if refusal then
 			Logger.error(LOG, "%s(): request refused before dispatch: %s.", method, refusal)
 			invoke_callback(callback, {
@@ -939,6 +952,7 @@ local function new(options)
 			})
 			return false
 		end
+		headers = captured_headers
 		if follow_redirects == true and (has_sensitive_headers(headers) or is_https(url)) then
 			return _dispatch_with_redirect_policy(method, url, headers, body, callback)
 		end

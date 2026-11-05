@@ -41,6 +41,11 @@ function M.register(helpers, env)
 			double[name] = function() return nil, "absent" end
 		end
 		double.make_dir = function(path) directories[path] = true; return true end
+		double.directory_status = function(path) return directories[path] and "present" or "absent" end
+		double.directory_identity = function(path)
+			if directories[path] then return { dev = 1, ino = 1 } end
+			return nil, "absent"
+		end
 		double.make_dir_exclusive = function(path)
 			if directories[path] then return nil, "exists" end
 			directories[path] = true
