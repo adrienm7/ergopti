@@ -102,6 +102,15 @@ function M.parse_config(text)
 		or not integer_in(s1.max_tokens, 1, 100000) or not number_in(s1.threshold, 0, 1) then
 		return nil, "agent.json system1 is invalid"
 	end
+	local jev = s1.jev
+	if type(jev) ~= "table" or type(jev.question_id) ~= "string" or jev.question_id == ""
+		or type(jev.instructions) ~= "string" or jev.instructions == "" or type(jev.criteria) ~= "table" then
+		return nil, "agent.json system1 Jev question is invalid"
+	end
+	for _, intent in ipairs(root.intents) do
+		if type(intent) ~= "string" or intent == "" or type(jev.criteria[intent]) ~= "string"
+			or jev.criteria[intent] == "" then return nil, "agent.json system1 Jev criteria are invalid" end
+	end
 	if type(s2) ~= "table" or type(s2.prompt) ~= "string" or s2.prompt == ""
 		or type(s2.tag) ~= "string" or s2.tag == "" or type(s2.user_prefix) ~= "string"
 		or not integer_in(s2.max_actions, 1, 100) or not integer_in(s2.max_tokens, 1, 100000) then

@@ -38,6 +38,23 @@ helpers.it("refuses fractional agent count limits", function()
 	end
 end)
 
+helpers.it("refuses a malformed Jev triage configuration", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, damage in ipairs({
+		function(config) config.system1.jev = nil end,
+		function(config) config.system1.jev.criteria = false end,
+		function(config) config.system1.jev.question_id = "" end,
+	}) do
+		local config = assert(Json.decode(source))
+		damage(config)
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "unusable Jev question must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
