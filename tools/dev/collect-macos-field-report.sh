@@ -80,6 +80,8 @@ FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
 # deadline (the declared default, which covers every step at its bound): the
 # app needs a moment to settle the last step, run the guard and write done.
 FIELD_RUN_GRACE_SECONDS=120
+# How many times a run a reload interrupted is requested again.
+FIELD_RUN_RELOAD_RETRIES=2
 # How long the developer app may take to publish its readiness, and then to
 # accept the request it was sent. Right after a reboot the 12:02 run of
 # 2026-10-28 saw the ready app hold its main thread 138 s (keystats ledger
@@ -177,6 +179,17 @@ finalize() {
 	"${finalized}" && return 0
 	finalized=true
 	local start_day today d f subject
+	# Resolved again: the app's first boot can write LogsDirPath during the run,
+	# and the folders read at start then pointed at yesterday's logs (field
+	# report 2026-11-05). Which one is said without the path, which names the home.
+	# shellcheck disable=SC2086 # one word per log name
+	field_paths="$(python3 "${REPO_ROOT}/tools/dev/field-report-paths.py" "${REPO_ROOT}/static/ergopti_plus/_shared" ${FIELD_TOPICAL_LOGS})" \
+		&& eval "${field_paths}"
+	if [ "${LOG_DIR}" = "${LOG_DEFAULT_DIR}" ]; then
+		printf '%-28s default folder\n' "log_folder" >> "${steps}"
+	else
+		printf '%-28s LogsDirPath\n' "log_folder" >> "${steps}"
+	fi
 	local days=() day_logs=()
 	# A run that crosses midnight spans two day logs: keep both, oldest first.
 	start_day="${stamp%%_*}"
@@ -479,6 +492,37 @@ run_field_run() {
 			|| log "WARNING: the managed Ollama was not built from this clone's pinned sources (reason above); the ollama_runtime step will fail."
 	fi
 
+	# A reload (from the menu, or one the run triggers) closes the run as
+	# interrupted before any step result; the run is requested again, up to
+	# FIELD_RUN_RELOAD_RETRIES times, so one reload does not cost the report.
+	local attempt=1 cause
+	while :; do
+		run_field_attempt
+		case $? in
+			0) return 0 ;;
+			2) ;;
+			*) return 1 ;;
+		esac
+		cause="$(plutil -extract cause.kind raw -o - "${results_dir}/${done_name}" 2>/dev/null || true)"
+		if [ "${cause}" != reload ] || [ "${attempt}" -gt "${FIELD_RUN_RELOAD_RETRIES}" ]; then
+			log "The field run was cut short in the app (see its log); the results so far are kept."
+			return 1
+		fi
+		# The attempt's copy moves aside so the next attempt's results are the report's
+		mv "${out}/field_run" "${out}/field_run_attempt_${attempt}" 2>/dev/null || true
+		attempt=$((attempt + 1))
+		started_at="$(date +%s)"
+		request_id="mac-${stamp}-r${attempt}"
+		results_dir="${run_folder}/$(spec_value files.results)/${request_id}"
+		seen_results="" passed_results=0 failed_results=0 other_results=0
+		log "Ergopti reloaded during the run; requesting the field run again (attempt ${attempt})."
+	done
+}
+
+# One request of the field run: readiness, request, acceptance, done.
+# Returns 0 when done, 2 when the app closed it as interrupted, 1 otherwise.
+run_field_attempt() {
+	local now pid
 	log "Waiting for the developer app to publish its readiness..."
 	while ! pid="$(ready_pid)"; do
 		now="$(date +%s)"
@@ -489,6 +533,7 @@ run_field_run() {
 		sleep "${FIELD_RUN_POLL_SECONDS}"
 	done
 	log "Developer app ready (pid ${pid}); requesting every step within ${deadline_seconds} s."
+	log "The run is working now: do not reload or quit Ergopti; each step prints its verdict here."
 
 	rm -f "${run_folder}/${refused_name}"
 	printf '{"schema":1,"request_id":"%s","steps":["all"],"deadline_seconds":%s}\n' \
@@ -541,8 +586,7 @@ run_field_run() {
 	log "Field run summary: ✅ ${passed_results} pass, ❌ ${failed_results} fail, ${other_results} other."
 	# A run a reload cut short is closed by the app with interrupted=true
 	if [ "$(plutil -extract interrupted raw -o - "${results_dir}/${done_name}" 2>/dev/null)" = "true" ]; then
-		log "The field run was cut short in the app (see its log); the results so far are kept."
-		return 1
+		return 2
 	fi
 	return 0
 }
