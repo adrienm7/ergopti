@@ -82,6 +82,20 @@ _MBPO_Log(Line) {
 			if InStr(Line, "status=confirmed")
 				_MBPO.MutationConfirmed += 1
 		}
+		if HasProp(_MBPO, "AdmissionArmed") && _MBPO.AdmissionArmed && !_MBPO.AdmissionActorFired {
+			FirstConfirmed := InStr(Line, "[LLMObservation.mutation-return.returned]") && InStr(Line, "status=confirmed")
+			SecondSchemaMode := _MBPO.Mode == "native-backend-second-schema-pause"
+			if SecondSchemaMode && FirstConfirmed
+				_MBPO.FirstModelAckObserved := true
+			else if (!SecondSchemaMode && FirstConfirmed) || (SecondSchemaMode
+					&& HasProp(_MBPO, "FirstModelAckObserved") && _MBPO.FirstModelAckObserved
+					&& InStr(Line, "[LLMObservation.schema-admission.enter]")) {
+				_MBPO.AtSecondSchema := SecondSchemaMode
+				_MBPO.AdmissionActorFired := true
+				_MBPO_BackendAdmissionActor()
+			}
+		}
+
 	} catch Any as Failure {
 		if !IsObject(_MBPO.Failure)
 			_MBPO.Failure := Failure
@@ -154,7 +168,7 @@ _MBPO_Prepare() {
 		&& _LLM_Menu["model"] == _MBPO.ModelA && !_LLM_Menu["auto_profile_for_model"],
 		"The private disabled state must preserve its actual backend/model without starting network dependencies.")
 	_MBPO_Require(!_LLM_Menu_Loaded, "Candidate collection must use its real explicit menu source, not a fabricated loaded flag.")
-	if _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api" {
+	if InStr(_MBPO.Mode, "native-backend-") == 1 {
 		; Model activation always invalidates its previous Ollama owners, even
 		; when inference is disabled. Run that genuine neutral cleanup before SUT.
 		_MBPO_Require(_LLM_AuxOwners.Count == 0 && _LLM_AuxCleanupDebt.Count == 0
@@ -284,14 +298,18 @@ _MBPO_NativeRefused() {
 				"only the intentional, identified lease refusal can explain the negative result")
 		} finally _ConfigWriteLeaseRelease(Lease)
 	}
-	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + 1)
+	ExpectedCommits := _LLM_Menu["backend"] == "ollama" ? 1 : 2
+	_MBPO_NativeClick(ButtonHwnd, _MBPO.MutationReturns + ExpectedCommits)
 	Parsed := TOML_ParseFreshFile(ConfigurationFile)
 	_MBPO_Require(Parsed is Map && Parsed.Has("llm.models") && Parsed["llm.models"] is Map
 		&& Parsed["llm.models"].Has("ollama"),
 		"The genuine uncached TOML parser must expose the literal llm.models section and its model leaf.")
 	_MBPO_Require(_LLM_Menu["model"] == _MBPO.ModelB && Features["llm"]["models"]["ollama"] == _MBPO.ModelB
-		&& Parsed["llm.models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == 1
-		&& _MBPO.MutationConfirmed == 1, "retry must really publish B through the unchanged durable writer")
+		&& Parsed["llm.models"]["ollama"] == _MBPO.ModelB && _MBPO.WriterConfirmed == ExpectedCommits
+		&& _MBPO.MutationConfirmed == ExpectedCommits, "retry must really publish the model and active backend through the actual durable writer")
+	_MBPO_Require(_LLM_Menu["backend"] == "ollama" && Features["llm"]["models"]["selected"] == "ollama"
+		&& Parsed["llm.models"].Get("selected", ManifestDefaultFor("llm.models.selected")) == "ollama",
+		"A successful fresh retry must activate the selected local backend in every real projection")
 	_MBPO_Require(!DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
 		"the acknowledged retry may hide its exact original browser")
 	FileAppend("RECEIPT native-model-refusal negative=lease positive=durable writer_confirmed=" . _MBPO.WriterConfirmed . "`n", "*", "UTF-8-RAW")
@@ -345,6 +363,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" {
+		_MBPO_BackendAdmission()
+		return
+	}
 	if _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api" {
 		_MBPO_NativeBackendPick()
 		return
@@ -411,7 +433,8 @@ _MBPO_Main() {
 		PausedWriterEntries: 0, MutationReturns: 0, MutationConfirmed: 0, RepaintRequests: 0,
 		Pulses: 0, Cleaning: false, Errors: [], Failure: 0, NativePick: 0, NativeCommands: 0, InitialBackend: "", BackendPickReturns: 0}
 	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
-		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api",
+		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
+		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -546,3 +569,171 @@ _MBPO_NativeBackendPick() {
 }
 
 _MBPO_Main()
+
+
+; The actor runs at the real transaction-return logger boundary AFTER the first
+; model's durable/live ACK and after its genuine configuration bundle released.
+_MBPO_BackendAdmissionActor() {
+	global _MBPO, ConfigurationFile, _LLM_ModelBrowser_Gui
+	if _MBPO.Mode == "native-backend-second-refused" {
+		_MBPO.AdmissionLease := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "native-backend-second-admission")
+		_MBPO_Require(_MBPO.AdmissionLease is Object, "A real lease must own the second, not the first, configuration refusal")
+	} else if _MBPO.Mode == "native-backend-replaced" {
+		_LLM_ModelBrowser_OnClose()
+		_MBPO.ReplacementWindow := _LLM_ModelBrowser_Build()
+		_LLM_ModelBrowser_Gui := _MBPO.ReplacementWindow
+		_MBPO.ReplacementWindow.Show("NA")
+		_MBPO.ReplacementHwnd := _MBPO.ReplacementWindow.Hwnd
+		_MBPO_Require(DllCall("IsWindowVisible", "Ptr", _MBPO.ReplacementHwnd, "Int"), "The genuine replacement native browser must be visible")
+	} else if _MBPO.Mode == "native-backend-superseded" {
+		Nested := LLM_Menu_SetModel(_MBPO.ModelA)
+		Image := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		_MBPO.SupersededConfirmed := Nested is Integer && Nested == 1
+			&& _LLM_Menu["model"] == _MBPO.ModelA && Image["llm"]["models"].Get("ollama", ManifestDefaultFor("llm.models.ollama")) == _MBPO.ModelA
+			&& _LLM_Menu["backend"] == "api"
+		FileAppend("RECEIPT native-backend-superseding confirmed=" . _MBPO.SupersededConfirmed
+			. " actual_model_a=" . (_LLM_Menu["model"] == _MBPO.ModelA) . " backend=" . _LLM_Menu["backend"] . "`n", "*", "UTF-8-RAW")
+		_MBPO_Require(_MBPO.SupersededConfirmed, "The newer public model mutation must actually acknowledge its real durable/live A before the old picker resumes")
+	} else {
+		; This uses the canonical transition allocator and native suspend bit.
+		; It does not claim to execute every full-driver suspend/resume owner.
+		Transition := LifecycleTransitionBegin("suspend")
+		LifecycleTransitionMarkStarted(Transition)
+		Suspend(true)
+		_MBPO.NativePaused := A_IsSuspended
+		_MBPO_Require(LifecycleTransitionFinish(Transition), "The narrow transition allocator must close its own frame")
+		Resumed := LifecycleTransitionBegin("resume")
+		LifecycleTransitionMarkStarted(Resumed)
+		Suspend(false)
+		_MBPO.NativeResumed := !A_IsSuspended
+		_MBPO_Require(LifecycleTransitionFinish(Resumed) && _MBPO.NativePaused && _MBPO.NativeResumed,
+			"Actual native pause/resume must finish before the old model handler resumes")
+	}
+}
+_MBPO_BackendAdmissionReturned(This, Args*) {
+	global _MBPO
+	try {
+		Result := Func.Prototype.Call.Call(This, Args*)
+		_MBPO.AdmissionReturns.Push(Result)
+		return Result
+	} finally _MBPO.BackendPickReturns += 1
+}
+_MBPO_BackendAdmissionClick(ButtonHwnd, ExpectedReturn) {
+	global _MBPO
+	BeforeCommands := _MBPO.NativeCommands
+	DllCall("SendMessageW", "Ptr", ButtonHwnd, "UInt", 0xF5, "Ptr", 0, "Ptr", 0, "Ptr")
+	Started := A_TickCount
+	while _MBPO.BackendPickReturns < ExpectedReturn && !IsObject(_MBPO.Failure) && TickElapsed(Started) < 3000
+		Sleep(10)
+	_MBPO_Observe()
+	_MBPO_Require(!IsObject(_MBPO.Failure) && _MBPO.BackendPickReturns == ExpectedReturn
+		&& _MBPO.NativeCommands == BeforeCommands + 1 && _MBPO.AdmissionReturns.Length == ExpectedReturn,
+		"The actual native button must return through the unchanged production Pick handler exactly once")
+}
+_MBPO_BackendAdmission() {
+	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_ModelBrowser_Gui
+	_MBPO.AdmissionArmed := false, _MBPO.AdmissionActorFired := false, _MBPO.AdmissionLease := 0
+	_MBPO.AdmissionReturns := [], _MBPO.ReplacementWindow := 0, _MBPO.NativePaused := false, _MBPO.NativeResumed := false
+	Picker := _LLM_ModelBrowser_PickRow, HadCall := Picker.HasOwnProp("Call")
+	if HadCall
+		OriginalCall := Picker.GetOwnPropDesc("Call")
+	Installed := false
+	try {
+		_MBPO.Window := _LLM_ModelBrowser_Build(), _MBPO.Hwnd := _MBPO.Window.Hwnd
+		_LLM_ModelBrowser_Gui := _MBPO.Window
+		_MBPO.Window.Show("NA")
+		List := _MBPO.Window.ListView, Selected := 0, ButtonHwnd := 0
+		Loop List.GetCount()
+			if List.GetText(A_Index, 1) == _MBPO.ModelB
+				Selected := A_Index
+		_MBPO_Require(Selected > 0, "The actual constructor must contain the real catalogue model B")
+		List.Modify(0, "-Select"), List.Modify(Selected, "Select Focus")
+		for Control in _MBPO.Window
+			if Control.Type == "Button" && Control.Text == t("menu.llm.browse_pick")
+				ButtonHwnd := Control.Hwnd
+		_MBPO_Require(ButtonHwnd != 0 && _MBPO.InitialBackend == "api", "The first genuine Pick must start from the real API backend")
+		_MBPO.NativePick := ButtonHwnd
+		Picker.DefineProp("Call", {Call: _MBPO_BackendAdmissionReturned}), Installed := true
+		_MBPO.AdmissionArmed := true
+		_MBPO_BackendAdmissionClick(ButtonHwnd, 1)
+		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		FileAppend("RECEIPT native-backend-admission mode=" . _MBPO.Mode . " actor=" . _MBPO.AdmissionActorFired
+			. " returned=" . _MBPO.AdmissionReturns[1] . " model_b=" . (_LLM_Menu["model"] == _MBPO.ModelB)
+			. " backend=" . _LLM_Menu["backend"] . " writers=" . _MBPO.WriterConfirmed
+			. " mutations=" . _MBPO.MutationReturns . " confirmed=" . _MBPO.MutationConfirmed
+			. " errors=" . _MBPO.Errors.Length . "`n", "*", "UTF-8-RAW")
+		if _MBPO.Mode == "native-backend-superseded" {
+			_MBPO_Require(_MBPO.SupersededConfirmed && _MBPO.AdmissionActorFired,
+				"The genuine newer model setter must complete before judging the original row")
+			_MBPO_Require(_MBPO.AdmissionReturns[1] is Integer && _MBPO.AdmissionReturns[1] == 0
+				&& _MBPO.Errors.Length == 0 && _LLM_Menu["model"] == _MBPO.ModelA
+				&& Features["llm"]["models"]["ollama"] == _MBPO.ModelA
+				&& Parsed["llm"]["models"].Get("ollama", ManifestDefaultFor("llm.models.ollama")) == _MBPO.ModelA
+				&& _LLM_Menu["backend"] == "api" && Features["llm"]["models"]["selected"] == "api"
+				&& Parsed["llm"]["models"]["selected"] == "api"
+				&& DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"The old B handler cannot activate A's backend or hide after the real newer model intent supersedes it")
+			return
+		}
+		_MBPO_Require(_MBPO.AdmissionActorFired && _MBPO.AdmissionReturns[1] is Integer && _MBPO.AdmissionReturns[1] == 0,
+			"The original admitted model receipt must not certify the refused or withdrawn backend activation")
+		_MBPO_Require(_MBPO.WriterConfirmed == 1 && _LLM_Menu["model"] == _MBPO.ModelB
+			&& Features["llm"]["models"]["ollama"] == _MBPO.ModelB && Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB,
+			"The first actual model ACK remains durable and live; no pretend rollback may explain the refusal")
+		_MBPO_Require(_LLM_Menu["backend"] == "api" && Features["llm"]["models"]["selected"] == "api"
+			&& Parsed["llm"]["models"]["selected"] == "api", "The second backend admission must not commit after refusal or context withdrawal")
+		if _MBPO.Mode == "native-backend-second-refused" {
+			_MBPO_Require(_MBPO.AdmissionLease is Object && _MBPO.MutationReturns == 2 && _MBPO.MutationConfirmed == 1
+				&& _MBPO.Errors.Length == 1 && InStr(_MBPO.Errors[1], "another configuration transaction owns the global barrier")
+				&& DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"The genuine second lease refusal alone must keep the chosen native row visible")
+			_ConfigWriteLeaseRelease(_MBPO.AdmissionLease), _MBPO.AdmissionLease := 0
+		} else if _MBPO.Mode == "native-backend-second-schema-pause" {
+			_MBPO_Require(_MBPO.AtSecondSchema && _MBPO.NativePaused && _MBPO.NativeResumed && !A_IsSuspended
+				&& _MBPO.MutationReturns == 2 && _MBPO.MutationConfirmed == 1 && _MBPO.Errors.Length == 1
+				&& InStr(_MBPO.Errors[1], "candidate construction was refused")
+				&& DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"The original receipt must refuse the real second mutator after bundle acquisition despite completed native pause/resume")
+		} else {
+			_MBPO_Require(_MBPO.MutationReturns == 1 && _MBPO.MutationConfirmed == 1 && _MBPO.Errors.Length == 0,
+				"A withdrawn native context cannot begin the second transaction")
+			if _MBPO.Mode == "native-backend-replaced" {
+				_MBPO_Require(IsObject(_MBPO.ReplacementWindow) && _LLM_ModelBrowser_Gui == _MBPO.ReplacementWindow
+					&& DllCall("IsWindowVisible", "Ptr", _MBPO.ReplacementHwnd, "Int"),
+					"The returning old native selection cannot hide its real replacement")
+				return
+			}
+			_MBPO_Require(_MBPO.NativePaused && _MBPO.NativeResumed && !A_IsSuspended
+				&& DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+				"Native resume alone must not complete the old activation or hide its original browser")
+		}
+		BeforeRetry := _MBPO.MutationReturns, ExpectedErrors := _MBPO.Errors.Length
+		_MBPO_BackendAdmissionClick(ButtonHwnd, 2)
+		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		_MBPO_Require(_MBPO.AdmissionReturns[2] is Integer && _MBPO.AdmissionReturns[2] == 1
+			&& _MBPO.MutationReturns == BeforeRetry + 2 && _MBPO.MutationConfirmed == 3 && _MBPO.WriterConfirmed == 3,
+			"A fresh native Pick of the already stored B must obtain genuine model and backend ACKs")
+		_MBPO_Require(_MBPO.Errors.Length == ExpectedErrors && _LLM_Menu["backend"] == "ollama"
+			&& Features["llm"]["models"]["selected"] == "ollama"
+			&& Parsed["llm"]["models"].Get("selected", ManifestDefaultFor("llm.models.selected")) == "ollama"
+			&& _LLM_Menu_ModelDisplayText() == _MBPO.ModelB && !DllCall("IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
+			"Only the fresh fully acknowledged activation may switch all backend projections and hide its native browser")
+	} finally {
+		_MBPO.AdmissionArmed := false
+		if _MBPO.AdmissionLease is Object
+			_ConfigWriteLeaseRelease(_MBPO.AdmissionLease)
+		if Installed {
+			if HadCall
+				Picker.DefineProp("Call", OriginalCall)
+			else
+				Picker.DeleteProp("Call")
+		}
+		if IsObject(_MBPO.ReplacementWindow) {
+			if IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == _MBPO.ReplacementWindow
+				_LLM_ModelBrowser_OnClose()
+			try _MBPO.ReplacementWindow.Destroy()
+			_LLM_ModelBrowser_Gui := _MBPO.Window
+		}
+		Suspend(false)
+	}
+}
