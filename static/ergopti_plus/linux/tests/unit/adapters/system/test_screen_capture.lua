@@ -133,6 +133,23 @@ helpers.it("linux-screen-refused-cleanup: retain private image until the refused
 	assert(ok, err)
 end)
 
+helpers.it("linux-screen-refused-cleanup: retire an image after an already settled refusal", function()
+	local uv = require("luv")
+	local saved, directory = ShellRunner.run_async
+	ShellRunner.run_async = function(_, args)
+		directory = args[4]:match("^(.*)/screen%.png$")
+		local image = assert(io.open(args[4], "wb")); image:write("private screenshot"); image:close()
+		return nil, "pipe activation failed"
+	end
+	local ok, err = pcall(function()
+		helpers.assert_nil(ScreenCapture.capture("full", EDGE, function() end))
+		helpers.assert_nil(uv.fs_lstat(directory), "a settled refusal must remove its image and directory")
+	end)
+	ShellRunner.run_async = saved
+	if directory then os.remove(directory .. "/screen.png"); os.remove(directory) end
+	assert(ok, err)
+end)
+
 -- The fake tools. Each logs its name and arguments; the behaviour is chosen
 -- per scenario.
 local BEHAVIOURS = {
