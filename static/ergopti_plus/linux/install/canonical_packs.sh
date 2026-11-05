@@ -21,6 +21,21 @@ same_bytes() {
 	[ "${left}" = "${right}" ]
 }
 
+# Admits the exact completion record without unbounded reads. NONBLOCK and
+# NOFOLLOW prevent a replaced FIFO or symlink from hanging the installer; the
+# surrounding metadata observations refuse observed source changes. They do not
+# serialize writers outside this installer.
+canonical_pack_marker_valid() {
+	local marker="$1" before after digest expected
+	[ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+	before="$(stat -c '%d:%i:%f:%s:%y:%z' -- "$marker")" || return 1
+	digest="$(set -o pipefail; dd if="$marker" bs=3 count=1 iflag=nonblock,nofollow status=none | sha256sum)" || return 1
+	after="$(stat -c '%d:%i:%f:%s:%y:%z' -- "$marker")" || return 1
+	[ "$before" = "$after" ] && [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+	expected="$(printf '2\n' | sha256sum)" || return 1
+	[ "$digest" = "$expected" ]
+}
+
 # Removes legacy seeds from the active override namespace while retaining their
 # exact bytes outside the recursive *.toml loader. Modified files stay active.
 # A marker makes this a one-time legacy transition: later user overrides are
@@ -39,10 +54,10 @@ migrate_canonical_packs() {
 	local -a user_packs=() backups=() backup_present=()
 
 	if [ -e "${marker}" ] || [ -L "${marker}" ]; then
-		[ -f "${marker}" ] && [ ! -L "${marker}" ] || return 1
-		# The published completion record is nonempty. An empty file cannot
-		# certify that migration ran, and stat does not open or read the path.
-		[ -s "${marker}" ] || return 1
+		if ! canonical_pack_marker_valid "$marker"; then
+			printf '[install] code=invalid-canonical-pack-marker\n' >&2
+			return 1
+		fi
 		return 0
 	fi
 

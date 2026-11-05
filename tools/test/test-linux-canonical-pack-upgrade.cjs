@@ -124,10 +124,10 @@ const installed = path.join(sandbox, 'installed');
 const config = path.join(sandbox, 'config');
 
 try {
-	// An empty marker cannot be the two-byte completion record written by this
-	// migration. Refuse it without changing the user's legacy seed.
-	{
-		const root = path.join(sandbox, 'empty-marker');
+	// Only the exact two-byte completion record can certify the migration.
+	// Refuse corrupt records without changing the user's legacy seed.
+	for (const [index, record] of ['', '1\n', '2', '2\n\n', '2\nextra', '2\0', 'invalid'].entries()) {
+		const root = path.join(sandbox, `invalid-marker-${index}`);
 		const source = path.join(root, 'source');
 		const previous = path.join(root, 'previous');
 		const user = path.join(root, 'user');
@@ -135,18 +135,19 @@ try {
 		write(path.join(previous, 'seed.toml'), 'old\n');
 		write(path.join(user, 'seed.toml'), 'old\n');
 		const marker = path.join(user, '.ergopti-canonical-packs-v2');
-		fs.writeFileSync(marker, '');
+		fs.writeFileSync(marker, record);
 		const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`;
 		const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], {
 			encoding: 'utf8',
 			timeout: 3000
 		});
-		if (refused.error || refused.status === 0) fail('an empty marker must be promptly refused');
+		if (refused.error || refused.status === 0)
+			fail(`invalid marker ${index} must be promptly refused`);
 		if (
 			fs.readFileSync(path.join(user, 'seed.toml'), 'utf8') !== 'old\n' ||
-			fs.readFileSync(marker, 'utf8') !== ''
+			fs.readFileSync(marker, 'utf8') !== record
 		)
-			fail('empty-marker refusal must preserve the seed and marker');
+			fail('invalid-marker refusal must preserve the seed and marker');
 	}
 
 	// A completion record must be an ordinary file, not a user's special path.
@@ -170,13 +171,75 @@ try {
 				fs.symlinkSync(target, marker);
 			}
 			const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(source))} ${shellQuote(bashPath(previous))} ${shellQuote(bashPath(user))}`;
-			const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], { encoding: 'utf8', timeout: 3000 });
+			const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], {
+				encoding: 'utf8',
+				timeout: 3000
+			});
 			if (refused.error || refused.status === 0) fail(`${kind} marker must be refused`);
 			if (fs.readFileSync(path.join(user, 'seed.toml'), 'utf8') !== 'old\n')
 				fail(`${kind} marker refusal must preserve the seed`);
 			const stat = fs.lstatSync(marker);
-			if (!(kind === 'directory' ? stat.isDirectory() : kind === 'fifo' ? stat.isFIFO() : stat.isSymbolicLink()))
+			if (
+				!(kind === 'directory'
+					? stat.isDirectory()
+					: kind === 'fifo'
+						? stat.isFIFO()
+						: stat.isSymbolicLink())
+			)
 				fail(`${kind} marker must be preserved`);
+		}
+		// Replace a validated regular path immediately before the actual open.
+		// Reading must still refuse promptly, even when the original inode returns.
+		const realDd = childProcess.spawnSync(bashExecutable(), ['-c', 'command -v dd'], {
+			encoding: 'utf8'
+		});
+		if (realDd.status !== 0) fail('could not locate the native dd');
+		for (const kind of ['fifo', 'link']) {
+			const root = path.join(sandbox, `marker-open-${kind}`);
+			const user = path.join(root, 'user');
+			const marker = path.join(user, '.ergopti-canonical-packs-v2');
+			const target = path.join(root, 'target');
+			const bin = path.join(root, 'bin');
+			write(marker, '2\n');
+			write(target, '2\n');
+			write(path.join(user, 'seed.toml'), 'old\n');
+			const shim = path.join(bin, 'dd');
+			write(
+				shim,
+				`#!/bin/bash
+set -eu
+mv -- "$MARKER_PATH" "$MARKER_PATH.saved"
+if [ "$MARKER_RACE" = fifo ]; then mkfifo -- "$MARKER_PATH"; else ln -s -- "$MARKER_TARGET" "$MARKER_PATH"; fi
+set +e
+"$REAL_DD" "$@"
+result=$?
+rm -- "$MARKER_PATH"
+mv -- "$MARKER_PATH.saved" "$MARKER_PATH"
+exit "$result"
+`
+			);
+			fs.chmodSync(shim, 0o755);
+			const command = `source ${shellQuote(bashPath(MIGRATOR))}; migrate_canonical_packs ${shellQuote(bashPath(root))} ${shellQuote(bashPath(root))} ${shellQuote(bashPath(user))}`;
+			const refused = childProcess.spawnSync(bashExecutable(), ['-c', command], {
+				encoding: 'utf8',
+				timeout: 3000,
+				env: {
+					...process.env,
+					PATH: `${bin}:${process.env.PATH}`,
+					REAL_DD: realDd.stdout.trim(),
+					MARKER_PATH: marker,
+					MARKER_TARGET: target,
+					MARKER_RACE: kind
+				}
+			});
+			if (refused.error || refused.status === 0)
+				fail(`${kind} replacement must be promptly refused`);
+			if (
+				fs.readFileSync(marker, 'utf8') !== '2\n' ||
+				fs.readFileSync(target, 'utf8') !== '2\n' ||
+				fs.readFileSync(path.join(user, 'seed.toml'), 'utf8') !== 'old\n'
+			)
+				fail('replacement refusal changed retained bytes');
 		}
 	}
 
