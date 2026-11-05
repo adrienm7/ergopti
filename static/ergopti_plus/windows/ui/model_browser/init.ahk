@@ -347,7 +347,7 @@ _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 		; terminal bundle acquisition, not adopted anew by a second setter.
 		Applied := LLM_Menu_CommitMutation("the LLM backend selection",
 			(Candidate) => _LLM_ModelBrowser_BackendCandidate(Candidate, Owner),
-			_LLM_Menu_ApplyBackendCommitted)
+			_LLM_Menu_ApplyBackendCommitted, _LLM_ModelBrowser_BackendWriter.Bind(Owner))
 		if !(Applied is Integer) || Applied != 1
 			return false
 	}
@@ -358,8 +358,35 @@ _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 }
 
 _LLM_ModelBrowser_BackendCandidate(Candidate, Owner) {
-	return _LLM_ModelBrowser_NativeCurrent(Owner)
-		&& _LLM_Menu_SetCandidateValue(Candidate, "backend", "ollama")
+	global ConfigurationFile
+	if !_LLM_ModelBrowser_NativeCurrent(Owner)
+		return false
+	; This mutator runs after the canonical transaction acquired its terminal
+	; bundle. Bind its actual issued target now; the writer may not adopt a
+	; newer bundle later if a native callback withdraws this one.
+	Path := ConfigurationFile
+	Token := _ConfigWriteLeaseSelectOwner(_ConfigWriteLeaseState().terminal, Path)
+	if !(Token is Object) || !_ConfigWriteLeaseOwns(Token, Path) || !_LLM_ModelBrowser_NativeCurrent(Owner)
+		return false
+	Owner.config_token := Token, Owner.config_path := Path
+	return _LLM_Menu_SetCandidateValue(Candidate, "backend", "ollama")
+}
+
+_LLM_ModelBrowser_BackendWriter(Owner, Path, Updates) {
+	if !Owner.HasOwnProp("config_token") || !(Path == Owner.config_path)
+			|| !_ConfigWriteLeaseOwns(Owner.config_token, Path) || !_LLM_ModelBrowser_BackendWriteCurrent(Owner)
+		return false
+	; Preserve the genuine config-document writer and repeat the original
+	; native owner predicate at its no-op/replace boundary. Once acknowledged,
+	; normal RAM/runtime publication still follows the durable configuration.
+	return TOML_ConfigBatchWrite(Path, Updates, [], _LLM_ModelBrowser_BackendWriteCurrent.Bind(Owner))
+}
+
+; Fixed-size RAM-only predicate for the actual native write admission.
+_LLM_ModelBrowser_BackendWriteCurrent(Owner) {
+	global ConfigurationFile
+	return _LLM_ModelBrowser_NativeCurrent(Owner) && (ConfigurationFile == Owner.config_path)
+		&& _ConfigWriteLeaseOwns(Owner.config_token)
 }
 
 ; Independent of the model lifecycle epoch, which this selection itself bumps.
