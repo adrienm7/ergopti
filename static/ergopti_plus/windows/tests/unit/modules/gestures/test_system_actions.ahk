@@ -1024,3 +1024,203 @@ _SAA_EnumerationBoundsReported() {
 	} finally DirDelete(Root, true)
 }
 Test("system actions: native unblock enumeration reports both resource bounds (unblock-native-limits)", _SAA_EnumerationBoundsReported)
+
+global _OAP_RetirementDebt := 0
+
+; The chooser stores one path; an unquoted path with spaces must not launch an
+; executable whose name is an earlier prefix of that path.
+class _OAP_NativeControl extends _SysActionsFake {
+	__New() {
+		super.__New()
+		this.Native := SystemControl(), this.ProcessHandle := 0, this.UnownedPid := 0, this.Admitted := false
+	}
+	Launch(Target, WorkingDir := "", Options := "") {
+		Pid := this.Native.Launch(Target, WorkingDir, "Hide")
+		if !(Pid is Integer) || Pid <= 0
+			throw Error("The owned witness did not return a process id.")
+		this.UnownedPid := Pid
+		this.ProcessHandle := DllCall("Kernel32\OpenProcess", "UInt", 0x101000, "Int", false, "UInt", Pid, "Ptr")
+		if !this.ProcessHandle
+			throw OSError(A_LastError, -1, "open owned witness process")
+		this.UnownedPid := 0
+		return Pid
+	}
+}
+_OAP_RunAction(Control, Target) {
+	global GestureActionParameters
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS, _LOGGER_VOLUME
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	PreviousCritical := Critical("On")
+	SavedLogger := _TLOG_CaptureLoggerState(), SavedExtra := Map(), SavedOptional := Map()
+	SavedParameters := GestureActionParameters
+	for Name in ["_LOGGER_TEST_SINK", "_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED", "_LOGGER_VOLUME"]
+		SavedExtra[Name] := %Name%
+	for Name in ["_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+		SavedOptional[Name] := { Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0 }
+	try {
+		AssertFalse(SavedLogger.FlushActive, "no foreign logger flush may be detached")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_VOLUME := _LOGGER_VOLUME.Clone()
+		_LOGGER_TEST_SINK := 0, _LOGGER_REPEAT_ENABLED := false
+		_LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		GestureActionParameters := Map(GestureActionParameterKey("tap_3", "open_app"), Target)
+		Critical("Off")
+		GestureSysOpenApp("tap_3", Control)
+	} finally {
+		Critical("On")
+		GestureActionParameters := SavedParameters
+		_TLOG_RestoreLoggerState(SavedLogger)
+		for Name, Value in SavedExtra
+			%Name% := Value
+		for Name, Saved in SavedOptional
+			%Name% := Saved.Present ? Saved.Value : unset
+		Critical(PreviousCritical)
+	}
+}
+_OAP_AwaitReceipt(Path, Control, Prefix, Target) {
+	AssertTrue(Control.ProcessHandle != 0, "the exact launched process is retained")
+	Start := A_TickCount, Observed := ""
+	while TickElapsed64(Start, A_TickCount) < 5000 {
+		try Observed := FileRead(Path, "UTF-8")
+		if Observed != ""
+			break
+		Sleep(20)
+	}
+	Parts := StrSplit(Observed, "|")
+	if Parts.Length != 3 || !RegExMatch(Parts[1], "^[0-9]+$") || !RegExMatch(Parts[2], "^[0-9]+$")
+		throw Error("The retained witness did not publish a complete identity receipt.")
+	Pid := DllCall("Kernel32\GetProcessId", "Ptr", Control.ProcessHandle, "UInt")
+	if !Pid
+		throw OSError(A_LastError, -1, "get witness process id")
+	Created := Buffer(8, 0), Exited := Buffer(8, 0), Kernel := Buffer(8, 0), User := Buffer(8, 0)
+	if !DllCall("Kernel32\GetProcessTimes", "Ptr", Control.ProcessHandle, "Ptr", Created,
+		"Ptr", Exited, "Ptr", Kernel, "Ptr", User, "Int")
+		throw OSError(A_LastError, -1, "get witness process creation time")
+	Image := Buffer(65536, 0), ImageLength := 32768
+	if !DllCall("Kernel32\QueryFullProcessImageNameW", "Ptr", Control.ProcessHandle, "UInt", 0,
+		"Ptr", Image, "UInt*", &ImageLength, "Int")
+		throw OSError(A_LastError, -1, "get witness process image")
+	ActualImage := StrGet(Image, ImageLength, "UTF-16")
+	if Pid != Integer(Parts[1]) || NumGet(Created, 0, "Int64") != Integer(Parts[2])
+		throw Error("Receipt does not belong to the retained process object.")
+	if StrLower(ActualImage) != StrLower(Parts[3])
+		throw Error("Receipt image does not match the retained process object.")
+	if StrLower(ActualImage) != StrLower(Prefix) && StrLower(ActualImage) != StrLower(Target)
+		throw Error("Retained process is not an owned witness image.")
+	Control.Admitted := true
+	return ActualImage
+}
+_OAP_Join(Control, EventHandle) {
+	if Control.UnownedPid
+		throw Error("An unowned witness process prevents private fixture cleanup.")
+	if !Control.ProcessHandle
+		return
+	if !Control.Admitted
+		throw Error("Unverified retained process prevents fixture cleanup.")
+	if !DllCall("Kernel32\SetEvent", "Ptr", EventHandle, "Int")
+		throw OSError(A_LastError, -1, "release owned witness")
+	Status := DllCall("Kernel32\WaitForSingleObject", "Ptr", Control.ProcessHandle, "UInt", 10000, "UInt")
+	if Status != 0
+		throw Error("The exact witness process did not retire; private fixture retained.")
+	ExitCode := 0
+	if !DllCall("Kernel32\GetExitCodeProcess", "Ptr", Control.ProcessHandle, "UInt*", &ExitCode, "Int")
+		throw OSError(A_LastError, -1, "read witness exit code")
+	if !DllCall("Kernel32\CloseHandle", "Ptr", Control.ProcessHandle, "Int")
+		throw OSError(A_LastError, -1, "close witness process")
+	Control.ProcessHandle := 0, Control.Admitted := false
+	if ExitCode != 0
+		throw Error("The native witness reported failure: " . ExitCode)
+}
+; Explicit retry only; never adopt a numeric PID or release an unverified process.
+_OAP_RetireDebt() {
+	global _OAP_RetirementDebt
+	if !IsObject(_OAP_RetirementDebt)
+		return true
+	Debt := _OAP_RetirementDebt
+	try {
+		_OAP_Join(Debt.Control, Debt.EventHandle)
+		if Debt.EventHandle {
+			if !DllCall("Kernel32\CloseHandle", "Ptr", Debt.EventHandle, "Int")
+				return false
+			Debt.EventHandle := 0
+		}
+		DirDelete(Debt.Root, true)
+		_OAP_RetirementDebt := 0
+		return true
+	} catch {
+		return false
+	}
+}
+_OAP_ChosenPathDoesNotLaunchPrefix() {
+	global _OAP_RetirementDebt
+	if IsObject(_OAP_RetirementDebt)
+		throw Error("A prior witness retirement debt blocks this probe.")
+	Root := A_Temp . "\ergopti-openapp-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	; No earlier whitespace component can resolve to a foreign executable.
+	if RegExMatch(Root, "[\s]")
+		throw Error("This native fixture requires a temporary path without whitespace.")
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	EventHandle := 0, Control := _OAP_NativeControl()
+	try {
+		Name := "Local\ErgoptiOpenAppWitness-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+		EventHandle := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
+		EventError := A_LastError
+		if !EventHandle || EventError == 183
+			throw Error("Exclusive witness event was not acquired.")
+		Compiler := A_WinDir . "\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+		AssertTrue(FileExist(Compiler) != "", "the native C# compiler is available")
+		Folder := Root . "\witness.exe folder", Prefix := Root . "\witness.exe"
+		DirCreate(Folder)
+		Target := Folder . "\target.exe", Source := Root . "\witness.cs", Receipt := Root . "\receipt.txt"
+		Code := 'using System; using System.IO; using System.Diagnostics; using System.Threading; '
+			. 'class Witness { static int Main() { try { var p = Process.GetCurrentProcess(); '
+			. 'File.WriteAllText(@"' . Receipt . '.pending", p.Id.ToString() + "|" + '
+			. 'p.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() + "|" + p.MainModule.FileName); '
+			. 'File.Move(@"' . Receipt . '.pending", @"' . Receipt . '"); '
+			. 'using (var e = EventWaitHandle.OpenExisting(@"' . Name
+			. '")) { return e.WaitOne(30000) ? 0 : 3; } } catch { return 4; } } }'
+		FileAppend(Code, Source, "UTF-8")
+		CompileCode := RunWait('"' . Compiler . '" /nologo /target:exe /out:"' . Prefix . '" "' . Source . '"', , "Hide")
+		AssertEqual(0, CompileCode, "native inert witness compiled successfully")
+		FileCopy(Prefix, Target)
+		Control.Launch('"' . Target . '"')
+		ControlReceipt := _OAP_AwaitReceipt(Receipt, Control, Prefix, Target)
+		_OAP_Join(Control, EventHandle)
+		AssertEqual(Target, ControlReceipt, "quoted control launches the selected executable")
+		FileDelete(Receipt)
+		if !DllCall("Kernel32\ResetEvent", "Ptr", EventHandle, "Int")
+			throw OSError(A_LastError, -1, "reset witness event")
+		_OAP_RunAction(Control, Target)
+		ActualReceipt := _OAP_AwaitReceipt(Receipt, Control, Prefix, Target)
+		_OAP_Join(Control, EventHandle)
+		_TestAppendProgress("# open_app native expected=" . Target . " observed=" . ActualReceipt)
+		AssertEqual(Target, ActualReceipt, "the action launches the chosen path, not its executable prefix")
+	} finally {
+		try _OAP_Join(Control, EventHandle)
+		finally {
+			if Control.ProcessHandle || Control.UnownedPid {
+				_OAP_RetirementDebt := { Control: Control, Root: Root, EventHandle: EventHandle }
+			} else {
+				if EventHandle && !DllCall("Kernel32\CloseHandle", "Ptr", EventHandle, "Int") {
+					ErrorCode := A_LastError
+					_OAP_RetirementDebt := { Control: Control, Root: Root, EventHandle: EventHandle }
+					throw OSError(ErrorCode, -1, "close witness event; private fixture retained")
+				}
+				EventHandle := 0
+				try DirDelete(Root, true)
+				catch as Err {
+					_OAP_RetirementDebt := { Control: Control, Root: Root, EventHandle: 0 }
+					throw Err
+				}
+			}
+		}
+	}
+}
+Test("system actions: chosen executable path with spaces does not launch its prefix (open-app-native-quoted-path)", _OAP_ChosenPathDoesNotLaunchPrefix)
