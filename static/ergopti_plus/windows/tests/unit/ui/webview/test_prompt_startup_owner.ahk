@@ -166,3 +166,7 @@ for _PRST_Mode in ["current", "close-create", "reopen-create"]
 for _PRST_SubscriptionMode in ["subscription-current", "subscription-close"]
 	Test("Prompt editor add-event retirement: " . _PRST_SubscriptionMode . " owns the real HWND (prompt-native-subscription-retirement-owner)",
 		_PRST_Case.Bind(_PRST_SubscriptionMode))
+
+for _PRST_SdkMode in ["subscription-throw-current", "subscription-throw-retired"]
+	Test("Prompt editor SDK refusal: " . _PRST_SdkMode . " preserves its original disposition (prompt-subscription-sdk-failure-owner)",
+		_PRST_Case.Bind(_PRST_SdkMode))

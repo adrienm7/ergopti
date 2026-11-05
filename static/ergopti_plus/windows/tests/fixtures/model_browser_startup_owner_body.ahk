@@ -10,14 +10,23 @@
 
 #Requires AutoHotkey v2.0
 
-global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false, NativeAliveAtSubscriptionReturn: false, NativeAliveAtControllerClose: false}
+global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false, NativeAliveAtSubscriptionReturn: false, NativeAliveAtControllerClose: false, SdkFailure: Error("Controlled model SDK add-event refusal"),
+	SdkCalls: 0, SdkPublicLogs: 0, SdkRetiredLogs: 0, SdkCaught: 0, SdkAliveAtThrow: false}
 global _VendorDir := A_Args[2]
 global _SharedDir := A_Args[3]
 global _I18nLocale := "fr"
 ; A passive selected-model projection does not grant backend/config currency.
 global _LLM_Menu := Map("model", "")
 t(Key) => Key
-LoggerError(*) => 0
+LoggerError(Owner, Template, Args*) {
+	global _MBSW
+	if InStr(_MBSW.Mode, "subscription-throw-") != 1
+		return
+	if InStr(Template, "WebView2 model browser failed:") && Args.Length && Args[1] == _MBSW.SdkFailure.Message
+		_MBSW.SdkPublicLogs += 1
+	else if InStr(Template, "Browser subscription failed (error_type=")
+		_MBSW.SdkRetiredLogs += 1
+}
 LoggerWarn(*) => 0
 WebView_ShouldUseNativeFallback() => false
 WebView_SharedEnvironment(Loader) {
@@ -41,7 +50,8 @@ _MBSW_Withdraw(Boundary) {
 
 ; The real browser reads this one delay from the registry; nothing else may ask.
 TimingsGet(Section, Key) {
-	if Section != "ui" || Key != "webview_page_safety_flush_ms"
+	global _MBSW
+	if Section != "ui" || (Key != "webview_page_safety_flush_ms" && !(InStr(_MBSW.Mode, "subscription-throw-") == 1 && Key == "model_browser_filter_debounce_ms"))
 		throw Error("The startup child binds only the page safety flush.")
 	if !RegExMatch(FileRead(A_Args[3] . "\modules\timings\constants.toml", "UTF-8"), "m)^\s*" . Key . "\s*=\s*(\d+)", &Value)
 		throw Error("The shared registry must declare the page safety flush.")
@@ -52,7 +62,7 @@ Gui_Create(Options := "", Title := "") {
 	global _MBSW
 	local Window := Gui(Options, Title)
 	_MBSW.Windows.Push(Window)
-	if _MBSW.Windows.Length > (_MBSW.Mode == "reopen" || _MBSW.Mode == "teardown-reopen" ? 2 : 1)
+	if _MBSW.Windows.Length > (_MBSW.Mode == "subscription-throw-cleanup-reopen" ? 3 : (_MBSW.Mode == "reopen" || _MBSW.Mode == "teardown-reopen" || InStr(_MBSW.Mode, "subscription-throw-") == 1 ? 2 : 1))
 		throw Error("A retired browser opening must not create an unrequested native fallback")
 	if _MBSW.Windows.Length == 1
 		_MBSW.Hwnd := Window.Hwnd
@@ -118,12 +128,13 @@ class _MBSW_PassiveController {
 		global _MBSW
 		_MBSW.Closed += 1
 		if InStr(_MBSW.Mode, "subscription-owner-") == 1
+				|| (InStr(_MBSW.Mode, "subscription-throw-") == 1 && _MBSW.Closed == 1)
 			_MBSW.NativeAliveAtControllerClose := !!DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int")
 		if _MBSW.Subscriptions {
 			_MBSW.CloseWhileSubscribed := true
 			throw Error("The actual subscription must retire before its controller closes")
 		}
-		if _MBSW.Mode == "teardown-reopen" && !_MBSW.TeardownReopened {
+		if (_MBSW.Mode == "teardown-reopen" || _MBSW.Mode == "subscription-throw-cleanup-reopen") && !_MBSW.TeardownReopened {
 			_MBSW.TeardownReopened := true
 			_MBSW.Successor := LLM_ModelBrowser_Show()
 			_MBSW.SuccessorEpoch := _LLM_MBW_SessionEpoch
@@ -139,6 +150,13 @@ class _MBSW_PassiveView {
 	}
 	WebMessageReceived(Callback) {
 		global _MBSW
+		if InStr(_MBSW.Mode, "subscription-throw-") == 1 && _MBSW.Created == 1 {
+			_MBSW.SdkCalls += 1
+			if _MBSW.Mode == "subscription-throw-retired"
+				_MBSW_Withdraw("subscription-throw-retired")
+			_MBSW.SdkAliveAtThrow := !!DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int")
+			throw _MBSW.SdkFailure
+		}
 		Subscription := _MBSW_PassiveSubscription()
 		_MBSW_Withdraw("subscription")
 		if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
@@ -165,10 +183,54 @@ class _MBSW_PassiveSubscription {
 		_MBSW.Subscriptions -= 1
 	}
 }
+
+_MBSW_CheckSdkFailure(PublicResult) {
+	global _MBSW, _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_SessionEpoch, _LLM_ModelBrowser_Gui
+	AliveB := _MBSW.TeardownReopened && IsSet(_LLM_MBW_Gui) && _LLM_MBW_Gui == _MBSW.Successor
+		&& _LLM_MBW_SessionEpoch == _MBSW.SuccessorEpoch && DllCall("IsWindowVisible", "Ptr", _MBSW.Successor.Hwnd, "Int")
+	NativeReady := _MBSW.Mode == "subscription-throw-current" && (PublicResult is Gui)
+		&& IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == PublicResult
+		&& PublicResult.HasOwnProp("ListView") && PublicResult.ListView.GetCount() > 0
+		&& DllCall("IsWindowVisible", "Ptr", PublicResult.Hwnd, "Int")
+	FileAppend("OBSERVATION model-sdk-failure mode=" . _MBSW.Mode . " sdk_calls=" . _MBSW.SdkCalls
+		. " hwnd_at_throw=" . _MBSW.SdkAliveAtThrow . " hwnd_at_close=" . _MBSW.NativeAliveAtControllerClose
+		. " native_ready=" . NativeReady . " native_global=" . IsSet(_LLM_ModelBrowser_Gui) . " successor_ready=" . AliveB . " windows=" . _MBSW.Windows.Length
+		. " controllers=" . _MBSW.Created . " closed=" . _MBSW.Closed . " subscriptions=" . _MBSW.Subscriptions
+		. " public_logs=" . _MBSW.SdkPublicLogs . " retired_logs=" . _MBSW.SdkRetiredLogs
+		. " caught_same=" . (_MBSW.SdkCaught == _MBSW.SdkFailure) . "`n", "*", "UTF-8")
+	if _MBSW.SdkCalls != 1 || !_MBSW.SdkAliveAtThrow || !_MBSW.NativeAliveAtControllerClose
+		|| _MBSW.Closed != 1 || DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int") || _MBSW.CloseWhileSubscribed
+		throw Error("The genuine failed SDK call must retire its exact original native/controller owner")
+	if _MBSW.Mode == "subscription-throw-current" {
+		if !NativeReady || _MBSW.Windows.Length != 2 || _MBSW.Created != 1
+			|| _MBSW.SdkPublicLogs != 1 || _MBSW.SdkRetiredLogs != 0 || _MBSW.Subscriptions != 0
+			throw Error("A still-current public SDK failure must preserve the genuine populated native ListView fallback")
+	} else if _MBSW.Mode == "subscription-throw-cleanup-reopen" {
+		if !AliveB || _MBSW.Windows.Length != 2 || _MBSW.Created != 2 || PublicResult != 0
+			|| IsSet(_LLM_ModelBrowser_Gui) || _MBSW.SdkPublicLogs != 1 || _MBSW.SdkRetiredLogs != 0
+			|| _MBSW.Subscriptions != 1 || _MBSW.Navigated != 1 || _MBSW.Filled != 1
+			throw Error("A public successor admitted during cleanup must prevent the old native fallback")
+	} else if _MBSW.Mode == "subscription-throw-direct" {
+		if _MBSW.SdkCaught != _MBSW.SdkFailure || _MBSW.Windows.Length != 1 || _MBSW.Created != 1
+			|| IsSet(_LLM_ModelBrowser_Gui) || IsSet(_LLM_MBW_Gui) || _MBSW.Subscriptions != 0
+			throw Error("The no-argument private web opener must preserve its original Error and cleanup")
+	} else if _MBSW.NativeClose != 1 || _MBSW.CloseEvents != 1 || _MBSW.Windows.Length != 1
+		|| _MBSW.Created != 1 || IsSet(_LLM_ModelBrowser_Gui) || IsSet(_LLM_MBW_Gui)
+		|| _MBSW.Subscriptions != 0 || _MBSW.Navigated != 0 || _MBSW.Filled != 0
+		|| _MBSW.SdkPublicLogs != 0 || _MBSW.SdkRetiredLogs != 1
+		throw Error("An SDK failure returned after real native Close cannot reopen a canceled model browser")
+}
+
 OnMessage(0x18, _MBSW_ShowMessage)
 OnMessage(0x10, _MBSW_CloseMessage)
 try {
-	PublicResult := LLM_ModelBrowser_Show()
+	if _MBSW.Mode == "subscription-throw-direct" {
+		PublicResult := 0
+		try PublicResult := _LLM_ModelBrowser_ShowWeb()
+		catch Any as SdkFailure
+			_MBSW.SdkCaught := SdkFailure
+	} else
+		PublicResult := LLM_ModelBrowser_Show()
 	if _MBSW.Mode == "reuse" {
 		Reused := LLM_ModelBrowser_Show()
 		if Reused != PublicResult || _MBSW.Windows.Length != 1 || _MBSW.Created != 1
@@ -179,7 +241,9 @@ try {
 	FileAppend("receipt mode=" . _MBSW.Mode . " native_close=" . _MBSW.NativeClose . " close_events=" . _MBSW.CloseEvents . " constructors=" . _MBSW.Created . " exists=" . Exists . " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBSW.Hwnd, "Int") . " epoch=" . _LLM_MBW_SessionEpoch . "`n", "*", "UTF-8")
 	if (_MBSW.Mode == "close" || _MBSW.Mode == "reopen") && !_MBSW.EarlyClose
 		throw Error("Unqualified: the native Show close must precede every browser callout/public return")
-	if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
+	if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
+		_MBSW_CheckSdkFailure(PublicResult)
+	} else if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
 		CurrentReady := true
 		if _MBSW.Mode == "subscription-owner-current" {
 			CurrentReady := Exists && _MBSW.Created == 1 && _MBSW.Subscriptions == 1
@@ -233,6 +297,15 @@ try {
 	FileAppend(Type(Failure) . ": " . Failure.Message . "`n", "*", "UTF-8")
 	ExitCode := 1
 } finally {
+	if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
+		if IsSet(_LLM_MBW_Gui)
+			try _LLM_MBW_OnClose(_LLM_MBW_Gui)
+		if IsSet(_LLM_ModelBrowser_Gui) {
+			try SetTimer(_LLM_ModelBrowser_Gui.FilterDebounce, 0)
+			try _LLM_ModelBrowser_Gui.DeleteProp("FilterDebounce")
+			try _LLM_ModelBrowser_Gui.DeleteProp("ListView")
+		}
+	}
 	for CleanupWindow in _MBSW.Windows
 		try CleanupWindow.Destroy()
 }
