@@ -58,6 +58,7 @@ local FILE_MANAGERS = {
 local DEFAULT_DEPS = {
 	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
 	exists = function(path) return require("adapters.file_system").exists(path) end,
+	path_status = function(path) return require("adapters.file_system").path_status(path) end,
 	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
@@ -224,6 +225,14 @@ function M.open(text)
 		return open("search", OpenTarget.DEFAULT_SEARCH_URL .. encode_query(target))
 	end
 	if kind == "path" then
+		if found.exact_path then
+			local called, status = pcall(deps.path_status, found.exact_path)
+			if not called or (status ~= "present" and status ~= "absent") then
+				report("failed")
+				return false
+			end
+			if status == "present" then target = found.exact_path end
+		end
 		if not deps.exists(target) then
 			report("missing")
 			return false

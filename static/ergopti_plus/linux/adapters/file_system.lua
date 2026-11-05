@@ -78,6 +78,28 @@ if not native_stat then
 end
 
 -- LuaJIT always has FFI, even when its optional C-module path omits luv/lfs.
+--- Classifies a selected path without following its final symlink. Only a
+--- native ENOENT is evidence for trying a punctuation-stripped alternative.
+--- @param path string Literal selected path.
+--- @return string status `present`, `absent`, or `error`.
+function M.path_status(path)
+	if not valid_native_path(path) then return "error" end
+	local ok_uv, uv = pcall(require, "luv")
+	if ok_uv and type(uv) == "table" and type(uv.fs_lstat) == "function" then
+		local called, attributes, _, code = pcall(uv.fs_lstat, path)
+		if not called then return "error" end
+		if type(attributes) == "table" then return "present" end
+		return code == "ENOENT" and "absent" or "error"
+	end
+	if lfs and type(lfs.symlinkattributes) == "function" then
+		local called, attributes, _, errno = pcall(lfs.symlinkattributes, path)
+		if not called then return "error" end
+		if type(attributes) == "table" then return "present" end
+		return errno == ENOENT and "absent" or "error"
+	end
+	return "error"
+end
+
 -- Keep daemon reload metadata in-process on that normal runtime as well.
 local native_exists
 if not native_stat then

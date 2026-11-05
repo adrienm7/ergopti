@@ -723,6 +723,14 @@ local function open_or_search(scope, text)
 		report_unopened("open_target.open_failed", target, "unexpected target kind " .. tostring(kind))
 		return false
 	end
+	if found.exact_path then
+		local called, status = pcall(FileSystem.path_status, found.exact_path)
+		if not called or (status ~= "present" and status ~= "absent") then
+			report_unopened("open_target.open_failed", found.exact_path, "the exact selected path could not be inspected")
+			return false
+		end
+		if status == "present" then target = found.exact_path end
+	end
 	if not FileSystem.exists(target) then
 		report_unopened("open_target.missing_path", target, "no file or folder exists at that path")
 		return false
