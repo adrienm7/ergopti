@@ -339,13 +339,25 @@ try {
 		const nestedWrapper = path.join(nestedPrefix, 'bin/ergopti-hotstrings');
 		fs.cpSync(prefix, nestedPrefix, { recursive: true });
 		fs.writeFileSync(path.join(checkout, '.git'), 'gitdir: elsewhere');
-		const quoted = spawnSync(bashExecutable(), ['-c', 'printf %q "$1"', 'quote', bashPath(`${nestedLibrary}/linux`)], { encoding: 'utf8' });
+		const quoted = spawnSync(
+			bashExecutable(),
+			['-c', 'printf %q "$1"', 'quote', bashPath(`${nestedLibrary}/linux`)],
+			{ encoding: 'utf8' }
+		);
 		assert.equal(quoted.status, 0, quoted.stderr);
-		fs.writeFileSync(nestedWrapper, `#!/bin/bash\nDRIVER_ROOT=${quoted.stdout}\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`);
-		const nested = spawnSync(bashExecutable(), [bashPath(script), '--prefix', bashPath(nestedPrefix), '--check'], {
-			encoding: 'utf8', timeout: 15000,
-			env: { HOME: bashPath(home), PATH: `${bashPath(stubs)}:/usr/bin:/bin` }
-		});
+		fs.writeFileSync(
+			nestedWrapper,
+			`#!/bin/bash\nDRIVER_ROOT=${quoted.stdout}\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+		);
+		const nested = spawnSync(
+			bashExecutable(),
+			[bashPath(script), '--prefix', bashPath(nestedPrefix), '--check'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: { HOME: bashPath(home), PATH: `${bashPath(stubs)}:/usr/bin:/bin` }
+			}
+		);
 		assert.notEqual(nested.status, 0, 'a checkout ancestor ending in newline prevents removal');
 		assert.match(nested.stderr, /checkout/i);
 		assert.ok(fs.existsSync(nestedWrapper));
@@ -1077,7 +1089,11 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	const customizedNativeStartup = `${ownedStartup}# personal startup setting\n[Desktop Action Example]\nExec=/other/application\n`;
 	fs.writeFileSync(nativeStartup, customizedNativeStartup);
 	assert.equal(packagedRun('--yes').status, 0);
-	assert.equal(fs.readFileSync(nativeStartup, 'utf8'), customizedNativeStartup, 'package removal preserves a customized owned entry');
+	assert.equal(
+		fs.readFileSync(nativeStartup, 'utf8'),
+		customizedNativeStartup,
+		'package removal preserves a customized owned entry'
+	);
 	fs.writeFileSync(nativeStartup, '[Desktop Entry]\nExec=/other/application\n');
 	assert.equal(packagedRun('--yes').status, 0);
 	assert.equal(

@@ -28,18 +28,38 @@ try {
 	// Debian calls postinst for rollback and triggers as well as configuration.
 	{
 		const builder = fs.readFileSync(path.join(ROOT, 'tools/build/build-linux-deb.sh'), 'utf8');
-		const match = /cat > "\$DEB_ROOT\/DEBIAN\/postinst" << 'POSTINST_EOF'\n([\s\S]*?)\nPOSTINST_EOF/.exec(builder);
+		const match =
+			/cat > "\$DEB_ROOT\/DEBIAN\/postinst" << 'POSTINST_EOF'\n([\s\S]*?)\nPOSTINST_EOF/.exec(
+				builder
+			);
 		assert.ok(match, 'actual Debian postinst');
 		const stubSetup = path.join(sandbox, 'postinst-setup.sh');
 		const hook = path.join(sandbox, 'postinst');
 		const calls = path.join(sandbox, 'postinst-calls');
 		fs.writeFileSync(stubSetup, '#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n');
-		fs.writeFileSync(hook, match[1].replace('/usr/lib/ergopti/install/setup_permissions.sh', bashPath(stubSetup)));
-		for (const action of ['configure', 'abort-upgrade', 'abort-remove', 'abort-deconfigure', 'triggered']) {
+		fs.writeFileSync(
+			hook,
+			match[1].replace('/usr/lib/ergopti/install/setup_permissions.sh', bashPath(stubSetup))
+		);
+		for (const action of [
+			'configure',
+			'abort-upgrade',
+			'abort-remove',
+			'abort-deconfigure',
+			'triggered'
+		]) {
 			fs.writeFileSync(calls, '');
-			const result = spawnSync(bashExecutable(), [bashPath(hook), action], { encoding: 'utf8', timeout: 10000, env: { ...process.env, CALL_LOG: calls } });
+			const result = spawnSync(bashExecutable(), [bashPath(hook), action], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, CALL_LOG: calls }
+			});
 			assert.equal(result.status, 0, result.stderr);
-			assert.equal(fs.readFileSync(calls, 'utf8'), action === 'configure' ? '--active-sessions\n' : '', action);
+			assert.equal(
+				fs.readFileSync(calls, 'utf8'),
+				action === 'configure' ? '--active-sessions\n' : '',
+				action
+			);
 		}
 	}
 	// A checkout name is data, even when it contains JavaScript quotes.
@@ -56,7 +76,12 @@ try {
 		assert.ok(assignment, 'actual installer version assignment');
 		const result = spawnSync(
 			bashExecutable(),
-			['-c', `SCRIPT_DIR="$1"\n${assignment[0]}\nprintf '%s' "$ERGOPTI_VERSION"`, 'version-test', bashPath(driver)],
+			[
+				'-c',
+				`SCRIPT_DIR="$1"\n${assignment[0]}\nprintf '%s' "$ERGOPTI_VERSION"`,
+				'version-test',
+				bashPath(driver)
+			],
 			{ encoding: 'utf8', timeout: 10000 }
 		);
 		assert.equal(result.status, 0, result.stderr);
@@ -274,8 +299,14 @@ show-session) case "$2" in
 			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
 	);
 	const ambiguous = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
-		encoding: 'utf8', timeout: 15000,
-		env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog), AMBIGUOUS_PASSWD: '1' }
+		encoding: 'utf8',
+		timeout: 15000,
+		env: {
+			HOME: bashPath(sandbox),
+			TEST_STUBS: bashPath(stubs),
+			CALL_LOG: bashPath(callLog),
+			AMBIGUOUS_PASSWD: '1'
+		}
 	});
 	assert.notEqual(ambiguous.status, 0, 'ambiguous NSS identity must be refused');
 	assert.equal(fs.existsSync(callLog), false, 'no privileged mutation before identity admission');
@@ -323,7 +354,8 @@ show-session) case "$2" in
 	assert.match(result.stderr, /Session 8 could not be inspected/, 'incomplete session is deferred');
 	assert.match(result.stderr, /Refusing a non-desktop account/, 'system account remains excluded');
 	const nonDesktop = spawnSync(bashExecutable(), [bashPath(script), '--user', '999'], {
-		encoding: 'utf8', timeout: 10000,
+		encoding: 'utf8',
+		timeout: 10000,
 		env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
 	});
 	assert.notEqual(nonDesktop.status, 0, 'explicit non-desktop requests remain refused');
@@ -583,7 +615,8 @@ fi`
 		stub('getent', `printf '%s\\n' ${shellQuote(entry)}`);
 		fs.writeFileSync(callLog, '');
 		const mismatch = spawnSync(bashExecutable(), [bashPath(stopScript)], {
-			encoding: 'utf8', timeout: 15000,
+			encoding: 'utf8',
+			timeout: 15000,
 			env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
 		});
 		assert.notEqual(mismatch.status, 0, 'inconsistent NSS identity must fail');
