@@ -402,6 +402,12 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 		return ok and current == true
 	end
 	local function changed() if type(on_changed) == "function" then on_changed() end end
+	local function removal_failed()
+		if page_owned() then
+			SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
+		end
+		return false
+	end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
 	local api = { rows = {}, providers = {}, tools = {} }
@@ -448,8 +454,9 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
 				if not page_owned() or not active_commands_ready() then return false end
-				if llm.set_backend("api") ~= true or not page_owned() or not active_commands_ready() then return false end
-				if entries.remove(active.id) ~= true then return false end
+				if llm.set_backend("api") ~= true then return removal_failed() end
+				if not page_owned() or not active_commands_ready() then return false end
+				if entries.remove(active.id) ~= true then return removal_failed() end
 				changed()
 				return true
 			end }
@@ -462,7 +469,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
 				if not page_owned() or not entry_retained(entries, entry) then return false end
-				if entries.remove(entry.id) ~= true then return false end
+				if entries.remove(entry.id) ~= true then return removal_failed() end
 				changed()
 				return true
 			end }

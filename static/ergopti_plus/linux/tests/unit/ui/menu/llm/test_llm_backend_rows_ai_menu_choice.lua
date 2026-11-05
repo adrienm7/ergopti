@@ -50,6 +50,33 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	helpers.it("reports a refused System 1 entry removal", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
+		state.entries, state.confirm, state.refuse_removal = { entry }, true, true
+		local result = find(build(), "🗑️").action()
+		local kept, errors = state.entries[1], #state.errors
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(kept, entry)
+		helpers.assert_eq(errors, 1)
+	end)
+
+	for _, fault in ipairs({ "backend", "storage" }) do
+		helpers.it("reports a refused API entry removal: " .. fault, function()
+			local build, state, restore = setup("api")
+			local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test", base_url = "" }
+			state.entries, state.active, state.confirm = { entry }, entry, true
+			state.refuse_backend, state.refuse_removal = fault == "backend", fault == "storage"
+			local result = find(build(), "🗑️").action()
+			local kept, errors = state.entries[1], #state.errors
+			restore()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(kept, entry)
+			helpers.assert_eq(errors, 1)
+		end)
+	end
+
 	helpers.it("retains a refused selection retirement after its page closes", function()
 		local build, state, restore = setup("api")
 		local live = true
@@ -447,7 +474,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			local rename = os.rename
 			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":""}],"active_id":"chosen","future":{"kept":true}}]]
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
-			local changed, result, after, count, active, foreign, stage_calls, backend_calls = 0, nil, nil, nil, nil, nil, 0, 0
+			local changed, result, after, count, active, foreign, stage_calls, backend_calls, errors = 0, nil, nil, nil, nil, nil, 0, 0, 0
 			local ok, failure = pcall(function()
 				local owner = helpers.load_module("modules.llm.api_entries")
 				owner._set_path_for_test(path)
@@ -471,7 +498,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 						backend_calls = backend_calls + 1
 						return kind == "api"
 					end },
-					{ confirm = function() return true end },
+					{ confirm = function() return true end, error = function() errors = errors + 1 end },
 					function() changed = changed + 1 end)
 				result = find(rows, "🗑️").action()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
@@ -487,6 +514,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			helpers.assert_eq(stage_calls, 1, "use the actual private stage and native publication owner")
 			helpers.assert_eq(changed, refused and 0 or 1, "writer refusal must not refresh as a committed mutation")
 			helpers.assert_eq(result, not refused, "the menu returns only a durable ACK")
+			helpers.assert_eq(errors, refused and 1 or 0, "a refused deletion reaches the user")
 			helpers.assert_eq(count, refused and 1 or 0, "the real store rolls back RAM when publication refuses")
 			helpers.assert_eq(active ~= nil, refused)
 			helpers.assert_eq(foreign, true, "unknown root data survives successful removal")
