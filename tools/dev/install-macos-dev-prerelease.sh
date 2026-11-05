@@ -39,33 +39,27 @@ DEFAULTS="$REPO_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json"
 repository="$(/usr/bin/python3 -c 'import json,sys; g=json.load(open(sys.argv[1]))["github"]; print(g["owner"] + "/" + g["repo"])' "$DEFAULTS")" \
 	|| fail "the updater defaults name no GitHub repository."
 ARCHIVE="$ERGOPTI_APP_BUNDLE.zip"
-API="https://${ERGOPTI_HOST_GITHUB_API}/repos/$repository/releases?per_page=30"
+# Git and the download links, not the REST API: behind a company proxy the shared
+# address exhausts the API's anonymous quota (a 403 in a field report).
+REMOTE="https://${ERGOPTI_HOST_GITHUB}/$repository"
 MANIFEST="$REPO_ROOT/static/ergopti_plus/macos/vendor/remap-runtime/manifest.json"
 as_admin=
 work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-dev-prerelease.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
-# The newest dev prerelease (v0.0.0-dev.N), and its two macOS assets.
-curl -fsSL --proto =https "$API" -o "$work/releases.json" || fail "GitHub's release list could not be read."
-release="$(/usr/bin/python3 - "$work/releases.json" "$ARCHIVE" <<'PY'
-import json, sys
-for release in json.load(open(sys.argv[1])):
-    if release.get("prerelease") and release.get("tag_name", "").startswith("v0.0.0-dev."):
-        assets = {a["name"]: a["browser_download_url"] for a in release.get("assets", [])}
-        if "macos-publication.json" in assets and sys.argv[2] in assets:
-            print(release["tag_name"], assets["macos-publication.json"], assets[sys.argv[2]])
-            break
-PY
-)" || fail "the release list could not be parsed."
-[ -n "$release" ] || fail "no dev prerelease with a macOS archive is published."
-read -r tag publication_url archive_url <<<"$release"
+# The newest dev prerelease tag (v0.0.0-dev.N), and its two macOS assets.
+tags="$(git ls-remote --tags --refs "$REMOTE.git" 'v0.0.0-dev.*')" || fail "GitHub's tags could not be read."
+tag="$(printf '%s\n' "$tags" | sed -n 's|.*refs/tags/\(v0\.0\.0-dev\.[0-9][0-9]*\)$|\1|p' | sort -t. -k4,4n | tail -n 1)"
+[ -n "$tag" ] || fail "no dev prerelease is published."
+publication_url="$REMOTE/releases/download/$tag/macos-publication.json"
+archive_url="$REMOTE/releases/download/$tag/$ARCHIVE"
 log "Newest signed dev prerelease: $tag."
 
 installed="$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist" 2>/dev/null || true)"
 if [ "v$installed" = "$tag" ] && [ "${ERGOPTI_REINSTALL:-0}" != 1 ]; then
 	log "$APP is already $tag."
 else
-	curl -fsSL --proto =https "$publication_url" -o "$work/publication.json" || fail "macos-publication.json could not be downloaded."
+	curl -fsSL --proto =https "$publication_url" -o "$work/publication.json" || fail "$tag publishes no macos-publication.json."
 	curl -fL --proto =https --progress-bar "$archive_url" -o "$work/app.zip" || fail "the macOS archive could not be downloaded."
 	expected="$(/usr/bin/python3 -c 'import json,sys
 for a in json.load(open(sys.argv[1]))["archives"]:
