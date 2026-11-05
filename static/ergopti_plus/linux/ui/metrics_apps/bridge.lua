@@ -17,6 +17,11 @@ local Logger = require("logger.shim")
 local LOG = "bridge.metrics_apps"
 local Flush = require("ui.metrics_flush_bridge")
 
+local function native_category_prompt(title, text, initial)
+	return require("ui.text_prompt").ask(title, require("ui.native_dialog").plain_markup(text), initial)
+end
+M._category_prompt = native_category_prompt
+
 local function default_push(payload, state, context)
 	return Flush.push("metrics_apps", M.bridge_name, payload, state, context)
 end
@@ -136,8 +141,32 @@ local function handle(payload, state, request)
 		local app_name = tostring(payload.app or "")
 		local category = tostring(payload.cat or "")
 		if state.keystats and type(state.keystats.set_app_category) == "function" then
-			local ok = state.keystats.set_app_category(app_name, category, tonumber(payload.score) or 0)
-			return with_payload({ saved = ok == true })
+			local stats = state.keystats
+			local capture, setter = stats.capture_app_category_edit, stats.set_app_category
+			local function refused(key)
+				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key) end
+				return with_payload({ saved = false })
+			end
+			if type(capture) ~= "function" or app_name == "" then return refused("healthcheck.status.failed") end
+			local receipt = capture()
+			if not request.valid() then return nil end
+			if type(receipt) ~= "table" then return refused("healthcheck.status.failed") end
+			local i18n = require("infra.i18n")
+			local chosen = M._category_prompt(i18n.get("metrics_apps.new_category_title"),
+				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name), category)
+			if chosen == nil or not request.valid() then return nil end
+			local score_text = M._category_prompt(i18n.get("metrics_apps.score_title"),
+				string.format(i18n.get("metrics_apps.score_prompt"), app_name), tostring(payload.score or 0))
+			if score_text == nil or not request.valid() then return nil end
+			local score = tonumber(score_text)
+			if not require("keystats.app_category_store").score_valid(score) then
+				return refused("metrics_apps.score_error")
+			end
+			if not chosen:find("%S") then return refused("healthcheck.status.failed") end
+			if stats.capture_app_category_edit ~= capture or stats.set_app_category ~= setter or state.keystats ~= stats then return nil end
+			local ok = setter(app_name, chosen, score, receipt)
+			if ok ~= true then return refused("healthcheck.status.failed") end
+			return with_payload({ saved = true })
 		end
 		Logger.error(LOG, "Category edit for '%s' arrived but the keystats cannot store it.", app_name)
 		return with_payload({ saved = false })
@@ -180,6 +209,7 @@ function M.on_window_closed(epoch) Requests.close(epoch) end
 function M._reset()
 	Requests.reset()
 	M._push = default_push
+	M._category_prompt = native_category_prompt
 end
 
 return M

@@ -1495,17 +1495,33 @@ function M.clear_cache()
 	return true
 end
 
---- Records the category and score a user assigned to an application.
----
---- Stored in the shared category file the dashboard page reads back as
---- `user_categories`, the same document macOS keeps. An unhandled edit is a
---- control that appears to work and silently discards what the user typed into
---- it, so every refusal is logged and answered false.
+-- An editor retains the exact file image observed before its native dialogs.
+local app_category_edits = setmetatable({}, { __mode = "k" })
+
+--- Captures an opaque, single-use category source for an interactive edit.
+--- @return table|nil receipt Source authority, or nil when capture is refused.
+function M.capture_app_category_edit()
+	if M.has_flush_debt() or _flush_stopping then return nil end
+	local model, _, source = AppCategoryFile.load_owned()
+	if not model or not source then return nil end
+	local receipt = {}
+	app_category_edits[receipt] = { model = model, source = source }
+	return receipt
+end
+
+--- Stores a category in the shared dashboard file, optionally against an interactive edit receipt.
 --- @param app_name string
 --- @param category string
---- @param score number|nil Productivity score, as the shared page defines it.
---- @return boolean Whether it was persisted.
-function M.set_app_category(app_name, category, score)
+--- @param score number|nil
+--- @param receipt table|nil Single-use receipt from capture_app_category_edit().
+--- @return boolean persisted
+function M.set_app_category(app_name, category, score, receipt)
+	local edit
+	if receipt ~= nil then
+		edit = app_category_edits[receipt]
+		if not edit then return false end
+		app_category_edits[receipt] = nil
+	end
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "set_app_category(): an application name is required.")
@@ -1515,7 +1531,13 @@ function M.set_app_category(app_name, category, score)
 		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
 		return false
 	end
-	local model, _, source = AppCategoryFile.load()
+	local model, source
+	if edit then
+		model, source = edit.model, edit.source
+	else
+		local reason
+		model, reason, source = AppCategoryFile.load()
+	end
 	if not model then return false end
 	local stored, reason = AppCategoryStore.set(model, app_name, category, tonumber(score) or 0)
 	if not stored then
