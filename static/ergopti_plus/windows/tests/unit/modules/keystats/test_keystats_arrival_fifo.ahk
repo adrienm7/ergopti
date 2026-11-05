@@ -614,7 +614,7 @@ _KPU_ChildSource() {
 		. "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
 }
 
-_KPU_Case(Mode) {
+_KPU_Case(Mode, SourceFn := unset) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
 	Directory := A_Temp . "\ergopti_native_unicode_packet_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -625,7 +625,8 @@ _KPU_Case(Mode) {
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KPU_ChildSource()) != 0)
+		Subject := IsSet(SourceFn) ? SourceFn.Call() : _KPU_ChildSource()
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . Subject) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory, "--allow-explicit-owned-edit-unicode-input"], _KSD_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")
@@ -746,3 +747,29 @@ _KCE_Run(Mode) {
 for _KCE_Mode in ["char-only", "modifier-release", "released", "packet-key", "different-hook", "multi-char", "one-use", "reenter-enter", "reenter-tab"]
 	Test("Keystats named control echo: " . _KCE_Mode . " preserves exact FIFO ownership (keystats-control-char-echo)",
 		_KLF_WithState.Bind(_KCE_Run.Bind(_KCE_Mode)))
+
+
+_KSP_ChildSource() {
+	global _DriverDir
+	Source := _KPU_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\keystats_unicode_packet_owner_body.ahk")
+	Start := InStr(Fixture, "_KID_Exercise() {")
+	AssertTrue(Start > 0 && InStr(Fixture, "_KID_Exercise() {", , Start + 1) == 0,
+		"The existing native fixture has one exact exercise boundary")
+	; Retain its real native SendInput/WM_CHAR/receiver observer and wrappers
+	; delegating the genuine production callbacks, without the old test entry.
+	Source .= SubStr(Fixture, 1, Start - 1)
+	for Symbol in ["JsonStringLiteral", "KL_JsonEncode", "FSWriteCreateDurable"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "" && _DriverIsProductionSource(Owner), "The actual codec/I/O owner must exist: " . Symbol)
+		Source .= "#Include " . Owner . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_utf16_packet_body.ahk`n"
+}
+
+for _KSP_Mode in ["packet-bmp", "packet-astral"]
+	Test("Keystats native Unicode record: " . _KSP_Mode . " preserves accepted output across JSON/UTF-8 (keystats-native-utf16-packet-roundtrip)",
+		_KPU_Case.Bind(_KSP_Mode, _KSP_ChildSource))
