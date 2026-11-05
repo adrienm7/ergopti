@@ -354,6 +354,26 @@ end)
 
 helpers.describe("mt decoder: what must not go wrong", function()
 
+	helpers.it("does not classify a long hold as a tap when positions arrive late", function()
+		local now = 10
+		local decoder = Decoder.new({ now_sec = function() return now end, tap_max_sec = 0.3, stable_frames = 1 })
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 1 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		now = 11
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_SYN, SYN_REPORT, 0 },
+		})
+		now = 11.05
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 }, { EV_KEY, BTN_TOOL[1], 0 },
+			{ EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "hold duration begins when touch was observed, not when coordinates arrive")
+	end)
+
 	helpers.it("recognises another tap when a reused slot omits unchanged coordinates", function()
 		local decoder = Decoder.new()
 		local first = feed_all(decoder, gesture_events(1, 0, 0))
