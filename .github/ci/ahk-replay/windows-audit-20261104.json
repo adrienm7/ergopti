@@ -1,7 +1,7 @@
 {
-	"expected_count": 134,
-	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"expected_count": 152,
+	"native_http_client_e2e": true,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
 			"contains": "reader-think-pause-corpus",
@@ -173,6 +173,42 @@
 		},
 		{
 			"contains": "agent-timezone-offset-refusal",
+			"expected_count": 1
+		},
+		{
+			"contains": "sticky-kana-native",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-stage-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "proxy-boot-seal-source",
+			"expected_count": 4
+		},
+		{
+			"contains": "proxy-full-save-persistence",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-captured-source-app-privacy",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-app-filter-enforced",
+			"expected_count": 1
+		},
+		{
+			"contains": "audit-ahk-006",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-persisted-option-type-boundary-restore-engine-filter",
 			"expected_count": 1
 		}
 	]
