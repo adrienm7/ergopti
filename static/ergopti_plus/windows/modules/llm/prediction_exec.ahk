@@ -1185,9 +1185,10 @@ _LLM_Engine_SourceAppAllowed(SourceAppId) {
 }
 
 _LLM_Engine_RequestSourceIsCurrent(RequestId, SemanticSignature, SourceAppId) {
+	global _LLM_Engine
 	PreviousCritical := Critical("On")
 	try {
-		return !A_IsSuspended && _LLM_Engine.Get("enabled", false)
+		return _LLM_Engine is Map && !A_IsSuspended && _LLM_Engine.Get("enabled", false)
 			&& _LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature)
 			&& _LLM_Engine_SourceAppAllowed(SourceAppId)
 	} finally Critical(PreviousCritical)
