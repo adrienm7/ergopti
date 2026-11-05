@@ -361,6 +361,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "screen capture cleanup",
+			wait_for_ack = true,
+			stop = function()
+				local owner = package.loaded["adapters.screen_capture"]
+				return not owner or owner.shutdown() == true
+			end,
+		},
+		{
 			name = "layout install and activation helpers",
 			wait_for_ack = true,
 			stop = (function()

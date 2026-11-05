@@ -171,7 +171,15 @@ local function scenario(opts, body)
 				handle:write(IMAGE)
 				handle:close()
 				world.captures[#world.captures + 1] = capture
-				return { path = capture.path, dir = capture.dir, cancel = function() capture.cancelled = true end }
+				capture.settle = function() os.remove(capture.path); os.remove(capture.dir) end
+				local handle = { path = capture.path, dir = capture.dir, cancel = function() capture.cancelled = true end,
+					discard = function() capture.settle(); return true end }
+				if opts.delayed_capture_cleanup then
+					handle.discard = function() capture.cleanup_registered = true; return true end
+				elseif opts.malformed_capture then
+					handle.discard = nil
+				end
+				return handle
 			end,
 		})
 		world.engine = engine
@@ -714,6 +722,31 @@ end)
 -- ======= 4/ One flow at a time ================
 -- ==============================================
 -- ==============================================
+
+helpers.describe("screen capture cleanup ownership", function()
+	helpers.it("refuses a capture without an explicit cleanup owner", function()
+		scenario({ malformed_capture = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_screen_full("tap_3", "openai"), false)
+			local capture = world.captures[1]
+			helpers.assert_true(capture.cancelled)
+			helpers.assert_true(exists(capture.path), "unproven capture cannot be deleted before retirement")
+			helpers.assert_eq(#world.posts, 0)
+			capture.settle()
+		end)
+	end)
+
+	helpers.it("keeps a cancelled image until its capture owner settles", function()
+		scenario({ delayed_capture_cleanup = true }, function(world)
+			world.handlers.llm_screen_full("tap_3", "openai")
+			local capture = world.captures[1]
+			world.engine.drop_vision("typing")
+			helpers.assert_true(capture.cancelled and capture.cleanup_registered)
+			helpers.assert_true(exists(capture.path), "the engine cannot race the child by deleting early")
+			capture.settle()
+			helpers.assert_eq(exists(capture.dir), false)
+		end)
+	end)
+end)
 
 helpers.describe("screen actions: a newer action supersedes the previous one", function()
 
