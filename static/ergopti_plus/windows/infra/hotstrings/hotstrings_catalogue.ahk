@@ -88,8 +88,11 @@ HotstringsBaseDelay() {
 ; millisecond grid and never below one grid step: 0 means "unlimited" everywhere,
 ; so an offset that cancels the base must not turn into it.
 HotstringsDelayFromOffset(Base, Offset) {
-		global HOTSTRINGS_DELAY_DECIMALS
-		return Max(Round(Base + Offset, HOTSTRINGS_DELAY_DECIMALS), 10 ** -HOTSTRINGS_DELAY_DECIMALS)
+		global HOTSTRINGS_DELAY_DECIMALS, TICK_MAX_DURATION_MS
+		; The effective projection must remain executable by the same duration
+		; policy as direct settings. StoredOffset keeps the unclipped intention.
+		return Min(TICK_MAX_DURATION_MS / 1000,
+				Max(Round(Base + Offset, HOTSTRINGS_DELAY_DECIMALS), 10 ** -HOTSTRINGS_DELAY_DECIMALS))
 }
 
 ; Derives the effective delay of every override read from a file, now that the
@@ -194,18 +197,24 @@ _HotstringsRecordAdoptLegacy(Record) {
 ; place and the next boot starts again, while this session already runs on the
 ; migrated values.
 _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
-		global _HotstringsOverrides, _HotstringsOverridesPath, Features
-		BoundPath := _HotstringsOverridesPath
+		global _HotstringsOverrides, _HotstringsOverridesPath, Features, ConfigurationFile
+		BoundPath := _HotstringsOverridesPath, FeatureOwner := Features
+		ConfigPathKey := _ConfigWriteLeaseKey(ConfigurationFile)
+		BaseNode := FeatureOwner.Has("hotstrings") && FeatureOwner["hotstrings"] is Map ? FeatureOwner["hotstrings"] : 0
+		BaseHad := BaseNode is Map && BaseNode.Has(ConfigLeaf.EXPANSION_DELAY)
+		BaseValue := BaseHad ? BaseNode[ConfigLeaf.EXPANSION_DELAY] : ""
+		BaseKind := BaseHad ? Type(BaseValue) : ""
 		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, BoundPath)
 		if !IsObject(Origin) || !_FSSourceIsUnchanged(BoundPath, Origin.Source) {
 				try LoggerError("HotstringsConfig", "Cannot migrate legacy delays because the admitted source changed or is unavailable. Reload is required.")
 				return false
 		}
 		Candidate := Map()
-		GlobalDelay := ""
+		GlobalDelay := "", DefaultRecord := 0
 		for Cat, Entry in _HotstringsOverrides {
 				if (Cat == "_global") {
 						GlobalDelay := Entry.LegacyDelay
+						DefaultRecord := _HotstringsCloneOverrideCategory(Entry)
 						continue
 				}
 				Clone := _HotstringsCloneOverrideCategory(Entry)
@@ -222,11 +231,29 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 				if HasMethod(BaseWriterFn, "Call")
 						Written := BaseWriterFn.Call(GlobalDelay)
 				else
-						Written := WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, GlobalDelay)
-				if !Written {
+						Written := WriteFeatureV2(FeatureOwner, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, GlobalDelay)
+				if !(Written is Integer) || Written != 1 {
 						try LoggerError("HotstringsConfig",
 								"The default expansion delay of the override file could not be moved to config.toml (hotstrings.expansion_delay); it applies for this session and the move is retried at the next start.")
-						Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := GlobalDelay
+						; The source still owns the only proven durable default. Keep
+						; its legacy record in any session projection so a later colour
+						; save cannot silently retire an unacknowledged cross-file move.
+						PreviousCritical := Critical("On")
+						try {
+								if Features == FeatureOwner && FeatureOwner.Has("hotstrings")
+										&& FeatureOwner["hotstrings"] == BaseNode && BaseNode is Map
+										&& BaseNode.Has(ConfigLeaf.EXPANSION_DELAY) == BaseHad
+										&& (!BaseHad || (Type(BaseNode[ConfigLeaf.EXPANSION_DELAY]) == BaseKind && BaseNode[ConfigLeaf.EXPANSION_DELAY] == BaseValue))
+										&& _ConfigWriteLeaseKey(ConfigurationFile) == ConfigPathKey
+										&& _HotstringsOverrideSourceFor(_HotstringsOverrides, _HotstringsOverridesPath) == Origin {
+										FeatureOwner["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := GlobalDelay
+										Candidate["_global"] := DefaultRecord
+										HotstringsOverridesApplyBase(Candidate)
+										_HotstringsOverrideBindSource(Candidate, BoundPath, Origin.Source)
+										_HotstringsPublishOverrideCandidate(Candidate)
+								}
+						} finally Critical(PreviousCritical)
+						return false
 				}
 		}
 		HotstringsOverridesApplyBase(Candidate)
@@ -238,6 +265,11 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 				finally _HotstringsOverrideLeaseRelease(OwnerToken)
 		}
 		if !Persisted {
+				; Even an acknowledged base cannot retire its source default until
+				; removal from this file is acknowledged too. A later user edit must
+				; still be able to finish the pending move instead of resurrecting it.
+				if IsObject(DefaultRecord) && GlobalDelay != ""
+						Candidate["_global"] := DefaultRecord
 				try LoggerError("HotstringsConfig",
 						"The delay overrides could not be rewritten as offsets of the base expansion delay; they apply for this session and the rewrite is retried at the next start.")
 				PreviousCritical := Critical("On")
@@ -258,12 +290,17 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 ; @param Seconds New base, a non-negative number of seconds.
 ; @returns {Integer} True once the leaf is durable and the overrides are rebased.
 HotstringsSetBaseDelay(Seconds) {
-		global Features
+		global Features, _HotstringsOverrides
 		if !(Seconds is Number) or !TickTryDurationMsFromSeconds(Seconds, &DelayMs) {
 				try LoggerError("HotstringsConfig",
 						"SetBaseDelay: the base delay must fit the elapsed-tick domain, got '{1}'.", Seconds)
 				return false
 		}
+		; Finish a pending default move first. Otherwise an older _global record
+		; could overwrite this newly acknowledged explicit choice at next boot.
+		if _HotstringsOverrides.Has("_global") && _HotstringsRecordIsLegacy(_HotstringsOverrides["_global"])
+				if !HotstringsOverridesBoot()
+						return false
 		Previous := HotstringsBaseDelay()
 		if !WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, Seconds)
 				return false

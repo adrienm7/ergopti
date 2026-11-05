@@ -621,8 +621,9 @@ Test("HotstringsConfig: set/clear rollback when publication fails (hotstrings-ov
 TestHotstringsConfig_SaveOverridesPublishesAtomically() {
 	Body := _DriverFuncBody("_SaveOverrides")
 	Assert(Body != "", "_SaveOverrides must exist for the atomic-publication guard")
-	Assert(InStr(Body, "FSAtomicMoveReplace(") > 0,
-		"_SaveOverrides must publish a same-directory stage through the atomic filesystem adapter")
+	Assert(InStr(Body, "FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)") > 0
+		&& InStr(Body, "FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)") > 0,
+		"both absent and existing sources must publish through their atomic filesystem adapter with final source admission")
 	Assert(InStr(Body, 'FileOpen(_HotstringsOverridesPath, "w"') == 0,
 		"_SaveOverrides must never truncate the live override file before publication succeeds")
 }
@@ -634,13 +635,19 @@ TestHotstringsConfig_SaveOverridesRequiresDurableExactStage() {
 	Body := _DriverFuncBody("_SaveOverrides")
 	DurablePos := InStr(Body, "FSWriteDurable(StagePath, Out)")
 	ExactPos := InStr(Body, "FSUtf8ExactMatches(StagePath, Out)")
-	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, Path)")
+	CreatePos := InStr(Body, "FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)")
+	ReplacePos := InStr(Body, "FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)")
+	PublishedReadbackPos := InStr(Body, "FSUtf8ExactMatches(Path, Out)")
+	LivePos := InStr(Body, "LivePublished := PublishFn.Call()")
 	Assert(DurablePos > 0,
 		"the default override writer must count bytes and flush its stage to stable storage")
 	Assert(ExactPos > DurablePos,
 		"the durable stage must be read back byte-exactly before publication")
-	Assert(ReplacePos > ExactPos,
-		"atomic replacement and live publication must remain downstream of exact stage validation")
+	Assert(CreatePos > ExactPos && ReplacePos > ExactPos,
+		"both atomic publication modes must remain downstream of durable exact stage validation")
+	Assert(PublishedReadbackPos > CreatePos && PublishedReadbackPos > ReplacePos
+		&& LivePos > PublishedReadbackPos,
+		"RAM publication must remain downstream of byte-exact native target readback")
 }
 Test("HotstringsConfig: durable exact stage validation gates override publish (AHK-078)",
 	TestHotstringsConfig_SaveOverridesRequiresDurableExactStage)
@@ -1678,19 +1685,50 @@ _HOLACK_DefaultNeedsDurableAck(Mode) {
 		HotstringsConfigInit(Path)
 		ConfigBefore := FSReadUtf8Exact(ConfigurationFile)
 		AssertEqual(0.75, TOML_ParseDocument(ConfigBefore)["hotstrings"]["expansion_delay"])
-		Held := Mode == "base-lease-refusal" || Mode == "base-refusal-color" || Mode == "no-default-lease-control"
+		Held := Mode == "base-lease-refusal" || Mode == "base-refusal-color" || Mode == "no-default-lease-control" || Mode == "explicit-after-base-refusal"
 		if Held {
 			Blocker := _ConfigWriteLeaseTryAcquire(ConfigurationFile, "independent-config-owner-during-legacy-default")
 			AssertTrue(Blocker is Object, "a real separate config writer must own the exact destination")
+		} else if Mode == "explicit-after-override-refusal" {
+			Blocker := _ConfigWriteLeaseTryAcquire(Path, "independent-override-owner-after-base-ack")
+			AssertTrue(Blocker is Object)
 		}
 		State := {Calls: 0}
 		RefuseBase(Seconds) {
 			State.Calls += 1
 			AssertEqual(1.5, Seconds)
+			if Mode == "sibling-base-commit"
+				AssertTrue(WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, 2.25), "the sibling really commits a different base through the native writer")
 			return false
 		}
-		Result := Mode == "seam-base-refusal" ? HotstringsOverridesBoot(RefuseBase) : HotstringsOverridesBoot()
-		if Mode == "base-success-control" {
+		Result := Mode == "seam-base-refusal" || Mode == "sibling-base-commit" ? HotstringsOverridesBoot(RefuseBase) : HotstringsOverridesBoot()
+		if Mode == "explicit-after-base-refusal" || Mode == "explicit-after-override-refusal" {
+			AssertFalse(Result, "the first migration must observe the genuine held destination")
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+			if Mode == "explicit-after-override-refusal"
+				AssertEqual(1.5, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "the base really acknowledged before override retirement was refused")
+			else
+				AssertEqual(ConfigBefore, FSReadUtf8Exact(ConfigurationFile))
+			AssertTrue(_ConfigWriteLeaseRelease(Blocker))
+			Blocker := 0
+			AssertTrue(HotstringsSetBaseDelay(2.25), "an explicit newer choice must finish pending legacy work before committing")
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
+			; Reconstruct the effective base from its actual durable image and run
+			; the real startup readers again, rather than trusting the RAM mirror.
+			Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"]
+			HotstringsConfigInit(Path)
+			AssertTrue(HotstringsOverridesBoot())
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "fresh boot cannot resurrect the older default after the explicit choice acknowledged")
+			AssertEqual(2.25, HotstringsBaseDelay())
+			AssertFalse(TOML_ParseDocument(FSReadUtf8Exact(Path)).Has("_global"))
+			AssertEqual(2.75, HotstringsResolve("magickey", "").Delay, "the category retains its relative distance through pending work and the later base change")
+		} else if Mode == "sibling-base-commit" {
+			AssertFalse(Result)
+			AssertEqual(1, State.Calls)
+			AssertEqual(2.25, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
+			AssertEqual(2.25, HotstringsBaseDelay(), "the failed old migration cannot overwrite the sibling's freshly committed base in the same Feature node")
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+		} else if Mode == "base-success-control" {
 			AssertTrue(Result, "the genuine unblocked cross-file migration must complete")
 			AssertEqual(1.5, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"])
 			AssertEqual(1.5, HotstringsBaseDelay())
@@ -1808,3 +1846,12 @@ for _HOUP_Mode in ["overflow", "below-cap-control", "zero-offset-control", "unli
 	Test("HotstringsConfig public base upper duration: " . _HOUP_Mode,
 		_HTBS_Run.Bind("upper-duration-" . _HOUP_Mode, "[hotstrings]`nexpansion_delay = 0.750`n",
 			_HOUP_PublicBaseKeepsEffectiveDuration.Bind(_HOUP_Mode)))
+
+Test("HotstringsConfig legacy default durable ACK: sibling-base-commit",
+	_HTBS_Run.Bind("legacy-default-ack-sibling-base-commit", "[hotstrings]`nexpansion_delay = 0.750`n",
+		_HOLACK_DefaultNeedsDurableAck.Bind("sibling-base-commit")))
+
+for _HOLACK_PendingMode in ["explicit-after-base-refusal", "explicit-after-override-refusal"]
+	Test("HotstringsConfig legacy default durable ACK: " . _HOLACK_PendingMode,
+		_HTBS_Run.Bind("legacy-default-ack-" . _HOLACK_PendingMode, "[hotstrings]`nexpansion_delay = 0.750`n",
+			_HOLACK_DefaultNeedsDurableAck.Bind(_HOLACK_PendingMode)))
