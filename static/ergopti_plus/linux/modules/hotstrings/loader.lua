@@ -58,6 +58,7 @@ local LOG = "modules.hotstrings.loader"
 -- committed=false for that state. Keep serving the last complete source instead
 -- of turning a transient write into a silently deleted hotstring category.
 local _source_snapshots = {}
+local _source_receipts = setmetatable({}, { __mode = "k" })
 
 --- Canonical collision tiers, read once from the shared JSON. Kept as a lazily
 --- resolved local rather than a require-time read so a driver that never loads a
@@ -129,6 +130,27 @@ local function source_identity(path, forced_group)
 	return tostring(path) .. "\0" .. tostring(forced_group or "")
 end
 
+--- Captures fallback sources privately for one explicit transaction inverse.
+--- @return table receipt Opaque immutable source-set receipt.
+function M.capture_source_snapshots()
+	local copy, receipt = {}, {}
+	for identity, data in pairs(_source_snapshots) do copy[identity] = data end
+	_source_receipts[receipt] = copy
+	return receipt
+end
+
+--- Publishes the exact source set prepared by a successful matcher publication.
+--- @param receipt table Opaque source-set receipt.
+--- @return boolean committed
+function M.commit_source_snapshots(receipt)
+	local sources = _source_receipts[receipt]
+	if not sources then return false end
+	local copy = {}
+	for identity, data in pairs(sources) do copy[identity] = data end
+	_source_snapshots = copy
+	return true
+end
+
 --- Replaces the shipped magic-key suffix with the configured one.
 ---
 --- The canonical TOMLs carry the shipped glyph because they are shared source
@@ -181,7 +203,7 @@ end
 --- where a category is
 ---   { id, path, description = {locale → text}, delay, show_tooltip, color,
 ---     sections_order = array, sections = { [name] = { count } }, count }
-function M.load_catalogue(paths, options, prepared_sources)
+function M.load_catalogue(paths, options, prepared_sources, inverse_receipt)
 	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
 		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
@@ -192,6 +214,9 @@ function M.load_catalogue(paths, options, prepared_sources)
 	local categories = {}
 	local errors = 0
 	local aggregate_committed = true
+	local deferred = type(options) == "table" and options.defer_source_snapshots == true
+	local inverse = inverse_receipt and _source_receipts[inverse_receipt] or nil
+	local prepared_snapshots = deferred and {} or nil
 
 	for _, source in ipairs(paths) do
 		-- A source is a path, or a table carrying a path and the category key it
@@ -222,7 +247,8 @@ function M.load_catalogue(paths, options, prepared_sources)
 		end
 		if not ok or committed ~= true or type(data) ~= "table" then
 			errors = errors + 1
-			data = _source_snapshots[identity]
+			if inverse_receipt ~= nil then data = inverse and inverse[identity]
+			else data = _source_snapshots[identity] end
 			if data then
 				Logger.warn(LOG, "Source '%s' did not commit — retaining its last healthy snapshot.",
 					tostring(path))
@@ -230,9 +256,10 @@ function M.load_catalogue(paths, options, prepared_sources)
 				aggregate_committed = false
 				Logger.error(LOG, "Source '%s' did not commit and has no healthy snapshot.", tostring(path))
 			end
-		elseif prepared == nil then
+		elseif prepared == nil and not deferred then
 			_source_snapshots[identity] = data
 		end
+		if data and deferred then prepared_snapshots[identity] = data end
 		if data then
 			local group = forced_group or category_of(path)
 			local meta = type(data.meta) == "table" and data.meta or {}
@@ -361,11 +388,16 @@ function M.load_catalogue(paths, options, prepared_sources)
 
 	Logger.success(LOG, "Loaded %d mapping(s) across %d categor(ies).",
 		#mappings, count_categories(categories))
+	local receipt
+	if deferred and aggregate_committed then
+		receipt = {}; _source_receipts[receipt] = prepared_snapshots
+	end
 	return {
 		mappings = mappings,
 		categories = categories,
 		errors = errors,
 		committed = aggregate_committed,
+		source_receipt = receipt,
 	}
 end
 

@@ -451,3 +451,71 @@ helpers.describe("hotstring choice rollback keeps the published catalogue", func
 		end)
 	end
 end)
+
+helpers.describe("hotstring catalogue: removed source lifetime", function()
+	helpers.it("does not revive a removed override when its path returns malformed", function()
+		local uv = require("luv")
+		local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-source-life-XXXXXX"))
+		local path = root .. "/autocorrection.toml"
+		local function write(bytes)
+			local f = assert(io.open(path, "wb")); assert(f:write(bytes)); assert(f:close())
+		end
+		local function match(engine)
+			engine:reset(false)
+			local result
+			for c in ("owned"):gmatch(".") do result = engine:on_char(c) end
+			return result
+		end
+		local ok, err = pcall(function()
+			write('[probe]\n"owned" = { output = "OLD", auto_expand = true }\n')
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			local engine = require("hotstring_engine").new()
+			Config._set_override_config_dir_for_test(root)
+			local id = "autocorrection"
+			require("tests.support.hotstring_choices").with_file(Config,
+				'[hotstrings]\ngroups = { autocorrection = true }\n[hotstrings.modules]\nautocorrection = { probe = true }\n', function()
+				assert(Config.init(engine, root))
+				local _, published = Config.load_all(); helpers.assert_true(published)
+				local first = match(engine); helpers.assert_not_nil(first, "the override source is live")
+				helpers.assert_eq(first.replacement, "OLD")
+				-- A healthy sibling read in a refused aggregate is not the live source.
+				write('[probe]\n"owned" = { output = "UNPUBLISHED", auto_expand = true }\n')
+				local sibling = root .. "/incomplete.toml"
+				local f = assert(io.open(sibling, "wb")); assert(f:write('[probe]\n"broken" = { output = ')); assert(f:close())
+				_, published = Config.reload(); helpers.assert_eq(published, false)
+				helpers.assert_eq(match(engine).replacement, "OLD")
+				write('[probe]\n"owned" = { output = '); assert(os.remove(sibling))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_eq(match(engine).replacement, "OLD", "unpublished source cannot replace the active fallback")
+				assert(os.remove(path))
+				local original_load = engine.load_mappings
+				engine.load_mappings = function() return false end
+				_, published = Config.reload(); helpers.assert_eq(published, false)
+				engine.load_mappings = original_load
+				helpers.assert_eq(match(engine).replacement, "OLD", "a refused removal leaves the live engine intact")
+				local owner = {}; helpers.assert_true(Config.acquire(owner))
+				local inverse = assert(Config.configuration_snapshot())
+				local borrowed = require("modules.hotstrings.loader").capture_source_snapshots()
+				_, published = Config.load_all(); helpers.assert_true(published)
+				write('[probe]\n"owned" = { output = ')
+				_, published = Config.load_all()
+				helpers.assert_eq(published, false, "an ordinary candidate cannot borrow an inverse-only snapshot")
+				_, published = Config.load_all(nil, nil, borrowed)
+				helpers.assert_eq(published, false, "a public load cannot supply its own inverse receipt")
+				helpers.assert_nil(match(engine), "the removed mapping stays inactive during the transaction")
+				helpers.assert_true(Config.restore_configuration(owner, inverse), "the explicit inverse may restore its retained source")
+				helpers.assert_eq(match(engine).replacement, "OLD")
+				helpers.assert_true(Config.release(owner))
+				assert(os.remove(path))
+				_, published = Config.reload(); helpers.assert_true(published)
+				helpers.assert_nil(match(engine), "a removed source is no longer live")
+				write('[probe]\n"owned" = { output = ')
+				_, published = Config.reload()
+				helpers.assert_eq(published, false, "a newly reappearing malformed source has no current snapshot")
+				helpers.assert_nil(match(engine), "the old removed mapping must not be revived")
+			end)
+		end)
+		os.remove(path); uv.fs_rmdir(root)
+		if not ok then error(err, 0) end
+	end)
+end)

@@ -108,6 +108,7 @@ local _choices = nil
 --- setters are refused until it releases, so they cannot interleave its inverse.
 local _scope_owner = nil
 local _scope_owner_epoch = 0
+local _scope_inverse_sources = nil
 local _personal_transaction_owner, _prepared_personal_sources, _personal_debt
 local _personal_gate_debt
 local restore_personal_runtime
@@ -1068,7 +1069,7 @@ function M.init(engine, config_dir, on_change)
 			return false
 		end
 	end
-	_scope_owner = nil
+	_scope_owner, _scope_inverse_sources = nil, nil
 	_personal_transaction_owner, _prepared_personal_sources, _personal_debt = nil, nil, nil
 	_personal_gate_debt = nil
 	_live_mappings = {}
@@ -1513,7 +1514,7 @@ end
 --- @param cold_boot boolean|nil Explicit partial registration mode for the sole startup caller.
 --- @return string|nil Refusal reason.
 --- @return table|nil Classified receipt only after native publication.
-function M.load_all(personal_owner, cold_boot)
+local function load_all_internal(personal_owner, cold_boot, inverse_sources)
 	if _personal_transaction_owner and personal_owner ~= _personal_transaction_owner then
 		return #_mappings, false, "personal-source-pending"
 	end
@@ -1563,7 +1564,8 @@ function M.load_all(personal_owner, cold_boot)
 	local catalogue = Loader.load_catalogue(staged_paths, {
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
-	}, _prepared_personal_sources)
+		defer_source_snapshots = true,
+	}, _prepared_personal_sources, inverse_sources)
 	_parse_errors = tonumber(catalogue.errors) or 0
 	if catalogue.committed ~= true then
 		Logger.error(LOG,
@@ -1641,6 +1643,10 @@ function M.load_all(personal_owner, cold_boot)
 		Logger.error(LOG, "Catalogue publication refused: %s.", reason)
 		return #_mappings, false, reason
 	end
+	-- Only this accepted image may become the active fallback source set.
+	if catalogue.source_receipt and type(Loader.commit_source_snapshots) == "function" then
+		assert(Loader.commit_source_snapshots(catalogue.source_receipt), "source publication receipt refused")
+	end
 	_toml_paths = staged_paths
 	_personal_sources = staged_personal_sources
 	_personal_adoptions = staged_personal_adoptions or {}
@@ -1660,6 +1666,11 @@ function M.load_all(personal_owner, cold_boot)
 	end
 	return #filtered, true, nil, { committed = true, complete = not common_unavailable,
 		unavailable = common_unavailable and { "autocorrection" } or {} }
+end
+
+--- Loads a catalogue without borrowing a transaction's inverse source receipt.
+function M.load_all(personal_owner, cold_boot)
+	return load_all_internal(personal_owner, cold_boot, nil)
 end
 
 --- Re-reads every hotstring source, then asks for a menu rebuild.
@@ -2056,6 +2067,9 @@ restore_personal_runtime = function(snapshot)
 	_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
 	_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, snapshot.resolve_cache or {}
 	_parse_errors, _published = snapshot.errors, snapshot.published
+	if _scope_inverse_sources and type(Loader.commit_source_snapshots) == "function" then
+		assert(Loader.commit_source_snapshots(_scope_inverse_sources), "inverse source receipt refused")
+	end
 	return true
 end
 
@@ -2494,6 +2508,8 @@ end
 --- @return boolean acquired
 function M.acquire(owner)
 	if type(owner) ~= "table" or _scope_owner ~= nil then return false end
+	_scope_inverse_sources = type(Loader.capture_source_snapshots) == "function"
+		and Loader.capture_source_snapshots() or nil
 	_scope_owner = owner
 	_scope_owner_epoch = _scope_owner_epoch + 1
 	return true
@@ -2506,6 +2522,7 @@ function M.release(owner)
 	if _scope_owner ~= owner then return false end
 	_scope_owner = nil
 	_scope_owner_epoch = _scope_owner_epoch + 1
+	_scope_inverse_sources = nil
 	return true
 end
 
@@ -2562,7 +2579,7 @@ function M.restore_configuration(owner, snapshot)
 	_choices, _overrides, _resolve_cache = copy_choices(snapshot.choices), copy_overrides(snapshot.overrides), {}
 	_override_source = { status = snapshot.override_source.status, content = snapshot.override_source.content }
 	_magic_key, _canonical_magic_key = snapshot.magic_key, snapshot.canonical_magic_key
-	local _, committed = M.load_all()
+	local _, committed = load_all_internal(nil, nil, _scope_inverse_sources)
 	return committed == true
 end
 
