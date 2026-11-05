@@ -34,10 +34,12 @@ local function server_options(llm, dialogs, changed, context)
 		return scope_ok and allowed == true and page_owned()
 	end
 	local function ai_on()
-		return type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		if type(llm.is_enabled) ~= "function" then return false end
+		local ok, enabled = pcall(llm.is_enabled)
+		return ok and enabled == true
 	end
 	-- The sweep's own fences recheck the switch: one switched off mid-sweep publishes nothing.
-	local function sweep_admit() return admit() and ai_on() end
+	local function sweep_admit() return admit() and ai_on() and admit() end
 	local function redraw() if type(changed) == "function" then changed() end end
 	local function rescan()
 		return Servers.rescan(sweep_admit, function(changed_models) if changed_models then redraw() end end)

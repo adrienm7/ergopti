@@ -276,6 +276,31 @@ helpers.describe("Linux local server discovery ownership", function()
 		end)
 	end
 
+	helpers.it("does not discover servers if the page closes while the AI state is read", function()
+		isolated(function(_, _, calls)
+			local live = true
+			local llm = { get_backend = function() return "ollama" end,
+				can_configure_local_servers = function() return true end,
+				is_enabled = function() live = false; return true end }
+			local rows = require("ui.menu.local_server_rows").rows(llm, {}, function() end,
+				{ is_paused = function() return false end, page_current = function() return live end })
+			helpers.assert_type(rows, "table")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
+	helpers.it("an unavailable AI state refuses local server discovery", function()
+		isolated(function(_, _, calls)
+			local llm = { get_backend = function() return "ollama" end,
+				can_configure_local_servers = function() return true end,
+				is_enabled = function() error("AI state unavailable") end }
+			local rows = require("ui.menu.local_server_rows").rows(llm, {}, function() end,
+				{ is_paused = function() return false end })
+			helpers.assert_type(rows, "table")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
 	helpers.it("an unavailable local configuration owner refuses discovery", function()
 		isolated(function(_, _, calls)
 			local llm = { get_backend = function() return "ollama" end,
