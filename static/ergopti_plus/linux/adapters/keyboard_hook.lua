@@ -2802,6 +2802,33 @@ local function _dispatch_pointer(ev, slot)
 	end
 end
 
+-- A lost last keyboard stops the pump, so no seized pointer can wait for a
+-- later layer release. Retire its forwarded keys before returning it to the desktop.
+function LayerPointer.release_for_recovery(session)
+	local slots = {}
+	for slot in pairs(LayerPointer.slots) do slots[#slots + 1] = slot end
+	if #slots == 0 then return true end
+	local called, released = pcall(_release_forwarded_sources, slots)
+	if _capture_session ~= session then return false end
+	if not called or released ~= true then
+		M.emergency_stop("could not retire pointer output during keyboard recovery"); return false
+	end
+	for _, slot in ipairs(slots) do
+		local checked, opened = pcall(EvdevReader.is_open, slot)
+		if _capture_session ~= session then return false end
+		if not checked then M.emergency_stop("could not inspect pointer during keyboard recovery"); return false end
+		if opened then
+			local ungrabbed, acknowledged = pcall(EvdevReader.ungrab, slot)
+			if _capture_session ~= session then return false end
+			if not ungrabbed or acknowledged ~= true then
+				M.emergency_stop("could not release pointer during keyboard recovery"); return false
+			end
+		end
+	end
+	LayerPointer.slots, LayerPointer.buttons = {}, {}
+	return true
+end
+
 local function _read_source(source)
 	local session = _capture_session
 	local event, status, reason = EvdevReader.read_event(source.slot)
@@ -2839,6 +2866,7 @@ local function _read_source(source)
 				break
 			end
 		end
+		if not any_open and not LayerPointer.release_for_recovery(session) then return nil end
 		_running = any_open
 		_reacquiring = true
 	end
@@ -2902,6 +2930,7 @@ function LayerPointer.pump_once()
 		end
 	end
 	if open_keyboards == 0 then
+		if not LayerPointer.release_for_recovery(session) then return end
 		_number_row.retire()
 		Logger.warn(LOG, "Every keyboard source is closed — waiting for re-acquisition.")
 		_running = false

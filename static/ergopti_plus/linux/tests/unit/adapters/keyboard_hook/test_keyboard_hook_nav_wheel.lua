@@ -61,7 +61,7 @@ end
 --- @param keyboard_events table { {code, value, at_us} }
 --- @param pointer_events table { {type, code, value, at_us} }
 --- @return table emitted { "key:code:value" | "rel:axis:value" }, table grabs { [path] = {on, off} }
-local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click, omit_click, snapshot)
+local function drive(pointer_kind, keyboard_events, pointer_events, on_relative, observer, fatal_pointer, fail_ungrab, on_click, omit_click, snapshot, fatal_keyboard, quit_on_recovery, after_recovery)
 	local keyboard, pointer, second = fake_node("keyboard"), fake_node(pointer_kind), fake_node("mouse")
 	local queues = { [keyboard] = {}, [pointer] = {}, [second] = {} }
 	for _, ev in ipairs(keyboard_events) do
@@ -107,6 +107,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		read = function(fd)
 			local event = table.remove(queues[fd] or {}, 1)
 			if event == nil and fd == pointer and fatal_pointer then return nil, "fatal", "controlled removal" end
+			if event == nil and fd == keyboard and (fatal_keyboard == true or type(fatal_keyboard) == "table" and fatal_keyboard.enabled) then return nil, "fatal", "controlled keyboard removal" end
 			return event
 		end,
 		read_bits = function(fd, _, count)
@@ -125,7 +126,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		close = function() end,
 	})
 	local kh = helpers.load_module("adapters.keyboard_hook")
-	local emitted, before_stop, running, pointer_open = {}, {}, false, false
+	local emitted, before_stop, running, pointer_open, ungrabs_before_stop = {}, {}, false, false, 0
 	local ok, err = pcall(function()
 		kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,
 			nav_layer = wheel_layer() }), function() end)
@@ -145,8 +146,16 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 		}
 		kh.start(start_options)
 		kh.pump()
+		if after_recovery then after_recovery(kh) end
+		if quit_on_recovery then
+			assert(kh.isRecovering(), "expected last keyboard loss")
+			local shutdown = require("infra.shutdown_coordinator").new({ pre_wait = {}, keyboard_hook = kh,
+				event_loop = { stop = function() end } })
+			shutdown.request("controlled quit")
+		end
 		running = kh.isRunning()
 		pointer_open = reader.is_open("pointer:" .. pointer)
+		ungrabs_before_stop = grabs[pointer].off
 		for index, row in ipairs(emitted) do before_stop[index] = row end
 	end)
 	kh.set_remapper(nil)
@@ -158,7 +167,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 	os.remove(pointer)
 	os.remove(second)
 	assert(ok, err)
-	return emitted, grabs[pointer], before_stop, running, "pointer:" .. pointer, pointer_open
+	return emitted, grabs[pointer], before_stop, running, "pointer:" .. pointer, pointer_open, ungrabs_before_stop
 end
 
 local function has(list, item)
@@ -365,6 +374,82 @@ helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux
 			end
 		end)
 		helpers.assert_eq(resets, 1, "cleanup cannot repeatedly reenter its reset observer")
+	end)
+
+	helpers.it("returns a held mouse button when the last keyboard disappears", function()
+		local _, grabs, before_stop, running, _, _, ungrabs = drive("mouse", {
+			{ LEFT_ALT, 1, 1000 }, { KEY_K, 1, 5000 },
+		}, { { EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 3000 } },
+			nil, nil, nil, nil, nil, nil, nil, true)
+		helpers.assert_eq(running, false)
+		helpers.assert_eq(grabs.on, 1)
+		helpers.assert_eq(ungrabs, 1, "the mouse must be usable before keyboard reacquisition")
+		helpers.assert_true(has(before_stop, "key:" .. BTN_LEFT .. ":1"))
+		helpers.assert_true(has(before_stop, "key:" .. BTN_LEFT .. ":0"), "virtual button is retired before ungrab")
+	end)
+
+	helpers.it("emergency-stops when pointer ungrab raises during keyboard recovery", function()
+		local original, reader, stopped = nil, nil, false
+		local ok, err = pcall(function()
+			drive("mouse", { { LEFT_ALT, 1, 1000 }, { KEY_K, 1, 5000 } },
+				{ { EV_REL, REL_X, 1, 3000 } }, nil, function(kind)
+					if kind == "motion" then
+						reader = require("adapters.evdev_reader"); original = reader.ungrab
+						reader.ungrab = function() error("controlled ungrab exception") end
+					end
+				end, nil, nil, nil, nil, nil, true, false,
+				function(hook) stopped = not hook.isRunning() and not hook.isRecovering() end)
+		end)
+		if original then reader.ungrab = original end
+		if not ok then error(err, 0) end
+		helpers.assert_true(stopped, "the grabbed source is retired without waiting for the outer pump guard")
+	end)
+
+	helpers.it("does not stop a successor started by a failed recovery ungrab", function()
+		local original, reader, restarted = nil, nil, false
+		local ok, err = pcall(function()
+			local _, _, _, running = drive("mouse", { { LEFT_ALT, 1, 1000 }, { KEY_K, 1, 5000 } },
+				{ { EV_REL, REL_X, 1, 3000 } }, nil, function(kind, _, _, _, hook, options)
+					if kind == "motion" and not original then
+						reader = require("adapters.evdev_reader"); original = reader.ungrab
+						reader.ungrab = function(slot)
+							reader.ungrab = original
+							hook.stop(); hook.start(options); restarted = hook.isRunning()
+							return false
+						end
+					end
+				end, nil, nil, nil, nil, nil, true)
+			helpers.assert_true(restarted and running, "old ungrab refusal cannot stop the successor")
+		end)
+		if original then reader.ungrab = original end
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("emergency-stops when a pointer cannot be returned on keyboard loss", function()
+		local stopped = false
+		drive("mouse", { { LEFT_ALT, 1, 1000 } }, {}, nil, nil, nil, true, nil, nil, nil,
+			true, false, function(hook) stopped = not hook.isRunning() and not hook.isRecovering() end)
+		helpers.assert_true(stopped, "an unacknowledged pointer grab cannot enter silent recovery")
+	end)
+
+	helpers.it("reacquires a keyboard after returning the seized pointer", function()
+		local failure, recovered = { enabled = true }, false
+		local _, grabs, _, running = drive("mouse", { { LEFT_ALT, 1, 1000 } }, {},
+			nil, nil, nil, nil, nil, nil, nil, failure, false, function(hook)
+				helpers.assert_true(hook.isRecovering())
+				failure.enabled = false
+				for _ = 1, hook.DEVICE_CHECK_TICKS do hook.check_device() end
+				recovered = hook.isRunning() and not hook.isRecovering()
+			end)
+		helpers.assert_true(recovered and running)
+		helpers.assert_eq(grabs.on, 1)
+	end)
+
+	helpers.it("releases grabbed pointer on quit while the last keyboard is recovering", function()
+		local _, grabs, _, _, _, _, ungrabs = drive("mouse", { { LEFT_ALT, 1, 1000 } }, {},
+			nil, nil, nil, nil, nil, nil, nil, true, true)
+		helpers.assert_eq(grabs.on, 1, "the layer acquired the mouse")
+		helpers.assert_eq(ungrabs, 1, "shutdown must not leave the mouse seized while input is recovering")
 	end)
 
 	helpers.it("reports one reset when a grabbed pointer reader fails", function()
