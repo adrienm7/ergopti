@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **126 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **127 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1907,3 +1907,17 @@ Replay42031267454 executes64 selected tests:54 pass and10 fail individually;53 p
 Replay42028281855 admits the genuine lifecycle with keyboard_port1 and debt0. Queued, waiting, inflight-file and clock-acquisition probes all allow old note work after resume; the unchanged-epoch control passes. Both orders reproduce. A current-suspension check cannot withdraw an older request after resume.
 
 Commite5a7025d captures the epoch before callouts, revokes exact jobs during SuspendEnter and checks ownership before each external effect and pending publication. Replay42031267454 qualifies all6 lifecycle tests plus13 existing note controls in both orders. The clock-port cutpoint is controlled reentry, not a claim that A_TickCount spontaneously pumps a callback. Real Notepad same-basename document probes are a separate unexecuted hypothesis.
+
+### Native replays54,67 and13
+
+Replay42034174395 atf305db51 finishes48/54 passing individually and49/54 reversed. Production parsing passes; E2E is unselected. The selected OneShot flag and balancing corrections pass. A genuine delivered Down followed by an explicitly thrown port error remains untracked after lifecycle cleanup (037). The six older model close/pause tests now pass after repairing their fixture. The API backend selection leaves the API backend active despite an acknowledged Ollama model choice; its ordinary backend control is initially unadmitted because the physical sparse TOML omits the actual default. The fixture now reads that canonical default; no model-policy fix is inferred before the control runs. A managed bootstrap retains its canceled bound timer (125). Sticky preheld fails an isolated injection prerequisite and passes reversed, so this is not product failure evidence.
+
+Replay42034753005 ataa51a694 passes65/67 in each order. It qualifies the selected source-B TapHold correction and typing admission correction, including all8 genuine source/privacy cases, both causal ordering probes and90 native hotstring E2E cases. Production parsing passes. Its two failures are a stale loader-signature meta repaired in0c27c169 and a real default-stage collision extending071. The original producer enters and returns after an exclusively created concurrent stage, then reports result1, consumes the stage and publishes enter. A held-stage correction is integrated for the next targeted replay, without claiming recovery after an unacknowledged post-rename flush.
+
+Replay42035395037 atc160aceb passes11/13 in each order. The admitted native settings Close exposes a stale Layout opening (109); the actual private-title lag exposes5 accepted paste rows plus1 burst despite captured-source refusal (016). Their controls pass. Source068df7d4 corrects paste source admission; native postfix qualification is pending.
+
+### AHK-127: A different note directory reuses the wrong actual document
+
+Replay42034174395 opens genuine private A/Notes.txt, then requests B/Notes.txt. The active native document still contains A's authenticated canary, launches remain1 and the public job finishes without an error. Both orders reproduce; same-folder reuse passes. Cleanup authenticates and retires the exact owned processes/windows before releasing private files.
+
+Basename matching cannot establish full document identity. A replacement which merely launches B and then searches that same basename could still accept A before B appears. The correction remains under investigation; current evidence does not justify a new document identity claim based on title, HWND or process alone.
