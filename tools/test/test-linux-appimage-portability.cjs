@@ -683,6 +683,7 @@ function elfWith(updateInformation, sectionName = Update.UPDATE_SECTION) {
 	info.write(updateInformation, 'utf8');
 	const header = Buffer.alloc(64);
 	Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1]).copy(header);
+	header.writeUInt16LE(62, 0x12); // EM_X86_64
 	const namesAt = 64;
 	const infoAt = namesAt + names.length;
 	const tableAt = infoAt + info.length;
@@ -752,6 +753,11 @@ assert.throws(() => Update.readEmbeddedUpdateInformation(unterminatedNames), /se
 
 
 assert.deepEqual(Update.verify(image, zsyncFor(image.length)), []);
+const wrongArch = Buffer.from(image);
+wrongArch.writeUInt16LE(183, 0x12); // EM_AARCH64
+const wrongArchHash = require('node:crypto').createHash('sha1').update(wrongArch).digest('hex');
+assert.ok(Update.verify(wrongArch, zsyncFor(wrongArch.length, { 'SHA-1': wrongArchHash })).some((problem) => /architecture/i.test(problem)));
+
 for (const [what, badImage, badZsync, expected] of [
 	['an AppImage built without -u', elfWith(''), zsyncFor(image.length), /differs from/],
 	[

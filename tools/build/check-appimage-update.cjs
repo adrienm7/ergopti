@@ -149,6 +149,8 @@ function parseZsyncHeader(file) {
  */
 function verify(image, zsync) {
 	const problems = [];
+	if (image.length >= 20 && image.readUInt16LE(0x12) !== 62)
+		problems.push('the AppImage ELF architecture is not x86-64');
 	let embedded = null;
 	try {
 		embedded = readEmbeddedUpdateInformation(image);
