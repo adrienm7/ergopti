@@ -1,0 +1,24 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_timer_transaction"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_timer_transaction
+
+=== healthcheck window focus ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","name":"sends one localized product prefix to the native title owner in every locale","status":"pass","elapsed_ms":438.062252,"timing_error":""}
+  ok   sends one localized product prefix to the native title owner in every locale
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","name":"(ui-focus-not-topmost) healthcheck presents only through the shared focus helper","status":"pass","elapsed_ms":2.940834,"timing_error":""}
+  ok   (ui-focus-not-topmost) healthcheck presents only through the shared focus helper
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","name":"(webview-focus-owner) healthcheck refused deletion permanently revokes deferred focus","status":"pass","elapsed_ms":3.766703,"timing_error":""}
+  ok   (webview-focus-owner) healthcheck refused deletion permanently revokes deferred focus
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","name":"(webview-focus-owner) healthcheck native close revokes initial deferred focus","status":"pass","elapsed_ms":4.399032,"timing_error":""}
+  ok   (webview-focus-owner) healthcheck native close revokes initial deferred focus
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","name":"tests.unit.ui.healthcheck.test_healthcheck_timer_transaction","status":"pass","elapsed_ms":449.506016,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,8 @@
+PASS normal-literal-directory
+PASS redaction-before-save
+PASS buffered-close-failure
+PASS zero-byte-close-failure
+PASS immediate-write-failure
+PASS readonly-existing-file
+PASS unwritable-directory
+Native diagnostics save receipts: 7 checks, 0 failures

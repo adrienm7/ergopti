@@ -1,0 +1,26 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_diagnostics_runner"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_diagnostics_runner
+
+=== diagnostics runner (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"refuses a runner built without its ports","status":"pass","elapsed_ms":0.007711,"timing_error":""}
+  ok   refuses a runner built without its ports
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"completes an unknown action as a failure","status":"pass","elapsed_ms":0.305590,"timing_error":""}
+  ok   completes an unknown action as a failure
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"opens the URL of an action through the effect kind its port names","status":"pass","elapsed_ms":0.020541,"timing_error":""}
+  ok   opens the URL of an action through the effect kind its port names
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"does not know an extra action the port did not declare","status":"pass","elapsed_ms":0.325049,"timing_error":""}
+  ok   does not know an extra action the port did not declare
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"never completes a cancelled request","status":"pass","elapsed_ms":0.011237,"timing_error":""}
+  ok   never completes a cancelled request
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_diagnostics_runner","name":"tests.unit.ui.healthcheck.test_diagnostics_runner","status":"pass","elapsed_ms":4.587172,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  5
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

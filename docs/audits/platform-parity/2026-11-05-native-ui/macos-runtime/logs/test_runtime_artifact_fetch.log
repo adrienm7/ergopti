@@ -1,0 +1,48 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_artifact_fetch/test_runtime_artifact_fetch.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch
+
+=== owned runtime artifact fetch: the first start ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"downloads, verifies, extracts and keeps the pinned artifact in Ergopti's own folder","status":"pass","elapsed_ms":4.570206,"timing_error":""}
+  ok   downloads, verifies, extracts and keeps the pinned artifact in Ergopti's own folder
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"never reads a receipt that does not exist","status":"pass","elapsed_ms":0.342155,"timing_error":""}
+  ok   never reads a receipt that does not exist
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"reports a download that failed as such, after clearing nothing it did not own","status":"pass","elapsed_ms":0.254172,"timing_error":""}
+  ok   reports a download that failed as such, after clearing nothing it did not own
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"downloads over https only, bounded by the pinned size","status":"pass","elapsed_ms":0.256406,"timing_error":""}
+  ok   downloads over https only, bounded by the pinned size
+
+=== owned runtime artifact fetch: named refusals ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses an unpinned runtime without running anything","status":"pass","elapsed_ms":0.323818,"timing_error":""}
+  ok   refuses an unpinned runtime without running anything
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses a download of another size before hashing it","status":"pass","elapsed_ms":0.226440,"timing_error":""}
+  ok   refuses a download of another size before hashing it
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses a download whose digest is not the pin and never extracts it","status":"pass","elapsed_ms":0.233662,"timing_error":""}
+  ok   refuses a download whose digest is not the pin and never extracts it
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses an archive holding a link before extracting it","status":"pass","elapsed_ms":0.224838,"timing_error":""}
+  ok   refuses an archive holding a link before extracting it
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"names the failing download with its status","status":"pass","elapsed_ms":0.290527,"timing_error":""}
+  ok   names the failing download with its status
+
+=== owned runtime artifact fetch: then always that one ===
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"uses the kept payload without any command when the receipt matches","status":"pass","elapsed_ms":0.335345,"timing_error":""}
+  ok   uses the kept payload without any command when the receipt matches
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"fetches again when the receipt names another digest","status":"pass","elapsed_ms":0.344108,"timing_error":""}
+  ok   fetches again when the receipt names another digest
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"lets a caller that asks during a fetch wait for that same fetch","status":"pass","elapsed_ms":0.511700,"timing_error":""}
+  ok   lets a caller that asks during a fetch wait for that same fetch
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"judges a listing closed only with every product under the helper bundle","status":"pass","elapsed_ms":0.360072,"timing_error":""}
+  ok   judges a listing closed only with every product under the helper bundle
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"names the helper executable and the products it seals","status":"pass","elapsed_ms":0.213581,"timing_error":""}
+  ok   names the helper executable and the products it seals
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","status":"pass","elapsed_ms":9.394165,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  14
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

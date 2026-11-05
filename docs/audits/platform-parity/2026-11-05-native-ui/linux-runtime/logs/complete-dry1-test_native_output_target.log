@@ -1,0 +1,49 @@
+
+=== Native Output Sink Composition Controls ===
+  ok   private ticket capability refuses forged ticket or unrelated producer
+
+=== Native Output Sink Composition Controls ===
+  ok   forged target native preflight refuses before allocating child resources
+
+=== Native Output Sink Composition Controls ===
+  ok   owned stdout pauses before byte-exact parent write and resumes on its ACK
+
+=== Native Output Sink Composition Controls ===
+  ok   native child success cannot publish before the exact pending file-write ACK
+
+=== Native Output Sink Composition Controls ===
+  ok   last ENOSPC after actual input completion cannot become successful HTTP completion
+
+=== Native Output Sink Composition Controls ===
+  ok   unexpected second stdout delivery while a write is pending aborts without dropped success
+
+=== Native Output Sink Composition Controls ===
+  ok   cancel without input EOF retains both native owner and pending writer until actual ACK
+
+=== Native Output Sink Composition Controls ===
+  ok   ambiguous native file-write throw retains exact debt through child and reader close
+
+=== Native Output Sink Composition Controls ===
+  ok   scheduled native reader close cannot retire the captured output descriptor
+
+=== Native Output Sink Composition Controls ===
+  ok   a slow native reader capability after file ACK cannot restart past original deadline
+
+=== Native Output Sink Composition Controls ===
+  ok   native archive size refusal cannot write another byte beyond captured limit
+
+=== Native Output Sink Composition Controls ===
+  ok   buffered redirect/body/path/etag combinations cannot admit an archive target
+
+=== Native Output Sink Composition Controls ===
+  ok   lease admission cannot spawn after withdrawing captured native source
+
+=== Native Output Sink Composition Controls ===
+  ok   lease admission cannot resume reader after native source withdrawal
+
+=== Native Output Sink Composition Controls ===
+  ok   slow final native source guard cannot receive a new archive deadline
+
+=== Native Output Sink Composition Controls ===
+  ok   reentrant output cancellation preserves terminal observation before physical done
+AUDIT_TEST_RESULT	16	0

@@ -1,0 +1,34 @@
+Selecting exact test module: "tests/unit/adapters/runtime_owner_ports/test_runtime_owner_ports.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports
+
+=== owned runtime ports ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"reads a job with a read-only print and maps the unknown-service status to not loaded","status":"pass","elapsed_ms":61.150452,"timing_error":""}
+  ok   reads a job with a read-only print and maps the unknown-service status to not loaded
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"reports a loaded job and treats any other status or a timeout as unknown","status":"pass","elapsed_ms":5.115861,"timing_error":""}
+  ok   reports a loaded job and treats any other status or a timeout as unknown
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"returns the extension listing only when the tool succeeded","status":"pass","elapsed_ms":2.659529,"timing_error":""}
+  ok   returns the extension listing only when the tool succeeded
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"counts the official user-side processes and distinguishes none from unknown","status":"pass","elapsed_ms":9.960174,"timing_error":""}
+  ok   counts the official user-side processes and distinguishes none from unknown
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"binds the consented closer and the capture owner, and no process of its own","status":"pass","elapsed_ms":1.167435,"timing_error":""}
+  ok   binds the consented closer and the capture owner, and no process of its own
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"raises one notice for the first block the user can act on, and none otherwise","status":"pass","elapsed_ms":1.073825,"timing_error":""}
+  ok   raises one notice for the first block the user can act on, and none otherwise
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"offers the first install once by itself and leaves other blocks to the notice","status":"pass","elapsed_ms":1.055377,"timing_error":""}
+  ok   offers the first install once by itself and leaves other blocks to the notice
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"hands the owner the shipped pin: the driver version and the capture declaration","status":"pass","elapsed_ms":1.610922,"timing_error":""}
+  ok   hands the owner the shipped pin: the driver version and the capture declaration
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"names the shipped driver version and no unpinned field from the same manifest","status":"pass","elapsed_ms":1.632995,"timing_error":""}
+  ok   names the shipped driver version and no unpinned field from the same manifest
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","status":"pass","elapsed_ms":86.109816,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

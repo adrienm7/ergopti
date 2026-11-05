@@ -1,0 +1,20 @@
+  ok   finite timeout is mandatory and refuses before any native acquisition
+  ok   shared timer admission precedes deferred process dispatch
+  ok   immutable helper fields map to actual shared worker and native capture
+  ok   completion waits for exact process settlement and shared timer close ACK
+  ok   same owner cannot succeed before either process or timer physical retirement
+  ok   source admission reentry observes reserved exact owner
+  ok   cancellation suppresses delivery and retains physical process and timer debt
+  ok   shared finite deadline cancels exact child then reports after physical retirement
+  ok   stale source retires without callbacks or owner release before ACKs
+  ok   reentrant cancellation during acquisition retains returned exact capability
+  ok   throwing native acquisition retains honest unknown debt
+  ok   malformed native acquisition retains honest unknown debt
+  ok   refused native settlement listener still requires independent physical polling
+  ok   refused shared timer stop cannot borrow process retirement
+  ok   refused shared timer close cannot borrow an attempted close callback
+  ok   empty native refusal retains diagnostic result after shared timer ACK
+  ok   synchronous native completion retains actual shared close debt
+  ok   output callback and capture policy are preserved without port dispatch
+  ok   invalid sparse argv and environment refuse without native calls
+AUDIT_TEST_RESULT	19	0

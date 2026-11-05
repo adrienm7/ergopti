@@ -1,0 +1,144 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source
+
+=== hotstring editor: unreadable source fails closed ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"sends strict-case state to the shared frontend","status":"pass","elapsed_ms":37.144190,"timing_error":""}
+  ok   sends strict-case state to the shared frontend
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"preserves unknown brace groups when loading the shared frontend","status":"pass","elapsed_ms":0.498159,"timing_error":""}
+  ok   preserves unknown brace groups when loading the shared frontend
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"publishes neither a baseline nor a save after a refused read","status":"pass","elapsed_ms":1.058162,"timing_error":""}
+  ok   publishes neither a baseline nor a save after a refused read
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"creates a missing baseline only after an exact committed write","status":"pass","elapsed_ms":1.093855,"timing_error":""}
+  ok   creates a missing baseline only after an exact committed write
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"keeps a readable source read-only when parsing raises","status":"pass","elapsed_ms":0.890659,"timing_error":""}
+  ok   keeps a readable source read-only when parsing raises
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"requires an exact committed parser result before enabling Save","status":"pass","elapsed_ms":1.267807,"timing_error":""}
+  ok   requires an exact committed parser result before enabling Save
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"routes a real editor save through the symlink-safe macOS writer","status":"pass","elapsed_ms":7.846662,"timing_error":""}
+  ok   routes a real editor save through the symlink-safe macOS writer
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"preserves an external edit that wins while the editor is open","status":"pass","elapsed_ms":2.573310,"timing_error":""}
+  ok   preserves an external edit that wins while the editor is open
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"keeps the previous live group and reports a post-save reload refusal","status":"pass","elapsed_ms":0.441253,"timing_error":""}
+  ok   keeps the previous live group and reports a post-save reload refusal
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Personal hotstrings were saved but the live group reload rolled back (the keymap reload API is unavailable).
+[logger] unified log write refused: /tmp/lua_ZsfPtd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_ZsfPtd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_ZsfPtd_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"names why a post-save live reload was refused (hotstring-reload-cause)","status":"pass","elapsed_ms":0.831360,"timing_error":""}
+  ok   names why a post-save live reload was refused (hotstring-reload-cause)
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Deferred menu refresh failed: injected deferred menu refresh failure
+stack traceback:
+	[C]: in function 'error'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:515: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:514>
+	[C]: in function 'xpcall'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:482: in function <...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:481>
+	[C]: in function 'xpcall'
+	...w/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...w/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in field 'fn'
+	...cos-webview/static/ergopti_plus/macos/tests/stubs/hs.lua:133: in method 'fire'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:526: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	...	(skipping 2 levels)
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:499: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:98>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:98: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?.
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"logs a deferred menu-refresh callback failure after a committed save","status":"pass","elapsed_ms":1.771935,"timing_error":""}
+  ok   logs a deferred menu-refresh callback failure after a committed save
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Callback 'Hotstring preference update' raised: preference controller exploded
+stack traceback:
+	[C]: in function 'error'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:546: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:544>
+	[C]: in function 'xpcall'
+	...macos-webview/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:133: in upvalue 'invoke_controller'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:504: in upvalue 'handle_message'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:569: in upvalue 'dispatch'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:84: in upvalue 'dispatch'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:560: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:559>
+	[C]: in function 'xpcall'
+	...	(skipping 4 levels)
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:534: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:98>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:98: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?.
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Callback 'Hotstring focus change' raised: focus controller exploded: true
+stack traceback:
+	[C]: in function 'error'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:550: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:548>
+	[C]: in function 'xpcall'
+	...macos-webview/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:133: in upvalue 'invoke_controller'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:510: in upvalue 'handle_message'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:569: in upvalue 'dispatch'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:84: in upvalue 'dispatch'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:561: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:559>
+	[C]: in function 'xpcall'
+	...	(skipping 4 levels)
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:534: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:98>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:98: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?.
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Callback 'Hotstring focus change' raised: focus controller exploded: false
+stack traceback:
+	[C]: in function 'error'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:550: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:548>
+	[C]: in function 'xpcall'
+	...macos-webview/static/ergopti_plus/macos/infra/logger.lua:1794: in function 'infra.logger.callback'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:133: in upvalue 'invoke_controller'
+	...w/static/ergopti_plus/macos/ui/hotstring_editor/init.lua:609: in field 'on_close'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:562: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:559>
+	[C]: in function 'xpcall'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:559: in upvalue 'callback'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:110: in function <...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:108>
+	...	(skipping 2 levels)
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:534: in function <...ring_windows/test_hotstring_editor_unreadable_source.lua:98>
+	[C]: in function 'pcall'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:815: in function 'tests.helpers.describe'
+	...ring_windows/test_hotstring_editor_unreadable_source.lua:98: in main chunk
+	[C]: in function 'require'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in function <...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181>
+	[C]: in function 'pcall'
+	...w/static/ergopti_plus/_shared/lua/test/runner_timing.lua:80: in field 'measure'
+	...webview/static/ergopti_plus/macos/tests/helpers/init.lua:965: in function 'tests.helpers.measure_module'
+	...05/macos-webview/static/ergopti_plus/macos/tests/run.lua:181: in main chunk
+	[C]: in ?.
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"logs throwing preference and focus controllers exactly once (HS-198)","status":"pass","elapsed_ms":2.540621,"timing_error":""}
+  ok   logs throwing preference and focus controllers exactly once (HS-198)
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Personal hotstrings file could not be read; editor remains read-only (failure content withheld).
+2026-11-05 00:43:18:000 [ERROR] [hotstring_editor] Personal hotstrings save refused because the source is not readable.
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"never invokes the writer for a dangling symlink","status":"pass","elapsed_ms":0.587994,"timing_error":""}
+  ok   never invokes the writer for a dangling symlink
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","name":"tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source","status":"pass","elapsed_ms":59.611946,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  13
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

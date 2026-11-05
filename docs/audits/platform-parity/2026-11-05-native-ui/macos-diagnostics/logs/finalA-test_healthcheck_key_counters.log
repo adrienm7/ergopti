@@ -1,0 +1,27 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_key_counters"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_key_counters
+
+=== healthcheck: key-event counters in the input section (key-event-counters-in-report) ===
+2026-11-05 00:53:36:000 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 3 key-down(s), 2 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 1 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+[logger] unified log write refused: /tmp/lua_xmjzVi_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_xmjzVi_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 3 key-down(s), 2 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 1 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-11-05 00:53:36:000 [WARNING] [key_event_health] Key events that waited behind the main thread passed untouched: no replay, no expansion; session totals: 3 key-down(s), 2 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 1 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-11-05 00:53:36:000 [WARNING] [key_event_health] A Karabiner lease failed (pong); session totals: 3 key-down(s), 2 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 1 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 1 Karabiner lease failure(s) (pong=1).
+2026-11-05 00:53:36:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_key_counters","name":"reports every counter the session recorded, and no key identity","status":"pass","elapsed_ms":45.789620,"timing_error":""}
+  ok   reports every counter the session recorded, and no key identity
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_key_counters","name":"declares each counter in the schema's input section and in the share projection","status":"pass","elapsed_ms":1.993292,"timing_error":""}
+  ok   declares each counter in the schema's input section and in the share projection
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_key_counters","name":"tests.unit.ui.healthcheck.test_healthcheck_key_counters","status":"pass","elapsed_ms":48.131515,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

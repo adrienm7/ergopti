@@ -1,0 +1,31 @@
+  ok   exit and native group absence still wait for every owned close ACK
+  ok   (context-async-private-output) streams bounded private bytes without retaining result bodies
+  ok   (context-async-private-output) counts cumulative streamed bytes even without retained bodies
+  ok   (context-async-private-output) rejects ambiguous retention and preserves legacy defaults
+  ok   (context-async-private-output) stderr and callback failures retain no private bytes
+  ok   (context-async-private-output) private callback exceptions cannot enter diagnostics
+  ok   accepted cancellation signals cannot release a successor
+  ok   a leader with closed pipes cannot hide a remaining descendant group
+  ok   a refused cleanup monitor can be rearmed by the exact owner
+  ok   refused group termination remains exact debt and can be retried
+  ok   refused close receipt does not become retirement
+  ok   malformed close receipt does not become retirement
+  ok   partial allocation preserves its first handle until close acknowledgement
+  ok   an unauthorized source allocates no native resources
+  ok   reentrant source admission cannot overwrite another exact operation
+  ok   source change during allocation refuses dispatch but retains native close debt
+  ok   source changes fence output and completion while retaining cleanup
+  ok   output bound preserves prior bytes and requires physical teardown
+  ok   explicit daemon tail capture remains bounded without killing ordinary output
+  ok   malformed tail capture refuses before native allocation
+  ok   malformed argv refuses before allocation and cannot be silently truncated
+  ok   native spawn refusal waits for handles and completes exactly once
+  ok   default process limit still refuses the measured archive names output
+  ok   captured updater limit admits both measured listing outputs
+  ok   explicit updater listing ceiling still rejects one byte beyond its cap
+
+=== Actual Private Tar Listing Options ===
+  ok   names receive the scalar captured before later policy mutation
+  ok   verbose receives the captured explicit listing ceiling
+  ok   extraction leaves the existing supervisor output ceiling unchanged
+AUDIT_TEST_RESULT	28	0

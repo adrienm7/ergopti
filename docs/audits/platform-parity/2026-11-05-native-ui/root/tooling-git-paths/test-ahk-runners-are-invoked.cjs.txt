@@ -1,0 +1,1 @@
+[32m[OK] All 8 AHK runner(s) under windows/tests are referenced.[0m

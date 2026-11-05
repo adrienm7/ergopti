@@ -1,0 +1,38 @@
+
+=== Diagnostic snapshot: shared contract ===
+  ok   the Lua formatter declares exactly the shared field list, in order
+  ok   every shared vector renders byte for byte
+  ok   renders a path under the home directory relative to ~
+
+=== Diagnostic snapshot: commit lookup ===
+  ok   reads a detached HEAD
+  ok   follows a branch ref in a linked worktree to the common directory
+  ok   falls back to packed-refs
+  ok   answers nil outside a repository
+
+=== linux-diagnostic-read-admission ===
+  ok   linux-diagnostic-read-admission: uses native ports for stamp
+  ok   linux-diagnostic-read-admission: uses native ports for git
+  ok   linux-diagnostic-read-admission: uses native ports for pid
+  ok   linux-diagnostic-read-admission: uses native ports for facts
+
+=== Diagnostic snapshot: Linux collector ===
+  ok   fills every probe it owns from the system files
+  ok   emits one INFO line carrying every shared field
+
+=== Diagnostic snapshot: the daemon boot emits it after ready ===
+  ok   logs the snapshot once the daemon reports ready
+  ok   closes every boot stage it opens
+
+=== snapshot preparation before capture (snapshot-prepared-ready) ===
+  ok   snapshot-prepared-ready emits cached discovery with frozen boot time and whitelisted metadata
+  ok   snapshot-prepared-ready a refused discovery produces no fabricated snapshot
+  ok   snapshot-prepared-ready actual Main prepares ungrabbed then emits only after genuine ready and frozen total
+Error: could not start the keyboard hook.
+  ok   snapshot-prepared-ready actual Main hook_refused never announces ready or emits prepared facts
+  ok   snapshot-prepared-ready actual Main layout_refused never announces ready or emits prepared facts
+  ok   snapshot-prepared-ready stopping during discovery prevents later capture and emission
+  ok   snapshot-prepared-ready an acknowledged stop during daemon.ready suppresses the cached emission
+  ok   snapshot-prepared-ready an acknowledged stop during boot.complete suppresses the cached emission
+  ok   snapshot-prepared-ready optional discovery failure leaves real input ready without a false snapshot
+AUDIT_TEST_RESULT	24	0

@@ -1,0 +1,70 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation
+
+=== hotstring editor malformed saves ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects missing payload before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.133930,"timing_error":""}
+  ok   rejects missing payload before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects false payload before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.992768,"timing_error":""}
+  ok   rejects false payload before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects text payload before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.033900,"timing_error":""}
+  ok   rejects text payload before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects empty object before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.109974,"timing_error":""}
+  ok   rejects empty object before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects missing order before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.795661,"timing_error":""}
+  ok   rejects missing order before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects missing sections before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.939128,"timing_error":""}
+  ok   rejects missing sections before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects sparse order before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.989974,"timing_error":""}
+  ok   rejects sparse order before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid name before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.055192,"timing_error":""}
+  ok   rejects invalid name before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects duplicate name before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.627268,"timing_error":""}
+  ok   rejects duplicate name before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects missing section before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.925046,"timing_error":""}
+  ok   rejects missing section before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects unlisted section before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.977304,"timing_error":""}
+  ok   rejects unlisted section before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects missing entries before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.184777,"timing_error":""}
+  ok   rejects missing entries before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects sparse entries before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.648380,"timing_error":""}
+  ok   rejects sparse entries before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid entry before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.110956,"timing_error":""}
+  ok   rejects invalid entry before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid trigger before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.927760,"timing_error":""}
+  ok   rejects invalid trigger before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid output before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.586942,"timing_error":""}
+  ok   rejects invalid output before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid flag before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":3.356309,"timing_error":""}
+  ok   rejects invalid flag before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid priority before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.903113,"timing_error":""}
+  ok   rejects invalid priority before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid description before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.821219,"timing_error":""}
+  ok   rejects invalid description before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects mapped entry sequence before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.011155,"timing_error":""}
+  ok   rejects mapped entry sequence before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid auto_expand before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":2.001811,"timing_error":""}
+  ok   rejects invalid auto_expand before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid is_case_sensitive before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.627548,"timing_error":""}
+  ok   rejects invalid is_case_sensitive before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid final_result before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.947590,"timing_error":""}
+  ok   rejects invalid final_result before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"rejects invalid is_case_sensitive_strict before persistence (hotstring-save-validation)","status":"pass","elapsed_ms":1.699607,"timing_error":""}
+  ok   rejects invalid is_case_sensitive_strict before persistence (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"accepts an explicitly empty document (hotstring-save-validation)","status":"pass","elapsed_ms":1.889673,"timing_error":""}
+  ok   accepts an explicitly empty document (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"preserves valid fields and separators (hotstring-save-validation)","status":"pass","elapsed_ms":1.868832,"timing_error":""}
+  ok   preserves valid fields and separators (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"does not notify a successor opened by the diagnostic sink (hotstring-save-validation)","status":"pass","elapsed_ms":1.787349,"timing_error":""}
+  ok   does not notify a successor opened by the diagnostic sink (hotstring-save-validation)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","name":"tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation","status":"pass","elapsed_ms":54.979209,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  27
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

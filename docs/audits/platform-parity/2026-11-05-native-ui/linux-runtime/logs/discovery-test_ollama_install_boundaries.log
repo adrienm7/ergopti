@@ -1,0 +1,9 @@
+  ok   changed native ancestry prevents even prerequisite helper dispatch (ollama-install-boundary)
+  ok   source callback ancestor substitution prevents successor dispatch (ollama-install-boundary)
+  ok   exported native admission cannot borrow changed ancestry (ollama-install-boundary)
+  ok   source callback budget exhaustion prevents initial helper dispatch (ollama-install-boundary)
+  ok   native file admission cannot consume the budget then admit stale timeout (ollama-install-boundary)
+  ok   native file owner must bind the captured immutable target (ollama-install-boundary)
+  ok   factory cannot rewrite the captured plan into another target (ollama-install-boundary)
+  ok   public current replacement cannot replace private ancestry admission (ollama-install-boundary)
+AUDIT_TEST_RESULT	8	0

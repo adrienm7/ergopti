@@ -1,0 +1,77 @@
+
+=== Diagnostic UI Integrity Validation ===
+  ✓  Shared: the page loads its helpers, the model and the redactor before its script
+  ✓  Shared: the page has one host entry point, window.receiveDiagnostics
+  ✓  Shared: collection availability reads the host capability, not the driver
+  ✓  Windows: the host states it runs the guided collection
+  ✓  linux/ui/healthcheck/bridge.lua: the host states it runs no guided collection
+  ✓  macos/ui/healthcheck/core.lua: the host states it runs no guided collection
+  ✓  Shared: the page follows a dark system appearance
+  ✓  macOS: the native tap telemetry status is rendered in the developer details
+  ✓  Shared: commit origin, config dir and app dir render under their own labels
+  ✓  macOS: a missing permission renders as a failure with its settings button
+  ✓  Linux: the system rows render their values
+  ✓  Shared: recent issues name their source (errors-file-issues)
+  ✓  Shared: module checks sit in collapsed developer details and a failure reaches the summary
+  ✓  macOS: the window registers the "healthcheck" message handler the page posts to
+  ✓  macOS: nothing polls the page for a copy flag
+  ✓  macOS: no synchronous subprocess in the diagnostics window
+  ✓  Windows: the window subscribes to the page's messages, bound to its epoch
+  ✓  Windows: the native copy button is gone
+  ✓  Windows: no WMI or blocking child on the thread that serves the keyboard hook
+  ✓  Windows: browser failure retains structured native diagnostics
+  ✓  Linux: every page message goes through the shared action allowlist
+  ✓  Linux: no blocking child in the collection or the probes
+  ✓  windows: the configuration probe is started
+  ✓  windows: the github_api probe is started
+  ✓  windows: the proxy_pac probe is started
+  ✓  windows: the ai_health probe is started
+  ✓  windows: the cpu_load probe is started
+  ✓  macos: the configuration probe is started
+  ✓  macos: the github_api probe is started
+  ✓  macos: the proxy_pac probe is started
+  ✓  macos: the ai_health probe is started
+  ✓  macos: the system_details probe is started
+  ✓  macos: the cpu_load probe is started
+  ✓  macos: the bluetooth probe is started
+  ✓  macos: the local_state probe is started
+  ✓  macos: the appleevent_transport probe is started
+  ✓  linux: the configuration probe is started
+  ✓  linux: the github_api probe is started
+  ✓  linux: the proxy_pac probe is started
+  ✓  linux: the ai_health probe is started
+  ✓  linux: the system_details probe is started
+  ✓  linux: the cpu_load probe is started
+  ✓  Shared: the probe check sees every driver's probes
+  ✓  Collection: hotstrings has an explicit result slot
+  ✓  Collection: ai has an explicit result slot
+  ✓  Collection: capture_replay has an explicit result slot
+  ✓  Collection: callbacks has an explicit result slot
+  ✓  Collection: fifo has an explicit result slot
+  ✓  Collection: modifiers has an explicit result slot
+  ✓  Collection: native_render has an explicit result slot
+  ✓  Collection: native_uia has an explicit result slot
+  ✓  Collection: cleanup has an explicit result slot
+  ✓  Collection: every platform uses the same evidence classes
+  ✓  Collection: statuses preserve cancellation and nonexecution
+  ✓  Collection source: producer membership
+  ✓  Collection source inverse: producer membership
+  ✓  Collection source: locked byte identity
+  ✓  Collection source inverse: locked byte identity
+  ✓  Collection source: same stream copy
+  ✓  Collection source inverse: same stream copy
+  ✓  Collection source: private first creation
+  ✓  Collection source inverse: private first creation
+  ✓  Collection source: all text producers
+  ✓  Collection source inverse: all text producers
+  ✓  Collection source: exclusive acquired update
+  ✓  Collection source inverse: exclusive acquired update
+  ✓  Collection source: private native identity
+  ✓  Collection source inverse: private native identity
+  ✓  Collection source: busy progress read
+  ✓  Collection source: primary exit
+  ✓  Collection source inverse: primary exit
+  ✓  Collection source: primary progress
+  ✓  Collection source inverse: primary progress
+
+Results: 73 passed, 0 failed.

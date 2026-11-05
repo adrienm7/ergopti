@@ -1,0 +1,21 @@
+
+=== test_output_continuations ===
+  ok   nonzero redirect body resets only after writer EOF and physical ACK
+  ok   pending parent write refuses redirect reset
+  ok   physical child ACK without actual EOF refuses continuation
+  ok   actual EOF without physical child retirement refuses continuation
+  ok   zero received and committed body permits admitted relay
+  ok   nonzero received but zero committed bytes cannot authorize relay
+  ok   nonzero committed body cannot authorize relay
+  ok   original current source refuses before destructive reset
+  ok   slow final continuation guard consumes original deadline
+  ok   a consumed predecessor cannot reset twice
+  ok   foreign result equality cannot borrow native receipt
+  ok   cancelled native producer cannot continue even after ACK
+  ok   final positive body returns a private completion capability
+  ok   fractional native received count refuses final proof
+  ok   nonfinite native received count refuses final proof
+  ok   empty final archive cannot obtain a sealing capability
+  ok   final completion requires actual EOF and physical producer ACK
+  ok   forged final result cannot borrow a completed producer
+AUDIT_TEST_RESULT	18	0

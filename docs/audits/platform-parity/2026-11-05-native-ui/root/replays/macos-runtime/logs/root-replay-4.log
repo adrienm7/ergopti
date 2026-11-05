@@ -1,0 +1,290 @@
+
+=== owned runtime first install ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"runs the launcher role, then asks pqrs' manager to activate the driver","status":"pass","elapsed_ms":6.295279,"timing_error":""}
+  ok   runs the launcher role, then asks pqrs' manager to activate the driver
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"names each refusal and never activates after one","status":"pass","elapsed_ms":1.816904,"timing_error":""}
+  ok   names each refusal and never activates after one
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"refuses without a launcher and when the manager is absent or fails","status":"pass","elapsed_ms":0.512086,"timing_error":""}
+  ok   refuses without a launcher and when the manager is absent or fails
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"downloads pqrs' driver first when none is installed, and stops when it cannot","status":"pass","elapsed_ms":0.583675,"timing_error":""}
+  ok   downloads pqrs' driver first when none is installed, and stops when it cannot
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"lets a second caller wait for the running install","status":"pass","elapsed_ms":0.091329,"timing_error":""}
+  ok   lets a second caller wait for the running install
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"tests.unit.platform.remap.runtime_install.test_runtime_install","status":"pass","elapsed_ms":9.720319,"timing_error":""}
+
+=== owned runtime driver approval watch ===
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"opens the extension pane once and reloads when the driver is allowed","status":"pass","elapsed_ms":3.547135,"timing_error":""}
+  ok   opens the extension pane once and reloads when the driver is allowed
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"gives up at its deadline without a reload","status":"pass","elapsed_ms":3.025594,"timing_error":""}
+  ok   gives up at its deadline without a reload
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"module","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","status":"pass","elapsed_ms":6.946145,"timing_error":""}
+
+=== VirtualHIDDevice driver update: the confirmed update ===
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"downloads, verifies, installs with administrator rights, then asks for activation","status":"pass","elapsed_ms":6.585268,"timing_error":""}
+  ok   downloads, verifies, installs with administrator rights, then asks for activation
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"downloads over https only into Ergopti's folder, bounded by the pinned size","status":"pass","elapsed_ms":0.337702,"timing_error":""}
+  ok   downloads over https only into Ergopti's folder, bounded by the pinned size
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"installs a root-owned copy only after checking its digest and the pqrs team again","status":"pass","elapsed_ms":0.359495,"timing_error":""}
+  ok   installs a root-owned copy only after checking its digest and the pqrs team again
+
+=== VirtualHIDDevice driver update: named refusals ===
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"refuses an incomplete pin without running anything","status":"pass","elapsed_ms":0.411102,"timing_error":""}
+  ok   refuses an incomplete pin without running anything
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"never prompts for a download of the wrong size or digest","status":"pass","elapsed_ms":0.664667,"timing_error":""}
+  ok   never prompts for a download of the wrong size or digest
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"names a refused download","status":"pass","elapsed_ms":0.293605,"timing_error":""}
+  ok   names a refused download
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"reads the privileged shell's own refusals and a cancelled prompt","status":"pass","elapsed_ms":1.487354,"timing_error":""}
+  ok   reads the privileged shell's own refusals and a cancelled prompt
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"names an activation macOS was not asked for","status":"pass","elapsed_ms":0.275047,"timing_error":""}
+  ok   names an activation macOS was not asked for
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"runs one update at a time and settles every caller","status":"pass","elapsed_ms":0.260265,"timing_error":""}
+  ok   runs one update at a time and settles every caller
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"module","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","status":"pass","elapsed_ms":11.420535,"timing_error":""}
+
+=== owned runtime ports ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"reads a job with a read-only print and maps the unknown-service status to not loaded","status":"pass","elapsed_ms":79.748110,"timing_error":""}
+  ok   reads a job with a read-only print and maps the unknown-service status to not loaded
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"reports a loaded job and treats any other status or a timeout as unknown","status":"pass","elapsed_ms":5.037904,"timing_error":""}
+  ok   reports a loaded job and treats any other status or a timeout as unknown
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"returns the extension listing only when the tool succeeded","status":"pass","elapsed_ms":2.846664,"timing_error":""}
+  ok   returns the extension listing only when the tool succeeded
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"counts the official user-side processes and distinguishes none from unknown","status":"pass","elapsed_ms":4.928078,"timing_error":""}
+  ok   counts the official user-side processes and distinguishes none from unknown
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"binds the consented closer and the capture owner, and no process of its own","status":"pass","elapsed_ms":1.160428,"timing_error":""}
+  ok   binds the consented closer and the capture owner, and no process of its own
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"raises one notice for the first block the user can act on, and none otherwise","status":"pass","elapsed_ms":1.430267,"timing_error":""}
+  ok   raises one notice for the first block the user can act on, and none otherwise
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"offers the first install once by itself and leaves other blocks to the notice","status":"pass","elapsed_ms":1.326019,"timing_error":""}
+  ok   offers the first install once by itself and leaves other blocks to the notice
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"hands the owner the shipped pin: the driver version and the capture declaration","status":"pass","elapsed_ms":2.052490,"timing_error":""}
+  ok   hands the owner the shipped pin: the driver version and the capture declaration
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"names the shipped driver version and no unpinned field from the same manifest","status":"pass","elapsed_ms":1.665363,"timing_error":""}
+  ok   names the shipped driver version and no unpinned field from the same manifest
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"module","module":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","name":"tests.unit.adapters.runtime_owner_ports.test_runtime_owner_ports","status":"pass","elapsed_ms":100.958790,"timing_error":""}
+
+=== owned runtime artifact fetch: the first start ===
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"downloads, verifies, extracts and keeps the pinned artifact in Ergopti's own folder","status":"pass","elapsed_ms":3.693327,"timing_error":""}
+  ok   downloads, verifies, extracts and keeps the pinned artifact in Ergopti's own folder
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"never reads a receipt that does not exist","status":"pass","elapsed_ms":0.330070,"timing_error":""}
+  ok   never reads a receipt that does not exist
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"reports a download that failed as such, after clearing nothing it did not own","status":"pass","elapsed_ms":0.275858,"timing_error":""}
+  ok   reports a download that failed as such, after clearing nothing it did not own
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"downloads over https only, bounded by the pinned size","status":"pass","elapsed_ms":0.277310,"timing_error":""}
+  ok   downloads over https only, bounded by the pinned size
+
+=== owned runtime artifact fetch: named refusals ===
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses an unpinned runtime without running anything","status":"pass","elapsed_ms":0.227515,"timing_error":""}
+  ok   refuses an unpinned runtime without running anything
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses a download of another size before hashing it","status":"pass","elapsed_ms":0.220755,"timing_error":""}
+  ok   refuses a download of another size before hashing it
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses a download whose digest is not the pin and never extracts it","status":"pass","elapsed_ms":0.325804,"timing_error":""}
+  ok   refuses a download whose digest is not the pin and never extracts it
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"refuses an archive holding a link before extracting it","status":"pass","elapsed_ms":0.305553,"timing_error":""}
+  ok   refuses an archive holding a link before extracting it
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"names the failing download with its status","status":"pass","elapsed_ms":0.266303,"timing_error":""}
+  ok   names the failing download with its status
+
+=== owned runtime artifact fetch: then always that one ===
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"uses the kept payload without any command when the receipt matches","status":"pass","elapsed_ms":0.300005,"timing_error":""}
+  ok   uses the kept payload without any command when the receipt matches
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"fetches again when the receipt names another digest","status":"pass","elapsed_ms":0.368839,"timing_error":""}
+  ok   fetches again when the receipt names another digest
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"lets a caller that asks during a fetch wait for that same fetch","status":"pass","elapsed_ms":0.254606,"timing_error":""}
+  ok   lets a caller that asks during a fetch wait for that same fetch
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"judges a listing closed only with every product under the helper bundle","status":"pass","elapsed_ms":6.342490,"timing_error":""}
+  ok   judges a listing closed only with every product under the helper bundle
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"names the helper executable and the products it seals","status":"pass","elapsed_ms":3.677923,"timing_error":""}
+  ok   names the helper executable and the products it seals
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"module","module":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","name":"tests.unit.platform.remap.runtime_artifact_fetch.test_runtime_artifact_fetch","status":"pass","elapsed_ms":18.220558,"timing_error":""}
+
+=== owned runtime owner: dormant until asked ===
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"is uninitialized after loading and binding the ports touches nothing","status":"pass","elapsed_ms":0.838090,"timing_error":""}
+  ok   is uninitialized after loading and binding the ports touches nothing
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"refuses a second initialization instead of replacing the ports","status":"pass","elapsed_ms":0.582753,"timing_error":""}
+  ok   refuses a second initialization instead of replacing the ports
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"rejects ports that miss a capability","status":"pass","elapsed_ms":0.450853,"timing_error":""}
+  ok   rejects ports that miss a capability
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"rejects a start before initialization and invalid start options","status":"pass","elapsed_ms":0.435890,"timing_error":""}
+  ok   rejects a start before initialization and invalid start options
+
+=== owned runtime owner: admission ===
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"admits a complete, compatible, uncontested runtime without starting anything","status":"pass","elapsed_ms":0.571106,"timing_error":""}
+  ok   admits a complete, compatible, uncontested runtime without starting anything
+# lua_timing {"schema":1,"driver":"macos","id":51,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"names an unpinned artifact and starts nothing","status":"pass","elapsed_ms":0.486918,"timing_error":""}
+  ok   names an unpinned artifact and starts nothing
+# lua_timing {"schema":1,"driver":"macos","id":52,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"names the missing file of an incomplete install","status":"pass","elapsed_ms":0.472466,"timing_error":""}
+  ok   names the missing file of an incomplete install
+# lua_timing {"schema":1,"driver":"macos","id":53,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"refuses an incompatible VirtualHIDDevice with both versions named, before any job or process","status":"pass","elapsed_ms":0.468139,"timing_error":""}
+  ok   refuses an incompatible VirtualHIDDevice with both versions named, before any job or process
+# lua_timing {"schema":1,"driver":"macos","id":54,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"refuses a driver signed by another team","status":"pass","elapsed_ms":0.400877,"timing_error":""}
+  ok   refuses a driver signed by another team
+# lua_timing {"schema":1,"driver":"macos","id":55,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"tells an absent, an unapproved and an unreadable driver apart","status":"pass","elapsed_ms":1.320331,"timing_error":""}
+  ok   tells an absent, an unapproved and an unreadable driver apart
+# lua_timing {"schema":1,"driver":"macos","id":56,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"prefers the active copy over a terminated older one","status":"pass","elapsed_ms":0.441378,"timing_error":""}
+  ok   prefers the active copy over a terminated older one
+# lua_timing {"schema":1,"driver":"macos","id":57,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"fails, rather than assuming, when the machine state cannot be read","status":"pass","elapsed_ms":1.218236,"timing_error":""}
+  ok   fails, rather than assuming, when the machine state cannot be read
+# lua_timing {"schema":1,"driver":"macos","id":58,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"names an installed job that launchd has not loaded","status":"pass","elapsed_ms":0.453237,"timing_error":""}
+  ok   names an installed job that launchd has not loaded
+
+=== owned runtime owner: coexistence ===
+# lua_timing {"schema":1,"driver":"macos","id":59,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"does not fight another Karabiner when the close option is off","status":"pass","elapsed_ms":0.417182,"timing_error":""}
+  ok   does not fight another Karabiner when the close option is off
+# lua_timing {"schema":1,"driver":"macos","id":60,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"closes the other Karabiner under the default-on option and re-checks","status":"pass","elapsed_ms":0.401668,"timing_error":""}
+  ok   closes the other Karabiner under the default-on option and re-checks
+# lua_timing {"schema":1,"driver":"macos","id":61,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"reports a Karabiner that survives the request","status":"pass","elapsed_ms":0.474388,"timing_error":""}
+  ok   reports a Karabiner that survives the request
+# lua_timing {"schema":1,"driver":"macos","id":62,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"names a closer that is not bound instead of skipping the check","status":"pass","elapsed_ms":0.420377,"timing_error":""}
+  ok   names a closer that is not bound instead of skipping the check
+# lua_timing {"schema":1,"driver":"macos","id":63,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"fails when the other Karabiner cannot be asked to quit","status":"pass","elapsed_ms":0.450873,"timing_error":""}
+  ok   fails when the other Karabiner cannot be asked to quit
+# lua_timing {"schema":1,"driver":"macos","id":64,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"defaults the close option to on, as ADR 011 decided","status":"pass","elapsed_ms":0.381037,"timing_error":""}
+  ok   defaults the close option to on, as ADR 011 decided
+
+=== owned runtime owner: physical capture admission ===
+# lua_timing {"schema":1,"driver":"macos","id":65,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"refuses an artifact that declares no capture, since the capture is the only way to a Console","status":"pass","elapsed_ms":0.391764,"timing_error":""}
+  ok   refuses an artifact that declares no capture, since the capture is the only way to a Console
+# lua_timing {"schema":1,"driver":"macos","id":66,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"takes no capture option: the user side of the runtime always runs with the capture","status":"pass","elapsed_ms":0.439846,"timing_error":""}
+  ok   takes no capture option: the user side of the runtime always runs with the capture
+
+=== owned runtime owner: results that arrive late ===
+# lua_timing {"schema":1,"driver":"macos","id":67,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"ignores an admission step delivered after a stop","status":"pass","elapsed_ms":0.398974,"timing_error":""}
+  ok   ignores an admission step delivered after a stop
+# lua_timing {"schema":1,"driver":"macos","id":68,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"refuses to start while an admission is in flight","status":"pass","elapsed_ms":0.364782,"timing_error":""}
+  ok   refuses to start while an admission is in flight
+
+=== owned runtime owner: the pinned artifact is fetched first ===
+# lua_timing {"schema":1,"driver":"macos","id":69,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"names a refused fetch and observes nothing else","status":"pass","elapsed_ms":0.480448,"timing_error":""}
+  ok   names a refused fetch and observes nothing else
+# lua_timing {"schema":1,"driver":"macos","id":70,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"admits after a fetch and names the waiting payload when the install is missing","status":"pass","elapsed_ms":0.414919,"timing_error":""}
+  ok   admits after a fetch and names the waiting payload when the install is missing
+# lua_timing {"schema":1,"driver":"macos","id":71,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"ignores a fetch that settles after a stop","status":"pass","elapsed_ms":0.450824,"timing_error":""}
+  ok   ignores a fetch that settles after a stop
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"module","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","name":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_admission","status":"pass","elapsed_ms":14.871214,"timing_error":""}
+
+=== owned runtime owner: the capture request ===
+# lua_timing {"schema":1,"driver":"macos","id":73,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a request before admission and starts nothing","status":"pass","elapsed_ms":0.520609,"timing_error":""}
+  ok   refuses a request before admission and starts nothing
+# lua_timing {"schema":1,"driver":"macos","id":74,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a request after an unavailable admission","status":"pass","elapsed_ms":0.518506,"timing_error":""}
+  ok   refuses a request after an unavailable admission
+# lua_timing {"schema":1,"driver":"macos","id":75,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"does not start the capture while the owned configuration is missing","status":"pass","elapsed_ms":0.424243,"timing_error":""}
+  ok   does not start the capture while the owned configuration is missing
+# lua_timing {"schema":1,"driver":"macos","id":76,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"requests the pinned capture once and spawns no process of its own","status":"pass","elapsed_ms":0.410381,"timing_error":""}
+  ok   requests the pinned capture once and spawns no process of its own
+# lua_timing {"schema":1,"driver":"macos","id":77,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is ready only once the capture admits its first stream","status":"pass","elapsed_ms":0.476783,"timing_error":""}
+  ok   is ready only once the capture admits its first stream
+# lua_timing {"schema":1,"driver":"macos","id":78,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is idempotent once ready and shares one start between callers","status":"pass","elapsed_ms":0.553068,"timing_error":""}
+  ok   is idempotent once ready and shares one start between callers
+# lua_timing {"schema":1,"driver":"macos","id":79,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails without a retry when the capture refuses to start","status":"pass","elapsed_ms":0.753141,"timing_error":""}
+  ok   fails without a retry when the capture refuses to start
+# lua_timing {"schema":1,"driver":"macos","id":80,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails once, and revokes the capture, when no stream is admitted in time","status":"pass","elapsed_ms":0.575442,"timing_error":""}
+  ok   fails once, and revokes the capture, when no stream is admitted in time
+# lua_timing {"schema":1,"driver":"macos","id":81,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails when the capture ends before it admitted a stream","status":"pass","elapsed_ms":0.463863,"timing_error":""}
+  ok   fails when the capture ends before it admitted a stream
+# lua_timing {"schema":1,"driver":"macos","id":82,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"treats an unreadable capture status as a lost capture, never as progress","status":"pass","elapsed_ms":0.516904,"timing_error":""}
+  ok   treats an unreadable capture status as a lost capture, never as progress
+# lua_timing {"schema":1,"driver":"macos","id":83,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"fails and revokes the capture when the readiness check cannot be scheduled","status":"pass","elapsed_ms":0.551356,"timing_error":""}
+  ok   fails and revokes the capture when the readiness check cannot be scheduled
+
+=== owned runtime owner: a lost capture ===
+# lua_timing {"schema":1,"driver":"macos","id":84,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"reports the loss once, revokes the capture and never restarts by itself","status":"pass","elapsed_ms":0.597175,"timing_error":""}
+  ok   reports the loss once, revokes the capture and never restarts by itself
+# lua_timing {"schema":1,"driver":"macos","id":85,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"answers the waiting callers with the loss when it happens before readiness","status":"pass","elapsed_ms":0.740843,"timing_error":""}
+  ok   answers the waiting callers with the loss when it happens before readiness
+# lua_timing {"schema":1,"driver":"macos","id":86,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"ignores a loss report while nothing was started, after a stop and after a release","status":"pass","elapsed_ms":0.445105,"timing_error":""}
+  ok   ignores a loss report while nothing was started, after a stop and after a release
+# lua_timing {"schema":1,"driver":"macos","id":87,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a new admission while the lost capture is retained","status":"pass","elapsed_ms":0.561391,"timing_error":""}
+  ok   refuses a new admission while the lost capture is retained
+
+=== owned runtime owner: stop ===
+# lua_timing {"schema":1,"driver":"macos","id":88,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"stops the capture and settles only when it is observed settled","status":"pass","elapsed_ms":0.451775,"timing_error":""}
+  ok   stops the capture and settles only when it is observed settled
+# lua_timing {"schema":1,"driver":"macos","id":89,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"retries the same capture while its stop is pending and never starts another","status":"pass","elapsed_ms":0.523744,"timing_error":""}
+  ok   retries the same capture while its stop is pending and never starts another
+# lua_timing {"schema":1,"driver":"macos","id":90,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"cancels the readiness poll and answers the waiting callers","status":"pass","elapsed_ms":0.541230,"timing_error":""}
+  ok   cancels the readiness poll and answers the waiting callers
+# lua_timing {"schema":1,"driver":"macos","id":91,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"settles at once when nothing was started","status":"pass","elapsed_ms":0.439375,"timing_error":""}
+  ok   settles at once when nothing was started
+# lua_timing {"schema":1,"driver":"macos","id":92,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"is idempotent once stopped and never calls the observer twice","status":"pass","elapsed_ms":0.470323,"timing_error":""}
+  ok   is idempotent once stopped and never calls the observer twice
+# lua_timing {"schema":1,"driver":"macos","id":93,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a second, different stop observer while one is pending","status":"pass","elapsed_ms":0.494680,"timing_error":""}
+  ok   refuses a second, different stop observer while one is pending
+# lua_timing {"schema":1,"driver":"macos","id":94,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"restarts only on request, through a settled stop, and asks the capture port again","status":"pass","elapsed_ms":0.447247,"timing_error":""}
+  ok   restarts only on request, through a settled stop, and asks the capture port again
+# lua_timing {"schema":1,"driver":"macos","id":95,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"names the capture port's refusal of a second capture in one Lua VM instead of hiding it","status":"pass","elapsed_ms":0.467078,"timing_error":""}
+  ok   names the capture port's refusal of a second capture in one Lua VM instead of hiding it
+# lua_timing {"schema":1,"driver":"macos","id":96,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses a restart while the previous stop is pending","status":"pass","elapsed_ms":0.444283,"timing_error":""}
+  ok   refuses a restart while the previous stop is pending
+
+=== owned runtime owner: release ===
+# lua_timing {"schema":1,"driver":"macos","id":97,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"refuses while a capture is retained and allows a new binding after the stop","status":"pass","elapsed_ms":0.410162,"timing_error":""}
+  ok   refuses while a capture is retained and allows a new binding after the stop
+# lua_timing {"schema":1,"driver":"macos","id":72,"kind":"module","module":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","name":"tests.unit.platform.remap.runtime_owner.test_runtime_owner_lifecycle","status":"pass","elapsed_ms":13.956418,"timing_error":""}
+
+=== runtime-selected Karabiner paths ===
+# lua_timing {"schema":1,"driver":"macos","id":99,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"names the shared tool until a caller selects the owned runtime","status":"pass","elapsed_ms":0.197289,"timing_error":""}
+  ok   names the shared tool until a caller selects the owned runtime
+# lua_timing {"schema":1,"driver":"macos","id":100,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"keeps the shared tool after selecting shared, as the default boot does","status":"pass","elapsed_ms":0.059951,"timing_error":""}
+  ok   keeps the shared tool after selecting shared, as the default boot does
+# lua_timing {"schema":1,"driver":"macos","id":101,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"points every variable writer at the owned tool after an explicit selection","status":"pass","elapsed_ms":0.084858,"timing_error":""}
+  ok   points every variable writer at the owned tool after an explicit selection
+# lua_timing {"schema":1,"driver":"macos","id":102,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"refuses to switch runtime inside one Lua VM and refuses unknown names","status":"pass","elapsed_ms":0.100382,"timing_error":""}
+  ok   refuses to switch runtime inside one Lua VM and refuses unknown names
+# lua_timing {"schema":1,"driver":"macos","id":103,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"never places the owned runtime under the official application's directory","status":"pass","elapsed_ms":0.050436,"timing_error":""}
+  ok   never places the owned runtime under the official application's directory
+
+=== the remap bridge reaches the owned runtime only after an opt-in ===
+# lua_timing {"schema":1,"driver":"macos","id":104,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"never requires the owner or its ports at load time","status":"pass","elapsed_ms":3.925609,"timing_error":""}
+  ok   never requires the owner or its ports at load time
+# lua_timing {"schema":1,"driver":"macos","id":105,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"binds the owner only inside the opt-in bind function","status":"pass","elapsed_ms":3.117289,"timing_error":""}
+  ok   binds the owner only inside the opt-in bind function
+# lua_timing {"schema":1,"driver":"macos","id":106,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"reaches the activation rule only behind the opt-in, at boot, on pause and on resume","status":"pass","elapsed_ms":0.623094,"timing_error":""}
+  ok   reaches the activation rule only behind the opt-in, at boot, on pause and on resume
+# lua_timing {"schema":1,"driver":"macos","id":107,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"never ties the owned runtime to the Tap-Hold or integration switches","status":"pass","elapsed_ms":2.249969,"timing_error":""}
+  ok   never ties the owned runtime to the Tap-Hold or integration switches
+# lua_timing {"schema":1,"driver":"macos","id":108,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"gives a closed Karabiner back on a quit but never on a reload","status":"pass","elapsed_ms":0.458775,"timing_error":""}
+  ok   gives a closed Karabiner back on a quit but never on a reload
+# lua_timing {"schema":1,"driver":"macos","id":109,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"selects Ergopti's own runtime when the preference is absent, from the one default","status":"pass","elapsed_ms":36.680411,"timing_error":""}
+  ok   selects Ergopti's own runtime when the preference is absent, from the one default
+# lua_timing {"schema":1,"driver":"macos","id":110,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"generates nothing for an owned boot until the owner admitted the runtime","status":"pass","elapsed_ms":3.136372,"timing_error":""}
+  ok   generates nothing for an owned boot until the owner admitted the runtime
+# lua_timing {"schema":1,"driver":"macos","id":111,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"skips the official-application wizard for an owned boot","status":"pass","elapsed_ms":0.282569,"timing_error":""}
+  ok   skips the official-application wizard for an owned boot
+# lua_timing {"schema":1,"driver":"macos","id":112,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"removes an earlier build's rules from the user's own karabiner.json on an owned boot","status":"pass","elapsed_ms":0.800493,"timing_error":""}
+  ok   removes an earlier build's rules from the user's own karabiner.json on an owned boot
+# lua_timing {"schema":1,"driver":"macos","id":113,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"saves a bulk edit for the admission instead of reverting it while ours is not admitted","status":"pass","elapsed_ms":0.466316,"timing_error":""}
+  ok   saves a bulk edit for the admission instead of reverting it while ours is not admitted
+# lua_timing {"schema":1,"driver":"macos","id":114,"kind":"case","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"deploys an owned boot only through the owned writer","status":"pass","elapsed_ms":0.229167,"timing_error":""}
+  ok   deploys an owned boot only through the owned writer
+# lua_timing {"schema":1,"driver":"macos","id":98,"kind":"module","module":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","name":"tests.unit.platform.remap.runtime_owner.test_runtime_dormant","status":"pass","elapsed_ms":53.299128,"timing_error":""}
+
+=== owned runtime activation: what « wanted » means ===
+# lua_timing {"schema":1,"driver":"macos","id":116,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"is running and not paused, and nothing else","status":"pass","elapsed_ms":3.576550,"timing_error":""}
+  ok   is running and not paused, and nothing else
+
+=== owned runtime activation: Ergopti runs ===
+# lua_timing {"schema":1,"driver":"macos","id":117,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"starts Ergopti's runtime with the user's consent to close theirs","status":"pass","elapsed_ms":0.208847,"timing_error":""}
+  ok   starts Ergopti's runtime with the user's consent to close theirs
+# lua_timing {"schema":1,"driver":"macos","id":118,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"does not start a second time while the runtime starts or runs","status":"pass","elapsed_ms":0.259563,"timing_error":""}
+  ok   does not start a second time while the runtime starts or runs
+# lua_timing {"schema":1,"driver":"macos","id":119,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"records and announces a close only when Karabiner's own quit succeeded","status":"pass","elapsed_ms":0.084198,"timing_error":""}
+  ok   records and announces a close only when Karabiner's own quit succeeded
+
+=== owned runtime activation: Ergopti paused ===
+# lua_timing {"schema":1,"driver":"macos","id":120,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"stops Ergopti's runtime and gives back the Karabiner it closed","status":"pass","elapsed_ms":0.081003,"timing_error":""}
+  ok   stops Ergopti's runtime and gives back the Karabiner it closed
+# lua_timing {"schema":1,"driver":"macos","id":121,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"never starts or restores anything when Ergopti closed nothing","status":"pass","elapsed_ms":0.142916,"timing_error":""}
+  ok   never starts or restores anything when Ergopti closed nothing
+# lua_timing {"schema":1,"driver":"macos","id":122,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"keeps the record after a crash and gives the Karabiner back at the next pause","status":"pass","elapsed_ms":0.091209,"timing_error":""}
+  ok   keeps the record after a crash and gives the Karabiner back at the next pause
+# lua_timing {"schema":1,"driver":"macos","id":123,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"keeps the record when the restore is refused, so a later try can succeed","status":"pass","elapsed_ms":0.140323,"timing_error":""}
+  ok   keeps the record when the restore is refused, so a later try can succeed
+
+=== owned runtime activation: Ergopti resumes ===
+# lua_timing {"schema":1,"driver":"macos","id":124,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"reloads instead of starting a second capture in the same Lua VM","status":"pass","elapsed_ms":0.086782,"timing_error":""}
+  ok   reloads instead of starting a second capture in the same Lua VM
+# lua_timing {"schema":1,"driver":"macos","id":125,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"starts again in place when no earlier start reached the capture","status":"pass","elapsed_ms":0.065419,"timing_error":""}
+  ok   starts again in place when no earlier start reached the capture
+# lua_timing {"schema":1,"driver":"macos","id":115,"kind":"module","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","status":"pass","elapsed_ms":5.402437,"timing_error":""}
+GROUP modules=9 passed=116 failed=0

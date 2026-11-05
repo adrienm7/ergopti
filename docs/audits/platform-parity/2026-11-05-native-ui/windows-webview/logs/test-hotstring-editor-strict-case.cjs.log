@@ -1,0 +1,8 @@
+
+=== Hotstring Editor Strict-Case Preservation ===
+  ✓  persist carries strict-case state to every host bridge
+  ✓  editing with the case box checked keeps the entry strict
+  ✓  a new entry with the case box checked matches its exact case
+  ✓  unchecking the case box clears an existing strict entry
+
+Results: 4 passed, 0 failed.

@@ -1,0 +1,35 @@
+{
+	"schema_version": 1,
+	"scope": "ahk",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/ahk/2026_11_05/report.md",
+	"findings": [
+		{
+			"title": "Personal editor save refusal emits invalid JavaScript and leaves Saved visible",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Open the personal editor through OpenPersonalEditor with WebView2 available. Suspend the driver after initialization. Add/edit an entry and save using the page. persist() posts save and immediately shows the common.saved toast. _HsEdWeb_OnWebMessage admits the suspended refusal timer; _HsEdWeb_ShowSaveFailure emits e.textContent=\"\"<translated error>\"\", which is invalid JavaScript, so the refusal never replaces Saved. The suspended route does not invoke _HsEdWeb_ReportSaveFailure's notification backstop. Run node probes/refusal-script.cjs <source-root> for exact-source emission and actual persist() receipts.",
+			"root_cause": "personal_toml_editor_webview.ahk:_HsEdWeb_ShowSaveFailure treats _HsEdWeb_JsStr/JsonStringLiteral's complete JSON literal as escaped string contents and wraps it in another pair of quotes. Every nonempty translated message produces a JavaScript syntax error.",
+			"silent_failure": "The page displays success before host persistence. WebView_RunScriptAsync observes native transport completion, not JS evaluation success; this path has no application acknowledgment. Ordinary durable-write refusal has a separate notifier, but the suspended/initial-not-ready refusal uses only this broken script.",
+			"regression_test": "Execute the actual refusal-script emission in a JS VM with ordinary, accented, quote and backslash text, assert the toast's exact error content, and drive suspended save through the real bridge boundary asserting zero physical writes and visible failure. Require positive native submission and JS application receipts separately.",
+			"id": "AHK-001",
+			"campaign_id": "WVB-001",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md"
+		},
+		{
+			"title": "Hotstring settings replace an unlimited zero delay with the default in the displayed control",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "In the hotstring category settings window set a category or section delay to 0 and let the host push its rebuilt state, or open a category already configured with delay_unlimited=true. Native _HCWWeb_FieldsJson returns delay_ms:0; actual shared bindDelay renders the positive default (normally750) instead. Run node probes/zero-delay.cjs <source-root>; category and section zero display750, while25/750 controls remain exact. Changing the displayed field thereafter uses the displayed positive value, no longer the persisted unlimited setting.",
+			"root_cause": "_shared/ui/hotstrings_config_window/script.js:bindDelay assigns input.value = ms || defaultMs and also computes the default with ||. Numeric0 is a supported unlimited delay, not an absent value; truthiness erases it. Windows serializer deliberately preserves0, resolver accepts it, and _HotstringsDelayLine encodes it as delay_unlimited=true.",
+			"silent_failure": "Rendering produces no exception and all bridge commands exist. The control remains marked overridden while showing another effective value. Existing focused bridge gates pass and do not assert rendered numeric-zero state.",
+			"regression_test": "Drive actual bindDelay and state rebuild with category and section delay0, nonzero delay, absent delay, and nonzero/zero defaults. Assert exact input.value and subsequent command payload. Assert the physical unlimited flag survives reopen and the UI predicts unlimited behavior.",
+			"id": "AHK-002",
+			"campaign_id": "WVB-002",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-webview/report.md"
+		}
+	]
+}

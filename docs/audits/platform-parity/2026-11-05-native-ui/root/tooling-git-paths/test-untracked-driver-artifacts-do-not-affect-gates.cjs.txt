@@ -1,0 +1,1 @@
+[32m[OK] all 4 commit-candidate gates ignore untracked artifacts; staged platform asymmetry still fails.[0m

@@ -1,0 +1,9 @@
+tools/lib/git-paths.cjs 62ms (unchanged)
+tools/test/test-git-paths.cjs 44ms
+tools/test/test-ahk-runners-are-invoked.cjs 20ms (unchanged)
+tools/test/test-no-plan-refs-in-source.cjs 11ms (unchanged)
+tools/test/test-source-trees-are-scanned.cjs 15ms
+tools/test/test-drift-guard-covers-every-output.cjs 18ms (unchanged)
+tools/test/test-ahk-runner-scan-streaming.cjs 12ms
+tools/test/features/test-infrastructure/suite.json 16ms (unchanged)
+package.json 9ms (unchanged)

@@ -1,0 +1,13 @@
+PASS native diagnostic stamp regular
+PASS native diagnostic stamp file-link
+PASS native diagnostic stamp fifo
+PASS native diagnostic stamp fifo-link
+PASS native diagnostic stamp fifo-peer
+PASS native diagnostic stamp directory
+Traceback (most recent call last):
+  File "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_diagnostic_source_receipts.py", line 143, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_diagnostic_source_receipts.py", line 84, in main
+    owner.bind(str(endpoint))
+OSError: AF_UNIX path too long

@@ -1,0 +1,40 @@
+Selecting exact test module: "tests.meta.corpus.test_corpus_healthcheck_snapshot"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.meta.corpus.test_corpus_healthcheck_snapshot
+
+=== healthcheck snapshot corpus — integrity ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"every vector belongs to a category someone replays","status":"pass","elapsed_ms":0.008372,"timing_error":""}
+  ok   every vector belongs to a category someone replays
+
+=== healthcheck snapshot corpus — vector replay ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"extract_recent_issues: issues_empty","status":"pass","elapsed_ms":0.002334,"timing_error":""}
+  ok   extract_recent_issues: issues_empty
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"extract_recent_issues: issues_no_match","status":"pass","elapsed_ms":0.003726,"timing_error":""}
+  ok   extract_recent_issues: issues_no_match
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"extract_recent_issues: issues_all_match","status":"pass","elapsed_ms":0.003986,"timing_error":""}
+  ok   extract_recent_issues: issues_all_match
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"extract_recent_issues: issues_trimmed","status":"pass","elapsed_ms":0.005768,"timing_error":""}
+  ok   extract_recent_issues: issues_trimmed
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_complete_windows","status":"pass","elapsed_ms":0.008382,"timing_error":""}
+  ok   check_fields: check_fields_complete_windows
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_platform_field_on_another_driver","status":"pass","elapsed_ms":0.007702,"timing_error":""}
+  ok   check_fields: check_fields_platform_field_on_another_driver
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_linux_needs_its_platform_field","status":"pass","elapsed_ms":0.006230,"timing_error":""}
+  ok   check_fields: check_fields_linux_needs_its_platform_field
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_probe_and_opt_in_fields_may_be_absent","status":"pass","elapsed_ms":0.004978,"timing_error":""}
+  ok   check_fields: check_fields_probe_and_opt_in_fields_may_be_absent
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_missing_section","status":"pass","elapsed_ms":0.005368,"timing_error":""}
+  ok   check_fields: check_fields_missing_section
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"check_fields: check_fields_unknown_section_and_field","status":"pass","elapsed_ms":0.006259,"timing_error":""}
+  ok   check_fields: check_fields_unknown_section_and_field
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.meta.corpus.test_corpus_healthcheck_snapshot","name":"tests.meta.corpus.test_corpus_healthcheck_snapshot","status":"pass","elapsed_ms":1.386788,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  11
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

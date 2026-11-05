@@ -1,0 +1,19 @@
+
+=== infra/fd_sha256 generated native descriptor ===
+  ok   future ABI4 identity refuses before native lookup
+  ok   numeric old ABI1 identity refuses before native lookup
+  ok   missing projection refuses before native lookup
+  ok   missing digest descriptor refuses before native lookup
+  ok   invalid descriptor type refuses before native lookup
+  ok   wrong schema refuses before native lookup
+  ok   empty identity refuses before native lookup
+  ok   path identity refuses before native lookup
+  ok   wrong library family refuses before native lookup
+  ok   old dotted ABI identity refuses before native lookup
+  ok   metatable descriptor cannot fabricate fields
+
+=== platform/network/digest_probe exact raw descriptor ===
+  ok   probe future ABI4 refuses before FFI lookup
+  ok   probe numeric old ABI1 refuses before FFI lookup
+  ok   probe metatable descriptor refuses before FFI lookup
+AUDIT_TEST_RESULT	14	0

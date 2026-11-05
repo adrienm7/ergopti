@@ -1,0 +1,9 @@
+  ok   actual native enable accepts exact revision and app lifetime (ollama-runtime)
+  ok   actual native enable refuses pause callback successor app epoch (ollama-runtime)
+  ok   actual native restore refuses pause callback successor app epoch (ollama-runtime)
+  ok   actual native enable refuses pause callback revision advance (ollama-runtime)
+  ok   actual native restore accepts exact originating claim (ollama-runtime)
+  ok   actual final native admission rechecks observer app epoch drift (ollama-runtime)
+  ok   actual final native admission rechecks observer scope ownership (ollama-runtime)
+  ok   actual final native admission observes source after pause callback intent (ollama-runtime)
+AUDIT_TEST_RESULT	8	0

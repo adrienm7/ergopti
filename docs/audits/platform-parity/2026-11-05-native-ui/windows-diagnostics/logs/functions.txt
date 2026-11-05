@@ -1,0 +1,244 @@
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:40:_HCActions_BoundedText(Value, Max) {
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:50:_HCActions_PathIds(Schema, Driver) {
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:72:_HCActions_ValidName(Name, Report) {
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:90:_HCActions_Flag(Message, Key) {
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:100:_HCActions_Refuse(Reason) {
+static/ergopti_plus/windows/ui/healthcheck/actions.ahk:120:HealthCheck_ValidateAction(Message, Context) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:38:_DayLog_BlockLines() {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:45:DayLog_CheckLimits(Limits) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:59:_DayLog_Cut(Line, MaxChars) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:81:DayLog_Collect(Raw, FileSize, Rules, Context, Limits) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:154:_DayLog_State() {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:163:_DayLog_ReadToday(Cap) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:176:_DayLog_Reply(Result) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:192:HealthCheck_DayLogDiscard(Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:207:HealthCheck_DayLogPrepare(Snapshot, Config, Context, Reader := 0) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:233:HealthCheck_DayLogRetained(Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/day_log.ahk:244:HealthCheck_DayLogName(Config, Safe) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:45:_HCConfig_CharacterCount(Text) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:59:_HCConfig_NumberText(Value) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:73:_HCConfig_Lookup(Document, Path) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:88:_HCConfig_Reduce(Path, Value, EnumValues) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:127:HealthCheck_ConfigurationRows(Features, Document, Driver, Limit) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:183:_HCConfig_PathOf(Id) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:199:HealthCheck_ConfigurationFiles(Ids, PathOf) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:239:HealthCheck_CollectConfiguration(Schema, PathOf := _HCConfig_PathOf) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:265:HealthCheck_ConfigurationProbe(Schema, Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/configuration.ahk:286:HealthCheck_CompleteConfiguration(Snapshot, Schema, Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:39:_HCShare_SettingRow(Value) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:58:_HCShare_Project(Value, Rule, &Present) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:145:HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:194:HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog := false) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:214:HealthCheck_PageChecks(Results, Schema) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:250:HealthCheck_CapturePageChecks(Snapshot, Action) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:261:_HCShare_Rows(Value, Rule, Prefix, Rows) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:281:_HCShare_Cell(Value) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:285:_HCShare_Table(Rows, Title := "") {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:295:_HCShare_Readable(Safe, Schema) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:336:_HCShare_English(Schema, Key) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:348:_HCShare_FormVersion(Safe, Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:364:_HCShare_FormOs(Safe) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:385:HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:422:_HCReport_Save(Dir, Name, Text, WriterFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:437:_HCReport_Start(CommandLine) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:449:_HCReport_Reveal(Path) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:455:_HCReport_Open(Path) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:460:_HCReport_Notify(Title, Body, Kind) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:469:_HCReport_Identity() {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:478:_HCReport_Effects(Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:500:HealthCheck_RedactionContext(Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:522:_HCReport_SaveAndReveal(Effects, Paths, Name, Text, LogFile := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:542:_HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:568:HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:656:HealthCheck_ReportBug(Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/report.ahk:685:HealthCheck_SuggestFeature(Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:43:class HealthCheckWindowControl {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:158:HealthCheck_StartWindowControl() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:182:HealthCheck_StopWindowControl() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:191:_HealthCheck_WindowControlReady() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:211:_HealthCheck_AdapterSpecs() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:234:_HealthCheck_ModuleCheck() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:267:HealthCheck_RecordError(Msg) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:281:HealthCheck_RecordWarn() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:303:HealthCheck_Config() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:348:_HealthCheck_Collect(Name, Collector, Fallback, Timings := 0) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:369:_HealthCheck_SlowestCollectors(Timings, Count) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:386:_HealthCheck_Issues() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:403:_HealthCheck_Developer() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:419:_HealthCheck_PendingProbes(Schema, Selected := true) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:431:_HealthCheck_NowMs() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:445:HealthCheck_Run(Detailed := false, Extensive := false) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:519:HealthCheck_FormatPlain(Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:533:_HealthCheck_PlainValue(Value) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:553:_HealthCheck_Applies(Entry, Driver := "windows") {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:566:_HealthCheck_HasProbe(Field, Driver) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:581:HealthCheck_CheckFields(Snapshot, Schema) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:620:_HealthCheck_SortedLines(Text) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:679:_HC_CanReuse(Key) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:687:_HC_ResumePending(Serial) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:695:_HC_NewWindow() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:700:_HC_OpenTimingMark(Phase, Timing) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:716:HealthCheck_ShowWindow() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:859:_HC_ShowNativeSnapshot(G, Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:892:_HC_NativeCollectionControls(G) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:911:_HC_NativeCollectionAction(Action, *) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:924:_HC_NativeCollectionUpdate(G) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:943:_HC_NativeSnapshotText(Snapshot) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:948:_HC_NativeSaveSnapshot(Snapshot, *) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:965:_HC_NativeAddValue(Tree, Label, Value, Parent) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:977:_HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:996:_HealthCheck_CloseGui(G, UserRequest := true) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1039:_HC_OnWebMessage(WindowEpoch, Handler, Args) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1060:_HC_HandleMessage(WindowEpoch, Raw) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1111:_HC_ArchiveCleanupMetadata(Session) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1137:_HC_PerformPageAction(WindowEpoch, Action, Config) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1235:_HC_InitJson(Session) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1250:_HC_Send(WindowEpoch, Json) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1262:_HC_SessionCurrent(WindowEpoch, Session) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1271:_HC_RestartProbes(WindowEpoch, StartFn := unset) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1303:_HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1324:_HC_ValueToJson(Val) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1350:_HC_JsStr(s) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1354:_HC_Join(Arr, Sep) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1370:_HC_Close() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1384:_HC_Reset() {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1406:_HC_ManagedTerminalCurrent(Owner) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1413:_HC_ShowManagedFailure(WindowEpoch, Id, Result, Report, PresentFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/core.ahk:1420:_HC_RetryManaged(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:48:_CrashReportWorkerLogError(FormatString, Args*) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:62:class _CrashReportMappingNative {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:105:_CrashReportWorkerQueueMappingDebt(Mapping) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:149:_CrashReportWorkerCreateMapping(Payload, OwnerId) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:218:_CrashReportWorkerPowerShellPath() {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:222:_CrashReportWorkerSpawnOwned(Executable, Args, Done) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:228:_CrashReportWorkerPrimaryArgs(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:243:_CrashReportWorkerFallbackArgs(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:262:_CrashReportWorkerClaim(OwnerId, ExpectedOwner := 0) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:277:_CrashReportWorkerDisarmDeadline(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:290:_CrashReportWorkerDeadlineTick(Owner, Attempt, TimerFn := SetTimer) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:354:_CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:394:_CrashReportWorkerCancelPendingTask(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:408:_CrashReportWorkerFinish(Owner, ExitCode, Stdout, Stderr) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:419:_CrashReportWorkerStartAttempt(Owner, Phase, Args) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:513:CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:561:_CrashReportWorkerCancelOwner(Owner) {
+static/ergopti_plus/windows/adapters/crash_report_worker.ahk:596:CrashReportWorker_StopAll() {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:53:HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides := 0, CurrentFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:86:HealthCheck_CancelProbes(CurrentFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:114:_HC_ProbeStarted(Id, Detail) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:124:_HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:152:_HC_ProbeHttp(Run, Id, Url, Headers, TimeoutMs, Interpret) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:159:_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:197:_HC_ManagedRunCurrent(Run) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:203:_HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:208:_HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset, ArmPollFn := unset) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:243:_HC_HttpFailure(Status) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:249:_HC_GithubAnswer(Status, Body) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:266:_HC_ProbePac(Run, Config) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:279:_HC_PacUrl() {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:289:_HC_PacAnswer(Status, Body) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:302:_HC_PacBindRequest(Request, Interpret) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:314:_HC_PacManagedDone(Request, ExitCode, Stdout, Stderr) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:326:_HC_PacInterpret(Request, Interpret, Status, Body) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:347:_HC_PacReadSource(Path) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:360:_HC_PacDecodeSource(Raw, Maximum) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:416:_HC_ProbeAi(Run, Config) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:437:_HC_AiAnswer(Status, Body) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:461:_HC_ProbeCpu(Run, Config) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:477:_HC_ProbeCpuSample(Run, Before, Started) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:495:_HC_CpuTimes() {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:513:HealthCheck_CpuShares(Before, After) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:540:_HC_ProbeConfiguration(Run, Config, Overrides := 0) {
+static/ergopti_plus/windows/ui/healthcheck/probes.ahk:547:_HC_ProbeConfigurationRun(Run, Started, Overrides) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:92:CrashReport_Build(ErrorObj) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:266:CrashReport_Dir() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:275:CrashReport_Save(Report, WriterFn := 0) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:319:CrashReport_PruneReports() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:342:CrashReport_ExpiredNames(Names, Limit := CRASH_REPORT_MAX_REPORTS) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:370:CrashReport_PromptUser(Report) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:397:_CrashReport_ReservedPaths() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:405:_CrashReport_Stem(Timestamp) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:415:_CrashReport_FileName(Stem, Attempt := 1) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:422:_CrashReport_ParseName(Name) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:433:_CrashReport_SysInfo(Hardware := 0) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:494:_CrashReport_IsoTimestamp() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:502:_CrashReport_CanonicalFields() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:515:_CrashReport_ToJson(Report) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:523:_CrashReport_ToWorkerJson(Report) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:530:_CrashReport_EncodeFields(Report, Trailing) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:550:_CrashReport_JoinParts(Parts) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:560:_CrashReport_StuckModifiers() {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:576:_CrashReport_JoinArr(Arr) {
+static/ergopti_plus/windows/modules/diagnostics/crash_reporter.ahk:586:_CrashReport_JoinNewlines(Lines) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:36:DiagSnapshot_Fields() {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:46:DiagSnapshot_CollectionIdentity() {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:80:DiagSnapshot_ResidentObservations(Contract := 0) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:137:_DiagSnapshot_ResidentRow(Id, Fields, Preconditions) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:149:DiagSnapshot_Module() {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:156:DiagSnapshot_RenderValue(Value?) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:172:DiagSnapshot_Format(Values) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:186:DiagSnapshot_RedactHome(Path, Home) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:211:_DiagSnapshot_ReadTrimmed(Path) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:230:DiagSnapshot_GitCommit(StartDir, Full := false) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:284:DiagSnapshot_BuildCommit(Stamp?) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:303:DiagSnapshot_ResolveCommit(StartDir := A_ScriptDir, Stamp?) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:327:DiagSnapshot_WindowsProductName(Name, Build) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:338:DiagSnapshot_OsInfo() {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:363:DiagCallerName(Offset) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:377:DiagSnapshot_CountFeatures(Tree) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:383:_DiagSnapshot_CountLeaves(Node, Counts) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:408:DiagSnapshot_Collect(BootMs) {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:440:DiagSnapshot_EarlyLine() {
+static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk:454:DiagSnapshot_Emit(BootMs) {
+static/ergopti_plus/windows/ui/healthcheck/collection.ahk:18:HealthCheck_CollectWindows() {
+static/ergopti_plus/windows/ui/healthcheck/collection.ahk:45:class DiagnosticCollectionWindows {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:21:if ($taskId -cnotmatch '^ergopti-diagnostic-[0-9a-f]{32}$') { throw 'Invalid diagnostic session identity.' }
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:22:if (!(Test-Path -LiteralPath $taskRoot -PathType Container)) { throw 'Missing owned diagnostic session.' }
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:23:if ((Get-Item -LiteralPath $taskRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:28:function Read-CollectionJson($Path, $Limit) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:37:function Get-CollectionHash($Path) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:64:if ($taskContract.schema_version -ne 1 -or $taskRequest.schema_version -ne 1) { throw 'Unsupported collection contract.' }
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:66:function Receive-CollectionResidentObservations($Value, $Owner) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:150:if ($UiaChild) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:162:public static class ErgoptiDiagnosticUiaProxy {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:201:function Get-CollectionStreamHash($Stream) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:207:function Initialize-CollectionFileIdentity {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:216:namespace ErgoptiDiagnosticPrivate {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:283:function Get-CollectionFileIdentity {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:297:function Write-CollectionText($Name, $Text) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:329:function Test-CollectionFileIdentity($Current, $Expected) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:334:function Write-CollectionJson($Name, $Value) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:339:function Test-CollectionCancelled {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:343:function Close-CollectionChild {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:359:function Add-CollectionResult($Id, $Status, $Evidence, $Reason, $Duration = 0, $Receipt = $null, $ErrorCode = 0) {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:376:try {
+static/ergopti_plus/windows/vendor/ergopti_diagnostics.ps1:644:if ($null -ne $taskFailure) { exit 1 }
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:31:global HC_WEBVIEW2_CLIENT := "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:50:_HealthCheck_Read(Label, Reader) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:62:_HealthCheck_Put(Section, Key, Value) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:70:_HealthCheck_Dirname(Path) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:90:_HealthCheck_Paths(ReportSubdir) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:117:_HealthCheck_WebView2Version() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:131:_HealthCheck_Versions() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:156:_HealthCheck_Memory() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:166:_HealthCheck_Displays() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:181:_HealthCheck_Hardware() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:205:_HealthCheck_ProcessMemory() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:218:_HealthCheck_LocaleName() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:227:_HealthCheck_RunningApps() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:244:_HealthCheck_System(Detailed, UptimeSec) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:288:_HealthCheck_Input(HookHealthFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:319:_HealthCheck_Features(LlmSnapshotFn := 0, KeystatsSnapshotFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:343:_HealthCheck_LlmOwner(SnapshotFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:361:_HealthCheck_Ai(SnapshotFn := 0) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:386:_HealthCheck_RawInputName(Handle) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:402:_HealthCheck_HidProductName(Path) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:422:_HealthCheck_DeviceBus(Path) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:437:_HealthCheck_Peripherals(Detailed) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:485:_HealthCheck_RingIssues(MaxLines) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:508:_HealthCheck_RecentIssueLimits() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:530:_HealthCheck_ReadTail(Path, MaxBytes) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:553:_HealthCheck_DecodeTail(Bytes, Length) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:564:_HealthCheck_ParseErrorsTail(Chunk, AtFileStart, MaxEntries) {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:599:_HealthCheck_ErrorsLogPath() {
+static/ergopti_plus/windows/ui/healthcheck/helpers.ahk:609:_HealthCheck_RecentIssues(ErrorsPath) {

@@ -1,0 +1,40 @@
+Selecting exact test module: "tests.unit.ui.editors.test_personal_info_editor_construction"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.editors.test_personal_info_editor_construction
+
+=== personal editor construction rollback ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rejects INFO sink retirement with replacement=false (personal-editor-publication)","status":"pass","elapsed_ms":3.692395,"timing_error":""}
+  ok   rejects INFO sink retirement with replacement=false (personal-editor-publication)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rejects INFO sink retirement with replacement=true (personal-editor-publication)","status":"pass","elapsed_ms":3.080434,"timing_error":""}
+  ok   rejects INFO sink retirement with replacement=true (personal-editor-publication)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rolls back bind_throws and permits retry (personal-editor-construction)","status":"pass","elapsed_ms":3.172603,"timing_error":""}
+  ok   rolls back bind_throws and permits retry (personal-editor-construction)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rolls back screen_throws and permits retry (personal-editor-construction)","status":"pass","elapsed_ms":3.571703,"timing_error":""}
+  ok   rolls back screen_throws and permits retry (personal-editor-construction)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rolls back factory_before_throws and permits retry (personal-editor-construction)","status":"pass","elapsed_ms":3.331673,"timing_error":""}
+  ok   rolls back factory_before_throws and permits retry (personal-editor-construction)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"rolls back factory_after_throws and permits retry (personal-editor-construction)","status":"pass","elapsed_ms":3.388827,"timing_error":""}
+  ok   rolls back factory_after_throws and permits retry (personal-editor-construction)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"retains exact clear_throws cleanup debt (personal-editor-construction)","status":"pass","elapsed_ms":3.276659,"timing_error":""}
+  ok   retains exact clear_throws cleanup debt (personal-editor-construction)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"retains exact delete_throws cleanup debt (personal-editor-construction)","status":"pass","elapsed_ms":3.886207,"timing_error":""}
+  ok   retains exact delete_throws cleanup debt (personal-editor-construction)
+
+=== personal editor deferred focus ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"retires factory retries before successor publication (personal-editor-focus-owner)","status":"pass","elapsed_ms":3.876351,"timing_error":""}
+  ok   retires factory retries before successor publication (personal-editor-focus-owner)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"retires singleton retries before successor publication (personal-editor-focus-owner)","status":"pass","elapsed_ms":2.994555,"timing_error":""}
+  ok   retires singleton retries before successor publication (personal-editor-focus-owner)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"keeps the current native focus retry operational (personal-editor-focus-owner)","status":"pass","elapsed_ms":2.995687,"timing_error":""}
+  ok   keeps the current native focus retry operational (personal-editor-focus-owner)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.editors.test_personal_info_editor_construction","name":"tests.unit.ui.editors.test_personal_info_editor_construction","status":"pass","elapsed_ms":37.773745,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  11
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

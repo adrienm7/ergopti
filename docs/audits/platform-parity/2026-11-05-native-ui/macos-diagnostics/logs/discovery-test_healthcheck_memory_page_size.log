@@ -1,0 +1,25 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_memory_page_size"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_memory_page_size
+
+=== healthcheck-memory-page-size ===
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+[logger] unified log write refused: /tmp/lua_FWSPpB_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_FWSPpB_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_memory_page_size","name":"uses 16 KiB native pages when computing free memory","status":"pass","elapsed_ms":6.794201,"timing_error":""}
+  ok   uses 16 KiB native pages when computing free memory
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_memory_page_size","name":"preserves 4 KiB pages and zero free memory","status":"pass","elapsed_ms":5.794644,"timing_error":""}
+  ok   preserves 4 KiB pages and zero free memory
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_memory_page_size","name":"does not invent a page size when the native snapshot is incomplete","status":"pass","elapsed_ms":3.938361,"timing_error":""}
+  ok   does not invent a page size when the native snapshot is incomplete
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_memory_page_size","name":"tests.unit.ui.healthcheck.test_healthcheck_memory_page_size","status":"pass","elapsed_ms":16.865933,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,21 @@
+
+=== Boot profiler: paired stages ===
+  ok   pairs every stage with a timed SUCCESS and reports the total
+  ok   names a stage that never closed
+  ok   refuses a second boot owner
+
+=== Runtime log: external processes and reloads ===
+  ok   logs a process exit by program name only, never its arguments
+  ok   throttles repeats per program and always reports a slow run
+  ok   names the files behind a reload by base name
+
+=== Runtime log: previously swallowed failures now log ===
+  ok   reports a signal handler that could not be installed
+  ok   reports a WPM restore failure
+  ok   reports an update notifier that raised
+
+=== Log privacy: a fired hotstring leaves no typed text in the log ===
+  ok   the shared engine logs no trigger, replacement or typed character
+  ok   the daemon's match, undo, replay and preview lines carry no typed text
+  ok   the diagnostic snapshot redacts the home directory
+AUDIT_TEST_RESULT	12	0

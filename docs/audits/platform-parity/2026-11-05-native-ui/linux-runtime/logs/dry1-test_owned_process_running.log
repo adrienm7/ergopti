@@ -1,0 +1,8 @@
+  ok   native running proof excludes known exit while exact close debt remains
+  ok   native running proof excludes terminal output failure with live process debt
+  ok   native running proof excludes cancelled process despite refused termination
+  ok   native running proof rechecks exit occurring inside source callback
+  ok   native running proof rechecks cancellation occurring inside source callback
+  ok   native running proof requires source truth and suppresses source exceptions
+  ok   missing native dispatch cannot manufacture a running process
+AUDIT_TEST_RESULT	7	0

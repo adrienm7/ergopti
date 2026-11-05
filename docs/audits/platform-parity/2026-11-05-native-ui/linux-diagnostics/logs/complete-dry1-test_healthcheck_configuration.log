@@ -1,0 +1,56 @@
+
+=== diagnostics configuration reducer ===
+  ok   reduces exact-scalars
+  ok   reduces unknown-enum-member-is-text
+  ok   reduces enum-member-is-a-declared-string-exactly
+  ok   reduces enum-declared-boolean-member-stays-a-boolean
+  ok   reduces enum-declared-string-member-is-exact
+  ok   reduces paths-and-free-text-keep-only-their-length
+  ok   reduces windows-path-keeps-only-its-length
+  ok   reduces empty-list-and-empty-text
+  ok   reduces unicode-length-counts-characters
+  ok   reduces table-default-reports-its-declared-members-only
+  ok   reduces undeclared-keys-never-become-rows
+  ok   reduces platform-gate
+  ok   reduces platform-gate-applies-on-its-own-driver
+  ok   reduces empty-document
+  ok   bounds the number of rows
+  ok   refuses an unknown driver
+
+=== diagnostics configuration sharing ===
+  ok   windows: valid-rows-pass-unchanged
+  ok   windows: a-path-or-sentence-cannot-pass-as-an-enum
+  ok   windows: text-and-list-rows-carry-only-a-count
+  ok   windows: booleans-and-numbers-keep-their-grammar
+  ok   windows: setting-names-are-dotted-identifiers
+  ok   windows: unknown-types-and-extra-members-are-removed
+  ok   macos: valid-rows-pass-unchanged
+  ok   macos: a-path-or-sentence-cannot-pass-as-an-enum
+  ok   macos: text-and-list-rows-carry-only-a-count
+  ok   macos: booleans-and-numbers-keep-their-grammar
+  ok   macos: setting-names-are-dotted-identifiers
+  ok   macos: unknown-types-and-extra-members-are-removed
+  ok   linux: valid-rows-pass-unchanged
+  ok   linux: a-path-or-sentence-cannot-pass-as-an-enum
+  ok   linux: text-and-list-rows-carry-only-a-count
+  ok   linux: booleans-and-numbers-keep-their-grammar
+  ok   linux: setting-names-are-dotted-identifiers
+  ok   linux: unknown-types-and-extra-members-are-removed
+  ok   bounds the shared configuration rows
+  ok   shares nothing a collector's own canaries could carry, end to end
+
+=== diagnostics configuration files ===
+  ok   reports ok, missing and unreadable in resolution order
+  ok   reports a permission failure as unreadable, never as missing
+  ok   reports a config.toml that does not decode as invalid and yields no setting
+  ok   collects the shareable rows of a readable config.toml
+
+=== diagnostics configuration is collected by a probe, not by phase A ===
+  ok   phase A never reads the configuration and says the probe is pending
+  ok   a report from the Debug menu completes the configuration after phase A
+  ok   the probe answers on a timer, alone, with both sections
+  ok   a slow reader past the deadline is a timeout that publishes no section
+  ok   a reader that raises is an error state, never an empty success
+  ok   without an asynchronous scheduler the state is unsupported, never a blocking fallback
+  ok   cancelling the run before the timer publishes nothing
+AUDIT_TEST_RESULT	47	0

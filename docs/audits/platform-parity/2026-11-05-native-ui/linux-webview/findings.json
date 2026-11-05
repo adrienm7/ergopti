@@ -1,0 +1,50 @@
+{
+	"schema_version": 1,
+	"scope": "linux-webview",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md",
+	"findings": [
+		{
+			"id": "LVB-001",
+			"title": "Shortcut hotstring auto-close is admitted but never closes its Linux page",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Open the hotstring editor through its shortcut, enable auto_close, add one entry and save without the Add another option. Shared script.js:1290-1293 posts close after persist. Alternatively route that exact {action:'close',data:{}} from a current hsEditor page. Replay probes/editor.lua SOURCE_ROOT: CLOSE_RECEIPT close_calls=0 reply=nil despite an accepting exact close_owned_window capability. This is a bridge/native-port model, not live GTK measurement.",
+			"root_cause": "linux/ui/hotstring_editor/bridge.lua:694-697 recognizes close but only logs 'closed' and returns nil; it never calls the manager-supplied epoch-owned context.close_owned_window. Therefore the registered route cannot reach native hide/destroy or input ownership release for this admitted command.",
+			"silent_failure": "The handler logs that the editor closed even though no close was requested. Existing opening-source tests verify saves, while native lifecycle tests verify hide once invoked; neither joins the shared auto-close command to this handler.",
+			"regression_test": "Use the actual manager and bridge with faithful GTK ports. Open shortcut mode with auto_close, deliver the shared page's close command, require exactly one close of the current page, physical retirement acknowledgements and input release. Refused native retirement must retain debt and report refusal; stale close must not retire a successor. Healthy manual window close is the control. Coordinate the shared save acknowledgment with MVB-002: successful save may auto-close, but refused save must preserve the draft when the current Linux no-op is fixed.",
+			"command": "/workspace/scratch/parity-toolchain/ci-bin/luajit /workspace/scratch/parity-native-ui/linux-webview/probes/editor.lua SOURCE_ROOT",
+			"evidence": [
+				"logs/countercheck-report.md",
+				"logs/countercheck.log",
+				"logs/countercheck.lua",
+				"logs/dry-1-editor.lua.log",
+				"logs/dry-1-personal.lua.log",
+				"logs/dry-1-scope.lua.log",
+				"logs/dry-2-editor.lua.log",
+				"logs/dry-2-personal.lua.log",
+				"logs/dry-2-scope.lua.log",
+				"logs/editor.log",
+				"logs/false-greens.log",
+				"logs/personal.log",
+				"logs/scope-expanded.log",
+				"logs/scope-initial.log",
+				"logs/scope-preload.log",
+				"probes/editor.lua",
+				"probes/personal.lua",
+				"probes/scope.lua",
+				"probes/sweep.py",
+				"probes/validate.py"
+			],
+			"other_os": "macOS ui/hotstring_editor/init.lua handle_message close calls M.close. Windows has a distinct personal-TOML editor, so the same API is not owed; its exact corresponding shortcut close join is outside this Linux proof. The separate shared page's premature close before save acknowledgement is coordinated with the macOS reviewer.",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/linux-webview/report.md",
+			"basis": {
+				"kind": "actual production Lua owners over explicit native-port fixtures, plus stated Linux native controls",
+				"native_limits": "Linux host only. Windows AHK/WebView2 and Darwin Hammerspoon/WebKit/launchd/System Extensions receiving boundaries were not executed. See scope report for exact synthetic input and source-only joins."
+			},
+			"submitted_evidence": ["logs/dry-1-editor.lua.log", "logs/dry-2-editor.lua.log"]
+		}
+	]
+}

@@ -1,0 +1,28 @@
+{
+  "sourceRoot": "/workspace/worktrees/parity-2026-11-05/windows-webview",
+  "provenance": "actual AHK function expression evaluated with its real JsonStringLiteral contract; actual shared persist VM; no AHK/WebView runtime",
+  "results": [
+    {
+      "message": "Save failed",
+      "generated": "(function(){const e=document.getElementById(\"save-toast\");if(e){e.textContent=\"\"Save failed\"\";e.classList.add(\"show\");}})();",
+      "error": "Unexpected identifier 'Save'",
+      "control": "Save failed"
+    },
+    {
+      "message": "Écriture impossible",
+      "generated": "(function(){const e=document.getElementById(\"save-toast\");if(e){e.textContent=\"\"Écriture impossible\"\";e.classList.add(\"show\");}})();",
+      "error": "Unexpected identifier 'Écriture'",
+      "control": "Écriture impossible"
+    },
+    {
+      "message": "Quote \" and slash \\",
+      "generated": "(function(){const e=document.getElementById(\"save-toast\");if(e){e.textContent=\"\"Quote \\\" and slash \\\\\"\";e.classList.add(\"show\");}})();",
+      "error": "Unexpected identifier 'Quote'",
+      "control": "Quote \" and slash \\"
+    }
+  ],
+  "persist": {
+    "posted": "save",
+    "optimisticToastShown": true
+  }
+}

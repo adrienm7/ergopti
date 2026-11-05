@@ -1,0 +1,40 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_appleevents"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_appleevents
+
+=== healthcheck: owned normal AppleEvent diagnostic ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"acknowledges the exact PID/nonce only after native closure","status":"pass","elapsed_ms":0.410438,"timing_error":""}
+  ok   acknowledges the exact PID/nonce only after native closure
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"retains synchronous completion until the actual start return","status":"pass","elapsed_ms":0.238699,"timing_error":""}
+  ok   retains synchronous completion until the actual start return
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"distinguishes typed missing consent, native timeout and malformed output","status":"pass","elapsed_ms":2.708746,"timing_error":""}
+  ok   distinguishes typed missing consent, native timeout and malformed output
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"never infers permission from a native exit or private stderr","status":"pass","elapsed_ms":0.261694,"timing_error":""}
+  ok   never infers permission from a native exit or private stderr
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"rejects expired success under the same original deadline","status":"pass","elapsed_ms":0.357338,"timing_error":""}
+  ok   rejects expired success under the same original deadline
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"does not restart the caller's original clock during setup","status":"pass","elapsed_ms":0.253531,"timing_error":""}
+  ok   does not restart the caller's original clock during setup
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"retains refused process termination and rejects its late success","status":"pass","elapsed_ms":0.226481,"timing_error":""}
+  ok   retains refused process termination and rejects its late success
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"keeps timer close debt and never restores success on a late ACK","status":"pass","elapsed_ms":0.338379,"timing_error":""}
+  ok   keeps timer close debt and never restores success on a late ACK
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"does not start native work when scripting is disabled","status":"pass","elapsed_ms":0.226060,"timing_error":""}
+  ok   does not start native work when scripting is disabled
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"does not invent a PID when native identity is invalid","status":"pass","elapsed_ms":0.706904,"timing_error":""}
+  ok   does not invent a PID when native identity is invalid
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"refuses a failed timer or native start without losing an owner","status":"pass","elapsed_ms":0.537228,"timing_error":""}
+  ok   refuses a failed timer or native start without losing an owner
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"rejects changed runtime identity, duplicate claim and invalid timing","status":"pass","elapsed_ms":0.233702,"timing_error":""}
+  ok   rejects changed runtime identity, duplicate claim and invalid timing
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","name":"tests.unit.ui.healthcheck.test_healthcheck_appleevents","status":"pass","elapsed_ms":7.073513,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  12
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

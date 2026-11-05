@@ -1,0 +1,194 @@
+[
+  {
+    "selector": "tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_program_provider_picker.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.menu.gestures_and_apps.test_automation_inventory",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_automation_inventory.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.menu.gestures_and_apps.test_automation_inventory"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_controller_pool_leases.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.action_picker.lifecycle.test_controller_retention",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_controller_retention.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.action_picker.lifecycle.test_controller_retention"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_webview_close_recursion.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion"
+    ]
+  },
+  {
+    "selector": "tests.unit.adapters.system.test_webview_result",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_webview_result.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.adapters.system.test_webview_result"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstrings_config_window_owners.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_transaction",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstrings_config_window_transaction.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstrings_config_window_transaction"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstrings_config_window_javascript.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstrings_config_window_javascript"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstrings_config_window_section_boundary.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstrings_config_window_section_boundary"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstring_editor_owners",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstring_editor_owners.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstring_editor_owners"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstring_editor_unreadable_source.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstring_editor_unreadable_source"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstring_editor_save_validation.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstring_editor_save_validation"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_hotstring_editor_javascript.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.hotstring_windows.test_hotstring_editor_javascript"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.editors.test_personal_info_editor_owner_callbacks",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_personal_info_editor_owner_callbacks.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.editors.test_personal_info_editor_owner_callbacks"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.editors.test_personal_info_editor_close_transaction",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_personal_info_editor_close_transaction.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.editors.test_personal_info_editor_close_transaction"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.editors.test_personal_info_editor_construction",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-test_personal_info_editor_construction.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.editors.test_personal_info_editor_construction"
+    ]
+  },
+  {
+    "selector": "private_receipts",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-receipts.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/scratch/parity-native-ui/macos-webview/probes/receipts.lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview"
+    ]
+  },
+  {
+    "selector": "private_autoclose_join",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-webview/logs/editor-finalA-autoclose.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/scratch/parity-native-ui/macos-webview/probes/autoclose-host.lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview",
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/scratch/parity-native-ui/macos-webview"
+    ]
+  }
+]

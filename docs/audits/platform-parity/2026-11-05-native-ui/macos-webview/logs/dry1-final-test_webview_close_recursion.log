@@ -1,0 +1,60 @@
+Selecting exact test module: "tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion
+
+=== factory-owned close avoids recursive native GC ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retires user close without re-wrapping GC","status":"pass","elapsed_ms":6.240784,"timing_error":""}
+  ok   retires user close without re-wrapping GC
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retires explicit close without re-wrapping GC","status":"pass","elapsed_ms":4.351223,"timing_error":""}
+  ok   retires explicit close without re-wrapping GC
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains the accepted callback after deferred admission mutates then false","status":"pass","elapsed_ms":8.017216,"timing_error":""}
+  ok   retains the accepted callback after deferred admission mutates then false
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains the accepted callback after deferred admission mutates then throw","status":"pass","elapsed_ms":7.259095,"timing_error":""}
+  ok   retains the accepted callback after deferred admission mutates then throw
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"acknowledges the safe policy before handing a candidate to external code","status":"pass","elapsed_ms":7.667970,"timing_error":""}
+  ok   acknowledges the safe policy before handing a candidate to external code
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"keeps a successor opened by the synchronous close observer","status":"pass","elapsed_ms":4.449892,"timing_error":""}
+  ok   keeps a successor opened by the synchronous close observer
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"tolerates an observer deleting its exact predecessor before reopening","status":"pass","elapsed_ms":3.909448,"timing_error":""}
+  ok   tolerates an observer deleting its exact predecessor before reopening
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retires the exact window even if the business observer raises","status":"pass","elapsed_ms":4.818425,"timing_error":""}
+  ok   retires the exact window even if the business observer raises
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains cleanup after deferred admission false","status":"pass","elapsed_ms":3.565371,"timing_error":""}
+  ok   retains cleanup after deferred admission false
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains cleanup after deferred admission throw","status":"pass","elapsed_ms":4.582190,"timing_error":""}
+  ok   retains cleanup after deferred admission throw
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains cleanup after deferred admission inline","status":"pass","elapsed_ms":3.339281,"timing_error":""}
+  ok   retains cleanup after deferred admission inline
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains cleanup after native delete false","status":"pass","elapsed_ms":6.250158,"timing_error":""}
+  ok   retains cleanup after native delete false
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains cleanup after native delete throw","status":"pass","elapsed_ms":4.803904,"timing_error":""}
+  ok   retains cleanup after native delete throw
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"accepts exact native consumption even when delete subsequently raises","status":"pass","elapsed_ms":4.638745,"timing_error":""}
+  ok   accepts exact native consumption even when delete subsequently raises
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"refuses required close policy false without recursive rollback","status":"pass","elapsed_ms":4.093084,"timing_error":""}
+  ok   refuses required close policy false without recursive rollback
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"refuses required close policy nil without recursive rollback","status":"pass","elapsed_ms":5.950117,"timing_error":""}
+  ok   refuses required close policy nil without recursive rollback
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"refuses required close policy throw without recursive rollback","status":"pass","elapsed_ms":3.971823,"timing_error":""}
+  ok   refuses required close policy throw without recursive rollback
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"keeps the deletion fence during a reentrant cleanup diagnostic","status":"pass","elapsed_ms":3.150167,"timing_error":""}
+  ok   keeps the deletion fence during a reentrant cleanup diagnostic
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"keeps notification depth through a throwing observer's diagnostic","status":"pass","elapsed_ms":4.042959,"timing_error":""}
+  ok   keeps notification depth through a throwing observer's diagnostic
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"retains a factory rollback whose native delete returns false","status":"pass","elapsed_ms":3.591200,"timing_error":""}
+  ok   retains a factory rollback whose native delete returns false
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"accepts factory rollback consumption before a subsequent native exception","status":"pass","elapsed_ms":4.138743,"timing_error":""}
+  ok   accepts factory rollback consumption before a subsequent native exception
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"reports a committed cleanup timer delivered inside another close notification","status":"pass","elapsed_ms":6.983551,"timing_error":""}
+  ok   reports a committed cleanup timer delivered inside another close notification
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","name":"tests.unit.ui.ui_builder.lifecycle.test_webview_close_recursion","status":"pass","elapsed_ms":111.732089,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  22
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

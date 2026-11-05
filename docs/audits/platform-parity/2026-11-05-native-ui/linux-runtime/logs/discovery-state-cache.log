@@ -1,0 +1,4 @@
+ADVERSE installed=true observer_current=false cause=absent reason=model_browser.reason_ollama_missing
+VISIBILITY Local Ollama install state: absent.
+HEALTHY fresh_observer cause=installed
+REFUSAL nonexecutable cause=absent

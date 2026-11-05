@@ -1,0 +1,64 @@
+{
+  "pass": "root-replay",
+  "start_utc": "2026-11-05T01:04:08.255434+00:00",
+  "source_root": "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+  "new_confirmed_roots": 0,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-0.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/root/replays/macos-runtime/probes/runtime-probes.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-1.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/root/replays/macos-runtime/probes/approval-wall-clock.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-2.log"
+    },
+    {
+      "argv": [
+        "python3",
+        "/workspace/scratch/parity-native-ui/root/replays/macos-runtime/probes/source-joins.py",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-3.log"
+    },
+    {
+      "argv": [
+        "/workspace/scratch/parity-toolchain/ci-bin/lua",
+        "/workspace/scratch/parity-native-ui/root/replays/macos-runtime/probes/run-group.lua",
+        "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+        "/workspace/scratch/parity-native-ui/root/replays/macos-runtime"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-4.log"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "exit_code": 0,
+      "log": "logs/root-replay-5.log"
+    }
+  ],
+  "end_utc": "2026-11-05T01:04:11.000454+00:00"
+}

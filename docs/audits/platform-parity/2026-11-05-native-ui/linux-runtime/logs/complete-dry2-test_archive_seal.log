@@ -1,0 +1,28 @@
+
+=== Retained FD Seal Ownership ===
+  ok   pending write cannot start seal or hash
+  ok   logical producer terminal cannot replace physical settlement
+  ok   no EOF cannot start a hash read
+  ok   seal prevents all new reset write and producer bind
+  ok   hash read debt prevents FD closure after cancellation
+  ok   private verification is bound to final sealed FD
+  ok   hash callback is not physical read context and timer ACK
+  ok   withdrawn transaction cannot publish completed digest
+  ok   expired original phase cannot publish completed digest
+  ok   verification cannot survive its captured hash bound
+  ok   throwing hash allocation never authorizes guessed FD close
+  ok   duplicate result cannot borrow later outcome
+  ok   computed SHA256 must match exact captured release checksum
+  ok   foreign equality metamethod cannot borrow verification token
+  ok   foreign equality metamethod cannot borrow final seal ticket
+  ok   matching digest plus typed native failure cannot verify
+  ok   matching digest plus malformed nonnil error cannot verify
+  ok   matching metatables cannot borrow sealed verification on either ABI
+  ok   matching metatables cannot borrow final seal ticket on either ABI
+  ok   mutated public hash settlement cannot close an FD with pending read
+  ok   mutated public hash cancel cannot suppress exact native cancellation
+  ok   cancel during hash construction signals the exact late child
+  ok   cancel during hash listener registration retains pending read
+  ok   source withdrawal during child return revokes late hash owner
+  ok   settled hash probe reentry cannot close exact FD twice
+AUDIT_TEST_RESULT	25	0

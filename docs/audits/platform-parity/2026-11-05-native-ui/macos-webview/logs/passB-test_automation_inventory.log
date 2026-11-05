@@ -1,0 +1,24 @@
+Selecting exact test module: "tests.unit.ui.menu.gestures_and_apps.test_automation_inventory"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.menu.gestures_and_apps.test_automation_inventory
+
+=== shared readonly automation acquisition ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","name":"reserves the session before a synchronous publication callback can close it","status":"pass","elapsed_ms":0.114662,"timing_error":""}
+  ok   reserves the session before a synchronous publication callback can close it
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","name":"contains construction reentry and retires its returned owner","status":"pass","elapsed_ms":0.146230,"timing_error":""}
+  ok   contains construction reentry and retires its returned owner
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","name":"rejects forged readonly keys before an ordinary resolver sees them","status":"pass","elapsed_ms":0.095784,"timing_error":""}
+  ok   rejects forged readonly keys before an ordinary resolver sees them
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","name":"keeps native debt fenced until the same exact owner acknowledges retirement","status":"pass","elapsed_ms":0.087571,"timing_error":""}
+  ok   keeps native debt fenced until the same exact owner acknowledges retirement
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","name":"tests.unit.ui.menu.gestures_and_apps.test_automation_inventory","status":"pass","elapsed_ms":0.617870,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  4
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,6 @@
+
+=== daemon wiring: the error window observes logged errors (error-dialog-linux) ===
+  ok   installs the observer after the bridge initialised, before main() (error-dialog-linux)
+  ok   queues no crash dialog at the next start, the immediate notification being the only notice (error-dialog-linux)
+  ok   removes the legacy text dumps once at startup (legacy-crash-cleanup)
+AUDIT_TEST_RESULT	3	0

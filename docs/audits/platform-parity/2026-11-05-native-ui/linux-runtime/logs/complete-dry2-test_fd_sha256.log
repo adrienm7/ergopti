@@ -1,0 +1,24 @@
+
+=== Retained FD Digest Lifecycle ===
+  ok   exact bytes and separate EOF precede private completion
+  ok   bounded reads retain exact offsets
+  ok   early EOF refuses digest
+  ok   extra byte refuses digest
+  ok   actual native filesystem errno stays typed
+  ok   pending read survives cancellation until exact callback
+  ok   deadline notification is not physical read retirement
+  ok   slow owner probe consumes original phase deadline
+  ok   withdrawn source refuses before allocation
+  ok   duplicate prior read callback cannot advance offset
+  ok   throwing submitted read retains exact ambiguous debt
+  ok   explicit nil submission can retire absent read
+  ok   unknown context free remains debt and is never retried
+  ok   scheduled timer close cannot publish success
+  ok   reentrant update cancellation cannot free active context
+  ok   reentrant final cancellation cannot free active context
+  ok   slow final hash cannot renew original deadline
+  ok   malformed final hash has no success fallback
+  ok   empty or fractional committed lengths refuse before IO
+  ok   cancel after EOF before timer ACK revokes digest
+  ok   late physical timer ACK cannot publish expired digest
+AUDIT_TEST_RESULT	21	0

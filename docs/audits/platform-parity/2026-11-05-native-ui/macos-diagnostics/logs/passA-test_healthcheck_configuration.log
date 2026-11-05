@@ -1,0 +1,124 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_configuration"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_configuration
+
+=== diagnostics configuration reducer ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces exact-scalars","status":"pass","elapsed_ms":0.122885,"timing_error":""}
+  ok   reduces exact-scalars
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces unknown-enum-member-is-text","status":"pass","elapsed_ms":0.348484,"timing_error":""}
+  ok   reduces unknown-enum-member-is-text
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces enum-member-is-a-declared-string-exactly","status":"pass","elapsed_ms":0.064717,"timing_error":""}
+  ok   reduces enum-member-is-a-declared-string-exactly
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces enum-declared-boolean-member-stays-a-boolean","status":"pass","elapsed_ms":0.039349,"timing_error":""}
+  ok   reduces enum-declared-boolean-member-stays-a-boolean
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces enum-declared-string-member-is-exact","status":"pass","elapsed_ms":0.116365,"timing_error":""}
+  ok   reduces enum-declared-string-member-is-exact
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces paths-and-free-text-keep-only-their-length","status":"pass","elapsed_ms":0.104097,"timing_error":""}
+  ok   reduces paths-and-free-text-keep-only-their-length
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces windows-path-keeps-only-its-length","status":"pass","elapsed_ms":0.057096,"timing_error":""}
+  ok   reduces windows-path-keeps-only-its-length
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces empty-list-and-empty-text","status":"pass","elapsed_ms":0.052319,"timing_error":""}
+  ok   reduces empty-list-and-empty-text
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces unicode-length-counts-characters","status":"pass","elapsed_ms":0.035043,"timing_error":""}
+  ok   reduces unicode-length-counts-characters
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces table-default-reports-its-declared-members-only","status":"pass","elapsed_ms":0.064918,"timing_error":""}
+  ok   reduces table-default-reports-its-declared-members-only
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces undeclared-keys-never-become-rows","status":"pass","elapsed_ms":0.089565,"timing_error":""}
+  ok   reduces undeclared-keys-never-become-rows
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces platform-gate","status":"pass","elapsed_ms":0.027932,"timing_error":""}
+  ok   reduces platform-gate
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces platform-gate-applies-on-its-own-driver","status":"pass","elapsed_ms":0.033340,"timing_error":""}
+  ok   reduces platform-gate-applies-on-its-own-driver
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reduces empty-document","status":"pass","elapsed_ms":0.017907,"timing_error":""}
+  ok   reduces empty-document
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"bounds the number of rows","status":"pass","elapsed_ms":0.038788,"timing_error":""}
+  ok   bounds the number of rows
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"refuses an unknown driver","status":"pass","elapsed_ms":0.002594,"timing_error":""}
+  ok   refuses an unknown driver
+
+=== diagnostics configuration sharing ===
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: valid-rows-pass-unchanged","status":"pass","elapsed_ms":0.308925,"timing_error":""}
+  ok   windows: valid-rows-pass-unchanged
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: a-path-or-sentence-cannot-pass-as-an-enum","status":"pass","elapsed_ms":0.243767,"timing_error":""}
+  ok   windows: a-path-or-sentence-cannot-pass-as-an-enum
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: text-and-list-rows-carry-only-a-count","status":"pass","elapsed_ms":0.262345,"timing_error":""}
+  ok   windows: text-and-list-rows-carry-only-a-count
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: booleans-and-numbers-keep-their-grammar","status":"pass","elapsed_ms":0.456728,"timing_error":""}
+  ok   windows: booleans-and-numbers-keep-their-grammar
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: setting-names-are-dotted-identifiers","status":"pass","elapsed_ms":0.152259,"timing_error":""}
+  ok   windows: setting-names-are-dotted-identifiers
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"windows: unknown-types-and-extra-members-are-removed","status":"pass","elapsed_ms":0.211408,"timing_error":""}
+  ok   windows: unknown-types-and-extra-members-are-removed
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: valid-rows-pass-unchanged","status":"pass","elapsed_ms":0.260262,"timing_error":""}
+  ok   macos: valid-rows-pass-unchanged
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: a-path-or-sentence-cannot-pass-as-an-enum","status":"pass","elapsed_ms":0.262285,"timing_error":""}
+  ok   macos: a-path-or-sentence-cannot-pass-as-an-enum
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: text-and-list-rows-carry-only-a-count","status":"pass","elapsed_ms":0.137938,"timing_error":""}
+  ok   macos: text-and-list-rows-carry-only-a-count
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: booleans-and-numbers-keep-their-grammar","status":"pass","elapsed_ms":0.154332,"timing_error":""}
+  ok   macos: booleans-and-numbers-keep-their-grammar
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: setting-names-are-dotted-identifiers","status":"pass","elapsed_ms":0.134863,"timing_error":""}
+  ok   macos: setting-names-are-dotted-identifiers
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"macos: unknown-types-and-extra-members-are-removed","status":"pass","elapsed_ms":0.131438,"timing_error":""}
+  ok   macos: unknown-types-and-extra-members-are-removed
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: valid-rows-pass-unchanged","status":"pass","elapsed_ms":0.208744,"timing_error":""}
+  ok   linux: valid-rows-pass-unchanged
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: a-path-or-sentence-cannot-pass-as-an-enum","status":"pass","elapsed_ms":0.161623,"timing_error":""}
+  ok   linux: a-path-or-sentence-cannot-pass-as-an-enum
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: text-and-list-rows-carry-only-a-count","status":"pass","elapsed_ms":0.157818,"timing_error":""}
+  ok   linux: text-and-list-rows-carry-only-a-count
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: booleans-and-numbers-keep-their-grammar","status":"pass","elapsed_ms":0.199260,"timing_error":""}
+  ok   linux: booleans-and-numbers-keep-their-grammar
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: setting-names-are-dotted-identifiers","status":"pass","elapsed_ms":0.154612,"timing_error":""}
+  ok   linux: setting-names-are-dotted-identifiers
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"linux: unknown-types-and-extra-members-are-removed","status":"pass","elapsed_ms":0.157296,"timing_error":""}
+  ok   linux: unknown-types-and-extra-members-are-removed
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"shares every permission state the drivers report","status":"pass","elapsed_ms":0.040771,"timing_error":""}
+  ok   shares every permission state the drivers report
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"bounds the shared configuration rows","status":"pass","elapsed_ms":6.518712,"timing_error":""}
+  ok   bounds the shared configuration rows
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"shares nothing a collector's own canaries could carry, end to end","status":"pass","elapsed_ms":1.506698,"timing_error":""}
+  ok   shares nothing a collector's own canaries could carry, end to end
+
+=== diagnostics configuration files ===
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reports ok, missing and unreadable in resolution order","status":"pass","elapsed_ms":0.039359,"timing_error":""}
+  ok   reports ok, missing and unreadable in resolution order
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reports a permission failure as unreadable, never as missing","status":"pass","elapsed_ms":0.002954,"timing_error":""}
+  ok   reports a permission failure as unreadable, never as missing
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"reports a config.toml that does not decode as invalid and yields no setting","status":"pass","elapsed_ms":0.007992,"timing_error":""}
+  ok   reports a config.toml that does not decode as invalid and yields no setting
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"collects the shareable rows of a readable config.toml","status":"pass","elapsed_ms":0.064657,"timing_error":""}
+  ok   collects the shareable rows of a readable config.toml
+
+=== diagnostics configuration is collected by a probe, not by phase A ===
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"phase A never reads the configuration and says the probe is pending","status":"pass","elapsed_ms":153.187338,"timing_error":""}
+  ok   phase A never reads the configuration and says the probe is pending
+# lua_timing {"schema":1,"driver":"macos","id":44,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"every probe is pending when the extensive checks are chosen","status":"pass","elapsed_ms":26.387080,"timing_error":""}
+  ok   every probe is pending when the extensive checks are chosen
+# lua_timing {"schema":1,"driver":"macos","id":45,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"a report from the Debug menu completes the configuration after phase A","status":"pass","elapsed_ms":98.181653,"timing_error":""}
+  ok   a report from the Debug menu completes the configuration after phase A
+# lua_timing {"schema":1,"driver":"macos","id":46,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"the probe answers on a timer, alone, with both sections","status":"pass","elapsed_ms":20.507640,"timing_error":""}
+  ok   the probe answers on a timer, alone, with both sections
+# lua_timing {"schema":1,"driver":"macos","id":47,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"a slow reader past the deadline is a timeout that publishes no section","status":"pass","elapsed_ms":19.861107,"timing_error":""}
+  ok   a slow reader past the deadline is a timeout that publishes no section
+# lua_timing {"schema":1,"driver":"macos","id":48,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"a reader that raises is an error state, never an empty success","status":"pass","elapsed_ms":24.369864,"timing_error":""}
+  ok   a reader that raises is an error state, never an empty success
+# lua_timing {"schema":1,"driver":"macos","id":49,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"cancelling the run before the timer publishes nothing","status":"pass","elapsed_ms":49.746253,"timing_error":""}
+  ok   cancelling the run before the timer publishes nothing
+# lua_timing {"schema":1,"driver":"macos","id":50,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"the default context finds the files where macOS keeps them (healthcheck-config-paths-99)","status":"pass","elapsed_ms":24.399553,"timing_error":""}
+  ok   the default context finds the files where macOS keeps them (healthcheck-config-paths-99)
+
+=== an over-budget synchronous collection names its slowest collectors ===
+# lua_timing {"schema":1,"driver":"macos","id":51,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"puts the collector that held the thread first on the line","status":"pass","elapsed_ms":132.519973,"timing_error":""}
+  ok   puts the collector that held the thread first on the line
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_configuration","name":"tests.unit.ui.healthcheck.test_healthcheck_configuration","status":"pass","elapsed_ms":589.109778,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  50
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

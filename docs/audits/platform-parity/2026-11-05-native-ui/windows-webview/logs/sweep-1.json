@@ -1,0 +1,82 @@
+{
+  "sourceRoot": "/workspace/worktrees/parity-2026-11-05/windows-webview",
+  "inventory": [
+    {
+      "path": "static/ergopti_plus/windows/infra/webview_script.ahk",
+      "sha256": "26d87f907ed767a363c974191d26f8b6874ba5062c46acc2de54970602481204"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/webview_utils.ahk",
+      "sha256": "af9a37b4542de168a388f527891cddbaf8f4074d355199f0930f019777d37fb7"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/webview_browser_warmup.ahk",
+      "sha256": "01d195daf5f1dd5d6d39062f4e01188345de77dbb6314ba393184ffe15947878"
+    },
+    {
+      "path": "static/ergopti_plus/windows/adapters/webview_profiles.ahk",
+      "sha256": "8533e0eafa8d255710b237b3a6c9121db4fdfcfbcc3a90d99a27f3b5015b3e84"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/personal_toml_editor_webview.ahk",
+      "sha256": "f8fef94523fbae5bef360e75181a88882e3718ea8edff48559c77cf07a7437c6"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/hotstrings_config_window/webview.ahk",
+      "sha256": "560f3c693c867a21e14dd14cb15c26669aff42d4324eae413513084c90b0e440"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/hotstrings_config_window/hcw_mutations.ahk",
+      "sha256": "2bea0753f3648cc43382f09b0e6f54bb00c08e1f5e91302ae6bca27f9d942c98"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/action_picker_webview.ahk",
+      "sha256": "a9d16bdbaa4e2e77203b408250b0e6ec6d0dde10f0ec185ff99bc280771ec455"
+    },
+    {
+      "path": "static/ergopti_plus/windows/ui/action_picker/init.ahk",
+      "sha256": "4cc0e980e8281c8dab5b93c6c89ca7769034e4e13c0915bd736a3b9a13cf68fb"
+    },
+    {
+      "path": "static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk",
+      "sha256": "09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9"
+    }
+  ],
+  "actions": [
+    {
+      "page": "hotstring_editor",
+      "actions": [
+        "close",
+        "ready",
+        "save",
+        "save_pref",
+        "window_focus"
+      ]
+    },
+    {
+      "page": "hotstrings_config_window",
+      "actions": [
+        "clear_color",
+        "clear_delay",
+        "clear_priority",
+        "clear_tooltip",
+        "close",
+        "reset_all",
+        "set_all_grey",
+        "set_color",
+        "set_delay",
+        "set_priority",
+        "set_tooltip"
+      ]
+    },
+    {
+      "page": "action_picker",
+      "actions": [
+        "cancel",
+        "confirm",
+        "ready"
+      ]
+    }
+  ],
+  "note": "source inventory, not execution of Windows owners"
+}

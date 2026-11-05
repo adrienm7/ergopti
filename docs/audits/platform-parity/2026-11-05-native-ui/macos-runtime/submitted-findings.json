@@ -1,0 +1,64 @@
+{
+	"schema_version": 1,
+	"scope": "macos-runtime",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md",
+	"findings": [
+		{
+			"id": "MRT-001",
+			"title": "Approval-watch deadline counts polling intervals rather than elapsed time",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Reach virtual_hid_not_active and start the automatic watch. Complete each listing in 4 seconds and each poll after 3 seconds. The real Lua module stops after 2104 simulated seconds despite its 900 second limit; an active answer at 1005 seconds still triggers reload. The genuine Linux libuv scaled 1 second experiment remains active at1.098s and stops at2.252s.",
+			"root_cause": "runtime_approval_watch.poll carries an elapsed counter increased only by APPROVAL_POLL_SEC; it excludes command and scheduling latency and assesses success before the deadline.",
+			"silent_failure": "The stop warning describes 900 seconds while the actual lifetime is longer. Existing tests use immediate listing callbacks and manually fire timers, so they verify a poll count rather than elapsed time.",
+			"regression_test": "Drive the actual watch with a monotonic clock and delayed listings/timers; assert no polling/reload authority after an absolute deadline, including a late approved answer and exact boundary."
+		},
+		{
+			"id": "MRT-002",
+			"title": "Refused command-timeout timer leaves install waiters permanently pending",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["P_BOUNDED_COMMAND_SETTLEMENT"],
+			"reproduction": "Start install launcher successfully; make actual TimerScheduler native timer construction throw and leave the launcher pending. Real field_check_ports.exec performs zero termination attempts and zero callbacks. A second actual runtime_installer.install joins the pending waiters forever. A committed-timeout control settles once.",
+			"root_cause": "field_check_ports.exec starts the native command then consumes only the timer handle, discarding Timer.after's false commitment result. It retains no alternate deadline/refusal settlement path.",
+			"silent_failure": "TimerScheduler logs the allocation failure, so this is not claimed as entirely silent G2 failure; the installer never receives that refusal and cannot finish or retry.",
+			"regression_test": "Exercise real bounded runner and installer with native timer new/start false,nil,throw plus pending/refused child retirement. Require truthful bounded settlement and retained exact cleanup debt; never treat a signal alone as physical completion."
+		},
+		{
+			"id": "MRT-003",
+			"title": "Malformed cached receipt is accepted by Lua but permanently refused by the Swift install source",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["P_ARTIFACT_ADMISSION_CONSISTENCY"],
+			"reproduction": "With all required cached payload products present, set receipt to pinned lowercase digest followed by newline+extra, two newlines, or space+extra. Real Lua fetch.ensure reports ready and executes zero repair commands on every boot/retry. Swift locate exact-byte guard refuses the same file as artifact_receipt_mismatch before the administrator prompt. The exact digest+one-newline control is accepted by both predicates.",
+			"root_cause": "runtime_artifact_fetch.kept compares only receipt:match(\"^(%x+)\") to the pin, while OwnedRuntimeDownloadedHelper.locate requires the entire bytes equal digest+one newline.",
+			"silent_failure": "Final install refusal is loud; the defect is persistent contradictory admission and ineffective automatic cache repair. An externally malformed/corrupt local receipt is a prerequisite; no normal successful write is claimed to produce it.",
+			"regression_test": "Test exact valid receipt and missing/newline/trailing-byte/uppercase/link/nonregular variants across Lua cache, readiness diagnostics and Swift locator. Malformed receipts must not take the cache-success path; retain Swift native no-follow and exact-byte checks."
+		},
+		{
+			"id": "MRT-004",
+			"title": "Advertised reinstall route always refuses an already published runtime needing service recovery",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["P_RECOVERABLE_PROVISIONING"],
+			"reproduction": "Let first installation publish Runtime then transiently fail Core or VirtualHID provisioning, or start with all installed files and a previously unloaded owned job. Owner reports runtime_not_installed/runtime_job_not_loaded; menu and facade offer the same retry. That fixed role always invokes --owned-install-first, whose original native publication guard requires Runtime absent, so every retry refuses the existing published tree before service repair. Lua owner/facade join is executed; native inevitability is source-derived, not a Darwin run.",
+			"root_cause": "Caller maps existing-runtime service deficits to first-install-only authority. IdleServiceEntry publishes files before service provisioning; FirstInstallOwner unconditionally rejects any existing Runtime. No independently reachable authenticated service continuation is dispatched by the menu role.",
+			"silent_failure": "Cleanup-pending and repeated refusal are loud. The wrong recovery affordance cannot repair the state; this is a named recoverability property rather than G2 silence.",
+			"regression_test": "Drive first publish through failed service bootstrap and restart/public retry after failure clears, plus existing unloaded jobs. Require safe authenticated recovery or truthful distinct action/reason; keep existing-tree/unknown-debt refusal in first-install authority."
+		},
+		{
+			"id": "MRT-006",
+			"title": "False native System Settings opener result is accepted without failure diagnostics",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Reach the automatic approval watch with its open_settings port returning literal false, the native hs.urlevent.openURL refusal form. Actual watch.start returns true and remains active with zero error diagnostics although the pane did not open. Existing successful and thrown-error paths are controls.",
+			"root_cause": "runtime_approval_watch captures pcall status but ignores its returned native boolean; runtime_owner_ports forwards hs.urlevent.openURL unchanged.",
+			"silent_failure": "Only a start message says the pane is opening. Neither a thrown exception nor any error diagnostic occurs for false. Existing test opener and common hs stub return nil and certify call recording instead of native success.",
+			"regression_test": "Test true,false,nil and throw at the actual watch/port join. Require explicit false/nil refusal diagnostics while preserving any intentionally independent background observation."
+		}
+	]
+}

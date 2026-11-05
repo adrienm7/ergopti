@@ -1,0 +1,9 @@
+verify-change: 1143 changed file(s).
+verify-change: silent-failure pre-checks passed.
+
+  Gates required by this change:
+   - format  (CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files)
+       e.g. TODO.md, docs/audits/ahk/2026_11_05/findings.json, docs/audits/ahk/2026_11_05/report.md
+   - js  (port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only)
+       e.g. TODO.md, docs/audits/ahk/2026_11_05/findings.json, docs/audits/ahk/2026_11_05/report.md
+

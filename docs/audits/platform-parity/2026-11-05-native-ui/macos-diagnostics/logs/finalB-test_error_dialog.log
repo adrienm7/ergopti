@@ -1,0 +1,86 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_error_dialog"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_error_dialog
+
+=== error window (macOS): policy and deferral (error-dialog-macos) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"presentation failure releases resources and admits the next error: frame (error-dialog-exception)","status":"pass","elapsed_ms":25.152856,"timing_error":""}
+  ok   presentation failure releases resources and admits the next error: frame (error-dialog-exception)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"presentation failure releases resources and admits the next error: chrome (error-dialog-exception)","status":"pass","elapsed_ms":26.658091,"timing_error":""}
+  ok   presentation failure releases resources and admits the next error: chrome (error-dialog-exception)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"disabling invalidates queued windows across reactivation (error-dialog-cancel)","status":"pass","elapsed_ms":30.858388,"timing_error":""}
+  ok   disabling invalidates queued windows across reactivation (error-dialog-cancel)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"a logged ERROR arms one timer and opens nothing synchronously (error-dialog-macos)","status":"pass","elapsed_ms":26.973049,"timing_error":""}
+  ok   a logged ERROR arms one timer and opens nothing synchronously (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"opens nothing while a reload or quit owns the process (error-dialog-during-reload)","status":"pass","elapsed_ms":21.040523,"timing_error":""}
+  ok   opens nothing while a reload or quit owns the process (error-dialog-during-reload)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"the same signature opens once; errors while pending or open are folded (error-dialog-macos)","status":"pass","elapsed_ms":24.847272,"timing_error":""}
+  ok   the same signature opens once; errors while pending or open are folded (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"holds a Karabiner lease failure and opens nothing once the lease runs again (hold-recoverable-error)","status":"pass","elapsed_ms":22.208996,"timing_error":""}
+  ok   holds a Karabiner lease failure and opens nothing once the lease runs again (hold-recoverable-error)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"still opens the window for a lease failure nothing recovered (hold-recoverable-error)","status":"pass","elapsed_ms":34.132502,"timing_error":""}
+  ok   still opens the window for a lease failure nothing recovered (hold-recoverable-error)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"the held template is the one the lease controller logs (hold-recoverable-error)","status":"pass","elapsed_ms":198.869679,"timing_error":""}
+  ok   the held template is the one the lease controller logs (hold-recoverable-error)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"nothing opens while the setting is unticked (error-dialog-macos)","status":"pass","elapsed_ms":35.656591,"timing_error":""}
+  ok   nothing opens while the setting is unticked (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"a second init is refused (error-dialog-macos)","status":"pass","elapsed_ms":33.350401,"timing_error":""}
+  ok   a second init is refused (error-dialog-macos)
+
+=== error window (macOS): page and actions (error-dialog-macos) ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"ready sends the error and its report, redacted (error-dialog-macos)","status":"pass","elapsed_ms":27.768226,"timing_error":""}
+  ok   ready sends the error and its report, redacted (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"copy, report and open act on the report the page showed (error-dialog-macos)","status":"pass","elapsed_ms":36.745841,"timing_error":""}
+  ok   copy, report and open act on the report the page showed (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"an unknown action is refused and changes nothing (error-dialog-macos)","status":"pass","elapsed_ms":30.335383,"timing_error":""}
+  ok   an unknown action is refused and changes nothing (error-dialog-macos)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"the close box frees the policy too (error-dialog-macos)","status":"pass","elapsed_ms":24.775223,"timing_error":""}
+  ok   the close box frees the policy too (error-dialog-macos)
+
+=== error window sharing uses the real report sink ===
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"retains the host snapshot and excludes the local error from the issue (error-sharing-owner)","status":"pass","elapsed_ms":46.609230,"timing_error":""}
+  ok   retains the host snapshot and excludes the local error from the issue (error-sharing-owner)
+
+=== error window retains its captured sharing identity ===
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"keeps local details and shares its own snapshot after another collection (error-sharing-owner)","status":"pass","elapsed_ms":23.002802,"timing_error":""}
+  ok   keeps local details and shares its own snapshot after another collection (error-sharing-owner)
+
+=== error dialog asynchronous action ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"does not acknowledge a pending opener after close","status":"pass","elapsed_ms":20.003338,"timing_error":""}
+  ok   does not acknowledge a pending opener after close
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"does not acknowledge a pending opener after module","status":"pass","elapsed_ms":23.663435,"timing_error":""}
+  ok   does not acknowledge a pending opener after module
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"does not acknowledge a pending opener after replacement","status":"pass","elapsed_ms":23.399113,"timing_error":""}
+  ok   does not acknowledge a pending opener after replacement
+
+=== error dialog native JavaScript receipts ===
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) reports a native submission false","status":"pass","elapsed_ms":21.132733,"timing_error":""}
+  ok   (error-dialog-js-receipt) reports a native submission false
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) reports a native submission nil","status":"pass","elapsed_ms":25.117152,"timing_error":""}
+  ok   (error-dialog-js-receipt) reports a native submission nil
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) reports a native submission throw","status":"pass","elapsed_ms":24.884318,"timing_error":""}
+  ok   (error-dialog-js-receipt) reports a native submission throw
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) preserves a native success nil","status":"pass","elapsed_ms":22.218181,"timing_error":""}
+  ok   (error-dialog-js-receipt) preserves a native success nil
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) preserves a native success code_zero","status":"pass","elapsed_ms":21.415301,"timing_error":""}
+  ok   (error-dialog-js-receipt) preserves a native success code_zero
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) reports an asynchronous native script error without its payload","status":"pass","elapsed_ms":23.143877,"timing_error":""}
+  ok   (error-dialog-js-receipt) reports an asynchronous native script error without its payload
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) ignores a closed page callback with successor=false","status":"pass","elapsed_ms":19.113727,"timing_error":""}
+  ok   (error-dialog-js-receipt) ignores a closed page callback with successor=false
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) ignores a closed page callback with successor=true","status":"pass","elapsed_ms":25.302202,"timing_error":""}
+  ok   (error-dialog-js-receipt) ignores a closed page callback with successor=true
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) observes localization script completion too","status":"pass","elapsed_ms":26.199986,"timing_error":""}
+  ok   (error-dialog-js-receipt) observes localization script completion too
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"(error-dialog-js-receipt) bounds diagnostic feedback from a failed folded update","status":"pass","elapsed_ms":21.904264,"timing_error":""}
+  ok   (error-dialog-js-receipt) bounds diagnostic feedback from a failed folded update
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_error_dialog","name":"tests.unit.ui.healthcheck.test_error_dialog","status":"pass","elapsed_ms":968.322933,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  30
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

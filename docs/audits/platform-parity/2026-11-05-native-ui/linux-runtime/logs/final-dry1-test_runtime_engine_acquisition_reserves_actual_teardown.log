@@ -1,0 +1,64 @@
+
+=== runtime acquisition reserves actual engine teardown ===
+  ok   explicit runtime constructor cannot reinitialize before returned cleanup capability (ollama-runtime-engine)
+  ok   scope cannot quiesce or snapshot unfinished runtime construction (ollama-runtime-engine)
+  ok   unknown constructor retains exact engine acquisition barrier (ollama-runtime-engine)
+
+=== runtime daemon pause and terminal authority ===
+  ok   actual pause retires the exact app epoch and preserves pending cleanup (ollama-runtime-engine)
+  ok   (linux-ai-off) switching the AI off stops the app-started service and the model download (ollama-runtime-engine)
+  ok   terminal daemon authority cannot capture fresh repair after cleanup (ollama-runtime-engine)
+  ok   terminal lexical writer hooks reject even freshly captured native revisions (ollama-runtime-engine)
+  ok   terminal close revokes an ordinary version receipt before native stop reenters (ollama-runtime-engine)
+  ok   backend admission cannot acknowledge shutdown and then publish a selection (ollama-runtime-engine)
+  ok   ordinary enable final writer admission refuses a terminal reentry (ollama-runtime-engine)
+  ok   backend final writer admission refuses shutdown after caller admission (ollama-runtime-engine)
+  ok   terminal model and download entries refuse before native dispatch (ollama-runtime-engine)
+  ok   actual model selection forwards a final native terminal admission (ollama-runtime-engine)
+  ok   terminal shutdown retains ordinary probe cancellation refusal until exact ACK (ollama-runtime-engine)
+
+=== managed response preserves the originating application ===
+  ok   (linux-managed-response) stopped app cannot publish late stream, debt=false (ollama-runtime-engine)
+  ok   (linux-managed-response) stopped app cannot publish late stream, debt=true (ollama-runtime-engine)
+  ok   (linux-managed-response) retained service exit cannot publish late stream or retire resources (ollama-runtime-engine)
+  ok   (linux-managed-response) retired binary source cannot turn a tags response into chat (ollama-runtime-engine)
+  ok   (linux-managed-response) origin construction cannot capture a successor after retiring the producer (ollama-runtime-engine)
+  ok   (linux-managed-response) same app permits the original stream (ollama-runtime-engine)
+
+=== managed response private identities and inventory ===
+  ok   (linux-managed-response) same-origin app replacement cannot borrow the unchanged engine epoch (ollama-runtime-engine)
+  ok   (linux-managed-response) capture invokes no observer and forged handles cannot authenticate (ollama-runtime-engine)
+  ok   (linux-managed-response) endpoint reader retires the producer before model inventory dispatch (ollama-runtime-engine)
+  ok   (linux-managed-response) same-origin service replacement during inventory read cannot publish models (ollama-runtime-engine)
+  ok   (linux-managed-response) inventory cache belongs to its original private app (ollama-runtime-engine)
+  ok   (linux-managed-response) origin resolution refuses before borrowing a newer managed owner (ollama-runtime-engine)
+
+=== managed response reentrancy and closed authority ===
+  ok   (linux-managed-response) source observer cannot deliver an old chunk after installing a successor request (ollama-runtime-engine)
+  ok   (linux-managed-response) a chunk callback retiring the app fences later lines in that same native chunk (ollama-runtime-engine)
+  ok   (linux-managed-response) replaced compatible controller port cannot grant custody: capture_response (ollama-runtime-engine)
+  ok   (linux-managed-response) replaced compatible controller port cannot grant custody: response_current (ollama-runtime-engine)
+  ok   (linux-managed-response) stale response retains refused HTTP cancellation until actual acknowledgement (ollama-runtime-engine)
+  ok   (linux-managed-response) fresh unowned same-origin query is observable only through its actual response (ollama-runtime-engine)
+
+=== managed response observer and cache publication order ===
+  ok   (linux-managed-response) retired inventory callbacks cannot overwrite a newer cache (ollama-runtime-engine)
+  ok   (linux-managed-response) final running proof has no later source observer (ollama-runtime-engine)
+  ok   (linux-managed-response) reentrant controller-port replacement is refused by the originating wrapper (ollama-runtime-engine)
+
+=== managed provisional source has no response authority ===
+  ok   (linux-managed-response) provisional serve cannot borrow an absent app receipt (ollama-runtime-engine)
+
+=== managed response reaches original transport admission ===
+  ok   (linux-managed-response) repeated app stop revokes an already unowned request epoch (ollama-runtime-engine)
+  ok   (linux-managed-response) standalone tags response cannot borrow a replacement app (ollama-runtime-engine)
+  ok   (linux-managed-response) native transport constructor receives the original final admission predicate (ollama-runtime-engine)
+
+=== managed response closes per-line observer currency ===
+  ok   (linux-managed-response) per-line source observer cannot publish into a superseded request (ollama-runtime-engine)
+
+=== managed response consumers retain constructor-bound engine ports ===
+  ok   (linux-managed-response) compatible latest engine exports cannot authorize chat (ollama-runtime-engine)
+  ok   (linux-managed-response) compatible latest engine exports cannot authorize probe (ollama-runtime-engine)
+  ok   (linux-managed-response) compatible latest engine exports cannot authorize inventory (ollama-runtime-engine)
+AUDIT_TEST_RESULT	43	0

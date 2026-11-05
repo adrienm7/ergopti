@@ -1,0 +1,44 @@
+Selecting exact test module: "tests.unit.infra.logger.test_diagnostic_snapshot"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.infra.logger.test_diagnostic_snapshot
+
+=== Diagnostic snapshot: macOS collector ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"the shared vectors render byte for byte on the macOS path","status":"pass","elapsed_ms":0.040671,"timing_error":""}
+  ok   the shared vectors render byte for byte on the macOS path
+2026-11-05 00:54:09:000 [WARNING] [BuildCommit] Build commit unknown: no build_stamp.txt in the shared tree '/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/_shared' and '/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/infra' is not inside a git checkout.
+[logger] unified log write refused: /tmp/lua_6TKkil_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_6TKkil_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:54:09:000 [INFO] [Diagnostics] Diagnostic snapshot (driver=macos version=3.1.0 commit=unknown os=macOS os_version="Version 15.5 (Build 24F74)" arch=arm64 runtime="Hammerspoon 1.0.0" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=2 dpi=2x display=quartz config_dir=~/Library/Ergopti logs_dir=~/Library/Logs/Ergopti/ log_level=DEBUG features_enabled=2/4 boot_ms=950).
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"emits one INFO line with every shared field, once per session","status":"pass","elapsed_ms":0.276237,"timing_error":""}
+  ok   emits one INFO line with every shared field, once per session
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"is emitted after boot from the menu prime, not from init.lua","status":"pass","elapsed_ms":183.361498,"timing_error":""}
+  ok   is emitted after boot from the menu prime, not from init.lua
+
+=== Boot profiler: the Boot complete mark freezes the total ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"init.lua still closes boot with the label the profiler watches","status":"pass","elapsed_ms":1.180838,"timing_error":""}
+  ok   init.lua still closes boot with the label the profiler watches
+
+=== Runtime diagnostics: previously invisible events now log ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"a controlled reload or exit logs its reason","status":"pass","elapsed_ms":0.482276,"timing_error":""}
+  ok   a controlled reload or exit logs its reason
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"a file-triggered reload names the changed files and a failed toast is logged","status":"pass","elapsed_ms":0.500113,"timing_error":""}
+  ok   a file-triggered reload names the changed files and a failed toast is logged
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"the webview factory times open, first load and close","status":"pass","elapsed_ms":3.125608,"timing_error":""}
+  ok   the webview factory times open, first load and close
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"menu feature toggles and menu prime failures are logged","status":"pass","elapsed_ms":1.034938,"timing_error":""}
+  ok   menu feature toggles and menu prime failures are logged
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"a settled pause or resume is logged","status":"pass","elapsed_ms":5.667175,"timing_error":""}
+  ok   a settled pause or resume is logged
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"a process exit is logged by program name only","status":"pass","elapsed_ms":4.515301,"timing_error":""}
+  ok   a process exit is logged by program name only
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.infra.logger.test_diagnostic_snapshot","name":"tests.unit.infra.logger.test_diagnostic_snapshot","status":"pass","elapsed_ms":206.144133,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  10
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

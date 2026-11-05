@@ -1,0 +1,5 @@
+
+=== diagnostics device write probe ===
+  ok   answers missing for an absent device and creates nothing
+  ok   answers granted for a node this user may write, and leaves it as it was
+AUDIT_TEST_RESULT	2	0

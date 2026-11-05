@@ -1,0 +1,2 @@
+orphan guard semantic scenarios: ok
+orphan guard streaming resource regression: ok

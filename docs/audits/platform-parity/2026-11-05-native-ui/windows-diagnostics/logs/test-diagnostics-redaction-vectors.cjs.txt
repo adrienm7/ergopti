@@ -1,0 +1,1 @@
+[OK] diagnostics redaction vectors (JS): 43 vector(s) match the Lua and AHK ports.

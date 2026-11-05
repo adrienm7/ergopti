@@ -1,0 +1,65 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_local_state_probe"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_local_state_probe
+
+=== healthcheck (macOS): local_state probe (healthcheck-local-state) ===
+2026-11-05 00:53:36:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+[logger] unified log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:36:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:53:36:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-05 00:53:37:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_WF8XTO_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log: No such file or directory.
+[logger] topical log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_keystats.log: No such file or directory
+2026-11-05 00:53:37:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_WF8XTO_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log' — bridge may not receive KE events.
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"phase A reads no Wi-Fi signal and checks no adapter (healthcheck-local-state)","status":"pass","elapsed_ms":104.216716,"timing_error":""}
+  ok   phase A reads no Wi-Fi signal and checks no adapter (healthcheck-local-state)
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+[logger] unified log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the USB devices: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:492: attempt to index a nil value (field 'usb').
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"the steps read the Wi-Fi signal and check every adapter (healthcheck-local-state)","status":"pass","elapsed_ms":58.312194,"timing_error":""}
+  ok   the steps read the Wi-Fi signal and check every adapter (healthcheck-local-state)
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+[logger] unified log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:37:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+2026-11-05 00:53:37:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"phase A leaves the versions, the keyboard state and the USB devices to the steps (healthcheck-local-state)","status":"pass","elapsed_ms":40.818008,"timing_error":""}
+  ok   phase A leaves the versions, the keyboard state and the USB devices to the steps (healthcheck-local-state)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"the USB step keeps the Bluetooth devices a faster probe already added (healthcheck-local-state)","status":"pass","elapsed_ms":4.148416,"timing_error":""}
+  ok   the USB step keeps the Bluetooth devices a faster probe already added (healthcheck-local-state)
+2026-11-05 00:53:37:000 [WARNING] [logger] ↑ 1 identical line suppressed
+[logger] unified log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_WF8XTO_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+2026-11-05 00:53:37:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+2026-11-05 00:53:37:000 [WARNING] [healthcheck] Diagnostics could not read the USB devices: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:492: attempt to index a nil value (field 'usb').
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"a report without a page completes them after phase A (healthcheck-local-state)","status":"pass","elapsed_ms":30.602817,"timing_error":""}
+  ok   a report without a page completes them after phase A (healthcheck-local-state)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"slices stop at the phase A budget and the answer carries the facts (healthcheck-local-state)","status":"pass","elapsed_ms":10.763554,"timing_error":""}
+  ok   slices stop at the phase A budget and the answer carries the facts (healthcheck-local-state)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"a raising step costs its fact, not the others (healthcheck-local-state)","status":"pass","elapsed_ms":8.796922,"timing_error":""}
+  ok   a raising step costs its fact, not the others (healthcheck-local-state)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"the field run names phase A's cost and fails over its budget (healthcheck-local-state)","status":"pass","elapsed_ms":0.030776,"timing_error":""}
+  ok   the field run names phase A's cost and fails over its budget (healthcheck-local-state)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","name":"tests.unit.ui.healthcheck.test_healthcheck_local_state_probe","status":"pass","elapsed_ms":281.939057,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

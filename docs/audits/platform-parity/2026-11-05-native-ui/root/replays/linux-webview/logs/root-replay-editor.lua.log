@@ -1,0 +1,6 @@
+RELOAD_RECEIPT mode=healthy saved=true alerts=0 reload_calls=1
+RELOAD_RECEIPT mode=refused saved=true alerts=0 reload_calls=1
+RELOAD_RECEIPT mode=throws saved=true alerts=0 reload_calls=1
+CLOSE_RECEIPT close_calls=0 reply=nil
+ACTUAL_RELOAD_REFUSAL saved=true receipt=false alerts=0
+ACTUAL_ENGINE generation_unchanged=true

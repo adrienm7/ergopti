@@ -1,0 +1,68 @@
+Selecting exact test module: "tests.unit.ui.editors.test_personal_info_editor_owner_callbacks"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.editors.test_personal_info_editor_owner_callbacks
+
+=== personal editor exact callback owners ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"honours public close during creation (personal-editor-construction-close)","status":"pass","elapsed_ms":0.273261,"timing_error":""}
+  ok   honours public close during creation (personal-editor-construction-close)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"honours page cancel during creation (personal-editor-construction-close)","status":"pass","elapsed_ms":0.198979,"timing_error":""}
+  ok   honours page cancel during creation (personal-editor-construction-close)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"keeps current readiness and retryable saves functional (personal-editor-owner)","status":"pass","elapsed_ms":0.163045,"timing_error":""}
+  ok   keeps current readiness and retryable saves functional (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"retains deletion retry without replaying committed saves (personal-editor-owner)","status":"pass","elapsed_ms":0.222285,"timing_error":""}
+  ok   retains deletion retry without replaying committed saves (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"does not publish a candidate closed during creation (personal-editor-owner)","status":"pass","elapsed_ms":0.153531,"timing_error":""}
+  ok   does not publish a candidate closed during creation (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"reopens through exact cleanup after a failed close (personal-editor-owner)","status":"pass","elapsed_ms":0.169986,"timing_error":""}
+  ok   reopens through exact cleanup after a failed close (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"rejects retired save callbacks (personal-editor-owner)","status":"pass","elapsed_ms":0.187832,"timing_error":""}
+  ok   rejects retired save callbacks (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"rejects retired cancel callbacks (personal-editor-owner)","status":"pass","elapsed_ms":0.330037,"timing_error":""}
+  ok   rejects retired cancel callbacks (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"rejects retired ready callbacks (personal-editor-owner)","status":"pass","elapsed_ms":0.165188,"timing_error":""}
+  ok   rejects retired ready callbacks (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"rejects retired close callbacks (personal-editor-owner)","status":"pass","elapsed_ms":0.145108,"timing_error":""}
+  ok   rejects retired close callbacks (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"rejects retired navigation callbacks (personal-editor-owner)","status":"pass","elapsed_ms":0.136315,"timing_error":""}
+  ok   rejects retired navigation callbacks (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"does not close a successor opened by save (personal-editor-owner)","status":"pass","elapsed_ms":0.152319,"timing_error":""}
+  ok   does not close a successor opened by save (personal-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"does not close an editor rebound during save (personal-editor-owner)","status":"pass","elapsed_ms":0.133981,"timing_error":""}
+  ok   does not close an editor rebound during save (personal-editor-owner)
+
+=== personal editor save diagnostic privacy ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds throw_string callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.454674,"timing_error":""}
+  ok   withholds throw_string callback content (personal-editor-save-privacy)
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds return_string callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.158909,"timing_error":""}
+  ok   withholds return_string callback content (personal-editor-save-privacy)
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds throw_table callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.307592,"timing_error":""}
+  ok   withholds throw_table callback content (personal-editor-save-privacy)
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds return_table callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.173771,"timing_error":""}
+  ok   withholds return_table callback content (personal-editor-save-privacy)
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds false callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.137897,"timing_error":""}
+  ok   withholds false callback content (personal-editor-save-privacy)
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"withholds nil callback content (personal-editor-save-privacy)","status":"pass","elapsed_ms":0.131037,"timing_error":""}
+  ok   withholds nil callback content (personal-editor-save-privacy)
+
+=== personal editor JavaScript failure boundary ===
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"reports throw without personal values (personal-editor-javascript)","status":"pass","elapsed_ms":0.144368,"timing_error":""}
+  ok   reports throw without personal values (personal-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"reports nil without personal values (personal-editor-javascript)","status":"pass","elapsed_ms":0.141432,"timing_error":""}
+  ok   reports nil without personal values (personal-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"reports false without personal values (personal-editor-javascript)","status":"pass","elapsed_ms":0.151268,"timing_error":""}
+  ok   reports false without personal values (personal-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"reports async without personal values (personal-editor-javascript)","status":"pass","elapsed_ms":0.299300,"timing_error":""}
+  ok   reports async without personal values (personal-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"accepts a successful script completion (personal-editor-javascript)","status":"pass","elapsed_ms":0.234843,"timing_error":""}
+  ok   accepts a successful script completion (personal-editor-javascript)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","name":"tests.unit.ui.editors.test_personal_info_editor_owner_callbacks","status":"pass","elapsed_ms":5.465832,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  24
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

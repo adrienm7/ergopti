@@ -1,0 +1,3 @@
+PASS schema 1; scope macos-webview; exact SHA/date; unique IDs MVB-001,MVB-002; severity/confidence enums; G1-G5; standard report fields.
+PASS editor-finalA/editor-finalB after MVB-002:19/19 commands successful each;17 original bounded test modules +actual picker receipt matrix +full production JS/public macOS editor/parser/writer join.
+PASS failed save diagnostic remains loud, failed draft absent on reopen; healthy/autoclose-off/menu controls preserved in both final logs.

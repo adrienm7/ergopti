@@ -1,0 +1,9 @@
+PASS owned-deadline cold: child exit/group ESRCH/close ACKs; zero native handles
+PASS owned-deadline callback: child exit/group ESRCH/close ACKs; zero native handles
+PASS owned-deadline existing: child exit/group ESRCH/close ACKs; zero native handles
+
+=== owned-process-deadline ===
+  ok   owned-process-deadline: cold preserves a newly armed native budget
+  ok   owned-process-deadline: callback preserves a newly armed native budget
+  ok   owned-process-deadline: existing preserves a newly armed native budget
+AUDIT_TEST_RESULT	3	0

@@ -1,0 +1,68 @@
+{
+	"schema_version": 1,
+	"scope": "linux-diagnostics",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "/workspace/scratch/parity-native-ui/linux-diagnostics/report.md",
+	"findings": [
+		{
+			"id": "LDG-001",
+			"title": "API diagnostics report and probe the Ollama backend instead of the selected backend",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "Select the supported API backend, enable AI, and open Diagnostics; optionally refresh with extensive checks. Actual Linux bridge.build_snapshot over that public query state reports ai_backend=ollama. Native probe with API input still requests the local Ollama /api/version and marks its answer as Backend answers. Replay probes/run.py with explicit --source-root; ai-projection.lua, page-model.cjs, and api-health transcript isolate the roots.",
+			"root_cause": "linux/ui/healthcheck/bridge.lua:346 collect_ai hardcodes ai_backend=\"ollama\" under an obsolete only-backend comment and never calls get_backend. linux/ui/healthcheck/probes.lua AI_BACKEND and ai_health use the same Ollama-only assumption, always appending /api/version to get_base_url. prediction_engine supports api and get_base_url still returns the local profiles URL. Shared schema AI rows apply to Linux without a backend restriction.",
+			"silent_failure": "Collection and probing complete normally; the actual shared page renders ollama as Backend and the unrelated local answer under Backend answers. The typed export preserves the wrong but valid enum. No mismatch diagnostic is emitted because source backend is never queried.",
+			"regression_test": "Drive actual bridge and probes with public API-backend state, render the actual shared page model and inspect actual typed export. Require backend api, and a truthful unsupported(API) probe unless a qualified API health route is implemented. Preserve normal Ollama local-probe and absent/disabled controls; never let a local answering service certify a different selected backend.",
+			"evidence": {
+				"artifact": "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/ai-projection.lua",
+				"log": "/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-ai-projection.log",
+				"additional_logs": [
+					"/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-page-model.log",
+					"/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-api-health.log"
+				],
+				"observed": "input backend api; snapshot/export/page ollama; get_backend calls 0; ai_health actual target http://127.0.0.1:11435/api/version, state ok",
+				"provenance": "Actual bridge, schema, share projection, and shared JavaScript page model. LLM public query results are explicit fixture input; actual backend selection transaction is source-traced. Actual HTTP/managed/curl native owners execute only private synthetic helper programs."
+			}
+		},
+		{
+			"id": "LDG-002",
+			"title": "Disabled AI becomes unknown in diagnostics and disappears from its export",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "Open Diagnostics with a present LLM owner whose is_enabled() returns false. Actual bridge sets ai_enabled=nil while its features row correctly carries llm=false. The actual shared page renders Enabled as unknown/muted, indistinguishable from an absent owner; typed export omits ai_enabled. ai-projection.lua and page-model.cjs reproduce this with true, false, and absent-owner controls.",
+			"root_cause": "linux/ui/healthcheck/bridge.lua:350 uses type-check and llm.is_enabled()==true or nil. A legitimate false result reaches or nil, collapsing known disabled into unavailable. Shared page formatValue/fieldDisplay treats absent as unknown and false as no; share projection can preserve false but never receives it.",
+			"silent_failure": "The collector returns a valid table and has no exception or warning. Enabled shows unknown rather than no, and the report loses the known false field. The developer/features sections still report the disabled module correctly, so their existing passing tests miss the AI-specific field.",
+			"regression_test": "Call the actual collector with is_enabled true, false, unavailable method, and absent LLM. Assert false remains a boolean in snapshot/export and renders no/value through the actual page model; only unavailable states should render unknown. Cover the AI section independently from the features/developer disabled rows.",
+			"evidence": {
+				"artifact": "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/ai-projection.lua",
+				"log": "/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-page-model.log",
+				"observed": "actual_page enabled=false renders=unknown/muted; preserved_false renders=no/value; absent_llm renders=unknown/muted",
+				"provenance": "Actual Linux build_snapshot and closed share projection; actual shipped JavaScript model evaluated in Node without a DOM or GUI. Only immediate native/system providers and the public LLM query input are controlled."
+			}
+		},
+		{
+			"id": "LDG-003",
+			"title": "Refused timer admission leaves the configuration diagnostic pending without a completion path",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Open Diagnostics to start its always-on local configuration probe. Make luv.new_timer return nil/ENOMEM, or timer_start return nil/EINVAL. Actual timer_scheduler.after returns a fired, unarmed handle after logging the refusal. Actual probes configuration body ignores that receipt. The public run publishes zero terminals, all native handles are gone, and the actual initial snapshot row remains pending. Healthy native timer publishes one ok terminal. timer-admission.lua exercises both failures and healthy control.",
+			"root_cause": "linux/ui/healthcheck/probes.lua configuration schedules Timers.after and only registers its canceller. It never checks the returned handle armed receipt; start_probe has no independent watchdog, so a nonthrowing scheduler refusal returns normally without done(). timer_scheduler.lua:93 initializes armed=false and its refusal path returns that handle. cpu_load has the same unchecked scheduling shape as an immediate sibling.",
+			"silent_failure": "The scheduler logs after(): timer allocation/start failed, so the native fault is not wholly silent. The diagnostics run does not publish an error or timeout and the UI stays at pending even though no timer remains capable of finishing it. Existing probe tests cover HAS_ASYNC=false and ordinary deferred callbacks, not a structurally valid unarmed scheduler handle.",
+			"regression_test": "Use actual timer_scheduler and probe modules over faithful luv allocation/start fault seams. Require one classified configuration terminal for nil allocation and nil/false start receipts, no successful sections and no live handles after cleanup. Preserve healthy actual-timer completion and cancelled-run late suppression; apply the invariant to cpu_load scheduling too.",
+			"evidence": {
+				"artifact": "/workspace/scratch/parity-native-ui/linux-diagnostics/probes/timer-admission.lua",
+				"log": "/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-timer-refused.log",
+				"additional_logs": [
+					"/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-timer-start-refused.log",
+					"/workspace/scratch/parity-native-ui/linux-diagnostics/logs/final-dry1-timer-healthy.log"
+				],
+				"observed": "native_timer=refused and start-refused: callbacks=0, live_handles=0, configuration_terminal=missing, snapshot=pending; healthy native_timer callbacks=1 configuration=ok live_handles=0",
+				"provenance": "Actual probes, schema pending-probe builder, bridge configuration context, configuration reducer, timer scheduler and native timer validation. Only the individual libuv allocation/start receipt is faulted; healthy uses real libuv and refusal cleanup closes real allocated handles."
+			}
+		}
+	]
+}

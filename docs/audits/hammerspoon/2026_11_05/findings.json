@@ -1,0 +1,48 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/hammerspoon/2026_11_05/report.md",
+	"findings": [
+		{
+			"title": "Approval-watch deadline counts polling intervals rather than elapsed time",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Reach virtual_hid_not_active and start the automatic watch. Complete each listing in 4 seconds and each poll after 3 seconds. The real Lua module stops after 2104 simulated seconds despite its 900 second limit; an active answer at 1005 seconds still triggers reload. The genuine Linux libuv scaled 1 second experiment remains active at1.098s and stops at2.252s.",
+			"root_cause": "runtime_approval_watch.poll carries an elapsed counter increased only by APPROVAL_POLL_SEC; it excludes command and scheduling latency and assesses success before the deadline.",
+			"silent_failure": "The stop warning describes 900 seconds while the actual lifetime is longer. Existing tests use immediate listing callbacks and manually fire timers, so they verify a poll count rather than elapsed time.",
+			"regression_test": "Drive the actual watch with a monotonic clock and delayed listings/timers; assert no polling/reload authority after an absolute deadline, including a late approved answer and exact boundary.",
+			"id": "HS-001",
+			"campaign_id": "MRT-001",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md"
+		},
+		{
+			"title": "False native System Settings opener result is accepted without failure diagnostics",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Reach the automatic approval watch with its open_settings port returning literal false, the native hs.urlevent.openURL refusal form. Actual watch.start returns true and remains active with zero error diagnostics although the pane did not open. Existing successful and thrown-error paths are controls.",
+			"root_cause": "runtime_approval_watch captures pcall status but ignores its returned native boolean; runtime_owner_ports forwards hs.urlevent.openURL unchanged.",
+			"silent_failure": "Only a start message says the pane is opening. Neither a thrown exception nor any error diagnostic occurs for false. Existing test opener and common hs stub return nil and certify call recording instead of native success.",
+			"regression_test": "Test true,false,nil and throw at the actual watch/port join. Require explicit false/nil refusal diagnostics while preserving any intentionally independent background observation.",
+			"id": "HS-002",
+			"campaign_id": "MRT-006",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-runtime/report.md"
+		},
+		{
+			"title": "Action picker silently drops failed initial data delivery",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Run ci-bin/lua probes/receipts.lua SOURCE_ROOT. Open the production ui.action_picker through its public API, retain the actual pool route, make the native evaluateJavaScript boundary throw, and deliver a correctly named ready message from the exact attached view. The exception is swallowed, no ERROR is recorded, and the view remains open. Repeat with hs.json.encode throwing: zero native delivery attempts, zero errors, view remains open. Healthy delivery and exact-source confirmation controls pass. This is a Linux Lua boundary replay, not a native Darwin/WebKit execution.",
+			"root_cause": "ui/action_picker/init.lua push_init protects encoding and evaluateJavaScript with pcall but ignores the failure values and never reports a failure. It also provides no completion observer. Its ready and didFinishNavigation entries both use this same unchecked delivery.",
+			"silent_failure": "The inner pcall consumes the raised boundary exception before ControllerPool.dispatch can log it. Logger.info still says that the picker opened. The custom probe observes zero central error messages; native stderr and asynchronous WebKit default error logging were not measured.",
+			"regression_test": "Drive the production picker and pool with correct native name/source and force encoding exception and evaluation exception independently. Require a fixed-metadata ERROR or explicit failed/opening state, with private action data withheld; preserve healthy init, confirmation, foreign-source rejection and stale-session controls. Add completion handling qualified against adapters.webview_result nil and {code=0} success sentinels.",
+			"id": "HS-003",
+			"campaign_id": "MVB-001",
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/macos-webview/report.md"
+		}
+	]
+}

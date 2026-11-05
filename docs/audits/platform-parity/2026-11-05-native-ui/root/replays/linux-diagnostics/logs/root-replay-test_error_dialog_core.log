@@ -1,0 +1,13 @@
+
+=== shared error window core (error-dialog-core) ===
+  ok   loads the shipped policy and refuses a missing one
+  ok   initialises once under the host's lifecycle lines
+  ok   answers false and logs why when the policy cannot be loaded
+  ok   reads the stored switch first, then the manifest's boolean default
+  ok   persists only a boolean and only reports a saved one
+  ok   composes the report and the file an error is logged in
+  ok   redacts every text of the page's first message
+
+=== the error window host delegates to the shared core (error-dialog-core) ===
+  ok   error_dialog/bridge.lua requires error_dialog.core and keeps no copy
+AUDIT_TEST_RESULT	8	0

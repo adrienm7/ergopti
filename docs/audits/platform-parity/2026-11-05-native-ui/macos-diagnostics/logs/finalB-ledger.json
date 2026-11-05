@@ -1,0 +1,496 @@
+[
+  {
+    "selector": "tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement",
+    "returncode": 0,
+    "passed_tests": 27,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_direct_native_window_retirement.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.lifecycle.test_direct_native_window_retirement"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_diagnostics_runner",
+    "returncode": 0,
+    "passed_tests": 5,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_diagnostics_runner.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_diagnostics_runner"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_error_dialog",
+    "returncode": 0,
+    "passed_tests": 30,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_error_dialog.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_error_dialog"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_error_dialog_core",
+    "returncode": 0,
+    "passed_tests": 8,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_error_dialog_core.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_error_dialog_core"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_appleevents",
+    "returncode": 0,
+    "passed_tests": 12,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_appleevents.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_appleevents"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_bridge_actions",
+    "returncode": 0,
+    "passed_tests": 19,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_bridge_actions.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_bridge_actions"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir",
+    "returncode": 0,
+    "passed_tests": 9,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_build_commit_and_config_dir.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_configuration",
+    "returncode": 0,
+    "passed_tests": 50,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_configuration.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_configuration"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_error_persistence",
+    "returncode": 0,
+    "passed_tests": 4,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_error_persistence.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_error_persistence"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_identity_rows",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_identity_rows.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_identity_rows"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_key_counters",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_key_counters.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_key_counters"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_local_state_probe",
+    "returncode": 0,
+    "passed_tests": 8,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_local_state_probe.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_local_state_probe"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_memory_page_size",
+    "returncode": 0,
+    "passed_tests": 3,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_memory_page_size.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_memory_page_size"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_no_network_identity",
+    "returncode": 0,
+    "passed_tests": 1,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_no_network_identity.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_no_network_identity"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_pac_check",
+    "returncode": 0,
+    "passed_tests": 7,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_pac_check.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_pac_check"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_permissions",
+    "returncode": 0,
+    "passed_tests": 9,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_permissions.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_permissions"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess",
+    "returncode": 0,
+    "passed_tests": 1,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_phase_a_no_subprocess.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_phase_a_no_subprocess"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_probes",
+    "returncode": 0,
+    "passed_tests": 13,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_probes.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_probes"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source",
+    "returncode": 0,
+    "passed_tests": 17,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_recent_issues_source.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_report_issue",
+    "returncode": 0,
+    "passed_tests": 49,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_report_issue.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_report_issue"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_retina_scale",
+    "returncode": 0,
+    "passed_tests": 4,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_retina_scale.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_retina_scale"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_share_enums",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_share_enums.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_share_enums"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_timer_transaction",
+    "returncode": 0,
+    "passed_tests": 4,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_timer_transaction.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_timer_transaction"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_unavailable",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_unavailable.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_unavailable"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease",
+    "returncode": 0,
+    "passed_tests": 1,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_uninitialized_lease.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease"
+    ]
+  },
+  {
+    "selector": "tests.unit.ui.healthcheck.test_hs_canvas_stub_contract",
+    "returncode": 0,
+    "passed_tests": 5,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_hs_canvas_stub_contract.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.ui.healthcheck.test_hs_canvas_stub_contract"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_report_contract",
+    "returncode": 0,
+    "passed_tests": 8,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_report_contract.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_report_contract"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_report_deferred_off_hot_path.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_report_deferred_off_hot_path"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_report_no_sync_probes",
+    "returncode": 0,
+    "passed_tests": 3,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_report_no_sync_probes.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_report_no_sync_probes"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive",
+    "returncode": 0,
+    "passed_tests": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_reporter_mkdir_recursive.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_reporter_mkdir_recursive"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_reporter_no_modal",
+    "returncode": 0,
+    "passed_tests": 2,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_reporter_no_modal.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_reporter_no_modal"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_reporter_retention",
+    "returncode": 0,
+    "passed_tests": 4,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_reporter_retention.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_reporter_retention"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_crash_reporter_unique_filenames",
+    "returncode": 0,
+    "passed_tests": 1,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_reporter_unique_filenames.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_crash_reporter_unique_filenames"
+    ]
+  },
+  {
+    "selector": "tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox",
+    "returncode": 0,
+    "passed_tests": 11,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_hid_diagnostic_mailbox.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.modules.diagnostics.test_hid_diagnostic_mailbox"
+    ]
+  },
+  {
+    "selector": "tests.unit.infra.logger.test_diagnostic_snapshot",
+    "returncode": 0,
+    "passed_tests": 10,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_diagnostic_snapshot.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.infra.logger.test_diagnostic_snapshot"
+    ]
+  },
+  {
+    "selector": "tests.unit.infra.logger.test_crash_reporter_wired",
+    "returncode": 0,
+    "passed_tests": 3,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_crash_reporter_wired.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.unit.infra.logger.test_crash_reporter_wired"
+    ]
+  },
+  {
+    "selector": "tests.meta.corpus.test_corpus_healthcheck_snapshot",
+    "returncode": 0,
+    "passed_tests": 11,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_corpus_healthcheck_snapshot.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.meta.corpus.test_corpus_healthcheck_snapshot"
+    ]
+  },
+  {
+    "selector": "tests.meta.corpus.test_corpus_diagnostics",
+    "returncode": 0,
+    "passed_tests": 219,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_corpus_diagnostics.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.meta.corpus.test_corpus_diagnostics"
+    ]
+  },
+  {
+    "selector": "tests.meta.architecture.test_healthcheck_api_contract",
+    "returncode": 0,
+    "passed_tests": 28,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test_healthcheck_api_contract.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/static/ergopti_plus/macos/tests/run.lua",
+      "--only=tests.meta.architecture.test_healthcheck_api_contract"
+    ]
+  },
+  {
+    "selector": "test-diagnostics-redaction-vectors.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-diagnostics-redaction-vectors.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-diagnostics-redaction-vectors.cjs"
+    ]
+  },
+  {
+    "selector": "test-healthcheck-model.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-healthcheck-model.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-healthcheck-model.cjs"
+    ]
+  },
+  {
+    "selector": "test-healthcheck-page.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-healthcheck-page.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-healthcheck-page.cjs"
+    ]
+  },
+  {
+    "selector": "test-error-dialog-page.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-error-dialog-page.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-error-dialog-page.cjs"
+    ]
+  },
+  {
+    "selector": "test-diagnostic-ui-integrity.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-diagnostic-ui-integrity.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-diagnostic-ui-integrity.cjs"
+    ]
+  },
+  {
+    "selector": "test-diagnostic-snapshot-parity.cjs",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-test-diagnostic-snapshot-parity.cjs.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/node",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview/tools/test/test-diagnostic-snapshot-parity.cjs"
+    ]
+  },
+  {
+    "selector": "private_crash_canary",
+    "returncode": 0,
+    "log": "/workspace/scratch/parity-native-ui/macos-diagnostics/logs/finalB-crash-canary.log",
+    "command": [
+      "/workspace/scratch/parity-toolchain/ci-bin/lua",
+      "/workspace/scratch/parity-native-ui/macos-diagnostics/probes/crash-canary.lua",
+      "/workspace/worktrees/parity-2026-11-05/macos-webview",
+      "/workspace/scratch/parity-native-ui/macos-diagnostics"
+    ]
+  }
+]

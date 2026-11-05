@@ -1,0 +1,20 @@
+
+=== Pinned Ollama native artifact ===
+  ok   fixed pinned constructor refuses updater-shaped admission
+  ok   digest commitment precedes any output and rejects a second commitment
+  ok   mutable caller asset cannot substitute admitted size hash or name
+  ok   wrong complete same-FD digest refuses native stage
+  ok   matching digest over wrong pinned byte count cannot stage
+  ok   refused master subscription acquires no native directory
+  ok   captured master methods cannot be replaced by caller table mutation
+  ok   changed original bound cannot borrow a reconstructed deadline
+  ok   pinned extraction admits original master without updater defaults
+  ok   master withdrawal without cancellation callback refuses retained output write
+  ok   foreign install transaction cannot acquire a retained reader
+  ok   original master withdrawal refuses later reader reservation
+  ok   invalid pinned key refuses before native lookup
+  ok   invalid pinned name refuses before native lookup
+  ok   invalid pinned url refuses before native lookup
+  ok   invalid pinned bytes refuses before native lookup
+  ok   invalid pinned sha256 refuses before native lookup
+AUDIT_TEST_RESULT	17	0

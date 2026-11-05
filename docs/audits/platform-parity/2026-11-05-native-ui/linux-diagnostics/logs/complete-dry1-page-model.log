@@ -1,0 +1,3 @@
+ADVERSE actual_page enabled=false renders=unknown/muted; api renders=ollama
+HEALTHY actual_page preserved_false renders=no/value
+REFUSAL actual_page absent_llm renders=unknown/muted

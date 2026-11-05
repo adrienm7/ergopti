@@ -1,0 +1,26 @@
+{
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"runtime_tree_changed_since_audit": false,
+	"tooling_fix": "4e8eefb",
+	"broad_run": {
+		"planned_linux_checks": 571,
+		"passed": 566,
+		"failed": 5,
+		"failed_cause": "Four default-buffer Git census calls exceeded1MiB; the fifth propagated one scanner failure.",
+		"native_ahk_case": "not_executed"
+	},
+	"targeted_after_fix": {
+		"all_twelve_commands_exit_zero": true,
+		"receipt": "tooling-git-paths/receipt.json",
+		"independent_root_final_large_index": "tooling-regression-root-final.txt"
+	},
+	"artifact_validation": {
+		"scope_count": 9,
+		"canonical_findings": 15,
+		"capability_rows": 28,
+		"corruption_negative_controls": 30,
+		"zero_findings_positive_control": true,
+		"source_area_members": 2333
+	},
+	"meaning": "Broad failed log retained; successful focused reruns resolve its failures. This is not a new clean full572 run or native feature certification."
+}

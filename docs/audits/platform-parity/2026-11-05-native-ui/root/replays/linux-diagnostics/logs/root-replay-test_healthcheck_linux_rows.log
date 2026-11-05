@@ -1,0 +1,26 @@
+
+=== healthcheck (linux): the system facts ===
+  ok   reads the distribution, kernel, CPU and memory
+  ok   leaves an unreadable fact absent instead of inventing one
+  ok   feeds the boot snapshot line from the same probes
+
+=== healthcheck (linux): the window title ===
+  ok   uses the menu row's translated name (diagnostics-window-name)
+
+=== healthcheck (linux): optional modules that are off ===
+  ok   reports an AI engine the user switched off as disabled, not failed (developer-details)
+  ok   counts an AI engine that is switched on as loaded (developer-details)
+  ok   fails an AI engine that did not load instead of calling it disabled (developer-details)
+  ok   still fails a missing required module (developer-details)
+
+=== healthcheck (linux): the system rows the page renders ===
+  ok   sends every Linux system and hardware value the schema declares
+
+=== healthcheck (linux): the daemon's own load ===
+  ok   reports the daemon's resident memory from /proc/self/status (system-load)
+
+=== healthcheck (linux): the features the page lists ===
+  ok   lists hotstrings, shortcuts and gestures with their switches (features-parity)
+  ok   reads hotstrings as off when every group is off (features-parity)
+  ok   leaves out a feature whose module the daemon does not run (features-parity)
+AUDIT_TEST_RESULT	13	0

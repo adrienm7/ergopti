@@ -1,0 +1,42 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_activation/test_runtime_activation.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_activation.test_runtime_activation
+
+=== owned runtime activation: what « wanted » means ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"is running and not paused, and nothing else","status":"pass","elapsed_ms":3.422470,"timing_error":""}
+  ok   is running and not paused, and nothing else
+
+=== owned runtime activation: Ergopti runs ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"starts Ergopti's runtime with the user's consent to close theirs","status":"pass","elapsed_ms":0.174954,"timing_error":""}
+  ok   starts Ergopti's runtime with the user's consent to close theirs
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"does not start a second time while the runtime starts or runs","status":"pass","elapsed_ms":1.146465,"timing_error":""}
+  ok   does not start a second time while the runtime starts or runs
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"records and announces a close only when Karabiner's own quit succeeded","status":"pass","elapsed_ms":0.067902,"timing_error":""}
+  ok   records and announces a close only when Karabiner's own quit succeeded
+
+=== owned runtime activation: Ergopti paused ===
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"stops Ergopti's runtime and gives back the Karabiner it closed","status":"pass","elapsed_ms":0.063094,"timing_error":""}
+  ok   stops Ergopti's runtime and gives back the Karabiner it closed
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"never starts or restores anything when Ergopti closed nothing","status":"pass","elapsed_ms":0.133912,"timing_error":""}
+  ok   never starts or restores anything when Ergopti closed nothing
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"keeps the record after a crash and gives the Karabiner back at the next pause","status":"pass","elapsed_ms":0.068013,"timing_error":""}
+  ok   keeps the record after a crash and gives the Karabiner back at the next pause
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"keeps the record when the restore is refused, so a later try can succeed","status":"pass","elapsed_ms":0.119941,"timing_error":""}
+  ok   keeps the record when the restore is refused, so a later try can succeed
+
+=== owned runtime activation: Ergopti resumes ===
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"reloads instead of starting a second capture in the same Lua VM","status":"pass","elapsed_ms":0.072720,"timing_error":""}
+  ok   reloads instead of starting a second capture in the same Lua VM
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"starts again in place when no earlier start reached the capture","status":"pass","elapsed_ms":0.061924,"timing_error":""}
+  ok   starts again in place when no earlier start reached the capture
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","name":"tests.unit.platform.remap.runtime_activation.test_runtime_activation","status":"pass","elapsed_ms":5.654449,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  10
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

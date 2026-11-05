@@ -1,0 +1,20 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_approval_watch/test_runtime_approval_watch.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch
+
+=== owned runtime driver approval watch ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"opens the extension pane once and reloads when the driver is allowed","status":"pass","elapsed_ms":3.847925,"timing_error":""}
+  ok   opens the extension pane once and reloads when the driver is allowed
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"gives up at its deadline without a reload","status":"pass","elapsed_ms":3.592872,"timing_error":""}
+  ok   gives up at its deadline without a reload
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","name":"tests.unit.platform.remap.runtime_approval_watch.test_runtime_approval_watch","status":"pass","elapsed_ms":7.595358,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

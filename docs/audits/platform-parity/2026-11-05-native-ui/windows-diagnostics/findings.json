@@ -1,0 +1,48 @@
+{
+	"schema_version": 1,
+	"scope": "windows-diagnostics",
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md",
+	"findings": [
+		{
+			"id": "WDG-001",
+			"title": "Both crash worker writers retain truncated canonical JSON after partial write refusal",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"reproduction": "Run ERGOPTI_AUDIT_SOURCE_ROOT=<audited-worktree> python3 probes/crash-partial.py. The unchanged primary and fallback Write-CrashDocument functions each pass healthy and no-replace collision controls, then an actual 1024-byte Linux file-size ceiling refuses a 16397-byte private-file write. Both leave a 1024-byte invalid timestamp-3.json. Native Windows counterpart: isolated bounded-volume write exhaustion during the actual retained crash worker; native trigger unexecuted.",
+			"root_cause": "Both vendor/ergopti_crash_worker.ps1:63 and vendor/ergopti_crash_fallback_worker.ps1:37 create the final canonical JSON path before writing and only Dispose in finally; no failed-write cleanup or separate incomplete-artifact publication state exists. The direct AHK durable-writer sibling's partial-removal invariant does not cover these workers.",
+			"silent_failure": "The write failure itself is not silent: no OK line is printed and worker failure/fallback is logged. The incomplete artifact remains under a normal report filename beside valid reports, while existing healthy/collision readback coverage does not expose partial-write retention.",
+			"regression_test": "Exercise each actual primary/fallback writer with real bounded-volume/private-file partial write and close refusal plus healthy and collision controls. Require no incomplete canonical JSON, no OK acknowledgement, preservation of existing files and healthy recovery. Retire only the exact created object or publish through an owned staging design; never unlink a foreign successor by unchecked pathname. Include full retained-worker fallback sequencing.",
+			"additional_properties": ["Crash artifact completeness"],
+			"source_report": "docs/audits/platform-parity/2026-11-05-native-ui/windows-diagnostics/report.md",
+			"basis": {
+				"kind": "actual PowerShell writer with Linux .NET file-limit refusal",
+				"native_limits": "Linux host only. Windows AHK/WebView2 and Darwin Hammerspoon/WebKit/launchd/System Extensions receiving boundaries were not executed. See scope report for exact synthetic input and source-only joins."
+			},
+			"submitted_evidence": null,
+			"evidence": [
+				"logs/crash-partial.txt",
+				"logs/dry-pass-1.txt",
+				"logs/dry-pass-2.txt",
+				"logs/functions.txt",
+				"logs/legacy-validator.txt",
+				"logs/native-save-source.txt",
+				"logs/resident-projection.txt",
+				"logs/test-diagnostic-snapshot-parity.cjs.txt",
+				"logs/test-diagnostic-ui-integrity.cjs.txt",
+				"logs/test-diagnostics-redaction-vectors.cjs.txt",
+				"logs/test-healthcheck-model.cjs.txt",
+				"logs/test-healthcheck-page.cjs.txt",
+				"logs/validate.txt",
+				"probes/crash-partial.ps1",
+				"probes/crash-partial.py",
+				"probes/native-save-source.cjs",
+				"probes/resident-projection.ps1",
+				"probes/sweep.py",
+				"probes/validate.cjs"
+			]
+		}
+	]
+}

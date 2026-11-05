@@ -1,0 +1,21 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease
+
+=== healthcheck: remapping phase before the lease init ===
+2026-11-05 00:52:59:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+[logger] unified log write refused: /tmp/lua_F8Or4P_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_F8Or4P_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease","name":"reports uninitialized without asking an uninitialized controller","status":"pass","elapsed_ms":37.401540,"timing_error":""}
+  ok   reports uninitialized without asking an uninitialized controller
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease","name":"tests.unit.ui.healthcheck.test_healthcheck_uninitialized_lease","status":"pass","elapsed_ms":37.489444,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

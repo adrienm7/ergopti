@@ -1,0 +1,8 @@
+
+=== Ergopti's own Ollama beside a system Ollama (linux-owned-ollama) ===
+  ok   (linux-owned-ollama) the endpoint is the owned port of defaults.json, never the stock one
+  ok   (linux-owned-ollama) profiles take the owned origin and refuse a stock-port override
+  ok   (linux-owned-ollama) the owned daemon is served on the owned port only
+  ok   (linux-owned-ollama) a system Ollama on PATH is never resolved, run or counted
+  ok   (linux-owned-ollama) the readiness probe never reaches a daemon on the stock port
+AUDIT_TEST_RESULT	5	0

@@ -1,0 +1,5 @@
+OBSERVED_ERROR module=toml_reader template=TOML file read did not commit (failure content withheld).
+OBSERVED_ERROR module=modules.hotstrings.loader template=Source '%s' did not commit and has no healthy snapshot.
+OBSERVED_ERROR module=modules.hotstrings.hotstrings_config template=Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).
+COUNTERCHECK saved=true exact_bytes_committed=true engine_unchanged=true explicit_editor_alerts=0 reload_error_observed=1 default_error_window_requests=1
+COUNTERCHECK native_visibility=unmeasured actual_logger_and_policy=true

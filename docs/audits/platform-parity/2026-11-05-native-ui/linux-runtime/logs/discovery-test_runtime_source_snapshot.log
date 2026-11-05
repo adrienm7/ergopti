@@ -1,0 +1,15 @@
+
+=== fresh runtime source snapshot ===
+  ok   reads fresh bytes once per admission without generation rereads
+  ok   refuses an acknowledged same-byte write during on_lookup
+  ok   refuses acquired source ownership during on_lookup
+  ok   refuses an acknowledged same-byte write during on_native
+  ok   refuses acquired source ownership during on_native
+  ok   refuses an acknowledged same-byte write during on_enabled
+  ok   refuses acquired source ownership during on_enabled
+  ok   refuses an acknowledged same-byte write during on_admit
+  ok   refuses acquired source ownership during on_admit
+  ok   refuses a native epoch ABA during the profile callback
+  ok   keeps the original native model and origin after lookup callbacks
+  ok   refuses a preference port that omits its exact snapshot revision
+AUDIT_TEST_RESULT	12	0

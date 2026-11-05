@@ -1,0 +1,1 @@
+[32m[OK] Webview geometry single-sourced — 22 manifest apps, all accounted for on three drivers: 18 macOS modules defer to get_app_geometry, 16 Windows hosts match the manifest, Linux resolves every id generically (34 value checks, 10 documented exclusions).[0m

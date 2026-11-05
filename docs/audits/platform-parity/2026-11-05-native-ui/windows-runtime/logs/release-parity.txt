@@ -1,0 +1,9 @@
+ok 1 - the catalogue pins the reviewed official release
+ok 2 - the macOS native source contract names the same release and tag commit
+ok 3 - the macOS shell projection is regenerated from the catalogue
+ok 4 - Windows and Linux read the catalogue at runtime instead of a copy
+ok 5 - no tracked driver, tool or workflow keeps a retired 0.24.0 pin
+ok 6 - the producer and its contract name no seam that Ollama 0.40.4 removed
+ok 7 - both checked transfer seams keep the address policy through WrapChecked
+ok 8 - every native Go source joins the producer inventory
+# passed: 8/8

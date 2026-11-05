@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstring_editor_owners"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstring_editor_owners
+
+=== hotstring editor native owners ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"construction exception before allocation remains retryable (hotstring-editor-owner)","status":"pass","elapsed_ms":3.581107,"timing_error":""}
+  ok   construction exception before allocation remains retryable (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"construction exception after allocation remains retryable (hotstring-editor-owner)","status":"pass","elapsed_ms":2.605231,"timing_error":""}
+  ok   construction exception after allocation remains retryable (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"retired bridges cannot save, initialize or close the successor (hotstring-editor-owner)","status":"pass","elapsed_ms":2.022499,"timing_error":""}
+  ok   retired bridges cannot save, initialize or close the successor (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"refused deletion retains only cleanup authority (hotstring-editor-owner)","status":"pass","elapsed_ms":2.437657,"timing_error":""}
+  ok   refused deletion retains only cleanup authority (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"native close commits before focus callback opens a successor (hotstring-editor-owner)","status":"pass","elapsed_ms":1.979203,"timing_error":""}
+  ok   native close commits before focus callback opens a successor (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"a candidate closed during construction never becomes live (hotstring-editor-owner)","status":"pass","elapsed_ms":2.195390,"timing_error":""}
+  ok   a candidate closed during construction never becomes live (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"write completion cannot reload a successor session (hotstring-editor-owner)","status":"pass","elapsed_ms":1.871510,"timing_error":""}
+  ok   write completion cannot reload a successor session (hotstring-editor-owner)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","name":"tests.unit.ui.hotstring_windows.test_hotstring_editor_owners","status":"pass","elapsed_ms":17.196508,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  7
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

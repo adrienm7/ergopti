@@ -1,0 +1,62 @@
+{
+  "sourceRoot": "/workspace/worktrees/parity-2026-11-05/macos-runtime",
+  "provenance": "full actual shared JS in VM, real bindDelay and change callback; fake DOM/bridge ports only",
+  "results": [
+    {
+      "requested": 0,
+      "section": false,
+      "displayed": 750,
+      "posted": {
+        "action": "set_delay",
+        "category": "punctuation",
+        "group": "common",
+        "section": "",
+        "personal_path": "",
+        "ext_id": "",
+        "ms": 750
+      }
+    },
+    {
+      "requested": 0,
+      "section": true,
+      "displayed": 750,
+      "posted": {
+        "action": "set_delay",
+        "category": "punctuation",
+        "group": "common",
+        "section": "test",
+        "personal_path": "",
+        "ext_id": "",
+        "ms": 750
+      }
+    },
+    {
+      "requested": 25,
+      "section": false,
+      "displayed": 25,
+      "posted": {
+        "action": "set_delay",
+        "category": "punctuation",
+        "group": "common",
+        "section": "",
+        "personal_path": "",
+        "ext_id": "",
+        "ms": 25
+      }
+    },
+    {
+      "requested": 750,
+      "section": false,
+      "displayed": 750,
+      "posted": {
+        "action": "set_delay",
+        "category": "punctuation",
+        "group": "common",
+        "section": "",
+        "personal_path": "",
+        "ext_id": "",
+        "ms": 750
+      }
+    }
+  ]
+}

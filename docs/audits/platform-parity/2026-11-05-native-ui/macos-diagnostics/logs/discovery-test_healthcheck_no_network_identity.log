@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_no_network_identity"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_no_network_identity
+
+=== healthcheck: no network identity (no-network-identity) ===
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the memory statistics: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:157: attempt to call a nil value (field 'vmStat').
+[logger] unified log write refused: /tmp/lua_oGK5b4_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_oGK5b4_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:52:17:000 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the locale: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:229: attempt to index a nil value (field 'locale').
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the open applications: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:200: attempt to call a nil value (field 'runningApplications').
+2026-11-05 00:52:17:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_oGK5b4_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log: No such file or directory.
+[logger] topical log write refused: /tmp/lua_oGK5b4_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_keystats.log: No such file or directory
+2026-11-05 00:52:17:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_oGK5b4_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log' — bridge may not receive KE events.
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] The accessibility permission could not be read: hs.accessibilityState is unavailable.
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the CapsLock state: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:263: ...webview/static/ergopti_plus/macos/adapters/key_state.lua:259: hs.hid.capslock.get is unavailable.
+2026-11-05 00:52:17:000 [WARNING] [healthcheck] Diagnostics could not read the USB devices: ...iew/static/ergopti_plus/macos/ui/healthcheck/helpers.lua:492: attempt to index a nil value (field 'usb').
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_no_network_identity","name":"the whole snapshot carries no Wi-Fi name and no host name (no-network-identity)","status":"pass","elapsed_ms":158.300589,"timing_error":""}
+  ok   the whole snapshot carries no Wi-Fi name and no host name (no-network-identity)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_no_network_identity","name":"tests.unit.ui.healthcheck.test_healthcheck_no_network_identity","status":"pass","elapsed_ms":158.439547,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  1
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

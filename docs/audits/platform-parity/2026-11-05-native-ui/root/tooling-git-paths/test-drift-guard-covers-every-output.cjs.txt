@@ -1,0 +1,1 @@
+[OK] The drift guard detects changes to all 4 previously unguarded outputs and preserves their exact edited bytes.

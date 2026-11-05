@@ -1,0 +1,11 @@
+
+=== test_managed_output_hops ===
+  ok   nonzero intermediate body is discarded before exact final archive bytes
+  ok   every redirect URL is resolved before its own native curl and secrets are stripped
+  ok   absolute archive phase deadline shrinks across redirect and never restarts
+  ok   cancel before physical ACK cannot redirect or publish artifact
+  ok   source withdrawal inside native continuation probe prevents successor
+  ok   writer debt cannot be mistaken for physically retired continuation
+  ok   unprocessed original deadline refuses late success capability
+  ok   source withdrawal inside final completion probe cannot publish token
+AUDIT_TEST_RESULT	8	0

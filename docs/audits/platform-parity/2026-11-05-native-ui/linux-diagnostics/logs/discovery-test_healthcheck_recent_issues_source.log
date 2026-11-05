@@ -1,0 +1,24 @@
+
+=== healthcheck (linux): recent issues source ===
+  ok   reads today's errors file when it exists (errors-file-issues)
+  ok   falls back to the ring only when the file is absent (errors-file-issues)
+  ok   reports an errors file that exists but cannot be read, never the ring (errors-file-issues)
+
+=== healthcheck closed recent-file IO ===
+  ok   (errors-file-io-receipts) refuses seek_end_nil without a ring fallback
+  ok   (errors-file-io-receipts) refuses seek_set_nil without a ring fallback
+  ok   (errors-file-io-receipts) refuses seek_end_raise without a ring fallback
+  ok   (errors-file-io-receipts) refuses read_nil without a ring fallback
+  ok   (errors-file-io-receipts) refuses read_errno2 without a ring fallback
+  ok   (errors-file-io-receipts) refuses read_raise without a ring fallback
+  ok   (errors-file-io-receipts) refuses read_short without a ring fallback
+  ok   (errors-file-io-receipts) refuses close_nil without a ring fallback
+  ok   (errors-file-io-receipts) refuses close_errno2 without a ring fallback
+  ok   (errors-file-io-receipts) refuses close_false without a ring fallback
+  ok   (errors-file-io-receipts) refuses close_raise without a ring fallback
+  ok   (errors-file-io-receipts) refuses read_close_nil without a ring fallback
+  ok   (errors-file-io-receipts) admits an empty closed file without inventing entries
+
+=== healthcheck simultaneous source refusals ===
+  ok   (errors-file-io-receipts) preserves both read and close refusal details
+AUDIT_TEST_RESULT	17	0

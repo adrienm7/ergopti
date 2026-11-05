@@ -1,0 +1,61 @@
+
+=== Native Output Transport Completion Controls ===
+  ok   private ticket capability refuses forged ticket or unrelated producer
+
+=== Native Output Transport Completion Controls ===
+  ok   forged target native preflight refuses before allocating child resources
+
+=== Native Output Transport Completion Controls ===
+  ok   owned stdout pauses before byte-exact parent write and resumes on its ACK
+
+=== Native Output Transport Completion Controls ===
+  ok   native child success cannot publish before the exact pending file-write ACK
+
+=== Native Output Transport Completion Controls ===
+  ok   last ENOSPC after actual input completion cannot become successful HTTP completion
+
+=== Native Output Transport Completion Controls ===
+  ok   unexpected second stdout delivery while a write is pending aborts without dropped success
+
+=== Native Output Transport Completion Controls ===
+  ok   cancel without input EOF retains both native owner and pending writer until actual ACK
+
+=== Native Output Transport Completion Controls ===
+  ok   ambiguous native file-write throw retains exact debt through child and reader close
+
+=== Native Output Transport Completion Controls ===
+  ok   scheduled native reader close cannot retire the captured output descriptor
+
+=== Native Output Transport Completion Controls ===
+  ok   a slow native reader capability after file ACK cannot restart past original deadline
+
+=== Native Output Transport Completion Controls ===
+  ok   native archive size refusal cannot write another byte beyond captured limit
+
+=== Native Output Transport Completion Controls ===
+  ok   buffered redirect/body/path/etag combinations cannot admit an archive target
+
+=== Native Output Transport Completion Controls ===
+  ok   lease admission cannot spawn after withdrawing captured native source
+
+=== Native Output Transport Completion Controls ===
+  ok   lease admission cannot resume reader after native source withdrawal
+
+=== Native Output Transport Completion Controls ===
+  ok   slow final native source guard cannot receive a new archive deadline
+
+=== Native Output Transport Completion Controls ===
+  ok   reentrant output cancellation preserves terminal observation before physical done
+
+=== Native Output Transport Completion Controls ===
+  ok   timeout after input EOF and exit with writer pending revokes retained file
+
+=== Native Output Transport Completion Controls ===
+  ok   cancel after completed transport but before physical close ACK retires its file
+
+=== Native Output Transport Completion Controls ===
+  ok   actual completed302 retains nonzero body only for strong admitted redirect
+
+=== Native Output Transport Completion Controls ===
+  ok   actual zero-byte completed transport failure retains exact predecessor for relay
+AUDIT_TEST_RESULT	20	0

@@ -1,0 +1,26 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_install/test_runtime_install.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_install.test_runtime_install
+
+=== owned runtime first install ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"runs the launcher role, then asks pqrs' manager to activate the driver","status":"pass","elapsed_ms":7.194567,"timing_error":""}
+  ok   runs the launcher role, then asks pqrs' manager to activate the driver
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"names each refusal and never activates after one","status":"pass","elapsed_ms":1.536490,"timing_error":""}
+  ok   names each refusal and never activates after one
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"refuses without a launcher and when the manager is absent or fails","status":"pass","elapsed_ms":0.285930,"timing_error":""}
+  ok   refuses without a launcher and when the manager is absent or fails
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"downloads pqrs' driver first when none is installed, and stops when it cannot","status":"pass","elapsed_ms":0.436206,"timing_error":""}
+  ok   downloads pqrs' driver first when none is installed, and stops when it cannot
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"lets a second caller wait for the running install","status":"pass","elapsed_ms":0.089655,"timing_error":""}
+  ok   lets a second caller wait for the running install
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_install.test_runtime_install","name":"tests.unit.platform.remap.runtime_install.test_runtime_install","status":"pass","elapsed_ms":9.999974,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  5
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

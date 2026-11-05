@@ -1,0 +1,4 @@
+
+=== shared application native window titles ===
+  ok   passes every shared application caption to GTK in every locale
+AUDIT_TEST_RESULT	1	0

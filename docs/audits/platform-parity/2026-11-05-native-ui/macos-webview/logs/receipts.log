@@ -1,0 +1,9 @@
+picker mode=healthy attempts=1 completion_observers=0 errors=0 view_open=true
+picker mode=throw attempts=1 completion_observers=0 errors=0 view_open=true
+picker mode=false attempts=1 completion_observers=0 errors=0 view_open=true
+picker mode=nil attempts=1 completion_observers=0 errors=0 view_open=true
+picker mode=async_error attempts=1 completion_observers=0 errors=0 view_open=true
+picker mode=encode_throw attempts=0 completion_observers=0 errors=0 view_open=true
+picker mode=encode_nil attempts=0 completion_observers=0 errors=0 view_open=true
+picker healthy confirm=1 foreign_source=0 stale_cancel_successor_delete=0
+native-error nil/sentinel accepted; real code-zero domain and false rejected

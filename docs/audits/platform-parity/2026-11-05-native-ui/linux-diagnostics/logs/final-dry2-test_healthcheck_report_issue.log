@@ -1,0 +1,69 @@
+
+=== healthcheck page actions (linux) ===
+  ok   report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)
+  ok   report saves its attachment and opens the browser last (report-focus)
+  ok   report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)
+  ok   report stops before the browser when the clipboard refuses (report-bug-flow)
+  ok   save still writes the redacted report and opens its folder
+  ok   open_path opens the folder the host collected, creating it first
+  ok   open_path on a file not created yet says so, without an error (open-missing-file)
+  ok   refuses to redact without the home folder (report-bug-flow)
+
+=== healthcheck debug menu reports (linux) ===
+  ok   Report a bug copies, saves and opens the prefilled bug form (menu-report-bug)
+  ok   Report a bug notifies instead of opening the form when the clipboard refuses (menu-report-bug)
+  ok   Suggest a feature opens the feature form with the version and the system
+
+=== healthcheck checked save receipts (linux) ===
+  ok   save requires the filesystem's completed write receipt (report-save-receipt)
+  ok   save refuses the filesystem false receipt before reveal (report-save-receipt)
+  ok   save refuses the filesystem nil receipt before reveal (report-save-receipt)
+  ok   save refuses the filesystem zero receipt before reveal (report-save-receipt)
+  ok   save refuses the filesystem string receipt before reveal (report-save-receipt)
+  ok   save refuses the filesystem throw receipt before reveal (report-save-receipt)
+  ok   save refuses directory creation before acquiring a write (report-save-receipt)
+  ok   save keeps a completed file successful when revealing its folder fails (report-save-receipt)
+
+=== closed diagnostic sharing corpus ===
+  ok   excludes synthetic private fields on all driver snapshots
+
+=== English attachment export boundaries ===
+  ok   does not consult localized labels or copy free private fields
+  ok   retains clipboard and refuses browser when attachment save fails
+  ok   browser refusal never claims successful report after saving attachment
+
+=== stable-metadata report URL ===
+  ok   stable-metadata report URL keeps complete output local and rejects page-derived query fields
+
+=== retained installed-page observations ===
+  ok   keeps useful page outcomes without qualifying suites and refuses stale identity
+
+=== closed recent error facts ===
+  ok   keeps observed technical failure codes and excludes every private message
+
+=== diagnostic opener actual child completion ===
+  ok   (diagnostic-opener-native) receives private child exit 0
+  ok   (diagnostic-opener-native) receives private child exit 23
+  ok   (diagnostic-opener-native) keeps the loop live while awaiting the owned child
+  ok   (diagnostic-opener-native) receives the controlled native deadline without a blocking fallback
+  ok   (diagnostic-opener-native) cancellation retires the child without a completion
+  ok   (diagnostic-opener-native) refuses unavailable spawn without inventing a child result
+
+=== feature opener cancellation ownership ===
+  ok   (feature-opener-cancel) a nested request survives cancellation of its predecessor
+
+=== diagnostic opener late port failure ===
+  ok   (diagnostic-opener-late) logs an exception after inline completion without a second outcome
+
+=== redaction context carries the configuration directory (config-dir-masking) ===
+  ok   a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)
+
+=== opt-in day log in the report actions (day-log-host) ===
+  ok   collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)
+  ok   a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)
+  ok   save writes the log first, then the report, and the report records the log (day-log-host)
+  ok   without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)
+  ok   copy never carries the log and an unprepared log is refused before any file is written (day-log-host)
+  ok   a collection prepared for another snapshot is never saved (day-log-host)
+  ok   reading the file distinguishes missing, unreadable, too large and read (day-log-host)
+AUDIT_TEST_RESULT	42	0

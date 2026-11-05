@@ -1,0 +1,1 @@
+[OK] drift-guard isolation skips directory links and keeps file links.

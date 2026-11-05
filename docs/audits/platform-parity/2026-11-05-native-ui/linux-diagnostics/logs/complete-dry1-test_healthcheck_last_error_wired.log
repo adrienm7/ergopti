@@ -1,0 +1,6 @@
+
+=== healthcheck (linux): session issues (healthcheck-last-error-wired) ===
+  ok   surfaces a real Logger.error after the ring has forgotten it (healthcheck-last-error-wired)
+  ok   counts every warning and error of the session, not the ring's (healthcheck-last-error-wired)
+  ok   never counts its own duration among the session's warnings (phase-a-budget-not-a-warning)
+AUDIT_TEST_RESULT	3	0

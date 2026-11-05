@@ -1,0 +1,12 @@
+
+=== Retained Linux Ollama installer ===
+  ok   ordinary live transaction uses retained download same-FD adoption and extract only
+  ok   download callback cannot admit same-FD hash before physical retirement
+  ok   same-FD hash callback cannot admit extraction before physical retirement
+  ok   missing authentic second completion refuses without hash or extraction
+  ok   checksum refusal cannot extract or publish
+  ok   cancelled retained download keeps stage until real producer retirement
+  ok   late archive cleanup is a separate physical gate before file cleanup
+  ok   refused output brand retires without any path download fallback
+  ok   foreign publication is preserved and cannot be claimed installed
+AUDIT_TEST_RESULT	9	0

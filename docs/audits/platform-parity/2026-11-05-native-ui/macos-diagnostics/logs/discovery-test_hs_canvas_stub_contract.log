@@ -1,0 +1,28 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_hs_canvas_stub_contract"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_hs_canvas_stub_contract
+
+=== hs.canvas stub: observable native state ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"persists elements, geometry, and visibility with native return shapes","status":"pass","elapsed_ms":0.979688,"timing_error":""}
+  ok   persists elements, geometry, and visibility with native return shapes
+
+=== hs.canvas stub: frame snapshots ===
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"copies the constructor frame instead of borrowing the caller's table","status":"pass","elapsed_ms":0.984475,"timing_error":""}
+  ok   copies the constructor frame instead of borrowing the caller's table
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"copies each accepted setter frame and keeps its native chainable receipt","status":"pass","elapsed_ms":1.024766,"timing_error":""}
+  ok   copies each accepted setter frame and keeps its native chainable receipt
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"returns independent native rect snapshots for every getter","status":"pass","elapsed_ms":0.912337,"timing_error":""}
+  ok   returns independent native rect snapshots for every getter
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"keeps a GraphicsRenderer drawing callback's frame edits behind the explicit setter","status":"pass","elapsed_ms":4.676708,"timing_error":""}
+  ok   keeps a GraphicsRenderer drawing callback's frame edits behind the explicit setter
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","name":"tests.unit.ui.healthcheck.test_hs_canvas_stub_contract","status":"pass","elapsed_ms":8.815299,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  5
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

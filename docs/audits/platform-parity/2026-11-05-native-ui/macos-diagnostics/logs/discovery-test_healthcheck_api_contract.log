@@ -1,0 +1,79 @@
+Selecting exact test module: "tests.meta.architecture.test_healthcheck_api_contract"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.meta.architecture.test_healthcheck_api_contract
+
+=== meta: healthcheck diagnostic API contract ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"infra.logger exposes the symbols healthcheck calls","status":"pass","elapsed_ms":6.383836,"timing_error":""}
+  ok   infra.logger exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"infra.config_paths exposes the symbols healthcheck calls","status":"pass","elapsed_ms":6.515684,"timing_error":""}
+  ok   infra.config_paths exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"infra.diagnostic_snapshot exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.881456,"timing_error":""}
+  ok   infra.diagnostic_snapshot exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.diagnostics.crash_reporter exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.370112,"timing_error":""}
+  ok   modules.diagnostics.crash_reporter exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.boot_fatal exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.375670,"timing_error":""}
+  ok   adapters.boot_fatal exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.system_info exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.641088,"timing_error":""}
+  ok   adapters.system_info exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.updater exposes the symbols healthcheck calls","status":"pass","elapsed_ms":4.300054,"timing_error":""}
+  ok   modules.updater exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"platform.remap.ke_paths exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.145634,"timing_error":""}
+  ok   platform.remap.ke_paths exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.file_system exposes the symbols healthcheck calls","status":"pass","elapsed_ms":4.979191,"timing_error":""}
+  ok   adapters.file_system exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.shortcuts.script_control exposes the symbols healthcheck calls","status":"pass","elapsed_ms":31.406772,"timing_error":""}
+  ok   modules.shortcuts.script_control exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.key_state exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.182349,"timing_error":""}
+  ok   adapters.key_state exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"platform.remap.lease_controller exposes the symbols healthcheck calls","status":"pass","elapsed_ms":4.963718,"timing_error":""}
+  ok   platform.remap.lease_controller exposes the symbols healthcheck calls
+2026-11-05 00:52:22:000 [WARNING] [keystats.kc_bridge] KC log EOF is untrusted at cold start — persistence stays denied until retry: open failed: /tmp/lua_LzL5zi_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log: No such file or directory.
+[logger] unified log write refused: /tmp/lua_LzL5zi_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_LzL5zi_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_keystats.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_LzL5zi_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+2026-11-05 00:52:22:000 [WARNING] [keystats.kc_bridge] Cannot create '/tmp/lua_LzL5zi_ergopti_home/Library/Application Support/Ergopti/config/metrics/karabiner_kc.log' — bridge may not receive KE events.
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.llm exposes the symbols healthcheck calls","status":"pass","elapsed_ms":53.953407,"timing_error":""}
+  ok   modules.llm exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.llm.api_ollama exposes the symbols healthcheck calls","status":"pass","elapsed_ms":4.416489,"timing_error":""}
+  ok   modules.llm.api_ollama exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"modules.llm.api_mlx exposes the symbols healthcheck calls","status":"pass","elapsed_ms":6.467632,"timing_error":""}
+  ok   modules.llm.api_mlx exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.accessibility_permission exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.535249,"timing_error":""}
+  ok   adapters.accessibility_permission exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.screen_capture exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.819996,"timing_error":""}
+  ok   adapters.screen_capture exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.http_client exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.823389,"timing_error":""}
+  ok   adapters.http_client exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.shell_runner exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.090781,"timing_error":""}
+  ok   adapters.shell_runner exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.json_codec exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.253657,"timing_error":""}
+  ok   adapters.json_codec exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.clipboard exposes the symbols healthcheck calls","status":"pass","elapsed_ms":10.971621,"timing_error":""}
+  ok   adapters.clipboard exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.notifier exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.414678,"timing_error":""}
+  ok   adapters.notifier exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"infra.locale exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.427197,"timing_error":""}
+  ok   infra.locale exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"infra.manifest_reader exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.878031,"timing_error":""}
+  ok   infra.manifest_reader exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"adapters.network_info exposes the symbols healthcheck calls","status":"pass","elapsed_ms":2.265565,"timing_error":""}
+  ok   adapters.network_info exposes the symbols healthcheck calls
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"ui.ui_builder exposes the symbols healthcheck calls","status":"pass","elapsed_ms":3.470610,"timing_error":""}
+  ok   ui.ui_builder exposes the symbols healthcheck calls
+
+=== meta: healthcheck.run() probes no nonexistent API ===
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"healthcheck.run() returns a version 2 snapshot","status":"pass","elapsed_ms":0.006861,"timing_error":""}
+  ok   healthcheck.run() returns a version 2 snapshot
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"no collector failed to read its facts","status":"pass","elapsed_ms":0.001041,"timing_error":""}
+  ok   no collector failed to read its facts
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.meta.architecture.test_healthcheck_api_contract","name":"tests.meta.architecture.test_healthcheck_api_contract","status":"pass","elapsed_ms":217.513297,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  28
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

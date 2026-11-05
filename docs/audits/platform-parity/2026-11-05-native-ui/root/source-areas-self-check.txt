@@ -1,0 +1,7 @@
+PASS healthy exact Git members, SHA/blob identity, test exclusions and lexical labels
+PASS formatted JSON and reordered object keys accepted semantically
+PASS CRLF output rejected
+PASS missing member rejected
+PASS later tracked source addition rejected as stale output
+PASS historical ref reproducible despite new HEAD and dirty working file
+PASS regenerated current census and UTF-8/LF deterministic bytes

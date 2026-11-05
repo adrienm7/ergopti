@@ -1,0 +1,15 @@
+  ok   explicit service runs indefinitely with referenced shared monitoring
+  ok   service API requires literal false and explicit source capability
+  ok   finite and service APIs share one exact owner exclusion map
+  ok   service fields remain immutable across source reentry
+  ok   service completion waits for physical owner and exact shared timer ACK
+  ok   service source refusal cancels and suppresses completion
+  ok   service source exception retains cancellation debt
+  ok   service current observer rechecks reentrant cancellation
+  ok   service cancellation reserves owner until all exact cleanup
+  ok   service timer admission refusal prevents native dispatch
+  ok   service physical acquisition exception remains unknown debt
+  ok   service malformed physical capability remains unknown debt
+  ok   service synchronous physical completion still owns shared timer
+  ok   service rejected close callback cannot borrow a fresh close
+AUDIT_TEST_RESULT	14	0

@@ -1,0 +1,36 @@
+Selecting exact test module: "tests/unit/platform/remap/runtime_vhid_update/test_runtime_vhid_update.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update
+
+=== VirtualHIDDevice driver update: the confirmed update ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"downloads, verifies, installs with administrator rights, then asks for activation","status":"pass","elapsed_ms":5.924186,"timing_error":""}
+  ok   downloads, verifies, installs with administrator rights, then asks for activation
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"downloads over https only into Ergopti's folder, bounded by the pinned size","status":"pass","elapsed_ms":0.296145,"timing_error":""}
+  ok   downloads over https only into Ergopti's folder, bounded by the pinned size
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"installs a root-owned copy only after checking its digest and the pqrs team again","status":"pass","elapsed_ms":0.362696,"timing_error":""}
+  ok   installs a root-owned copy only after checking its digest and the pqrs team again
+
+=== VirtualHIDDevice driver update: named refusals ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"refuses an incomplete pin without running anything","status":"pass","elapsed_ms":0.232239,"timing_error":""}
+  ok   refuses an incomplete pin without running anything
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"never prompts for a download of the wrong size or digest","status":"pass","elapsed_ms":0.518799,"timing_error":""}
+  ok   never prompts for a download of the wrong size or digest
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"names a refused download","status":"pass","elapsed_ms":0.613002,"timing_error":""}
+  ok   names a refused download
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"reads the privileged shell's own refusals and a cancelled prompt","status":"pass","elapsed_ms":1.164250,"timing_error":""}
+  ok   reads the privileged shell's own refusals and a cancelled prompt
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"names an activation macOS was not asked for","status":"pass","elapsed_ms":0.398229,"timing_error":""}
+  ok   names an activation macOS was not asked for
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"runs one update at a time and settles every caller","status":"pass","elapsed_ms":0.360713,"timing_error":""}
+  ok   runs one update at a time and settles every caller
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","name":"tests.unit.platform.remap.runtime_vhid_update.test_runtime_vhid_update","status":"pass","elapsed_ms":10.466615,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

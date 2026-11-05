@@ -1,0 +1,7 @@
+LIMIT: actual Linux per-process file-size ceiling 1024 bytes; no business function substituted
+PASS ergopti_crash_worker.ps1 healthy JSON + no-replace duplicate
+{"worker":"ergopti_crash_worker.ps1","write_refused":true,"exception":"System.ArgumentOutOfRangeException","canonical_json_retained":true,"retained_bytes":1024,"intended_bytes":16397,"valid_json":false}
+PASS ergopti_crash_fallback_worker.ps1 healthy JSON + no-replace duplicate
+{"worker":"ergopti_crash_fallback_worker.ps1","write_refused":true,"exception":"System.ArgumentOutOfRangeException","canonical_json_retained":true,"retained_bytes":1024,"intended_bytes":16397,"valid_json":false}
+CONFIRMED both unchanged production crash writers retain truncated canonical JSON after actual private-file write refusal
+EXIT 0

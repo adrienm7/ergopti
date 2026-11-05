@@ -1,0 +1,36 @@
+[32m[OK] bash is /bin/bash (Linux); 63 JS and 2 Python consumer(s) of the shared resolver, no bare spawn in 1171 tools/ file(s) or 668 npm script(s).[0m
+[OK] Linux ambient native prefix "ordinary" executes 1 existing case(s) without loader errors.
+[OK] macOS ambient native prefix "ordinary" executes 5 existing case(s) without loader errors.
+[OK] Linux without-lfs native prefix "ordinary" executes 1 existing case(s) without loader errors.
+[OK] macOS without-lfs native prefix "ordinary" executes 5 existing case(s) without loader errors.
+[OK] E2E bootstrap only ["ambient","ordinary","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-lfs","ordinary","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","ordinary","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","ordinary","absolute"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","ordinary","directory-symlink"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","ordinary","quote-and-trailing-newline"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] Linux ambient native prefix "literal\\backslash" executes 1 existing case(s) without loader errors.
+[OK] macOS ambient native prefix "literal\\backslash" executes 5 existing case(s) without loader errors.
+[OK] Linux without-lfs native prefix "literal\\backslash" executes 1 existing case(s) without loader errors.
+[OK] macOS without-lfs native prefix "literal\\backslash" executes 5 existing case(s) without loader errors.
+[OK] E2E bootstrap only ["ambient","literal\\backslash","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-lfs","literal\\backslash","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\\backslash","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\\backslash","absolute"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\\backslash","directory-symlink"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\\backslash","quote-and-trailing-newline"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] Linux ambient native prefix "literal\nnewline" executes 1 existing case(s) without loader errors.
+[OK] macOS ambient native prefix "literal\nnewline" executes 5 existing case(s) without loader errors.
+[OK] Linux without-lfs native prefix "literal\nnewline" executes 1 existing case(s) without loader errors.
+[OK] macOS without-lfs native prefix "literal\nnewline" executes 5 existing case(s) without loader errors.
+[OK] E2E bootstrap only ["ambient","literal\nnewline","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-lfs","literal\nnewline","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\nnewline","relative"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\nnewline","absolute"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\nnewline","directory-symlink"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] E2E bootstrap only ["without-sdk","literal\nnewline","quote-and-trailing-newline"] loads real helpers, synthetic stack, and nonempty shared corpus.
+[OK] Six SDK-free bootstrap failure controls reject incomplete roots and retire exactly their owned pipe.
+[OK] The source census rejects an undeclared emission in a newline-bearing filename.
+[OK] Native TMPDIR backslash allocates and retires within the exact owned directory.
+[OK] Native TMPDIR quote allocates and retires within the exact owned directory.
+[OK] Native TMPDIR newline allocates and retires within the exact owned directory.

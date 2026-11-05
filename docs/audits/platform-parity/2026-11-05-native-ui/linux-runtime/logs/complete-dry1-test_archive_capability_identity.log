@@ -1,0 +1,9 @@
+
+=== Retained FD Raw Capability ===
+  ok   forged bind never captures producer or equality callback
+  ok   forged write never submits filesystem IO
+  ok   forged EOF cannot retire an actual input
+  ok   forged predecessor cannot truncate a retired exact ticket
+  ok   forged ledger ticket cannot borrow bytes pending or settlement
+  ok   forged ticket cannot receive another ticket typed filesystem error
+AUDIT_TEST_RESULT	6	0

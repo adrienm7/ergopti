@@ -1,0 +1,6 @@
+{
+	"owned_worktrees_retired": 6,
+	"free_bytes_before": 26167742464,
+	"free_bytes_after": 28341088256,
+	"recovery": "The audited commit is also in dev ancestry; recreate a private detached worktree at its pinned SHA. Local refs/audit preserve each owned snapshot. No unrelated worktree was removed."
+}

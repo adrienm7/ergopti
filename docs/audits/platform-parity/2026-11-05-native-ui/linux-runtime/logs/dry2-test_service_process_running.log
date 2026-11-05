@@ -1,0 +1,6 @@
+  ok   service running proof uses physical lifecycle rather than logical current
+  ok   service running proof refuses absent malformed throwing or false native predicates
+  ok   service running proof rechecks logical cancellation from native predicate
+  ok   service running proof rechecks native exit at final logical source boundary
+  ok   service running proof excludes settled or superseded exact operations
+AUDIT_TEST_RESULT	5	0

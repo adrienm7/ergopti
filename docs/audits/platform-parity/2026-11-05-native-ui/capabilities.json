@@ -1,0 +1,536 @@
+{
+	"schema_version": 1,
+	"audited_sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+	"created_at": "2026-11-05",
+	"title": "Runtime, editor and diagnostics capability comparison",
+	"classifications": [
+		"explicit_policy",
+		"explicit_mechanism",
+		"implementation_constraint",
+		"observed_defect",
+		"observed_limit",
+		"unknown_intent",
+		"refuted_or_demoted"
+	],
+	"classification_meanings": {
+		"explicit_policy": "An explicit declaration or settled product decision, including declared host-only capability.",
+		"explicit_mechanism": "Different native owners implement equivalent product intent.",
+		"implementation_constraint": "An identified OS/dependency/API constraint; no universal technical impossibility is inferred beyond it.",
+		"observed_defect": "Confirmed actionable behavior within the report’s explicit executed/source-derived evidence boundary.",
+		"observed_limit": "Measured or source-reviewed limit, coverage gap, or weaker evidence that is not a new confirmed defect.",
+		"unknown_intent": "Difference observed, but the product/privacy obligation needed to call it a defect is unestablished.",
+		"refuted_or_demoted": "Candidate is excluded from confirmed findings after whole-owner/context countercheck."
+	},
+	"scope_register": {
+		"windows": "Managed Ollama; WebView/personal editor; diagnostics/crash/export.",
+		"macos": "Owned remap install/provision/approval; WebView/editors; diagnostics/crash/export. Ollama is a source-compared counterpart, not the Mac runtime audit subject.",
+		"linux": "Managed Ollama; in-process LGI/WebKit editors; diagnostics/crash/export."
+	},
+	"evidence_boundary": "A revision-pinned comparison from nine bounded audit reports and coordinator adjudications. No real native three-OS receiving or all-product parity certification. Reports may contain provisional wording; explicit adjudications below govern excluded candidates.",
+	"adjudications": [
+		{
+			"id": "WVB-002",
+			"disposition": "confirmed_shared_cause",
+			"summary": "Valid unlimited numeric 0 is serialized by all three hosts but ms || defaultMs displays the positive default. One shared root, not three findings.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			]
+		},
+		{
+			"id": "MVB-002",
+			"disposition": "confirmed_macos_effect",
+			"summary": "Actual refused CAS/write plus independent shortcut close destroys attempted draft on Mac reopen. Windows host hardcodes menu mode; Linux close is separately a no-op. Loud Mac refusal does not restore the draft.",
+			"evidence_reports": [
+				"macos-webview/report.md",
+				"windows-webview/report.md",
+				"linux-webview/report.md"
+			]
+		},
+		{
+			"id": "LVB-002",
+			"disposition": "demoted_not_confirmed",
+			"summary": "Durable bytes saved, live reload refused, prior engine retained, and actual Config error is loud. saved=true/bridge-alert count alone does not establish silent save loss; exclude the provisional cohort claim from confirmed findings.",
+			"evidence_reports": ["linux-webview/report.md"]
+		},
+		{
+			"id": "MRT-005",
+			"disposition": "refuted_not_confirmed",
+			"summary": "Unanswered logical timeout with pending native child is not physical-done success or proof consent was withdrawn. Original EX lifecycle lock fences publication; asserted overlap consequence was not proved.",
+			"evidence_reports": ["macos-runtime/report.md"]
+		}
+	],
+	"capabilities": [
+		{
+			"id": "native-webview",
+			"title": "Native browser and message ownership",
+			"behavior": {
+				"windows": "WebView2/COM hosts, native fallback forms, retained subscriptions and per-session epochs.",
+				"macos": "Hammerspoon hs.webview/WKWebView; controller pool and deferred close ownership.",
+				"linux": "GTK/WebKit2GTK through LGI inside the daemon; native signals and page epochs. No editor worker/socket protocol."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Equivalent editor/diagnostics capabilities use distinct native APIs. No actual native browser receiving, GUI destruction or three-OS lifecycle certification was performed.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "structured-editors",
+			"title": "Personal hotstrings and personal-information editing",
+			"behavior": {
+				"windows": "Structured personal TOML editor, category settings and action picker through WebView/native owners.",
+				"macos": "Hotstring editor, personal-information form, metadata settings and action picker through their own owners.",
+				"linux": "Structured personal.toml editor plus personal_info.toml field form; other TOMLs retain their own owners."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Missing same-named modules do not establish a feature gap. These are structured forms, not evidence of a universal arbitrary-TOML editor requirement.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "generic-toml-intent",
+			"title": "A universal raw TOML editor",
+			"behavior": {
+				"windows": "No general capability inferred from the personal editor name.",
+				"macos": "Dedicated forms are present; a universal text editor is not established.",
+				"linux": "No personal_toml_editor registry entry; dedicated hotstring and information editors exist."
+			},
+			"classification": "unknown_intent",
+			"rationale": "A product requirement for identical generic text editing was not found. Do not classify absence of a matching API/module name as a confirmed defect.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "zero-delay",
+			"title": "Unlimited zero delay in category/section controls",
+			"behavior": {
+				"windows": "Native state preserves numeric 0 and engine unlimited semantics; shared input displays positive default.",
+				"macos": "State builder preserves effective 0 and delay_unlimited semantics; same shared renderer substitutes default.",
+				"linux": "fields_for preserves numeric 0; same shared renderer substitutes default."
+			},
+			"classification": "observed_defect",
+			"rationale": "WVB-002 is one shared all-OS cause: bindDelay assigns ms || defaultMs, conflating valid unlimited 0 with absence. It is not an intentional platform delay difference.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": ["WVB-002"]
+		},
+		{
+			"id": "save-failure-delivery",
+			"title": "Personal-editor refused-save feedback",
+			"behavior": {
+				"windows": "WVB-001: double quoting a complete JSON literal generates invalid failure-toast JavaScript; paused save can retain the optimistic Saved indication. Ordinary commit failure has a separate notifier.",
+				"macos": "Hotstring/configuration editors observe failure and notify; action-picker initialization has a separate delivery gap.",
+				"linux": "Actual Config failure logs remain relevant even when bridge return says saved; see demoted LVB-002 below."
+			},
+			"classification": "observed_defect",
+			"rationale": "WVB-001 concerns failure visibility. A transport submission or native script completion is not a JavaScript application acknowledgement; loud sibling failure paths must be included before claiming silence.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": ["WVB-001"]
+		},
+		{
+			"id": "picker-init",
+			"title": "Action-picker initial data delivery",
+			"behavior": {
+				"windows": "WebView_RunScriptAsync observes native submission/completion; actual WebView2 receiving remains unexecuted.",
+				"macos": "MVB-001: actual picker swallows encoding/evaluation exceptions and installs no completion observer; page remains open without a central failure.",
+				"linux": "Manager/bridge native-currentness and failure/debt controls exercised through native-shaped ports."
+			},
+			"classification": "observed_defect",
+			"rationale": "The confirmed Mac root rests on swallowed exceptions, not an assumption that Hammerspoon normally returns false/nil or that native stderr is silent. No corresponding Windows/Linux defect was established.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": ["MVB-001"]
+		},
+		{
+			"id": "shortcut-autoclose",
+			"title": "Shortcut save followed by automatic close",
+			"behavior": {
+				"windows": "Actual host hardcodes open_mode=menu; shared shortcut automatic-close branch is unreachable through this owner.",
+				"macos": "MVB-002: actual shortcut mode emits save then independent close; CAS/write refusal is loud, but host requests deletion and actual reopen loses the attempted draft.",
+				"linux": "Shortcut branch is reachable, but LVB-001 close command is a no-op and never invokes the trusted close capability; this does not prove Mac-style draft destruction."
+			},
+			"classification": "observed_defect",
+			"rationale": "One shared frontend branch has different reachable host consequences. MVB-002 is refused-save draft preservation, not merely an optimistic toast. LVB-001 is missing close effect; neither is duplicated onto Windows.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": ["MVB-002", "LVB-001"]
+		},
+		{
+			"id": "durable-save-live-reload",
+			"title": "Durable save versus live reload",
+			"behavior": {
+				"windows": "Exact opening source and acknowledged write/live publication are owned by the native commit path.",
+				"macos": "Actual editor checks reload commitment and notifies refusal while retaining prior live state.",
+				"linux": "LVB-002 is DEMOTED: private bytes are saved durably while reload refuses and engine generation stays unchanged; actual Config emits a loud error."
+			},
+			"classification": "refuted_or_demoted",
+			"rationale": "A saved durable file and failed live application are separate facts. saved=true plus bridge alerts=0 alone does not establish a silent lost save when the actual lower owner reports refusal. Candidate receipt handling remains a review observation, not a confirmed new root.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "focus-fallback",
+			"title": "Editor focus and native fallback behavior",
+			"behavior": {
+				"windows": "window_focus is explicitly ignored; named launchers provide native AHK form/ListBox fallbacks.",
+				"macos": "Editor focus guard and host-specific unavailable/error behavior.",
+				"linux": "Input capture gate owns editor focus; native runtime absence/headless state refuses construction."
+			},
+			"classification": "explicit_mechanism",
+			"rationale": "Windows focus no-op and fallback promises are explicit host behavior. Equivalent pixel styling or identical focus/capture internals are not a shared requirement established here.",
+			"evidence_reports": [
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "owned-inference",
+			"title": "Managed Ollama selection and consent",
+			"behavior": {
+				"windows": "Managed pinned runtime under LocalAppData/Ergopti/ollama; own port 11435, reject ambient stock 11434. Silent startup does not grant install/pull consent.",
+				"macos": "Managed-runtime-only counterpart is source-compared by sibling reports; this campaign Mac runtime audit primarily covers remap, not full Ollama bootstrap.",
+				"linux": "Per-user XDG version/architecture/digest target, official pinned archive and explicit repair consent; own port 11435, reject stock 11434."
+			},
+			"classification": "explicit_policy",
+			"rationale": "PIN/own-runtime-only and explicit install consent are settled policy. Differing roots/security APIs are mechanisms, not missing parity. Full Mac/Windows/Linux inference installation was not run.",
+			"evidence_reports": ["windows-runtime/report.md", "linux-runtime/report.md"],
+			"finding_ids": []
+		},
+		{
+			"id": "managed-install-status",
+			"title": "Managed Ollama status after first installation",
+			"behavior": {
+				"windows": "Current pinned bootstrap admission differs from cheap advisory directory presence; old-version display intent remains unestablished.",
+				"macos": "Ollama candidate/hint lookup is a source counterpart, not a newly qualified native install.",
+				"linux": "LRT-001: browser caches missing-ancestor resolver; independent installer creates those parents, leaving empty-inventory browser state absent until observer reset."
+			},
+			"classification": "observed_defect",
+			"rationale": "Linux immutable ancestry checks are correct within an operation; lifetime reuse across the separate installation causes stale observer state. Do not infer matching sibling defects from similar labels.",
+			"evidence_reports": ["windows-runtime/report.md", "linux-runtime/report.md"],
+			"finding_ids": ["LRT-001"]
+		},
+		{
+			"id": "remap-platform",
+			"title": "Remap/tap-hold runtime architecture",
+			"behavior": {
+				"windows": "Native AHK remap/tap-hold/input owners; no Karabiner/DriverKit package.",
+				"macos": "Owned Karabiner fork, Core/Console and pqrs VirtualHIDDevice; native approval and capture admission.",
+				"linux": "Native Lua tap-hold engine with evdev capture and uinput; no Karabiner dependency."
+			},
+			"classification": "implementation_constraint",
+			"rationale": "Equivalent input intent uses OS-specific mechanisms. DriverKit, launchd and Mac approval panes have no corresponding dependency on Windows/Linux. Counterpart source review is not native input qualification.",
+			"evidence_reports": [
+				"macos-runtime/report.md",
+				"windows-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "runtime-permission",
+			"title": "Runtime installation authority and approval",
+			"behavior": {
+				"windows": "Windows job/handle/DACL and input-hook lifecycles require native qualification.",
+				"macos": "Protected install needs administrator authority, followed by OS driver approval. Explicit Mac-only install/approval rows; Developer ID remains deferred by decision.",
+				"linux": "Permission setup configures the explicit/local graphical UID for input/uinput and udev/module rules."
+			},
+			"classification": "implementation_constraint",
+			"rationale": "Native permission/security systems differ. The Mac-only menu declaration is explicit; installing the Mac dependency on other OS is not owed parity. No privileged operation ran in this campaign.",
+			"evidence_reports": [
+				"macos-runtime/report.md",
+				"windows-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "approval-bounds",
+			"title": "Approval observation deadline and Settings receipt",
+			"behavior": {
+				"windows": "No DriverKit approval observer counterpart.",
+				"macos": "MRT-001 counts poll intervals rather than elapsed task/timer time; MRT-006 accepts false Settings-open result because only pcall status is checked.",
+				"linux": "No DriverKit approval observer counterpart."
+			},
+			"classification": "observed_defect",
+			"rationale": "Mac approval is inherently platform-specific; truthful opening failure and bounded observation remain ordinary product requirements. Linux libuv timing qualifies the scaled experiment only, not Mac native latency.",
+			"evidence_reports": ["macos-runtime/report.md"],
+			"finding_ids": ["MRT-001", "MRT-006"]
+		},
+		{
+			"id": "runtime-timer",
+			"title": "Runtime command deadline admission",
+			"behavior": {
+				"windows": "Managed bootstrap retains native task/file debt; actual AHK timer/NTFS behavior was not executed.",
+				"macos": "MRT-002: bounded runner ignores Timer.after committed=false and can leave a started install without a deadline/terminal result.",
+				"linux": "Managed repair owns budget plus finite/service process capabilities; no same runtime-command defect retained."
+			},
+			"classification": "observed_defect",
+			"rationale": "An allocated handle is not an armed deadline. This Mac runtime join and Linux diagnostics LDG-003 have related receipt themes but distinct owners and regressions.",
+			"evidence_reports": [
+				"macos-runtime/report.md",
+				"windows-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": ["MRT-002"]
+		},
+		{
+			"id": "runtime-recovery",
+			"title": "Runtime receipt and post-publication recovery",
+			"behavior": {
+				"windows": "Exact source/archive/WAL/native ownership paths reviewed; interrupted root-marker recovery remains an unconfirmed expectation.",
+				"macos": "MRT-003: Lua cache accepts receipt suffixes rejected by exact Swift guard. MRT-004: exposed first-install retry cannot repair already-present Runtime after service provisioning failure.",
+				"linux": "No-replace publication and captured cleanup preserve foreign/late-published trees; old-pin reclamation and runtime purge product policy remain unknown."
+			},
+			"classification": "observed_defect",
+			"rationale": "Mac cache/install consistency and recoverable provisioning are confirmed within stated source/model boundaries. Existing-tree refusal must stay; a recovery route must not blindly overwrite unknown/live state.",
+			"evidence_reports": [
+				"macos-runtime/report.md",
+				"windows-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": ["MRT-003", "MRT-004"]
+		},
+		{
+			"id": "native-timeout-continuation",
+			"title": "Logical timeout and privileged helper continuation",
+			"behavior": {
+				"windows": "Task/receipt cleanup retains native debt and blocks replacements until acknowledgement, source reviewed.",
+				"macos": "MRT-005 is NOT confirmed: pending child after logical timeout does not revoke existing consent or prove corruption; original EX lifecycle lock fences publication.",
+				"linux": "Cancellation and process-group/close receipts are distinct; uncertain acquisition is not inferred settled."
+			},
+			"classification": "refuted_or_demoted",
+			"rationale": "A signal, unanswered install or cleared logical waiter is not physical completion. Forbidden continuation or bad effect was not established; EX-lock protection refutes the asserted overlapping-publication consequence.",
+			"evidence_reports": [
+				"macos-runtime/report.md",
+				"windows-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "runtime-removal",
+			"title": "Application removal versus runtime/model purge",
+			"behavior": {
+				"windows": "App uninstall explicitly removes confirmed executable/startup shortcut after parent exit; runtime, models and user config survive. Source checkout uninstall refuses visibly.",
+				"macos": "App Trash/termination counterpart is source-compared; remap runtime lifecycle/other-Karabiner restoration has separate explicit ownership.",
+				"linux": "App removal is manifest-scoped; no user-facing managed-runtime purge or in-place update transaction established in the audited Ollama call graph."
+			},
+			"classification": "unknown_intent",
+			"rationale": "Windows retention is explicit policy, not a new defect. Whether all platforms should offer a purge-all/old-pin cleanup action is unknown; app removal and runtime removal must not be conflated.",
+			"evidence_reports": [
+				"windows-runtime/report.md",
+				"macos-runtime/report.md",
+				"linux-runtime/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "diagnostic-scope",
+			"title": "Quick/extensive checks, page observations and driver suites",
+			"behavior": {
+				"windows": "Shared snapshot/probes; guided collection and resident controls explicitly keep native/physical scenarios unqualified or UNRUN.",
+				"macos": "Driver-specific quick/extensive probes; installed-page model/synthetic checks remain unqualified.",
+				"linux": "Local configuration by default, optional extensive providers; shared model observations remain unqualified."
+			},
+			"classification": "explicit_policy",
+			"rationale": "driver-suites: not_run and installed_page_reported (unqualified) are authority boundaries. A saved archive, page-model PASS or function-existence check does not qualify native driver/install/reload behavior.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "guided-collection",
+			"title": "Guided native diagnostic collection",
+			"behavior": {
+				"windows": "Declared Windows-only independent collection job/session and bounded receipt-based ZIP; guided scenarios retain explicit unrun/unqualified status.",
+				"macos": "Init capability diagnostic_collection=false; ordinary diagnostics still available.",
+				"linux": "Init capability diagnostic_collection=false; ordinary diagnostics still available."
+			},
+			"classification": "explicit_policy",
+			"rationale": "The Windows-only collection is an explicit declared asymmetry. No universal native technical impossibility on Mac/Linux was established; absence does not authorize inventing a substitute PASS.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "diagnostic-ai",
+			"title": "Diagnostics selected AI backend and off state",
+			"behavior": {
+				"windows": "Helpers preserve actual backend and boolean off; non-Ollama local-health checks are unsupported.",
+				"macos": "Helpers preserve actual backend/false; schema path gates unsupported backends before local-health request.",
+				"linux": "LDG-001 attributes API input to Ollama and probes local Ollama; LDG-002 erases false to nil, rendering Enabled unknown and omitting known off in export."
+			},
+			"classification": "observed_defect",
+			"rationale": "API is supported by Linux engine; no policy makes local Ollama a proxy for selected remote API health. Known off differs from absent/unavailable. Actual shared model/export replay establishes the display consequence.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": ["LDG-001", "LDG-002"]
+		},
+		{
+			"id": "diagnostic-timer",
+			"title": "Diagnostics refusal, timeout and cancellation",
+			"behavior": {
+				"windows": "Native SetTimer/poll deadlines and owner/session checks are source-reviewed; no Windows timer failure execution.",
+				"macos": "Probe watchdog explicitly checks committed receipt; actor/cleanup status remains separate from business result.",
+				"linux": "LDG-003 ignores returned unarmed scheduler handle after native allocation/start refusal; configuration stays pending with no remaining timer. Lower scheduler logs the error."
+			},
+			"classification": "observed_defect",
+			"rationale": "The Linux missing terminal result is not total diagnostic silence or a native memory-exhaustion measurement. Fault seams use faithful return shapes; healthy real timer and actual handle cleanup controls pass.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": ["LDG-003"]
+		},
+		{
+			"id": "connectivity-status",
+			"title": "HTTP connectivity versus complete provider readiness",
+			"behavior": {
+				"windows": "HTTP status can describe endpoint reachability even when optional version/rate-limit fields cannot parse.",
+				"macos": "Same bounded endpoint-answer interpretation; no successful inference implied.",
+				"linux": "Actual curl exit18/status200 can yield probe ok while transport logs failure; retained as a bounded observation, not a confirmed completeness defect."
+			},
+			"classification": "observed_limit",
+			"rationale": "Backend answers is weaker than valid complete payload, authenticated provider correctness or model inference. The Linux API-to-Ollama attribution is separately LDG-001. Preserve loud lower-layer errors.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "approved-sharing",
+			"title": "Approved copy/save/report and opt-in day log",
+			"behavior": {
+				"windows": "Closed typed English report; exact host preview; separate redacted day-log slot/cap; no automatic upload.",
+				"macos": "Same closed host projection, snapshot-bound redacted day log, save/reveal/browser ordering.",
+				"linux": "Same closed projection; real unprivileged native write/close/permission controls refuse incomplete diagnostic saves before reveal."
+			},
+			"classification": "explicit_policy",
+			"rationale": "Raw local snapshot detail is not the shared attachment. Canary controls support bounded policy assertions, not exhaustive privacy certification or actual OS clipboard/browser success.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "crash-local-privacy",
+			"title": "Local crash-file privacy policy",
+			"behavior": {
+				"windows": "Full error/stack/log/window context locally is explicitly documented; sharing has its separate redacted boundary.",
+				"macos": "Raw recognized token/account/path canaries reach local crash JSON; categorical no-personal-data comments conflict with output. Mac local-retention intent is unknown.",
+				"linux": "Crash dump captures admitted sink redactor/currentness and redacts before opening/writing; no raw fallback."
+			},
+			"classification": "unknown_intent",
+			"rationale": "These are actual different local policies/mechanisms. Windows raw retention is explicit; Linux is stricter; Mac comment inconsistency is not promoted to an automatic-upload/data-leak finding without policy adjudication.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "crash-partial-artifact",
+			"title": "Failed crash-worker artifact completeness",
+			"behavior": {
+				"windows": "WDG-001, LOW: both PowerShell writers can leave truncated canonical .json after partial write refusal; no OK or saved notification is emitted.",
+				"macos": "Create-if-absent writer/retention controls exercised through Linux-backed filesystem port; Darwin physical write/identity behavior unqualified.",
+				"linux": "Regular writer/close/path-image receipts and redaction fail closed; no blanket cross-OS crash failure-atomicity claim."
+			},
+			"classification": "observed_defect",
+			"rationale": "Actual PowerShell/.NET private Linux file-size refusal proves Windows worker mechanism, not a measured Windows disk-full incident. This is failed-artifact cleanup, not false saved success or a privacy leak.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": ["WDG-001"]
+		},
+		{
+			"id": "diagnostic-native-constraints",
+			"title": "Platform diagnostics and known gaps",
+			"behavior": {
+				"windows": "Native UIA/guided collection available by declaration; unavailable-feature explanation absent and already in prior TODO.",
+				"macos": "External AppleEvent transport/permissions differ; manifest unavailable-feature explanation exists.",
+				"linux": "X11 detailed app list; Wayland app enumeration omitted with explanation. Portable reveal opens containing directory, not file selection. Unavailable-feature explanation already backlog."
+			},
+			"classification": "implementation_constraint",
+			"rationale": "Wayland enumeration and platform transport differ for native reasons. Existing unavailable-feature parity debt is not reissued. Implementing only Windows guided collection is explicit policy, not proof that Mac/Linux are technically incapable.",
+			"evidence_reports": [
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		},
+		{
+			"id": "qualification",
+			"title": "Native receiving, memory and performance qualification",
+			"behavior": {
+				"windows": "Portable PowerShell/source/JS controls only; no AHK, WebView2, NTFS/ACL/listener or physical driver receiving.",
+				"macos": "Lua/native-shaped ports and selected Linux-backed file/timing controls only; no Darwin WebKit, Swift/security/launchd/DriverKit receiving.",
+				"linux": "Actual private POSIX/libuv/source/save/HTTP-helper controls; no GTK/WebKit receiving, live managed model, corporate network or physical input."
+			},
+			"classification": "observed_limit",
+			"rationale": "No native three-OS certification, production latency percentile or steady-state native heap/leak rate follows. Module/test timings and modeled cleanup are not production performance or physical retirement receipts.",
+			"evidence_reports": [
+				"windows-runtime/report.md",
+				"macos-runtime/report.md",
+				"linux-runtime/report.md",
+				"windows-webview/report.md",
+				"macos-webview/report.md",
+				"linux-webview/report.md",
+				"windows-diagnostics/report.md",
+				"macos-diagnostics/report.md",
+				"linux-diagnostics/report.md"
+			],
+			"finding_ids": []
+		}
+	]
+}

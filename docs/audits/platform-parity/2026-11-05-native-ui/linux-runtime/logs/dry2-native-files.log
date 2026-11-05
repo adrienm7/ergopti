@@ -1,0 +1,14 @@
+PASS real native prerequisite receipts
+PASS tiny independently hashed archive extracts and publishes full tree
+PASS actual file transaction composes exact native helpers with local copy port
+PASS actual raced empty foreign destination survives mv no-clobber
+PASS actual hash cannot admit a wrong independent digest
+PASS native post-hash archive replacement is refused before tar
+PASS native intermediate bin link cannot chmod outside executable
+PASS native intermediate lib link cannot admit outside runtime tree
+PASS late cancelled publication retains actual verified tree
+PASS native cleanup unlinks a symlink without touching its outside target
+PASS native staging replacement keeps exact foreign inode
+Install native filesystem receipts: 11 passed, 0 failed.
+Native subreaper: 0 adopted descendants physically reaped
+Native subreaper closure: {"adopted": 0, "pending": 0, "rescue": 0}

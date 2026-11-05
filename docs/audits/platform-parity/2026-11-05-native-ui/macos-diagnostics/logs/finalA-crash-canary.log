@@ -1,0 +1,11 @@
+2026-11-05 00:53:44:000 [ERROR] [synthetic_probe] Failure <secret> at <config>/<name>
+[logger] unified log write refused: /tmp/lua_aIVhtB_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_aIVhtB_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+actual_report_and_save: canary_in_error=true canary_in_stack=true private_account_in_saved_json=true
+healthy_control: canonical_redactor_removes_canary=true ordinary_log_line_printed_redacted=true
+2026-11-05 00:53:44:000 [ERROR] [crash_reporter] Crash report write failed: atomic report creation failed (status=error): synthetic write refused.
+persistence_false: returned_nil=true
+2026-11-05 00:53:44:000 [ERROR] [crash_reporter] Crash report write failed: atomic report creation raised: ...rity-native-ui/macos-diagnostics/probes/crash-canary.lua:28: synthetic write raised.
+persistence_throw: returned_nil=true
+native_port: actual_Linux_libuv_exclusive_create_write_close=true files_removed=true Darwin_adapter_not_executed=true
+shared_export_control: typed_document_canary_absent=true daylog_preview_and_file_canary_absent=true refreshed_or_discarded_snapshot_has_no_attachment=true

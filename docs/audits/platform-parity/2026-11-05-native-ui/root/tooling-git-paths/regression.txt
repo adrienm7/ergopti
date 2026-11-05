@@ -1,0 +1,2 @@
+[OK] complete 10004-path, 1470090-byte real inventory; old reader ENOBUFS
+[OK] empty, exact names, untracked policy, command/spawn refusal and capture cleanup

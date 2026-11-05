@@ -1,0 +1,106 @@
+Selecting exact test module: "tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker
+
+=== Production macOS program provider picker sessions ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"projects only public choices and delivers the resolved scalar through the existing callback","status":"pass","elapsed_ms":4.371455,"timing_error":""}
+  ok   projects only public choices and delivers the resolved scalar through the existing callback
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"stale old-page choices cannot resolve or confirm a replacement binding","status":"pass","elapsed_ms":4.114667,"timing_error":""}
+  ok   stale old-page choices cannot resolve or confirm a replacement binding
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"resolver-driven replacement cannot publish the previous binding","status":"pass","elapsed_ms":3.613012,"timing_error":""}
+  ok   resolver-driven replacement cannot publish the previous binding
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"recursive resolution cannot invoke the durable callback twice","status":"pass","elapsed_ms":2.640104,"timing_error":""}
+  ok   recursive resolution cannot invoke the durable callback twice
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"retains the provider after synchronous on-close followed by native delete throw","status":"pass","elapsed_ms":3.016807,"timing_error":""}
+  ok   retains the provider after synchronous on-close followed by native delete throw
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"a genuine public user-close invalidates choices without affecting its successor","status":"pass","elapsed_ms":4.178512,"timing_error":""}
+  ok   a genuine public user-close invalidates choices without affecting its successor
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"refuses malformed or foreign opaque choices: true","status":"pass","elapsed_ms":2.434712,"timing_error":""}
+  ok   refuses malformed or foreign opaque choices: true
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"refuses malformed or foreign opaque choices: 0","status":"pass","elapsed_ms":2.604231,"timing_error":""}
+  ok   refuses malformed or foreign opaque choices: 0
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"refuses malformed or foreign opaque choices: ","status":"pass","elapsed_ms":3.831662,"timing_error":""}
+  ok   refuses malformed or foreign opaque choices: 
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"refuses malformed or foreign opaque choices: foreign-choice","status":"pass","elapsed_ms":3.353200,"timing_error":""}
+  ok   refuses malformed or foreign opaque choices: foreign-choice
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"refused persistence keeps the same discovery retryable and manual fallback available","status":"pass","elapsed_ms":2.492808,"timing_error":""}
+  ok   refused persistence keeps the same discovery retryable and manual fallback available
+
+=== Production readonly automation picker sessions ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"publishes a closed pending inventory independently of ordinary providers","status":"pass","elapsed_ms":3.108312,"timing_error":""}
+  ok   publishes a closed pending inventory independently of ordinary providers
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"suppresses a retired native callback after window replacement","status":"pass","elapsed_ms":3.575316,"timing_error":""}
+  ok   suppresses a retired native callback after window replacement
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"retains native query debt without constructing a replacement query owner","status":"pass","elapsed_ms":2.896100,"timing_error":""}
+  ok   retains native query debt without constructing a replacement query owner
+
+=== Actual macOS reserved program assignment availability ===
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"manual reserved refusal keeps the editor retryable for an ordinary repair","status":"pass","elapsed_ms":3.462161,"timing_error":""}
+  ok   manual reserved refusal keeps the editor retryable for an ordinary repair
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"resolved reserved descriptors obey the same host refusal","status":"pass","elapsed_ms":2.760881,"timing_error":""}
+  ok   resolved reserved descriptors obey the same host refusal
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: ordinary executable","status":"pass","elapsed_ms":2.475692,"timing_error":""}
+  ok   actual native predicate presentation: ordinary executable
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: different shortcut path","status":"pass","elapsed_ms":4.093206,"timing_error":""}
+  ok   actual native predicate presentation: different shortcut path
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: other native subcommand","status":"pass","elapsed_ms":4.970214,"timing_error":""}
+  ok   actual native predicate presentation: other native subcommand
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: case-sensitive subcommand","status":"pass","elapsed_ms":2.825075,"timing_error":""}
+  ok   actual native predicate presentation: case-sensitive subcommand
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: empty native arguments","status":"pass","elapsed_ms":2.832246,"timing_error":""}
+  ok   actual native predicate presentation: empty native arguments
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: chosen native UUID","status":"pass","elapsed_ms":2.696777,"timing_error":""}
+  ok   actual native predicate presentation: chosen native UUID
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: native name parameter","status":"pass","elapsed_ms":2.829382,"timing_error":""}
+  ok   actual native predicate presentation: native name parameter
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"actual native predicate presentation: missing native direct parameter","status":"pass","elapsed_ms":2.958752,"timing_error":""}
+  ok   actual native predicate presentation: missing native direct parameter
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"malformed syntax stays with the existing parameter owner","status":"pass","elapsed_ms":2.696988,"timing_error":""}
+  ok   malformed syntax stays with the existing parameter owner
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"unavailable native classifier refuses without disabling ordinary repair: missing","status":"pass","elapsed_ms":2.636289,"timing_error":""}
+  ok   unavailable native classifier refuses without disabling ordinary repair: missing
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"unavailable native classifier refuses without disabling ordinary repair: throw","status":"pass","elapsed_ms":3.574475,"timing_error":""}
+  ok   unavailable native classifier refuses without disabling ordinary repair: throw
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"unavailable native classifier refuses without disabling ordinary repair: nil","status":"pass","elapsed_ms":3.704015,"timing_error":""}
+  ok   unavailable native classifier refuses without disabling ordinary repair: nil
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"unavailable native classifier refuses without disabling ordinary repair: table","status":"pass","elapsed_ms":3.635645,"timing_error":""}
+  ok   unavailable native classifier refuses without disabling ordinary repair: table
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"failed reason observation clears settling before the next confirmation","status":"pass","elapsed_ms":3.949466,"timing_error":""}
+  ok   failed reason observation clears settling before the next confirmation
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"classifier replacement cannot confirm or warn the retired page","status":"pass","elapsed_ms":2.623259,"timing_error":""}
+  ok   classifier replacement cannot confirm or warn the retired page
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"reason encoding replacement cannot warn the retired page","status":"pass","elapsed_ms":2.543342,"timing_error":""}
+  ok   reason encoding replacement cannot warn the retired page
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"native prompt refuses a reserved value and still accepts an ordinary replacement","status":"pass","elapsed_ms":2.536672,"timing_error":""}
+  ok   native prompt refuses a reserved value and still accepts an ordinary replacement
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"public commit refuses before any writer and permits an ordinary replacement","status":"pass","elapsed_ms":2.583691,"timing_error":""}
+  ok   public commit refuses before any writer and permits an ordinary replacement
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"stored reserved bytes remain editable and ordinary stored values have no refusal hint","status":"pass","elapsed_ms":5.830396,"timing_error":""}
+  ok   stored reserved bytes remain editable and ordinary stored values have no refusal hint
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"physical fallback nil cannot produce a parameterized entry draft","status":"pass","elapsed_ms":5.392593,"timing_error":""}
+  ok   physical fallback nil cannot produce a parameterized entry draft
+
+=== action picker scalar native JSON boundary ===
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) actual unavailable reason reaches the retained picker with native table-only JSON","status":"pass","elapsed_ms":7.602089,"timing_error":""}
+  ok   (hs-scalar-json-picker) actual unavailable reason reaches the retained picker with native table-only JSON
+# lua_timing {"schema":1,"driver":"macos","id":39,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) unavailable reason quotation nil cannot confirm","status":"pass","elapsed_ms":4.197159,"timing_error":""}
+  ok   (hs-scalar-json-picker) unavailable reason quotation nil cannot confirm
+# lua_timing {"schema":1,"driver":"macos","id":40,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) unavailable reason quotation false cannot confirm","status":"pass","elapsed_ms":3.157273,"timing_error":""}
+  ok   (hs-scalar-json-picker) unavailable reason quotation false cannot confirm
+# lua_timing {"schema":1,"driver":"macos","id":41,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) unavailable reason quotation throw cannot confirm","status":"pass","elapsed_ms":2.756525,"timing_error":""}
+  ok   (hs-scalar-json-picker) unavailable reason quotation throw cannot confirm
+# lua_timing {"schema":1,"driver":"macos","id":42,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) reason encoding reentry cannot target a replacement picker","status":"pass","elapsed_ms":3.153638,"timing_error":""}
+  ok   (hs-scalar-json-picker) reason encoding reentry cannot target a replacement picker
+# lua_timing {"schema":1,"driver":"macos","id":43,"kind":"case","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"(hs-scalar-json-picker) invalid UTF-8 reason neither dispatches nor confirms","status":"pass","elapsed_ms":2.591623,"timing_error":""}
+  ok   (hs-scalar-json-picker) invalid UTF-8 reason neither dispatches nor confirms
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","name":"tests.unit.ui.menu.gestures_and_apps.test_program_provider_picker","status":"pass","elapsed_ms":162.093739,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  42
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

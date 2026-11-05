@@ -1,0 +1,32 @@
+Selecting exact test module: "tests.unit.modules.diagnostics.test_crash_report_contract"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.diagnostics.test_crash_report_contract
+
+=== Crash report format and retention ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"keeps the cap and the field list of the corpus","status":"pass","elapsed_ms":0.016886,"timing_error":""}
+  ok   keeps the cap and the field list of the corpus
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"derives the file stem from the UTC timestamp","status":"pass","elapsed_ms":0.009234,"timing_error":""}
+  ok   derives the file stem from the UTC timestamp
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"names a report and parses the name back","status":"pass","elapsed_ms":0.013671,"timing_error":""}
+  ok   names a report and parses the name back
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"refuses every name that is not a report","status":"pass","elapsed_ms":0.011037,"timing_error":""}
+  ok   refuses every name that is not a report
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"deletes the oldest reports beyond the cap, and only reports","status":"pass","elapsed_ms":0.028434,"timing_error":""}
+  ok   deletes the oldest reports beyond the cap, and only reports
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"applies the shared cap by default","status":"pass","elapsed_ms":0.045849,"timing_error":""}
+  ok   applies the shared cap by default
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"serialises a record in the documented order with the documented defaults","status":"pass","elapsed_ms":0.123077,"timing_error":""}
+  ok   serialises a record in the documented order with the documented defaults
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"raises on an unknown field and converts a non-string value","status":"pass","elapsed_ms":0.011828,"timing_error":""}
+  ok   raises on an unknown field and converts a non-string value
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.diagnostics.test_crash_report_contract","name":"tests.unit.modules.diagnostics.test_crash_report_contract","status":"pass","elapsed_ms":1.349572,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

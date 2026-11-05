@@ -1,0 +1,9 @@
+PASS healthy four closed UNRUN observations, scenario_qualified=false
+PASS healthy observed runtime generations remain scenario-unqualified
+PASS refusal unknown canary field
+PASS refusal unexecuted passing claim
+PASS refusal future captured time
+PASS refusal free text numeric field
+PASS refusal inactive native passing claim
+PASS genuine private Linux file JSON, cap refusal and independent SHA-256
+RESULT 8 controls passed; no native collector entry, input, network or Windows APIs executed

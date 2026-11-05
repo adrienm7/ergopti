@@ -1,0 +1,60 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_bridge_actions"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_bridge_actions
+
+=== diagnostics window: the page's bridge (macOS) ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"registers the handler host_bridge.js posts to, and polls nothing","status":"pass","elapsed_ms":6.221045,"timing_error":""}
+  ok   registers the handler host_bridge.js posts to, and polls nothing
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"answers ready with a quick snapshot and starts probes only after explicit opt-in","status":"pass","elapsed_ms":81.073581,"timing_error":""}
+  ok   answers ready with a quick snapshot and starts probes only after explicit opt-in
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"refuses and logs an action outside the allowlist, doing nothing","status":"pass","elapsed_ms":20.169882,"timing_error":""}
+  ok   refuses and logs an action outside the allowlist, doing nothing
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"copies the redacted report and tells the page","status":"pass","elapsed_ms":23.593288,"timing_error":""}
+  ok   copies the redacted report and tells the page
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"report completes its attachment, then opens the stable-metadata form last (report-focus)","status":"pass","elapsed_ms":25.793829,"timing_error":""}
+  ok   report completes its attachment, then opens the stable-metadata form last (report-focus)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"keeps the window open when the clipboard refuses, and says so (healthcheck-copy-receipt)","status":"pass","elapsed_ms":23.268825,"timing_error":""}
+  ok   keeps the window open when the clipboard refuses, and says so (healthcheck-copy-receipt)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"ignores a message of a closed window and releases its handler","status":"pass","elapsed_ms":2.300573,"timing_error":""}
+  ok   ignores a message of a closed window and releases its handler
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"closes on the page's close button, cancelling its probes","status":"pass","elapsed_ms":29.952402,"timing_error":""}
+  ok   closes on the page's close button, cancelling its probes
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"reopening releases the previous window's handler before the new one exists","status":"pass","elapsed_ms":2.570522,"timing_error":""}
+  ok   reopening releases the previous window's handler before the new one exists
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"refresh collects again with details and restarts the probes","status":"pass","elapsed_ms":32.877894,"timing_error":""}
+  ok   refresh collects again with details and restarts the probes
+
+=== diagnostics user presentation admission ===
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"diagnostics foreground refuses focus false","status":"pass","elapsed_ms":39.653449,"timing_error":""}
+  ok   diagnostics foreground refuses focus false
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"diagnostics foreground refuses focus throw","status":"pass","elapsed_ms":33.612700,"timing_error":""}
+  ok   diagnostics foreground refuses focus throw
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"diagnostics background probe completion never steals window focus","status":"pass","elapsed_ms":22.888588,"timing_error":""}
+  ok   diagnostics background probe completion never steals window focus
+
+=== diagnostics asynchronous action ownership ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"rejects a retained opener after close","status":"pass","elapsed_ms":17.584346,"timing_error":""}
+  ok   rejects a retained opener after close
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"rejects a retained opener after refresh","status":"pass","elapsed_ms":23.708333,"timing_error":""}
+  ok   rejects a retained opener after refresh
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"rejects a retained opener after revision","status":"pass","elapsed_ms":25.921082,"timing_error":""}
+  ok   rejects a retained opener after revision
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"rejects a retained opener after module","status":"pass","elapsed_ms":18.489751,"timing_error":""}
+  ok   rejects a retained opener after module
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"cancellation reentry keeps the newest action and does not dispatch the displaced one","status":"pass","elapsed_ms":21.038373,"timing_error":""}
+  ok   cancellation reentry keeps the newest action and does not dispatch the displaced one
+
+=== diagnostics close cancellation reentry ===
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"reentrant reopen during native action cancellation preserves the replacement","status":"pass","elapsed_ms":18.606322,"timing_error":""}
+  ok   reentrant reopen during native action cancellation preserves the replacement
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","name":"tests.unit.ui.healthcheck.test_healthcheck_bridge_actions","status":"pass","elapsed_ms":470.842295,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  19
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

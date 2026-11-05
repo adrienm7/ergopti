@@ -1,0 +1,43 @@
+Native subreaper: 0 adopted descendants physically reaped
+Native subreaper closure: {"adopted": 0, "pending": 0, "rescue": 0}
+FAIL real native prerequisite receipts: ...time/static/ergopti_plus/linux/adapters/shell_runner.lua:42: module 'text_utils' not found:
+	no field package.preload['text_utils']
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua/text_utils.lua'
+	no file './text_utils.lua'
+	no file '/usr/local/share/luajit-2.1/text_utils.lua'
+	no file '/usr/local/share/lua/5.1/text_utils.lua'
+	no file '/usr/local/share/lua/5.1/text_utils/init.lua'
+	no file '/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.1/text_utils.so'
+	no file '/workspace/scratch/parity-toolchain/modules51/text_utils.so'
+	no file './text_utils.so'
+	no file '/usr/local/lib/lua/5.1/text_utils.so'
+	no file '/usr/local/lib/lua/5.1/loadall.so'
+/workspace/scratch/parity-toolchain/LuaJIT-2.1/src/luajit: ...linux/tests/hardware/run_ollama_install_files_native.lua:26: ...time/static/ergopti_plus/linux/adapters/shell_runner.lua:42: module 'text_utils' not found:
+	no field package.preload['text_utils']
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/text_utils.lua'
+	no file '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua/text_utils.lua'
+	no file './text_utils.lua'
+	no file '/usr/local/share/luajit-2.1/text_utils.lua'
+	no file '/usr/local/share/lua/5.1/text_utils.lua'
+	no file '/usr/local/share/lua/5.1/text_utils/init.lua'
+	no file '/workspace/scratch/parity-toolchain/debian/usr/lib/x86_64-linux-gnu/lua/5.1/text_utils.so'
+	no file '/workspace/scratch/parity-toolchain/modules51/text_utils.so'
+	no file './text_utils.so'
+	no file '/usr/local/lib/lua/5.1/text_utils.so'
+	no file '/usr/local/lib/lua/5.1/loadall.so'
+stack traceback:
+	[C]: in function 'error'
+	...linux/tests/hardware/run_ollama_install_files_native.lua:26: in function 'test'
+	...linux/tests/hardware/run_ollama_install_files_native.lua:79: in main chunk
+	[C]: at 0x556005e69360
+Traceback (most recent call last):
+  File "/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.py", line 70, in <module>
+    subprocess.run(command, check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['python3', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py', '/workspace/scratch/parity-toolchain/ci-bin/luajit', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux/tests/hardware/run_ollama_install_files_native.lua', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/linux', '/workspace/worktrees/parity-2026-11-05/linux-runtime/static/ergopti_plus/_shared/lua', '/tmp/ergopti-archive-native-q6h8vvmh', '/tmp/ergopti-archive-native-q6h8vvmh/independent-fixture.tar.zst', '216', '758348c5365a4d12aee014ef8bb2ccd41e70c8a74c7966b4c1d937d436abf8b2']' returned non-zero exit status 1.

@@ -1,0 +1,20 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_share_enums"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_share_enums
+
+=== healthcheck: shared report enums ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_share_enums","name":"accepts every lease phase the controller publishes","status":"pass","elapsed_ms":183.622021,"timing_error":""}
+  ok   accepts every lease phase the controller publishes
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_share_enums","name":"accepts every backend identifier of the detector","status":"pass","elapsed_ms":4.911109,"timing_error":""}
+  ok   accepts every backend identifier of the detector
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_share_enums","name":"tests.unit.ui.healthcheck.test_healthcheck_share_enums","status":"pass","elapsed_ms":193.924881,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  2
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

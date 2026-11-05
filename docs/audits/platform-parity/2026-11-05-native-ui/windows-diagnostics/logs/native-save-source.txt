@@ -1,0 +1,17 @@
+SOURCE characterization: native Click binds direct handler; it returns the effect outcome without rendering it.
+SOURCE healthy control: acknowledged durable writer returns Path, then Explorer is invoked.
+SOURCE refusal control: durable writer false/throw -> caught effect refusal {ok:false}; no native result presenter.
+SOURCE sibling control: WebView effect result renders the same outcome through an action acknowledgement.
+NATIVE WINDOWS CHARACTERIZATION UNEXECUTED: WebView unavailable -> native fallback Save; deny the private diagnostics target write; click Save; inspect unchanged native window and logged Diagnostics action save failed.
+_HC_NativeSaveSnapshot(Snapshot, *) {
+	Config := HealthCheck_Config()
+	Name := Config["schema"]["report"]["name_prefix"] . "windows-" . FormatTime(A_NowUTC, "yyyyMMdd-HHmmss")
+		. Config["schema"]["report"]["name_suffix"]
+	Text := _HC_NativeSnapshotText(Snapshot)
+	Validated := HealthCheck_ValidateAction(Map("action", "save", "text", Text, "name", Name),
+		Map("schema", Config["schema"], "templates", Config["templates"], "driver", "windows"))
+	if !Validated.Has("action")
+		throw Error("The native diagnostic export was refused.")
+	return HealthCheck_PerformAction(Validated["action"], Snapshot["sections"]["paths"], Config, 0, Snapshot)
+}
+REFUTATION: LoggerError reaches ErrorDialog_OnError; unavailable WebView path announces the logged failure through NotifierSend. No confirmed silent-failure item retained.

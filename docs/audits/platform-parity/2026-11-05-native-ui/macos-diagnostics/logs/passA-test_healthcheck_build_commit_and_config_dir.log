@@ -1,0 +1,41 @@
+Selecting exact test module: "tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir
+
+=== build-commit: the macOS resolver ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: a packaged app answers from its stamp, not a checkout","status":"pass","elapsed_ms":5.430365,"timing_error":""}
+  ok   build-commit: a packaged app answers from its stamp, not a checkout
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: the boot snapshot's commit field is the stamp","status":"pass","elapsed_ms":2.240933,"timing_error":""}
+  ok   build-commit: the boot snapshot's commit field is the stamp
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: an unknown commit is logged with the places it looked","status":"pass","elapsed_ms":5.229011,"timing_error":""}
+  ok   build-commit: an unknown commit is logged with the places it looked
+
+=== build-commit: the healthcheck of a packaged app ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: reports the stamped commit and its origin, with no subprocess","status":"pass","elapsed_ms":7.613911,"timing_error":""}
+  ok   build-commit: reports the stamped commit and its origin, with no subprocess
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: the config dir is the chosen folder and the bundle is the app dir","status":"pass","elapsed_ms":4.131909,"timing_error":""}
+  ok   build-commit: the config dir is the chosen folder and the bundle is the app dir
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: an uninitialised config_paths is left unknown, not replaced by the bundle","status":"pass","elapsed_ms":3.449162,"timing_error":""}
+  ok   build-commit: an uninitialised config_paths is left unknown, not replaced by the bundle
+
+=== build-commit: the crash report of a packaged app ===
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: carries the commit and both directories without system probes","status":"pass","elapsed_ms":4.819084,"timing_error":""}
+  ok   build-commit: carries the commit and both directories without system probes
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: the version is the launcher's, not Hammerspoon's","status":"pass","elapsed_ms":2.840196,"timing_error":""}
+  ok   build-commit: the version is the launcher's, not Hammerspoon's
+2026-11-05 00:52:54:000 [ERROR] [crash_reporter] Build commit resolution raised: ...thcheck/test_healthcheck_build_commit_and_config_dir.lua:249: stamp read exploded.
+[logger] unified log write refused: /tmp/lua_lQ5s0z_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] errors-only log write refused: /tmp/lua_lQ5s0z_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_errors_2026-11-05.log: No such file or directory
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"build-commit: a resolver failure is reported as unknown, not raised","status":"pass","elapsed_ms":4.623660,"timing_error":""}
+  ok   build-commit: a resolver failure is reported as unknown, not raised
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","name":"tests.unit.ui.healthcheck.test_healthcheck_build_commit_and_config_dir","status":"pass","elapsed_ms":43.025566,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  9
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

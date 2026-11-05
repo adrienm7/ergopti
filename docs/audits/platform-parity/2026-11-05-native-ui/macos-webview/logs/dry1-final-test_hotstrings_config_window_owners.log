@@ -1,0 +1,30 @@
+Selecting exact test module: "tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners
+
+=== hotstrings configuration native owners ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"construction exception before allocation remains retryable (config-window-owner)","status":"pass","elapsed_ms":8.961669,"timing_error":""}
+  ok   construction exception before allocation remains retryable (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"construction exception after allocation remains retryable (config-window-owner)","status":"pass","elapsed_ms":6.267054,"timing_error":""}
+  ok   construction exception after allocation remains retryable (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"rejects retired bridge mutation, navigation and close (config-window-owner)","status":"pass","elapsed_ms":7.343357,"timing_error":""}
+  ok   rejects retired bridge mutation, navigation and close (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"a refused close leaves cleanup authority but no mutation authority (config-window-owner)","status":"pass","elapsed_ms":10.001689,"timing_error":""}
+  ok   a refused close leaves cleanup authority but no mutation authority (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"construction-time close cannot publish an owner (config-window-owner)","status":"pass","elapsed_ms":6.514686,"timing_error":""}
+  ok   construction-time close cannot publish an owner (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"native close and navigation from A cannot retire B (config-window-owner)","status":"pass","elapsed_ms":6.738553,"timing_error":""}
+  ok   native close and navigation from A cannot retire B (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"JavaScript reentry cannot invoke a successor refresh callback (config-window-owner)","status":"pass","elapsed_ms":6.461586,"timing_error":""}
+  ok   JavaScript reentry cannot invoke a successor refresh callback (config-window-owner)
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","name":"tests.unit.ui.hotstring_windows.test_hotstrings_config_window_owners","status":"pass","elapsed_ms":53.025153,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  7
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

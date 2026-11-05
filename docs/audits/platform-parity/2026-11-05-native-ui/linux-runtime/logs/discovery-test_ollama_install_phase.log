@@ -1,0 +1,13 @@
+  ok   one master budget clamps finite helpers without allocating another timer (ollama-install)
+  ok   each successor uses fresh remaining master budget (ollama-install)
+  ok   archive HTTP uses the same shrinking budget and captured source (ollama-install)
+  ok   zero remaining budget cannot dispatch any native helper (ollama-install)
+  ok   unknown remaining budget cannot borrow an independent phase timeout (ollama-install)
+  ok   master revocation immediately cancels exact active operation (ollama-install)
+  ok   revocation during cancellation registration prevents acquisition (ollama-install)
+  ok   refused immediate cancellation subscription cannot start installation (ollama-install)
+  ok   budget function replacement cannot change captured deadline authority (ollama-install)
+  ok   local helper budget remains an upper bound inside larger master budget (ollama-install)
+  ok   complete installation retains exact original file retirement semantics (ollama-install)
+  ok   source revocation cannot admit successor after active operation retirement (ollama-install)
+AUDIT_TEST_RESULT	12	0

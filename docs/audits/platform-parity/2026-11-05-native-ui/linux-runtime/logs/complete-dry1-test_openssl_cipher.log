@@ -1,0 +1,62 @@
+
+=== native AES acknowledgement ownership ===
+  ok   refuses missing native capability without acquisition no_ffi
+  ok   refuses missing native capability without acquisition declaration
+  ok   refuses missing native capability without acquisition no_cipher
+  ok   refuses missing native capability without acquisition missing_symbol
+  ok   refuses missing native capability without acquisition missing_symbol
+  ok   releases checked encrypt context and every transient byte buffer
+  ok   refuses encrypt useful partial bytes after init status 0
+  ok   refuses encrypt useful partial bytes after init status -1
+  ok   refuses encrypt useful partial bytes after init status 2
+  ok   cleans up encrypt after an exception from init
+  ok   refuses encrypt useful partial bytes after update status 0
+  ok   refuses encrypt useful partial bytes after update status -1
+  ok   refuses encrypt useful partial bytes after update status 2
+  ok   cleans up encrypt after an exception from update
+  ok   refuses encrypt useful partial bytes after final status 0
+  ok   refuses encrypt useful partial bytes after final status -1
+  ok   refuses encrypt useful partial bytes after final status 2
+  ok   cleans up encrypt after an exception from final
+  ok   releases checked decrypt context and every transient byte buffer
+  ok   refuses decrypt useful partial bytes after init status 0
+  ok   refuses decrypt useful partial bytes after init status -1
+  ok   refuses decrypt useful partial bytes after init status 2
+  ok   cleans up decrypt after an exception from init
+  ok   refuses decrypt useful partial bytes after update status 0
+  ok   refuses decrypt useful partial bytes after update status -1
+  ok   refuses decrypt useful partial bytes after update status 2
+  ok   cleans up decrypt after an exception from update
+  ok   refuses decrypt useful partial bytes after final status 0
+  ok   refuses decrypt useful partial bytes after final status -1
+  ok   refuses decrypt useful partial bytes after final status 2
+  ok   cleans up decrypt after an exception from final
+  ok   refuses invalid native output length 1
+  ok   refuses invalid native output length 2
+  ok   refuses invalid native output length 3
+  ok   refuses invalid native output length 4
+  ok   refuses absent context and malformed key/IV/ciphertext without admitting bytes
+
+=== native canonical Base64 ownership ===
+  ok   matches independent RFC 4648 bytes 
+  ok   matches independent RFC 4648 bytes Zg==
+  ok   matches independent RFC 4648 bytes Zm8=
+  ok   matches independent RFC 4648 bytes Zm9v
+  ok   matches independent RFC 4648 bytes Zm9vYg==
+  ok   matches independent RFC 4648 bytes Zm9vYmE=
+  ok   matches independent RFC 4648 bytes Zm9vYmFy
+  ok   matches independent RFC 4648 bytes YQBi
+  ok   rejects malformed or noncanonical Base64 Zg=
+  ok   rejects malformed or noncanonical Base64 Zg===
+  ok   rejects malformed or noncanonical Base64 Zg==LF
+  ok   rejects malformed or noncanonical Base64  Zg==
+  ok   rejects malformed or noncanonical Base64 !!!!
+  ok   rejects malformed or noncanonical Base64 =AAA
+  ok   rejects malformed or noncanonical Base64 A=AA
+  ok   rejects malformed or noncanonical Base64 AA=A
+  ok   rejects malformed or noncanonical Base64 ====
+  ok   rejects malformed or noncanonical Base64 Zh==
+  ok   rejects malformed or noncanonical Base64 Zm9=
+  ok   does not admit useful Base64 bytes after a refused true length ACK
+  ok   does not admit useful Base64 bytes after a refused false length ACK
+AUDIT_TEST_RESULT	57	0

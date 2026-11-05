@@ -1,0 +1,9 @@
+
+=== shared owned timer slots (owned-timer-slots) ===
+  ok   refuses invalid options
+  ok   delivers once, then frees the slot
+  ok   frees the slot and never calls back after a refused start
+  ok   refuses a delivery or a cancellation that lands during acquisition
+  ok   keeps a refused cancellation as owned debt until the native timer settles
+  ok   cancels an armed timer and an empty slot
+AUDIT_TEST_RESULT	6	0

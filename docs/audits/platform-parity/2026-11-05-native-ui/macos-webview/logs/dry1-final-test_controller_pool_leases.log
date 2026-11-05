@@ -1,0 +1,44 @@
+Selecting exact test module: "tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases
+
+=== usercontent pool keeps authority outside the native controller identity ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"rejects unknown roles and forged tokens without allocating native controllers","status":"pass","elapsed_ms":0.851230,"timing_error":""}
+  ok   rejects unknown roles and forged tokens without allocating native controllers
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"keeps a terminal A release inert after B reuses the same controller","status":"pass","elapsed_ms":1.066954,"timing_error":""}
+  ok   keeps a terminal A release inert after B reuses the same controller
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"routes simultaneous leases independently and detaches only the final receiver","status":"pass","elapsed_ms":1.089949,"timing_error":""}
+  ok   routes simultaneous leases independently and detaches only the final receiver
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"retains cleanup debt after applied native detach returns false","status":"pass","elapsed_ms":0.761976,"timing_error":""}
+  ok   retains cleanup debt after applied native detach returns false
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"retains cleanup debt after applied native detach returns nil","status":"pass","elapsed_ms":0.956368,"timing_error":""}
+  ok   retains cleanup debt after applied native detach returns nil
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"retains cleanup debt after applied native detach returns true","status":"pass","elapsed_ms":0.995847,"timing_error":""}
+  ok   retains cleanup debt after applied native detach returns true
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"retains cleanup debt after applied native detach returns foreign","status":"pass","elapsed_ms":0.896287,"timing_error":""}
+  ok   retains cleanup debt after applied native detach returns foreign
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"removes the retired domain receiver while another lease keeps the dispatcher alive","status":"pass","elapsed_ms":2.550335,"timing_error":""}
+  ok   removes the retired domain receiver while another lease keeps the dispatcher alive
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"collects terminal opaque tokens and their private receiver session while retaining one UCC","status":"pass","elapsed_ms":1.872546,"timing_error":""}
+  ok   collects terminal opaque tokens and their private receiver session while retaining one UCC
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"never reads an old or forged body's fields before rejecting its native source","status":"pass","elapsed_ms":0.771350,"timing_error":""}
+  ok   never reads an old or forged body's fields before rejecting its native source
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"does not publish business before exact attach and commit","status":"pass","elapsed_ms":0.784520,"timing_error":""}
+  ok   does not publish business before exact attach and commit
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"retains an applied binding exception until exact native cleanup is acknowledged","status":"pass","elapsed_ms":1.822381,"timing_error":""}
+  ok   retains an applied binding exception until exact native cleanup is acknowledged
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"blocks reentrant reserve and native cleanup until the nil setter returns","status":"pass","elapsed_ms":0.877229,"timing_error":""}
+  ok   blocks reentrant reserve and native cleanup until the nil setter returns
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"keeps the picker loadable when the native usercontent capability is absent","status":"pass","elapsed_ms":1.846136,"timing_error":""}
+  ok   keeps the picker loadable when the native usercontent capability is absent
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","name":"tests.unit.ui.action_picker.lifecycle.test_controller_pool_leases","status":"pass","elapsed_ms":17.805985,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  14
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

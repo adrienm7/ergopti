@@ -1,0 +1,38 @@
+{
+  "sourceRoot": "/workspace/worktrees/parity-2026-11-05/windows-webview",
+  "provenance": "actual Windows init mode extracted; actual shared saveEntry/persist in JS VM; AHK/native write failure not executed",
+  "actualWindows": {
+    "mode": "menu",
+    "autoClose": true,
+    "actions": [
+      "save"
+    ],
+    "postedEntry": {
+      "trigger": "new-trigger",
+      "output": "new-output",
+      "is_word": false,
+      "auto_expand": false,
+      "is_case_sensitive": false,
+      "final_result": false,
+      "is_case_sensitive_strict": false
+    }
+  },
+  "syntheticShortcutControl": {
+    "mode": "shortcut",
+    "autoClose": true,
+    "actions": [
+      "save",
+      "close"
+    ],
+    "postedEntry": {
+      "trigger": "new-trigger",
+      "output": "new-output",
+      "is_word": false,
+      "auto_expand": false,
+      "is_case_sensitive": false,
+      "final_result": false,
+      "is_case_sensitive_strict": false
+    }
+  },
+  "conclusion": "Windows automatic save→close failure repro is unreachable through current native initializer; no WVB-003"
+}

@@ -1,0 +1,23 @@
+{
+  "source_root": "/workspace/worktrees/parity-2026-11-05/linux-runtime",
+  "sha": "3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a",
+  "status": "?? node_modules\n",
+  "sources": {
+    "linux/modules/llm/ollama_install_state.lua": "bbc45e34b201d57c0e11997b6dba19c1b164164d6ebdd97e105c6796887a6d30",
+    "linux/modules/llm/ollama_install_resolver.lua": "202ed5f7fe2621a9e6a7871245e3fd2a1def20f6b24d349ee4470bcd9df294c2",
+    "linux/modules/llm/runtime_factory.lua": "77ef6597ed55809d33c5042c4ec9d834d1fffc09c5a84e062a6478a48a6a703a",
+    "linux/modules/llm/ollama_install_admission.lua": "77568bf0c1679d478e8b55523e9dc55bcddaeb992238ada082bfe9d7149ae3e0",
+    "linux/modules/llm/ollama_install_files.lua": "5f3e6b648a0e93b060c34dd6dba310da20ee22c37eaf0f8666ace7e769f4034a",
+    "linux/modules/llm/ollama_installed_runtime.lua": "9df06b0da98694f7e6359e5c1b840076c8ecf4743b645cb6beb04d468a2e8eb1",
+    "linux/modules/llm/runtime_source.lua": "1ec49bf609578e8cba00bde7802dfde5af5085d755e2bc2b86c59dd76952a322",
+    "linux/modules/llm/runtime_composition.lua": "7f743479db50dc7b91ba5359eadae5518eb452c60f93b1527491abe36e63837d",
+    "linux/modules/llm/managed_ollama_proxy.lua": "de7ba9b013fa89252fedac1f41640a67914edccc3d5e3235acc21baa6eac0529",
+    "linux/adapters/owned_process.lua": "ac52f9dc3a8a07900b5ca5817d83b2722a6e6d63139c4021d04dc0497aa51cec",
+    "linux/infra/archive_output.lua": "638ff9b7bbff3269c79d739e7458624631bc6c009ba50bdcb5719b1f5e33a6db",
+    "_shared/lua/llm/ollama_archive_installer.lua": "88f268fada80efef598f04f55613f1d270f2bc88c22d28f81d08a7ddcef229ea",
+    "_shared/lua/llm/ollama_install_phase.lua": "6c57f3b9aeb214587c51533977602a3ee2efe3484abc12354347d535ed626360",
+    "_shared/lua/llm/runtime_repair.lua": "de1304652fb1a1e2089de3c33f021bbe3824c885399ec68a640d96807c9adb4b",
+    "_shared/lua/llm/process_port.lua": "dc5ff92d7269c2c37c355e8227f57ca12980334e38594e9f685b73affd4fb81f",
+    "linux/ui/model_browser/bridge.lua": "9d7cbb7c721952b1bba394b3c8d75c6e943542754ac1e502dab32ebc1be0fe0f"
+  }
+}
