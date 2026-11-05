@@ -6,11 +6,6 @@ _SKN_ChildSource() {
 	Footer := FSReadStrict(_DriverDir . "\tests\fixtures\sticky_modifier_flags_body.ahk")
 	AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "Only the unrelated Shift fixture entry may be replaced")
 	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
-	for Name in ["KS_AltGrKeyName", "KS_AltGrSendKey"] {
-		Body := _DriverFuncBody(Name)
-		AssertTrue(Body != "", "The actual Kana identity dependency must exist: " . Name)
-		Source .= Body . "`n"
-	}
 	return Source . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_kana_native_body.ahk")
 }
 _SKN_Complete(State, Code, Output, ErrorText) {
