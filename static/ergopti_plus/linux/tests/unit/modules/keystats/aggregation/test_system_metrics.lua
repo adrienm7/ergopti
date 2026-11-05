@@ -348,6 +348,24 @@ helpers.describe("system metrics: network changes", function()
 		end)
 	end)
 
+	helpers.it("does not mistake a different network reader for a network change", function()
+		local nmcli, iwgetid = "yes:maison", ""
+		with_shell({
+			{ match = "nmcli", out = function() return nmcli end },
+			{ match = "iwgetid", out = function() return iwgetid end },
+		}, function(metrics, sample)
+			local step = metrics._sample_interval_ms()
+			sample(0, "2026-08-06")
+			nmcli, iwgetid = "", "maison"
+			sample(step, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 0, "the readers have different representations")
+			iwgetid = "bureau"
+			sample(step * 2, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 1, "the same reader still detects a change")
+			helpers.assert_eq(metrics.take_events(), { sample_event("wifi_change", step * 2, "2026-08-06") })
+		end)
+	end)
+
 	helpers.it("does not count a change to or from 'cannot tell'", function()
 		with_shell({
 			{ match = "power_supply", out = "50" },
