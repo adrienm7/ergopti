@@ -403,6 +403,8 @@ try {
 		const helperStart = subject.indexOf('\t_lua_with_path() {');
 		const helperEnd = subject.indexOf('\n\t# Test 1:', helperStart);
 		assert.ok(helperStart >= 0 && helperEnd > helperStart, 'the production Lua probe must exist');
+		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v luajit || command -v lua5.4 || command -v lua'], { encoding: 'utf8' });
+		assert.equal(realLua.status, 0, 'a Lua smoke runtime is required');
 		const helpRoot = path.join(scratch, 'help;source?');
 		fs.mkdirSync(helpRoot);
 		fs.symlinkSync(path.join(ROOT, 'static/ergopti_plus/linux'), path.join(helpRoot, 'linux'));
@@ -410,15 +412,13 @@ try {
 		const helpStart = subject.indexOf('\t# Test 1: --help must exit 0');
 		const helpEnd = subject.indexOf('\n\t# On real Linux', helpStart);
 		assert.ok(helpStart >= 0 && helpEnd > helpStart);
-		const help = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
-			input: 'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
+		const help = spawnSync(bashExecutable(), ['-s', '--', helpRoot, realLua.stdout.trim()], {
+			input: 'set -euo pipefail\nLUA_BIN="$2"\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
 			encoding: 'utf8', timeout: 15000, env: { ...process.env, HOME: scratch }
 		});
 		assert.equal(help.status, 0, `help smoke with Lua path delimiters: ${help.stderr || help.stdout}`);
 		const relativeBin = path.join(scratch, 'relative-bin');
 		fs.mkdirSync(relativeBin);
-		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v lua'], { encoding: 'utf8' });
-		assert.equal(realLua.status, 0, realLua.stderr);
 		fs.symlinkSync(realLua.stdout.trim(), path.join(relativeBin, 'lua'));
 		const relativeHelp = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
 			input: 'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
