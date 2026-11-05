@@ -44,9 +44,11 @@ _MBPT_AbsoluteFile(Path) {
 	BufferPath := Buffer(65536, 0)
 	Length := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 32768,
 		"Ptr", BufferPath.Ptr, "Ptr", 0, "UInt")
-	AssertTrue(Length > 0 && Length < 32768 && FileExist(Path) != "",
-		"The diagnostic dependency must have an actual canonical file")
-	return StrGet(BufferPath)
+	AssertTrue(Length > 0 && Length < 32768,
+		"The diagnostic dependency must have a complete canonical path")
+	Canonical := StrGet(BufferPath)
+	AssertTrue(FileExist(Canonical) != "", "The diagnostic dependency must have an actual canonical file")
+	return Canonical
 }
 
 ; Keep the real writer and its caught exception. Only a private whole owner
@@ -78,18 +80,26 @@ _MBPT_WriterDiagnosticOwner(Directory) {
 	AssertEqual(1, Insertions, "Only the actual writer catch may gain diagnostic observation")
 	Changed := SubStr(Original, 1, Definition.Idx - 1) . ChangedFunction . SubStr(Original, Cursor)
 	SplitPath(Owner, , &OwnerDir)
-	Rewrites := [], Private := ""
+	Rewrites := [], Private := "", SawRefusalOwner := false
 	for Index, Line in StrSplit(Changed, "`n") {
 		OriginalLine := Line
 		if RegExMatch(Line, "^#Include\s+(.+)$", &Include) {
-			AssertTrue(FileExist(OwnerDir . "\" . Include[1]) != "",
-				"Each private owner include must retain its genuine original sibling")
-			Line := "#Include " . _MBPT_AbsoluteFile(OwnerDir . "\" . Include[1])
+			; A_LineFile belongs to the real production owner, not to the private
+			; diagnostic file which will contain these rewritten include lines.
+			Target := StrReplace(Include[1], "%A_LineFile%", Owner, true, &Expanded)
+			AssertTrue(Expanded <= 1, "Each production include has at most one exact owner macro")
+			if Expanded == 0
+				Target := OwnerDir . "\" . Target
+			CanonicalInclude := _MBPT_AbsoluteFile(Target)
+			if InStr(Include[1], "toml_refusals.ahk")
+				SawRefusalOwner := true
+			Line := "#Include " . CanonicalInclude
 			Rewrites.Push({ Original: OriginalLine, Private: Line })
 		}
 		Private .= (Index > 1 ? "`n" : "") . Line
 	}
-	AssertEqual(4, Rewrites.Length, "The real configuration owner has exactly four sibling imports")
+	AssertEqual(5, Rewrites.Length, "The real configuration owner has exactly five sibling imports")
+	AssertTrue(SawRefusalOwner, "The private custom-writer subject must retain the genuine session-refusal owner")
 	Inverse := Private
 	for Rewrite in Rewrites {
 		Inverse := StrReplace(Inverse, Rewrite.Private, Rewrite.Original, true, &Count)

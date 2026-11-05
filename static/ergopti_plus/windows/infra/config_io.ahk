@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include config_write_lease.ahk
+#Include toml/toml_refusals.ahk
 #Include config_unused_keys.ahk
 #Include %A_LineFile%\..\slot_roles.ahk
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
@@ -497,7 +498,7 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0,
 		FailureDetail := "another configuration transaction is already in progress"
 		StateUnchanged := true
 		_ConfigRunPrecommitCompensation(CompensateFn, &FailureDetail, &StateUnchanged)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 				FailureDetail, StateUnchanged)
 	}
 	return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
@@ -518,13 +519,16 @@ ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
 		finally Critical(InheritedCritical)
 	}
 	if !_ConfigWriteLeaseOwns(OwnerToken, Path)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 			"the borrowed configuration owner is stale or owns another path")
 	FailureDetail := ""
 	if !_ConfigInvokeCommitWriter(Path, Updates, WriterFn,
-			"the borrowed configuration writer", &FailureDetail, 0, 0, DurableOutcome)
+			"the borrowed configuration writer", &FailureDetail, 0, 0, DurableOutcome) {
+		StateUnchanged := true
+		_ConfigDescribeSessionPartial(Path, &FailureDetail, &StateUnchanged)
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
-			FailureDetail)
+			FailureDetail, StateUnchanged)
+	}
 	return true
 }
 
@@ -548,11 +552,11 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 	}
 	Borrowed := ExistingOwner is Object
 	if !Borrowed && (!(ExistingOwner is Integer) || ExistingOwner != 0)
-		return ConfigReportPersistenceFailure(Context, NotifyFn, "invalid borrowed configuration owner")
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn, "invalid borrowed configuration owner")
 	OwnerToken := Borrowed ? _ConfigWriteLeaseSelectOwner(ExistingOwner, Path)
 		: _ConfigWriteLeaseTryAcquire(Path, "built")
 	if !(OwnerToken is Object)
-		return ConfigReportPersistenceFailure(Context, NotifyFn,
+		return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn,
 				"another configuration transaction is already in progress")
 	Plan := 0
 	FailureDetail := ""
@@ -634,7 +638,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, Existing
 			DurableOutcome["status"] := "committed", DurableOutcome["committed"] := true
 		return true
 	}
-	return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail,
+	return _ConfigReportPathPersistenceFailure(Path, Context, NotifyFn, FailureDetail,
 		StateUnchanged)
 }
 
@@ -879,9 +883,26 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		if ReleaseOwner
 			_ConfigWriteLeaseRelease(OwnerToken)
 	}
-	if Failed
+	if Failed {
+		_ConfigDescribeSessionPartial(Path, &FailureDetail, &StateUnchanged)
 		return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail, StateUnchanged)
+	}
 	return true
+}
+
+; A session latch describes a previous uncertain effect, including on retries.
+; It is reporting metadata and cannot admit or acknowledge another writer.
+_ConfigDescribeSessionPartial(Path, &Detail, &StateUnchanged) {
+	if !_TOML_SessionHasPartialPublication(Path)
+		return
+	StateUnchanged := false
+	Detail .= (Detail != "" ? "; " : "")
+		. "a native publication in this session was not fully acknowledged; restart before further writes"
+}
+
+_ConfigReportPathPersistenceFailure(Path, Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+	_ConfigDescribeSessionPartial(Path, &Detail, &StateUnchanged)
+	return ConfigReportPersistenceFailure(Context, NotifyFn, Detail, StateUnchanged)
 }
 
 ; Optional result observation never stores source bytes on a long-lived UI
