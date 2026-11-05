@@ -53,6 +53,10 @@ local function with_owner(options, body)
 				for _, listener in ipairs(listeners) do listener() end
 			end
 			state.operations[#state.operations + 1] = operation
+			if options.refuse_debt then return nil, "pipe activation failed", {
+				on_settled = function(listener) return operation:on_settled(listener) end,
+				cancel = function() return operation:cancel() end,
+			} end
 			if options.constructing then state.constructor_ack = Connector.shutdown() end
 			if options.throw then error("controlled uncertain native constructor") end
 			if options.malformed then operation.on_settled = nil end
@@ -202,6 +206,16 @@ helpers.describe("agent connector owned shutdown", function()
 			state.operations[1]:logical(); helpers.assert_true(Connector.shutdown())
 			helpers.assert_eq(state.removals, 2)
 			helpers.assert_eq(state.callbacks, 0)
+		end)
+	end)
+
+	helpers.it("(agent-connector-shutdown) refused desktop retains calendar input until native exit", function()
+		with_owner({ refuse_debt = true }, function(Connector, state)
+			helpers.assert_eq(state.calendar(), false)
+			helpers.assert_eq(state.callbacks, 1)
+			helpers.assert_eq(state.removals, 0, "a live refused launcher can still read its calendar input")
+			state.operations[1]:ack()
+			helpers.assert_eq(state.removals, 2)
 		end)
 	end)
 
