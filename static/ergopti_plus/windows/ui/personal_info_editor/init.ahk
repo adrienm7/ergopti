@@ -50,6 +50,8 @@ global _PiEdWeb_NavSub     := unset
 global _PiEdWeb_ResetDone  := false
 global _PiEdWeb_SessionEpoch := 0
 global _PiEdWeb_EditorSource := 0
+global _PiEdWeb_SubscriptionOwner := 0
+global _PiEdWeb_RetiredHosts := []
 
 global PIED_VHOST             := "ergopti.personalinfo"
 global PIED_HOST_ACCESS_ALLOW := 1
@@ -67,8 +69,9 @@ _PiEdWeb_TryOpen() {
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView
 	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
-	global _PiEdWeb_EditorSource
+	global _PiEdWeb_EditorSource, _PiEdWeb_SubscriptionOwner
 
+	_PiEdWeb_RetryRetiredHosts()
 	if !_PiEdWeb_Available()
 		return false
 
@@ -94,7 +97,7 @@ _PiEdWeb_TryOpen() {
 
 	g := Gui_Create("+Resize +MinSize480x400", t("dialog.personal_info.title"))
 	Controller := unset, MsgSub := unset, NavSub := unset
-	Installed := false
+	Installed := false, Host := 0, FallbackRequested := false, ResetReceipt := false
 	try {
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
@@ -132,21 +135,22 @@ _PiEdWeb_TryOpen() {
 		}
 		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 			return true
-		MsgSub := View.WebMessageReceived(_PiEdWeb_OnWebMessage.Bind(SessionEpoch))
-		if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
+		Host := _PiEdWeb_BeginSubscriptions(g, Controller, View, SessionEpoch, EditorSource)
+		if !IsObject(Host)
 			return true
-		NavSub := View.NavigationCompleted(_PiEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		if !_PiEdWeb_Subscribe(Host, "message", _PiEdWeb_OnWebMessage.Bind(SessionEpoch))
+			return true
+		if !_PiEdWeb_Subscribe(Host, "navigation", _PiEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
+			return true
 		PreviousCritical := Critical("On")
 		try {
 			if !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource) || _PiEdWeb_Gui != g
+					|| _PiEdWeb_SubscriptionOwner != Host || Host.retired
 				return true
 			_PiEdWeb_Controller := Controller
 			_PiEdWeb_WebView := View
-			_PiEdWeb_MsgSub := MsgSub
-			_PiEdWeb_NavSub := NavSub
-			; Move subscription custody before restoring the scheduler. Reset must
-			; unsubscribe before Close, without a local alias delaying __Delete.
-			MsgSub := unset, NavSub := unset
+			_PiEdWeb_MsgSub := Host.message
+			_PiEdWeb_NavSub := Host.navigation
 			Installed := true
 		} finally Critical(PreviousCritical)
 		try View.SetVirtualHostNameToFolderMapping(PIED_VHOST, _SharedDir, PIED_HOST_ACCESS_ALLOW)
@@ -159,24 +163,37 @@ _PiEdWeb_TryOpen() {
 		try LoggerSuccess("PersonalInfo", "Personal info editor shown via WebView2.")
 	} catch as Err {
 		try LoggerError("PersonalInfo", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
-		; A retired opening must not launch a fallback over its successor.
-		return Installed || !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
+		; Decide only after cleanup, which may open a successor.
+		FallbackRequested := !Installed && _PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 	} finally {
 		if !Installed {
+			; Preserve an earlier plumbing-only Reset's retained-window intent.
+			RetireDestroy := IsObject(Host) && (!Host.retired || Host.destroy)
 			; Detach only this opening before any local unsubscribe/Close can pump
 			; a successor. An unpublished GUI may own source consent at slot zero.
 			if _PiEdWeb_Gui == g
-				_PiEdWeb_Reset(g, SessionEpoch)
+				_PiEdWeb_Reset(g, SessionEpoch, &ResetReceipt)
 			else if _PiEdWeb_Gui == 0
-				_PiEdWeb_Reset(0, SessionEpoch)
-			; These uninstalled locals were never lent to another session.
-			MsgSub := unset, NavSub := unset
-			if IsSet(Controller)
-				try Controller.Close()
-			try g.Destroy()
+				_PiEdWeb_Reset(0, SessionEpoch, &ResetReceipt)
+			if IsObject(Host)
+				_PiEdWeb_RetireHost(Host, RetireDestroy, true)
+			else {
+				if IsSet(Controller)
+					try Controller.Close()
+				try g.Destroy()
+			}
 		}
 	}
 
+	if FallbackRequested {
+		PreviousCritical := Critical("On")
+		try {
+			; Only this frame's acknowledged Reset may lend a fallback admission.
+			if ResetReceipt && _PiEdWeb_ResetDone && _PiEdWeb_SessionEpoch == SessionEpoch + 1
+					&& _PiEdWeb_Gui == 0
+				return false
+		} finally Critical(PreviousCritical)
+	}
 	return true
 }
 
@@ -401,9 +418,12 @@ _PiEdWeb_Close(ExpectedGui := unset) {
 ; Default Reset retires plumbing while retaining its native host. Exact Close
 ; paths also detach that captured GUI before any unsubscribe/Close/Destroy can
 ; pump another public opening. Returning old frames never clear a successor.
-_PiEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset) {
+_PiEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset, &ResetReceipt := unset) {
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView, _PiEdWeb_MsgSub, _PiEdWeb_NavSub
 	global _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch, _PiEdWeb_EditorSource
+	global _PiEdWeb_SubscriptionOwner, _PiEdWeb_RetiredHosts
+	ResetReceipt := false
+	Host := 0, SavedGui := 0, SavedController := 0, SavedMsg := 0, SavedNav := 0
 	PreviousCritical := Critical("On")
 	try {
 		if IsSet(ExpectedGui) && _PiEdWeb_Gui != ExpectedGui
@@ -411,38 +431,169 @@ _PiEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset) {
 		if IsSet(ExpectedEpoch) && !_PiEdWeb_SessionCurrent(ExpectedEpoch)
 			return 0
 		if _PiEdWeb_ResetDone {
-			; A prior plumbing-only Reset must not prevent exact host closure.
-			if IsSet(ExpectedGui) {
-				SavedGui := _PiEdWeb_Gui
-				_PiEdWeb_Gui := 0
-				return SavedGui
-			}
-			return 0
-		}
-		SavedGui := _PiEdWeb_Gui
-		SavedController := IsSet(_PiEdWeb_Controller) ? _PiEdWeb_Controller : 0
-		SavedView := IsSet(_PiEdWeb_WebView) ? _PiEdWeb_WebView : 0
-		SavedMsg := IsSet(_PiEdWeb_MsgSub) ? _PiEdWeb_MsgSub : 0
-		SavedNav := IsSet(_PiEdWeb_NavSub) ? _PiEdWeb_NavSub : 0
-		SavedSource := _PiEdWeb_EditorSource
-		_PiEdWeb_ResetDone := true
-		_PiEdWeb_SessionEpoch += 1
-		_PiEdWeb_EditorSource := 0
-		if SavedSource is Map
-			SavedSource["active"] := false
-		_PiEdWeb_MsgSub := unset
-		_PiEdWeb_NavSub := unset
-		_PiEdWeb_Controller := unset
-		_PiEdWeb_WebView := unset
-		if IsSet(ExpectedGui)
+			if !IsSet(ExpectedGui)
+				return 0
+			SavedGui := _PiEdWeb_Gui
 			_PiEdWeb_Gui := 0
+			for Pending in _PiEdWeb_RetiredHosts
+				if Pending.gui == SavedGui {
+					Host := Pending, Host.destroy := true
+					break
+				}
+		} else {
+			SavedGui := _PiEdWeb_Gui
+			Host := _PiEdWeb_SubscriptionOwner
+			SavedController := IsSet(_PiEdWeb_Controller) ? _PiEdWeb_Controller : 0
+			SavedView := IsSet(_PiEdWeb_WebView) ? _PiEdWeb_WebView : 0
+			SavedMsg := IsSet(_PiEdWeb_MsgSub) ? _PiEdWeb_MsgSub : 0
+			SavedNav := IsSet(_PiEdWeb_NavSub) ? _PiEdWeb_NavSub : 0
+			SavedSource := _PiEdWeb_EditorSource
+			_PiEdWeb_ResetDone := true
+			_PiEdWeb_SessionEpoch += 1
+			_PiEdWeb_EditorSource := 0
+			if SavedSource is Map
+				SavedSource["active"] := false
+			_PiEdWeb_MsgSub := unset, _PiEdWeb_NavSub := unset
+			_PiEdWeb_Controller := unset, _PiEdWeb_WebView := unset
+			_PiEdWeb_SubscriptionOwner := 0
+			ResetReceipt := true
+			if IsSet(ExpectedGui)
+				_PiEdWeb_Gui := 0
+			if IsObject(Host) {
+				Host.retired := true, Host.destroy := IsSet(ExpectedGui)
+				_PiEdWeb_RetiredHosts.Push(Host)
+			}
+		}
 	} finally Critical(PreviousCritical)
-
-	; Strong references prevent finalizers during the RAM detach. Actual
-	; unsubscribe occurs outside Critical and before closing its exact controller.
-	try SavedMsg := unset
-	try SavedNav := unset
+	; Global aliases must be gone before the host releases its own handles.
+	SavedMsg := 0, SavedNav := 0
+	if IsObject(Host) {
+		if Host.destroy
+			try Host.gui.Hide()
+		_PiEdWeb_RetryRetiredHosts()
+		return 0
+	}
 	if SavedController
 		try SavedController.Close()
 	return SavedGui
+}
+
+; A native close revokes admission immediately but retains the exact host until
+; any add_Event call has returned its handle and that handle is released.
+_PiEdWeb_BeginSubscriptions(Window, Controller, View, Epoch, Source) {
+	global _PiEdWeb_SubscriptionOwner, _PiEdWeb_Gui
+	Host := {gui: Window, controller: Controller, view: View, epoch: Epoch, source: Source,
+		message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: false, destroy: false}
+	PreviousCritical := Critical("On")
+	try {
+		if !_PiEdWeb_EditorSourceCurrent(Epoch, Source) || _PiEdWeb_Gui != Window || IsObject(_PiEdWeb_SubscriptionOwner)
+			return 0
+		_PiEdWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+_PiEdWeb_Subscribe(Host, Kind, Handler) {
+	global _PiEdWeb_SubscriptionOwner, _PiEdWeb_Gui
+	PreviousCritical := Critical("On")
+	try {
+		if Host.retired || _PiEdWeb_SubscriptionOwner != Host || _PiEdWeb_Gui != Host.gui
+				|| !_PiEdWeb_EditorSourceCurrent(Host.epoch, Host.source)
+			return false
+		Host.in_flight := true
+	} finally Critical(PreviousCritical)
+	Subscription := 0, Failed := false, FailureValue := 0
+	try {
+		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
+			: Host.view.NavigationCompleted(Handler)
+	} catch Any as Failure {
+		Failed := true, FailureValue := Failure
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Host.%Kind% := Subscription
+			Subscription := 0
+			Host.in_flight := false
+			Current := !Host.retired && _PiEdWeb_SubscriptionOwner == Host
+				&& _PiEdWeb_Gui == Host.gui && _PiEdWeb_EditorSourceCurrent(Host.epoch, Host.source)
+		} finally Critical(PreviousCritical)
+	}
+	if Host.retired
+		_PiEdWeb_RetryRetiredHosts()
+	if Failed
+		throw FailureValue
+	return Current && !Host.retired
+}
+
+_PiEdWeb_RetireHost(Host, Destroy, RespectExisting := false) {
+	global _PiEdWeb_RetiredHosts, _PiEdWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(Host.gui)
+			return
+		; A plumbing Reset can retire the host after the caller's snapshot.
+		Host.destroy := Host.destroy || (Destroy && (!RespectExisting || !Host.retired))
+		Host.retired := true
+		if _PiEdWeb_SubscriptionOwner == Host
+			_PiEdWeb_SubscriptionOwner := 0
+		Found := false
+		for Pending in _PiEdWeb_RetiredHosts
+			if Pending == Host
+				Found := true
+		if !Found
+			_PiEdWeb_RetiredHosts.Push(Host)
+	} finally Critical(PreviousCritical)
+	if Host.destroy
+		try Host.gui.Hide()
+	_PiEdWeb_RetryRetiredHosts()
+}
+
+_PiEdWeb_RetryRetiredHosts() {
+	global _PiEdWeb_RetiredHosts
+	PreviousCritical := Critical("On")
+	try Pending := _PiEdWeb_RetiredHosts.Clone()
+	finally Critical(PreviousCritical)
+	for Host in Pending {
+		PreviousCritical := Critical("On")
+		try {
+			if Host.in_flight || Host.closing
+				continue
+			Host.closing := true
+		} finally Critical(PreviousCritical)
+		Settled := false, Destroyed := false, Recheck := false
+		try {
+			Host.message := 0, Host.navigation := 0
+			if !Host.closed {
+				Host.controller.Close()
+				Host.closed := true
+			}
+			if Host.destroy {
+				Host.gui.Destroy()
+				Destroyed := true
+			}
+			Settled := true
+		} catch Any as Failure {
+			try LoggerWarn("PersonalInfo", "Browser retirement remains pending (error_type={1}).", Type(Failure))
+		} finally {
+			; Retain local strong references until after the RAM-only claim.
+			Window := Host.gui, Controller := Host.controller, View := Host.view
+			PreviousCritical := Critical("On")
+			try {
+				Host.closing := false
+				if Settled && Host.destroy && !Destroyed
+					Recheck := true
+				else if Settled {
+					Host.gui := 0, Host.controller := 0, Host.view := 0
+					Count := _PiEdWeb_RetiredHosts.Length
+					Loop Count {
+						Index := Count - A_Index + 1
+						if _PiEdWeb_RetiredHosts[Index] == Host
+							_PiEdWeb_RetiredHosts.RemoveAt(Index)
+					}
+				}
+			} finally Critical(PreviousCritical)
+		}
+		if Recheck
+			_PiEdWeb_RetryRetiredHosts()
+	}
 }
