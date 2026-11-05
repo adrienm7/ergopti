@@ -31,9 +31,10 @@ _NativeRelayHopBranches_Controls() {
 		AssertEqual(1, ReceiptCount, "Both joined protocol peers must publish one settled receipt")
 		AssertTrue(Receipt is Map, "The actual-hop fixture must publish a structured receipt")
 		AssertEqual(1, Receipt.Get("schema_version", 0))
-		for Name in ["independent_oracles", "actual_hops", "http_connect", "http_authenticated", "http_requests",
-			"socks_connect", "socks_authenticated", "socks_requests"]
-			AssertEqual(2, Receipt.Get(Name, 0), "Exact branch observation: " . Name)
+		for Name, Expected in Map("independent_oracles", 3, "actual_hops", 2, "http_connect", 2,
+			"http_authenticated", 2, "http_requests", 2, "socks_connect", 4, "socks_authenticated", 4,
+			"socks_requests", 4, "domain_frames", 2, "ipv4_explicit_frames", 2)
+			AssertEqual(Expected, Receipt.Get(Name, 0), "Exact branch observation: " . Name)
 		AssertEqual(0, Receipt.Get("peer_failures", -1))
 		AssertTrue(Receipt.Get("component_bodies_exact", false) && Receipt.Get("fixture_peers_joined", false),
 			"The real CONNECT and SOCKS branches must deliver exact private bodies before their peers join")
