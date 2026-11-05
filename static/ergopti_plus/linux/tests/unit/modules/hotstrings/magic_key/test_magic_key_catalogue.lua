@@ -146,18 +146,19 @@ helpers.describe("magic key: static catalogue ownership", function()
 end)
 
 helpers.describe("magic-key transactional publication", function()
-	local function scenario(restore_refused, accept_reload)
+	local function scenario(restore_refused, accept_reload, notification_refused)
 		local path = os.tmpname()
 		local initial = '[hotstrings]\ntrigger_char = "★"\n'
 		local file = assert(io.open(path, "wb")); assert(file:write(initial)); assert(file:close())
 		local current, active, locked, preference_locked = "★", "★", false, false
-		local fail_restore = restore_refused
+		local fail_restore, fail_notice, restore_calls = restore_refused, notification_refused, 0
 		local Config = {
 			acquire = function() locked = true; return true end,
 			release = function() locked = false; return true end,
 			configuration_snapshot = function() return { value = active } end,
 			set_magic_key = function(value) active = value; return true end,
 			restore_configuration = function(_, snapshot)
+				restore_calls = restore_calls + 1
 				if fail_restore then return false end
 				active = snapshot.value; return true
 			end,
@@ -172,7 +173,8 @@ helpers.describe("magic-key transactional publication", function()
 		local Magic = { get = function() return current end, default = function() return "★" end,
 			validate = function(value) return value == "★" or value == "§" end }
 		local owner = require("infra.hotstrings_scope").new_magic({ path = path, backup_path = path .. ".bak",
-			config = Config, preferences = Preferences, magic_key = Magic, reload = function() return accept_reload == true end })
+			config = Config, preferences = Preferences, magic_key = Magic, reload = function() return accept_reload == true end,
+			after_restore = function() return not fail_notice end })
 		local ok, error_message = owner.apply_updates({ { section = "hotstrings", key = "trigger_char", value = "§" } })
 		if accept_reload then
 			helpers.assert_true(ok, tostring(error_message))
@@ -187,6 +189,14 @@ helpers.describe("magic-key transactional publication", function()
 		helpers.assert_eq(ok, false, "a refused catalogue cannot publish the new key")
 		local input = assert(io.open(path, "rb")); local bytes = input:read("*a"); input:close()
 		helpers.assert_eq(bytes, initial, "the file keeps the previous choice")
+		if notification_refused then
+			helpers.assert_true(owner.pending(), "a refused notification remains pending")
+			helpers.assert_true(locked and preference_locked, "the owners stay fenced until notification succeeds")
+			helpers.assert_eq(restore_calls, 1)
+			fail_notice = false
+			helpers.assert_true(owner.retry_restore())
+			helpers.assert_eq(restore_calls, 1, "retry must not repeat the acknowledged catalogue inverse")
+		end
 		if restore_refused then
 			helpers.assert_true(owner.pending(), "a refused inverse remains debt: " .. tostring(error_message))
 			helpers.assert_true(locked and preference_locked, "both owners remain fenced")
@@ -232,6 +242,7 @@ helpers.describe("magic-key transactional publication", function()
 	helpers.it("publishes the accepted choice to the catalogue and file", function() scenario(false, true) end)
 	helpers.it("keeps the old choice when catalogue reload refuses", function() scenario(false) end)
 	helpers.it("retains both fences until a refused restoration settles", function() scenario(true) end)
+	helpers.it("retains notification debt without repeating restored state", function() scenario(false, false, true) end)
 end)
 
 helpers.describe("magic-key restoration after publication refusal", function()
