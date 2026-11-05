@@ -358,6 +358,8 @@ _CWNS_CloseNative(Environment, Mode) {
 	} finally {
 		State.Armed := false
 		Changelog_Close()
+		if IsObject(State.NewController) && !State.NewController.Closed
+			State.NewController.Close()
 		if State.NewGui is Gui && DllCall("User32\IsWindow", "Ptr", State.NewHwnd, "Int")
 			State.NewGui.Destroy()
 		_CWOC_RetireShowObserver(State)
@@ -431,6 +433,8 @@ _CWSF_Run(Environment, Mode) {
 		State.Armed := false
 		Gui.Prototype.DefineProp("Show", PreviousShow)
 		Changelog_Close()
+		if IsObject(State.NewController) && !State.NewController.Closed
+			State.NewController.Close()
 		if State.NewGui is Gui && DllCall("User32\IsWindow", "Ptr", State.NewHwnd, "Int")
 			State.NewGui.Destroy()
 		_CWOC_RetireShowObserver(State)
