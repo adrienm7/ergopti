@@ -581,3 +581,27 @@ _KCSENABLED_Read(Mode, Cache) {
 for _KCSENABLED_Mode in ["number-zero", "false-control", "true-control", "legacy-zero-control", "legacy-one-control"]
 	Test("key chord boot enabled admission: " . _KCSENABLED_Mode,
 		_KCCE_With.Bind(Map(), false, _KCSENABLED_Run.Bind(_KCSENABLED_Mode)))
+
+
+_KCCE_ChordDelayCannotWrap() {
+ _KCCE_With(Map(), false, _KCCE_ChordDelayCannotWrapBody)
+}
+_KCCE_ChordDelayCannotWrapBody(World, Ports) {
+ Path := A_Temp . "\ergopti_chord_numeric_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".toml"
+ AssertTrue(FSWriteCreateDurable(Path, "") != 0)
+ Reloads := 0, Reload := () => (Reloads += 1, true)
+ try {
+  Before := FSReadUtf8Exact(Path)
+  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon"] {
+   AssertFalse(KeyCombinationChordCommitDelay(Raw, Path, Reload), "The complete user magnitude must be refused before any config write")
+   AssertEqual(Before, FSReadUtf8Exact(Path), "A rejected delay cannot change even private source bytes")
+   AssertEqual(0, Reloads, "A rejected delay cannot reload")
+  }
+  AssertTrue(KeyCombinationChordCommitDelay("3", Path, Reload))
+  AssertEqual(1, Reloads)
+  AssertTrue(KeyCombinationChordCommitDelay("3.5", Path, Reload), "The existing positive fractional grammar must stay accepted")
+  AssertEqual(2, Reloads)
+  AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 3.5")
+ } finally FileDelete(Path)
+}
+Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)
