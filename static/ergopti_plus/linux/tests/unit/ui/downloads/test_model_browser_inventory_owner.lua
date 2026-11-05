@@ -18,6 +18,12 @@ local function with_browser(body)
 		get_models = function() error("page reprojection cannot call an acquiring getter") end,
 		get_cached_models = function() seen.cache_reads = (seen.cache_reads or 0) + 1; return seen.cache end,
 		get_current_model = function() return "qwen3.5:0.8b" end,
+		get_backend = function() return seen.backend or "ollama" end,
+		set_backend = function(kind)
+			seen.backend = kind
+			if seen.on_backend then seen.on_backend() end
+			return true
+		end,
 		refresh_models = function() seen.refreshes = seen.refreshes + 1; return {} end,
 		set_model = function(model) seen.selected[#seen.selected + 1] = model; return true end,
 		download_model = function(model, label) seen.downloads[#seen.downloads + 1] = { model, label }; return not seen.refuse_download end,
@@ -31,6 +37,21 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	helpers.it("(linux-model-selection-owner) does not select after page revocation during backend switch", function()
+		with_browser(function(f, bridge, seen)
+			seen.backend = "api"
+			local ready = f.handshake()
+			local installed
+			for _, row in ipairs(ready.data.models) do
+				if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+			end
+			helpers.assert_not_nil(installed)
+			seen.on_backend = function() bridge.on_window_acquiring(9999) end
+			f.send({ action = "select_model", backend = "ollama", name = installed.name })
+			helpers.assert_eq(seen.selected, {})
+		end)
+	end)
+
 	helpers.it("(linux-model-delete-owner) passes the page owner to the model deletion", function()
 		local previous = package.loaded["ui.menu.llm_backend_rows"]
 		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
