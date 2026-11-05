@@ -3,6 +3,7 @@
 """Exercise real installed uninstall rollback without touching a user prefix."""
 
 import errno
+import fcntl
 import hashlib
 import os
 from pathlib import Path
@@ -474,6 +475,111 @@ class UninstallTransactionTests(unittest.TestCase):
         self.assertIn(b"code=recovery-retained", result.stderr)
         self.assert_retained_recovery()
         self.assert_personal_untouched()
+
+    def setup_controlled_service(self):
+        """Prepare an owned unit and a private, observable systemctl."""
+        unit = self.home / ".config/systemd/user/ergopti-hotstrings.service"
+        unit.parent.mkdir(parents=True)
+        unit.write_text("[Service]\nExecStart=" + str(self.wrapper) + " --tray\n")
+        with self.manifest.open("ab") as receipt:
+            receipt.write((digest(unit.read_bytes()) + "\t@unit\n").encode())
+        ctl = self.root / "systemctl-tools"
+        ctl.mkdir()
+        program = ctl / "systemctl"
+        program.write_text("""#!/bin/bash
+printf '%s\\n' "$*" >> "$CALLS"
+if [ "$2" = stop ] && [ -n "${HOLDER_PID:-}" ]; then
+  kill "$HOLDER_PID"
+  flock -w 5 "$LOCK_FILE" true
+fi
+if [ "$2" = stop ]; then printf inactive > "$ACTIVE_STATE"; fi
+if [ "$2" = disable ]; then
+  if [ "${FAIL_DISABLE:-0}" = 1 ]; then exit 42; fi
+  printf disabled > "$ENABLED_STATE"
+fi
+""")
+        program.chmod(0o755)
+        lock = self.home / ".cache/ergopti/ergopti.lock"
+        enabled = self.root / "enabled-state"
+        active = self.root / "active-state"
+        enabled.write_text("enabled")
+        active.write_text("inactive")
+        env = {
+            "HOME": str(self.home),
+            "PATH": str(ctl) + ":/usr/bin:/bin",
+            "LANG": "C",
+            "CALLS": str(self.calls),
+            "LOCK_FILE": str(lock),
+            "ENABLED_STATE": str(enabled),
+            "ACTIVE_STATE": str(active),
+        }
+        return lock, env
+
+    def test_busy_terminal_keeps_enabled_service(self):
+        lock, env = self.setup_controlled_service()
+        with lock.open("r+") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            result = subprocess.run(
+                ["/bin/bash", str(self.installed), "--prefix", str(self.prefix), "--yes"],
+                env=env,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 75, result.stderr)
+        calls = self.calls.read_text()
+        self.assertIn("--user stop ergopti-hotstrings.service", calls)
+        self.assertNotIn("--user disable", calls)
+        self.assertEqual(Path(env["ENABLED_STATE"]).read_text(), "enabled")
+        self.assertEqual(Path(env["ACTIVE_STATE"]).read_text(), "inactive")
+        self.assertTrue(self.wrapper.exists())
+        self.assertTrue(self.manifest.exists())
+
+    def test_disable_refusal_keeps_installed_files(self):
+        _, env = self.setup_controlled_service()
+        env["FAIL_DISABLE"] = "1"
+        result = subprocess.run(
+            ["/bin/bash", str(self.installed), "--prefix", str(self.prefix), "--yes"],
+            env=env,
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assertTrue(self.wrapper.exists())
+        self.assertTrue(self.manifest.exists())
+
+    def test_service_releases_lock_before_disabling(self):
+        lock, env = self.setup_controlled_service()
+        Path(env["ACTIVE_STATE"]).write_text("active")
+        holder = subprocess.Popen(
+            ["flock", "-F", "-x", str(lock), "/bin/bash", "-c", "printf ready; exec sleep 60"],
+            stdout=subprocess.PIPE,
+        )
+        try:
+            self.assertEqual(holder.stdout.read(5), b"ready")
+            env["HOLDER_PID"] = str(holder.pid)
+            result = subprocess.run(
+                ["/bin/bash", str(self.installed), "--prefix", str(self.prefix), "--yes"],
+                env=env,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = self.calls.read_text()
+            self.assertLess(
+                calls.index("--user stop ergopti-hotstrings.service"),
+                calls.index("--user disable ergopti-hotstrings.service"),
+            )
+            self.assertEqual(Path(env["ENABLED_STATE"]).read_text(), "disabled")
+            self.assertEqual(Path(env["ACTIVE_STATE"]).read_text(), "inactive")
+            self.assertFalse(self.wrapper.exists())
+        finally:
+            if holder.poll() is None:
+                holder.kill()
+            holder.wait(timeout=5)
+            holder.stdout.close()
 
     def test_postcommit_cleanup_is_attempted_once_and_retains_snapshot(self):
         result = self.run_installed("cleanup-refusal")

@@ -476,8 +476,12 @@ SNAPSHOT_SOURCES=("${OWNED[@]}" "$MANIFEST")
 manifest_digest="$(sha256sum < "$MANIFEST")"
 SNAPSHOT_DIGESTS=("${OWNED_DIGESTS[@]}" "${manifest_digest%% *}")
 prepare_uninstall_snapshots
+stopped_unit=false
 if [ -f "$UNIT" ] && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
-	systemctl --user disable --now ergopti-hotstrings.service
+	# The service may own the singleton lock itself. Stop it first, but do not
+	# change its enabled preference until removal can acquire that lock.
+	systemctl --user stop ergopti-hotstrings.service
+	stopped_unit=true
 fi
 # A terminal-launched daemon is not owned by systemd. Hold the same singleton
 # lock as every Linux entry point until removal finishes, so its live files are
@@ -501,6 +505,9 @@ else
 	fi
 	if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
 	exit "$lock_status"
+fi
+if "$stopped_unit"; then
+	systemctl --user disable ergopti-hotstrings.service
 fi
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
