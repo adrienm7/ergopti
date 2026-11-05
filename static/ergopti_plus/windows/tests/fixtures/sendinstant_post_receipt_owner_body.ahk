@@ -176,7 +176,7 @@ _SICO_RestoreIncoming(Snapshot) {
 		PreviousCritical := Critical("On")
 		try {
 			Token := _SICO.Token && CBClipboardOwner.active.Has(_SICO.Token) ? _SICO.Token : 0
-			CB_RestoreOwnedAllEventually(Snapshot, Expected, Token, "sendinstant_post_receipt_fixture", false)
+			CB_RestoreOwnedAllEventually(Snapshot, Expected, Token, "sendinstant_post_receipt_fixture", true, false)
 		} finally Critical(PreviousCritical)
 		_SICO_Settle(false)
 	} else {

@@ -483,6 +483,29 @@ _SendInstantReport(Text) {
 		CapsWordAutoOffObserveOutput(Text)
 }
 
+; Native focus observations never retain document or clipboard contents.
+_SendInstantCaptureTarget() {
+	PreviousCritical := Critical("On")
+	try {
+		Window := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		Pid := Window ? WinGetPID("ahk_id " . Window) : 0
+		if !Window || !Control || !Pid || WIGetForegroundHwnd() != Window
+			return 0
+		return Map("hwnd", Window, "control", Control, "pid", Pid)
+	} catch {
+		return 0
+	} finally Critical(PreviousCritical)
+}
+
+_SendInstantTargetCurrent(Target) {
+	if !(Target is Map)
+		return false
+	Current := _SendInstantCaptureTarget()
+	return Current is Map && Current["hwnd"] == Target["hwnd"]
+		&& Current["control"] == Target["control"] && Current["pid"] == Target["pid"]
+}
+
 SendInstant(Text, Prefix := "") {
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
@@ -500,6 +523,9 @@ SendInstant(Text, Prefix := "") {
 			return false
 		}
 	}
+	Target := _SendInstantCaptureTarget()
+	if !(Target is Map)
+		return false
 	; Reentrancy guard: a previous SendInstant's deferred restore has not run
 	; yet, so the clipboard still holds its payload. Touching A_Clipboard now
 	; would race the in-flight paste/restore — fall back to the clipboard-free
@@ -510,7 +536,12 @@ SendInstant(Text, Prefix := "") {
 	if !OwnerToken {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
-			SendInput(Prefix . "{Text}" . Text)
+			SendCritical := Critical("On")
+			try {
+				if !_SendInstantTargetCurrent(Target)
+					return false
+				SendInput(Prefix . "{Text}" . Text)
+			} finally Critical(SendCritical)
 			_SendInstantReport(Text)
 			return true
 		} catch as Err {
@@ -531,7 +562,12 @@ SendInstant(Text, Prefix := "") {
 		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
-			SendInput(Prefix . "{Text}" . Text)
+			SendCritical := Critical("On")
+			try {
+				if !_SendInstantTargetCurrent(Target)
+					return false
+				SendInput(Prefix . "{Text}" . Text)
+			} finally Critical(SendCritical)
 			_SendInstantReport(Text)
 			return true
 		} catch as Err {
@@ -543,6 +579,12 @@ SendInstant(Text, Prefix := "") {
 	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
 		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
+		return false
+	}
+	; ClipboardAll can synchronously render a foreign format and change focus.
+	; Refuse before replacing its clipboard when that target is already gone.
+	if !_SendInstantTargetCurrent(Target) {
+		CB_EndOwnedTransaction(OwnerToken)
 		return false
 	}
 	RestoreCallback := false
@@ -560,7 +602,15 @@ SendInstant(Text, Prefix := "") {
 		RestoreTimerArmed := true
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
-		SendInput(Prefix . "^v")
+		SendCritical := Critical("On")
+		try {
+			if !_SendInstantTargetCurrent(Target)
+				throw Error("input target changed before paste")
+			; The publication receipt never adopts a copy made after its return.
+			if CB_GetSequenceNumber() != OwnedSequence
+				throw Error("clipboard ownership changed before paste")
+			SendInput(Prefix . "^v")
+		} finally Critical(SendCritical)
 		_SendInstantReport(Text)
 		return true
 	} catch as err {
@@ -753,6 +803,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
 		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
+		ControlFn := Ports.Get("control", WIGetFocusedControlToken)
 		GenerationFn := Ports.Get("physical_generation", KS_GetPhysicalInputGeneration)
 		BusyFn := Ports.Get("report_busy", _SelectionReportClipboardBusy)
 
@@ -766,6 +817,8 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				"physical_generation", GenerationFn.Call(),
 				"generation_fn", GenerationFn,
 				"foreground", 0,
+				"control", 0,
+				"control_fn", ControlFn,
 				"clipboard", "",
 				"clear_sequence", 0,
 				"owned_sequence", 0,
@@ -784,6 +837,10 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		Started := false
 		try {
 				Job["foreground"] := ForegroundFn.Call()
+				Control := ControlFn.Call()
+				if !(Control is Integer) || Control == 0
+						throw Error("selection capture focus unavailable")
+				Job["control"] := Control
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
 				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
@@ -870,6 +927,14 @@ _SelectionForegroundProcess() {
 
 _SelectionCaptureStartCurrent(Job) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
+		if A_IsSuspended or _SelectionCaptureJob != Job
+				or _SelectionCaptureNextId != Job["id"]
+				return false
+		; Legacy manually assembled jobs have no control observer. Every job
+		; created by GetSelectionAsync captures one before its first clipboard call.
+		if Job.Has("control") && Job["control_fn"].Call() != Job["control"]
+				return false
+		; A supplied observation port may itself cancel or replace the capture.
 		return !A_IsSuspended and _SelectionCaptureJob == Job
 				and _SelectionCaptureNextId == Job["id"]
 }
@@ -923,6 +988,10 @@ _SelectionCapturePoll(Job) {
 		}
 		if (WinExist("A") != Job["foreground"]) {
 				_SelectionCaptureFinish(Job, "", false, "foreground changed")
+				return
+		}
+		if !_SelectionCaptureStartCurrent(Job) {
+				_SelectionCaptureFinish(Job, "", false, "focused control changed")
 				return
 		}
 		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
@@ -1040,6 +1109,11 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 						_SelectionForegroundProcess())
 				return
 		}
+		if Job.Has("control") && Context.Get("control", 0) != Job["control"] {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: the focused control changed.")
+				return
+		}
 		if (Context["physical_generation"] != Job["physical_generation"]) {
 				try LoggerInfo("hotstring_engine",
 						"Selection read but not delivered: a newer physical action superseded it.")
@@ -1071,6 +1145,7 @@ GetSelectionCancel(*) {
 
 _SelectionCaptureCurrentContext(Job) {
 		return Map("foreground", WinExist("A"),
+				"control", Job.Has("control") ? Job["control_fn"].Call() : 0,
 				"physical_generation", Job["generation_fn"].Call())
 }
 

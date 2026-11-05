@@ -20,7 +20,8 @@ _SICOT_ChildSource() {
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
-	for Name in ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded",
+	for Name in ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "WIGetForegroundHwnd", "WIGetFocusedControlToken",
+			"_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "_SendVerdictSucceeded",
 			"_SendInstantReport", "_SendInstant_RestoreClipboard"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "Every genuine SendInstant dependency must have a real body: " . Name)

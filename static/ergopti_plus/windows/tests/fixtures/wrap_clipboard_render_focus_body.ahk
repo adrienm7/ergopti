@@ -199,7 +199,7 @@ _WRF_Main() {
 				Expected := _WRF.OwnSequence
 				; Current is a diagnostic comparison only, never cleanup authority.
 				Current := CB_GetSequenceNumber()
-				CB_RestoreOwnedAllEventually(Incoming, Expected, _WRF.OwnToken, "wrap_render_focus_fixture", false)
+				CB_RestoreOwnedAllEventually(Incoming, Expected, _WRF.OwnToken, "wrap_render_focus_fixture", true, false)
 				FileAppend("CLEANUP wrap-render-focus expected_sequence=" . Expected . " observed_sequence=" . Current
 					. " receipt_current=" . (Current == Expected) . " unknown_preserved=" . (Current != Expected) . "`n", "*")
 			} else if _WRF.Mutated
