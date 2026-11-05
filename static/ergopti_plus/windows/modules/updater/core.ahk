@@ -1362,16 +1362,29 @@ Updater_LoadCheckInterval() {
 		return
 	}
 	raw := IniCacheGet(_IniCache, UPDATER_INI_SECTION, UPDATER_INI_INTERVAL_KEY)
+	; This interval belongs to the updater, not the feature manifest. The
+	; compatibility cache erases native Boolean-vs-integer source types, so
+	; use the actual bootstrap owner's typed value when that owner exists.
+	Snapshot := ConfigTomlBootSnapshot(_IniCache)
+	if IsObject(Snapshot) {
+		for Row in Snapshot.Rows {
+			if Row.Section == UPDATER_INI_SECTION && Row.Key == UPDATER_INI_INTERVAL_KEY {
+				raw := Row.Typed
+				break
+			}
+		}
+	}
 	if (raw == "_" or raw == "") {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	; Validate before arithmetic — AHK v2 throws a TypeError on a non-numeric
-	; string in arithmetic (e.g. "fast" + 0), it does NOT silently coerce to 0
-	; as the old comment claimed. A malformed entry falls back to the default
-	; instead of aborting the boot auto-execute section.
-	if !IsNumber(raw) {
-		try LoggerWarn("Updater", "Ignoring non-numeric check_interval_seconds '{1}' — using default ({2} s).", raw, UPDATER_DEFAULT_INTERVAL)
+	; Only a finite, non-negative whole number carries updater cadence intent.
+	; Coercing a quoted zero or truncating a fraction would disable checks.
+	; A genuine source Boolean remains a TOML_Bool above and is rejected here.
+	if (!(raw is Integer) && !(raw is Float)) || raw != raw || raw < 0
+			|| (raw - raw) != 0 {
+		try LoggerWarn("Updater", "Ignoring invalid check_interval_seconds '{1}' — using default ({2} s).",
+			raw is Object ? Type(raw) : raw, UPDATER_DEFAULT_INTERVAL)
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
@@ -1384,8 +1397,11 @@ Updater_LoadCheckInterval() {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	if (seconds < 0)
-		seconds := 0
+	if seconds != raw {
+		try LoggerWarn("Updater", "Ignoring non-integral check_interval_seconds '{1}' — using default ({2} s).", raw, UPDATER_DEFAULT_INTERVAL)
+		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
+		return
+	}
 	Snap := UpdateSchedule_SnapInterval(seconds)
 	if Snap.Snapped
 		try LoggerWarn("Updater", "check_interval_seconds {1} is not a frequency preset — using the nearest one, {2} s ({3}).",
