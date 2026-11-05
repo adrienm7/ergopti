@@ -43,7 +43,7 @@ function run(script) {
 	return result;
 }
 try {
-	const sourceDriver = path.join(scratch, 'model repository/static/ergopti_plus/linux');
+	const sourceDriver = path.join(scratch, 'model repository\n/static/ergopti_plus/linux');
 	const sourceDirectory = path.join(sourceDriver, 'native/archive_output');
 	const builderRelative = 'tools/build/build-linux-native-output.sh';
 	fs.mkdirSync(sourceDirectory, { recursive: true });
@@ -52,7 +52,7 @@ try {
 			path.join(driver, 'native/archive_output', file),
 			path.join(sourceDirectory, file)
 		);
-	const copiedBuilder = path.join(scratch, 'model repository', builderRelative);
+	const copiedBuilder = path.join(scratch, 'model repository\n', builderRelative);
 	fs.mkdirSync(path.dirname(copiedBuilder), { recursive: true });
 	fs.copyFileSync(path.join(root, builderRelative), copiedBuilder);
 	if (process.platform === 'linux') {
@@ -86,7 +86,7 @@ try {
 			calls = path.join(owned, 'packages'),
 			args = path.join(owned, 'args');
 		const compilerBody =
-			'#!/usr/bin/env bash\nprintf "%s\\n" "$@" > ' + quote(bashPath(args)) + '\nexit 0\n';
+			'#!/usr/bin/env bash\nprintf "%s\\0" "$@" > ' + quote(bashPath(args)) + '\nexit 0\n';
 		if (ready) {
 			fs.writeFileSync(compiler, compilerBody);
 			fs.chmodSync(compiler, 0o755);
@@ -122,7 +122,7 @@ ${acquisition}`;
 				: [];
 		assert.deepEqual(observed, expectedPackages);
 		if (ready || (repair && packageStatus === 0 && selectedDriver === sourceDriver && !skip)) {
-			const receivedArgs = fs.readFileSync(args, 'utf8').trim().split('\n');
+			const receivedArgs = fs.readFileSync(args, 'utf8').split('\0').filter(Boolean);
 			assert.ok(receivedArgs.includes('-fsyntax-only'));
 			assert.ok(
 				receivedArgs.includes(bashPath(path.join(sourceDirectory, 'archive_publication.c')))
