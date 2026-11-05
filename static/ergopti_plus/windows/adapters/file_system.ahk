@@ -441,6 +441,154 @@ FSEnsureDirectoryStrict(Path) {
 	return true
 }
 
+; Writes a retained handoff into a fresh, user-private temporary directory.
+; Directory and file are created relative to held handles and never adopted by
+; pathname. The caller receives a path only after the actual bytes are flushed.
+; Later cleanup is owned by the OS/user temporary-file lifecycle; no read receipt
+; from the external handler exists and no cleanup date is guaranteed.
+; @param Parent {String} Existing absolute temporary parent directory.
+; @param DirectoryName {String} Fresh literal directory leaf; collisions refuse.
+; @param FileName {String} Literal file leaf in the newly owned directory.
+; @param Content {String} Complete UTF-8 text, without embedded NUL.
+; @return {String} Retained path after private ACL verification and durable write.
+; @throws {Error} On acquisition, ACL, write or flush refusal.
+FSWritePrivateRetained(Parent, DirectoryName, FileName, Content) {
+	if !FSPathIsAdmissible(Parent) || !(Content is String)
+		throw ValueError("A private handoff requires a parent and UTF-8 text")
+	Loop StrLen(Content)
+		if NumGet(StrPtr(Content), (A_Index - 1) * 2, "UShort") == 0
+			throw ValueError("A private handoff cannot contain NUL")
+	for Name in [DirectoryName, FileName] {
+		if !FSPathIsAdmissible(Name) || Name == "." || Name == ".."
+				|| InStr(Name, "\") || InStr(Name, "/") || InStr(Name, ":")
+			throw ValueError("A private handoff requires literal leaf names")
+	}
+	Token := 0, SidText := 0, Descriptor := 0
+	Root := -1, Directory := -1, File := -1, Committed := false, Failure := 0
+	try {
+		Process := DllCall("kernel32\GetCurrentProcess", "Ptr")
+		if !DllCall("advapi32\OpenProcessToken", "Ptr", Process, "UInt", 0x8, "Ptr*", &Token, "Int")
+			throw OSError(A_LastError, "open user token")
+		Needed := 0
+		DllCall("advapi32\GetTokenInformation", "Ptr", Token, "Int", 1,
+			"Ptr", 0, "UInt", 0, "UInt*", &Needed, "Int")
+		if Needed < A_PtrSize
+			throw OSError(A_LastError, "size token user")
+		User := Buffer(Needed, 0)
+		if !DllCall("advapi32\GetTokenInformation", "Ptr", Token, "Int", 1,
+			"Ptr", User, "UInt", User.Size, "UInt*", &Needed, "Int")
+			throw OSError(A_LastError, "read token user")
+		Sid := NumGet(User, 0, "Ptr")
+		if !Sid || !DllCall("advapi32\ConvertSidToStringSidW", "Ptr", Sid, "Ptr*", &SidText, "Int")
+			throw OSError(A_LastError, "format token SID")
+		SidString := StrGet(SidText, "UTF-16")
+		Sddl := "O:" . SidString . "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;" . SidString . ")"
+		if !DllCall("advapi32\ConvertStringSecurityDescriptorToSecurityDescriptorW",
+			"Str", Sddl, "UInt", 1, "Ptr*", &Descriptor, "Ptr", 0, "Int")
+			throw OSError(A_LastError, "build private directory security")
+		; FILE_ADD_SUBDIRECTORY | FILE_TRAVERSE on the held parent; the new
+		; directory denies delete sharing while its exact child is written.
+		Root := _FSHoldRootFolder(Parent, 0x4 | 0x20)
+		Directory := _FSNtCreateRelative(Root, DirectoryName,
+			0x2 | 0x20 | 0x80 | 0x100 | 0x10000 | 0x20000,
+			0x10, 0x1 | 0x2, 2, 0x1, Descriptor)
+		if !_FSPrivateRetainedSecurityMatches(Directory, Sid, true)
+			throw Error("the directory did not retain its private ACL")
+		; Assign the same explicit DACL rather than relying on the token's
+		; default owner or filesystem-specific ACE inheritance.
+		File := _FSNtCreateRelative(Directory, FileName, 0xC0010000,
+			0x80, 0, 2, 0x40 | 0x2, Descriptor)
+		if !_FSPrivateRetainedSecurityMatches(File, Sid, true)
+			throw Error("the handoff file did not retain its private ACL")
+		Size := StrPut(Content, "UTF-8") - 1
+		Bytes := Buffer(Size + 1, 0)
+		if Size
+			StrPut(Content, Bytes, Size + 1, "UTF-8")
+		Offset := 0
+		while Offset < Size {
+			Written := 0
+			if !_FSNativeWrite(File, Bytes.Ptr + Offset, Size - Offset, &Written)
+					|| Written <= 0 || Written > Size - Offset
+				throw OSError(A_LastError, "private handoff write")
+			Offset += Written
+		}
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", File, "Int")
+			throw OSError(A_LastError, "private handoff flush")
+		Committed := true
+		Result := RTrim(Parent, "\/") . "\" . DirectoryName . "\" . FileName
+	} catch as Err {
+		Failure := Err
+	} finally {
+		if File != -1 {
+			if !Committed && !_FSPrivateRetainedDiscard(File) && IsObject(Failure)
+				Failure.Message .= "; owned handoff file cleanup failed"
+			DllCall("kernel32\CloseHandle", "Ptr", File, "Int")
+		}
+		if Directory != -1 {
+			if !Committed && !_FSPrivateRetainedDiscard(Directory) && IsObject(Failure)
+				Failure.Message .= "; owned handoff directory cleanup failed"
+			DllCall("kernel32\CloseHandle", "Ptr", Directory, "Int")
+		}
+		if Root != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Root, "Int")
+		if Descriptor
+			DllCall("kernel32\LocalFree", "Ptr", Descriptor, "Ptr")
+		if SidText
+			DllCall("kernel32\LocalFree", "Ptr", SidText, "Ptr")
+		if Token
+			DllCall("kernel32\CloseHandle", "Ptr", Token, "Int")
+	}
+	if IsObject(Failure)
+		throw Failure
+	return Result
+}
+
+; Both directory and file ACLs must grant only user and SYSTEM.
+_FSPrivateRetainedSecurityMatches(Handle, UserSid, Protected) {
+	Owner := 0, Dacl := 0, Descriptor := 0
+	Status := DllCall("advapi32\GetSecurityInfo", "Ptr", Handle, "Int", 1, "UInt", 5,
+		"Ptr*", &Owner, "Ptr", 0, "Ptr*", &Dacl, "Ptr", 0, "Ptr*", &Descriptor, "UInt")
+	try {
+		if Status != 0 || !Descriptor
+			return false
+		if !Owner || !Dacl || !DllCall("advapi32\EqualSid", "Ptr", Owner, "Ptr", UserSid, "Int")
+			return false
+		Control := 0, Revision := 0
+		if !DllCall("advapi32\GetSecurityDescriptorControl", "Ptr", Descriptor,
+				"UShort*", &Control, "UInt*", &Revision, "Int")
+				|| (Protected && !(Control & 0x1000))
+			return false
+		Info := Buffer(12, 0)
+		if !DllCall("advapi32\GetAclInformation", "Ptr", Dacl, "Ptr", Info, "UInt", 12, "Int", 2, "Int")
+				|| NumGet(Info, 0, "UInt") != 2
+			return false
+		SeenUser := false, SeenSystem := false
+		loop 2 {
+			Ace := 0
+			if !DllCall("advapi32\GetAce", "Ptr", Dacl, "UInt", A_Index - 1, "Ptr*", &Ace, "Int")
+					|| NumGet(Ace, 0, "UChar") != 0 || NumGet(Ace, 4, "UInt") != 0x1F01FF
+				return false
+			AceSid := Ace + 8
+			IsUser := DllCall("advapi32\EqualSid", "Ptr", AceSid, "Ptr", UserSid, "Int") != 0
+			IsSystem := DllCall("advapi32\IsWellKnownSid", "Ptr", AceSid, "Int", 22, "Int") != 0
+			if !IsUser && !IsSystem
+				return false
+			SeenUser := SeenUser || IsUser, SeenSystem := SeenSystem || IsSystem
+		}
+		return SeenUser && SeenSystem
+	} finally {
+		if Descriptor
+			DllCall("kernel32\LocalFree", "Ptr", Descriptor, "Ptr")
+	}
+}
+
+; Marks only this still-owned object for deletion; no pathname is reopened.
+_FSPrivateRetainedDiscard(Handle) {
+	Disposition := Buffer(1, 1)
+	return DllCall("kernel32\SetFileInformationByHandle", "Ptr", Handle,
+		"Int", 4, "Ptr", Disposition, "UInt", 1, "Int") != 0
+}
+
 ; Deletes a file. Returns true if deleted or already absent, false on error.
 ; @param Path {String} Absolute path to the file to delete.
 ; @return {Boolean} True on success, false on error.
@@ -1021,7 +1169,7 @@ FSCopyReplaceAtomic(Source, RootDir, Relative, &Detail := "") {
 ; @param StageSuffix {String} Non-empty leaf suffix reserved by this publisher.
 ; @param Detail {VarRef} Native failure and any retained-stage cleanup debt.
 ; @return {Boolean} True only after the owned replacement was published/flushed.
-FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "") {
+FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "", StageFn := 0) {
 	Detail := ""
 	if !FSPathIsAdmissible(Path) || !(Content is String) || !FSPathIsAdmissible(StageSuffix)
 			|| InStr(StageSuffix, "\") || InStr(StageSuffix, "/") || InStr(StageSuffix, ":") {
@@ -1038,7 +1186,8 @@ FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "") {
 		; Relative create/rename need add-file and traverse, not directory
 		; enumeration or permission to create subdirectories.
 		FolderHandle := _FSHoldRootFolder(Parent, 0x2 | 0x20)
-		StageHandle := _FSCreateHeldStage(FolderHandle, Leaf . StageSuffix, 0)
+		CreateStage := HasMethod(StageFn, "Call") ? StageFn : _FSCreateHeldStage
+		StageHandle := CreateStage.Call(FolderHandle, Leaf . StageSuffix, 0)
 		ByteCount := StrPut(Content, "UTF-8") - 1
 		Utf8 := Buffer(ByteCount + 1, 0)
 		if ByteCount > 0
@@ -1059,7 +1208,13 @@ FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "") {
 			throw OSError(A_LastError, "published text flush")
 		return true
 	} catch as Err {
-		Detail := (Published ? "published, but " : "") . Err.Message
+		; OSError.Message carries only the system message, not its What field.
+		; Keep the fixed write-operation label and numeric receipt without
+		; interpolating arbitrary error context into a diagnostic control message.
+		if (Err is OSError) && Err.What == "owned text stage write"
+			Detail := "owned text stage write (Win32 " . Err.Number . "): " . Err.Message
+		else
+			Detail := (Published ? "published, but " : "") . Err.Message
 		if !Published && StageHandle != -1
 			Detail .= _FSDiscardHeldStage(StageHandle)
 		return false
@@ -1124,7 +1279,7 @@ _FSCreateHeldStage(Folder, Name, SourceAttributes) {
 ; as itself, never followed; the caller decides what that means.
 ; @return {Integer} The new handle.
 ; @throws {Error} Carrying the NTSTATUS on refusal.
-_FSNtCreateRelative(Root, Name, Access, Attributes, Share, Disposition, Options) {
+_FSNtCreateRelative(Root, Name, Access, Attributes, Share, Disposition, Options, SecurityDescriptor := 0) {
 	static SYNCHRONIZE := 0x100000, OBJ_CASE_INSENSITIVE := 0x40
 	static FILE_SYNCHRONOUS_IO_NONALERT := 0x20, FILE_OPEN_REPARSE_POINT := 0x200000
 	Wide := Buffer(StrLen(Name) * 2 + 2, 0)
@@ -1137,6 +1292,7 @@ _FSNtCreateRelative(Root, Name, Access, Attributes, Share, Disposition, Options)
 	NumPut("Ptr", Root, ObjectAttributes, A_PtrSize)
 	NumPut("Ptr", Unicode.Ptr, ObjectAttributes, 2 * A_PtrSize)
 	NumPut("UInt", OBJ_CASE_INSENSITIVE, ObjectAttributes, 3 * A_PtrSize)
+	NumPut("Ptr", SecurityDescriptor, ObjectAttributes, 4 * A_PtrSize)
 	Io := Buffer(2 * A_PtrSize, 0)
 	Status := DllCall("ntdll\NtCreateFile", "Ptr*", &Handle := 0, "UInt", Access | SYNCHRONIZE,
 		"Ptr", ObjectAttributes, "Ptr", Io, "Ptr", 0, "UInt", Attributes, "UInt", Share, "UInt", Disposition,
@@ -1466,13 +1622,11 @@ FSConfigDeleteStrict(Path, AdmissionFn := 0) {
 }
 
 
-/** Writes a strict UTF-8 stage and retains the original close-before-move order. */
-FSWriteUtf8ReplaceStrict(Path, Text, OpenFn := 0) {
-	Open := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
-	Utf8ReplacementStream := Open.Call(Path . ".tmp", "w", "UTF-8-RAW")
-	try Utf8ReplacementStream.Write(Text)
-	finally Utf8ReplacementStream.Close()
-	FileMove(Path . ".tmp", Path, true)
+/** Publishes a strict UTF-8 control through an owned, durably written stage. */
+FSWriteUtf8ReplaceStrict(Path, Text, StageFn := 0) {
+	Detail := ""
+	if !FSWriteReplaceOwned(Path, Text, ".tmp", &Detail, StageFn)
+		throw Error("Diagnostic control publication failed: " . Detail)
 }
 
 /** Encodes the complete UTF-8 image without its additional terminator byte. */
