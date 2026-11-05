@@ -55,6 +55,51 @@ assert.equal(
 	0,
 	'an assertion on the returned value remains a positive control'
 );
+for (const [body, count, reason] of [
+	[
+		'helpers.assert_true(pcall(subject))\nhelpers.assert_eq(observed, 1)',
+		0,
+		'inline status with observed effect'
+	],
+	[
+		'local ok = pcall(subject)\nhelpers.assert_true(ok)\nhelpers.assert_eq(observed, 1)',
+		0,
+		'named status with observed effect'
+	],
+	[
+		'local ok = pcall(subject)\nhelpers.assert_true(ok)\n-- helpers.assert_eq(observed, 1)',
+		1,
+		'comment is not an observation'
+	],
+	[
+		'local ok = pcall(subject)\nlocal other = pcall(subject)\nhelpers.assert_true(ok)\nhelpers.assert_true(other)',
+		2,
+		'another status is not an observation'
+	],
+	[
+		'helpers.assert_true(pcall(subject))\nhelpers.assert_true(true)',
+		1,
+		'tautology is not an observation'
+	]
+]) {
+	const text = `helpers.it("case", function()\n${body}\nend)`;
+	assert.equal(scan(fixture, text).length, count, reason);
+}
+assert.equal(
+	scan(
+		fixture,
+		[
+			'helpers.it("weak", function()',
+			'  helpers.assert_true(pcall(subject))',
+			'end)',
+			'helpers.it("next", function()',
+			'  helpers.assert_eq(observed, 1)',
+			'end)'
+		].join('\n')
+	).length,
+	1,
+	'an observation in another test cannot hide a weak test'
+);
 const ahkFixture = path.join(__dirname, 'synthetic-mixed-quotes.ahk');
 for (const literal of [
 	"{Source: ' # fake } ] \"', Expected: 1}",

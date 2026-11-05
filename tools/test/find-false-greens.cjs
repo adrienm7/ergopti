@@ -513,6 +513,37 @@ function inlineExpectsFalse(match, line) {
 	return false;
 }
 
+// A status assertion can be a necessary exception-isolation check within a
+// behavioral test. Only consider later assertions in the same registered test;
+// never borrow an assertion from the next test or from a comment.
+function hasLaterBehavioralAssertion(lines, at, statusVars) {
+	let start = at;
+	while (start >= 0 && !/^([\t ]*)(?:(?:helpers|h)\.)?it\s*\(.*\bfunction\s*\(/.test(lines[start]))
+		start--;
+	if (start < 0) return false;
+	const indent = lines[start].match(/^[\t ]*/)[0];
+	let end = start + 1;
+	while (
+		end < lines.length &&
+		!(lines[end].startsWith(indent) && /^end\s*\)/.test(lines[end].slice(indent.length)))
+	)
+		end++;
+	const statuses = new Set(statusVars);
+	for (let j = start + 1; j < end; j++) {
+		if (isComment(lines[j], '.lua')) continue;
+		const assignment = lines[j].match(/\blocal\s+(\w+)(?:\s*,[^=]+)?\s*=\s*pcall\s*\(/);
+		if (assignment) statuses.add(assignment[1]);
+	}
+	for (let j = at + 1; j < end; j++) {
+		if (isComment(lines[j], '.lua')) continue;
+		const match = lines[j].match(/\b(assert\w*)\s*\(\s*([^,)]*)/);
+		if (!match || /\bpcall\s*\(/.test(match[2])) continue;
+		if (statuses.has(match[2].trim()) || /^(?:true|false|nil)$/.test(match[2].trim())) continue;
+		return true;
+	}
+	return false;
+}
+
 function findPcallOnly(file, src) {
 	const out = [];
 	const lines = src.split(/\r?\n/);
@@ -520,7 +551,11 @@ function findPcallOnly(file, src) {
 	lines.forEach((line, i) => {
 		if (isComment(line, '.lua')) return;
 		for (const match of line.matchAll(/(assert\w*)\s*\(\s*pcall\s*\(/g)) {
-			if (match[1] !== 'assert_false' && !inlineExpectsFalse(match, line)) {
+			if (
+				match[1] !== 'assert_false' &&
+				!inlineExpectsFalse(match, line) &&
+				!hasLaterBehavioralAssertion(lines, i, [])
+			) {
 				out.push({
 					file: rel(file),
 					line: i + 1,
@@ -566,7 +601,7 @@ function findPcallOnly(file, src) {
 					/^\s*false\s*[,)]/.test(rest)
 				);
 			});
-			if (weak) {
+			if (weak && !hasLaterBehavioralAssertion(lines, j, [statusVar])) {
 				out.push({
 					file: rel(file),
 					line: j + 1,
