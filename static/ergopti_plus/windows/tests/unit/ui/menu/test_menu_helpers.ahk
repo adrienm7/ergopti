@@ -107,3 +107,29 @@ _MH_MalformedSectionBoundary() {
 	AssertTrue(_HS_DeclaredSectionBoundary().Get("separator", false), "a refused proposal cannot retire the genuine declaration")
 }
 Test("menu_helpers: empty and duplicated shared boundaries refuse construction", _MH_MalformedSectionBoundary)
+
+; Free-text section descriptions can already contain the generated suffix.
+; The actual helper and native RegisterMenuItem path must preserve each choice.
+_MH_NativeSuffixCollision(Order) {
+	Descriptions := Order == "generated-first" ? ["LPUL section", "LPUL section", "LPUL section #2"]
+		: ["LPUL section #2", "LPUL section", "LPUL section"]
+	Model := _MH_Fixture(Descriptions[1], Descriptions[2], Descriptions[3])
+	Labels := _HS_BuildDisambiguatedSectionLabels(Model)
+	MenuOwner := Menu(), Count := -1
+	try {
+		for Key in ["alpha", "beta", "gamma"] {
+			Callback := ((Value, *) => Value).Bind(Key)
+			AssertEqual(1, RegisterMenuItem(MenuOwner, Labels[Key], Callback),
+				"Each actual personal section row must be admitted by the native dispatcher")
+		}
+		Count := DllCall("GetMenuItemCount", "ptr", MenuOwner.Handle, "int")
+		_TestPrint("# personal-suffix order=" . Order . " labels=" . Labels["alpha"] . "|" . Labels["beta"]
+			. "|" . Labels["gamma"] . " native=" . Count)
+		AssertTrue(Labels["alpha"] != Labels["beta"] && Labels["alpha"] != Labels["gamma"]
+			&& Labels["beta"] != Labels["gamma"], "Each real section description must receive a unique label")
+		AssertEqual(3, Count, "The real native menu must retain all three personal section choices")
+	} finally _CTC_ReleaseMenu(MenuOwner)
+}
+for _MH_SuffixOrder in ["generated-first", "literal-first"]
+	Test("menu_helpers: " . _MH_SuffixOrder . " preserves literal personal section suffixes (personal-suffix-menu-owner)",
+		_MH_NativeSuffixCollision.Bind(_MH_SuffixOrder))
