@@ -178,7 +178,15 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 		AssertEqual(1, State.Calls, "the row sender child must settle once")
 		AssertEqual(0, State.Code, "the row sender refused: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "no native child error may be hidden")
-		AssertEqual(Receipt, State.Output)
+		if Receipt == "PASS layout-row-native-flags" {
+			AssertTrue(IsSet(ExtraArgs) && ExtraArgs.Length >= 1)
+			Observation := "OBSERVATION row-native-feed mode=" . ExtraArgs[1]
+				. " observer_level=1 keydowns=1 char_units=1 expected_units=1"
+			AssertEqual(Observation . "`n" . Receipt, State.Output,
+				"the exact I1 observation and terminal native receipt must both be received")
+			_TestPrint("# " . Observation)
+		} else
+			AssertEqual(Receipt, State.Output)
 	} catch as Err {
 		Primary := Err
 	}

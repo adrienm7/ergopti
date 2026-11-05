@@ -1,43 +1,83 @@
 {
-	"expected_count": 68,
-	"native_hotstring_e2e": false,
+	"expected_count": 91,
 	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "layout-row-send-level",
-			"expected_count": 6
+			"contains": "HotstringsConfig legacy default durable ACK:",
+			"expected_count": 8
 		},
 		{
-			"contains": "layout-row-chosen-magic-scope",
+			"contains": "HotstringsConfig public base upper duration:",
 			"expected_count": 4
 		},
 		{
-			"contains": "builtin-number-row-magic-owner",
-			"expected_count": 16
+			"contains": "idle-delay-decimal-domain",
+			"expected_count": 3
 		},
 		{
-			"contains": "layout-row-control-admission",
-			"expected_count": 10
+			"contains": "ui-decimal-sibling-domain",
+			"expected_count": 1
 		},
 		{
-			"contains": "layout-row-scopes",
-			"expected_count": 4
+			"contains": "llm-integer-input-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "token-margin-integer-domain",
+			"expected_count": 1
+		},
+		{
+			"contains": "Log openers: daylog",
+			"expected_count": 3
+		},
+		{
+			"contains": "worker-unicode-sibling070",
+			"expected_count": 2
 		},
 		{
 			"contains": "layout-row-native-flags",
 			"expected_count": 3
 		},
 		{
-			"contains": "layout-row-external-native-flags",
+			"contains": "native-profile-paste-owner",
 			"expected_count": 3
+		},
+		{
+			"contains": "llm-profile-preopen-source",
+			"expected_count": 2
+		},
+		{
+			"contains": "key chord boot settings:",
+			"expected_count": 7
+		},
+		{
+			"contains": "HotstringsConfig: override file publication is atomic",
+			"expected_count": 1
+		},
+		{
+			"contains": "HotstringsConfig: durable exact stage validation gates override publish",
+			"expected_count": 1
+		},
+		{
+			"contains": "reload parses outside Critical and revalidates path before coupled publication",
+			"expected_count": 1
 		},
 		{
 			"contains": "capsword-idle-domain",
 			"expected_count": 3
 		},
 		{
-			"contains": "HotstringsConfig public base upper duration:",
-			"expected_count": 4
+			"contains": "capsword-tiny-positive",
+			"expected_count": 1
+		},
+		{
+			"contains": "capsword-idle-store-domain",
+			"expected_count": 2
+		},
+		{
+			"contains": "capsword auto-off:",
+			"expected_count": 21
 		},
 		{
 			"contains": "new-file-document-owner",
@@ -48,8 +88,40 @@
 			"expected_count": 3
 		},
 		{
-			"contains": "layout-zoom-host-precedence",
-			"expected_count": 10
+			"contains": "parameter and assignment share one commit",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: first related update failure",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: second related update failure",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: successful related batch",
+			"expected_count": 1
+		},
+		{
+			"contains": "Gestures: parameterized action values persist",
+			"expected_count": 1
+		},
+		{
+			"contains": "gesture-binding-identity-refusal",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar-native-nontext-receiving",
+			"expected_count": 6
+		},
+		{
+			"contains": "window-title-app-attribution",
+			"expected_count": 2
+		},
+		{
+			"contains": "native-editor-cross-process",
+			"expected_count": 2
 		}
 	]
 }

@@ -339,3 +339,81 @@ Test("scalar completion: single named Escape stays cancellation (inputhook-named
 for _SICU_PacketMode in ["delete", "enter", "backspace", "unicode"]
 	Test("control packet ABI: " . _SICU_PacketMode . " preserves physical and Unicode identity (inputhook-control-packet-abi)",
 		_SICU_Case.Bind("packet", _SICU_PacketMode))
+
+_SNR_ChildSource() {
+	global _DriverDir
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	for Symbol in ["SIHO_StartOwned", "JsonParse"] {
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The genuine scalar capture dependency must exist: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "DeadKey", "OneShotShift", "OneShotShiftFix",
+		"_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "The unchanged scalar producer must exist: " . Name)
+		Code .= Definition . "`n"
+	}
+	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\scalar_nontext_receiving_body.ahk")
+}
+_SNR_NativeCase(Owner, Mode) {
+	global _SharedDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired native probe prevents another keyboard sender.")
+	Root := A_Temp . "\ergopti_scalar_nontext_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Root . "\subject.ahk"
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}, Handle := 0, Primary := 0, Retired := false, Created := false
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The native scalar fixture must exclusively acquire its own source directory.")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SNR_ChildSource()))
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-edit-scalar-nontext", Owner, Mode, _SharedDir], _SICS_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The genuine scalar receiving child must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "The owned scalar receiving child must settle once.")
+		_TestPrint("# scalar-native " . Owner . " " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(0, State.Code, "Native scalar capture suppression failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "Native diagnostics may not be hidden.")
+		AssertContains(State.Output, "PASS scalar-nontext " . Owner . " " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try {
+		if !IsObject(Handle)
+			Retired := true
+		else {
+			Started := A_TickCount
+			loop {
+				Accepted := Handle.terminate()
+				Retired := Accepted is Integer && Accepted == 1
+				if Retired || TickElapsed(Started) >= 5000
+					break
+				_SR_TreePoll()
+				Sleep(10)
+			}
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := Handle
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The sender and actual InputHook must physically retire.")
+}
+for _SNR_Owner in ["one-shot", "dead-key"]
+	for _SNR_Mode in ["letter", "enter", "backspace"]
+		Test("scalar native nontext receiving: " . _SNR_Owner . " " . _SNR_Mode . " (scalar-native-nontext-receiving)",
+			_SNR_NativeCase.Bind(_SNR_Owner, _SNR_Mode))

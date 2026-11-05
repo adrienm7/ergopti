@@ -273,3 +273,51 @@ _WTC_CapMatchesSharedContract() {
 }
 Test("walker: the title cap matches the shared cross-driver contract (walker-title-cap-declared-but-dead)",
 	_WTC_CapMatchesSharedContract)
+
+
+; These are the exact outgoing-app window rows emitted by the genuine focus
+; refresh on a captured A -> B -> A transition. Native acquisition itself is
+; already isolated by switch-destination-privacy-owner; this fixture qualifies
+; the actual SQLite rebuild and public manifest projection of those rows.
+_WTC_WindowTitleAppAttribution(CrossApp) {
+	global KLRLastReplayFailure
+	SavedFailure := KLRLastReplayFailure
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		SecondApp := CrossApp ? "app-b.exe" : "app-a.exe"
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch "
+			. "(device_id,id,ts,date,app,prev_title,next_title,duration_ms) VALUES "
+			. "('title-owner',1,'2026-01-01T10:00:00','2026-01-01','app-a.exe','Title A','Title B',2500),"
+			. "('title-owner',2,'2026-01-01T10:00:03','2026-01-01'," . SQLite_Q(SecondApp)
+			. ",'Title B','Title A',3500);"))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		Manifest := KLR_ReadManifestBase(Db, "2026-01-01", "2026-01-01")
+		Apps := Manifest["2026-01-01"]
+		First := Apps["app-a.exe"]["win_titles"]
+		Second := Apps[SecondApp]["win_titles"]
+		_TestPrint("# title-app-attribution cross_app=" . CrossApp
+			. " a_foreign_title=" . (First.Has("Title B") ? First["Title B"]["c"] : 0)
+			. " b_foreign_title=" . (Second.Has("Title A") ? Second["Title A"]["c"] : 0))
+		AssertTrue(First.Has("Title A"))
+		AssertEqual(2500, First["Title A"]["ms"])
+		AssertTrue(Second.Has("Title B"))
+		AssertEqual(3500, Second["Title B"]["ms"])
+		if CrossApp {
+			AssertFalse(First.Has("Title B"), "App A must never display app B's independently owned window title")
+			AssertFalse(Second.Has("Title A"), "App B must never display app A's independently owned window title")
+		} else {
+			AssertTrue(First["Title A"]["c"] > 0)
+			AssertTrue(First["Title B"]["c"] > 0,
+				"A same-application title round-trip must keep both legitimate occurrence counters")
+		}
+	} finally {
+		SQLite_Close(Db)
+		KLRLastReplayFailure := SavedFailure
+	}
+}
+for _WTC_CrossApp in [false, true]
+	Test("Reader window title app owner: " . (_WTC_CrossApp ? "cross-app" : "same-app control") . " (window-title-app-attribution)",
+		_WTC_WindowTitleAppAttribution.Bind(_WTC_CrossApp))

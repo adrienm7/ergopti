@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **74 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **81 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1232,7 +1232,7 @@ Run41926489533 executes75 cases:64 pass,10 assertions fail and one constructor-s
 
 Run41927538467 at09e8ea2 executes58 cases in each order:55 pass and3 fail. All selected AHK-068 business cases pass; one empty-file fixture fails before the reader and is corrected separately. Screenshot pre-write failure deletes an independently owned file; its no-stage control passes. The proposed zero-access metadata lease is experimentally rejected because it does not block native deletion. All4 bounded PCRE cases pass; no Windows PCRE resource defect is established at the measured sizes. Both runs compile the complete production entry and pass90/90 native hotstring E2E; HTTP E2E is not selected.
 
-The register now contains74 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 has an integrated original-event correction awaiting native post-fix qualification. The requested1,000 target remains unmet.
+The register now contains81 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 has an integrated original-event correction awaiting native post-fix qualification. The requested1,000 target remains unmet.
 
 ## AHK-072: Override saves overwrite a source changed after the loaded snapshot
 
@@ -1275,3 +1275,95 @@ Regression: Native run41939048652 at46019fb confirms the same released-Shift fai
 Run41930158432 executes60 cases in each order:48 pass and12 assertions fail, with no timeout and complete production compilation. AHK-025 durable outcomes, AHK-063 constructor ownership, AHK-069 supplementary keys, AHK-070 crash Unicode and the AHK-066 integer-price case pass. The real read lease passes all3 GDI compatibility cases. Five stale-source failures establish AHK-072; two Anthropic contract failures establish AHK-073; one deferred layout failure establishes AHK-074. Two finite-cost failures and two request-budget failures extend existing numeric and deadline findings rather than adding duplicate counts. Both optional E2E groups were explicitly not selected.
 
 Native run41930158432 proves that a GENERIC_READ lease with read/write sharing permits actual GDI encoding while retaining stage identity and preventing deletion. The integrated fix acquires CREATE_NEW before capture, retains the native handle and snapshot through publication/cleanup, refuses unowned stages, preserves close-failure debt and releases unstarted job cycles. Existing cleanup fixtures now carry actual ownership receipts. Three real one-pixel composition tests and two unstarted lifetime witnesses are added; post-fix Windows qualification pending.
+
+## AHK-075: Legacy default migration retires its source after the destination refuses the write
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The cross-file migration updates session RAM after WriteFeatureV2 refusal but continues to persist the projected override state, deleting \_global despite lacking a destination durability acknowledgment.
+
+Reproduction: Native run41938680258 at a7fa655: real base-config lease refusal and writer-refusal cases still rewrite the override file without its legacy global delay. A subsequent unrelated color save also loses that only durable default. Three failures repeat in reverse; successful migration and no-default controls pass.
+
+Consequence: Restart restores the old base while the only durable record of the intended default has been erased.
+
+Regression: Five real cross-file migration probes include actual lease refusal, subsequent public color save, a refusal seam and two positive controls. Integrated correction keeps the legacy record and original source receipt in the session projection, returns refusal before rewriting the source and publishes fallback only to the still-current owners. Post-fix qualification pending.
+
+## AHK-076: Numeric UI prompts wrap decimal text before validating its intended magnitude
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+Text+0 and Integer(Raw) apply native signed64 modulo conversion before the setting domain is checked. Lexical integer validity does not prove representability.
+
+Reproduction: Native run41938680258: the actual idle-reset parser turns decimal18446744073709551616 into disabled0. The LLM prediction-count prompt accepts18446744073709551619 as3 without a validation notice. Ordinary and wider finite-float idle controls pass.
+
+Consequence: A value outside the intended setting domain is accepted as a different small value, including a disabled timer.
+
+Regression: Three idle decimal-domain probes and one actual LLM normalizer probe retain the original lexical inputs. Idle parsing now uses checked decimal parsing and finite Float fallback without forcing wide values back to Integer. The LLM sibling correction must preserve its already accepted plus/hex/whitespace forms while refusing overflow; qualification pending.
+
+## AHK-077: Token refresh-margin validation overflows while doubling an admitted integer
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+Margin\*2 wraps signed64 before comparison to the bounded default lifetime, turning a huge positive margin into a small or negative value.
+
+Reproduction: Native run41938680258: parsed margins2^62 and MAXINT pass the below-half-lifetime check and produce refresh due one second after token issue. Four ordinary/even/odd boundary controls behave correctly; reverse repeats the two invalid admissions.
+
+Consequence: An invalid authentication configuration is accepted and newly issued usable tokens are immediately treated as requiring refresh.
+
+Regression: One six-row real parser/reader/state test observes both admission and refresh behavior. The fix compares Margin >= Default/2 after the default lifetime has already been validated in its intrinsic bounded domain. Post-fix qualification pending.
+
+## Native qualification at a7fa655
+
+Run41938680258 executes165 cases in each order:149 pass and the same16 fail. Complete production compilation and90/90 native hotstring E2E pass. Screenshot ownership29/29, external/staged source ownership8/8, Anthropic3/3, token request budgets8/8, finite cost3/3 and picker11/11 pass. Three source migration failures establish AHK-075; two numeric UI failures establish one shared AHK-076 family; the margin test establishes AHK-077. DayLog and Ollama Unicode extend existing033/070 families. The released layout case remains fail-before for the subsequently integrated074 correction. Two old source guards need the actual new atomic owner; three profile probes stop at an undefined A_Pid fixture variable, now corrected to ProcessExist(). One reload fixture tries to acquire its second private scope before retiring the first; its first business assertions pass, but the full case remains unqualified until the scope transition is repaired. The requested1,000 target remains unmet.
+
+## AHK-078: Accepted CapsWord inactivity durations compile into disabled native policies
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The shared policy multiplies seconds by integer1000 then rounds without establishing representability in the native timer domain. Windows publishes that policy without platform admission.
+
+Reproduction: Native run41940017179 at0888bda: public config reading accepts2^62 integer seconds and1e308 float seconds. Real compilation publishes idle_ms0 and MININT respectively, arms a character subscription but no inactivity timer. The ordinary0.05s control actually delivers its native timer once; inverse repeats both failures.
+
+Consequence: An accepted positive inactivity setting silently disables the requested automatic CapsWord shutdown.
+
+Regression: Three public config/compile/arm cases inspect genuine HookDispatcher subscriptions and native timer ownership. Correction must explicitly admit the intrinsic native timer domain or use the existing documented fallback before policy publication and durable stores; implementation pending.
+
+## AHK-079: A valid base-delay change pushes existing hotstring offsets outside the engine duration domain
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+HotstringsDelayFromOffset enforces only a lower duration boundary, while HotstringsSetBaseDelay validates only the base rather than the resulting effective projections.
+
+Reproduction: Native run41940017179: real public setters produce category and section offset+0.25, then acknowledge a valid base at the DWORD elapsed-clock ceiling. Both effective durations exceed that ceiling and the actual engine time gate expires them even at the current character timestamp. Below-cap, zero-offset and unlimited controls pass.
+
+Consequence: An acknowledged valid base setting disables existing time-gated hotstrings with positive relative offsets.
+
+Regression: Four real public-write/time-gate cases preserve exact stored source and prove that returning the base restores original relative intent. The integrated projection clamps at the existing canonical TICK_MAX_DURATION_MS ceiling without mutating StoredOffset. Post-fix qualification pending.
+
+## AHK-080: Explorer navigation redirects new-file rename preparation to an unrelated file
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+GestureSysNewTextFileHere captures the creation folder, then reacquires Window.Document after filesystem I/O/logging and resolves only the base filename without checking the resulting folder or item path.
+
+Reproduction: Native run41940017179: the genuine SystemControl CreateNewFile creates an empty file in original folderA. A controlled Explorer document navigation during that external call exposes a same-named pre-existing file in folderB; the public action selectsB with rename flags. The unchanged-document control selects the createdA file. Both real files and exact selected paths are independently checked; no real Explorer window is automated.
+
+Consequence: The action can start renaming a same-named unrelated file after the user navigates while the new file is being created.
+
+Regression: Two native filesystem cases use explicit Shell/Document ports and the actual creation adapter. The integrated guard retains the folder object, checks its exact path against the captured folder and requires the returned item path to equal the created path before SelectItem. Post-fix qualification pending.
+
+## AHK-081: Gesture configuration publishes cached RAM candidates outside its configuration lease
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+GestureSetActionParameter and \_GestureCommitAssignment clone mutable state before ConfigCommitUpdates acquires its owner and publish the prebuilt Maps after that owner is released.
+
+Reproduction: Native run41940017179 parameter and assignment probes delegate the genuine clone, admit a second real MenuCommandRun mutation before the first acquires its lease, and execute both actual writers. TOML contains both acknowledged updates but the first cached Map replaces RAM with the second field still old. Diagnostics disk_b_new1/ram_b_new0 repeat in reverse.
+
+Consequence: A successfully persisted independent menu change disappears from live behavior until restart, and later actions can operate on stale assignment state.
+
+Regression: Two real native-writer/dispatcher cases assert exact durable/live agreement and one second invocation. A CapsWord sibling probe stops before its first writer acknowledgment and is not counted as evidence. Correction is being prepared using ConfigCommitBuilt with lease-owned candidate construction and memory publication; implementation pending.
+
+## Native qualification at 0888bda
+
+Run41940017179 executes68 cases in each order:58 pass and the same10 fail. Complete production compilation passes; optional E2E groups are not selected. All3 external modifier cases pass, including released Shift. Three local children satisfy their strict character/key/provenance assertions and emit PASS, but the parent incorrectly rejects the preceding observation line; its receipt check is repaired to require both exact lines. The other failures establish AHK-078 through081: two CapsWord numeric cases, one effective duration case, one wrong Explorer rename target and two cached gesture publication cases. The CapsWord cached-publication sibling stops before its first writer acknowledges, so no business conclusion is drawn for it. The target of1,000 remains unmet.

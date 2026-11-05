@@ -537,3 +537,278 @@ for _NEC_CapsWordMode in ["missing-evidence", "mismatched-evidence", "unowned-ev
 	"focus-refused", "schedule-refused", "accepted-delimiter", "accepted-word"]
 	Test("TextSend native CapsWord: " . _NEC_CapsWordMode . " respects queue admission (native-refusal-capsword)",
 		_NEC_CapsWordAdmission.Bind(_NEC_CapsWordMode))
+
+; Cross-process receiving checks use the shipped production DLL and actual focus.
+; The separate receiver's native subclass observes/delays one real Edit message.
+; These are receiving controls, not a new defect or a source-contract substitute.
+
+_NECP_Done(State, Code, Output, ErrorText) {
+	State.Calls += 1
+	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+}
+
+/** Duplicates the actual pre-adoption process capability without changing launch. */
+_NECP_Adopt(State, TaskState, Native) {
+	Current := DllCall("Kernel32\GetCurrentProcess", "Ptr")
+	Process := 0
+	AssertTrue(DllCall("Kernel32\DuplicateHandle", "Ptr", Current,
+		"Ptr", Native["ProcessHandle"], "Ptr", Current, "Ptr*", &Process,
+		"UInt", 0, "Int", false, "UInt", 2, "Int"), "SETUP: exact receiver handle duplication")
+	State.Process := Process, State.Pid := Native["Pid"]
+}
+
+_NECP_Event(Name) {
+	static CloseDebt := []
+	Handle := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true,
+		"Int", false, "Str", Name, "Ptr")
+	NativeError := A_LastError
+	if !Handle
+		throw OSError(NativeError, , "SETUP: private editor event creation")
+	if NativeError == 183 {
+		if !DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+			CloseDebt.Push(Handle)
+		throw Error("SETUP: the event name belongs to an existing owner")
+	}
+	return Handle
+}
+
+_NECP_Exports() {
+	global _VendorDir
+	Manifest := JsonParse(FSReadUtf8Exact(_VendorDir . "\ergopti_nav_owner.manifest.json"))
+	ExpectedHash := Manifest["dll_sha256"]
+	Exports := Map()
+	for Name in ["Begin", "Poll", "Decide", "Close"]
+		Exports[Name] := _LLM_NavEventOwnerNativeExport("ErgoptiEditor_" . Name)
+	Module := 0
+	AssertTrue(DllCall("Kernel32\GetModuleHandleExW", "UInt", 6,
+		"Ptr", Exports["Begin"], "Ptr*", &Module, "Int"), "SETUP: authenticate actual export module")
+	Path := Buffer(65536, 0)
+	Length := DllCall("Kernel32\GetModuleFileNameW", "Ptr", Module,
+		"Ptr", Path, "UInt", 32768, "UInt")
+	AssertTrue(Length > 0 && Length < 32768, "SETUP: resolve the actually loaded native DLL")
+	ActualHash := CryptoSha256Bytes(FSReadBytesStrict(StrGet(Path, Length, "UTF-16")))
+	AssertEqual(StrUpper(ExpectedHash), StrUpper(ActualHash), "SETUP: shipped DLL manifest hash")
+	_TestPrint("# native-editor-cross-process authenticated_dll=" . ActualHash)
+	return Exports
+}
+
+_NECP_WaitFile(State, Path, Boundary) {
+	Started := A_TickCount
+	while !FileExist(Path) && State.Calls == 0 && TickElapsed(Started) < 5000 {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	AssertTrue(FileExist(Path) != "", Boundary . ": exact receiver receipt missing: "
+		. State.Output . State.ErrorText)
+}
+
+_NECP_Phase(Exports, Token, Minimum) {
+	Started := A_TickCount
+	Phase := 0, NativeError := 0
+	loop {
+		AssertEqual(0, DllCall(Exports["Poll"], "UInt64", Token,
+			"UInt*", &Phase, "UInt*", &NativeError, "Int"), "BUSINESS: actual native phase receipt")
+		if Phase >= Minimum
+			return {Phase: Phase, NativeError: NativeError}
+		AssertTrue(TickElapsed(Started) < 5000, "BUSINESS: actual native worker phase timed out")
+		_SR_TreePoll()
+		Sleep(10)
+	}
+}
+
+/** A terminal phase alone cannot retire the worker's copied strings. */
+_NECP_CloseWorker(State) {
+	if !State.WorkerStarted || State.WorkerClosed
+		return true
+	Started := A_TickCount
+	loop {
+		Status := DllCall(State.Exports["Close"], "UInt64", State.Token, "Int")
+		if Status == 0 {
+			State.WorkerClosed := true
+			return true
+		}
+		if Status != 5
+			throw Error("RETIREMENT: native editor close returned " . Status)
+		if TickElapsed(Started) >= 5000
+			return false
+		Sleep(10)
+	}
+}
+
+_NECP_SavedFocus() {
+	Window := DllCall("User32\GetForegroundWindow", "Ptr")
+	Pid := 0, Control := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Window, "UInt*", &Pid, "UInt")
+	Info := Buffer(8 + 6 * A_PtrSize + 16, 0)
+	NumPut("UInt", Info.Size, Info)
+	if ThreadId && DllCall("User32\GetGUIThreadInfo", "UInt", ThreadId, "Ptr", Info, "Int")
+		Control := NumGet(Info, 8 + A_PtrSize, "Ptr")
+	return {Window: Window, Control: Control, Pid: Pid}
+}
+
+_NECP_RestoreFocus(Saved) {
+	Pid := 0
+	if !Saved.Window || !DllCall("User32\IsWindow", "Ptr", Saved.Window, "Int")
+		return
+	DllCall("User32\GetWindowThreadProcessId", "Ptr", Saved.Window, "UInt*", &Pid)
+	if Pid != Saved.Pid
+		return
+	WinActivate("ahk_id " . Saved.Window)
+	if Saved.Control && DllCall("User32\IsChild", "Ptr", Saved.Window, "Ptr", Saved.Control, "Int")
+		ControlFocus(Saved.Control)
+}
+
+_NECP_Run(Delayed) {
+	global _DriverDir, _TEXT_NATIVE_OWNER
+	static Debt := 0, Serial := 0
+	AssertFalse(IsObject(Debt), "SETUP: an earlier exact editor receiver still owns retirement debt")
+	AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "SETUP: the native output queue must be idle")
+	SavedCritical := Critical("Off"), SavedSuspend := A_IsSuspended
+	SavedFocus := _NECP_SavedFocus()
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: "", Process: 0, Pid: 0,
+		WorkerStarted: false, WorkerClosed: false, Exports: 0, Token: 0x454350000 + ++Serial}
+	Task := 0, Events := [], Primary := 0, Retired := false, NativeRetired := false, Passed := false
+	Root := A_Temp . "\ergopti_native_editor_peer_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	BaseName := "Local\ErgoptiEditorPeer_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	try {
+		Suspend(false)
+		AssertTrue(FSCreateDirectoryExclusiveStrict(Root), "SETUP: own the private receiver directory")
+		State.Exports := _NECP_Exports()
+		for Suffix in ["entered", "release", "stop"]
+			Events.Push(_NECP_Event(BaseName . "_" . Suffix))
+		Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", _DriverDir . "\tests\fixtures\native_editor_cross_process_receiver.ahk",
+				Root, Delayed ? "delay" : "positive", BaseName, String(ProcessExist())],
+			_NECP_Done.Bind(State), , _NECP_Adopt.Bind(State))
+		AssertTrue(Task.start(), "SETUP: start the exact owned receiver process")
+		_NECP_WaitFile(State, Root . "\ready", "SETUP")
+		Ready := StrSplit(FSReadUtf8Exact(Root . "\ready"), "|")
+		AssertEqual(3, Ready.Length, "SETUP: complete receiver identity receipt")
+		AssertEqual(State.Pid, Integer(Ready[1]), "SETUP: native launch and receiver PID agree")
+		AssertTrue(State.Pid != ProcessExist(), "SETUP: the production ABI requires another process")
+		Window := Integer(Ready[2]), Control := Integer(Ready[3]), Pid := 0
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Window, "UInt*", &Pid)
+		AssertEqual(State.Pid, Pid, "SETUP: exact top-level window process")
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Control, "UInt*", &Pid)
+		AssertEqual(State.Pid, Pid, "SETUP: exact edit control process")
+		AssertTrue(DllCall("User32\IsChild", "Ptr", Window, "Ptr", Control, "Int"), "SETUP: exact native child relationship")
+		AssertEqual("Edit", WinGetClass("ahk_id " . Control), "SETUP: a genuine native Edit class")
+		AssertEqual("left " . Chr(0x1F600) . " tail", ControlGetText(Control), "SETUP: actual receiver seed")
+		WinActivate("ahk_id " . Window)
+		AssertTrue(WinWaitActive("ahk_id " . Window, , 3), "SETUP: the exact receiver becomes foreground")
+		ControlFocus(Control)
+		Focus := _TextSenderNativeFocus()
+		AssertEqual(Window, Focus["hwnd"], "SETUP: production foreground witness")
+		AssertEqual(Control, Focus["control"], "SETUP: production GetGUIThreadInfo focus witness")
+		AssertEqual(State.Pid, Focus["pid"], "SETUP: production focused PID witness")
+		Selection := Buffer(8, 0)
+		MessageResult := 0
+		AssertTrue(DllCall("User32\SendMessageTimeoutW", "Ptr", Control, "UInt", 0xB0,
+			"Ptr", Selection, "Ptr", Selection.Ptr + 4, "UInt", 0x23, "UInt", 1000,
+			"UPtr*", &MessageResult, "Ptr"), "SETUP: actual selection receipt")
+		AssertEqual(7, NumGet(Selection, 0, "UInt"), "SETUP: exact collapsed start")
+		AssertEqual(7, NumGet(Selection, 4, "UInt"), "SETUP: exact collapsed end")
+		Deleted := Chr(0x1F600), Inserted := Chr(0xE9) . Chr(0x1F642)
+		AssertEqual(0, DllCall(State.Exports["Begin"], "UInt64", State.Token,
+			"UInt64", Window, "UInt64", Control, "UInt", State.Pid,
+			"Ptr", StrPtr(Deleted), "Ptr", StrPtr(Inserted), "Int"), "BUSINESS: actual production Begin")
+		State.WorkerStarted := true
+		Receipt := _NECP_Phase(State.Exports, State.Token, 2)
+		AssertEqual(2, Receipt.Phase, "BUSINESS: real document and selection prepare successfully")
+		AssertEqual(5, DllCall(State.Exports["Close"], "UInt64", State.Token, "Int"),
+			"BUSINESS: a prepared live worker cannot release its strings")
+		Focus := _TextSenderNativeFocus()
+		AssertEqual(Window, Focus["hwnd"], "SETUP: exact foreground persists until decision")
+		AssertEqual(Control, Focus["control"], "SETUP: exact control persists until decision")
+		AssertEqual(0, DllCall(State.Exports["Decide"], "UInt64", State.Token, "UInt", 1, "Int"),
+			"BUSINESS: actual production decision")
+		Receipt := _NECP_Phase(State.Exports, State.Token, 4)
+		AssertEqual(Delayed ? 6 : 4, Receipt.Phase, "BUSINESS: timeout is indeterminate; ordinary output succeeds")
+		AssertEqual(Delayed ? 1460 : 0, Receipt.NativeError, "BUSINESS: actual Win32 timeout receipt")
+		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", Events[1], "UInt", 0, "UInt"),
+			"BUSINESS: the real receiver entered EM_REPLACESEL")
+		AssertTrue(_NECP_CloseWorker(State), "BUSINESS: actual worker exit precedes freeing its strings")
+		AssertEqual(8, DllCall(State.Exports["Close"], "UInt64", State.Token, "Int"),
+			"BUSINESS: exact retired token cannot close twice")
+		if Delayed {
+			AssertEqual(258, DllCall("Kernel32\WaitForSingleObject", "Ptr", State.Process, "UInt", 0, "UInt"),
+				"BUSINESS: delayed receiver outlives the exact sender worker")
+			AssertFalse(FileExist(Root . "\settled"), "BUSINESS: receiver has not consumed replacement before release")
+			AssertTrue(DllCall("Kernel32\SetEvent", "Ptr", Events[2], "Int"), "BUSINESS: release the exact blocked receiver")
+		}
+		_NECP_WaitFile(State, Root . "\settled", "BUSINESS")
+		AssertEqual("1|8|8", FSReadUtf8Exact(Root . "\settled"), "BUSINESS: one replacement and exact DWORD caret receipt")
+		AssertEqual("left " . Inserted . " tail", FSReadUtf8Exact(Root . "\text"), "BUSINESS: independent receiver text is complete")
+		Passed := true
+	} catch Any as Err {
+		Primary := Err
+	} finally {
+		; Never retire the receiver while its exact native worker may address it.
+		try {
+			if Events.Length >= 2
+				AssertTrue(DllCall("Kernel32\SetEvent", "Ptr", Events[2], "Int"), "RETIREMENT: unblock the owned receiver")
+			NativeRetired := _NECP_CloseWorker(State)
+			if NativeRetired && IsObject(Task) {
+				if Events.Length >= 3
+					AssertTrue(DllCall("Kernel32\SetEvent", "Ptr", Events[3], "Int"), "RETIREMENT: request owned receiver stop")
+				Started := A_TickCount
+				while State.Calls == 0 && TickElapsed(Started) < 5000 {
+					_SR_TreePoll()
+					Sleep(10)
+				}
+				if State.Calls == 1
+					Retired := Task.terminate() == 1
+			} else if !IsObject(Task)
+				Retired := NativeRetired
+			if Retired && State.Process
+				AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", State.Process, "UInt", 0, "UInt"),
+					"RETIREMENT: the retained exact receiver process must be signaled")
+		} catch Any as Err {
+			Retired := false
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		if Retired {
+			try {
+				for Index, Handle in Events {
+					AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "RETIREMENT: close exact event")
+					Events[Index] := 0
+				}
+				if State.Process {
+					AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", State.Process, "Int"), "RETIREMENT: close exact process reference")
+					State.Process := 0
+				}
+			} catch Any as Err {
+				Retired := false
+				if !IsObject(Primary)
+					Primary := Err
+			}
+		}
+		if !Retired
+			Debt := {Task: Task, State: State, Events: Events, Root: Root}
+		try _NECP_RestoreFocus(SavedFocus)
+		catch Any as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		} finally {
+			Suspend(SavedSuspend)
+			Critical(SavedCritical)
+		}
+	}
+	_TestPrint("# native-editor-cross-process delayed=" . Delayed . " passed=" . Passed
+		. " native_closed=" . State.WorkerClosed . " receiver_retired=" . Retired . " calls=" . State.Calls
+		. " code=" . State.Code . " errors=" . State.ErrorText)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "RETIREMENT: exact native worker and receiver resources must retire")
+	AssertEqual(1, State.Calls, "BUSINESS: exact child completion occurs once")
+	AssertEqual(0, State.Code, "BUSINESS: actual receiver exits successfully: " . State.Output . State.ErrorText)
+	AssertEqual("PASS native editor receiver", State.Output, "BUSINESS: exact receiver completion witness")
+	AssertEqual("", State.ErrorText, "BUSINESS: no hidden child errors")
+	DirDelete(Root, true)
+}
+
+Test("Native editor: shipped DLL receives actual cross-process supplementary replacement (native-editor-cross-process)",
+	_NECP_Run.Bind(false))
+Test("Native editor: shipped DLL retires sender before delayed receiver consumes text (native-editor-cross-process)",
+	_NECP_Run.Bind(true))
