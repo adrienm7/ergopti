@@ -94,13 +94,27 @@ global SYSTEM_CONTROL_DISPLAY_QUERY_ATTEMPTS := 3
 ; ======================================
 
 class SystemControl {
+	; Win32 launch and path APIs consume NUL-terminated text. Inspect original
+	; counted units before any coercion can alias a different prefix target.
+	static _ContainsNativeNul(Value) {
+		if !(Value is String)
+			return false
+		loop StrLen(Value)
+			if NumGet(StrPtr(Value), (A_Index - 1) * 2, "UShort") == 0
+				return true
+		return false
+	}
+
 	; Starts a program or opens a target without waiting for it.
 	; @param {String} Target Command line, path or URI.
 	; @param {String} WorkingDir Directory it starts in ("" = inherited).
 	; @param {String} Options Run options ("Hide", "Max", …).
 	; @returns {Integer} The process id (0 when the shell did not report one).
-	; @throws {Error} When Windows refuses the launch.
+	; @throws {Error} When Windows refuses the launch or an argument contains NUL.
 	Launch(Target, WorkingDir := "", Options := "") {
+		for _, Argument in [Target, WorkingDir, Options]
+			if SystemControl._ContainsNativeNul(Argument)
+				throw ValueError("Shell launch arguments cannot contain an embedded NUL.", -1)
 		Pid := 0
 		Run(Target, WorkingDir, Options, &Pid)
 		return Pid
@@ -412,13 +426,16 @@ class SystemControl {
 
 	; @returns {Boolean} Whether Path is a directory.
 	IsDirectory(Path) {
+		if SystemControl._ContainsNativeNul(Path)
+			return false
 		return InStr(FileExist(Path), "D") > 0
 	}
 
 	; True only when the whole value names an existing file. Wildcards and
 	; command-line quoting cannot be literal Windows file-name characters.
 	IsExistingFile(Path) {
-		if !(Path is String) || Path == "" || RegExMatch(Path, '[*?"<>|]')
+		if !(Path is String) || Path == "" || SystemControl._ContainsNativeNul(Path)
+				|| RegExMatch(Path, '[*?"<>|]')
 			return false
 		Attributes := FileExist(Path)
 		return Attributes != "" && !InStr(Attributes, "D")

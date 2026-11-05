@@ -1610,3 +1610,38 @@ _OAN_OriginalJsonNul(Mode) {
 for _OAN_Mode in ["action", "adapter", "valid"]
 	Test("open app original NUL: " . _OAN_Mode . " observes a private native process (open-app-original-nul)",
 		_OAN_OriginalJsonNul.Bind(_OAN_Mode))
+
+
+; The native Run target is deliberately not a StrArg. Even a regressed guard
+; cannot start a process: coercion is forbidden and this object returns no path.
+class _SCN_NoNativeTarget {
+	__New() {
+		this.Coercions := 0
+	}
+	ToString() {
+		this.Coercions += 1
+		throw Error("The pure launch-argument test forbids native target coercion")
+	}
+}
+_SCN_RejectOriginalArgument(Field) {
+	Left := Field == "working-dir" ? "C:\é😀\kept" : "Hide"
+	Encoded := JsonStringLiteral(Left)
+	Value := JsonParse(SubStr(Encoded, 1, StrLen(Encoded) - 1) . '\u0000ignored"')
+	Units := StrLen(Left) + 1 + StrLen("ignored")
+	AssertEqual(Units, StrLen(Value), "the actual JSON decoder retains the complete original argument")
+	AssertEqual(0, NumGet(StrPtr(Value), StrLen(Left) * 2, "UShort"))
+	Poison := _SCN_NoNativeTarget(), Caught := 0
+	try SystemControl().Launch(Poison, Field == "working-dir" ? Value : "", Field == "options" ? Value : "Hide")
+	catch as Err
+		Caught := Err
+	_TestPrint("# native launch argument field=" . Field . " original_units=" . StrLen(Value)
+		. " value_error=" . (Caught is ValueError) . " target_coercions=" . Poison.Coercions)
+	AssertTrue(Caught is ValueError, "the adapter must reject its original NUL argument before native Run argument binding")
+	AssertContains(Caught.Message, "embedded NUL", "the refusal must come from the whole-string native ABI guard")
+	AssertEqual(0, Poison.Coercions, "argument validation must precede target coercion")
+	AssertEqual(Units, StrLen(Value), "the original String must not be truncated or normalized")
+	AssertEqual(0, NumGet(StrPtr(Value), StrLen(Left) * 2, "UShort"))
+}
+for _SCN_Field in ["working-dir", "options"]
+	Test("SystemControl original NUL argument: " . _SCN_Field . " refuses before native ABI (system-control-original-nul-args)",
+		_SCN_RejectOriginalArgument.Bind(_SCN_Field))
