@@ -1187,6 +1187,7 @@ end
 ---   stamps its own time.
 function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 	if not may_record() then return end
+	if M.is_unrecorded_app(app_id) then return end
 	if type(key) ~= "string" or key == "" then
 		Logger.warn(LOG, "record_shortcut(): no key name — the event would say only that "
 			.. "something fired, so it is dropped.")
