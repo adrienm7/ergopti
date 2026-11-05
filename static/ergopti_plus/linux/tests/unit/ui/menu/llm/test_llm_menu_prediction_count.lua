@@ -135,8 +135,8 @@ local function with_numeric_menu(options, exercise)
 		local declaration = renderer.get_array("llm_numeric_custom_rows")
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
-		local log = { prompts = {}, changed = 0 }
-		package.loaded["adapters.notifier"] = { send = function() return true end }
+		local log = { prompts = {}, changed = 0, notices = 0 }
+		package.loaded["adapters.notifier"] = { send = function() log.notices = log.notices + 1; return true end }
 		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
@@ -192,6 +192,37 @@ local function numeric_tail(fixture, context)
 end
 
 helpers.describe("tray (linux): declared free numeric tails", function()
+	helpers.it("numeric presets report refused persistence without redrawing success", function()
+		with_numeric_menu({}, function(f)
+			for _, context in ipairs({ NumericCorpus.contexts[1], NumericCorpus.contexts[2] }) do
+				local picker = assert(numeric_picker(f.rows, context.key, f.strings))
+				local before = f.log.notices
+				local rename = os.rename
+				os.rename = function(from, to) if to == f.path then return false, "inert refusal" end; return rename(from, to) end
+				local called, result = pcall(picker.menu[1].fn)
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(f.log.changed, 0)
+				helpers.assert_eq(f.log.notices, before + 1)
+				helpers.assert_eq(numeric_read(f.path), f.initial)
+			end
+			local count = count_row(ai_rows(f.rows))
+			local rename = os.rename
+			os.rename = function(from, to) if to == f.path then return false, "inert refusal" end; return rename(from, to) end
+			local called, result = pcall(count.menu[1].fn)
+			os.rename = rename
+			helpers.assert_true(called)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(f.log.changed, 0)
+			helpers.assert_eq(f.log.notices, 3)
+			helpers.assert_eq(numeric_read(f.path), f.initial)
+			local retry = assert(numeric_picker(f.rows, NumericCorpus.contexts[2].key, f.strings)).menu[1].fn()
+			helpers.assert_eq(retry, true)
+			helpers.assert_eq(f.log.changed, 1)
+			helpers.assert_true(numeric_read(f.path) ~= f.initial)
+		end)
+	end)
 	helpers.it("matches the independent two-row declaration without hiding preset choices", function()
 		with_numeric_menu({}, function(f)
 			helpers.assert_eq(f.declaration, NumericCorpus.declaration)
