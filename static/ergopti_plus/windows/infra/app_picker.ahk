@@ -199,12 +199,17 @@ AppPicker_DurableResult(Receipt) {
 
 ; A failed attempt can restore only its original logical owner. Cancel and a
 ; newer picker are terminal, even if the old callback later reports no commit.
-_AppPicker_RearmReceipt(Receipt) {
+_AppPicker_RearmReceipt(Receipt, Attempt) {
 	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
 	PreviousCritical := Critical("On")
 	try {
-		Owner := Receipt["owner"]
-		if _AppPickerOwnerEpochs.Get(Owner, 0) != Receipt["epoch"]
+		; Only the private entry claim can authorize restoration of an empty
+		; active slot. A Map clone carries data, never this exact admission.
+		if !IsObject(Attempt) || Attempt.receipt != Receipt
+			return false
+		Owner := Attempt.owner
+		if Receipt.Get("owner", "") != Owner || Receipt.Get("epoch", 0) != Attempt.epoch
+				|| _AppPickerOwnerEpochs.Get(Owner, 0) != Attempt.epoch
 				|| (Receipt.Get("state", "") != "open" && Receipt.Get("state", "") != "claimed")
 			return false
 		Active := _AppPickerActiveReceipts.Get(Owner, 0)
@@ -217,13 +222,26 @@ _AppPicker_RearmReceipt(Receipt) {
 }
 
 AppPicker_InvokeSave(OnSave, Selected, Receipt) {
+	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
 	Durable := Receipt is Map && Receipt.Get("durable_mode", false)
+	Attempt := 0
 	if Durable {
-		if Receipt.Get("saving", false)
-			return false
-		Receipt["saving"] := true, Receipt["close_after_save"] := true
-		if Receipt.Has("durable_result")
-			Receipt.Delete("durable_result")
+		PreviousCritical := Critical("On")
+		try {
+			if Receipt.Get("saving", false)
+				return false
+			Owner := Receipt.Get("owner", "")
+			if !(Owner is String) || Receipt.Get("state", "") != "open"
+					|| _AppPickerActiveReceipts.Get(Owner, 0) != Receipt
+					|| _AppPickerOwnerEpochs.Get(Owner, 0) != Receipt.Get("epoch", 0) {
+				Receipt["close_after_save"] := true
+				return false
+			}
+			Attempt := {receipt: Receipt, owner: Owner, epoch: Receipt["epoch"]}
+			Receipt["saving"] := true, Receipt["close_after_save"] := true
+			if Receipt.Has("durable_result")
+				Receipt.Delete("durable_result")
+		} finally Critical(PreviousCritical)
 	}
 	Returned := false
 	try {
@@ -241,7 +259,7 @@ AppPicker_InvokeSave(OnSave, Selected, Receipt) {
 			; outcomes and accepted durability can never replay the old command.
 			if Result is Map && !Result.Get("committed", false)
 					&& (Result.Get("status", "") == "not_started" || Result.Get("status", "") == "refused")
-				Keep := _AppPicker_RearmReceipt(Receipt)
+				Keep := _AppPicker_RearmReceipt(Receipt, Attempt)
 			Receipt["close_after_save"] := !Keep
 			Receipt["saving"] := false
 		}
