@@ -65,6 +65,7 @@ local TAP_HOLD_IMPORT_TIMEOUT_SEC = 30
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
+local _config_path_unresolved = false
 
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
@@ -718,6 +719,7 @@ local function commit_owned(answers, publication)
 	-- "drop the override" case internally).
 	local previous_config_path = _config_path
 	if answers.config_dir ~= "" then
+		_config_path_unresolved = true
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 		local persisted, persist_err = M._persist_config_dir(
 			ok_mp and menu_paths or nil,
@@ -739,6 +741,11 @@ local function commit_owned(answers, publication)
 			return
 		end
 		_config_path = resolved_path
+		_config_path_unresolved = false
+	elseif _config_path_unresolved then
+		Logger.error(LOG, "The selected configuration folder must be confirmed again; onboarding answers were not written.")
+		fail_commit("paths_editor.save_failed_title", i18n.get("onboarding.error.commit_redirect_render"))
+		return
 	end
 
 	-- Switch to the chosen locale before writing so success messages are translated,
@@ -1024,7 +1031,7 @@ function M.run(config_path)
 	-- Retained cleanup authority cannot retarget its captured configuration.
 	-- Same-source reuse keeps the existing singleton acknowledgment and revoked page.
 	if _webview and _focus_owner == nil and config_path ~= _config_path then return false end
-	_config_path = config_path
+	if _webview and not _config_path_unresolved then _config_path = config_path end
 
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
@@ -1037,6 +1044,8 @@ function M.run(config_path)
 		end
 		return true
 	end
+	_config_path = config_path
+	_config_path_unresolved = false
 	if _usercontent and close_webview() ~= true then
 		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
 		return false
