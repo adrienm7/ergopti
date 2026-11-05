@@ -625,7 +625,7 @@ _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
 		return _SaveOverrides(Candidate, WriterFn, ReplaceFn,
 				BoundPath,
 				_HotstringsAuthorizeOverrideCommit.Bind(OwnerToken, BoundPath),
-				_HotstringsPublishOverrideCandidate.Bind(Candidate), RetiredLegacy, ExpectedSource)
+				_HotstringsPublishOverrideCandidate.Bind(Candidate), RetiredLegacy, ExpectedSource, OwnerToken)
 }
 
 ; Validate the shared priority domain before any backend can stage or publish a
