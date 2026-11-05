@@ -1268,20 +1268,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
-	active := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
-	if (active != "") {
-		found := false
-		for e in entries {
-			if (e["Id"] == active) {
-				found := true
-				break
-			}
-		}
-		if !found
-			active := ""
-	}
-	if (active == "" and entries.Length > 0)
-		active := entries[1]["Id"]
+	active := _LLM_Menu_ResolveApiEntryId(entries, _LLM_Menu.Get("api_entry_id", _LLM_Menu_DefaultApiEntryId()))
 	; Parsing and anchoring precede this bounded native authority publication.
 	; Equal reload remains semantically current for existing general receipts;
 	; only a final transaction claim pins this narrow publication revision.
@@ -1294,6 +1281,27 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
 	} finally Critical(PreviousCritical)
 	return true
+}
+
+; The loader and opening-source projection resolve a neutral selection alike.
+_LLM_Menu_ResolveApiEntryId(Entries, Requested) {
+	if !(Entries is Array) || !(Requested is String)
+		throw TypeError("API selection requires validated entries and a String id.")
+	Active := Requested
+	if Active != "" {
+		Found := false
+		for Entry in Entries {
+			if Entry["Id"] == Active {
+				Found := true
+				break
+			}
+		}
+		if !Found
+			Active := _LLM_Menu_DefaultApiEntryId()
+	}
+	if Active == _LLM_Menu_DefaultApiEntryId() && Entries.Length > 0
+		Active := Entries[1]["Id"]
+	return Active
 }
 
 ; Unknown entry fields cannot be serialized losslessly by this six-field writer.

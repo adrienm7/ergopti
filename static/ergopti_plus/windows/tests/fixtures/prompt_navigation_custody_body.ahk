@@ -160,7 +160,14 @@ _PNAV_Main() {
 		Boot := ConfigMigrateBoot(ConfigurationFile)
 		_PNAV_Require(Boot["status"] == "current" && Boot["read_only"] == 0 && ConfigFullStateCanPersist(),
 			"The actual migration owner must admit this private source before the public editor opens.")
-		_LLM_Menu := Map("user_profiles", _PNAV.Profiles, "profile_id", "user_private_a", "enabled", false)
+		_LLM_Menu["user_profiles"] := _PNAV.Profiles
+		_LLM_Menu["profile_id"] := "user_private_a"
+		_LLM_Menu["enabled"] := false
+		_LLM_Menu["ollama_port"] := 11435
+		_PNAV_Require(TOML_ConfigBatchWrite(ConfigurationFile,
+			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
+			"The actual native writer must align the complete private LLM source before opening.")
+		Source := FSConfigReadUtf8Exact(ConfigurationFile)
 		First := _PNAV_Open(1)
 		_PNAV_Require(_PNAV.Controllers.Length == 1 && First.Closed == 0 && First.Fills == 1)
 		if Mode == "current" {

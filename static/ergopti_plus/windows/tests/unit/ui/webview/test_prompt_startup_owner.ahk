@@ -51,6 +51,25 @@ _PRST_ChildSource() {
 		}
 	}
 	AssertEqual(4, Owners.Count, "The public profile, editor, serializer and default dialog owners must be distinct")
+	; The opening receipt covers the full persisted LLM projection. Keep the
+	; authored state initializer and genuine normalizers, not a three-field menu.
+	for Spec in [["_LLM_Menu_SyncToFeatures", _DriverDir], ["LLM_Option_TryNormalize", _DriverDir],
+		["ChordParse", _DriverDir], ["LLM_DisplayStreamingCapable", _SharedDir]] {
+		Owner := _DriverProductionFileForSymbol(Spec[1], Spec[2])
+		AssertTrue(Owner != "", "The projection component requires its genuine owner: " . Spec[1])
+		if !Owners.Has(Owner) {
+			Owners[Owner] := true
+			Code .= "#Include " . Owner . "`n"
+		}
+	}
+	for Symbol in ["LLM_BackendCapabilities", "LLM_EffectiveStreaming"]
+		Code .= _DriverFuncBody(Symbol) . "`n"
+	StateOwner := _DriverProductionFileForSymbol("LLM_Menu_ApplySharedDefaults")
+	StateSource := FileRead(StateOwner, "UTF-8")
+	AssertTrue(RegExMatch(StateSource, "ms)^global _LLM_Menu := Map\(.*?^\)", &StateDefinition) > 0,
+		"The component must retain the complete unmodified authored menu initializer")
+	Code .= StateDefinition[0] . "`n"
+	Code .= "global Features := ManifestBuildFeaturesMap()`n"
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\prompt_startup_owner_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))

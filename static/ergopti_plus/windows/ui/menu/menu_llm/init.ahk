@@ -70,17 +70,8 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		return false
 	if !(saved_opts is Map)
 		throw TypeError("LLM saved options must be a Map.")
-	static _str_keys := ["model", "profile_id", "temperature",
-		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, "backend",
-		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE,
-		ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
-	static _num_keys := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
-		"ctx_chars", ConfigLeaf.PRED_INDENT, "ollama_port"]
-	static _bool_keys := ["enabled", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING,
-		ConfigLeaf.RESET_ON_NAV, "disable_url_bars", "disable_password_fields",
-		ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.AUTO_RAISE_TEMP,
-		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, ConfigLeaf.ONBOARDING_SEEN, ConfigLeaf.INLINE_AUTOTYPE]
-	static _arr_keys := [ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, ConfigLeaf.AGENT_DISABLED_APPS]
+	Groups := _LLM_Menu_PersistedFieldGroups()
+	_str_keys := Groups[1], _num_keys := Groups[2], _bool_keys := Groups[3], _arr_keys := Groups[4]
 	for key in _str_keys {
 		if !saved_opts.Has(key)
 			continue
@@ -125,13 +116,13 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 			try LoggerError("LLM",
 				"Ignoring persisted '{1}' because its array shape is invalid.", key)
 	}
-	if saved_opts.Has(ConfigLeaf.APP_PROFILE_OVERRIDES) {
-		if LLM_Option_TryNormalize(ConfigLeaf.APP_PROFILE_OVERRIDES,
-				saved_opts[ConfigLeaf.APP_PROFILE_OVERRIDES], &NormalizedOverrides)
-			_LLM_Menu[ConfigLeaf.APP_PROFILE_OVERRIDES] := NormalizedOverrides
+	for Key in Groups[5] {
+		if !saved_opts.Has(Key)
+			continue
+		if LLM_Option_TryNormalize(Key, saved_opts[Key], &NormalizedOverrides)
+			_LLM_Menu[Key] := NormalizedOverrides
 		else
-			try LoggerError("LLM",
-				"Ignoring persisted app-profile overrides because their shape is invalid.")
+			try LoggerError("LLM", "Ignoring persisted '{1}' because its map shape is invalid.", Key)
 	}
 	return true
 }

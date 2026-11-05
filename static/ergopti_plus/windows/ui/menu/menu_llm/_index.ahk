@@ -180,7 +180,7 @@ global _LLM_Menu := Map(
 	; submenu when backend = "api"; each record is a Map with
 	; { Id, Name, Provider, BaseUrl, Token, Model }.
 	"api_entries",                [],
-	"api_entry_id",               ""
+	"api_entry_id",               _LLM_Menu_DefaultApiEntryId()
 )
 
 ; How many Ctrl+<n> shortcuts we register. We stop at Ctrl+9 because Ctrl+0

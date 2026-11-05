@@ -151,21 +151,25 @@ _PFI_Collect(State, CandidateFeatures, CandidateMenu) {
 
 _PFI_Notify(State, Message, Options) {
 	State.Notices.Push(Message)
+	State.NoticeLevels.Push(Options["level"])
 	return true
 }
 
 _PFI_Run(Mode) {
-	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir
+	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir, Features, LLM_Defaults, _LLM_Menu_ApiPrivateAuthorityGeneration
 	global _PromptEdWeb_OpeningSource, _PromptEdWeb_PersistHook, _PromptEdWeb_ResetDone
+	SavedApiAuthority := _LLM_Menu_ApiPrivateAuthorityGeneration
+	HadDefaults := IsSet(LLM_Defaults)
+	SavedDefaults := HadDefaults ? LLM_Defaults : 0
 	PreviousContext := _PEC_InstallFixture()
 	World := 0
-	PreviousCritical := Critical("On")
+	PreviousCritical := Critical("Off")
 	WasSuspended := A_IsSuspended
 	SavedHotkeys := _LLM_Menu_ProfileHotkeyOwner
 	SavedVendor := _VendorDir
 	SavedReset := _PromptEdWeb_ResetDone
 	State := { Mode: Mode, World: 0, Inputs: 0, Confirms: 0, Collects: 0,
-		Notices: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "", NativeCaptures: [] }
+		Notices: [], NoticeLevels: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "", NativeCaptures: [] }
 	try {
 		Suspend(false)
 		World := _LSP_World()
@@ -173,12 +177,32 @@ _PFI_Run(Mode) {
 		_LLM_Menu_ProfileHotkeyOwner := 0
 		; Genuine missing loader forces the actual native fallback without replacing TryOpen.
 		_VendorDir := World.ConfigPath . "-no-webview-loader"
+		_PFI_InstallMemoryRetirement(State)
 		Profiles := [_PFI_Profile("user_profile_a", "original-a"), _PFI_Profile("user_profile_b", "original-b")]
 		AssertTrue(TOML_ConfigBatchWrite(World.ConfigPath,
 			[{ Section: "llm", Key: "user_profiles", Value: _LLM_Menu_SerializeUserProfiles(Profiles) }]))
 		_LLM_Menu["user_profiles"] := Profiles
 		_LLM_Menu["profile_id"] := "user_profile_a"
-		_LLM_Menu["enabled"] := false
+		_LLM_Menu["enabled"] := InStr(Mode, "edit-memory-retire-") == 1
+		if Mode == "edit-current-absent-foreign" || Mode == "edit-current-stock-port" {
+			LLM_Defaults_Load()
+			AssertTrue(LLM_Defaults is Map && LLM_Defaults.Has("llm_ollama_owned_port"))
+			_LLM_Menu["ollama_port"] := LLM_Defaults["llm_ollama_owned_port"]
+		}
+		if Mode == "edit-current-absent-foreign" || Mode == "edit-current-api-neutral" {
+			_LLM_Menu["api_entry_id"] := _LLM_Menu_DefaultApiEntryId()
+			AssertTrue(_LLM_Menu_LoadApiEntries(), "The real private file loader must supply the automatic active entry")
+			AssertTrue(_LLM_Menu["api_entries"].Length > 0 && _LLM_Menu["api_entry_id"] == _LLM_Menu["api_entries"][1]["Id"])
+		}
+		if InStr(Mode, "edit-current-legacy-bool") == 1
+			_LLM_Menu[ConfigLeaf.SHOW_INFO_BAR] := InStr(Mode, "bool1") > 0
+		if Mode == "edit-current-disabled-alias"
+			_LLM_Menu["disabled_apps"] := ["visual studio code"]
+		AssertTrue(TOML_ConfigBatchWrite(World.ConfigPath,
+			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
+			"The private current source must genuinely match every persisted LLM leaf before external replacement")
+		if InStr(Mode, "edit-current-") == 1
+			_PFI_CurrentCanonicalSource(State)
 		State.InitialProfiles := LLM_Menu_DeepClone(Profiles)
 		State.InitialImage := FSReadUtf8Exact(World.ConfigPath)
 		; A source captured only after this valid external replacement must not
@@ -189,6 +213,8 @@ _PFI_Run(Mode) {
 			_PFI_ExternalNavigation(State)
 		if Mode == "edit-preopen-unrepresentable"
 			_PFI_ExternalUnknownProfileField(State)
+		if Mode == "edit-preopen-api-unknown"
+			_PFI_UnknownApiSelection(State)
 		MenuBefore := _LLM_Menu
 		Port := Map("input", _PFI_Input.Bind(State), "confirm", _PFI_Confirm.Bind(State),
 			"notify", _PFI_Notify.Bind(State), "collect", _PFI_Collect.Bind(State),
@@ -224,7 +250,9 @@ _PFI_Run(Mode) {
 			Result := LLM_Menu_PromptEditProfile(Profiles[1], Port)
 		else
 			Result := LLM_Menu_OnUserProfileClick(Profiles[1], Port)
-		Accepted := Mode == "edit-current" || Mode == "create-current" || Mode == "delete-current"
+		if InStr(Mode, "edit-current-") == 1
+			_TestPrint("# profile-canonical mode=" . Mode . " apply_calls=" . World.ApplyCalls . " inputs=" . State.Inputs . " collects=" . State.Collects)
+		Accepted := Mode == "edit-current" || InStr(Mode, "edit-current-") == 1 || Mode == "create-current" || Mode == "delete-current"
 			|| Mode == "web-current" || Mode == "use-current"
 			|| ((Mode == "edit-preopen-external" || Mode == "edit-preopen-nav") && World.ApplyCalls == 1)
 			|| Mode == "edit-native-paste" || Mode == "edit-native-single"
@@ -247,6 +275,11 @@ _PFI_Run(Mode) {
 				. " physical_nav_preserved=" . NavPreserved . " external_exact_bytes=" . FSUtf8ExactMatches(World.ConfigPath, State.ExternalImage))
 			AssertTrue(NavPreserved, "Editing a profile cannot erase an independent navigation preference written before opening")
 		}
+		if InStr(Mode, "edit-memory-retire-") == 1 {
+			_TestPrint("# profile-memory-source mode=" . Mode . " retired=" . State.Retired . " enabled=" . _LLM_Menu["enabled"] . " apply_calls=" . World.ApplyCalls . " disk_changed=" . !FSUtf8ExactMatches(World.ConfigPath, State.InitialImage))
+			AssertTrue(State.Retired && State.Rebuilds == 1, "The genuine dependency failure must execute once inside the actual profile save")
+			AssertFalse(_LLM_Menu["enabled"], "The old profile candidate cannot re-enable the actual retired dependency state")
+		}
 		AssertEqual(Accepted, World.ApplyCalls, "Only an owned accepted image may publish the real profile action.")
 		HandledChooser := InStr(Mode, "chooser-edit") || InStr(Mode, "use")
 		if HandledChooser
@@ -255,8 +288,14 @@ _PFI_Run(Mode) {
 			AssertEqual(Accepted, !!Result, "A stale opening source cannot be reported as a saved profile.")
 		Actual := FSReadUtf8Exact(World.ConfigPath)
 		if !Accepted {
-			AssertEqual(State.ExternalImage != "" ? State.ExternalImage : State.InitialImage, Actual,
-				"Refusal or cancellation must preserve the actual externally edited image byte for byte.")
+			if Mode == "edit-memory-retire-after-ack" {
+				DurableRows := _LLM_Menu_DeserializeUserProfiles(TOML_ParseFreshFileTyped(World.ConfigPath)["llm"]["user_profiles"])
+				AssertEqual("edited-a", DurableRows[1]["system_single"], "A retired presentation cannot undo an already acknowledged profile write")
+				AssertEqual("original-b", DurableRows[2]["system_single"])
+				_PFI_AssertRetiredPublicationFence(State)
+			} else
+				AssertEqual(State.ExternalImage != "" ? State.ExternalImage : State.InitialImage, Actual,
+					"Refusal or cancellation must preserve the actual externally edited image byte for byte.")
 			AssertTrue(_LLM_Menu == MenuBefore)
 			AssertTrue(ManifestValuesEqual(State.InitialProfiles, _LLM_Menu["user_profiles"]),
 				"A refused detached profile edit cannot mutate the original live models.")
@@ -270,7 +309,7 @@ _PFI_Run(Mode) {
 			AssertEqual("user_profile_b", Sibling["id"])
 			AssertEqual(Mode == "edit-preopen-external" ? "external-b-must-survive" : "original-b",
 				Sibling["system_single"], "Successful edits preserve the independent sibling profile.")
-			if Mode == "edit-current" || Mode == "web-current" || Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
+			if Mode == "edit-current" || InStr(Mode, "edit-current-") == 1 || Mode == "web-current" || Mode == "edit-preopen-external" || Mode == "edit-preopen-nav" {
 				AssertEqual("edited-a", Saved[1]["system_single"])
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
@@ -290,7 +329,7 @@ _PFI_Run(Mode) {
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
 		}
-		if Mode == "edit-preopen-unrepresentable" {
+		if Mode == "edit-preopen-unrepresentable" || Mode == "edit-preopen-api-unknown" {
 			AssertEqual(0, State.Inputs, "The public editor must refuse before authorizing native inputs from a lossy profile projection")
 			AssertEqual(0, State.Collects, "No complete profile-array effect may be built from an unrepresentable source")
 			AssertTrue(State.Notices.Length > 0, "The actual public failure must visibly explain the refused source")
@@ -310,19 +349,27 @@ _PFI_Run(Mode) {
 			AssertTrue(State.Collects <= 1, "A refused stale image must never retry its full projection automatically")
 			if Accepted
 				AssertEqual(1, State.Collects, "A successful reconciled edit must serialize its actual candidate")
-		} else if !Cancelled && Mode != "web-successor" && Mode != "edit-preopen-unrepresentable"
+		} else if !Cancelled && Mode != "web-successor" && Mode != "edit-preopen-unrepresentable" && Mode != "edit-preopen-api-unknown"
 			AssertEqual(1, State.Collects, "The actual profile collector must run before native image refusal.")
 		AssertFalse(_ConfigWriteTerminalIsActive(), "Every path must release its exact borrowed configuration lease.")
 	} finally {
 		try {
-			if World is _LSP_World
-				World.Restore()
+			try _PFI_ReleaseMemoryRetirement(State)
+			finally {
+				if World is _LSP_World
+					World.Restore()
+			}
 		} finally {
 			_PEC_RestoreFixture(PreviousContext)
 			_PromptEdWeb_ResetDone := SavedReset
 			_LLM_Menu_ProfileHotkeyOwner := SavedHotkeys
 			_VendorDir := SavedVendor
 			State.World := 0
+			_LLM_Menu_ApiPrivateAuthorityGeneration := SavedApiAuthority
+			if HadDefaults
+				LLM_Defaults := SavedDefaults
+			else
+				LLM_Defaults := unset
 			Suspend(WasSuspended)
 			Critical(PreviousCritical)
 		}
@@ -414,3 +461,150 @@ _PFI_ExternalNavigation(State) {
 
 Test("LLM profile opening source: prior external navigation edit survives (llm-profile-preopen-navigation)",
 	_PFI_Run.Bind("edit-preopen-nav"))
+
+; Retire actual dependencies after real stage verification or durable observation.
+; The only suppressed external effect is the unrelated tray rebuild request.
+_PFI_InstallMemoryRetirement(State) {
+	if !InStr(State.Mode, "edit-memory-retire-")
+		return
+	State.RetirementScope := []
+	State.Retired := false
+	State.Rebuilds := 0
+	for Spec in [[_TOML_StageMatches, _PFI_RetirementStage.Bind(State)],
+		[_LLM_Menu_ObservationEnd, _PFI_RetirementObservation.Bind(State)],
+		[LLM_Menu_RequestBuild, _PFI_RetirementRebuild.Bind(State)]] {
+		AssertFalse(Spec[1].HasOwnProp("Call"), "The retirement probe delegates genuine unmodified function bodies")
+		Spec[1].DefineProp("Call", {Call: Spec[2]})
+		State.RetirementScope.Push({Function: Spec[1], Callback: Spec[2]})
+	}
+}
+
+_PFI_ReleaseMemoryRetirement(State) {
+	if !State.HasOwnProp("RetirementScope")
+		return
+	for Scope in State.RetirementScope {
+		AssertTrue(Scope.Function.HasOwnProp("Call") && Scope.Function.GetOwnPropDesc("Call").Call == Scope.Callback,
+			"Only this probe's exact function observer may be removed")
+		Scope.Function.DeleteProp("Call")
+	}
+}
+
+_PFI_RetirementStage(State, Self, Args*) {
+	Result := Func.Prototype.Call.Call(Self, Args*)
+	if State.Mode == "edit-memory-retire-before-ack" && State.Collects > 0 && !State.Retired {
+		AssertTrue(Args.Length >= 2 && InStr(Args[1], State.World.ConfigPath . ".") == 1,
+			"The real post-projection stage verification must belong to this actual config writer")
+		AssertTrue(Result is Integer && Result == 1, "The native writer must genuinely flush and verify its complete staged image")
+		_PFI_RetireActualDependencies(State)
+	}
+	return Result
+}
+
+_PFI_RetirementObservation(State, Self, Stage, Started, Result) {
+	Returned := Func.Prototype.Call.Call(Self, Stage, Started, Result)
+	if State.Mode == "edit-memory-retire-after-ack" && Stage == "durable-writer" && Result == 1 && !State.Retired
+		_PFI_RetireActualDependencies(State)
+	return Returned
+}
+
+_PFI_RetirementRebuild(State, Self, Reason, Args*) {
+	AssertTrue(Self == LLM_Menu_RequestBuild && Reason == "deps_failure", "Only the actual dependency failure may request this isolated tray effect")
+	State.Rebuilds += 1
+	return true
+}
+
+_PFI_RetireActualDependencies(State) {
+	global _LLM_Menu
+	State.Retired := true
+	Before := _LLM_Menu
+	AssertTrue(_LLM_Menu["enabled"], "The actual failure must retire a previously enabled menu state")
+	AssertTrue(_LLM_Menu_ApplyCurrentDepsFailure())
+	AssertTrue(_LLM_Menu == Before && !_LLM_Menu["enabled"], "The genuine producer changes enabled in place without replacing its Map")
+}
+
+; The existing permanent session refusal is the recovery protocol: reopening
+; the real driver reads B, and until then neither full-state admission nor the
+; actual native writer can serialize old RAM over that acknowledged image.
+_PFI_AssertRetiredPublicationFence(State) {
+	global _LLM_Menu, Features
+	Path := State.World.ConfigPath
+	Durable := FSConfigReadUtf8Exact(Path)
+	AssertEqual("durable LLM profile publication was retired; restart required", TOML_WriteRefusal(Path))
+	AssertFalse(ConfigFullStateCanPersist(), "The actual full-save admission must reject the stale loaded tree")
+	OldProjection := _LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu)
+	OldProfiles := ""
+	for Row in OldProjection
+		if Row.Section == "llm" && Row.Key == "user_profiles" && Row.HasOwnProp("Value")
+			OldProfiles := Row.Value
+	AssertTrue(OldProfiles is String && _LLM_Menu_DeserializeUserProfiles(OldProfiles)[1]["system_single"] == "original-a",
+		"The real full-save LLM collector must still expose the stale value this fence protects against")
+	AssertFalse(TOML_ConfigBatchWrite(Path, _ConfigPrepareTypedUpdates(OldProjection)),
+		"Even an actual native attempt to write the old full-save projection must be refused")
+	AssertEqual(Durable, FSConfigReadUtf8Exact(Path), "The acknowledged profile B remains byte exact after the later old-RAM write attempt")
+	PartialNotice := false
+	for Index, Message in State.Notices
+		if Message == t("onboarding.done.restart_required") && State.NoticeLevels[Index] == "warning"
+			PartialNotice := true
+	AssertTrue(PartialNotice, "The real notification must say the configuration was saved and requires restart, not that nothing changed")
+}
+
+for _PFI_RetirementMode in ["edit-memory-retire-before-ack", "edit-memory-retire-after-ack"]
+	Test("LLM profile frozen RAM source: " . _PFI_RetirementMode . " preserves actual dependency retirement (llm-profile-memory-source)",
+		_PFI_Run.Bind(_PFI_RetirementMode))
+
+; These are current, representable images under the existing consumer policy,
+; not stale choices: prove the broader source guard still admits their edit.
+_PFI_CurrentCanonicalSource(State) {
+	global _LLM_Menu, LLM_Defaults
+	Updates := []
+	if InStr(State.Mode, "edit-current-legacy-bool") == 1 {
+		Digit := InStr(State.Mode, "bool1") > 0 ? 1 : 0
+		Built := TOML_BuildUpdatedContent(State.World.ConfigPath,
+			[{Section: "llm.display", Key: "show_info_bar", Value: Digit}])
+		AssertTrue(Built is Map && Built.Get("status", "") == "ok")
+		AssertTrue(FSWriteDurable(State.World.ConfigPath, Built["content"]))
+		RawFound := false
+		for Row in ConfigTomlDecodeSnapshot(FSConfigReadUtf8Exact(State.World.ConfigPath)).Rows {
+			if Row.Section == "llm.display" && Row.Key == "show_info_bar" {
+				AssertEqual(String(Digit), Trim(TOML_StripInlineComment(Row.Raw)))
+				RawFound := true
+			}
+		}
+		AssertTrue(RawFound, "The actual typed snapshot must retain the exact legacy bare Boolean token")
+		AssertTrue(ConfigFullStateCanPersist(), "The genuine source owner must admit the historical bare Boolean")
+		return
+	}
+	switch State.Mode {
+		case "edit-current-absent-foreign":
+			Updates := [{Section: "llm", Key: "ollama_port", Delete: 1},
+				{Section: "llm", Key: "api_entry_id", Delete: 1}]
+		case "edit-current-api-neutral":
+			Updates := [{Section: "llm", Key: "api_entry_id", Value: _LLM_Menu_DefaultApiEntryId()}]
+		case "edit-current-streaming-canonical":
+			Updates := [{Section: "llm.display", Key: "streaming", Value: TOML_Bool(true)}]
+		case "edit-current-disabled-alias":
+			Updates := [{Section: "llm.trigger", Key: "disabled_apps", Value: ["VISUAL STUDIO CODE", "visual studio code"]}]
+		case "edit-current-stock-port":
+			AssertTrue(LLM_Defaults is Map && LLM_Defaults.Has("llm_ollama_port"))
+			Updates := [{Section: "llm", Key: "ollama_port", Value: LLM_Defaults["llm_ollama_port"]}]
+	}
+	AssertTrue(Updates.Length > 0)
+	AssertTrue(TOML_ConfigBatchWrite(State.World.ConfigPath, Updates), "The current canonicalization control must be a genuine native source")
+	AssertTrue(ConfigFullStateCanPersist(), "The actual schema owner must admit the current canonical source")
+}
+
+for _PFI_CanonicalMode in ["edit-current-absent-foreign", "edit-current-streaming-canonical", "edit-current-disabled-alias", "edit-current-stock-port", "edit-current-api-neutral", "edit-current-legacy-bool0", "edit-current-legacy-bool1"]
+	Test("LLM profile full projection: " . _PFI_CanonicalMode . " remains editable (llm-profile-projection-canonical)",
+		_PFI_Run.Bind(_PFI_CanonicalMode))
+
+_PFI_UnknownApiSelection(State) {
+	Built := TOML_BuildConfigUpdatedContent(State.World.ConfigPath,
+		[{Section: "llm", Key: "api_entry_id", Value: "future-api-selection-must-survive"}])
+	AssertTrue(Built is Map && Built.Get("status", "") == "ok")
+	State.ExternalImage := Built["content"]
+	AssertTrue(FSWriteDurable(State.World.ConfigPath, State.ExternalImage))
+	AssertTrue(ConfigFullStateCanPersist())
+}
+
+Test("LLM profile opening source: explicit unknown API selection is preserved (llm-profile-projection-unknown-api)",
+	_PFI_Run.Bind("edit-preopen-api-unknown"))

@@ -144,15 +144,16 @@ _CPC_ProfileSourceWriterContract(Body) {
 	Body := _DriverMaskBlockComments(&Body)
 	Body := _StripFullLineComments(Body)
 	Guard := RegExMatch(Body,
-		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
+		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!_LLM_Menu_ProfileSourceProjectionMatches\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
 	Publish := RegExMatch(Body,
-		'return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
+		'Committed\s*:=\s*TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
 		. '_LLM_Menu_ProfileSourceBound\.Bind\(Source\),\s*Source\["content"\],\s*Source\["present"\]\)')
 	Code := _DriverMaskNonCode(&Body)
 	CodeGuard := RegExMatch(Code, 'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)')
-	CodePublish := RegExMatch(Code, 'return\s+TOML_ConfigBatchWrite\(')
+	CodePublish := RegExMatch(Code, 'Committed\s*:=\s*TOML_ConfigBatchWrite\(')
 	return Guard > 0 && Publish > Guard && CodeGuard == Guard && CodePublish == Publish
 		&& _CPC_CountOccurrences(Body, "TOML_ConfigBatchWrite(") == 1
+		&& RegExMatch(Body, 'if\s+Committed\s+is\s+Integer\s*&&\s*Committed\s*==\s*1\s+Source\["native_ack"\]\s*:=\s*1\s+return\s+Committed') > Publish
 }
 
 _CPC_ProfilePublisherRetainsOpeningImage() {
@@ -163,9 +164,11 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 	Quoted := 'Evidence := ' . Chr(34) . StrReplace(Body, Chr(34), Chr(96) . Chr(34)) . Chr(34)
 	AssertFalse(_CPC_ProfileSourceWriterContract(Quoted), "quoted documentation cannot stand in for an executable writer")
 	for Mutant in [StrReplace(Body, 'Source["content"]', '""'),
+		StrReplace(Body, "return Committed", "return true"),
 		StrReplace(Body, 'Source["present"]', "1"),
 		StrReplace(Body, "_LLM_Menu_ProfileSourceBound.Bind(Source)", "0"),
-		StrReplace(Body, 'if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])', "if false")] {
+		StrReplace(Body, "_LLM_Menu_ProfileSourceProjectionMatches(Source)", "true"),
+		StrReplace(Body, "!_LLM_Menu_ProfileSourceBound(Source)", "false")] {
 		Assert(StrCompare(Body, Mutant, true) != 0, "each custody mutant must change the real writer")
 		AssertFalse(_CPC_ProfileSourceWriterContract(Mutant), "a lost retained image or owner fence cannot join the census")
 	}

@@ -163,6 +163,44 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 	return true
 }
 
+; The restore owner and opening receipts share their persisted RAM field set.
+_LLM_Menu_PersistedFieldGroups() {
+	static _str_keys := ["model", "profile_id", "temperature",
+		ConfigLeaf.NAV_MODIFIERS, ConfigLeaf.VAL_MODIFIERS, "backend",
+		"api_entry_id", ConfigLeaf.AGENT_SYSTEM1, ConfigLeaf.AGENT_SYSTEM2, ConfigLeaf.AGENT_MODE,
+		ConfigLeaf.WHILE_HOTSTRING_TOOLTIP]
+	static _num_keys := ["n_predictions", ConfigLeaf.MIN_WORDS, ConfigLeaf.MAX_WORDS, ConfigLeaf.DEBOUNCE_MS, ConfigLeaf.MIN_REQUEST_INTERVAL_MS,
+		"ctx_chars", ConfigLeaf.PRED_INDENT, "ollama_port"]
+	static _bool_keys := ["enabled", ConfigLeaf.INSTANT_ON_WORD_END, ConfigLeaf.AFTER_HOTSTRING,
+		ConfigLeaf.RESET_ON_NAV, "disable_url_bars", "disable_password_fields",
+		ConfigLeaf.SHOW_INFO_BAR, "streaming", "show_all_at_once", ConfigLeaf.AUTO_RAISE_TEMP,
+		ConfigLeaf.AUTO_PROFILE_FOR_MODEL, ConfigLeaf.ONBOARDING_SEEN, ConfigLeaf.INLINE_AUTOTYPE]
+	static _arr_keys := [ConfigLeaf.USER_PROFILES, ConfigLeaf.DISABLED_APPS, ConfigLeaf.AGENT_DISABLED_APPS]
+	static MapKeys := [ConfigLeaf.APP_PROFILE_OVERRIDES]
+	return [_str_keys, _num_keys, _bool_keys, _arr_keys, MapKeys]
+}
+
+; The neutral active API id has one owner for initialization and source receipts.
+_LLM_Menu_DefaultApiEntryId() => ""
+
+; The full-save and profile opening owners share all private LLM rows.
+_LLM_Menu_AppendOwnedPersistedUpdates(Updates, MenuState) {
+	if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
+			|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
+				MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
+		throw Error("LLM onboarding state could not be serialized into the full-save candidate")
+	Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
+	_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
+			MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
+	if !(_AppOverridesPayload is String)
+			throw Error("Could not serialize LLM app-profile overrides")
+	Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
+	if IsSet(_LLM_Menu_AppendPersistedUpdates)
+			&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
+		throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
+	return true
+}
+
 _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 	global _LLM_Menu
 	if !(Updates is Array)

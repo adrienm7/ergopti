@@ -255,7 +255,14 @@ _PRSO_Main() {
 		Boot := ConfigMigrateBoot(ConfigurationFile)
 		_PRSO_Require(Boot["status"] == "current" && Boot["read_only"] == 0 && ConfigFullStateCanPersist(),
 			"Actual native boot must admit this exact private file before the public editor opens.")
-		_LLM_Menu := Map("user_profiles", _PRSO.Profiles, "profile_id", "user_private_a", "enabled", false)
+		_LLM_Menu["user_profiles"] := _PRSO.Profiles
+		_LLM_Menu["profile_id"] := "user_private_a"
+		_LLM_Menu["enabled"] := false
+		_LLM_Menu["ollama_port"] := 11435
+		_PRSO_Require(TOML_ConfigBatchWrite(ConfigurationFile,
+			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
+			"The actual native writer must align the complete private LLM source before opening.")
+		_PRSO.Source := FSConfigReadUtf8Exact(ConfigurationFile)
 		_PRSO_Open(_PRSO.Profiles[1])
 		_PRSO_Observe(), Observed := true
 		_PRSO_Check()
