@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "提案あたりの最大単語数: %s",
 	"menu.llm.max_words_prompt": "提案あたりの最大単語数（0 = 無制限）:",
 	"menu.llm.min_words_label": "提案あたりの最小単語数: %s",
+	"menu.llm.word_limits_incompatible": "最小値は最大単語数を超えることはできません。",
 	"menu.llm.min_words_prompt": "提案あたりの最小単語数:",
 	"menu.llm.mlx_model_hint": "MLXモデルのHuggingFace識別子、例: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s サーバーポート: %s",

@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Max. slov na návrh: %s",
 	"menu.llm.max_words_prompt": "Maximální počet slov na návrh (0 = neomezeno):",
 	"menu.llm.min_words_label": "Min. slov na návrh: %s",
+	"menu.llm.word_limits_incompatible": "Minimum nesmí překročit maximální počet slov.",
 	"menu.llm.min_words_prompt": "Minimální počet slov na návrh:",
 	"menu.llm.mlx_model_hint": "Identifikátor HuggingFace pro model MLX, např.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "Port serveru %s: %s",

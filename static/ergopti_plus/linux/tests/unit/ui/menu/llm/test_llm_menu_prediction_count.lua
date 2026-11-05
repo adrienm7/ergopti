@@ -135,8 +135,8 @@ local function with_numeric_menu(options, exercise)
 		local declaration = renderer.get_array("llm_numeric_custom_rows")
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
-		local log = { prompts = {}, changed = 0, notices = 0 }
-		package.loaded["adapters.notifier"] = { send = function() log.notices = log.notices + 1; return true end }
+		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {} }
+		package.loaded["adapters.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
 		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
@@ -192,6 +192,31 @@ local function numeric_tail(fixture, context)
 end
 
 helpers.describe("tray (linux): declared free numeric tails", function()
+	helpers.it("does not report a save failure for an invalid minimum word preset", function()
+		with_numeric_menu({}, function(f)
+			local picker = assert(numeric_picker(f.rows, "menu.llm.min_words_label", f.strings))
+			helpers.assert_eq(picker.menu[6].fn(), false)
+			helpers.assert_eq(f.log.notices, 1)
+			helpers.assert_eq(f.log.notice_texts[1], f.strings["menu.llm.word_limits_incompatible"])
+			helpers.assert_eq(f.log.changed, 0)
+			helpers.assert_eq(numeric_read(f.path), f.initial)
+		end)
+	end)
+	helpers.it("does not report a rollback if a preset setter raises after saving", function()
+		with_numeric_menu({}, function(f)
+			local setter = f.settings.set_with_reason
+			f.settings.set_with_reason = function(...)
+				assert(setter(...) == true)
+				error("inert post-save exception")
+			end
+			local picker = assert(numeric_picker(f.rows, "menu.llm.generation.temperature", f.strings))
+			local called = pcall(picker.menu[1].fn)
+			f.settings.set_with_reason = setter
+			helpers.assert_eq(called, false)
+			helpers.assert_eq(f.log.notices, 0)
+			helpers.assert_true(numeric_read(f.path) ~= f.initial)
+		end)
+	end)
 	helpers.it("numeric presets report refused persistence without redrawing success", function()
 		with_numeric_menu({}, function(f)
 			for _, context in ipairs({ NumericCorpus.contexts[1], NumericCorpus.contexts[2] }) do

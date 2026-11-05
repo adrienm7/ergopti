@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "מילים מקסימליות להצעה: %s",
 	"menu.llm.max_words_prompt": "מספר מילים מקסימלי להצעה (0 = ללא הגבלה):",
 	"menu.llm.min_words_label": "מילים מינימליות להצעה: %s",
+	"menu.llm.word_limits_incompatible": "המינימום אינו יכול לעלות על מספר המילים המרבי.",
 	"menu.llm.min_words_prompt": "מספר מילים מינימלי להצעה:",
 	"menu.llm.mlx_model_hint": "מזהה HuggingFace למודל MLX, לדוגמה: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "פורט שרת %s: %s",

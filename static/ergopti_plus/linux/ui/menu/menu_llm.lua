@@ -88,14 +88,26 @@ end
 --- @param name string Setting name.
 --- @param value any Selected value.
 --- @param refresh function|nil Menu refresh callback.
+--- @param classified boolean|nil Whether the owner exposes a closed refusal reason.
 --- @return boolean committed
-local function commit_preset(owner, name, value, refresh)
-	local called, accepted = pcall(owner.set, name, value)
-	if not called or accepted ~= true then
+local function commit_preset(owner, name, value, refresh, classified)
+	local setter = classified and owner.set_with_reason or owner.set
+	if type(setter) ~= "function" then return false end
+	local accepted, reason = setter(name, value)
+	if accepted ~= true then
+		if classified and reason == "invalid" then
+			local okay, notifier = pcall(require, "adapters.notifier")
+			if okay and type(notifier.send) == "function" then
+				pcall(notifier.send, i18n_safe("menu.llm.word_limits_incompatible"), { level = "error" })
+			end
+			return false
+		end
+		if classified and reason ~= "persistence" then return false end
 		Logger.error(LOG, "Preset setting '%s' could not be saved.", name)
 		local okay, notifier = pcall(require, "adapters.notifier")
 		if okay and type(notifier.send) == "function" then
-			pcall(SaveFailure.present, i18n_safe, function(message) notifier.send(message, { level = "error" }) end)
+			pcall(SaveFailure.present, function() return i18n_safe("dialog.personal_info.save_failed_title") end,
+				function(message) notifier.send(message, { level = "error" }) end)
 		end
 		return false
 	end
@@ -897,7 +909,7 @@ local function _build_llm(ctx)
 					label = tostring(value),
 					checked = current == value,
 					action = function()
-						return commit_preset(Settings, setting.name, value, ctx.on_menu_changed)
+						return commit_preset(Settings, setting.name, value, ctx.on_menu_changed, true)
 					end,
 				}
 			end

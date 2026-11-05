@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "每条建议最多单词: %s",
 	"menu.llm.max_words_prompt": "每条建议的最多单词数（0 = 无限制）：",
 	"menu.llm.min_words_label": "每条建议最少单词: %s",
+	"menu.llm.word_limits_incompatible": "最小值不能超过最大字数。",
 	"menu.llm.min_words_prompt": "每条建议生成的最少单词数：",
 	"menu.llm.mlx_model_hint": "MLX模型HuggingFace标识，例：mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s 服务器端口：%s",

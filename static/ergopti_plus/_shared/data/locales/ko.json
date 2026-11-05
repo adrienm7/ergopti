@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "제안당 최대 단어 수: %s",
 	"menu.llm.max_words_prompt": "제안당 최대 단어 수 (0 = 무제한):",
 	"menu.llm.min_words_label": "제안당 최소 단어 수: %s",
+	"menu.llm.word_limits_incompatible": "최솟값은 최대 단어 수를 초과할 수 없습니다.",
 	"menu.llm.min_words_prompt": "제안당 최소 단어 수:",
 	"menu.llm.mlx_model_hint": "MLX 모델의 HuggingFace 식별자, 예: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s 서버 포트: %s",
