@@ -119,6 +119,20 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 			helpers.assert_eq(state.saves, { { keys = { "tab" }, path = Fixture.KARABINER_CONFIG_PATH } })
 		end)
 	end)
+
+	helpers.it("does not write to the old folder when resolving the selected folder fails", function()
+		local persisted = 0
+		local menu_paths = {
+			persist_config_dir_for_wizard = function() persisted = persisted + 1; return true end,
+			get = function() error("path unavailable") end,
+		}
+		with_finish({ answers = answers({ tab = true }, "/virtual/moved"), menu_paths = menu_paths }, function(state)
+			helpers.assert_eq(persisted, 1)
+			helpers.assert_eq(#state.writes, 0, "an unknown destination cannot reuse the old config path")
+			helpers.assert_eq(#state.saves, 0)
+			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0)
+		end)
+	end)
 end)
 
 

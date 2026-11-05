@@ -794,6 +794,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-number-input.cjs"],
 			"repro": "node tools/test/test-hotstrings-config-number-input.cjs"
+		},
+		{
+			"id": "js-personal-editor-multiline",
+			"ordinal": 585,
+			"name": "personal information editor preserves multiline fields",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-editor-multiline.cjs"],
+			"repro": "node tools/test/test-personal-editor-multiline.cjs"
 		}
 	]
 }

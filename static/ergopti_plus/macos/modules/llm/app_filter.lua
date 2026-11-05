@@ -275,12 +275,17 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 		Logger.debug(LOG, "Focused application metadata is unreadable — LLM request skipped.")
 		return true
 	end
+	local path_known = type(path) == "string" and path ~= ""
 	bid, path, name = bid or "", path or "", (name or ""):lower()
 
 	for _, app in ipairs(excluded_apps) do
 		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
 		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
 		local configured_name = type(app.name) == "string" and app.name:lower() or ""
+		if has_path and not path_known then
+			Logger.debug(LOG, "Focused application path is unavailable — LLM request skipped.")
+			return true
+		end
 		-- Guard: name must also be non-empty. Without this, an empty name (app
 		-- whose hs:name() returns nil) causes ("slack"):find("", 1, true) = 1,
 		-- so every name-only exclusion entry would match any nameless app.

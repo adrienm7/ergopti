@@ -31,7 +31,7 @@ const rows = {
 const inputs = () => rows.children.map((row) => row.children[1]);
 const document = {
 	getElementById: (id) => ({ rows, 'btn-save': save, 'btn-cancel': cancel })[id],
-	querySelectorAll: (selector) => (selector === '#rows input' ? inputs() : []),
+	querySelectorAll: (selector) => (selector === '#rows input, #rows textarea' ? inputs() : []),
 	querySelector: () => inputs()[0] || null,
 	addEventListener() {},
 	createElement: () => ({

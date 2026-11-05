@@ -38,7 +38,7 @@ local function with_filter(callback)
 		end }
 		local front = { pid = function() if c.mode == "pid_error" then error("PID unavailable") end; return 4242 end,
 			bundleID = function() if c.mode == "bundle_error" then error("bundle unavailable") end; if c.mode == "bundle_bad" then return 7 end; return c.bundle end,
-			path = function() if c.mode == "path_error" then error("path unavailable") end; if c.mode == "path_bad" then return {} end; return "/Applications/Editor.app" end,
+			path = function() if c.mode == "path_error" then error("path unavailable") end; if c.mode == "path_bad" then return {} end; if c.mode == "path_absent" then return nil end; return "/Applications/Editor.app" end,
 			name = function() if c.mode == "name_error" then error("name unavailable") end; if c.mode == "name_bad" then return 7 end; return "Editor" end }
 		_G.hs = { application = { frontmostApplication = function()
 				if c.mode == "front_error" then error("front application unavailable") end
@@ -178,6 +178,17 @@ helpers.describe("Native AX focus refusal in the AI app filter", function()
 			end)
 		end)
 	end
+	helpers.it("does not bypass a path exclusion when native application path is unavailable", function()
+		with_filter(function(f, c)
+			local exclusions = { { appPath = "/Applications/Secret.app" } }
+			helpers.assert_eq(f.is_blocked({}, exclusions, false, false), false)
+			c.mode = "path_absent"
+			helpers.assert_eq(f.is_blocked({}, exclusions, false, false), true,
+				"a missing native path cannot prove that a path exclusion does not apply")
+			helpers.assert_eq(f.is_blocked({}, {}, false, false), false,
+				"an unused missing path must not block ordinary applications")
+		end)
+	end)
 	for _, mode in ipairs({ "bundle_error", "path_error", "name_error", "bundle_bad", "path_bad", "name_bad" }) do
 		helpers.it("(native-ai-metadata) blocks when the focused application's metadata raises: " .. mode, function()
 			with_filter(function(f, c)
