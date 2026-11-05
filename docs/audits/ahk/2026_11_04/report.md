@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **138 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **139 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2039,3 +2039,13 @@ Replay42096622224 at160d47f6 passes15/19 cases individually and reversed. It qua
 Sourcec7e9952d preserves the exact current error, consumes only failures from retired openings and requires the original model Reset acknowledgement before public fallback. It also rejects a successor admitted during cleanup or error logging. Seven dedicated SDK controls await native postfix execution, alongside prior startup/navigation/subscription controls. The extra Close-during-unwind probe must prove the real Reset refused after actual native Close; it forges no acknowledgement.
 
 IPv6 source91a7682c uses bracketed Uri.Host only for IPv6. The independent oracle now compares equivalent IPv6 addresses and adds actual production DNS/IPv4 controls. macOS URLSession and Linux curl use their native URL owners, without the Windows bracket-stripping wrapper. Their runtime qualification is not claimed. The Windows native postfix remains pending.
+
+### Native qualification: SDK error disposition and IPv6 host spelling
+
+Replay42097865628 at20be54dc passes27/28 selected cases individually and reversed. All seven SDK error controls and18 prior startup/navigation/subscription cases pass. The current Prompt and direct model propagate the identical Error; the public current model returns a populated native ListView fallback. Cleanup reentry keeps B without opening a native fallback. The real Close-during-unwind case observes its own epoch retirement and refusal of the returning cleanup Reset, so it cannot revive the canceled window.
+
+The native IPv6 host correction139 passes with HTTP200/exact body/wire_actual1/retired1, alongside independent Uri.Host, DNS, actual production DNS/IPv4 and refusing-proxy controls. The private peer joins with no failures. Actual relay branch controls pass. The HTTP override step reports11 passed,0 failed,0 not executed; bounded job-log evidence is retained separately, not represented as a JSON receipt.
+
+The remaining IPv6 HTTP-over-SOCKS case now completes with HTTP502 and exact native retirement. Its first independent SOCKS control succeeds; the genuine hop closes its second greeting before a CONNECT frame. Investigation must distinguish the authority parser from any other pre-frame refusal before recording or fixing another defect.
+
+PiEd source73d2dcd0 and ActionPicker source756c6018 now retain hosts during subscription admission, preserve their prior SDK failure policies and retain the native GUI after plumbing-only Reset until exact Close. Their additional current-error/retained-host/cleanup-reopen tests await native execution. Unicode135 V2 is deliberately not integrated: revoking its assembly authority can still lose an unpublished high unit and make a later Backspace erase the earlier public prefix. Three independent native traces now cover RAM-only revocations and consecutive high units before choosing a correction representation.
