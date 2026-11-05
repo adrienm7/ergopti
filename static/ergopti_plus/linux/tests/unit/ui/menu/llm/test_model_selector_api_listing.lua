@@ -72,6 +72,20 @@ local function by_name(api)
 end
 
 helpers.describe("model selector API listing on Linux", function()
+	helpers.it("(model-selector-api-owner) refuses a listed model if backend selection replaces its entry", function()
+		local opts = {}
+		with_rows(opts, function(Rows, calls, dialogs)
+			local llm = engine(calls)
+			llm.set_backend = function()
+				opts.current = { id = "e1", provider = "openai", model = "replacement" }
+				return true
+			end
+			local api = Rows.api_page(llm, dialogs, nil, nil, { e1 = { state = "listed", ids = { "o3" } } })
+			helpers.assert_eq(by_name(api)["openai/o3"].run(), false)
+			helpers.assert_eq(#calls.set_model, 0)
+		end)
+	end)
+
 	helpers.it("(model-selector-api-owner) refuses a typed model after entry replacement", function()
 		local opts = {}
 		with_rows(opts, function(Rows, calls, dialogs)
