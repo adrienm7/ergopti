@@ -148,6 +148,7 @@ class WPMWidget {
 
     ; Visibility + position.
     static visible        := false
+    static _visibility_revision := 0
     static pos_x          := -1         ; -1 = auto-position on first show
     static pos_y          := -1
 
@@ -530,7 +531,13 @@ _WPMWidget_ResetRolling() {
 }
 
 
-WPMWidget_Show() {
+WPMWidget_Show(ExpectedRevision := unset) {
+    PreviousCritical := Critical("On")
+    try {
+        if IsSet(ExpectedRevision) && WPMWidget._visibility_revision != ExpectedRevision
+            return false
+        Revision := ++WPMWidget._visibility_revision
+    } finally Critical(PreviousCritical)
     LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
         WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
     if WPMWidget.show_graph {
@@ -541,7 +548,12 @@ WPMWidget_Show() {
             WPMWidget_BuildCompact()
     }
 
-    WPMWidget.visible := true
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision
+            return false
+        WPMWidget.visible := true
+    } finally Critical(PreviousCritical)
 
     ; Start from a clean slate -- discard any keystrokes counted during boot or
     ; reload so the surface stays hidden until the user types AFTER it is shown.
@@ -556,28 +568,37 @@ WPMWidget_Show() {
     ; Compact mode uses the same "Hide" approach — no flash on startup.
     _WPMWidget_ApplySurfaceGeometry(gui_ref)
 
-    SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-
-    ; Seed the cursor position and arm the fast mouse-watch so the widget hides the
-    ; instant the cursor moves — it must never cover text the user wants to read.
+    ; Seed outside the RAM claim; an intervening Hide revokes both timer arms.
     MouseGetPos(&_seed_mx, &_seed_my)
-    WPMWidget._last_mouse_x := _seed_mx
-    WPMWidget._last_mouse_y := _seed_my
-    SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    PreviousCritical := Critical("On")
+    try {
+        if WPMWidget._visibility_revision != Revision || !WPMWidget.visible
+            return false
+        WPMWidget._last_mouse_x := _seed_mx
+        WPMWidget._last_mouse_y := _seed_my
+        SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
+        SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+    } finally Critical(PreviousCritical)
 
     LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
 WPMWidget_Hide() {
-    WPMWidget.visible := false
-    SetTimer(WPMWidget_Tick, 0)
-    SetTimer(WPMWidget_MouseWatch, 0)
-    if WPMWidget._gui
-        try WPMWidget._gui.Hide()
-    if WPMWidget._graph_gui
-        try WPMWidget._graph_gui.Hide()
+    PreviousCritical := Critical("On")
+    try {
+        Revision := ++WPMWidget._visibility_revision
+        WPMWidget.visible := false
+        Compact := WPMWidget._gui, Graph := WPMWidget._graph_gui
+        SetTimer(WPMWidget_Tick, 0)
+        SetTimer(WPMWidget_MouseWatch, 0)
+    } finally Critical(PreviousCritical)
+    if Compact && WPMWidget._visibility_revision == Revision
+        try Compact.Hide()
+    if Graph && WPMWidget._visibility_revision == Revision
+        try Graph.Hide()
     try LoggerDone("WPMWidget", "Widget hidden.")
+    return Revision
 }
 
 

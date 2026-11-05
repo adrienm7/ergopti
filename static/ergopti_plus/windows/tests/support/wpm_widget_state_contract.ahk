@@ -16,6 +16,7 @@ class WPMWidgetConst {
 
 class WPMWidget {
 	static visible := false
+	static _visibility_revision := 0
 	static pos_x := 0
 	static pos_y := 0
 	static use_colors := false

@@ -75,5 +75,5 @@ _WPMG_Case(Mode) {
 		throw Primary
 	AssertTrue(Retired)
 }
-for _WPMG_Mode in ["current", "reopen"]
+for _WPMG_Mode in ["current", "reopen", "destroy-before", "destroy-after", "hide-during-destroy"]
 	Test("WPM graph native toggle: " . _WPMG_Mode . " owns its actual successor (wpm-graph-native-reentry)", _WPMG_Case.Bind(_WPMG_Mode))
