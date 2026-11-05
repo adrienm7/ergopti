@@ -915,24 +915,40 @@ ConfigMigrateBackupPath(FilePath, Version, Stamp) {
 _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 	static Sequence := 0
 	Sequence += 1
-	StagePath := FilePath . "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
+	Suffix := "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
+	StagePath := FilePath . Suffix
+	try PhysicalPath := FSResolveAbsolutePath(FilePath)
+	catch as Err
+		return "the native target could not be captured: " . Err.Message
 	if !_FSNativeAdmissionAccepted(AdmissionFn)
 		return "the actual migration owner lost registry/lease admission before staging"
-	if !FSWriteDurable(StagePath, Candidate) || !FSUtf8ExactMatches(StagePath, Candidate) {
-		try FSDelete(StagePath)
-		return "the staging file could not be written and verified"
+	Stage := {handle: -1}
+	CreateStage(Folder, Name, Attributes) {
+		; Existing diagnostics can read the retained candidate, but cannot write,
+		; replace or delete it while its exclusive creation identity is held.
+		Stage.handle := _FSCreateHeldStage(Folder, Name, Attributes, 1)
+		return Stage.handle
 	}
-	; Report verified staging before the final source/native admission boundary;
-	; this identifies the owned path without disclosing configuration content.
-	try LoggerInfo("ConfigMigrate", "Verified durable migration stage '{1}' for '{2}' before native publication.",
-		StagePath, FilePath)
-	if !FSUtf8ExactMatches(FilePath, Source) {
-		try FSDelete(StagePath)
-		return "the file changed after it was read"
+	Preflight() {
+		_FSRewind(Stage.handle)
+		Readback := _FSReadUtf8ExactHandle(Stage.handle, 0, false)
+		if !(Readback is String) || !(Readback == Candidate)
+			return false
+		; Preserve the actual verified-stage observation before final admission.
+		try LoggerInfo("ConfigMigrate", "Verified durable migration stage '{1}' for '{2}' before native publication.",
+			StagePath, FilePath)
+		; Source I/O is outside the immediately following final native span.
+		; This is not a kernel CAS against another process's source changes.
+		return FSUtf8ExactMatches(PhysicalPath, Source)
 	}
-	if !FSConfigAtomicMoveReplace(StagePath, FilePath, &NativeError, AdmissionFn) {
-		try FSDelete(StagePath)
-		return "the atomic replace was refused"
+	Published := FSWriteReplaceOwned(PhysicalPath, Candidate, Suffix, &Detail,
+		CreateStage, Preflight, AdmissionFn, true, &Publication)
+	if !((Published is Integer) && Published == 1) {
+		if Publication.renamed && !Publication.durable {
+			_TOML_RecordPartialPublication(FilePath, Publication)
+			return "the native stage was renamed but durable completion was not acknowledged: " . Detail
+		}
+		return "owned native publication was refused: " . Detail
 	}
 	_TOML_InvalidateParseCache(FilePath)
 	return ""
@@ -957,8 +973,11 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		Result["detail"] := Detail
 		Result["read_only"] := 1
 		TOML_RefuseWrites(FilePath, Detail)
-		try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. The file is left "
-			. "untouched and this session will not write it.", FilePath, Status, Detail)
+		Effect := _TOML_SessionHasPartialPublication(FilePath)
+			? "This session contains a native publication without complete durable acknowledgement; no further writes are admitted."
+			: "The file is left untouched and this session will not write it."
+		try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. {4}",
+			FilePath, Status, Detail, Effect)
 		return Result
 	}
 
