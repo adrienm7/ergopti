@@ -120,12 +120,15 @@ _PathsEdWeb_TryOpen() {
 			try LoggerError("PathsEditor", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
 			if !_PathsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
+			; Capture the exact GUI even though no controller was ever created.
+			; The usual retirement queue owns any unacknowledged Destroy.
+			Host := _PathsEdWeb_BeginBareHost(g, SessionEpoch)
+			if !IsObject(Host)
+				return true
 			ResetReceipt := false
-			Saved := _PathsEdWeb_Reset(g, SessionEpoch, &ResetReceipt)
-			if Saved
-				try Saved.Destroy()
+			_PathsEdWeb_Reset(g, SessionEpoch, &ResetReceipt)
 			PreviousCritical := Critical("On")
-			try FallbackReady := ResetReceipt && _PathsEdWeb_Gui == 0 && _PathsEdWeb_ResetDone
+			try FallbackReady := ResetReceipt && !IsObject(Host.gui) && _PathsEdWeb_Gui == 0 && _PathsEdWeb_ResetDone
 				&& _PathsEdWeb_SessionEpoch == SessionEpoch + 1
 			finally Critical(PreviousCritical)
 			return !FallbackReady
@@ -193,7 +196,10 @@ _PathsEdWeb_TryOpen() {
 			if IsObject(Host) {
 				if _PathsEdWeb_Gui == g
 					_PathsEdWeb_Reset(g, SessionEpoch)
-				_PathsEdWeb_RetireHost(Host, RetireDestroy, true)
+				; Reset already queued a bare host; leave any failed Destroy debt
+				; for the next public request instead of retrying inside this one.
+				if !Host.HasOwnProp("bare") || !Host.bare || !Host.retired
+					_PathsEdWeb_RetireHost(Host, RetireDestroy, true)
 			} else if IsSet(Controller) {
 				try Controller.Close()
 				catch as Err
@@ -640,6 +646,30 @@ _PathsEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset, &ResetReceipt :=
 
 ; A native close revokes admission immediately but retains the exact host until
 ; any add_Event call has returned its handle and that handle is released.
+; A factory failure has no controller, but still owns this native window.
+_PathsEdWeb_BeginBareHost(Window, Epoch) {
+	global _PathsEdWeb_SubscriptionOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !_PathsEdWeb_StartupCurrent(Epoch, Window) || IsObject(_PathsEdWeb_SubscriptionOwner)
+			return 0
+		Hwnd := Window.Hwnd
+		Host := {gui: Window, hwnd: Hwnd, bare: true, controller: 0, view: 0, epoch: Epoch,
+			message: 0, navigation: 0, in_flight: false, retired: false, closing: false, closed: true, destroy: false}
+		_PathsEdWeb_SubscriptionOwner := Host
+		return Host
+	} finally Critical(PreviousCritical)
+}
+
+; Only a different AHK owner or native absence proves this HWND was retired.
+; An extant HWND without a resolvable AHK owner stays debt rather than being adopted.
+_PathsEdWeb_BareWindowRetired(Host) {
+	if !DllCall("User32\IsWindow", "Ptr", Host.hwnd, "Int")
+		return true
+	Other := GuiFromHwnd(Host.hwnd)
+	return IsObject(Other) && Other != Host.gui
+}
+
 _PathsEdWeb_BeginSubscriptions(Window, Controller, View, Epoch) {
 	global _PathsEdWeb_SubscriptionOwner, _PathsEdWeb_Gui
 	Host := {gui: Window, controller: Controller, view: View, epoch: Epoch,
@@ -728,7 +758,17 @@ _PathsEdWeb_RetryRetiredHosts() {
 				Host.closed := true
 			}
 			if Host.destroy {
-				Host.gui.Destroy()
+				if Host.HasOwnProp("bare") && Host.bare {
+					if !_PathsEdWeb_BareWindowRetired(Host) {
+						if GuiFromHwnd(Host.hwnd) != Host.gui
+							throw Error("The failed Paths editor HWND identity is unresolved.")
+						; Verify the actual outcome even if the call throws after effect.
+						try Host.gui.Destroy()
+					}
+					if !_PathsEdWeb_BareWindowRetired(Host)
+						throw Error("The failed Paths editor native window remains live.")
+				} else
+					Host.gui.Destroy()
 				Destroyed := true
 			}
 			Settled := true
