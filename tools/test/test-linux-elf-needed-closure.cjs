@@ -116,7 +116,11 @@ const good = tree({
 const injected = (file) => dynamics[path.relative(good, file).split(path.sep).join('/')];
 let result = Closure.checkClosure([good], injected, recipient);
 assert.equal(result.checked.length, 2);
-assert.deepEqual(result.violations, [], 'a soname provided by a bundled file resolves');
+assert.deepEqual(result.violations.map((entry) => entry.needed), ['libluv.so.1'],
+	'an internal SONAME does not create a filesystem entry');
+fs.symlinkSync('libluv.so.1.0', path.join(good, 'usr/lib/libluv.so.1'));
+result = Closure.checkClosure([good], injected, recipient);
+assert.deepEqual(result.violations, [], 'a real bundled SONAME symlink resolves');
 dynamics['usr/bin/luajit'] += '\n (NEEDED) Shared library: [libselinux.so.1]';
 result = Closure.checkClosure([good], injected, recipient);
 assert.deepEqual(
@@ -203,6 +207,13 @@ if (gcc.status === 0 && readelf.status === 0) {
 		});
 	let real = Closure.checkClosure([image], readDynamic, recipient);
 	assert.deepEqual(real.violations, [], 'a bundled library resolves in a real executable');
+	fs.renameSync(path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(image, 'usr/lib/renamed.so'));
+	real = Closure.checkClosure([image], readDynamic, recipient);
+	assert.deepEqual(real.violations.map((entry) => entry.needed), ['libergoptifixture.so.7'],
+		'a real ELF SONAME alone cannot stand in for the library pathname');
+	fs.symlinkSync('renamed.so', path.join(image, 'usr/lib/libergoptifixture.so.7'));
+	real = Closure.checkClosure([image], readDynamic, recipient);
+	assert.deepEqual(real.violations, [], 'the actual alias supplies the required pathname');
 	fs.rmSync(path.join(image, 'usr/lib/libergoptifixture.so.7'));
 	real = Closure.checkClosure([image], readDynamic, recipient);
 	assert.deepEqual(
