@@ -188,16 +188,17 @@ _LLM_Bridge_TypingSourceCurrent(Source, Active, Generation, Guard := unset) {
 	return _LLM_Bridge_TypingStateCurrent(Source, Active, Generation)
 }
 
-; Runs only after the RAM edit, on the deferred prefix observer or fallback
-; notification. Native classification never enters FeedCharForPrefix. Unknown
+; Reads privacy on a deferred prefix observer or the bounded fallback input
+; transaction. Native classification never enters FeedCharForPrefix. Unknown
 ; fields fail closed, and the caller revalidates its owner after these probes.
-_LLM_Bridge_ReadTypingPrivacy(Source, AgentWanted) {
+_LLM_Bridge_ReadTypingPrivacy(Source, AgentWanted, AgentApps := unset) {
 	global _LLM_Engine, _LLM_Bridge_PrivacyAppCache, SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	NeedsSecure := _LLM_Engine.Get("disable_password_fields", true) || AgentWanted
 	if NeedsSecure
 		SFD_EnsureFocusTracking()
 	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
-	AgentApps := AgentWanted ? LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS) : []
+	if !IsSet(AgentApps)
+		AgentApps := AgentWanted ? LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS) : []
 	NeedsApp := !(Apps is Array) || Apps.Length > 0 || !(AgentApps is Array) || AgentApps.Length > 0
 	FocusGeneration := SFD_FIELD_CACHE["focus_generation"]
 	SampleAt := A_TickCount
@@ -1668,24 +1669,45 @@ _LLM_Bridge_DeferredTooltipHide(ExpectedRecord, accepted) {
  */
 LLM_Bridge_OnChar(ch) {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_ContentGeneration, _LLM_Engine
-	if !_LLM_Bridge_Active || A_IsSuspended
-		return
+	global _PrefixDeferredGeneration, SFD_FIELD_CACHE
+	EntryCritical := Critical("On")
+	try {
+		if !_LLM_Bridge_Active || A_IsSuspended
+			return false
+		EntryEpoch := _PrefixDeferredGeneration
+		EntryGeneration := _LLM_Bridge_ContentGeneration
+		EntryFieldGeneration := SFD_FIELD_CACHE["focus_generation"]
+		EntryElement := SFD_FIELD_CACHE["current_element_id"]
+		EntrySource := _LLM_Bridge_ReadLiveFocus.Call()
+	} finally Critical(EntryCritical)
 
-	Source := _LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), true)
-	if !IsObject(Source)
-		return false
-	BeforeEdit := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, _LLM_Bridge_ContentGeneration)
-	Receipt := _LLM_Bridge_ReadTypingPrivacy(Source, IsSet(LLM_Agent_WatchesTyping) && LLM_Agent_WatchesTyping())
-	if !BeforeEdit.Call()
-		return false
-	if !_LLM_Bridge_TypingPrivacyAllowed(Receipt) {
-		_LLM_Bridge_RejectPrivateTyping(true, Source, _LLM_Bridge_ContentGeneration)
-		return false
-	}
+	; Resolve file-backed defaults and install focus tracking before the short
+	; native classification/edit transaction. A later character cannot commit
+	; between this character's source binding, privacy read and RAM append.
+	AgentWanted := IsSet(LLM_Agent_WatchesTyping) && LLM_Agent_WatchesTyping()
+	AgentApps := AgentWanted ? LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS) : []
+	if _LLM_Engine.Get("disable_password_fields", true) || AgentWanted
+		SFD_EnsureFocusTracking()
 	PreviousCritical := Critical("On")
 	try {
+		; Preparation may yield, but cannot acquire a new lifecycle or relabel
+		; this input after a newer edit or a same-HWND field transition.
+		if A_IsSuspended || !_LLM_Bridge_Active || EntryEpoch != _PrefixDeferredGeneration
+			|| EntryGeneration != _LLM_Bridge_ContentGeneration
+			|| EntryFieldGeneration != SFD_FIELD_CACHE["focus_generation"]
+			|| EntryElement !== SFD_FIELD_CACHE["current_element_id"]
+			return false
+		Source := _LLM_Bridge_BindTypingSource(EntrySource, true)
+		if !IsObject(Source)
+			return false
+		BeforeEdit := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, _LLM_Bridge_ContentGeneration)
+		Receipt := _LLM_Bridge_ReadTypingPrivacy(Source, AgentWanted, AgentApps)
 		if !BeforeEdit.Call()
 			return false
+		if !_LLM_Bridge_TypingPrivacyAllowed(Receipt) {
+			_LLM_Bridge_RejectPrivateTyping(true, Source, _LLM_Bridge_ContentGeneration)
+			return false
+		}
 		_LLM_Bridge_PrepareInput(ch)
 		_LLM_Bridge_ApplyBufferEdit(0, ch)
 		LLM_Engine_CancelTimer()
@@ -1695,11 +1717,13 @@ LLM_Bridge_OnChar(ch) {
 			_LLM_Bridge_InvalidateIncompleteTyping()
 			return false
 		}
+		Generation := _LLM_Bridge_ContentGeneration
+		Buffer := _LLM_Bridge_Buffer
 	} finally {
 		Critical(PreviousCritical)
 	}
-	Current := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, _LLM_Bridge_ContentGeneration)
-	return _LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer, Current, Source, Receipt)
+	Current := _LLM_Bridge_TypingSourceCurrent.Bind(Source, true, Generation)
+	return _LLM_Bridge_NotifyChar(ch, Buffer, Current, Source, Receipt)
 }
 
 _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset, Source := unset, Receipt := unset) {
@@ -1862,36 +1886,53 @@ LLM_Bridge_OnFlush() {
 _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 	global _LLM_Bridge_AgentBuffer, _LLM_Bridge_AgentFeedErrorTick
 	global _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS
+	global _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_AgentContentGeneration, _LLM_Bridge_Active
+	global _PrefixDeferredGeneration, SFD_FIELD_CACHE
+	EntryCritical := Critical("On")
+	try {
+		if A_IsSuspended || _LLM_Bridge_Active
+			return false
+		EntryEpoch := _PrefixDeferredGeneration
+		EntryGeneration := _LLM_Bridge_AgentContentGeneration
+		EntryFieldGeneration := SFD_FIELD_CACHE["focus_generation"]
+		EntryElement := SFD_FIELD_CACHE["current_element_id"]
+		EntrySource := _LLM_Bridge_ReadLiveFocus.Call()
+	} finally Critical(EntryCritical)
 	if !_LLM_Bridge_AgentFeedIsWanted()
 		return false
-	global _LLM_Bridge_ReadLiveFocus, _LLM_Bridge_AgentContentGeneration
-	Source := _LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), false)
-	if !IsObject(Source)
-		return false
-	Generation := _LLM_Bridge_AgentContentGeneration
-	BeforeEdit := _LLM_Bridge_TypingSourceCurrent.Bind(Source, false, Generation)
-	Receipt := _LLM_Bridge_ReadTypingPrivacy(Source, true)
-	if !BeforeEdit.Call()
-		return false
-	if !_LLM_Bridge_TypingPrivacyAllowed(Receipt, true) {
-		_LLM_Bridge_RejectPrivateTyping(false, Source, Generation)
-		return false
-	}
+	AgentApps := LLM_Agent_Setting(ConfigLeaf.AGENT_DISABLED_APPS)
+	SFD_EnsureFocusTracking()
 	EditCritical := Critical("On")
 	try {
-		if !_LLM_Bridge_TypingStateCurrent(Source, false, Generation)
+		if A_IsSuspended || _LLM_Bridge_Active || EntryEpoch != _PrefixDeferredGeneration
+			|| EntryGeneration != _LLM_Bridge_AgentContentGeneration
+			|| EntryFieldGeneration != SFD_FIELD_CACHE["focus_generation"]
+			|| EntryElement !== SFD_FIELD_CACHE["current_element_id"]
 			return false
+		Source := _LLM_Bridge_BindTypingSource(EntrySource, false)
+		if !IsObject(Source)
+			return false
+		Generation := _LLM_Bridge_AgentContentGeneration
+		BeforeEdit := _LLM_Bridge_TypingSourceCurrent.Bind(Source, false, Generation)
+		Receipt := _LLM_Bridge_ReadTypingPrivacy(Source, true, AgentApps)
+		if !BeforeEdit.Call()
+			return false
+		if !_LLM_Bridge_TypingPrivacyAllowed(Receipt, true) {
+			_LLM_Bridge_RejectPrivateTyping(false, Source, Generation)
+			return false
+		}
 		_LLM_Bridge_PrepareInput(InsertedText)
 		LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
-	} finally Critical(EditCritical)
-	if _LLM_Bridge_AgentBuffer != "" && _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == "" {
-		_LLM_Bridge_InvalidateIncompleteTyping(false)
-		return false
-	}
-	try {
 		Generation := _LLM_Bridge_AgentContentGeneration
+		Buffer := _LLM_Bridge_AgentBuffer
+		if Buffer != "" && _TextCompleteTailScalar(Buffer) == "" {
+			_LLM_Bridge_InvalidateIncompleteTyping(false)
+			return false
+		}
+	} finally Critical(EditCritical)
+	try {
 		Current := _LLM_Bridge_TypingStateCurrent.Bind(Source, false, Generation)
-		LLM_Agent_OnTyping(_LLM_Bridge_AgentBuffer, _LLM_Bridge_AdmittedTypingCurrent.Bind(Current, Receipt, true),
+		LLM_Agent_OnTyping(Buffer, _LLM_Bridge_AdmittedTypingCurrent.Bind(Current, Receipt, true),
 			_LLM_Bridge_TypingSourceCurrent.Bind(Source, false, Generation))
 	} catch as Err {
 		Now := A_TickCount
