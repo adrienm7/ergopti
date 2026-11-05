@@ -1,7 +1,7 @@
 {
-	"expected_count": 32,
+	"expected_count": 50,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
@@ -21,40 +21,44 @@
 			"expected_count": 2
 		},
 		{
-			"contains": "klr-live-deep-inventory",
-			"expected_count": 2
-		},
-		{
-			"contains": "metrics-live-foreground-worker",
-			"expected_count": 2
-		},
-		{
-			"contains": "prompt-native-subscription-retirement-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "model-web-native-subscription-retirement-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "hcw-native-destroy-owner",
-			"expected_count": 2
+			"contains": "program-provider-exact-duplicate",
+			"expected_count": 1
 		},
 		{
 			"contains": "backspace-cached-privacy-gap",
 			"expected_count": 5
 		},
 		{
-			"contains": "keystats-native-utf16-packet-roundtrip",
-			"expected_count": 2
-		},
-		{
 			"contains": "native-relay-hop-branches1",
 			"expected_count": 1
 		},
 		{
-			"contains": "model-browser-native-visibility-order-owner",
+			"contains": "native-ipv6-http-socks1",
+			"expected_count": 1
+		},
+		{
+			"contains": "takenote-native-document-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "take-note-counted-nul",
 			"expected_count": 3
+		},
+		{
+			"contains": "wrap-native-trigger-epoch",
+			"expected_count": 1
+		},
+		{
+			"contains": "wrap-native-fresh-selection",
+			"expected_count": 4
+		},
+		{
+			"contains": "UIA worker: cold startup is bounded",
+			"expected_count": 1
+		},
+		{
+			"contains": "time-gate-corpus",
+			"expected_count": 20
 		}
 	]
 }
