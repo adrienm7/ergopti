@@ -9,7 +9,18 @@
 #Requires AutoHotkey v2.0
 class _TNLC_Ops extends _TakeNoteFakeOps {
  static PauseAtFile := false
+ static PauseAtClock := false
  static PauseCompleted := false
+ static NowTick() {
+  if _TNLC_Ops.PauseAtClock {
+   _TNLC_Ops.PauseAtClock := false
+   PreviousCritical := Critical("Off")
+   try _TNLC_RunLifecycle()
+   finally Critical(PreviousCritical)
+   _TNLC_Ops.PauseCompleted := true
+  }
+  return _TakeNoteFakeOps.NowTick()
+ }
  static IsSuspended() => A_IsSuspended
  static FileExists(Path) {
   if _TNLC_Ops.PauseAtFile {
@@ -41,7 +52,7 @@ _TNLC_Main() {
  global _LCPC_World, _ConfigDir, _UserProgramPaused, _TakeNotePending, _TakeNoteNextId
  _LCPC_Require(A_Args.Length == 3, "A private mode, directory and shared source are required")
  Mode := A_Args[1]
- _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch" || Mode == "in-flight", "Unknown mode")
+ _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch" || Mode == "in-flight" || Mode == "acquire-in-flight", "Unknown mode")
  _LCPC_World := {Ports: Map()}
  _ConfigDir := A_Args[2]
  TimingsLoadShared(A_Args[3])
@@ -51,7 +62,20 @@ _TNLC_Main() {
   "The private lifecycle and note owners must start empty")
  _TakeNoteFakeOps.Reset(), _TakeNotePending := Map(), _TakeNoteNextId := 0
  try {
+  if Mode == "acquire-in-flight"
+   _TNLC_Ops.PauseAtClock := true
   JobId := TakeNoteRequest(false, A_Args[2], true, _TNLC_Ops)
+  if Mode == "acquire-in-flight" {
+   FileAppend("OBSERVATION takenote-acquire-in-flight id=" . JobId . " pause=" . _TNLC_Ops.PauseCompleted
+    . " pending=" . _TakeNotePending.Count . " timers=" . _TakeNoteFakeOps.timers.Length
+    . " launch=" . _TakeNoteFakeOps.launch_count . " errors=" . _TakeNoteFakeOps.errors.Length . "`n", "*")
+   _LCPC_Require(_TNLC_Ops.PauseCompleted && _LCPC_World.Ports.Count == 16,
+    "The real suspend and resume must complete within the genuine acquisition callout")
+   _LCPC_Require(JobId == 0 && _TakeNotePending.Count == 0 && _TakeNoteFakeOps.timers.Length == 0
+    && _TakeNoteFakeOps.launch_count == 0 && _TakeNoteFakeOps.errors.Length == 0,
+    "The pre-pause request may not insert or schedule an owner after the resume")
+   return
+  }
   _LCPC_Require(JobId > 0 && _TakeNotePending.Has(JobId) && _TakeNoteFakeOps.timers.Length == 1,
    "The actual public request must publish its owned deferred callback")
   if Mode == "waiting" {
