@@ -68,8 +68,8 @@ ergopti_desktop_entry_owned() {
 }
 
 # Match GLib's effective values in the primary group; later duplicate keys win.
-ergopti_desktop_entry_disabled() {
-	local file="$1" line trimmed key value group= hidden= gnome=
+ergopti_desktop_entry_state() {
+	local file="$1" wanted="$2" line trimmed key value group= hidden= gnome= managed=
 	while :; do
 		line=
 		if IFS= read -r line; then line="${line%$'\r'}"; else [ -n "$line" ] || break; fi
@@ -80,13 +80,23 @@ ergopti_desktop_entry_disabled() {
 				if [ "$trimmed" = '[Desktop Entry]' ]; then group=main; else group=other; fi ;;
 			*)
 				[ "$group" = main ] || continue
-				[[ "$trimmed" =~ ^(Hidden|X-GNOME-Autostart-enabled)[[:space:]]*= ]] || continue
+				[[ "$trimmed" =~ ^(Hidden|X-GNOME-Autostart-enabled|X-Ergopti-Startup)[[:space:]]*= ]] || continue
 				key="${trimmed%%=*}"
 				key="${key%"${key##*[![:space:]]}"}"
 				value="${trimmed#*=}"
 				value="${value#"${value%%[![:space:]]*}"}"
-				case "$key" in Hidden) hidden="$value" ;; X-GNOME-Autostart-enabled) gnome="$value" ;; esac ;;
+				case "$key" in
+					Hidden) hidden="$value" ;;
+					X-GNOME-Autostart-enabled) gnome="$value" ;;
+					X-Ergopti-Startup) managed="$value" ;;
+				esac ;;
 		esac
 	done < "$file"
-	[ "$hidden" = true ] || [ "$gnome" = false ]
+	case "$wanted" in
+		disabled) [ "$hidden" = true ] || [ "$gnome" = false ] ;;
+		managed) [ "$managed" = true ] ;;
+		*) return 1 ;;
+	esac
 }
+ergopti_desktop_entry_disabled() { ergopti_desktop_entry_state "$1" disabled; }
+ergopti_desktop_entry_managed() { ergopti_desktop_entry_state "$1" managed; }

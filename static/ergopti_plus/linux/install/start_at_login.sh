@@ -172,7 +172,39 @@ if [ -f "$DESKTOP_FILE" ]; then
 fi
 hidden=false
 if [ "$ACTION" = disable ]; then hidden=true; fi
-cat > "$desktop_tmp" <<EOF
+write_desktop_choice() {
+	local line normalized group= inserted=false newline= last_newline=true
+	while :; do
+		line= newline=
+		if IFS= read -r line; then newline=$'\n'; else [ -n "$line" ] || break; fi
+		normalized="$line"
+		[ -z "$newline" ] || normalized="${normalized%$'\r'}"
+		normalized="${normalized#"${normalized%%[![:space:]]*}"}"
+		case "$normalized" in
+			\[*\]*)
+				if [ "$group" = main ] && ! "$inserted"; then
+					printf 'Hidden=%s\nX-Ergopti-Startup=true\n' "$hidden" || return 1
+					inserted=true
+				fi
+				normalized="${normalized%"${normalized##*[![:space:]]}"}"
+				if [ "$normalized" = '[Desktop Entry]' ]; then group=main; else group=other; fi ;;
+			*)
+				if [ "$group" = main ] && [[ "$normalized" =~ ^(Hidden|X-GNOME-Autostart-enabled|X-Ergopti-Startup)[[:space:]]*= ]]; then
+					continue
+				fi ;;
+		esac
+		printf '%s%s' "$line" "$newline" || return 1
+		if [ -n "$newline" ]; then last_newline=true; else last_newline=false; fi
+	done < "$desktop_previous" || return 1
+	if [ "$group" = main ] && ! "$inserted"; then
+		if ! "$last_newline"; then printf '\n' || return 1; fi
+		printf 'Hidden=%s\nX-Ergopti-Startup=true\n' "$hidden" || return 1
+	fi
+}
+if [ -n "$desktop_previous" ]; then
+	write_desktop_choice > "$desktop_tmp"
+else
+	cat > "$desktop_tmp" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Ergopti
@@ -181,6 +213,7 @@ Terminal=false
 Hidden=$hidden
 X-Ergopti-Startup=true
 EOF
+fi
 # Standalone removal follows content receipts, including startup changes made
 # by this menu. Stage its exact new digest before either file is published.
 if "$receipt_present"; then
