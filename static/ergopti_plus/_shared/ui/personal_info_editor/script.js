@@ -75,17 +75,23 @@ window.initData = function (data) {
 		const label = document.createElement('label');
 		label.textContent = f.hint ? f.label + ' ' + f.hint : f.label;
 
-		const input = document.createElement('input');
+		const original = f.value ? String(f.value) : '';
+		const input = document.createElement('textarea');
+		input.setAttribute('rows', /[\r\n]/.test(original) ? '3' : '1');
 		input.setAttribute('name', f.key);
 		input.setAttribute('autocomplete', 'off');
-		input.value = f.value || '';
+		input.value = original;
+		// Textareas normalize line endings in the DOM. Keep the source bytes
+		// whenever the user leaves this field unchanged, including after undo.
+		input._originalValue = original;
+		input._initialDomValue = input.value;
 
 		row.appendChild(label);
 		row.appendChild(input);
 		rows.appendChild(row);
 	});
 
-	const first = document.querySelector('#rows input');
+	const first = document.querySelector('#rows textarea');
 	if (first) first.focus();
 };
 
@@ -94,9 +100,10 @@ window.initData = function (data) {
  * @returns {Object} A map of {key: value}.
  */
 function collectValues() {
-	const values = {};
-	document.querySelectorAll('#rows input').forEach(function (input) {
-		values[input.getAttribute('name')] = input.value;
+	const values = Object.create(null);
+	document.querySelectorAll('#rows textarea').forEach(function (input) {
+		values[input.getAttribute('name')] =
+			input.value === input._initialDomValue ? input._originalValue : input.value;
 	});
 	return values;
 }
