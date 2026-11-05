@@ -422,6 +422,8 @@ _TPO_FullSavePersistence(Mode) {
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
 	global _ProxyOverrideInitialized, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
 	global _ProxyOverrideDeclaration, _ProxyOverrideBootSealSource, PROXY_OVERRIDE_ENVIRONMENT
+	Auto := InStr(Mode, "auto-seal") > 0, Manual := InStr(Mode, "manual-store") > 0
+	Queued := InStr(Mode, "queued-") == 1, Optional := Mode == "queued-auto-seal-optional"
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Saved := [Features, _IniCache, _ProxyOverrideInitialized, _ProxyOverrideStored,
 		_ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideDeclaration,
@@ -450,7 +452,7 @@ _TPO_FullSavePersistence(Mode) {
 		Declaration := ProxyOverride_Declaration()
 		RelayA := "http://fixture-user:fixture-a@proxy-a.invalid:8080"
 		RelayB := "http://fixture-user:fixture-b@proxy-b.invalid:8080"
-		StoredA := Mode == "auto-seal" ? RelayA : ProxyOverride_Seal(RelayA)
+		StoredA := Auto ? RelayA : ProxyOverride_Seal(RelayA)
 		AssertTrue(StoredA is String)
 		AssertTrue(TOML_ConfigBatchWrite(Path, [{Section: Declaration["section"], Key: Declaration["key"], Value: StoredA}]))
 		_IniCache := ParseConfigTomlFile(Path)
@@ -460,14 +462,29 @@ _TPO_FullSavePersistence(Mode) {
 		AssertTrue(ProxyOverride_Init(_IniCache))
 		AssertEqual(RelayA, _ProxyOverrideStored)
 		_TestPrint("# proxy-full-save mode=" . Mode . " seeded=1")
-		if Mode == "auto-seal" {
+		if Queued {
+			Wakeups := []
+			AssertTrue(_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS,
+				(Callback, Delay) => Wakeups.Push(Callback), !Optional))
+			AssertEqual(1, Wakeups.Length)
+			AssertTrue(Wakeups[1] == _SaveFullConfigDeferred, "The real queue retains only its exact production drain callback")
+			AssertTrue(_ConfigFullSaveHasPending())
+			QueuedState := _ConfigFullSaveCoordinator()
+			CommittedBefore := QueuedState.committed_generation
+			if Optional {
+				Intent := _ConfigFullSaveRequest(false, QueuedState.requested_generation, QueuedState, 3)
+				AssertTrue(IsObject(Intent) && Intent.optional && Intent.admitted,
+					"The actual optional boot queue must authenticate its original pre-store source")
+			}
+		}
+		if Auto {
 			Scheduled := []
 			ProxyOverride_ScheduleSealAtStart((Callback) => Scheduled.Push(Callback))
 			AssertEqual(1, Scheduled.Length)
 			AssertTrue(Scheduled[1].Call(), "The actual automatic boot sealer must acknowledge A before full-save retention is assessed")
-		} else if Mode == "manual-store"
+		} else if Manual
 			AssertTrue(_ProxyOverride_Store(RelayB), "The actual manual setter must acknowledge B before full-save retention is assessed")
-		Expected := Mode == "manual-store" ? RelayB : RelayA
+		Expected := Manual ? RelayB : RelayA
 		Before := FSConfigReadUtf8Exact(Path)
 		LeafBefore := _TOML_DocumentLookup(TOML_ParseDocument(Before),
 			_TOML_ConfigPath(Declaration["section"], Declaration["key"]))
@@ -475,7 +492,9 @@ _TPO_FullSavePersistence(Mode) {
 		AssertEqual(Expected, ProxyOverride_Unseal(LeafBefore["value"]))
 		AssertEqual(Expected, _ProxyOverrideStored)
 		AssertTrue(_ProxyOverrideSealed)
-		Result := SaveFullConfig(0, _CFGFS_Timer)
+		; The exact queued production callback still uses the real writer/collector.
+		; Its existing retry timer port contains error cleanup in this private role.
+		Result := Queued ? Wakeups[1].Call(0, _CFGFS_Timer) : SaveFullConfig(0, _CFGFS_Timer)
 		After := FSConfigReadUtf8Exact(Path)
 		LeafAfter := _TOML_DocumentLookup(TOML_ParseDocument(After),
 			_TOML_ConfigPath(Declaration["section"], Declaration["key"]))
@@ -485,6 +504,13 @@ _TPO_FullSavePersistence(Mode) {
 		_TestPrint("# proxy-full-save mode=" . Mode . " result=" . Result
 			. " durable_preserved=" . Preserved . " sealed_after=" . ProxyOverride_IsSealed(LeafAfter["value"]))
 		AssertTrue(Preserved, "A full save cannot restore an older relay or unseal credentials acknowledged by the actual proxy owner")
+		if Optional {
+			AssertEqual(CONFIG_SAVE_OK, Result)
+			AssertEqual(Before, After, "Obsolete optional boot work is discarded without replacing the acknowledged newer source")
+			AssertEqual(CommittedBefore, QueuedState.committed_generation,
+				"Discarded optional work must not claim a new durable commit")
+			AssertFalse(_ConfigFullSaveHasPending(), "Only that obsolete optional generation is settled")
+		}
 		if Mode == "current-control"
 			AssertEqual(CONFIG_SAVE_OK, Result, "A matching admitted boot image retains the genuine successful full-save route")
 		else if Result != CONFIG_SAVE_OK {
@@ -514,3 +540,7 @@ _TPO_FullSavePersistence(Mode) {
 for _TPO_FullSaveMode in ["current-control", "auto-seal", "manual-store"]
 	Test("Proxy full-save retention: " . _TPO_FullSaveMode . " preserves its acknowledged choice (proxy-full-save-persistence)",
 		_TPO_FullSavePersistence.Bind(_TPO_FullSaveMode))
+
+for _TPO_QueuedMode in ["queued-auto-seal", "queued-manual-store", "queued-auto-seal-optional"]
+	Test("Proxy queued full-save retention: " . _TPO_QueuedMode . " collects after the actual store (proxy-queued-full-save)",
+		_TPO_FullSavePersistence.Bind(_TPO_QueuedMode))
