@@ -1,0 +1,21 @@
+'br★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=True
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'ff★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=True
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'gf★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=True
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+':D★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=False
+    bundled magickey.text_expansion_emojis is_word=True auto_expand=True is_case_sensitive=True final_result=False
+'dst★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=False
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'ds★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=False
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'llm★' personal is_word=True auto_expand=True is_case_sensitive=True final_result=False
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'pc★' personal is_word=True auto_expand=True is_case_sensitive=False final_result=False
+    bundled magickey.text_expansion_emojis is_word=True auto_expand=True is_case_sensitive=True final_result=False
+'pr★' personal is_word=True auto_expand=True is_case_sensitive=False final_result=False
+    bundled magickey.text_expansion is_word=True auto_expand=True is_case_sensitive=False final_result=False
+'sru' personal is_word=True auto_expand=True is_case_sensitive=True is_case_sensitive_strict=False final_result=True priority=100
+    bundled autocorrection.errors is_word=True auto_expand=False is_case_sensitive=False final_result=False
+10 personal trigger(s) shared with a bundled one

@@ -1,0 +1,13 @@
+[dev-prerelease] Newest signed dev prerelease: v0.0.0-dev.162.
+[dev-prerelease] /Applications/ErgoptiPlus.app is already v0.0.0-dev.162.
+[dev-prerelease] Another copy shares the app's identity: /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app; unregistering it (its files stay).
+[dev-prerelease] Opened /Applications/ErgoptiPlus.app with this clone as its field-run root.
+[field-report] Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog
+[field-report] names (never add one with +); type your password if macOS asks for it (Ergopti installs its own
+[field-report] Karabiner runtime); and if System Settings opens Login Items & Extensions, switch on the Karabiner driver.
+[field-report] Nothing else needs a click; the run waits for all three.
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 56093); requesting every step within 10300 s.
+[field-report] Field run done: {"cause":{"kind":"reload","reason":"menu","step":"field_lease"},"finished_at":"2026-11-05T10:17:18Z","interrupted":true,"order":[],"pid":56093,"request_id":"mac-2026-11-05_111400","schema":1,"started_at":"2026-11-05T10:17:12Z","verdicts":{}}
+[field-report] Field run summary: ✅ 0 pass, ❌ 0 fail, 0 other.
+[field-report] The field run was cut short in the app (see its log); the results so far are kept.
