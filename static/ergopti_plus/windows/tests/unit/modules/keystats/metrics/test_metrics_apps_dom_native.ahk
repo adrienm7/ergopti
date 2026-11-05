@@ -291,7 +291,12 @@ _KMCD_Source(Root) {
 	Code := _KLWF_Source(Root)
 	Fixture := FSReadStrict(_DriverDir . "\tests\fixtures\worker_live_foreground_body.ahk")
 	AssertEqual(Fixture, SubStr(Code, StrLen(Code) - StrLen(Fixture) + 1))
-	return SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
+	DispatcherOwner := _KFCD_ClassOwner("HookDispatcherConst")
+	AssertTrue(DispatcherOwner != "" && _DriverIsProductionSource(DispatcherOwner),
+		"The actual hook teardown constants require their genuine production owner")
+	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Fixture))
+	Code .= "#Include " . DispatcherOwner . "`n"
+	return Code
 		. FSReadStrict(_DriverDir . "\tests\fixtures\keystats_calendar_focus_body.ahk")
 }
 _KMCD_Case(Mode) {
