@@ -134,7 +134,7 @@ local function read_rows(sqlite_path, sql, media_owned)
 	return rows, true
 end
 
-local function filters(start_date, end_date, apps, exclude_date)
+local function filters(start_date, end_date, apps, exclude_date, include_unknown)
 	local clauses = {}
 	if valid_date(start_date) then clauses[#clauses + 1] = "date >= " .. sql_quote(start_date) end
 	if valid_date(end_date) then clauses[#clauses + 1] = "date <= " .. sql_quote(end_date) end
@@ -144,7 +144,12 @@ local function filters(start_date, end_date, apps, exclude_date)
 		for _, app in ipairs(apps) do
 			if type(app) == "string" and app ~= "" then quoted[#quoted + 1] = sql_quote(app) end
 		end
-		if #quoted > 0 then clauses[#clauses + 1] = "app IN (" .. table.concat(quoted, ",") .. ")" end
+		-- Unknown is a transport bucket, not a selectable app; the dashboard
+		-- retains it alongside every non-empty application selection.
+		if #quoted > 0 then
+			if include_unknown then quoted[#quoted + 1] = sql_quote("Unknown") end
+			clauses[#clauses + 1] = "app IN (" .. table.concat(quoted, ",") .. ")"
+		end
 	end
 	return #clauses > 0 and (" WHERE " .. table.concat(clauses, " AND ")) or ""
 end
@@ -554,7 +559,7 @@ end
 function M.read_ngrams(sqlite_path, start_date, end_date, apps, exclude_date)
 	local out = empty_ngrams()
 	local complete = true
-	local where = filters(start_date, end_date, apps, exclude_date)
+	local where = filters(start_date, end_date, apps, exclude_date, true)
 	for _, code in ipairs(NGRAM_CODES) do
 		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
 		if not accepted then complete = false end
@@ -564,7 +569,7 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps, exclude_date)
 	end
 	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
 		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
-		filters(start_date, end_date, apps, exclude_date)))
+		filters(start_date, end_date, apps, exclude_date, true)))
 	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do merge_ngram(out.sc_kb, tostring(row.scancode), row.c) end
 	return out, complete
@@ -611,7 +616,7 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today
 		future_requested and today or nil)
 	local today_by_app = {}
 	if not bounds.includes_today then return { historical = historical, today = today_by_app }, complete end
-	local today_where = filters(today, today, apps)
+	local today_where = filters(today, today, apps, nil, true)
 	for _, code in ipairs(NGRAM_CODES) do
 		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
 		if not accepted then complete = false end
@@ -622,7 +627,7 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today
 	end
 	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
 		"SELECT json_quote(app) AS app_json, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",
-		filters(today, today, apps)))
+		filters(today, today, apps, nil, true)))
 	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do
 		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()

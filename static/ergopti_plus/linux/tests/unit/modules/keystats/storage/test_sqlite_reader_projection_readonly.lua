@@ -1033,7 +1033,7 @@ helpers.describe("linux-sqlite-ngram-catalogue", function()
 		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
 			reader.read_ngrams("/db/metrics.sqlite", "2026-10-01", "2026-10-02", { "editor" })
 		end)
-		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor')"
+		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor','Unknown')"
 		local issued = {}
 		for _, sql in ipairs(statements) do issued[sql] = true end
 		for _, entry in ipairs(EXPECTED) do

@@ -1576,7 +1576,7 @@ local function add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 	for date, entries in pairs(snapshot_calendar(clock).values) do
 		if (date <= clock.date or future_requested) and SqliteReader.includes_date(date, start_date, end_date) then
 			for app, stats in pairs(entries) do
-				if unrestricted or selected[app] then
+				if unrestricted or app == "Unknown" or selected[app] then
 					local target = payload.historical
 					if date == clock.date then
 						payload.today[app] = payload.today[app] or empty_ngrams()

@@ -82,6 +82,26 @@ scenario({ month = 10, day = 26, hour = 0, min = 0, sec = 20 }, function(k, _, a
 	check_range()
 end)
 
+scenario({ month = 10, day = 25 }, function(k, _, advance)
+	k.on_keydown("x", Monotonic.now_ms(), nil)
+	k.on_keydown("y", Monotonic.now_ms(), "editor")
+	k.on_keydown("z", Monotonic.now_ms(), "browser")
+	local function check_today()
+		local range = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "editor" }))
+		equal(range.today.editor.c.y.c, 1)
+		equal(range.today.Unknown and range.today.Unknown.c.x and range.today.Unknown.c.x.c, 1)
+		equal(range.today.browser, nil)
+	end
+	check_today()
+	Fixture.flush(k)
+	check_today()
+	advance(2000)
+	local old = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "editor" }))
+	equal(old.historical.c.x and old.historical.c.x.c, 1)
+	equal(old.historical.c.y.c, 1)
+	equal(old.historical.c.z, nil)
+end)
+
 scenario({ month = 10, day = 25 }, function(k, _, advance, rows)
 	k.on_app_focus("calendar-app", Monotonic.now_ms())
 	k.set_window_title("calendar-app", "original", Monotonic.now_ms())
@@ -326,4 +346,4 @@ for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 
 		equal(rows("SELECT ms FROM agg_app_day_titles WHERE title='dst' ORDER BY date;"), { string.format("%.0f", length), "1000" })
 	end)
 end
-print("native capture calendar: scenarios=10 checks=" .. checks)
+print("native capture calendar: scenarios=11 checks=" .. checks)

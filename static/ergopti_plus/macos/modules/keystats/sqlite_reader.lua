@@ -646,6 +646,7 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 		if extra_app and #extra_app > 0 then
 			local quoted = {}
 			for _, a in ipairs(extra_app) do table.insert(quoted, _q(a)) end
+			table.insert(quoted, _q("Unknown"))
 			table.insert(clauses, "app IN (" .. table.concat(quoted, ",") .. ")")
 		end
 		return (#clauses > 0) and (" WHERE " .. table.concat(clauses, " AND ")) or ""
@@ -825,6 +826,7 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 		if selected_apps and #selected_apps > 0 then
 			local quoted = {}
 			for _, a in ipairs(selected_apps) do table.insert(quoted, _q(a)) end
+			table.insert(quoted, _q("Unknown"))
 			app_clause = " AND app IN (" .. table.concat(quoted, ",") .. ")"
 		end
 		-- The catalogue's ngram.tokens_by_app groups by app, token and esrc_json,
