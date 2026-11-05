@@ -84,6 +84,34 @@ local function with_stage(body, options)
 end
 
 helpers.describe("prepared clipboard exact lifetime", function()
+	helpers.it("refuses a foreign copy after preparation (clipboard-payload-replaced)", function()
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.value = "external copy"
+			helpers.assert_eq(s.stage.paste(s.channel), false)
+			helpers.assert_eq(s.rows, {}, "never paste the other application's bytes")
+			helpers.assert_true(s.stage.close())
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(s.writes, { "replacement" })
+		end)
+	end)
+	for _, mode in ipairs({ "unreadable", "retired" }) do
+		helpers.it("refuses " .. mode .. " clipboard preflight before output (clipboard-payload-replaced)", function()
+			local options = {}
+			with_stage(function(s)
+				helpers.assert_true(s.stage.prepare())
+				if mode == "unreadable" then options.read_refused = true end
+				s.boundary = function(phase)
+					if mode == "retired" and phase == "read" then s.live = false end
+				end
+				helpers.assert_eq(s.stage.paste(s.channel), false)
+				helpers.assert_eq(s.rows, {})
+				options.read_refused, s.boundary = false, nil
+				helpers.assert_true(s.stage.close())
+				helpers.assert_eq(s.value, "original")
+			end, options)
+		end)
+	end
 	helpers.it("does not overwrite an external copy after a failed setter", function()
 		with_stage(function(s)
 			s.failure = "set"
@@ -145,7 +173,7 @@ helpers.describe("prepared clipboard exact lifetime", function()
 				helpers.assert_eq(s.stage.prepare(), false, "preparation is one-shot")
 				helpers.assert_eq(s.stage.paste(s.channel), true)
 				helpers.assert_eq(s.rows, { { 29, 1 }, { 38, 1 }, { 38, 0 }, { 29, 0 } })
-				helpers.assert_eq({ s.reads, #s.writes, s.waits, s.lookups }, { 1, 1, { 30, 120 }, 0 })
+				helpers.assert_eq({ s.reads, #s.writes, s.waits, s.lookups }, { 2, 1, { 30, 120 }, 0 })
 				helpers.assert_eq(s.stage.close(), true)
 				helpers.assert_eq(s.value, saved)
 				helpers.assert_eq(s.writes, { "replacement", saved })
@@ -321,14 +349,14 @@ helpers.describe("prepared clipboard exact lifetime", function()
 			s.boundary = function(phase)
 				if phase ~= "admission" then return end
 				checks = checks + 1
-				if checks == 2 then
+				if checks == 3 then
 					helpers.assert_eq(s.stage.close(), false, "the paste frame still owns its native call")
 				end
 			end
 			local issued = s.stage.paste(s.channel)
 			helpers.assert_eq(s.rows, { { 29, 1 } }, "an affirmative stale admission cannot publish V after close")
 			helpers.assert_eq(issued, false)
-			helpers.assert_eq(checks, 2)
+			helpers.assert_eq(checks, 3)
 			helpers.assert_eq(s.stage.close(), true)
 			helpers.assert_eq(s.value, "original")
 		end)
