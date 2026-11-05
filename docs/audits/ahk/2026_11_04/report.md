@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **128 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **130 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1933,3 +1933,21 @@ Replay42039178724 at67757700 passes35/40 in each order. Production parsing and90
 Replay42037461104 establishes a genuine normal Edit/cache/focus-hook receipt, then enables native ES_PASSWORD without changing HWND or element identity. Native inspection reports secure1 and conclusive1, but the actual adapter returns secure0 at47ms inside the unmodified1000ms TTL; diagnostics0. Both orders repeat. The normal and naturally expired controls pass.
 
 Source92e4c1c7 refreshes bounded native classification before cache reuse and keeps inconclusive fallback conservative. Two added controls preserve exact UIA-negative reuse and reject stale native-negative reuse. Postfix qualification is pending. This detector proof is separate from any keyboard/HTTP leak claim; a native prefix retention/publication composition is newly integrated for testing. No IO is added to the RAM-only prefix reader by that getter-only change.
+
+### Native qualification: replays37,41 and24
+
+Replay42040988578 passes34/37 selected cases in both orders, with production parsing green and E2E unselected. All10 Layout retirement controls pass, including actual Destroy-then-throw retry, as do the5 secure-field getter/cache controls. The remaining prefix composition retains24 private units from actual InputHook callbacks despite fresh native password classification; the private peer receives0 requests. The public control produces1 real public POST. Source0388b174 corrects immediate retention through fresh gateway hints and a private-gap barrier;8 additional units and the original2 native oracles await postfix qualification.
+
+Replay42055350664 passes40/41 in both orders. Production parsing and90 native hotstring cases pass, as does one selected actual launcher/relay owner case using its stub daemon. This does not qualify the complete proxy/SSPI suite. All20 selected scalar custody controls,11 bootstrap lifetime controls and2 native navigation controls pass. The sole failure confirms129 below with a now-clean ordinary control.
+
+Replay42062852930 passes19/24 selected cases in both orders. Production parsing passes; all E2E flags are unselected. The original model2, earlier6 and3 admission controls qualify V1, while2 later admission cutpoints remain red. The power-unknown case confirms130. A failed actual bootstrap constructor retains its owner while the throwing acyclic control is destroyed, extending125. The action-level NUL launch probe refuses safely and its valid control passes; the direct adapter launches the shorter prefix despite retaining all original110 input units. The latter requires primitive-contract correction and does not establish a public action/config bypass.
+
+### AHK-129: Native model selection leaves the previous API backend active
+
+The actual API-to-Ollama selection persists B and closes the catalogue, but leaves the API backend active. Replay42055350664 has clean lifecycle retirement and errors0 in both ordinary/API probes; the ordinary Ollama control passes. The Web selector and other drivers activate Ollama for the same model-selection intent.
+
+Sourceefda9c0a requires both persistence acknowledgements and current native ownership. Replay42062852930 qualifies the original controls and3 new refusal/replacement/lifecycle cases. Two further cutpoints expose an old selection activating a newer model and a second commit adopting a resumed lifecycle. Source9cffc325 validates the original receipt inside the existing mutator after bundle acquisition, then binds model/backend before closing. Those2 postfix cases remain pending.
+
+### AHK-130: Unknown power status becomes a definite offline reading
+
+The sensor receives documented AC255/battery73 bytes through an explicit native power port and publishes on_ac0. The genuine central publication and known AC/DC controls execute in both orders. Sourcec2787b90 omits the unknown AC field, preserving known values and the existing unknown-battery policy. Native postfix qualification is pending. The test does not claim these bytes came from runner hardware.
