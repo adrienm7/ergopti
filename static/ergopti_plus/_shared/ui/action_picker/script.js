@@ -1127,6 +1127,8 @@ document.addEventListener('DOMContentLoaded', function () {
 	});
 
 	document.addEventListener('keydown', function (e) {
+		// Let the focused button handle Enter itself, including Back and Cancel.
+		if (e.key === 'Enter' && e.target?.tagName === 'BUTTON') return;
 		// While a value is being edited every key belongs to the editor: Escape
 		// and Enter can be keys to capture there, never a cancel or a pick.
 		if (onParamKeydown(e)) return;

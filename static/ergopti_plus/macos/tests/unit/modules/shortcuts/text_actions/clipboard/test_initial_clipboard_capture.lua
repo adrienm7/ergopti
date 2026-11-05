@@ -12,7 +12,7 @@ local Fixture = require("tests.support.modules.shortcuts.initial_clipboard_fixtu
 
 helpers.describe("initial-clipboard-capture", function()
 	for _, kind in ipairs({ "plain", "wrap", "transform" }) do
-		for _, original in ipairs({ "all-types", "empty", "nil-snapshot" }) do
+		for _, original in ipairs({ "all-types", "empty" }) do
 			helpers.it("(initial-clipboard-capture) " .. kind .. " preserves healthy " .. original, function()
 				Fixture.run(kind, { empty = original == "empty", nil_snapshot = original == "nil-snapshot" }, function(state)
 					helpers.assert_eq(state.start(), true)
@@ -24,6 +24,12 @@ helpers.describe("initial-clipboard-capture", function()
 				end)
 			end)
 		end
+		helpers.it("(initial-clipboard-capture) " .. kind .. " refuses an invalid nil native snapshot", function()
+			Fixture.run(kind, { nil_snapshot = true }, function(state)
+				helpers.assert_eq(state.start(), false)
+				state.assert_refused()
+			end)
+		end)
 		local boundaries = kind == "plain" and { "snapshot", "plain", "timer" }
 			or kind == "transform" and { "snapshot", "timer" } or { "snapshot" }
 		for _, boundary in ipairs(boundaries) do

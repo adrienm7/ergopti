@@ -87,6 +87,7 @@ const title = [];
 const boundary = [];
 const wordSeparator = [];
 const caseIgnorable = [];
+const cased = [];
 for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (codepoint >= 0xd800 && codepoint <= 0xdfff) continue;
 	const character = String.fromCodePoint(codepoint);
@@ -95,6 +96,7 @@ for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (/^[\p{White_Space}\p{P}]$/u.test(character)) boundary.push(character);
 	if (/^[\p{White_Space}\p{Pd}]$/u.test(character)) wordSeparator.push(character);
 	if (/^\p{Case_Ignorable}$/u.test(character)) caseIgnorable.push(character);
+	if (/^\p{Cased}$/u.test(character)) cased.push(character);
 	if (uppercase !== character) {
 		upper.push([character, uppercase]);
 		const titlecase = titlecaseCharacter(character);
@@ -109,12 +111,13 @@ if (
 	title.length < 1500 ||
 	boundary.length < 800 ||
 	wordSeparator.length < 45 ||
-	caseIgnorable.length < 2700
+	caseIgnorable.length < 2700 ||
+	cased.length < 4500
 ) {
 	throw new Error(
 		`case data unexpectedly small: upper=${upper.length}, lower=${lower.length}, ` +
 			`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
-			`caseIgnorable=${caseIgnorable.length}`
+			`caseIgnorable=${caseIgnorable.length}, cased=${cased.length}`
 	);
 }
 if (
@@ -166,7 +169,8 @@ for (const [name, rows] of [
 for (const [name, characters] of [
 	['boundary', boundary],
 	['word_separator', wordSeparator],
-	['case_ignorable', caseIgnorable]
+	['case_ignorable', caseIgnorable],
+	['cased', cased]
 ]) {
 	lines.push(`\t${name} = {`);
 	for (const character of characters) lines.push(`\t\t[${quote(character)}] = true,`);
@@ -181,5 +185,5 @@ console.log(
 	`[OK] Unicode ${EXPECTED_UNICODE_VERSION}: ${upper.length} upper, ${lower.length} lower, ` +
 		`${title.length} title mappings, ${boundary.length} word boundaries, ` +
 		`${wordSeparator.length} title-case word separators, ` +
-		`${caseIgnorable.length} case-ignorable characters.`
+		`${caseIgnorable.length} case-ignorable characters, ${cased.length} cased characters.`
 );

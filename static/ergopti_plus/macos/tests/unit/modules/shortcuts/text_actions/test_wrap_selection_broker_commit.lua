@@ -16,7 +16,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- @param callback function Scenario body.
 local function with_broker(callback)
 	helpers.with_stub_scope({
-		"modules.shortcuts.actions.text", "adapters.synthetic_input",
+		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
 	}, function()

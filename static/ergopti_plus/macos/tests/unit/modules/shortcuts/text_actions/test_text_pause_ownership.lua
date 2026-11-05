@@ -23,7 +23,7 @@ end
 
 local function fresh_fixture()
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text",
+		"modules.shortcuts.actions.text", "adapters.clipboard",
 		"adapters.synthetic_input",
 		"adapters.event_provenance",
 		"adapters.timer_scheduler",

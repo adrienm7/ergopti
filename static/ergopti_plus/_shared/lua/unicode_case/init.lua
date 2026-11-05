@@ -67,7 +67,7 @@ function M.lower(text)
 		characters[#characters + 1] = character
 	end
 	local function is_cased(character)
-		return Data.upper[character] ~= nil or Data.lower[character] ~= nil
+		return Data.cased[character] == true
 	end
 	local cased_before = {}
 	local preceding_is_cased = false

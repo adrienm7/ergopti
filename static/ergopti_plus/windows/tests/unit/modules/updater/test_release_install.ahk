@@ -337,6 +337,31 @@ _RIT_BackupAndRestoreRealFiles() {
 Test("Config backup: backs up and restores the configuration's exact bytes (config-backup-real-files)",
 	_RIT_BackupAndRestoreRealFiles)
 
+_RIT_BackupManifestReadback() {
+	Root := A_Temp . "\ergopti_rit_manifest_readback_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Path := Root . "\backup.json"
+	try {
+		_RIT_WriteFile(Path, '{"tag":"é"}')
+		_ConfigBackup_RequireManifest(Path, '{"tag":"é"}')
+		for Expected in ['{"tag":"different"}', '{"tag":"É"}'] {
+			Rejected := false
+			try _ConfigBackup_RequireManifest(Path, Expected)
+			catch
+				Rejected := true
+			AssertTrue(Rejected, "a changed manifest must refuse the backup")
+		}
+		FileDelete(Path)
+		Rejected := false
+		try _ConfigBackup_RequireManifest(Path, '{"tag":"é"}')
+		catch
+			Rejected := true
+		AssertTrue(Rejected, "a missing manifest must refuse the backup")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: verifies its published manifest exactly", _RIT_BackupManifestReadback)
+
 _RIT_BackupSkipsMissingCopy() {
 	Root := A_Temp . "\ergopti_rit_missing_copy_" . PLC_CurrentProcessId() . "_" . A_TickCount
 	Cfg := Root . "\cfg"

@@ -18,6 +18,7 @@ local M = {}
 
 local hs         = hs
 local pasteboard = hs.pasteboard
+local Clipboard  = require("adapters.clipboard")
 local JsonCodec  = require("adapters.json_codec")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -484,10 +485,10 @@ local function capture_text_clipboard(owner, include_plain)
 	if not before_ok or before == nil then
 		return false, "native clipboard generation unavailable before snapshot"
 	end
-	local snapshot_ok, snapshot = call_text_boundary(owner, pasteboard.readAllData)
-	if not snapshot_ok or (snapshot ~= nil and type(snapshot) ~= "table") then
-		return false, snapshot_ok and "readAllData returned " .. type(snapshot) or snapshot
-	end
+	local snapshot_ok, snapshot, captured, snapshot_count = call_text_boundary(owner, Clipboard.save, true)
+	if not snapshot_ok then return false, snapshot end
+	if captured ~= true then return false, "clipboard snapshot incomplete or unavailable" end
+	if snapshot_count ~= before then return false, "clipboard changed during snapshot capture" end
 	local plain = nil
 	if include_plain then
 		local plain_ok

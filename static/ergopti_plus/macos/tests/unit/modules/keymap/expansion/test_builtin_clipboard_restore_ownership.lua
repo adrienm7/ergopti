@@ -104,7 +104,7 @@ helpers.describe("builtin clipboard restore follows native ownership", function(
 	helpers.it("restores an absent original through the native void clear (builtin-restore-empty)", function()
 		with_world(function(w)
 			w.clear()
-			hs.pasteboard.readAllData = function() return nil end
+			hs.pasteboard.readAllData = function() return {} end
 			w.handoff()
 			w.advance(1)
 			helpers.assert_true(next(w.board) == nil)
