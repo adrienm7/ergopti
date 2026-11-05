@@ -134,6 +134,18 @@ function M.new(active)
 		return states[button] == nil
 	end
 
+	-- Capture the exact physical obligation, not just its reusable binding name.
+	-- Finalization is harmless if this obligation has already been replaced.
+	function owner.capture_binding_retirement(button, binding)
+		local state = states[button]
+		if not state or state.binding ~= binding then return function() end end
+		return function()
+			if states[button] ~= state then return end
+			state.wanted = false
+			if not busy then owner.pump() end
+		end
+	end
+
 	--- Accepts one toggle without waiting for any native child in the callback.
 	function owner.toggle(button, binding)
 		if (button ~= "1" and button ~= "3") or busy or retiring then return false end
