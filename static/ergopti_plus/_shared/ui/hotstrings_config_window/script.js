@@ -252,7 +252,22 @@ function bindPriority(field, cat, sec) {
 	if (typeof def === 'number') input.placeholder = def;
 	field.classList.toggle('overridden', !!overridden);
 
+	function clearPriority() {
+		send({
+			action: 'clear_priority',
+			category: cat.name,
+			group: cat.group,
+			section: sec ? sec.name : '',
+			personal_path: cat.personal_path || '',
+			ext_id: cat.ext_id || ''
+		});
+	}
+
 	input.addEventListener('change', () => {
+		if (input.value === '' && !input.validity?.badInput) {
+			clearPriority();
+			return;
+		}
 		const v = Number(input.value);
 		if (input.value !== '' && Number.isSafeInteger(v) && v >= 0 && v <= 100) {
 			send({
@@ -267,16 +282,7 @@ function bindPriority(field, cat, sec) {
 		}
 	});
 
-	reset.addEventListener('click', () => {
-		send({
-			action: 'clear_priority',
-			category: cat.name,
-			group: cat.group,
-			section: sec ? sec.name : '',
-			personal_path: cat.personal_path || '',
-			ext_id: cat.ext_id || ''
-		});
-	});
+	reset.addEventListener('click', clearPriority);
 }
 
 function bindColor(field, cat, sec) {

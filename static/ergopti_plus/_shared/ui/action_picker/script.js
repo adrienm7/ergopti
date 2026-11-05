@@ -505,6 +505,8 @@ let defaultCount = null;
 // Host-supplied for llm_vision: the vision backends a binding may use
 // ([{value: id, label, defaultModel}], defaultModel "" when it needs one).
 let visionChoices = null;
+let visionModelDrafts = new Map();
+let visionModelOwner = null;
 
 // Host-supplied for llm_language: the target languages a binding may name
 // ([{value, label}]: "ui" for the interface language, then every locale).
@@ -764,7 +766,22 @@ function fillVisionChoices(value) {
 		if (current && choice.value === current.backend) selected = choice.value;
 	}
 	provider.value = selected;
-	el('param-vision-model').value = current && current.model !== null ? current.model : '';
+	visionModelDrafts = new Map();
+	visionModelOwner = selected;
+	const model =
+		current && current.backend === selected && current.model !== null ? current.model : '';
+	visionModelDrafts.set(selected, model);
+	el('param-vision-model').value = model;
+	updateVisionModelHint();
+}
+
+// Models belong to a backend. Keep unsaved drafts when switching back, but
+// never submit one provider's model name to a newly selected provider.
+function changeVisionProvider() {
+	const model = el('param-vision-model');
+	if (visionModelOwner !== null) visionModelDrafts.set(visionModelOwner, model.value);
+	visionModelOwner = el('param-vision-provider').value;
+	model.value = visionModelDrafts.get(visionModelOwner) || '';
 	updateVisionModelHint();
 }
 
@@ -1138,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		editCurrent();
 	});
 	el('param-vision-provider').addEventListener('change', function () {
-		updateVisionModelHint();
+		changeVisionProvider();
 	});
 
 	document.addEventListener('keydown', function (e) {

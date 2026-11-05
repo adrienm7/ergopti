@@ -317,12 +317,16 @@ local function logs_dir()
 end
 
 --- Ensures a directory exists (idempotent), creating parents as needed.
---- Memoised per session; prefers the in-process hs.fs API over a shell fork.
+--- Cached paths are rechecked in-process; creation prefers hs.fs over a shell fork.
 --- @param path string Absolute path with trailing slash.
 --- @return boolean ensured True only when the directory exists after the call.
 local function ensure_dir(path)
 	if not path or path == "" then return false end
-	if _ensured_dirs[path] then return true end
+	if _ensured_dirs[path] then
+		local ok, attr = pcall(hs.fs.attributes, path)
+		if ok and type(attr) == "table" and attr.mode == "directory" then return true end
+		_ensured_dirs[path] = nil
+	end
 
 	-- hs.fs.mkdir creates a single level only, so walk the ancestors first to
 	-- reproduce "mkdir -p" without leaving the process.
@@ -357,7 +361,7 @@ local function ensure_dir(path)
 	-- remembering the failure would skip every later attempt — leaving the config
 	-- directory missing for the whole session while every save silently no-ops.
 	local ok_final, final_attr = pcall(hs.fs.attributes, path)
-	if ok_final and final_attr then
+	if ok_final and type(final_attr) == "table" and final_attr.mode == "directory" then
 		_ensured_dirs[path] = true
 		return true
 	else

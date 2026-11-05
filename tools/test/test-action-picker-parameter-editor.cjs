@@ -700,6 +700,42 @@ for (const id of ['send_text', 'send_key', 'send_shortcut', 'llm_prompt_predicti
 	);
 }
 
+// Each vision provider has its own model namespace and an independent draft.
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
+	vm.runInContext("doConfirm('llm_screen_region')", page.context);
+	const provider = page.byId['param-vision-provider'];
+	const model = page.byId['param-vision-model'];
+	check(model.value === 'llama-4-scout', `${host}: source provider starts with its model`);
+	provider.value = 'local';
+	provider.dispatch('change');
+	check(model.value === '', `${host}: switching providers must not copy a remote model to local`);
+	model.value = 'local-custom';
+	provider.value = 'cerebras';
+	provider.dispatch('change');
+	check(model.value === 'llama-4-scout', `${host}: returning restores the original provider draft`);
+	provider.value = 'local';
+	provider.dispatch('change');
+	check(model.value === 'local-custom', `${host}: returning restores the local draft`);
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'local|local-custom',
+		`${host}: only the active provider model is saved`
+	);
+}
+
+{
+	const page = loadPage('hs');
+	vm.runInContext("doConfirm('llm_screen_region')", page.context);
+	page.byId['param-vision-provider'].value = 'local';
+	page.byId['param-vision-provider'].dispatch('change');
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 && page.posted[0].parameter === 'local',
+		'the local default is saved instead of a model from the former provider'
+	);
+}
+
 // Editing an existing translate prompt must preserve its per-binding target.
 for (const host of ['ahk', 'hs', 'linux']) {
 	const page = loadPage(host);
