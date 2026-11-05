@@ -596,6 +596,7 @@ _HotstringsCacheBuildRows(CategoryPaths := 0) {
 ; every boot keeps rebuilding from the TOML (mirrors _I18nWriteTsvCache).
 _HotstringsCacheWriteTsv(TsvPath, Rows) {
 	try {
+		PhysicalPath := FSResolveAbsolutePath(TsvPath)
 		Content := "# source-order-v1`n"
 		if !Rows.HasOwnProp("SourceOrder")
 			throw Error("Hotstring cache source order is unavailable.")
@@ -630,16 +631,23 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 				throw Error("hotstring cache receipt checksum is unavailable")
 			Content .= "# receipt-v1`t" . Rows.SourceInventory.Length . "`t" . Records.Length . "`t" . Digest . "`n"
 		}
-		; Finish and verify the temporary cache before the write-through atomic
-		; replacement. FileAppend cannot expose a short write, so it could publish a
-		; valid-looking prefix that the cache reader would accept on the next boot.
-		TmpPath := TsvPath . ".tmp"
-		if !FSWriteDurable(TmpPath, Content)
-			throw Error("hotstring cache stage write was incomplete")
-		if !FSUtf8ExactMatches(TmpPath, Content)
-			throw Error("hotstring cache stage bytes did not verify")
-		if !FSAtomicMoveReplace(TmpPath, TsvPath)
-			throw Error("hotstring cache stage could not be published")
+		; The cache is best effort, but never borrows an existing sidecar.
+		; Retain one exclusive native stage through readback, rename and cleanup.
+		static WriteSeq := 0
+		Suffix := "." . A_ScriptHwnd . "-" . (++WriteSeq) . ".tmp"
+		Stage := {handle: -1}
+		CreateStage(Folder, Name, Attributes) {
+			Stage.handle := _FSCreateHeldStage(Folder, Name, Attributes)
+			return Stage.handle
+		}
+		VerifyStage() {
+			_FSRewind(Stage.handle)
+			Readback := _FSReadUtf8ExactHandle(Stage.handle, 0, false)
+			return (Readback is String) && Readback == Content
+		}
+		if !FSWriteReplaceOwned(PhysicalPath, Content, Suffix, &Detail,
+				CreateStage, VerifyStage, 0, true, &Publication)
+			throw Error("hotstring cache publication was not fully acknowledged: " . Detail)
 	} catch as err {
 		try LoggerWarn("Hotstrings", "Could not write hotstring cache '{1}' ({2}); TOML path stays active.", TsvPath, err.Message)
 	}
