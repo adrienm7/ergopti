@@ -104,21 +104,25 @@ SFD_IsSecureField(KnownFocusedHwnd := unset) {
 		return true
 	SFD_EnsureFocusTracking()
 	Focus := SFD_FocusSnapshot()
-	CachedSecure := true
-	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
-			&CachedSecure)
-		return CachedSecure
-
+	; ES_PASSWORD can change without changing HWND, focus or RuntimeId. Native
+	; Edit/RichEdit classification is bounded and authoritative on every read;
+	; only inconclusive provider fields may reuse their exact UIA receipt.
+	NativeElement := "hwnd:" . Hwnd
 	Conclusive := false
 	Secure := SFD_DetectNative(Hwnd, &Conclusive)
-	if !Conclusive {
-		; Unknown is fail-closed until the asynchronous UIA probe establishes a
-		; normal field. This protects browser password boxes and UAC-restricted UI.
-		Secure := true
-		SFD_ScheduleUiaProbe(Hwnd, Focus.Generation)
+	if Conclusive {
+		SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation, NativeElement)
+		return Secure
 	}
-	SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation,
-		Conclusive ? "hwnd:" . Hwnd : "")
+	CachedSecure := true
+	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
+			&CachedSecure) && (CachedSecure || Focus.ElementId !== NativeElement)
+		return CachedSecure
+	; A failed native read cannot reuse an old native negative verdict. Unknown
+	; remains fail-closed until the asynchronous UIA owner confirms its field.
+	Secure := true
+	SFD_ScheduleUiaProbe(Hwnd, Focus.Generation)
+	SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation, "")
 	return Secure
 }
 
