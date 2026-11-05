@@ -38,6 +38,7 @@ local TextUtils = require("text_utils")
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local TextCipher    = require("modules.keystats.text_cipher")
+local MigrationPlan = require("keystats.text_migration")
 local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
 local NativePath    = require("native_path")
@@ -780,8 +781,11 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 		-- cost every query a decryption it does not need.
 		local raw_text = ev.text or ""
 		local raw_json = ev.events_json or "[]"
-		local enc_text = TextCipher.encrypt(device_id, event_id, raw_text)
-		local enc_json = TextCipher.encrypt(device_id, tostring(event_id) .. "j", raw_json)
+		local text_id = MigrationPlan.iv_event_id(event_id, "text")
+		local json_id = MigrationPlan.iv_event_id(event_id, "events_json")
+		if not text_id or not json_id then return nil end
+		local enc_text = TextCipher.encrypt(device_id, text_id, raw_text)
+		local enc_json = TextCipher.encrypt(device_id, json_id, raw_json)
 		if enc_text == nil or enc_json == nil then
 			-- Encryption is on but could not run. Storing the plaintext would
 			-- silently defeat the setting the user turned on, so drop the batch.
