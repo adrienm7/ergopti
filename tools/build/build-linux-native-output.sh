@@ -62,6 +62,13 @@ if [[ ! -f "${STAGE_DIR}/libergopti_archive_publication.so" \
 	echo "Native compiler did not produce a nonempty ordinary file" >&2
 	exit 1
 fi
+# This is only a basic format admission: the runtime still verifies the ABI.
+ELF_MAGIC="$(od -An -tx1 -N4 -- "${STAGE_DIR}/libergopti_archive_publication.so")"
+ELF_MAGIC="${ELF_MAGIC//[[:space:]]/}"
+if [ "$ELF_MAGIC" != 7f454c46 ]; then
+	echo "Native compiler output is not ELF" >&2
+	exit 1
+fi
 chmod 755 "${STAGE_DIR}/libergopti_archive_publication.so"
 # Atomic no-replace publication, including a concurrent destination arrival.
 ln -T -- "${STAGE_DIR}/libergopti_archive_publication.so" "$DESTINATION"
