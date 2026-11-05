@@ -19,8 +19,8 @@ class _ManagedRemoteTimingControlHttp {
 		this.Polls := 0
 		this.Aborts := 0
 		this.Pending := false
-		this.Status := 0
-		this.ResponseText := ""
+		this.Status := 200
+		this.ResponseText := '{"choices":[{"message":{"content":"managed-network-ok"}}]}'
 		this.ResponseEncodingValid := true
 	}
 
@@ -61,7 +61,7 @@ _ManagedRemoteTimingFilteredGeneration() {
 	try {
 		TimingsLoadShared()
 		LLM_REMOTE_POLL_MS := 0
-		Fixture.CheckGeneration(false)
+		Fixture.CheckGeneration(true)
 		AssertTrue(Http.Polls >= 2, "the actual remote poll must rearm after its first pending response")
 		AssertEqual(0, LLM_REMOTE_POLL_MS, "the fixture restores the filtered caller's sentinel")
 	} finally {
