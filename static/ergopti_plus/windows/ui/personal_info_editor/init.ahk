@@ -163,16 +163,16 @@ _PiEdWeb_TryOpen() {
 		return Installed || !_PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource)
 	} finally {
 		if !Installed {
-			; These locals were never lent to another session. Release subscriptions
-			; before their controller; only the exact still-current frame resets RAM.
+			; Detach only this opening before any local unsubscribe/Close can pump
+			; a successor. An unpublished GUI may own source consent at slot zero.
+			if _PiEdWeb_Gui == g
+				_PiEdWeb_Reset(g, SessionEpoch)
+			else if _PiEdWeb_Gui == 0
+				_PiEdWeb_Reset(0, SessionEpoch)
+			; These uninstalled locals were never lent to another session.
 			MsgSub := unset, NavSub := unset
 			if IsSet(Controller)
 				try Controller.Close()
-			if _PiEdWeb_EditorSourceCurrent(SessionEpoch, EditorSource) {
-				_PiEdWeb_Reset()
-				if _PiEdWeb_Gui == g
-					_PiEdWeb_Gui := 0
-			}
 			try g.Destroy()
 		}
 	}
@@ -384,60 +384,65 @@ _PiEdWeb_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 ; Window-close (X / Alt+F4) and the frontend "cancel" button both land here.
-_PiEdWeb_OnClose(*) {
-	_PiEdWeb_Close()
+_PiEdWeb_OnClose(GuiObj := unset, *) {
+	_PiEdWeb_Close(GuiObj?)
 }
 
-_PiEdWeb_Close() {
+_PiEdWeb_Close(ExpectedGui := unset) {
 	global _PiEdWeb_Gui
-	saved := (_PiEdWeb_Gui != 0) ? _PiEdWeb_Gui : 0
-	_PiEdWeb_Reset()
+	Window := IsSet(ExpectedGui) ? ExpectedGui : _PiEdWeb_Gui
+	Saved := _PiEdWeb_Reset(Window)
 	try {
-		if saved
-			saved.Destroy()
+		if Saved
+			Saved.Destroy()
 	}
-	_PiEdWeb_Gui := 0
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui). Idempotent: a
-; second call (e.g. the frontend "cancel" message and the native Gui Close
-; event both firing for the same teardown) is a true no-op instead of touching
-; the globals again.
-_PiEdWeb_Reset() {
-	global _PiEdWeb_Controller, _PiEdWeb_WebView, _PiEdWeb_MsgSub, _PiEdWeb_NavSub
-	global _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch
-	global _PiEdWeb_EditorSource
-
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _PiEdWeb_ResetDone
-		return
-	_PiEdWeb_ResetDone := true
-	_PiEdWeb_SessionEpoch += 1
-	RetiredSource := _PiEdWeb_EditorSource
-	_PiEdWeb_EditorSource := 0
-	if RetiredSource is Map
-		RetiredSource["active"] := false
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+; Default Reset retires plumbing while retaining its native host. Exact Close
+; paths also detach that captured GUI before any unsubscribe/Close/Destroy can
+; pump another public opening. Returning old frames never clear a successor.
+_PiEdWeb_Reset(ExpectedGui := unset, ExpectedEpoch := unset) {
+	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView, _PiEdWeb_MsgSub, _PiEdWeb_NavSub
+	global _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch, _PiEdWeb_EditorSource
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
+		if IsSet(ExpectedGui) && _PiEdWeb_Gui != ExpectedGui
+			return 0
+		if IsSet(ExpectedEpoch) && !_PiEdWeb_SessionCurrent(ExpectedEpoch)
+			return 0
+		if _PiEdWeb_ResetDone {
+			; A prior plumbing-only Reset must not prevent exact host closure.
+			if IsSet(ExpectedGui) {
+				SavedGui := _PiEdWeb_Gui
+				_PiEdWeb_Gui := 0
+				return SavedGui
+			}
+			return 0
+		}
+		SavedGui := _PiEdWeb_Gui
+		SavedController := IsSet(_PiEdWeb_Controller) ? _PiEdWeb_Controller : 0
+		SavedView := IsSet(_PiEdWeb_WebView) ? _PiEdWeb_WebView : 0
+		SavedMsg := IsSet(_PiEdWeb_MsgSub) ? _PiEdWeb_MsgSub : 0
+		SavedNav := IsSet(_PiEdWeb_NavSub) ? _PiEdWeb_NavSub : 0
+		SavedSource := _PiEdWeb_EditorSource
+		_PiEdWeb_ResetDone := true
+		_PiEdWeb_SessionEpoch += 1
+		_PiEdWeb_EditorSource := 0
+		if SavedSource is Map
+			SavedSource["active"] := false
 		_PiEdWeb_MsgSub := unset
 		_PiEdWeb_NavSub := unset
-		if IsSet(_PiEdWeb_Controller)
-			_PiEdWeb_Controller.Close()
-	}
-	_PiEdWeb_Controller := unset
-	_PiEdWeb_WebView    := unset
+		_PiEdWeb_Controller := unset
+		_PiEdWeb_WebView := unset
+		if IsSet(ExpectedGui)
+			_PiEdWeb_Gui := 0
+	} finally Critical(PreviousCritical)
+
+	; Strong references prevent finalizers during the RAM detach. Actual
+	; unsubscribe occurs outside Critical and before closing its exact controller.
+	try SavedMsg := unset
+	try SavedNav := unset
+	if SavedController
+		try SavedController.Close()
+	return SavedGui
 }
