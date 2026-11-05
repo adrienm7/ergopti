@@ -80,8 +80,8 @@ try {
 		const fakeCompiler = path.join(scratch, 'bad-compiler');
 		const foreign = path.join(scratch, 'foreign-file');
 		fs.writeFileSync(foreign, 'personal bytes', { mode: 0o600 });
-		fs.writeFileSync(fakeCompiler, '#!/bin/bash\nwhile [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then shift; output="$1"; break; fi; shift; done\ncase "$BAD_OUTPUT" in empty) : > "$output" ;; link) ln -s "$FOREIGN_FILE" "$output" ;; fifo) mkfifo "$output" ;; esac\n', { mode: 0o755 });
-		for (const kind of ['empty', 'link', 'fifo']) {
+		fs.writeFileSync(fakeCompiler, '#!/bin/bash\nwhile [ "$#" -gt 0 ]; do if [ "$1" = -o ]; then shift; output="$1"; break; fi; shift; done\ncase "$BAD_OUTPUT" in invalid) printf non-elf > "$output" ;; empty) : > "$output" ;; link) ln -s "$FOREIGN_FILE" "$output" ;; fifo) mkfifo "$output" ;; esac\n', { mode: 0o755 });
+		for (const kind of ['empty', 'link', 'fifo', 'invalid']) {
 			const output = path.join(scratch, `bad-native-${kind}`);
 			const result = spawnSync(bashExecutable(), [bashPath(copiedBuilder), '--source-directory', bashPath(sourceDirectory), '--output-directory', bashPath(output)], {
 				encoding: 'utf8', timeout: 10000,
