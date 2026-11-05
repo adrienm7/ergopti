@@ -687,6 +687,12 @@ _SysActions_OpenApp() {
 			AssertEqual('"' . FilePath . '"', _SysActions_CallsNamed(Fake, "Launch")[1][2],
 				"an existing whole file is passed as one argument")
 		}
+		Folder := "C:\Folder With Spaces"
+		GestureActionParameters := Map(GestureActionParameterKey("keyboard__primary_k", "open_app"), Folder)
+		Fake := _SysActionsFake(), Fake.Directories[Folder] := true
+		GestureSysOpenApp("keyboard__primary_k", Fake)
+		AssertEqual('"' . Folder . '"', _SysActions_CallsNamed(Fake, "Launch")[1][2],
+			"an existing whole directory is passed as one shell target")
 		Command := '"C:\Program Files\Demo\demo.exe" --option'
 		GestureActionParameters := Map(GestureActionParameterKey("keyboard__primary_k", "open_app"), Command)
 		Fake := _SysActionsFake()
@@ -1048,6 +1054,7 @@ class _OAP_NativeControl extends _SysActionsFake {
 		super.__New()
 		this.Native := SystemControl(), this.ProcessHandle := 0, this.UnownedPid := 0, this.Admitted := false
 	}
+	IsDirectory(Path) => this.Native.IsDirectory(Path)
 	IsExistingFile(Path) => this.Native.IsExistingFile(Path)
 	Launch(Target, WorkingDir := "", Options := "") {
 		Pid := this.Native.Launch(Target, WorkingDir, "Hide")
