@@ -55,7 +55,9 @@ function M.with_session(options, body)
 		close = function(fd)
 			s.source_closes = (s.source_closes or 0) + 1
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
-			return options.fail_reader_close and -1 or 0
+			local fail = type(options.fail_reader_close) == "function" and options.fail_reader_close(fd)
+				or options.fail_reader_close == true
+			return fail and -1 or 0
 		end,
 		ioctl = function(fd, request, argument)
 			if request == 0x80044520 then
