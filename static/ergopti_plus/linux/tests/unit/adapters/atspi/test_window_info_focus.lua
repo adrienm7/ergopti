@@ -235,12 +235,40 @@ helpers.describe("window_info: X11", function()
 		wi.getFocused()
 		local after_first = #log
 		for _ = 1, 5 do wi.getFocused() end
-		-- The window ID and title must stay current; the owning process needs
-		-- resolving only when either changes or its identity is still unknown.
-		helpers.assert_eq(#log - after_first, 10,
-			"an unchanged window needs only the identity and title probes, got "
+		-- The fallback must refresh the PID as well: the X server may recycle
+		-- an ID while another process opens a window with the same title.
+		helpers.assert_eq(#log - after_first, 15,
+			"an unchanged window needs its ID, title and PID probes, got "
 				.. tostring(#log - after_first) .. " for five calls")
 		restore()
+	end)
+
+	helpers.it("(linux-focus-reused-xid) detects a new owner in the xdotool fallback", function()
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		local previous = package.loaded["adapters.x11_focus"]
+		package.loaded["adapters.x11_focus"] = { has_transport = function() return false end }
+		local pid = 101
+		Shell._set_runner(function(command)
+			if command:find("getactivewindow", 1, true) then return "0x100\n" end
+			if command:find("getwindowname", 1, true) then return "Documents\n" end
+			if command:find("getwindowpid", 1, true) then return tostring(pid) .. "\n" end
+			if command:find("/proc/101/comm", 1, true) then return "first-app\n" end
+			if command:find("/proc/202/comm", 1, true) then return "second-app\n" end
+			return ""
+		end)
+		local ok, err = pcall(function()
+			local window = helpers.load_module("adapters.window_info")
+			window._reset_state()
+			helpers.assert_eq(window.getFocused().appId, "first-app")
+			pid = 202
+			helpers.assert_eq(window.getFocused().appId, "second-app")
+		end)
+		package.loaded["adapters.x11_focus"] = previous
+		restore()
+		assert(ok, err)
 	end)
 
 	helpers.it("re-resolves the identity when the title changes", function()
@@ -267,6 +295,34 @@ helpers.describe("window_info: X11", function()
 			"a changed title must invalidate the cached identity — otherwise the "
 				.. "first application of the session owns every keystroke that follows")
 		restore()
+	end)
+
+	helpers.it("(linux-focus-reused-xid) resolves the new owner when an XID and title are reused", function()
+		local previous = package.loaded["adapters.x11_focus"]
+		local pid = 101
+		package.loaded["adapters.x11_focus"] = {
+			has_transport = function() return true end,
+			query = function() return "0x100", "Documents", pid end,
+		}
+		local ok, err = pcall(function()
+			local window = under("x11", "xfce", {
+				{ "/proc/101/comm", "first-app\n" },
+				{ "/proc/202/comm", "second-app\n" },
+			})
+			local first, identity = window.focused_snapshot()
+			helpers.assert_eq(first.appId, "first-app")
+			helpers.assert_eq(identity, "x11:101:0x100")
+			pid = 202
+			local second, next_identity = window.focused_snapshot()
+			helpers.assert_eq(second.appId, "second-app")
+			helpers.assert_eq(next_identity, "x11:202:0x100")
+			pid = nil
+			local unknown = window.focused_snapshot()
+			helpers.assert_eq(unknown.appId, "", "a missing native PID cannot inherit the former owner")
+		end)
+		package.loaded["adapters.x11_focus"] = previous
+		restore()
+		assert(ok, err)
 	end)
 
 	helpers.it("answers empty when there is no focused window", function()
