@@ -452,8 +452,9 @@ public static class ErgoptiWinHttpTransport
             int connectMs = Math.Max(1, Math.Min(spec.ConnectTimeoutMs, budget));
             if (!WinHttpSetTimeouts(op.Session, connectMs, connectMs, budget, budget))
                 throw new InvalidOperationException("timeouts");
-            string host = destination.IdnHost;
-            if (host.StartsWith("[") && host.EndsWith("]")) host = host.Substring(1, host.Length - 2);
+            // WinHttpConnect requires brackets around IPv6 server names.
+            // Other hosts keep their existing IDN normalization.
+            string host = destination.HostNameType == UriHostNameType.IPv6 ? destination.Host : destination.IdnHost;
             op.Connect = WinHttpConnect(op.Session, host, (ushort)destination.Port, 0);
             if (op.Connect == IntPtr.Zero) { Classify(result, spec, op, Marshal.GetLastWin32Error(), "connect"); return; }
             // Revocation is always checked on HTTPS; best-effort only forgives an
