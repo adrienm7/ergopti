@@ -335,19 +335,6 @@ _TBUI_OwnedLastWinsRetainsForeignSource() {
 }
 Test("toml physical ownership preserves last-wins and absent deletion semantics", _TBUI_OwnedLastWinsRetainsForeignSource)
 
-
-
-
-
-; ===================================
-; ===================================
-; ======= 2/ Direct-run Entry =======
-; ===================================
-; ===================================
-
-if A_LineFile = A_ScriptFullPath
-	RunTests()
-
 _TBCS_Run(Mode) {
 	Root := A_Temp . "\ergopti_toml_stage_collision_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Created := false
@@ -355,7 +342,8 @@ _TBCS_Run(Mode) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		Harness := A_ScriptDir . "\fixtures\toml_stage_collision.ahk"
+		SplitPath(A_LineFile, , &TestDirectory)
+		Harness := FSResolveDirectoryPath(TestDirectory . "\..\..\..\fixtures") . "\toml_stage_collision.ahk"
 		AssertTrue(FSStrictExists(Harness), "the isolated native config writer owner must exist")
 		Q := Chr(34)
 		Command := Q . A_AhkPath . Q . " /ErrorStdOut " . Q . Harness . Q
@@ -372,3 +360,16 @@ _TBCS_Run(Mode) {
 }
 Test("TOML ordinary stage: foreign first-sequence stage survives (toml-stage-collision)", _TBCS_Run.Bind("collision"))
 Test("TOML ordinary stage: uncollided native write acknowledges (toml-stage-collision)", _TBCS_Run.Bind("control"))
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 2/ Direct-run Entry =======
+; ===================================
+; ===================================
+
+if A_LineFile = A_ScriptFullPath
+	RunTests()
