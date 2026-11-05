@@ -165,6 +165,28 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 		end)
 	end)
 
+	helpers.it("does not log arbitrary model-provided action type or field text", function()
+		local previous = package.loaded["logger.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local lines = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		local ok, err = pcall(function()
+			Scenario.run({ selection = SELECTION }, function(world)
+				world.handlers.llm_agent_selection("tap_3")
+				world.wait_for(1)
+				world.respond(1, 'ACTIONS: [{"type":"private_type_829"},{"type":"reminder","private_field_493":"x","title":"OK"}]')
+			end)
+			local log = table.concat(lines, "\n")
+			helpers.assert_nil(log:find("private_type_829", 1, true))
+			helpers.assert_nil(log:find("private_field_493", 1, true))
+			helpers.assert_true(log:find("Agent action refused", 1, true) ~= nil, "a generic refusal is still reported")
+		end)
+		package.loaded["logger.shim"] = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("drops the invalid actions and logs why, never offering them", function()
 		Scenario.run({ selection = SELECTION }, function(world)
 			world.handlers.llm_agent_selection("tap_3")
