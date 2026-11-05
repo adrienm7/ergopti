@@ -281,10 +281,32 @@ _PWSO_CheckSubscriptionError() {
 ; The injected failure is limited to the existing passive browser factory.
 ; Destruction still delegates to the real Gui before the public reopen.
 _PWSO_FactoryDestroy(Window, Args*) {
-	global _PWSO
-	if _PWSO.Mode == "factory-error-destroy-refuse" && !_PWSO.FactoryRefused && Window == _PWSO.Windows[1] {
+	global _PWSO, _PathsEdWeb_SessionEpoch
+	if (_PWSO.Mode == "factory-error-destroy-refuse" || _PWSO.Mode == "factory-error-retry-current" || _PWSO.Mode == "factory-error-retry-reentry") && !_PWSO.FactoryRefused && Window == _PWSO.Windows[1] {
 		_PWSO.FactoryRefused := true
 		throw Error("private pre-effect Destroy refusal")
+	}
+	if _PWSO.Mode == "factory-error-destroy-after" && !_PWSO.FactoryRefused && Window == _PWSO.Windows[1] {
+		_PWSO.FactoryRefused := true
+		_PWSO.FactoryDestroy.Call(Window, Args*)
+		throw Error("private post-effect Destroy refusal")
+	}
+	if _PWSO.Mode == "factory-error-retry-reentry" && _PWSO.FactoryRefused && !_PWSO.FactoryReopen && Window == _PWSO.Windows[1] {
+		_PWSO.FactoryReopen := true
+		Result := _PWSO.FactoryDestroy.Call(Window, Args*)
+		FilePathsEditor()
+		_PWSO_Require(_PWSO.Windows.Length == 2 && _PWSO.Controllers.Length == 1,
+			"the exact retry must really open successor B")
+		Epoch := _PathsEdWeb_SessionEpoch, Hwnd := _PWSO.Hwnds[2], Pid := 0
+		_PWSO_Require(DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid, "UInt")
+			&& Pid == ProcessExist() && DllCall("User32\IsWindowVisible", "Ptr", Hwnd, "Int"),
+			"native close must address the exact owned successor")
+		DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while (_PathsEdWeb_SessionEpoch == Epoch || DllCall("IsWindow", "Ptr", Hwnd, "Int")) && A_TickCount - Started < 1500
+			Sleep(10)
+		_PWSO.RetrySuccessorClosed := _PathsEdWeb_SessionEpoch != Epoch && !DllCall("IsWindow", "Ptr", Hwnd, "Int")
+		return Result
 	}
 	if _PWSO.Mode == "factory-error-reopen" && !_PWSO.FactoryReopen && Window == _PWSO.Windows[1] {
 		_PWSO.FactoryReopen := true
@@ -295,12 +317,38 @@ _PWSO_FactoryDestroy(Window, Args*) {
 	return _PWSO.FactoryDestroy.Call(Window, Args*)
 }
 _PWSO_CheckFactoryError() {
-	global _PWSO, _PathsEdWeb_Gui, _PathsEdWeb_Controller
+	global _PWSO, _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_RetiredHosts
 	OldGone := _PWSO.Hwnds.Length && !DllCall("IsWindow", "Ptr", _PWSO.Hwnds[1], "Int")
 	FileAppend("OBSERVATION paths-factory-error mode=" . _PWSO.Mode . " failed=" . _PWSO.FactoryFailed
 		. " result=" . _PWSO.FactoryResult . " reopened=" . _PWSO.FactoryReopen
 		. " windows=" . _PWSO.Windows.Length . " old_gone=" . OldGone
 		. " caught=" . IsObject(_PWSO.OpenError) . "`n", "*", "UTF-8")
+	if _PWSO.Mode == "factory-error-destroy-after" {
+		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
+			&& OldGone && _PWSO.FactoryResult is Integer && _PWSO.FactoryResult == 0
+			&& _PathsEdWeb_RetiredHosts.Length == 0,
+			"a Destroy exception after real effect must admit fallback without a phantom debt")
+		return
+	}
+	if _PWSO.Mode == "factory-error-retry-current" || _PWSO.Mode == "factory-error-retry-reentry" {
+		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
+			&& !OldGone && _PWSO.FactoryResult is Integer && _PWSO.FactoryResult == 1
+			&& _PathsEdWeb_RetiredHosts.Length == 1 && _PathsEdWeb_RetiredHosts[1].gui == _PWSO.Windows[1],
+			"a refused native Destroy must retain the exact old GUI without admitting fallback")
+		FilePathsEditor()
+		FileAppend("OBSERVATION paths-bare-retry mode=" . _PWSO.Mode . " reopened=" . _PWSO.FactoryReopen
+			. " successor_closed=" . _PWSO.RetrySuccessorClosed . " windows=" . _PWSO.Windows.Length
+			. " pending=" . _PathsEdWeb_RetiredHosts.Length . "`n", "*", "UTF-8")
+		_PWSO_Require(!DllCall("IsWindow", "Ptr", _PWSO.Hwnds[1], "Int") && _PathsEdWeb_RetiredHosts.Length == 0,
+			"a new public request must retire its exact earlier bare host")
+		if _PWSO.Mode == "factory-error-retry-current"
+			_PWSO_Require(_PWSO.Windows.Length == 2 && _PathsEdWeb_Gui == _PWSO.Windows[2],
+				"with no intervening intent the new public request must open normally")
+		else
+			_PWSO_Require(_PWSO.FactoryReopen && _PWSO.RetrySuccessorClosed && _PWSO.Windows.Length == 2
+				&& !IsObject(_PathsEdWeb_Gui), "an old request must not recreate C after the genuine close of B")
+		return
+	}
 	if _PWSO.Mode == "factory-error-destroy-refuse" {
 		FileAppend("OBSERVATION paths-factory-destroy-refusal refused=" . _PWSO.FactoryRefused . " alive=" . !OldGone . " result=" . _PWSO.FactoryResult . "`n", "*", "UTF-8")
 		_PWSO_Require(_PWSO.FactoryFailed && _PWSO.FactoryRefused && !IsObject(_PWSO.OpenError)
@@ -330,7 +378,7 @@ _PWSO_Main() {
 		ReleasedSubscriptions: 0, ReleasedInFlight: false, CloseObserved: false,
 		AliveAtReturn: false, AliveAtClose: false, ActiveAtClose: -1, CloseCalls: 0,
 		ResetRetained: false, ErrorReopen: false, OpenError: 0, SdkFailure: Error("private Paths SDK refusal"),
-		FactoryFailed: false, FactoryReopen: false, FactoryRefused: false, FactoryResult: "unset", FactoryDestroy: 0 }
+		FactoryFailed: false, FactoryReopen: false, FactoryRefused: false, RetrySuccessorClosed: false, FactoryResult: "unset", FactoryDestroy: 0 }
 	global _VendorDir := A_Args[2], _SharedDir := A_Args[2], _I18nLocale := "en"
 	global _ConfigDir := A_Args[2] . "\", _PathsFile := A_Args[2] . "\unwritten-paths.toml"
 	Primary := 0
@@ -340,6 +388,7 @@ _PWSO_Main() {
 	try {
 		if InStr(_PWSO.Mode, "factory-error-") == 1 {
 			if _PWSO.Mode == "factory-error-reopen" || _PWSO.Mode == "factory-error-destroy-refuse"
+					|| _PWSO.Mode == "factory-error-retry-current" || _PWSO.Mode == "factory-error-retry-reentry" || _PWSO.Mode == "factory-error-destroy-after"
 				Gui.Prototype.DefineProp("Destroy", {Call: _PWSO_FactoryDestroy})
 			try _PWSO.FactoryResult := _PathsEdWeb_TryOpen()
 			catch Any as Failure

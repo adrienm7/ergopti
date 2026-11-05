@@ -128,3 +128,7 @@ for _PWST_SubscriptionMode in ["subscription-current", "subscription-close"]
 for _PWST_ExtraMode in ["subscription-reset-retain", "subscription-error-current", "subscription-error-reopen", "factory-error-current", "factory-error-reopen", "factory-error-destroy-refuse"]
 	Test("Paths editor subscription compatibility: " . _PWST_ExtraMode . " retains its exact owner (paths-editor-subscription-compat)",
 		_PWST_Case.Bind(_PWST_ExtraMode))
+
+for _PWST_BareMode in ["factory-error-destroy-after", "factory-error-retry-current", "factory-error-retry-reentry"]
+	Test("Paths bare host retirement: " . _PWST_BareMode . " retains exact native ownership (paths-bare-retirement-owner)",
+		_PWST_Case.Bind(_PWST_BareMode))
