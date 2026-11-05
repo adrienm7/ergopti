@@ -68,8 +68,8 @@ try {
 	_KRSC_Main()
 	FileAppend("PASS roi-stale " . _KRSC.Mode . "`n", "*")
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL roi-stale " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n", "*")
+} catch Any as _KRSC_EntryFailure {
+	FileAppend("FAIL roi-stale " . _KRSC_EntryFailure.Message . " [" . _KRSC_EntryFailure.File . ":" . _KRSC_EntryFailure.Line . "]`n", "*")
 	if FileExist(_KSD.Log)
 		FileAppend(FileRead(_KSD.Log, "UTF-8"), "*")
 	ExitApp(1)

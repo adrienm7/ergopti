@@ -279,12 +279,16 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		try {
 			if !_KL_ContextEpochCurrent(Generation)
 				return false
+			; A getter can return after a newer focus and word were admitted. ROI
+			; may mutate only for the object still owned by the canonical cache;
+			; the retained snapshot keeps its existing projection contract below.
+			SnapshotCurrent := IsObject(Snapshot) && Snapshot == MetricsFocusCache.state
 			if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
-				if IsSet(KL_Roi_DiscardWord)
+				if SnapshotCurrent && IsSet(KL_Roi_DiscardWord)
 					KL_Roi_DiscardWord()
 				return false
 			}
-			if IsSet(KL_Roi_AdmitWordContext)
+			if SnapshotCurrent && IsSet(KL_Roi_AdmitWordContext)
 				KL_Roi_AdmitWordContext(Snapshot)
 		} finally Critical(ProjectionCritical)
 		return _KL_ContextProject(Snapshot, A_TickCount, Generation)
