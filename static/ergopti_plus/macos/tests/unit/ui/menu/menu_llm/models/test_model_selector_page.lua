@@ -64,7 +64,9 @@ local CATALOGUE = { { label = "Alibaba", families = { { label = "Qwen", models =
 local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return "OK" end,
+		package.loaded["infra.dialog_util"] = { block_alert = function()
+			return opts.confirm_remove and require("infra.i18n").get("button.remove") or "OK"
+		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = { set_alternative = function() end }
@@ -101,7 +103,7 @@ local function with_page(opts, body)
 			state = state, keymap = {}, settings_mgr = {}, WarmupCtrl = {},
 			DEFAULT_STATE = { llm_model_ollama = "Qwen-A", llm_model_mlx = "Qwen-A" },
 			models_mgr = {
-				get_all_presets = function() return CATALOGUE end,
+				get_all_presets = function() return opts.catalogue or CATALOGUE end,
 				backend_model_installed = function(backend, name) return installed[backend][name] == true end,
 				backend_actual_model_name = function(_, name) return name:lower() end,
 				pull_ollama_model = function(tag, done) calls.pulls[#calls.pulls + 1] = "ollama:" .. tag; calls.done = done; return true end,
@@ -456,6 +458,23 @@ helpers.describe("model selector page owner", function()
 		with_page({ entries = two, listing = {} }, function(Page, ctx, _, collected, p)
 			local row = row_of(Page.build_payload(ctx, p, collected), "api", "OpenAI/gpt-4o-mini")
 			helpers.assert_eq(row.entry_id, "e2", "an entry's own model wins over another entry's known one")
+		end)
+	end)
+
+	helpers.it("removes a custom entry whose name matches a catalogue row", function()
+		local catalogue = { { label = "Provider", families = { { label = "Family", models = {
+			{ name = "mistral-small:22b", urls = { ollama = "https://ollama.com/library/mistral-small:22b" } },
+		} } } } }
+		with_page({ catalogue = catalogue, confirm_remove = true }, function(Page, ctx, calls, collected, p)
+			ctx.state.llm_user_models = { { backend = "ollama", name = "mistral-small:22b" } }
+			helpers.assert_true(Page.handle_action(ctx, { action = "remove_custom_model", backend = "ollama",
+				name = "mistral-small:22b" }, p, collected))
+			helpers.assert_eq(#ctx.state.llm_user_models, 0)
+			helpers.assert_eq(calls.saves, 1, "the real custom model owner persists the removal")
+			helpers.assert_nil(calls.disabled)
+			helpers.assert_eq(Page.handle_action(ctx, { action = "remove_custom_model", backend = "ollama",
+				name = "mistral-small:22b" }, p, collected), false, "catalogue rows cannot be removed as custom")
+			helpers.assert_eq(calls.saves, 1)
 		end)
 	end)
 

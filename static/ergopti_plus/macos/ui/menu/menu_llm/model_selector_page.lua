@@ -420,10 +420,11 @@ function M.build_payload(ctx, probes, collected)
 	return payload
 end
 
---- Finds one row of the current payload by backend and name.
-local function find_row(payload, backend, name)
+--- Finds one row of the current payload by backend, name, and optional custom provenance.
+local function find_row(payload, backend, name, custom)
 	for _, row in ipairs(payload.models) do
-		if row.name == name and (backend == nil or row.backend == backend) then return row end
+		if row.name == name and (backend == nil or row.backend == backend)
+			and (custom == nil or (row.custom == true) == custom) then return row end
 	end
 	return nil
 end
@@ -678,7 +679,10 @@ function M.handle_action(ctx, body, probes, collected)
 		if ctx.models_mgr.backend_model_installed(b.id, body.name) then return true end
 		return start_download(ctx, b.id, body.name, true)
 	end
-	local row = type(body.name) == "string" and find_row(payload, body.backend, body.name) or nil
+	-- The remove button exists only on custom rows. A catalogue row may have
+	-- the same visible name but must not shadow that custom deletion target.
+	local custom = action == "remove_custom_model" and true or nil
+	local row = type(body.name) == "string" and find_row(payload, body.backend, body.name, custom) or nil
 	if not row then
 		Logger.warn(LOG, "Refused model selector action '%s' for an unknown row '%s'.", tostring(action), tostring(body.name))
 		return false
