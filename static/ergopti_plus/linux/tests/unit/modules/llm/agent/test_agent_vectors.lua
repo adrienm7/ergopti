@@ -171,6 +171,18 @@ end)
 -- ============================================
 
 helpers.describe("agent actions stay inside the closed schema", function()
+	helpers.it("rejects malformed Unicode in model-generated action text", function()
+		local config = read_json("modules/llm/agent.json")
+		for _, invalid in ipairs({
+			string.char(0xe0, 0x80, 0x80),
+			string.char(0xed, 0xa0, 0x80),
+			string.char(0xf4, 0x90, 0x80, 0x80),
+		}) do
+			local action = Agent.validate_action(config, { type = "reminder", title = invalid }, { tools = {} })
+			helpers.assert_nil(action, "ill-formed UTF-8 cannot become a calendar title")
+		end
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }
