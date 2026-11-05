@@ -1414,6 +1414,9 @@ _PersonalInfoSerializeCandidate(Information, Letters) {
 			throw ValueError("Invalid personal-information key.")
 		if !(Val is String)
 			throw TypeError("Personal-information values must be strings.")
+		; String helpers may truncate at NUL before the TOML codec sees it.
+		; Apply the reader's exact scalar domain to the original UTF-16 units.
+		_PersonalInfoRequireUnicodeScalars(StrPtr(Val), 0, StrLen(Val))
 		Lines.Push(Key . " = " . Q . EscapeTomlValue(Val) . Q)
 	}
 
