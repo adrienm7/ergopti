@@ -642,6 +642,12 @@ const STEP_CONDITIONS = [
 		'Retain actual LuaJIT XI2 diagnostic evidence',
 		'${{ always() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
 	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Qualify X11 input source activation',
+		'${{ !cancelled() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
+	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[
 		LINUX_BOX,
