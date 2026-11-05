@@ -6,7 +6,7 @@
 ; never just the generated payload. No physical keyboard claim is made.
 if A_Args.Length != 3 || A_Args[1] != "--allow-explicit-owned-one-shot-control-flags"
 	throw Error("Explicit owned native one-shot control opt-in is required.")
-if !(A_Args[2] == "plain" || A_Args[2] == "ctrl" || A_Args[2] == "shift" || A_Args[2] == "ctrl-shift" || A_Args[2] == "tab" || A_Args[2] == "tab-shift" || A_Args[2] == "kana-plain" || A_Args[2] == "kana-released")
+if !(A_Args[2] == "plain" || A_Args[2] == "ctrl" || A_Args[2] == "shift" || A_Args[2] == "ctrl-shift" || A_Args[2] == "tab" || A_Args[2] == "tab-shift" || A_Args[2] == "kana-plain" || A_Args[2] == "kana-released" || A_Args[2] == "kana-control-refuse" || A_Args[2] == "kana-control-throw" || A_Args[2] == "kana-up-retry" || A_Args[2] == "kana-held-original" || A_Args[2] == "kana-down-delivered-throw")
 	throw Error("Unknown spent-control case.")
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0, _TH_SyntheticEpoch := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605)), OneShotShiftEnabled := false
@@ -16,7 +16,55 @@ global _OSPC := {Mode: A_Args[2], Window: 0, A: 0, B: 0, Hook: 0, ReadyAt: 0, At
 	ControlSent: 0, FollowingSent: 0, PendingAfterControl: -1, NativeKeys: [], FocusSteps: [], Escapes: 0,
 	Backspaces: [], CtrlAttempted: false, ShiftAttempted: false, Outputs: [], Rings: [], Logs: [], Failure: 0, Armed: false,
 	KanaObserver: 0, KanaKeys: [], KanaInserted: 0, KanaOemOwed: false, KanaBackOwed: false,
-	KanaOriginalOem: 0, KanaAsyncReleased: false, KanaLogicalReleased: false}
+	FailedDownObserved: false, FailedDownThrown: 0, RestoredOwed: false, RestoreDowns: 0, RestoreUps: 0, RefusedUps: 0, ControlCalls: 0, ControlDown: false, AllowUp: false, OriginalReleased: false, KanaOriginalOem: 0, KanaAsyncReleased: false, KanaLogicalReleased: false}
+; Fresh private ledger state; the extracted production functions own every edge.
+global _TH_SyntheticHeldKeys := Map(), _TH_SyntheticReleasePendingKeys := Map(), _TH_SyntheticUserHeldKeys := Map()
+global _TH_ModifierOwners := Map(), _TH_OwnedModifiers := Map(), _TH_AltGrLCtrlOwners := Map()
+global _TapCopyPending := 0, _TapCopyGeneration := 0
+global _TapHoldKeyIsDown := (Name, Mode) => Mode == "" ? GetKeyState(Name) : GetKeyState(Name, Mode)
+_AHK_SendInput := _OSPC_ModifierInput
+if _OSPC.Mode == "kana-control-refuse" || _OSPC.Mode == "kana-control-throw"
+	_SendHook := _OSPC_ControlRefusal
+LoggerIsDebugEnabled() => false
+_OSPC_ModifierInput(Keys) {
+	global _OSPC
+	_OSPC_Target()
+	IsDown := Keys == "{vkDF Down}", IsUp := Keys == "{vkDF Up}"
+	if IsDown {
+		_OSPC.KanaAsyncReleased := !(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+		_OSPC.KanaLogicalReleased := !GetKeyState("vkDF")
+		_OSPC.OriginalReleased := _OSPC.KanaAsyncReleased && _OSPC.KanaLogicalReleased
+	}
+	if IsUp && _OSPC.Mode == "kana-up-retry" && !_OSPC.AllowUp {
+		_OSPC.RefusedUps += 1
+		throw Error("Explicit owned Up port refusal before native emission")
+	}
+	SendInput(Keys)
+	if IsDown {
+		_OSPC.RestoredOwed := true
+		_OSPC.RestoreDowns += 1
+		if _OSPC.Mode == "kana-down-delivered-throw" {
+			_OSPC.FailedDownObserved := !!(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+			_OSPC.FailedDownThrown += 1
+			throw Error("Explicit port exception AFTER actual native Down delivery")
+		}
+	} else if IsUp {
+		_OSPC.RestoredOwed := false
+		_OSPC.RestoreUps += 1
+	}
+}
+_OSPC_ControlRefusal(Kind, Keys, OnlyText) {
+	global _OSPC
+	_OSPC_Target()
+	_OSPC.ControlCalls += 1
+	_OSPC.ControlDown := !!(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+	_OSPC_Require(Kind == "SendNewResult" && Keys == "{Backspace}" && !OnlyText,
+		"The real control sender must reach its existing refusal port unchanged")
+	if _OSPC.Mode == "kana-control-throw"
+		throw Error("Explicit control port exception after actual restoration Down")
+	return false
+}
+
 ; Simulated family only; actual native input ABI is independently observed below.
 global _ALTGR_KANA_FIXUP := InStr(_OSPC.Mode, "kana-") == 1, _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0xDF)
 if _ALTGR_KANA_FIXUP && A_PtrSize != 8
@@ -52,7 +100,7 @@ _OSPC_NativeReplay(Keys) {
 	_OSPC_Target()
 	_OSPC_Require(SIHO_Count() == 0, "The actual output must follow settlement of the genuine one-shot capture.")
 	_OSPC.Outputs.Push(Keys)
-	if InStr(_OSPC.Mode, "kana-") == 1 {
+	if _OSPC.Mode == "kana-plain" || _OSPC.Mode == "kana-held-original" {
 		_OSPC.KanaAsyncReleased := !(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
 		_OSPC.KanaLogicalReleased := !GetKeyState("vkDF")
 	}
@@ -178,6 +226,14 @@ _OSPC_Main() {
 			. " ctrl_released=" . !(DllCall("User32\GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000)
 			. " shift_released=" . !(DllCall("User32\GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000)
 			. " capture_owners=" . SIHO_Count() . " logs=" . _OSPC.Logs.Length . "`n", "*")
+		if _OSPC.Mode == "kana-down-delivered-throw" {
+			_OSPC_FailedDownCheck()
+			return
+		}
+		if _OSPC.Mode == "kana-control-refuse" || _OSPC.Mode == "kana-control-throw" || _OSPC.Mode == "kana-up-retry" {
+			_OSPC_BalanceCheck()
+			return
+		}
 		_OSPC_Require(_OSPC.ControlSent == 1 && _OSPC.Outputs.Length == 1 && SIHO_Count() == 0,
 			"The genuine one-shot must consume and replay its one ending control exactly once.")
 		if InStr(_OSPC.Mode, "kana-") == 1
@@ -234,9 +290,11 @@ _OSPC_KanaControl() {
 	_OSPC.KanaObserver.OnKeyDown := _OSPC_KanaObserve
 	_OSPC.KanaObserver.Start()
 	_OSPC_Require(_OSPC.KanaObserver.InProgress, "The independent native ABI observer must be newest before original injection")
-	Rows := _OSPC.Mode == "kana-released"
+	Rows := _OSPC.Mode != "kana-plain"
 		? [[0xDF, 0x38, 1], [0x08, 0x0E, 0], [0x08, 0x0E, 2], [0xDF, 0x38, 3]]
 		: [[0x08, 0x0E, 0], [0x08, 0x0E, 2]]
+	if _OSPC.Mode == "kana-held-original"
+		Rows.Pop()
 	Packets := _OSPC_KanaPackets(Rows)
 	_OSPC.KanaInserted := DllCall("SendInput", "UInt", Rows.Length, "Ptr", Packets, "Int", 40, "UInt")
 	for Index, Row in Rows {
@@ -252,7 +310,7 @@ _OSPC_KanaControl() {
 }
 _OSPC_KanaCheck() {
 	global _OSPC
-	Expected := _OSPC.Mode == "kana-released"
+	Expected := _OSPC.Mode != "kana-plain"
 	Count := Expected ? 2 : 1
 	Started := A_TickCount
 	while _OSPC.KanaKeys.Length < Count && A_TickCount - Started < 1000
@@ -265,17 +323,75 @@ _OSPC_KanaCheck() {
 		&& _OSPC.KanaKeys[Count].Vk == 8 && _OSPC.KanaKeys[Count].Sc == 0x0E
 	FileAppend("OBSERVATION one-shot-kana mode=" . _OSPC.Mode . " native_oem=" . NativeOem
 		. " native_backspace=" . NativeBack . " original_oem=" . _OSPC.KanaOriginalOem
-		. " async_released_at_replay=" . _OSPC.KanaAsyncReleased . " logical_released_at_replay=" . _OSPC.KanaLogicalReleased
+		. " async_original_released_before_output=" . _OSPC.KanaAsyncReleased . " logical_original_released_before_output=" . _OSPC.KanaLogicalReleased
 		. " receiver_oem=" . (_OSPC.Backspaces.Length ? _OSPC.Backspaces[1].Oem : -1)
 		. " captured_end=" . _OSPC.Hook.EndKey . " outputs=" . _OSPC.Outputs.Length . "`n", "*")
 	_OSPC_Require(NativeBack && (!Expected || NativeOem), "The native original VK/SC pair must be witnessed independently of its constructed packets")
-	_OSPC_Require(_OSPC.KanaOriginalOem == Expected && _OSPC.KanaAsyncReleased,
+	_OSPC_Require(_OSPC.KanaOriginalOem == Expected && (_OSPC.Mode == "kana-held-original" ? !_OSPC.KanaAsyncReleased : _OSPC.KanaAsyncReleased),
 		"The original visible OEM key and its acknowledged release must precede the actual replay")
 	_OSPC_Require(_OSPC.Backspaces.Length == 1 && _OSPC.Backspaces[1].Extra != 0x4F534301,
 		"Only the real replay, not the suppressed original control, may reach the owned receiver")
+	if _OSPC.Mode == "kana-held-original"
+		_OSPC_Require(_OSPC.RestoreDowns == 0 && _OSPC.RestoreUps == 0 && GetKeyState("vkDF"),
+			"An original hold still down must acquire no synthetic Down or Up")
 	_OSPC_Require(_OSPC.Backspaces[1].Oem == Expected,
 		"The spent native control must retain its captured custom modifier after its original release")
 }
+
+
+; Fault injection deliberately follows an actual native Down. This does not
+; claim that Win32 SendInput itself reports a partial error in this execution.
+_OSPC_FailedDownCheck() {
+	global _OSPC, _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	_OSPC_Require(_OSPC.ControlSent == 1 && SIHO_Count() == 0 && _OSPC.OriginalReleased
+		&& _OSPC.RestoreDowns == 1 && _OSPC.FailedDownThrown == 1 && _OSPC.FailedDownObserved,
+		"The refusal verdict requires a genuinely delivered restored Down, independently sampled at Win32")
+	_OSPC_Require(_OSPC.Outputs.Length == 0 && _OSPC.Backspaces.Length == 0,
+		"An unacknowledged restoration must not dispatch the captured control")
+	WasDown := !!(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+	Pending := _TH_SyntheticReleasePendingKeys.Has("vkDF")
+	_OSPC_Require(TapHoldReleaseSyntheticKeys(), "The genuine lifecycle release must acknowledge its retained debt")
+	Started := A_TickCount
+	while GetKeyState("vkDF") && A_TickCount - Started < 1000
+		Sleep(5)
+	FileAppend("OBSERVATION failed-down delivered=" . _OSPC.FailedDownObserved . " down_before_lifecycle=" . WasDown
+		. " pending_before_lifecycle=" . Pending . " ups=" . _OSPC.RestoreUps
+		. " down_after_lifecycle=" . GetKeyState("vkDF") . "`n", "*")
+	_OSPC_Require(_OSPC.RestoreUps == 1 && !GetKeyState("vkDF")
+		&& !(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+		&& _TH_SyntheticHeldKeys.Count == 0 && _TH_SyntheticReleasePendingKeys.Count == 0,
+		"A failed Down after delivery must remain releasable instead of stranding an untracked modifier")
+}
+
+_OSPC_BalanceCheck() {
+	global _OSPC, _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticEpoch, TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+	_OSPC_Require(_OSPC.ControlSent == 1 && SIHO_Count() == 0 && _OSPC.RestoreDowns == 1 && _OSPC.OriginalReleased,
+		"Actual released original and exact restoration Down must precede any refusal verdict")
+	if _OSPC.Mode == "kana-up-retry" {
+		_OSPC_Require(_OSPC.Outputs.Length == 1 && _OSPC.Backspaces.Length == 1 && _OSPC.Backspaces[1].Oem,
+			"The unchanged real control must reach its receiver before the refused Up")
+		_OSPC_Require(_OSPC.RefusedUps == TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+			&& _TH_SyntheticReleasePendingKeys.Has("vkDF") && GetKeyState("vkDF"),
+			"Bounded refused Ups must retain the exact pending native key")
+		_OSPC.AllowUp := true
+		Epoch := _TH_SyntheticEpoch
+		_OSPC_Require(TapHoldReleaseSyntheticKeys() && _TH_SyntheticEpoch == Epoch + 1,
+			"The real lifecycle must retry its pending Up under a new epoch")
+	} else {
+		_OSPC_Require(_OSPC.ControlCalls == 1 && _OSPC.ControlDown && _OSPC.Outputs.Length == 0 && _OSPC.Backspaces.Length == 0,
+			"The refusal or exception must follow actual Down without emitting the control")
+	}
+	Started := A_TickCount
+	while GetKeyState("vkDF") && A_TickCount - Started < 1000
+		Sleep(5)
+	_OSPC_Require(_OSPC.RestoreUps == 1 && !GetKeyState("vkDF") && !_OSPC.RestoredOwed
+		&& !(DllCall("User32\GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+		&& _TH_SyntheticHeldKeys.Count == 0 && _TH_SyntheticReleasePendingKeys.Count == 0,
+		"Every acknowledged restoration Down must settle its exact Up even after refused control or lifecycle retry")
+	FileAppend("OBSERVATION one-shot-balancing mode=" . _OSPC.Mode . " downs=" . _OSPC.RestoreDowns
+		. " ups=" . _OSPC.RestoreUps . " refused_ups=" . _OSPC.RefusedUps . " control_calls=" . _OSPC.ControlCalls . "`n", "*")
+}
+
 _OSPC_KanaCleanup() {
 	global _OSPC
 	if IsObject(_OSPC.KanaObserver) {
@@ -285,14 +401,14 @@ _OSPC_KanaCleanup() {
 	Rows := []
 	if _OSPC.KanaBackOwed
 		Rows.Push([0x08, 0x0E, 2])
-	if _OSPC.KanaOemOwed
+	if _OSPC.KanaOemOwed || _OSPC.RestoredOwed
 		Rows.Push([0xDF, 0x38, 3])
 	if Rows.Length {
 		_OSPC_Target()
 		Packets := _OSPC_KanaPackets(Rows)
 		_OSPC_Require(DllCall("SendInput", "UInt", Rows.Length, "Ptr", Packets, "Int", 40, "UInt") == Rows.Length,
 			"Every actually admitted original Down retains its exact owed native Up")
-		_OSPC.KanaBackOwed := false, _OSPC.KanaOemOwed := false
+		_OSPC.KanaBackOwed := false, _OSPC.KanaOemOwed := false, _OSPC.RestoredOwed := false
 	}
 	if InStr(_OSPC.Mode, "kana-") == 1 {
 		Started := A_TickCount

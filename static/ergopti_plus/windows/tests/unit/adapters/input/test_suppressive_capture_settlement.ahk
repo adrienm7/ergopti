@@ -430,11 +430,16 @@ _OSPC_ChildSource() {
 		Code .= "#Include " . Owner . "`n"
 	}
 	for Name in ["TapHoldNewOwner", "TapHoldOwnerCurrent", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable",
-		"TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_SendVerdictSucceeded", "_EmitReachedScreen", "_TextSenderAtSendLevel"] {
+		"TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_SendVerdictSucceeded", "_EmitReachedScreen", "_TextSenderAtSendLevel",
+		"KS_AltGrKeyName", "KS_AltGrSendKey", "KS_IsMenuModifier", "TapHoldSyntheticKeyDown", "TapHoldSyntheticKeyUp", "TapHoldReleaseSyntheticKeys", "TapCopyCheckStop", "_TH_MaskMenuModifierRelease", "_TH_SyntheticKeyList", "_TH_SyntheticKeyLabel", "_TH_UserHoldsDeliveredKey", "_TH_SyntheticReleaseStaysWithUser", "_TH_ForgetSyntheticKeyForUser", "_TH_MarkSyntheticKeyReleasePending", "_TH_RetrySyntheticKeyRelease", "TextPressKey", "TextSendMenuMask", "_TextSenderNormalizeModifierKey", "_TextSenderModifierPrefix", "_TextSenderModifierWords", "_TextSenderKeystroke", "_TextSenderSustainedKey", "_TextSenderSendInput"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The unchanged one-shot owner must exist: " . Name)
 		Code .= Definition . "`n"
 	}
+	Constants := FSReadStrict(_DriverProductionFileForSymbol("TapHoldSyntheticKeyDown"))
+	AssertTrue(RegExMatch(Constants, "m)^global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := [0-9]+[^`r`n]*", &RetryDeclaration),
+		"The native child must retain the production bounded-release policy")
+	Code .= RetryDeclaration[0] . "`n"
 	Body := _DriverFuncBody("SendNewResult")
 	AssertTrue(Body != "")
 	Masked := _DriverMaskNonCode(&Body)
@@ -590,3 +595,10 @@ for _OSCF_TabMode in ["tab", "tab-shift"]
 for _OSCF_KanaMode in ["kana-plain", "kana-released"]
 	Test("one-shot native custom flags: " . _OSCF_KanaMode . " retains the original control modifier (one-shot-native-kana-flags)",
 		_OSCF_Case.Bind(_OSCF_KanaMode))
+
+for _OSCF_BalanceMode in ["kana-control-refuse", "kana-control-throw", "kana-up-retry", "kana-held-original"]
+	Test("one-shot custom modifier balancing: " . _OSCF_BalanceMode . " preserves exact ownership (one-shot-native-kana-balancing)",
+		_OSCF_Case.Bind(_OSCF_BalanceMode))
+
+Test("one-shot restoration: a delivered Down followed by port exception retains release ownership (one-shot-native-failed-down)",
+	_OSCF_Case.Bind("kana-down-delivered-throw"))
