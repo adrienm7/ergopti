@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 local Fixture = require("tests.support.synthetic_input_fixture")
 
 
@@ -16,6 +17,7 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 --- @param callback function Scenario body.
 local function with_broker(callback)
 	helpers.with_stub_scope({
+		"modules.keymap.utils",
 		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
@@ -50,6 +52,7 @@ local function with_broker(callback)
 		end
 		local synthetic = f.load()
 		package.loaded["modules.shortcuts.actions.text"] = nil
+		Destination.install()
 		local text = require("modules.shortcuts.actions.text")
 		f.text = text
 		f.synthetic = synthetic

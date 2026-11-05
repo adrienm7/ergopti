@@ -11,6 +11,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["modules.keymap.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 
 
 local function clone(value)
@@ -22,6 +24,7 @@ end
 
 
 local function fresh_fixture()
+	Destination.install()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.text", "adapters.clipboard",
 		"adapters.synthetic_input",
@@ -727,3 +730,5 @@ helpers.describe("text composite owner: parent isolation", function()
 		end)
 	end
 end)
+
+package.loaded["modules.keymap.utils"] = previous_destination

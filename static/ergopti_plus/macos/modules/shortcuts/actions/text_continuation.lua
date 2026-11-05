@@ -10,6 +10,32 @@
 
 local M = {}
 
+--- Captures the currently classified native destination without probing AX.
+--- Full verification remains the deferred producer's responsibility.
+--- @return table|nil publication
+function M.capture_destination()
+	-- A tracker that has not already loaded cannot own a classified destination.
+	-- Never load its dependency graph on an input callback.
+	local utils = package.loaded["modules.keymap.utils"]
+	if type(utils) ~= "table" or type(utils.capture_text_destination) ~= "function"
+		or type(utils.owns_text_destination) ~= "function" then return nil end
+	local receipt = utils.capture_text_destination()
+	if type(receipt) ~= "table" or type(receipt.pid) ~= "number"
+		or math.tointeger(receipt.pid) == nil or receipt.pid <= 0
+		or type(receipt.window_id) ~= "number" or math.tointeger(receipt.window_id) == nil
+		or receipt.window_id <= 0 or type(receipt.generation) ~= "number"
+		or receipt.element == nil then return nil end
+	local function cached()
+		local current = utils.capture_text_destination()
+		return current ~= nil and current.generation == receipt.generation
+			and current.pid == receipt.pid and current.window_id == receipt.window_id
+			and current.element == receipt.element
+	end
+	return { cached = cached, current = function()
+		return cached() and utils.owns_text_destination(receipt) == true and cached()
+	end }
+end
+
 --- Builds a latched admission check without changing unguarded text actions.
 --- @param check function|table|nil Exact predicate or full/cached publication receipt.
 --- @return function current True until the first refusal or exception.
