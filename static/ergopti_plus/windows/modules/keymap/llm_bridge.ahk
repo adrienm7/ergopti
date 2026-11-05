@@ -1404,8 +1404,13 @@ LLM_Bridge_CancelPrefixObserver() {
 	try {
 		Owner := _LLM_Bridge_PrefixObserver
 		_LLM_Bridge_PrefixObserver := 0
-		if IsObject(Owner) && IsObject(Owner.Timer)
-			TimerSetCallback(Owner.Timer, 0)
+		if IsObject(Owner) {
+			Callback := Owner.Timer
+			; The callback binds Owner: detach its reverse edge before native retirement.
+			Owner.Timer := 0
+			if IsObject(Callback)
+				TimerSetCallback(Callback, 0)
+		}
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -1490,6 +1495,8 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
 			if IsObject(_LLM_Bridge_PrefixObserver)
 				&& ObjPtr(_LLM_Bridge_PrefixObserver) == ObjPtr(Owner)
 				_LLM_Bridge_PrefixObserver := 0
+			; Retire this callback even when reentrance already published a successor.
+			Owner.Timer := 0
 		} finally {
 			Critical(PreviousCritical)
 		}
