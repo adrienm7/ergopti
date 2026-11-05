@@ -455,6 +455,15 @@ _AP70_Run(Scope, Action, Request) {
 	Receipt := JsonParse(Lines[Lines.Length])
 	AssertTrue(Receipt is Map && Receipt.Get("ok", false))
 	AssertEqual(Action == "prepare" ? "prepared" : "published", Receipt["phase"])
+	AssertEqual(Action == "prepare" ? 2 : 1, Lines.Length, "Each physical worker keeps its progressive/final JSON framing")
+	if Action == "prepare" {
+		Construction := JsonParse(Lines[1])
+		AssertTrue(Construction is Map)
+		AssertEqual("creation-owned", Construction["phase"])
+		AssertEqual(Request["TicketId"], Construction["ticket"])
+		AssertEqual(Receipt["creation_wal_identity"], Construction["creation_wal_identity"],
+			"The first ASCII receipt and final Unicode receipt must retain the same physical creation owner")
+	}
 	return Map("receipt", Receipt, "encoding", State["encoding"], "lines", Lines.Length)
 }
 

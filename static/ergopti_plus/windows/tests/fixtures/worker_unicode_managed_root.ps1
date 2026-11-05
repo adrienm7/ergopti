@@ -11,7 +11,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ($FixtureNonce -cnotmatch '^[0-9a-f]{32}\z') { throw 'Fixture birth requires an exact nonce.' }
+$FixtureInitialOutputCodePage = [Console]::OutputEncoding.CodePage
 . $FixtureManagedHelper
+if ([Console]::OutputEncoding.CodePage -ne $FixtureInitialOutputCodePage) {
+    throw 'Dot-sourcing the real managed owner must not alter host stdout encoding.'
+}
 Initialize-OllamaManagedNative
 $FixtureRoot = Assert-OllamaLocalPath $FixtureRoot
 $Base = [Environment]::GetFolderPath('LocalApplicationData')
