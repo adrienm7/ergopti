@@ -313,6 +313,34 @@ helpers.describe("Linux local server discovery ownership", function()
 		end)
 	end)
 
+	helpers.it("retains a successor scan when an older inline scan subsequently raises", function()
+		isolated(function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			local previous, earlier, later, starts, completed = ports.scan, nil, nil, 0, 0
+			local all_down = {}
+			for _, id in ipairs(CATALOGUE.server_order) do all_down[id] = { running = false, pids = {} } end
+			ports.scan = function(_, callback)
+				starts = starts + 1
+				if starts == 1 then earlier = callback; callback(all_down); error("old scan failed") end
+				later = callback
+				return true
+			end
+			local ok, failure = pcall(function()
+				servers.rescan(function() return true end, function()
+					servers.rescan(function() return true end, function() completed = completed + 1 end)
+				end)
+				helpers.assert_eq(starts, 2)
+				helpers.assert_type(later, "function")
+				earlier(all_down)
+				helpers.assert_eq(completed, 0, "an old duplicate cannot complete the successor")
+				later(all_down)
+				helpers.assert_eq(completed, 1)
+			end)
+			ports.scan = previous
+			assert(ok, failure)
+		end)
+	end)
+
 	for _, source in ipairs({ "port scan", "completion" }) do
 		helpers.it("does not log private text from a local server " .. source .. " exception", function()
 			isolated(function(servers, _, _, _, scan)

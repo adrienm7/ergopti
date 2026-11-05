@@ -332,7 +332,8 @@ function M.rescan(admit, on_done)
 		scan_waiters[#scan_waiters + 1] = { admit = admit, on_done = on_done }
 		return true
 	end
-	scan_waiters = { { admit = admit, on_done = on_done } }
+	local owner = { { admit = admit, on_done = on_done } }
+	scan_waiters = owner
 	local entries, undescribed = {}, {}
 	for _, id in ipairs(catalogue_order) do
 		local server = catalogue_servers[id]
@@ -344,9 +345,10 @@ function M.rescan(admit, on_done)
 		end
 	end
 	local ok = pcall(Ports.scan, entries, function(results)
+		if scan_waiters ~= owner then return end
 		for id, result in pairs(undescribed) do results[id] = result end
 		port_scans = results
-		local waiters = scan_waiters or {}
+		local waiters = owner
 		scan_waiters = nil
 		local function done(changed)
 			for _, waiter in ipairs(waiters) do
@@ -364,7 +366,7 @@ function M.rescan(admit, on_done)
 		end
 	end)
 	if not ok then
-		scan_waiters = nil
+		if scan_waiters == owner then scan_waiters = nil end
 		Logger.error(LOG, "The local server port scan could not start.")
 		return false
 	end
