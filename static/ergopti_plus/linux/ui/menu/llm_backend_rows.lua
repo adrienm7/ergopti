@@ -291,10 +291,24 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
 			entry.id)
 	end
-	if type(on_changed) == "function" then on_changed() end
+	if type(on_changed) == "function" then
+		local notified = pcall(on_changed)
+		if not notified then Logger.warn(LOG, "The API entry was saved but its menu could not refresh.") end
+	end
 	if chat and not published_current() then return false end
-	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id],
-		chat and published_current or function() return entry_retained(entries, entry) end, page_current)
+	-- The entry has already been published. A refused optional connection test
+	-- must not report that durable addition as a failed operation.
+	local tested = pcall(function()
+		return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id],
+			chat and published_current or function() return entry_retained(entries, entry) end, page_current)
+	end)
+	if not tested then Logger.warn(LOG, "The optional API entry test raised after the entry was saved.") end
+	if chat then
+		if not published_current() then return false end
+	elseif not entry_retained(entries, entry) then
+		return false
+	end
+	return true
 end
 
 --- The name of the model that answers predictions: the active API entry's
