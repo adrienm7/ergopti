@@ -46,6 +46,25 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check('private runtime staging copies double-dot hidden library entries', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runtime-hidden-'));
+		try {
+			const app = path.join(scratch, 'AppDir');
+			const lib = path.join(app, 'usr/lib');
+			const bin = path.join(app, 'usr/bin');
+			fs.mkdirSync(path.join(lib, 'ergopti'), { recursive: true });
+			fs.mkdirSync(bin, { recursive: true });
+			fs.mkdirSync(path.join(app, 'usr/share'));
+			fs.writeFileSync(path.join(bin, 'luajit'), '#!/bin/sh\n', { mode: 0o755 });
+			fs.writeFileSync(path.join(lib, 'ergopti/network-runtime-env.sh'), ':\n');
+			fs.writeFileSync(path.join(lib, '..hidden-runtime'), 'runtime bytes\n');
+			const destination = path.join(scratch, 'runtime');
+			const result = spawnSync(bashExecutable(), [path.join(ROOT, 'tools/build/stage-linux-private-runtime.sh'), app, destination, '/usr/lib/ergopti'], { encoding: 'utf8', timeout: 10000 });
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(fs.readFileSync(path.join(destination, 'lib/..hidden-runtime'), 'utf8'), 'runtime bytes\n');
+		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+	});
 	check('native luv build stage is representable in Lua paths', () => {
 		if (process.platform !== 'linux') return;
 		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-stage-'));
