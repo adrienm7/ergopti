@@ -32,7 +32,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { gitPaths } = require('../lib/git-paths.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TESTS = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
@@ -46,9 +46,7 @@ function walk(dir, acc = []) {
 	return acc;
 }
 
-const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
-	.split('\n')
-	.filter(Boolean);
+const tracked = gitPaths(ROOT, ['ls-files', '--cached', '-z']);
 // `git ls-files` reports the INDEX, so a file deleted on disk but not yet staged
 // is listed and unreadable. Reading it unguarded made this gate die with ENOENT
 // halfway through deleting a superseded test — a crash where a finding belongs,

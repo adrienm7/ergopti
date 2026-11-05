@@ -26,7 +26,7 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { gitPaths } = require('../lib/git-paths.cjs');
 const fs = require('fs');
 const path = require('path');
 
@@ -75,9 +75,7 @@ const BARE_PHASE = /\bPhase \d/;
 
 const SELF = 'tools/test/test-no-plan-refs-in-source.cjs';
 
-const files = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' })
-	.split('\n')
-	.filter(Boolean)
+const files = gitPaths(ROOT, ['ls-files', '--cached', '-z'])
 	.filter((f) => /\.(lua|ahk|py|cjs|js)$/.test(f))
 	.filter((f) => f.startsWith('static/ergopti_plus/') || f.startsWith('tools/'))
 	.filter((f) => !f.includes('/_generated/'))
