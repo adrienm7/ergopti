@@ -84,6 +84,10 @@ local function number_in(value, min, max)
 	return type(value) == "number" and value == value and value >= min and value <= max
 end
 
+local function integer_in(value, min, max)
+	return number_in(value, min, max) and value % 1 == 0
+end
+
 --- Parses agent.json. Exposed for tests.
 --- @param text string|nil The file's content.
 --- @return table|nil config, string|nil reason
@@ -94,13 +98,13 @@ function M.parse_config(text)
 	if type(root.default_models) ~= "table" then return nil, "agent.json has no default_models" end
 	local s1, s2 = root.system1, root.system2
 	if type(s1) ~= "table" or type(s1.prompt) ~= "string" or s1.prompt == ""
-		or not number_in(s1.pause_ms, 0, 60000) or not number_in(s1.min_chars, 1, 10000)
-		or not number_in(s1.max_tokens, 1, 100000) or not number_in(s1.threshold, 0, 1) then
+		or not number_in(s1.pause_ms, 0, 60000) or not integer_in(s1.min_chars, 1, 10000)
+		or not integer_in(s1.max_tokens, 1, 100000) or not number_in(s1.threshold, 0, 1) then
 		return nil, "agent.json system1 is invalid"
 	end
 	if type(s2) ~= "table" or type(s2.prompt) ~= "string" or s2.prompt == ""
 		or type(s2.tag) ~= "string" or s2.tag == "" or type(s2.user_prefix) ~= "string"
-		or not number_in(s2.max_actions, 1, 100) or not number_in(s2.max_tokens, 1, 100000) then
+		or not integer_in(s2.max_actions, 1, 100) or not integer_in(s2.max_tokens, 1, 100000) then
 		return nil, "agent.json system2 is invalid"
 	end
 	for _, key in ipairs({ "actions", "source_kinds", "learning", "ics" }) do
@@ -111,7 +115,7 @@ function M.parse_config(text)
 		or not number_in(learning.max_threshold, learning.min_threshold, 1) then
 		return nil, "agent.json learning is invalid"
 	end
-	if not number_in(root.default_duration_minutes, 1, 100000) or not number_in(root.max_tools, 0, 1000) then
+	if not number_in(root.default_duration_minutes, 1, 100000) or not integer_in(root.max_tools, 0, 1000) then
 		return nil, "agent.json default_duration_minutes or max_tools is invalid"
 	end
 	if type(root.ics.prodid) ~= "string" or root.ics.prodid == "" then return nil, "agent.json has no ics.prodid" end
