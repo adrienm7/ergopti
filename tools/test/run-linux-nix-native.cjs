@@ -7,6 +7,7 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const ROOT = path.resolve(__dirname, '../..');
 const PROBE = 'tools/test/fixtures/linux-nix-installed-runtime.lua';
+const GIT_INVENTORY = 'tools/test/run-linux-nix-git-inventory.py';
 const LABELS = Object.freeze([
 	'installed shared root',
 	'packaged LuaJIT and luv',
@@ -166,6 +167,112 @@ function inspectSource(root, paths) {
 		else refuse();
 	}
 	return result;
+}
+/** Admit only the helper's exact small creation receipt, never arbitrary output. */
+function gitInventoryReceipt(result) {
+	if (
+		!success(result) ||
+		result.stderr !== '' ||
+		typeof result.stdout !== 'string' ||
+		result.stdout.length > 1024
+	)
+		refuse();
+	const value = JSON.parse(result.stdout);
+	if (
+		!value ||
+		Object.keys(value).sort().join(',') !== 'dev,ino,mode,nlink,schema,uid' ||
+		value.schema !== 1 ||
+		value.mode !== 0o600 ||
+		value.nlink !== 1 ||
+		value.uid !== String(process.getuid()) ||
+		!['dev', 'ino', 'uid'].every(
+			(key) => typeof value[key] === 'string' && /^(?:0|[1-9][0-9]*)$/.test(value[key])
+		) ||
+		result.stdout !== JSON.stringify(value) + '\n'
+	)
+		refuse();
+	return value;
+}
+/** Read the original completed spool without borrowing the phase capture budget. */
+function readGitInventory(filename, receipt, current) {
+	const expected = { dev: BigInt(receipt.dev), ino: BigInt(receipt.ino), uid: BigInt(receipt.uid) };
+	current();
+	const before = fs.lstatSync(filename, { bigint: true });
+	const identity = (fact) => [
+		fact.dev,
+		fact.ino,
+		fact.uid,
+		fact.mode,
+		fact.nlink,
+		fact.size,
+		fact.mtimeNs,
+		fact.ctimeNs
+	];
+	const same = (fact) =>
+		fact.isFile() &&
+		!fact.isSymbolicLink() &&
+		fact.dev === expected.dev &&
+		fact.ino === expected.ino &&
+		fact.uid === expected.uid &&
+		(fact.mode & 511n) === 384n &&
+		fact.nlink === 1n &&
+		identity(fact).every((value, index) => value === identity(before)[index]);
+	if (!same(before) || before.size <= 0n || before.size > BigInt(Number.MAX_SAFE_INTEGER)) refuse();
+	const descriptor = fs.openSync(
+		filename,
+		fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+	);
+	let raw;
+	try {
+		if (!same(fs.fstatSync(descriptor, { bigint: true }))) refuse();
+		const chunks = [],
+			chunk = Buffer.alloc(64 * 1024);
+		let offset = 0;
+		while (offset < Number(before.size)) {
+			current();
+			const remaining = Math.min(chunk.length, Number(before.size) - offset);
+			const count = fs.readSync(descriptor, chunk, 0, remaining, offset);
+			if (!Number.isSafeInteger(count) || count <= 0 || count > remaining) refuse();
+			chunks.push(Buffer.from(chunk.subarray(0, count)));
+			offset += count;
+		}
+		if (
+			!same(fs.fstatSync(descriptor, { bigint: true })) ||
+			!same(fs.lstatSync(filename, { bigint: true }))
+		)
+			refuse();
+		raw = Buffer.concat(chunks);
+	} finally {
+		fs.closeSync(descriptor);
+	}
+	current();
+	if (!same(fs.lstatSync(filename, { bigint: true }))) refuse();
+	const tracked = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+		.decode(raw)
+		.split('\0');
+	if (
+		tracked.pop() !== '' ||
+		new Set(tracked).size !== tracked.length ||
+		tracked.some(
+			(relative) =>
+				!relative ||
+				path.isAbsolute(relative) ||
+				relative.split('/').some((part) => !part || part === '..' || part === '.')
+		)
+	)
+		refuse();
+	current();
+	return tracked;
+}
+/** Keep Git execution under the unchanged physical owner, then read its exact file. */
+async function gitInventory(phase, root, helper, filename, current) {
+	current();
+	const result = await phase('/usr/bin/python3', ['-B', helper, root, filename], {
+		GIT_OPTIONAL_LOCKS: '0'
+	});
+	if (hasRetainedPhases()) refuse();
+	const receipt = gitInventoryReceipt(result);
+	return readGitInventory(filename, receipt, current);
 }
 function unchanged(before, after) {
 	if (JSON.stringify(before) !== JSON.stringify(after)) refuse();
@@ -382,7 +489,8 @@ async function run({
 			'tools/build/stage-linux-network-runtime.py',
 			'tools/lib/git_bash.py',
 			'tools/__init__.py',
-			PROBE
+			PROBE,
+			GIT_INVENTORY
 		];
 		const inputHashes = {};
 		for (const relative of inputs) {
@@ -462,13 +570,14 @@ async function run({
 			(await git(['status', '--porcelain=v1', '--untracked-files=all'])) !== ''
 		)
 			refuse();
-		const tracked = (await git(['ls-files', '-z'])).split('\0');
-		if (
-			tracked.pop() !== '' ||
-			new Set(tracked).size !== tracked.length ||
-			!tracked.includes(PROBE)
-		)
-			refuse();
+		const tracked = await gitInventory(
+			phase,
+			root,
+			path.join(snapshot, GIT_INVENTORY),
+			path.join(work, 'git-inventory.nul'),
+			executionCurrent
+		);
+		if (!tracked.includes(PROBE)) refuse();
 		const source = inspectSource(root, tracked);
 		if (!source[NODE_OWNER] || source[NODE_OWNER].sha256 !== capturedNodeOwner) refuse();
 		for (const relative of inputs)
@@ -639,6 +748,9 @@ module.exports = {
 	lockReceipt,
 	outputReceipt,
 	inspectSource,
+	gitInventory,
+	gitInventoryReceipt,
+	readGitInventory,
 	unchanged,
 	helpReceipt,
 	HELP,

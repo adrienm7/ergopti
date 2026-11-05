@@ -14,6 +14,8 @@ hardware test.
 
 The [nine-scope November 5 audit](audits/platform-parity/2026-11-05-native-ui/report.md) follows managed runtime/provisioning, WebView editors and diagnostics separately on each OS at `3aaaae7dd028cdf21e99b7ff5a3e49acce15b46a`. It retains 15 qualified findings, documents intentional differences and refuted hypotheses, and adds an automatic source-area register alongside the existing generated feature inventory. Source presence and declared availability remain distinct from verified native behavior. The [capability comparison](audits/platform-parity/2026-11-05-native-ui/capabilities.md) and root TODO record the concrete follow-ups.
 
+The [Nix delivery follow-up](audits/platform-parity/2026-11-05-native-ui/delivery-nix.md) preserves the native process owner while transporting the enlarged Git inventory outside its bounded result capture; its local controls do not claim an installed-Nix build.
+
 ## Migration and update continuation
 
 The [six-scope recovery audit](audits/platform-parity/2026-11-04-recovery/report.md) covers the previously excluded folder migration and updater/reload handoff at `3a680d9f530a9af686fccc16d3f7611ec7fb034c`. It adds 17 qualified OS follow-ups and a [machine-readable, rendered capability/intent comparison](audits/platform-parity/2026-11-04-recovery/capabilities.md). Actual native boundaries, shared causes, receiving gaps and two final dry passes are explicit; the Windows updater scope adds controls without a new confirmed root.

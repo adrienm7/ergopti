@@ -13,7 +13,10 @@ const {
 	outputReceipt,
 	helpReceipt,
 	SUMMARY,
-	nativeExecutableHash
+	nativeExecutableHash,
+	gitInventory,
+	gitInventoryReceipt,
+	readGitInventory
 } = require('./run-linux-nix-native.cjs');
 const root = path.resolve(__dirname, '../..');
 const head = '0123456789abcdef0123456789abcdef01234567';
@@ -360,6 +363,12 @@ check('Git index observation does not refresh original locks', () => {
 		source.includes("owner: path.join(snapshot, 'tools/build/stage-linux-network-runtime.py')")
 	);
 	assert.ok(source.includes("LUA_INIT: '@' + path.join(snapshot, PROBE)"));
+	assert.ok(source.includes("const GIT_INVENTORY = 'tools/test/run-linux-nix-git-inventory.py'"));
+	assert.ok(
+		/PROBE,\s*GIT_INVENTORY\s*\]/.test(source),
+		'helper belongs to the actual input hash fences'
+	);
+	assert.ok(source.includes('unchanged(source, inspectSource(root, tracked))'));
 });
 
 // Execute only the actual fixed projection in isolation: no Nix or phase owner.
@@ -671,6 +680,347 @@ check('reflecting stderr fails independent fixed privacy receipt', () => {
 	);
 });
 
-process.stdout.write(
-	`PASS Nix source/receipt/registration controls: ${checks}; native execution unqualified.\n`
-);
+/** Build only creator identity; the real reader must observe all later bytes. */
+function inventoryIdentity(filename) {
+	const fact = fs.lstatSync(filename, { bigint: true });
+	return {
+		schema: 1,
+		dev: String(fact.dev),
+		ino: String(fact.ino),
+		uid: String(fact.uid),
+		mode: 0o600,
+		nlink: 1
+	};
+}
+function inventoryResult(identity, replacements = {}) {
+	return {
+		status: 0,
+		signal: null,
+		error: null,
+		stdout: JSON.stringify(identity) + '\n',
+		stderr: '',
+		...replacements
+	};
+}
+/** Exercise exact completed-file admission with real files and read-race ports. */
+function inventoryReadControls() {
+	const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ergopti-nix-index-'));
+	fs.chmodSync(directory, 0o700);
+	const filename = path.join(directory, 'inventory');
+	function replace(raw) {
+		if (fs.existsSync(filename)) fs.unlinkSync(filename);
+		fs.writeFileSync(filename, raw, { flag: 'wx', mode: 0o600 });
+		return inventoryIdentity(filename);
+	}
+	const current = () => {};
+	try {
+		const valid = Buffer.from('audit/outside-static\0directory/name with\nnewline\0');
+		let identity = replace(valid);
+		check('Git inventory keeps every path byte and creates a closed identity receipt', () => {
+			assert.deepEqual(gitInventoryReceipt(inventoryResult(identity)), identity);
+			assert.deepEqual(readGitInventory(filename, identity, current), [
+				'audit/outside-static',
+				'directory/name with\nnewline'
+			]);
+		});
+		for (const [name, raw] of [
+			['empty output', Buffer.alloc(0)],
+			['missing final NUL', Buffer.from('file')],
+			['empty path', Buffer.from('file\0\0')],
+			['duplicate path', Buffer.from('file\0file\0')],
+			['absolute path', Buffer.from('/file\0')],
+			['parent component', Buffer.from('dir/../file\0')],
+			['dot component', Buffer.from('./file\0')],
+			['empty component', Buffer.from('dir//file\0')],
+			['invalid UTF-8', Buffer.from([0xff, 0])]
+		]) {
+			identity = replace(raw);
+			check('Git inventory refuses ' + name, () =>
+				assert.throws(() => readGitInventory(filename, identity, current))
+			);
+		}
+		identity = replace(valid);
+		for (const [name, replacements] of [
+			['nonzero Git', { status: 128 }],
+			['signalled Git', { signal: 'SIGTERM' }],
+			['physical owner refusal', { error: 'native_closure_unknown' }],
+			['stderr output', { stderr: 'unexpected' }],
+			['extra stdout', { stdout: JSON.stringify(identity) + '\nextra' }],
+			['missing receipt', { stdout: '' }],
+			['receipt over capture allowance', { stdout: 'x'.repeat(1025) }],
+			['unknown receipt field', { stdout: JSON.stringify({ ...identity, extra: true }) + '\n' }],
+			['noncanonical receipt', { stdout: JSON.stringify(identity, null, 1) + '\n' }],
+			['wrong receipt mode', { stdout: JSON.stringify({ ...identity, mode: 0o644 }) + '\n' }],
+			['wrong receipt links', { stdout: JSON.stringify({ ...identity, nlink: 2 }) + '\n' }],
+			['wrong receipt UID', { stdout: JSON.stringify({ ...identity, uid: '-1' }) + '\n' }]
+		])
+			check('Git inventory refuses ' + name, () =>
+				assert.throws(() => gitInventoryReceipt(inventoryResult(identity, replacements)))
+			);
+		for (const mode of [
+			'partial-read',
+			'read-error',
+			'premature-eof',
+			'mutation',
+			'equal-byte-successor',
+			'symlink',
+			'mode',
+			'hardlink',
+			'forged-identity',
+			'close-error',
+			'close-successor',
+			'currentness'
+		]) {
+			identity = replace(valid);
+			const saved = Object.fromEntries(
+				['openSync', 'readSync', 'closeSync'].map((name) => [name, fs[name]])
+			);
+			let descriptor,
+				reads = 0,
+				closes = 0,
+				fences = 0;
+			const previous = path.join(directory, 'previous-' + mode);
+			const write = (raw) => {
+				const fd = saved.openSync(filename, 'w', 0o600);
+				try {
+					assert.equal(fs.writeSync(fd, raw), raw.length);
+				} finally {
+					saved.closeSync(fd);
+				}
+			};
+			if (mode === 'symlink') {
+				fs.renameSync(filename, previous);
+				fs.symlinkSync(previous, filename);
+			} else if (mode === 'mode') fs.chmodSync(filename, 0o644);
+			else if (mode === 'hardlink') fs.linkSync(filename, previous);
+			else if (mode === 'forged-identity') identity = { ...identity, ino: '0' };
+			fs.openSync = (...args) => {
+				descriptor = saved.openSync(...args);
+				return descriptor;
+			};
+			fs.readSync = (fd, buffer, offset, length, position) => {
+				assert.equal(fd, descriptor);
+				assert.ok(length <= 64 * 1024);
+				reads++;
+				if (mode === 'read-error') throw new Error('controlled inventory read refusal');
+				if (mode === 'premature-eof') return 0;
+				const count = saved.readSync(
+					fd,
+					buffer,
+					offset,
+					mode === 'partial-read' ? Math.min(length, 3) : length,
+					position
+				);
+				if (reads === 1 && mode === 'mutation') write(Buffer.alloc(valid.length));
+				if (reads === 1 && mode === 'equal-byte-successor') {
+					fs.renameSync(filename, previous);
+					write(valid);
+				}
+				return count;
+			};
+			fs.closeSync = (fd) => {
+				assert.equal(fd, descriptor);
+				closes++;
+				saved.closeSync(fd);
+				if (mode === 'close-error') throw new Error('controlled inventory close refusal');
+				if (mode === 'close-successor') {
+					fs.renameSync(filename, previous);
+					write(valid);
+				}
+			};
+			try {
+				check('Git inventory exact read/cleanup: ' + mode, () => {
+					const read = () =>
+						readGitInventory(filename, identity, () => {
+							if (++fences === 2 && mode === 'currentness') throw new Error('source revoked');
+						});
+					if (mode === 'partial-read') assert.equal(read().length, 2);
+					else assert.throws(read);
+					assert.equal(closes, descriptor === undefined ? 0 : 1, 'exact acquired reader is closed');
+				});
+			} finally {
+				Object.assign(fs, saved);
+			}
+		}
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+
+/** Run real Git above the unchanged capture ceiling under the actual owner. */
+async function inventoryPhaseControls() {
+	const { spawnSync } = require('node:child_process');
+	const crypto = require('node:crypto');
+	const { ownPhase, hasRetainedPhases } = require('./run-linux-managed-http-native.cjs');
+	const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ergopti-nix-git-'));
+	fs.chmodSync(directory, 0o700);
+	const repository = path.join(directory, 'repository'),
+		execution = path.join(directory, 'execution');
+	for (const name of [repository, execution]) fs.mkdirSync(name, { mode: 0o700 });
+	const inputs = [
+		'tools/test/run-linux-nix-git-inventory.py',
+		'tools/test/run-linux-managed-http-phase.py',
+		'tools/build/stage-linux-network-runtime.py',
+		'tools/lib/git_bash.py',
+		'tools/__init__.py'
+	];
+	const hashes = {};
+	for (const name of inputs) {
+		const raw = fs.readFileSync(path.join(root, name)),
+			copy = path.join(execution, name);
+		hashes[name] = crypto.createHash('sha256').update(raw).digest('hex');
+		fs.mkdirSync(path.dirname(copy), { recursive: true, mode: 0o700 });
+		fs.writeFileSync(copy, raw, { flag: 'wx', mode: 0o600 });
+	}
+	const current = () => {
+		for (const name of inputs)
+			for (const location of [root, execution])
+				assert.equal(
+					crypto
+						.createHash('sha256')
+						.update(fs.readFileSync(path.join(location, name)))
+						.digest('hex'),
+					hashes[name]
+				);
+	};
+	const env = {
+		PATH: '/usr/bin:/bin',
+		HOME: directory,
+		GIT_CONFIG_NOSYSTEM: '1',
+		GIT_OPTIONAL_LOCKS: '0',
+		PYTHONDONTWRITEBYTECODE: '1'
+	};
+	function setup(args, input) {
+		const result = spawnSync('/usr/bin/git', ['-C', repository, ...args], {
+			env,
+			input,
+			encoding: 'utf8'
+		});
+		assert.equal(result.status, 0, 'private Git index setup must succeed');
+		assert.equal(result.error, undefined);
+		return result.stdout;
+	}
+	let serial = 0,
+		expired = false,
+		lastResult;
+	const phase = async (command, args, extra) => {
+		current();
+		const label = 'inventory-' + ++serial;
+		const result = await ownPhase({
+			command,
+			args,
+			env: { ...env, ...extra },
+			cwd: directory,
+			work: directory,
+			label,
+			worker: path.join(execution, inputs[1]),
+			owner: path.join(execution, inputs[2]),
+			ownerSha: hashes[inputs[2]],
+			kind: 'command',
+			budgetMs: 10000,
+			gateDeadline: process.hrtime.bigint() + (expired ? -1n : 15000000000n)
+		});
+		current();
+		assert.equal(
+			hasRetainedPhases(),
+			false,
+			'actual phase must physically close, even after capture refusal'
+		);
+		if (!expired) {
+			const closed = JSON.parse(
+				fs.readFileSync(path.join(directory, label + '.owner', 'closed.json'))
+			);
+			assert.equal(closed.state, 'closed');
+			assert.equal(closed.phase, 'command');
+			assert.equal(closed.status, result.status);
+			assert.ok(Number.isSafeInteger(closed.pid) && closed.pid > 0);
+		}
+		lastResult = result;
+		return result;
+	};
+	async function refusesBeforeRead(target, operation) {
+		const open = fs.openSync;
+		let reads = 0;
+		fs.openSync = (filename, ...args) => {
+			if (filename === target) reads++;
+			return open(filename, ...args);
+		};
+		try {
+			await assert.rejects(operation());
+			assert.equal(reads, 0, 'failed phase must not acquire the spool reader');
+		} finally {
+			fs.openSync = open;
+		}
+	}
+	try {
+		setup(['init', '--quiet']);
+		const blob = setup(['hash-object', '-w', '--stdin'], 'synthetic tracked bytes\n').trim();
+		const expected = Array.from(
+			{ length: 6000 },
+			(_, index) => 'audit/' + String(index).padStart(6, '0') + '-' + 'p'.repeat(200) + '.json'
+		);
+		expected.push('zz-last-tracked-sentinel');
+		assert.ok(Buffer.byteLength(expected.join('\0') + '\0') > 1024 * 1024);
+		setup(
+			['update-index', '-z', '--index-info'],
+			expected.map((name) => `100644 ${blob}\t${name}\0`).join('')
+		);
+		const old = await phase('/usr/bin/git', ['-C', repository, 'ls-files', '-z']);
+		assert.ok(
+			['capture_bound', 'closure_receipt_refused'].includes(old.error),
+			'original capture must refuse the real oversized inventory'
+		);
+		checks++;
+		const helper = path.join(execution, inputs[0]);
+		const filename = path.join(directory, 'tracked.nul');
+		const actual = await gitInventory(phase, repository, helper, filename, current);
+		assert.deepEqual(actual, expected);
+		assert.equal(actual.at(-1), 'zz-last-tracked-sentinel');
+		assert.ok(fs.statSync(filename).size > 1024 * 1024);
+		checks++;
+		const preserved = fs.readFileSync(filename);
+		await refusesBeforeRead(filename, () =>
+			gitInventory(phase, repository, helper, filename, current)
+		);
+		assert.equal(lastResult.status, 1);
+		assert.deepEqual(
+			fs.readFileSync(filename),
+			preserved,
+			'exclusive helper cannot truncate an incumbent spool'
+		);
+		checks++;
+		const notRepository = path.join(directory, 'not-repo.nul');
+		await refusesBeforeRead(notRepository, () =>
+			gitInventory(phase, directory, helper, notRepository, current)
+		);
+		assert.equal(lastResult.status, 1);
+		checks++;
+		expired = true;
+		const late = path.join(directory, 'expired.nul');
+		await refusesBeforeRead(late, () => gitInventory(phase, repository, helper, late, current));
+		assert.equal(lastResult.error, 'acquisition_refused');
+		assert.equal(
+			fs.existsSync(late),
+			false,
+			'expired original deadline must not start Git or parse a spool'
+		);
+		checks++;
+		assert.equal(hasRetainedPhases(), false);
+		process.stdout.write(
+			'PASS real oversized Git inventory: old capture refused; complete spool and original physical closure admitted.\n'
+		);
+	} finally {
+		if (!hasRetainedPhases()) fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+async function finish() {
+	inventoryReadControls();
+	if (process.platform === 'linux') await inventoryPhaseControls();
+	process.stdout.write(
+		`PASS Nix source/receipt/registration controls: ${checks}; native Nix execution unqualified.\n`
+	);
+}
+finish().catch((error) => {
+	console.error(error);
+	process.exitCode = 1;
+});
