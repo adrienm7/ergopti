@@ -66,7 +66,7 @@ function openAppDrilldown(appName) {
 		},
 		{
 			label: _t('ui_apps.tile_focus_lat'),
-			value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
+			value: (a.focus_latency_count || 0) > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
 			detail: a.focus_latency_count > 0 ? `n=${a.focus_latency_count}` : ''
 		},
 		{

@@ -5172,4 +5172,98 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+test('linux rhythm displays a measured zero inter-key delay', () => {
+	const page = loadMetricsTypingPage('linux');
+	freezePageClock(page, '2026-10-25T12:00:00Z');
+	const manifest = {
+		'2026-10-25': {
+			Editor: {
+				chars: 3,
+				burst_count_total: 1,
+				burst_inter_delay_count: 1,
+				burst_inter_delay_sum: 0,
+				burst_inter_delay_sumsq: 0
+			}
+		}
+	};
+	publishTypingPage(page, 'linux', manifest);
+	page.context.render_rhythm_kpi();
+	assert.equal(page.elements.get('rhythm_mean_delay').innerHTML, '0 ms');
+	const empty = loadMetricsTypingPage('linux');
+	freezePageClock(empty, '2026-10-25T12:00:00Z');
+	publishTypingPage(empty, 'linux', {
+		'2026-10-25': { Editor: { chars: 1, burst_count_total: 1 } }
+	});
+	empty.context.render_rhythm_kpi();
+	assert.equal(empty.elements.get('rhythm_mean_delay').innerHTML, '—');
+});
+test('apps focus latency displays measured zero and distinguishes absence', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const tbody = {
+		children: [],
+		appendChild(child) {
+			this.children.push(child);
+		}
+	};
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'apps-tbody': tbody,
+		'kpi-tx-focus-lat': {},
+		app_drilldown_modal: { style: {} },
+		app_modal_title: {},
+		app_modal_tiles: {},
+		app_modal_hourly: { getContext: () => 'hourly' },
+		app_modal_dests: {},
+		app_modal_layouts: {},
+		app_modal_records: {},
+		app_modal_assist: {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({
+		style: {},
+		children: [],
+		appendChild(child) {
+			this.children.push(child);
+		},
+		addEventListener() {}
+	});
+	context.Chart = class {
+		destroy() {}
+	};
+	context.window._i18n_strings = {
+		'ui_apps.value_ms': '{n} ms',
+		'ui_apps.tile_focus_lat': 'Focus'
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': {
+				Editor: {
+					chars: 1,
+					app_time_ms: 1000,
+					focus_to_first_key_count: 1,
+					focus_to_first_key_sum_ms: 0
+				},
+				Other: { chars: 1, app_time_ms: 500 }
+			}
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(!elements['render-error-banner'].textContent);
+	assert.equal(elements['kpi-tx-focus-lat'].textContent, '0 ms');
+	assert.equal(tbody.children[0].children[6].textContent, '0 ms');
+	assert.equal(tbody.children[1].children[6].textContent, '—');
+	context.openAppDrilldown('Editor');
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>0 ms<\/div>/);
+	context.openAppDrilldown('Other');
+	assert.match(elements['app_modal_tiles'].innerHTML, />Focus<\/div>\s*<div[^>]*>—<\/div>/);
+});
 console.log(`${passed} passed, 0 failed.`);
