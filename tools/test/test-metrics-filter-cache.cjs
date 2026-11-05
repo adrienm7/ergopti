@@ -4887,7 +4887,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					session_total_active_ms: 60000,
 					burst_count_total: 1,
 					burst_max_chars: 10,
-					burst_length_buckets: { 10: 1 }
+					burst_length_buckets: { 10: 1, 500: 1, '500+': 1 }
 				}
 			}
 		});
@@ -4901,6 +4901,9 @@ for (const host of ['windows', 'macos', 'linux']) {
 		page.context.render_lexical_kpi();
 		assert.match(page.elements.get('lexical_val').innerHTML, /&lt;rich-local&gt;/);
 		page.context.render_rhythm_kpi();
+		assert.match(page.elements.get('rhythm_distribution_container').innerHTML, /≤ 500/);
+		assert.match(page.elements.get('rhythm_distribution_container').innerHTML, /> 500/);
+		assert.doesNotMatch(page.elements.get('rhythm_distribution_container').innerHTML, /500\+/);
 		page.context.render_records_kpi();
 		page.context.render_apps_kpi();
 		for (const id of [

@@ -2760,7 +2760,7 @@ function render_rhythm_kpi() {
 		.map((k) => {
 			const n = length_buckets[k] || 0;
 			const pct = max_bucket > 0 ? (n / max_bucket) * 100 : 0;
-			const label = `${k === '500+' ? '500+' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
+			const label = `${k === '500+' ? '> 500' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
