@@ -36,6 +36,11 @@ helpers.describe("LLM navigation settings", function()
 		helpers.assert_eq(settings.get(), { "ctrl", "shift" })
 		helpers.assert_eq(storage.get("llm.navigation.val_modifiers"), { "ctrl", "shift" })
 		helpers.assert_eq(settings.set({ "alt", "alt" }), false)
+		for _, malformed in ipairs({ { [1] = "ctrl", [3] = "shift" }, { "ctrl", extra = "alt" } }) do
+			helpers.assert_eq(settings.set(malformed), false, "a partial or mixed chord must not be persisted")
+			helpers.assert_eq(settings.get(), { "ctrl", "shift" })
+			helpers.assert_eq(storage.get("llm.navigation.val_modifiers"), { "ctrl", "shift" })
+		end
 		package.loaded["infra.llm_preferences"] = previous
 	end)
 
