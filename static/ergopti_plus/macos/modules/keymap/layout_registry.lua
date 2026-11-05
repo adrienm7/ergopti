@@ -209,6 +209,7 @@ local function default_deps(settings)
 		inspect_file = FileSystem.classify_no_follow,
 		read_status = FileSystem.read_with_status,
 		digest = Crypto.sha256_bytes,
+		replace_exact = FileSystem.write_if_unchanged,
 		remove_exact = FileSystem.remove_if_unchanged,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
@@ -441,14 +442,12 @@ end
 --- Capture both registered copies before a mutation. The digest proves only
 --- their bytes, not who owns the inode; the native conditional operations
 --- recheck those bytes under the cooperative writer lock.
-local function capture_registered_files(deps, entry)
+local function capture_registered_files(deps, entry, verified_candidate)
 	if type(deps.inspect_file) ~= "function" or type(deps.read_status) ~= "function"
 		or type(deps.digest) ~= "function" then
 		return nil, "classified layout verification is unavailable"
 	end
-	if type(entry.sha256) ~= "string" or not entry.sha256:match("^%x+$") or #entry.sha256 ~= 64 then
-		return nil, "the installed layout has no usable checksum"
-	end
+	local checksum_valid = type(entry.sha256) == "string" and entry.sha256:match("^%x+$") ~= nil and #entry.sha256 == 64
 	local copies = {}
 	for _, path in ipairs({ deps.local_dir .. entry.id .. ".keylayout", deps.layouts_dir .. entry.id .. ".keylayout" }) do
 		local attrs, status = deps.inspect_file(path)
@@ -456,8 +455,10 @@ local function capture_registered_files(deps, entry)
 			copies[path] = { status = "absent" }
 		elseif status == "ok" and type(attrs) == "table" and attrs.mode == "file" then
 			local content, read_status = deps.read_status(path)
-			local digest = type(content) == "string" and deps.digest(content) or nil
-			if read_status ~= "ok" or type(digest) ~= "string" or digest:lower() ~= entry.sha256:lower() then
+			local is_candidate = type(verified_candidate) == "string" and content == verified_candidate
+			if not checksum_valid and not is_candidate then return nil, "the installed layout has no usable checksum" end
+			local digest = not is_candidate and type(content) == "string" and deps.digest(content) or nil
+			if read_status ~= "ok" or (not is_candidate and (type(digest) ~= "string" or digest:lower() ~= entry.sha256:lower())) then
 				return nil, "the installed layout was changed or cannot be read: " .. path
 			end
 			copies[path] = { status = "ok", content = content }
@@ -528,7 +529,126 @@ end
 --- @return string|nil installed_path
 --- @return string|nil failure_code
 --- @return string|nil detail
+local function publish_update(deps, entry, text, previous)
+	if type(deps.replace_exact) ~= "function" or type(deps.remove_exact) ~= "function"
+		or type(deps.inspect_file) ~= "function" or type(deps.read_status) ~= "function" then
+		return nil, M.FAILURE_WRITE, "conditional layout publication is unavailable"
+	end
+	local record_path = deps.local_dir .. deps.settings.installed_file
+	local attrs, record_status = deps.inspect_file(record_path)
+	if record_status ~= "ok" or type(attrs) ~= "table" or attrs.mode ~= "file" then
+		return nil, M.FAILURE_RECORD, "the installed layout record is not a regular file"
+	end
+	local raw, read_status = deps.read_status(record_path)
+	if read_status ~= "ok" or type(raw) ~= "string" then
+		return nil, M.FAILURE_RECORD, "the installed layout record cannot be read"
+	end
+	local current, record_err = Catalogue.decode_installed(raw, deps.decode_installed_json or Json.decode_lossless)
+	local registered = current and current.layouts[entry.id]
+	if not registered or registered.sha256 ~= previous.sha256 or registered.version ~= previous.version then
+		return nil, M.FAILURE_RECORD, record_err or "the installed layout record changed"
+	end
+	local copies, capture_err = capture_registered_files(deps, registered, text)
+	if not copies then return nil, M.FAILURE_FOREIGN_FILE, capture_err end
+	local local_path = deps.local_dir .. entry.id .. ".keylayout"
+	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
+	local encoded_ok, encoded = pcall(function() return deps.encode_json(Catalogue.with_installed(current, entry)) end)
+	if not encoded_ok or type(encoded) ~= "string" then return nil, M.FAILURE_RECORD, "cannot encode the installed layout record" end
+	local loaded, inverse_module = pcall(require, "config_file_inverse")
+	local factory = loaded and type(inverse_module) == "table" and inverse_module.for_current_writer or nil
+	if type(factory) ~= "function" then return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable" end
+	local built, inverse, writer = pcall(factory)
+	if not built or type(inverse) ~= "table" or type(writer) ~= "table"
+		or type(inverse.restore) ~= "function" or type(inverse.settle_publication) ~= "function"
+		or type(writer.publish_if_unchanged) ~= "function" or type(writer.read_classified) ~= "function"
+		or type(writer.remove_if_unchanged) ~= "function" or type(writer.retry_publication_cleanup) ~= "function" then
+		return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable"
+	end
+	local publish_exact, read_classified = writer.publish_if_unchanged, writer.read_classified
+	local remove_conditional, settle_publication = writer.remove_if_unchanged, writer.retry_publication_cleanup
+	local restore, settle_inverse = inverse.restore, inverse.settle_publication
+	local inspect, read, replace, remove = deps.inspect_file, deps.read_status, deps.replace_exact, deps.remove_exact
+	local files = { read_with_status = read, remove_if_unchanged = remove }
+	files.write_if_unchanged = function(path, content, expected, on_error)
+		local observed, status = inspect(path)
+		if expected.status == "absent" then
+			if status ~= "absent" then return false, "layout path is no longer absent" end
+		elseif status ~= "ok" or type(observed) ~= "table" or observed.mode ~= "file" then
+			return false, "layout path is no longer a regular file"
+		end
+		return replace(path, content, expected, on_error)
+	end
+	local function current_owner()
+		return rawequal(package.loaded["config_file_inverse"], inverse_module)
+			and rawequal(inverse_module.for_current_writer, factory)
+			and rawequal(package.loaded["toml_codec.writer"], writer)
+			and rawequal(writer.publish_if_unchanged, publish_exact)
+			and rawequal(writer.read_classified, read_classified)
+			and rawequal(writer.remove_if_unchanged, remove_conditional)
+			and rawequal(writer.retry_publication_cleanup, settle_publication)
+			and rawequal(inverse.restore, restore)
+			and rawequal(inverse.settle_publication, settle_inverse)
+			and rawequal(deps.inspect_file, inspect) and rawequal(deps.read_status, read)
+			and rawequal(deps.replace_exact, replace) and rawequal(deps.remove_exact, remove)
+	end
+	local effects = {}
+	local function rollback()
+		if not current_owner() then return false end
+		for index = #effects, 1, -1 do
+			if not current_owner() or restore(effects[index], files) ~= true then return false end
+			table.remove(effects, index)
+		end
+		return true
+	end
+	local function retry_rollback()
+		local called, settled = pcall(rollback)
+		return called and settled == true
+	end
+	local function fail(code, detail)
+		if #effects == 0 then return nil, code, detail end
+		if not retry_rollback() then
+			retain_file_cleanup(retry_rollback)
+			return nil, code, tostring(detail) .. "; conditional rollback remains pending"
+		end
+		return nil, code, detail
+	end
+	for _, step in ipairs({ { local_path, text, copies[local_path], M.FAILURE_WRITE },
+		{ installed_path, text, copies[installed_path], M.FAILURE_WRITE },
+		{ record_path, encoded, { status = "ok", content = raw }, M.FAILURE_RECORD } }) do
+		local source = { status = step[3].status, content = step[3].content }
+		local effect = { path = step[1], source = source, candidate = step[2] }
+		if not current_owner() then return fail(step[4], "layout publication owner changed") end
+		local called, written, detail, receipt = pcall(publish_exact, step[1], step[2], files, source)
+		if not called then detail, written, receipt = tostring(written), false, nil end
+		if written ~= true then
+			if type(receipt) == "function" then
+				effect.publication_cleanup = receipt
+				effects[#effects + 1] = effect
+			else
+				-- Without a receipt, only an unchanged source proves this step had
+				-- no visible effect. Preserve earlier candidates when the outcome
+				-- is unknown, so a retry of the same verified candidate can join it.
+				local checked, unchanged = pcall(function()
+					local observed, status = inspect(step[1])
+					if source.status == "absent" then return status == "absent" end
+					if status ~= "ok" or type(observed) ~= "table" or observed.mode ~= "file" then return false end
+					local bytes, read_status = read(step[1])
+					return read_status == "ok" and bytes == source.content
+				end)
+				if not checked or not unchanged then
+					return nil, step[4], tostring(detail) .. "; publication was not confirmed at " .. step[1]
+						.. "; inspect retained layout copies at " .. local_path .. " and " .. installed_path
+				end
+			end
+			return fail(step[4], detail)
+		end
+		effects[#effects + 1] = effect
+	end
+	return installed_path, nil, nil
+end
+
 local function publish(deps, entry, text, previous)
+	if previous ~= nil then return publish_update(deps, entry, text, previous) end
 	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
 	local created_paths = {}
 	local function retained(detail)
@@ -646,6 +766,10 @@ function M.install(id, on_done, deps)
 				finish(false, M.FAILURE_DOWNLOAD, detail)
 				return
 			end
+			if record.layouts[id] then
+				local copies, capture_err = capture_registered_files(deps, record.layouts[id], detail.text)
+				if not copies then finish(false, M.FAILURE_FOREIGN_FILE, capture_err); return end
+			end
 			if entry.extension ~= nil then
 				local staged, stage_err = Extension.stage(deps.local_dir, entry, detail.content, {
 					read = deps.read, write = function(path, text) return write_file(deps, path, text) end,
@@ -683,17 +807,19 @@ function M.uninstall(id, on_done, deps)
 		return false
 	end
 	deps = resolved
+	if not acquire_slot(id, "uninstall", on_done) then return false end
 	local record, record_err = read_installed(deps)
 	if not record then
+		_busy = nil
 		on_done(false, M.FAILURE_RECORD, record_err)
 		return false
 	end
 	local entry = Registry.is_valid_id(id) and record.layouts[id] or nil
 	if not entry then
+		_busy = nil
 		on_done(false, M.FAILURE_NOT_INSTALLED, "the layout '" .. tostring(id) .. "' was not installed here")
 		return false
 	end
-	if not acquire_slot(id, "uninstall", on_done) then return false end
 	local copies, capture_err = capture_registered_files(deps, entry)
 	if not copies then
 		_busy = nil
