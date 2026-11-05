@@ -715,11 +715,17 @@ _TNK_Boot(Kind) {
 		RawName := Kind == "header-nul" ? "layout\u0000ignored"
 			: Kind == "escaped-spelling-control" ? "ergopti_base\\u0000ignored"
 			: Kind == "non-nul-control" ? "ergopti_base\u0001ignored"
-			: Kind == "known-control" ? "ergopti_base" : "ergopti_base\u0000ignored"
+			: Kind == "known-control" ? "ergopti_base"
+			: Kind == "known-escape-control" ? "ergo\u0070ti_base" : "ergopti_base\u0000ignored"
 		Decoded := "", DecodeRejected := false
 		try Decoded := TOML_UnescapeBasicStringContents(RawName)
 		catch
 			DecodeRejected := true
+		if Kind == "known-escape-control" {
+			AssertFalse(DecodeRejected)
+			AssertEqual("ergopti_base", Decoded, "the valid Unicode escape identifies the exact actual manifest key")
+			AssertTrue(InStr(RawName, "\u0070", true) > 0, "the actual source spelling must contain a real escape")
+		}
 		Prefix := Kind == "header-nul" ? "layout" : "ergopti_base"
 		Negative := Kind == "leaf-nul" || Kind == "inline-nul" || Kind == "dotted-nul" || Kind == "header-nul"
 		if Kind == "non-nul-control" {
@@ -798,7 +804,7 @@ _TNK_Boot(Kind) {
 			AssertEqual("current", Boot["status"], "representable quoted key controls must reach genuine current boot")
 			AssertFalse(ReadThrew || ApplyThrew, "ordinary and representable unknown keys remain supported")
 			AssertTrue(Applied >= 0)
-			AssertEqual(Kind == "known-control" ? Requested : Default, Target["layout"]["ergopti_base"])
+			AssertEqual((Kind == "known-control" || Kind == "known-escape-control") ? Requested : Default, Target["layout"]["ergopti_base"])
 		}
 	} finally {
 		_ConfigBootRejectedOverrides := SavedRejected, _ConfigBootOutdatedEntries := SavedOutdated
@@ -813,5 +819,5 @@ _TNK_Boot(Kind) {
 		}
 	}
 }
-for _TNK_Kind in ["leaf-nul", "inline-nul", "dotted-nul", "header-nul", "known-control", "escaped-spelling-control", "non-nul-control"]
+for _TNK_Kind in ["leaf-nul", "inline-nul", "dotted-nul", "header-nul", "known-control", "escaped-spelling-control", "non-nul-control", "known-escape-control"]
 	Test("TOML native decoded key admission: " . _TNK_Kind . " (toml-decoded-key-nul)", _TNK_Boot.Bind(_TNK_Kind))
