@@ -1,0 +1,113 @@
+﻿; tests/fixtures/system_action_inflight_lifecycle_body.ahk
+
+#Requires AutoHotkey v2.0
+
+; These private IO ports model only query results and record requested effects.
+; No registry value, application window or audio endpoint is changed.
+class _SAIL_System extends SystemControl {
+ __New(Pauses) {
+  this.Pauses := Pauses, this.Queries := 0, this.PulseCompleted := false
+  this.Effects := []
+ }
+ _Read() {
+  this.Queries += 1
+  if this.Pauses {
+   _LCPC_Require(this.Queries == 1, "Only the first genuine public-action query may pulse lifecycle")
+   _TNLC_RunLifecycle()
+   this.PulseCompleted := true
+  }
+ }
+ ReadDword(Key, Name) {
+  _LCPC_Require(Name == "AppsUseLightTheme", "The real theme query must reach its expected registry value")
+  this._Read()
+  return 1
+ }
+ WriteDword(Key, Name, Value) {
+  this.Effects.Push("write:" . Name . ":" . Value)
+ }
+ BroadcastSettingChange(Area) {
+  this.Effects.Push("broadcast:" . Area)
+  return true
+ }
+ ActiveWindow() {
+  this._Read()
+  return {Hwnd: 0x4321, Pid: 7001, Class: "Notepad"}
+ }
+ OwnPid() => 4000
+ ShellPid() => 6000
+ WindowsOfProcess(Pid) {
+  _LCPC_Require(Pid == 7001, "Only the original private window owner can be enumerated")
+  return [0x4321]
+ }
+ PostClose(Hwnd) {
+  _LCPC_Require(Hwnd == 0x4321, "Only the explicit private close port can receive a request")
+  this.Effects.Push("close")
+  return true
+ }
+ CaptureMuted() {
+  this._Read()
+  return false
+ }
+ SetCaptureMuted(Muted) {
+  _LCPC_Require(Muted == 1, "The genuine microphone action must request its expected toggle")
+  this.Effects.Push("mute")
+ }
+}
+
+_SAIL_Main() {
+ global _LCPC_World, _ConfigDir, _UserProgramPaused
+ _LCPC_Require(A_Args.Length == 3, "Mode, private directory and shared source are required")
+ Mode := A_Args[1], Fields := StrSplit(Mode, "-")
+ _LCPC_Require(Fields.Length == 2 && (Fields[1] == "theme" || Fields[1] == "quit" || Fields[1] == "mic")
+  && (Fields[2] == "pulse" || Fields[2] == "same"), "Unknown in-flight lifecycle mode")
+ Action := Fields[1], Pauses := Fields[2] == "pulse"
+ _LCPC_World := {Ports: Map()}, _ConfigDir := A_Args[2]
+ TimingsLoadShared(A_Args[3]), KeystatsWalkerLoadTimings()
+ Logs := []
+ LoggerSetTestSink((Line) => Logs.Push(Line))
+ Sys := _SAIL_System(Pauses), Done := {Value: false}
+ ActionFn := Action == "theme" ? GestureSysToggleDarkMode : Action == "quit" ? GestureSysQuitFrontmostApp : GestureSysMicMuteToggle
+ Barrier := (*) => Done.Value := true
+ PreviousCritical := Critical("On")
+ try {
+  _LCPC_Require(!A_IsSuspended && !_UserProgramPaused, "The genuine lifecycle must begin resumed")
+  _GestureMakeSystemRunner(Action, ActionFn.Bind(Sys), Sys).Call()
+  _LCPC_Require(Sys.Queries == 0 && Sys.Effects.Length == 0, "The default native scheduler must defer the genuine action")
+  SetTimer(Barrier, -250)
+ } finally Critical(PreviousCritical)
+ Started := A_TickCount
+ try {
+  while !Done.Value && A_TickCount - Started < 7000
+   Sleep(10)
+  Errors := 0
+  for Line in Logs
+   Errors += InStr(Line, "ERROR") ? 1 : 0
+  FileAppend("RECEIPT system-action-inflight-lifecycle mode=" . Mode . " queries=" . Sys.Queries
+   . " effects=" . Sys.Effects.Length . " pulse=" . Sys.PulseCompleted . " ports=" . _LCPC_World.Ports.Count
+   . " barrier=" . Done.Value . " suspended=" . A_IsSuspended . " errors=" . Errors . "`n", "*")
+  for Effect in Sys.Effects
+   FileAppend("EFFECT system-action-inflight-lifecycle " . Effect . "`n", "*")
+  _LCPC_Require(Done.Value && Sys.Queries == 1 && Errors == 0, "Real timer delivery must reach exactly one complete query without hidden dependency failures")
+  _LCPC_Require(!A_IsSuspended && !_UserProgramPaused && Sys.PulseCompleted == Pauses
+   && _LCPC_World.Ports.Count == (Pauses ? 17 : 0), "A pulse must complete the genuine full suspend/resume before the private first effect")
+  _LCPC_Require(Sys.Effects.Length == (Pauses ? 0 : (Action == "theme" ? 3 : 1)),
+   "An in-flight pre-pause read cannot authorize the first native effect after resume; a same-epoch action must retain its full transaction")
+  if !Pauses {
+   Expected := Action == "theme" ? ["write:AppsUseLightTheme:0", "write:SystemUsesLightTheme:0", "broadcast:ImmersiveColorSet"] : [Action == "quit" ? "close" : "mute"]
+   for Index, Effect in Expected
+    _LCPC_Require(Sys.Effects[Index] == Effect, "The same-epoch control must request the exact established effects in order")
+  }
+ } finally {
+  SetTimer(Barrier, 0)
+  LoggerClearTestSink()
+  Suspend(false)
+ }
+}
+try {
+ _SAIL_Main()
+ FileAppend("PASS system-action-inflight-lifecycle " . A_Args[1] . "`n", "*")
+ ExitApp(0)
+} catch Any as _SAIL_Failure {
+ FileAppend("FAIL system-action-inflight-lifecycle " . _SAIL_Failure.Message . " [" . _SAIL_Failure.File . ":" . _SAIL_Failure.Line . "]`n", "*")
+ ExitApp(1)
+}
