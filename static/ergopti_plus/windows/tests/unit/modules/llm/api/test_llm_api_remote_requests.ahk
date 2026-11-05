@@ -858,6 +858,23 @@ _MCC_Row(Mode) {
         case "thinking-only":
             Content := '[{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]}]'
             Expected := ""
+        case "multi-text":
+            Content := '[{"type":"text","text":"first "},{"type":"thinking","thinking":[{"type":"text","text":"private-reasoning-decoy"}]},{"type":"text","text":"second"},{"type":"text","text":"!"}]'
+            Expected := "first second!"
+        case "empty-text-before-answer":
+            Content := '[{"type":"text","text":""},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
+        case "empty-array": Content := '[]', Expected := ""
+        case "untyped-decoy": Content := '[{"text":"untyped-decoy"}]', Expected := ""
+        case "malformed-text-after-answer":
+            Content := '[{"type":"text","text":"partial-answer-must-not-escape"},{"type":"text","text":42}]'
+            Expected := ""
+        case "malformed-entry-after-answer":
+            Content := '[{"type":"text","text":"partial-answer-must-not-escape"},42]'
+            Expected := ""
+        case "nontext-decoy-before-answer":
+            Content := '[{"type":"image_url","text":"nontext-decoy"},{"type":"TEXT","text":"wrong-case-decoy"},{"type":"text","text":"owned-mistral-answer"}]'
+            Expected := "owned-mistral-answer"
         default: throw ValueError("Unknown Mistral content case.")
     }
     Body := '{"id":"fixture-mistral","object":"chat.completion","created":1,"model":"mistral-small-latest",'
@@ -887,5 +904,6 @@ _MCC_Row(Mode) {
 _MCC_Run(Mode) {
     _ManagedRemoteFixtureWithLlmTimings(_MCC_Row.Bind(Mode))
 }
-for _MCC_Mode in ["string", "text-chunk", "thinking-plus-text", "thinking-only"]
+for _MCC_Mode in ["string", "text-chunk", "thinking-plus-text", "thinking-only", "multi-text", "empty-text-before-answer",
+    "empty-array", "untyped-decoy", "malformed-text-after-answer", "malformed-entry-after-answer", "nontext-decoy-before-answer"]
     Test("Mistral response: " . _MCC_Mode . " reaches the actual response consumer (mistral-content-chunks)", _MCC_Run.Bind(_MCC_Mode))
