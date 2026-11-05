@@ -1204,6 +1204,85 @@ _PersonalInfoDecodeSourceBytes(Bytes) {
 ;   a = "StreetAddress"
 ;   …
 ; Missing file is silently skipped (defaults remain).
+; Preserve actual string-token intent: the shared general decoder retains
+; some unknown bare tokens as legacy Strings, which this declared schema cannot.
+_PersonalInfoStringLiteral(Raw) {
+	if !(Raw is String)
+		return false
+	Raw := Trim(Raw, " `t`r`n")
+	Triple := SubStr(Raw, 1, 3)
+	return Triple == Chr(34) . Chr(34) . Chr(34)
+		|| Triple == Chr(39) . Chr(39) . Chr(39) || TOML_LiteralKind(Raw) == "string"
+}
+
+_PersonalInfoProjectDocument(Content, OpeningInformation) {
+	Document := TOML_ParseDocument(Content, &Records, &Physical)
+	for Record in Physical {
+		if Record.Kind == "opaque"
+			throw ValueError("The personal-information document contains an uninterpreted record")
+	}
+	RawFields := Map()
+	RawFields.CaseSense := "On"
+	for Name in ["info", "letters"] {
+		RawFields[Name] := Map()
+		RawFields[Name].CaseSense := "On"
+	}
+	; Reuse the canonical inline-table owner for literal spellings; this is
+	; metadata from the same document, not another parser or another file read.
+	for Record in Records {
+		if !Record.Path.Length || !RawFields.Has(Record.Path[1])
+			continue
+		Fields := RawFields[Record.Path[1]]
+		if Record.Path.Length == 1 && Record.Value is Map {
+			for Key, Raw in TOML_ParseInlineTable(Record.Raw, (Token) => Token, _TOML_DocumentSplit)
+				Fields[Key] := Raw
+		} else if Record.Path.Length == 2
+			Fields[Record.Path[2]] := Record.Raw
+	}
+	NextInformation := OpeningInformation.Clone()
+	if Document.Has("info") {
+		Info := Document["info"]
+		if !(Info is Map)
+			throw TypeError("Personal-information info must be a table")
+		for Key, Value in Info {
+			; This auto-managed file owns the declared runtime schema. Unknown
+			; fields retain the previous ignored-extension policy.
+			if !NextInformation.Has(Key)
+				continue
+			if !(Value is String) || !_PersonalInfoStringLiteral(RawFields["info"].Get(Key, 0))
+				throw TypeError("A declared personal-information field must be a TOML String")
+			NextInformation[Key] := Value
+		}
+	}
+	NextLetters := Map()
+	SawLetters := Document.Has("letters")
+	if SawLetters {
+		Letters := Document["letters"]
+		if !(Letters is Map)
+			throw TypeError("Personal-information letters must be a table")
+		for Key, Value in Letters {
+			if !(Value is String) || !_PersonalInfoStringLiteral(RawFields["letters"].Get(Key, 0))
+				throw TypeError("A personal-information alias must be a TOML String")
+			; Keep the existing alias-domain and duplicate diagnostics, including
+			; their interruptible callout; the caller still fences publication.
+			if StrLen(Key) != 1 {
+				LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because it is not one character.", Key)
+				continue
+			}
+			if !NextInformation.Has(Value) {
+				LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because '{2}' is not an info key.", Key, Value)
+				continue
+			}
+			if NextLetters.Has(Key) {
+				LoggerWarn("hotstrings", "Ignoring duplicate personal-info letter alias '{1}'.", Key)
+				continue
+			}
+			NextLetters[Key] := Value
+		}
+	}
+	return {information: NextInformation, letters: NextLetters, saw_letters: SawLetters}
+}
+
 ReadPersonalInfoToml(FilePath) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	PreviousCritical := Critical("On")
@@ -1234,6 +1313,7 @@ ReadPersonalInfoToml(FilePath) {
 			return
 		Bytes := FSReadBytesStrict(FilePath)
 		FileContent := _PersonalInfoDecodeSourceBytes(Bytes)
+		Projected := _PersonalInfoProjectDocument(FileContent, OpeningInformation)
 	} catch as e {
 		; Latch the failure the way the personal_hotstrings.toml sibling above
 		; already does. The placeholder identity left in PersonalInformation
@@ -1252,62 +1332,13 @@ ReadPersonalInfoToml(FilePath) {
 			if IsSet(_TomlUnreadableFiles)
 				_TomlUnreadableFiles[FilePath] := true
 		} finally Critical(PreviousCritical)
-		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}. Writes to this file are blocked so the placeholder identity cannot replace its contents.", FilePath, e.Message)
+		LoggerError("hotstrings", "Could not read or interpret personal info TOML '{1}'. Writes are blocked so an incomplete identity cannot replace its source (failure content withheld).", FilePath)
 		return
 	}
-	; Only the still-current admission may clear an unreadable-source latch.
-	PreviousCritical := Critical("On")
-	try {
-		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
-			|| _ReadPersonalInfoTomlCache != Cache
-			return
-		if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
-			_TomlUnreadableFiles.Delete(FilePath)
-		NextInformation := OpeningInformation.Clone()
-	} finally Critical(PreviousCritical)
-	NextLetters := Map()
-	SawLetters := false
-	FileContent := StrReplace(FileContent, "`r`n", "`n")
-	FileContent := StrReplace(FileContent, "`r", "`n")
-	CurrentSection := ""
+	NextInformation := Projected.information
+	NextLetters := Projected.letters
+	SawLetters := Projected.saw_letters
 
-	loop parse, FileContent, "`n" {
-		Line := Trim(A_LoopField, " `t")
-		if (Line == "" or SubStr(Line, 1, 1) == "#") {
-			continue
-		}
-		; Section header
-		if RegExMatch(Line, "^\[([a-z_]+)\]$", &HM) {
-			CurrentSection := HM[1]
-			; An explicit empty section clears aliases; an omitted one keeps defaults.
-			if (CurrentSection == "letters")
-				SawLetters := true
-			continue
-		}
-		; Key = "value" pair
-		if RegExMatch(Line, 'i)^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
-			Key := KM[1]
-			Val := UnescapeTomlString(KM[2])
-			if (CurrentSection == "info") {
-				if NextInformation.Has(Key)
-					NextInformation[Key] := Val
-			} else if (CurrentSection == "letters") {
-				if (StrLen(Key) != 1) {
-					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because it is not one character.", Key)
-					continue
-				}
-				if !NextInformation.Has(Val) {
-					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because '{2}' is not an info key.", Key, Val)
-					continue
-				}
-				if NextLetters.Has(Key) {
-					LoggerWarn("hotstrings", "Ignoring duplicate personal-info letter alias '{1}'.", Key)
-					continue
-				}
-				NextLetters[Key] := Val
-			}
-		}
-	}
 	PreviousCritical := Critical("On")
 	try {
 		; Publish maps and their source cache only while this parse still owns
@@ -1315,6 +1346,9 @@ ReadPersonalInfoToml(FilePath) {
 		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
 			|| _ReadPersonalInfoTomlCache != Cache
 			return
+		; Only a complete still-current parse may clear this source's latch.
+		if IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath)
+			_TomlUnreadableFiles.Delete(FilePath)
 		PersonalInformation := NextInformation
 		if SawLetters
 			PersonalInformationLetters := NextLetters

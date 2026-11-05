@@ -15,7 +15,7 @@ class _PIRP_Fixture {
 		this.SinkFn := ObjBindMethod(this, "OnLog")
 	}
 	OnLog(Line) {
-		if !InStr(Line, "Ignoring duplicate personal-info letter alias", true)
+		if !InStr(Line, "Ignoring personal-info letter alias 'extra' because it is not one character.", true)
 			return
 		this.LogCalls += 1
 		if this.LogCalls != 1
@@ -59,14 +59,20 @@ class _PIRP_Fixture {
 	Exercise() {
 		global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 		global HSE_RuntimeDecisionGeneration
-		AssertEqual(1, FSWriteDurable(this.Path, _PIRP_Image("André", "Older parse", true)))
+		Image := _PIRP_Image("André", "Older parse", true)
+		ActualDocument := TOML_ParseDocument(Image)
+		AssertEqual(2, ActualDocument["letters"].Count,
+			"the real fixture must be valid TOML with one declared alias and one unsupported alias name")
+		AssertEqual("first_name", ActualDocument["letters"]["p"])
+		AssertEqual("last_name", ActualDocument["letters"]["extra"])
+		AssertEqual(1, FSWriteDurable(this.Path, Image))
 		BeforeGeneration := HSE_RuntimeDecisionGeneration
 		LoggerSetTestSink(this.SinkFn)
 		ReadPersonalInfoToml(this.Path)
 		LoggerClearTestSink()
 		if this.Failure is Error
 			throw this.Failure
-		AssertEqual(1, this.LogCalls, "the real duplicate-alias diagnostic must be observed once")
+		AssertEqual(1, this.LogCalls, "the real unsupported-alias-length diagnostic must be observed once")
 		AssertEqual(1, this.TimerCalls, "one genuine timer must interrupt the diagnostic")
 		if this.Mode == "live" {
 			AssertEqual("André", PersonalInformation["first_name"],
@@ -74,7 +80,7 @@ class _PIRP_Fixture {
 			AssertEqual("Older parse", PersonalInformation["last_name"])
 			AssertEqual("first_name", PersonalInformationLetters["p"])
 			AssertEqual(1, PersonalInformationLetters.Count,
-				"the real duplicate alias must remain ignored")
+				"the real unsupported alias must remain ignored")
 			AssertEqual(BeforeGeneration, HSE_RuntimeDecisionGeneration)
 		} else {
 			; Check business state before receipt/cache shape: the old reader really
@@ -116,8 +122,8 @@ class _PIRP_Fixture {
 	}
 }
 
-_PIRP_Image(First, Last, Duplicate) {
-	Aliases := Duplicate ? 'p = "first_name"`np = "last_name"`n' : 'q = "last_name"`n'
+_PIRP_Image(First, Last, WithIgnoredAlias) {
+	Aliases := WithIgnoredAlias ? 'p = "first_name"`nextra = "last_name"`n' : 'q = "last_name"`n'
 	return '[info]`nfirst_name = "' . First . '"`nlast_name = "' . Last
 		. '"`n`n[letters]`n' . Aliases
 }
