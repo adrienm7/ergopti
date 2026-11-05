@@ -10,6 +10,10 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Dead-key composition continuation
+
+The [November 5 dead-key audit](audits/platform-parity/2026-11-05-dead-keys/report.md) follows four OS/shared owners at `f2c3ea43542c985fb20e5f0887976f1c02525341`. Five roots cover disabled-row continuation routing, grouped macOS payload lookup/output, consumed Linux Compose history and inherited Bépo Compose prefixes. The [generated 13-contract comparison](audits/platform-parity/2026-11-05-dead-keys/capabilities.md) preserves intentional architecture, native policy, known limits and unresolved lifecycle questions. Six registry layouts, 140 states and 4,391 explicit converter expectations are checked; 97 distinct named source paths are authenticated. Genuine native component tests and original owners over controlled ports do not establish actual application receiving. Reproduction/check commands and immutable worker custody are retained in the campaign README; implementation and policy work remains in the root TODO.
+
 ## One-shot Shift continuation
 
 The [November 5 one-shot Shift audit](audits/platform-parity/2026-11-05-one-shot-shift/report.md) keeps four OS/shared reviewers on activation, consumption, modifier context, repeated presses and retirement at `9c565c88c9a1366a2e9b18c1b9d2868509510975`. Its90 qualified coverage summaries are not90 native scenarios. Five OS-scoped findings cover Windows named-control modifier attribution, macOS/Linux Caps+Shift title selection, the macOS programmatic timeout domain and Linux repeat ownership. The [generated comparison](audits/platform-parity/2026-11-05-one-shot-shift/capabilities.md) documents the deliberate tap-only Linux route, action aliases, trigger defaults and configuration differences. Replays authenticate original-owner behavior over declared ports; a separate genuine XKB component check does not establish desktop receiving. The dated source checker rejects changed reviewed bytes, and projection controls reject stale or unqualified metadata.

@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Backspace로 트리거를 자동 복원하지 않습니다. 앱의 실행 취소는 별도 기능입니다.",
 	"inventory.behavior.repeat_activation_window": "매직 키 반복의 활성화 시간 창",
 	"inventory.behavior.repeat_window_untimed": "대체 반복에는 별도의 활성화 시간 창이 없습니다. 유휴 후 단어 초기화는 별도 규칙입니다.",
-	"inventory.behavior.repeat_window_macos": "보조 키의 시간 규칙을 포함한 현재 매직 키 활성화 시간 창을 사용합니다. 0은 이 시간 창을 비활성화합니다. 유휴 후 단어 초기화는 별도 규칙입니다."
+	"inventory.behavior.repeat_window_macos": "보조 키의 시간 규칙을 포함한 현재 매직 키 활성화 시간 창을 사용합니다. 0은 이 시간 창을 비활성화합니다. 유휴 후 단어 초기화는 별도 규칙입니다.",
+	"inventory.behavior.dead_composition": "데드 키 문자 조합",
+	"inventory.behavior.dead_fallback": "데드 키에 지정되지 않은 후속 입력",
+	"inventory.behavior.dead_lifetime": "데드 키 대기 시간",
+	"inventory.behavior.dead_windows_composition": "내장 데드 키 표와 레지스트리 배열 에뮬레이션입니다.",
+	"inventory.behavior.dead_macos_composition": "기본 키보드 배열이 조합을 관리합니다. 물리 입력 문자 묶음은 검증되지 않았습니다.",
+	"inventory.behavior.dead_linux_composition": "기본 XKB/Compose와 독립적인 텍스트 캡처를 사용합니다. 가로챈 후속 입력은 결과가 다를 수 있습니다.",
+	"inventory.behavior.dead_windows_fallback": "지정되지 않은 후속 입력은 악센트 종료 문자 다음에 현재 문자를 출력합니다.",
+	"inventory.behavior.dead_macos_fallback": "대체 동작은 기본 배열에 따릅니다. 물리 이벤트와 응용 프로그램 출력은 검증되지 않았습니다.",
+	"inventory.behavior.dead_linux_fallback": "취소된 캡처는 현재 문자를 유지하고 이전 악센트를 버립니다. 기본 출력과 다를 수 있습니다.",
+	"inventory.behavior.dead_windows_lifetime": "내장 표는 최대 2초를 기다립니다. 레지스트리 데드 키 상태에는 시간 제한이 없습니다.",
+	"inventory.behavior.dead_native_lifetime": "기본 운영 체제가 대기 중인 조합을 관리합니다. 캡처 및 초기화 규칙은 드라이버 공통 시간 제한과 별개입니다."
 }

@@ -1,0 +1,37 @@
+{
+	"owned_worktrees": [
+		{
+			"role": "windows",
+			"path": "/workspace/worktrees/parity-dead-keys-2026-11-05/windows",
+			"head": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+			"clean_before_removal": true,
+			"recovery_ref": "refs/audit/parity-dead-keys-2026-11-05/windows",
+			"removed_without_force": true
+		},
+		{
+			"role": "macos",
+			"path": "/workspace/worktrees/parity-dead-keys-2026-11-05/macos",
+			"head": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+			"clean_before_removal": true,
+			"recovery_ref": "refs/audit/parity-dead-keys-2026-11-05/macos",
+			"removed_without_force": true
+		},
+		{
+			"role": "linux",
+			"path": "/workspace/worktrees/parity-dead-keys-2026-11-05/linux",
+			"head": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+			"clean_before_removal": true,
+			"recovery_ref": "refs/audit/parity-dead-keys-2026-11-05/linux",
+			"removed_without_force": true
+		},
+		{
+			"role": "shared",
+			"path": "/workspace/worktrees/parity-dead-keys-2026-11-05/shared",
+			"head": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+			"clean_before_removal": true,
+			"recovery_ref": "refs/audit/parity-dead-keys-2026-11-05/shared",
+			"removed_without_force": true
+		}
+	],
+	"qualification": "Only these four campaign-owned detached worktrees were retired after all role probes froze. Audit archives and recovery refs remain."
+}

@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Brak automatycznego przywracania wyzwalacza klawiszem Backspace; funkcja Cofnij aplikacji jest niezależna.",
 	"inventory.behavior.repeat_activation_window": "Okno aktywacji powtarzania magicznym klawiszem",
 	"inventory.behavior.repeat_window_untimed": "Powtarzanie awaryjne nie ma osobnego okna aktywacji; rozpoczęcie nowego słowa po bezczynności jest niezależne.",
-	"inventory.behavior.repeat_window_macos": "Używa obowiązującego okna aktywacji magicznego klawisza, wraz z regułami czasowymi modyfikatorów; zero wyłącza to okno. Rozpoczęcie nowego słowa po bezczynności jest niezależne."
+	"inventory.behavior.repeat_window_macos": "Używa obowiązującego okna aktywacji magicznego klawisza, wraz z regułami czasowymi modyfikatorów; zero wyłącza to okno. Rozpoczęcie nowego słowa po bezczynności jest niezależne.",
+	"inventory.behavior.dead_composition": "Składanie znaków martwym klawiszem",
+	"inventory.behavior.dead_fallback": "Nieprzypisana kontynuacja martwego klawisza",
+	"inventory.behavior.dead_lifetime": "Czas oczekiwania martwego klawisza",
+	"inventory.behavior.dead_windows_composition": "Wbudowane mapy martwych klawiszy i emulacja układów z rejestru.",
+	"inventory.behavior.dead_macos_composition": "Składaniem zarządza natywny układ klawiatury; nie zweryfikowano grupowania znaków fizycznych.",
+	"inventory.behavior.dead_linux_composition": "Natywne XKB/Compose z niezależnym przechwytywaniem tekstu; przechwycone kontynuacje mogą się różnić.",
+	"inventory.behavior.dead_windows_fallback": "Nieprzypisana kontynuacja emituje znak kończący akcent, a następnie bieżący znak.",
+	"inventory.behavior.dead_macos_fallback": "Zachowanie zastępcze zależy od natywnego układu; zdarzenia fizyczne i tekst w aplikacji nie zostały zweryfikowane.",
+	"inventory.behavior.dead_linux_fallback": "Anulowane przechwytywanie zachowuje bieżący znak i odrzuca poprzedni akcent; wynik natywny może się różnić.",
+	"inventory.behavior.dead_windows_lifetime": "Wbudowane mapy czekają do 2 sekund; stan martwego klawisza z rejestru nie ma limitu czasu.",
+	"inventory.behavior.dead_native_lifetime": "Natywny system zarządza oczekującym składaniem; przechwytywanie i resetowanie są niezależne od wspólnego limitu czasu sterownika."
 }

@@ -1,0 +1,78 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"qualification": "Only two compact actual stdout JSON archives are reformatted. Exact original bytes are retained once; worker handoff hashes, program bodies and sweep records are unchanged. Comparison preserves JSON types/values, duplicate keys and nonfinite constants are refused. All unlisted transforms remain forbidden.",
+	"transforms": [
+		{
+			"role": "windows",
+			"path": "data-output.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/windows-data-output.json.txt",
+			"original_sha256": "7d8fe41313acb6109f86f9eb53b05040e972bec245307aaff3c4f62271cb0a5c",
+			"current_sha256": "f2b4a788fecd0815a865296790bf32531cb07998723b7117f562ca9ac89b2b83"
+		},
+		{
+			"role": "windows",
+			"path": "source-output.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/windows-source-output.json.txt",
+			"original_sha256": "8f32ae5e1dc450162bd8bb414ddbf2d3edb603e865e6819535450e1070adc410",
+			"current_sha256": "8db7157b7d0b2766c0e2f8b86eaa744d1c19e5c369e074b148668de9b6d4ed28"
+		},
+		{
+			"role": "macos",
+			"path": "no-marker-observed.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/macos-no-marker-observed.json.txt",
+			"original_sha256": "04f8a5e48c1b51a876ae90dc625f9007aaccbce8425d5b5bd60f5fe0a83e621c",
+			"current_sha256": "527570e28c7686897a2a6fca64a961e068fa03b541fa34c47a909c6d3502b360"
+		},
+		{
+			"role": "macos",
+			"path": "ordinary-baseline-observed.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/macos-ordinary-baseline-observed.json.txt",
+			"original_sha256": "bdd295c5b655f3f376e1e1f3a888fcc9f3ab632db552f410ffeec78e223daddb",
+			"current_sha256": "8e64a09a3aab3ae43df058bb14eb9f35cc69f0c61d37f82295158fff596422a4"
+		},
+		{
+			"role": "macos",
+			"path": "root-observed.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/macos-root-observed.json.txt",
+			"original_sha256": "18e38010dff3e16a3386641180b1101c8706bd4b71ffc5975c041b0ada28fddf",
+			"current_sha256": "aafc6bc0f7d0143885a2c5d637bd851bbf5dedad2c5e215ff429a9a6aa7193d4"
+		},
+		{
+			"role": "macos",
+			"path": "semantic-output.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/macos-semantic-output.json.txt",
+			"original_sha256": "106821bf721dedd63dbe0d6e231d20e679926f7dd9d90219804f683388b703db",
+			"current_sha256": "efbd49c7512f2a8c82de6bb3491dd6b9889c51cbf5f454d0133bdac8f04d21f8"
+		},
+		{
+			"role": "macos",
+			"path": "source-output.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/macos-source-output.json.txt",
+			"original_sha256": "1054513f25e3fcbaa3cfb58bbc44138a97a20759f5e513c16a09a1e9f090309a",
+			"current_sha256": "28d9e4eb41eb2caa7ff5fe2f1a85235dca3fc621d8d019380f1a70a45826813b"
+		},
+		{
+			"role": "shared",
+			"path": "enumeration.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/shared-enumeration.json.txt",
+			"original_sha256": "6a7c2691fb2ddd42bd11e014017ed4f23977c1382ca1793eb090c1c344496e75",
+			"current_sha256": "414a6b1d978f257932fab5c99b323a19ff674a8523fd0544cc269520d058afda"
+		},
+		{
+			"role": "shared",
+			"path": "prefix.json",
+			"kind": "json-format",
+			"original_copy": "validation/worker-originals/shared-prefix.json.txt",
+			"original_sha256": "7638c91a74828d038e49b6c475b62df3a5040e5f1e77f830665dbea3cab18d03",
+			"current_sha256": "2c05a3d20e6b6f323e883bb3d3433bbda629ca742dae9a6b77eb845becbadfde"
+		}
+	]
+}

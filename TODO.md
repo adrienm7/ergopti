@@ -8,6 +8,18 @@ the field-run step or the hand action that proves it and the commits it confirms
 [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
 (`git show 2a0083cb11:TODO.md` is the long form before this shrink).
 
+## Dead-key composition parity follow-up
+
+[Focused audit](docs/audits/platform-parity/2026-11-05-dead-keys/report.md), pinned source `f2c3ea43542c985fb20e5f0887976f1c02525341`: five new roots, [generated comparison](docs/audits/platform-parity/2026-11-05-dead-keys/capabilities.md). Evidence boundaries remain explicit; these are follow-ups, not implemented fixes.
+
+- [ ] **[CODE] DKW-001 — Windows:** make pending registry composition respect disabled physical continuation rows. Reproduce original registered callback with global base enabled, top row disabled and installed US HKL; preserve neutral/enabled/Shift controls. Current proof is source routing plus original parsed data, not AHK execution.
+- [ ] **[CODE] DKM-001 — macOS:** make automatic suffix lookup scalar-aware for grouped two-ASCII payloads; compare grouped/split original callback paths with Unicode and longer-payload controls. Qualify native dead-state payload grouping separately.
+- [ ] **[CODE] DKM-002 — macOS:** preserve the unmatched prefix exactly once when consuming a grouped payload for a shorter suffix; assert constructed event text and logical buffer agree, retaining split/full-trigger controls. Native application receiving remains unmeasured.
+- [ ] **[CODE] DKL-001 — Linux:** preserve the previously acknowledged Compose prefix when a later continuation is consumed; compare semantic capture against acknowledged raw plus emitted-output history. Keep first-consumed, refusal, repeat, ignored-modifier and stale-generation controls; qualify actual desktop receiving separately.
+- [ ] **[CODE] DKS-001 — shared/Linux:** avoid inherited locale descendants shadowing an explicit shorter Compose terminal in both converters. Require actual native COMPOSED ₢ for Bépo monnaie+cedille; retain locale/no-include/private-trigger controls. Private-trigger probe is not a proposed production fix.
+- [ ] **[CODE] Magic conversion:** decide and document the eight known Plus/PlusANSI pending-state Magic contexts at level 1 before claiming equivalent state-aware output; retain all six registry checks and native explicit-rule comparisons, without counting eight additional roots.
+- [ ] **[CODE] Dead-key lifecycle:** define unmapped fallback, expiry/pause and modified-control replay contracts across legacy Windows, registry Windows, native macOS and Linux Compose. Extend existing OSW-001 conditional replay regression to legacy DeadKey; do not call modifier loss intentional. Qualify native cancelled-state policy, macOS grouped payloads, AHK/HKL and real Linux desktop receiving. Keep current per-engine behavior until a common contract is approved. Latency, RSS and long-session memory watchlist remain unmeasured.
+
 ## Cross-platform feature inventory
 
 - [ ] **Dynamic hotstrings:** align or explicitly document the Windows `@td★` / `@dt★` / `@date★` date vocabulary versus bare Lua triggers and their boundary rules. Linux's shortest phone prefix must wait for the magic key, as Windows/macOS do; normalize the international phone output consistently (the Lua drivers currently keep the national zero after +33). Reproduce with the [module audit probe](docs/audits/platform-parity/2026-11-04/hotstrings.md).
@@ -799,7 +811,7 @@ Each closes on a named green hosted or native run, recorded here.
       (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),
       "Qualify the installed managed Ollama route plan" (c0a50b5e41), the Linux private runtime in every package,
       and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
-      Audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) is not a green receipt: Arch integration's `local-server-detection-native` case reported that its textgen_webui stand-in never listened, and Common failed while installing shared UI browsers. Diagnose/requalify those cells; the portable audit checks do not close the hosted checkpoint. Its macOS stubbed replay failure is covered by upstream `cf18689745` and a later local181/181 replay; native receiving remains separate.
+      Initial audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) failed Arch native server detection, shared UI browser installation and macOS stubbed replay. Follow-up [42108198520](https://github.com/adrienm7/ergopti/actions/runs/42108198520) at `4ca161c3e512eecc4c78499db0465139c9a71861` is green: 114 successful jobs, with only Release / Publish skipped; Arch integration, shared UI rendering and all OS verdicts passed. The final-source checkpoint remains open; this earlier hosted run does not establish physical dead-key receiving.
 - [ ] **macOS lane.** L32 and L42 Swift in the Build stage; the Issue #101
       Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
       setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,

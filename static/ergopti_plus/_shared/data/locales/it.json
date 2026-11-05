@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Nessun ripristino automatico del testo di attivazione con Backspace; Annulla dell’applicazione è separato.",
 	"inventory.behavior.repeat_activation_window": "Finestra di attivazione della ripetizione con il tasto magico",
 	"inventory.behavior.repeat_window_untimed": "Nessuna finestra di attivazione separata per la ripetizione di riserva; il riavvio della parola dopo una pausa è indipendente.",
-	"inventory.behavior.repeat_window_macos": "Usa la finestra effettiva del tasto magico, incluse le regole temporali dei modificatori; zero disattiva questa finestra. Il riavvio della parola dopo una pausa è indipendente."
+	"inventory.behavior.repeat_window_macos": "Usa la finestra effettiva del tasto magico, incluse le regole temporali dei modificatori; zero disattiva questa finestra. Il riavvio della parola dopo una pausa è indipendente.",
+	"inventory.behavior.dead_composition": "Composizione con tasto morto",
+	"inventory.behavior.dead_fallback": "Continuazione non associata di un tasto morto",
+	"inventory.behavior.dead_lifetime": "Durata di attesa di un tasto morto",
+	"inventory.behavior.dead_windows_composition": "Tabelle integrate dei tasti morti ed emulazione delle disposizioni del registro.",
+	"inventory.behavior.dead_macos_composition": "La disposizione nativa gestisce la composizione; il raggruppamento dei caratteri fisici non è verificato.",
+	"inventory.behavior.dead_linux_composition": "XKB/Compose nativo con acquisizione del testo indipendente; le continuazioni intercettate possono differire.",
+	"inventory.behavior.dead_windows_fallback": "Una continuazione non associata emette il terminatore dell’accento seguito dal carattere corrente.",
+	"inventory.behavior.dead_macos_fallback": "Il ripiego dipende dalla disposizione nativa; eventi fisici e testo ricevuto dall’applicazione non sono verificati.",
+	"inventory.behavior.dead_linux_fallback": "L’acquisizione annullata mantiene il carattere corrente e scarta l’accento precedente; l’uscita nativa può differire.",
+	"inventory.behavior.dead_windows_lifetime": "Le tabelle integrate attendono fino a 2 secondi; lo stato di tasto morto del registro non ha scadenza.",
+	"inventory.behavior.dead_native_lifetime": "Il sistema nativo gestisce la composizione in attesa; acquisizione e ripristino sono distinti da un limite comune del driver."
 }

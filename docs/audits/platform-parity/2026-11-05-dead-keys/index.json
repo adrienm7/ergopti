@@ -1,0 +1,1055 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"created_at": "2026-11-05",
+	"module": "dead-keys",
+	"roles": [
+		{
+			"role": "windows",
+			"report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/handoff.json",
+					"sha256": "51a7ceab925ec4345539821eb5a5ecf7275853e866fa004bfae09cce85729d28"
+				},
+				{
+					"path": "windows/source-receipts.json",
+					"sha256": "1c2a758d2329ce389c73c58920e41f227ddf39c905eae044b33cc8f30a4ecde7"
+				}
+			],
+			"ids": ["DKW-001"],
+			"coverage": [
+				{
+					"aspect": "legacy.public-producers",
+					"basis": "source",
+					"qualification": "Reviewed real producers; chain literal used during active capture AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.activation",
+					"basis": "source",
+					"qualification": "Suspension and reentrancy guards AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.capture",
+					"basis": "source",
+					"qualification": "Two UTF-16 units, scalar decoder, named end keys, ownership token AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.wait",
+					"basis": "source",
+					"qualification": "Critical released around Wait and restored; two-second deadline AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.mapped",
+					"basis": "source",
+					"qualification": "Original mapping success branch AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.unmapped",
+					"basis": "source",
+					"qualification": "Base/terminator plus scalar continuation AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.timeout",
+					"basis": "source",
+					"qualification": "Base emitted if mapping supplies space entry AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.invalid",
+					"basis": "source",
+					"qualification": "Invalid scalar discarded with warning AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.named-controls",
+					"basis": "source",
+					"qualification": "Bare control re-send; modifier loss deduplicated OSW-001 AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.pause-stale",
+					"basis": "source",
+					"qualification": "Before/after suspension guards; settled token prevents old capture output AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.chain",
+					"basis": "source",
+					"qualification": "Nested producer emits literal rather than starting capture AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.generated-chain-refusal",
+					"basis": "source",
+					"qualification": "Next transitions explicitly unsupported by builtin map builder AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.deviations",
+					"basis": "source",
+					"qualification": "Documented golden compatibility overrides retained intentionally AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "legacy.output-ring",
+					"basis": "source",
+					"qualification": "SIHO reached-screen ownership gate prevents capture-consumed output recording AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.activation",
+					"basis": "source",
+					"qualification": "Canonical model/category/navigation plus desired independent layer gates AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.neutral-row",
+					"basis": "source",
+					"qualification": "Row switch respected while neutral AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.pending-row",
+					"basis": "source",
+					"qualification": "DKW-001: missing callback row policy; shipped parser data witness AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.selected-step",
+					"basis": "source",
+					"qualification": "Original action machine supports output and chained Next AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.unmapped",
+					"basis": "source",
+					"qualification": "Printable terminator prefix then neutral resolve AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.native-compose",
+					"basis": "source",
+					"qualification": "Native text lookup into pending composition; source reviewed, no native DLL run AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.native-dead",
+					"basis": "source",
+					"qualification": "Native dead/empty reader result terminates registry state and forwards physical key AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.ambiguous-neutral",
+					"basis": "source",
+					"qualification": "Conditional custom-layout rejection; shared agent all-six inventory found none shipped AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.digits",
+					"basis": "source",
+					"qualification": "Independent symbol/digit overrides have dedicated paths; ordinary KeyE witness avoids these branches AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.modifiers",
+					"basis": "source",
+					"qualification": "Shift/Caps/AltGr levels and shortcut prefixes reviewed; native combinations unexecuted AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.magic",
+					"basis": "source",
+					"qualification": "Neutral unshifted magic ownership exclusion; pending state routes continuation AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.shortcuts",
+					"basis": "source",
+					"qualification": "Reset before command text/physical fallback; native Win-L behavior unexecuted AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.reset-controls",
+					"basis": "source",
+					"qualification": "Thirteen physical scan identities; fixed computed-name shadow is not a finding AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.modified-controls",
+					"basis": "source",
+					"qualification": "Native matching/policy gap; no confirmed second root AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.deadline",
+					"basis": "source",
+					"qualification": "No timer expiry; intentional construction difference from legacy timeout AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.source-replacement",
+					"basis": "source",
+					"qualification": "Candidate before publication; successful replacement neutralizes, failed load preserves old cell AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.retained-replay",
+					"basis": "source",
+					"qualification": "Old admitted model retained intentionally, no new native authority AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.reset-metadata",
+					"basis": "source",
+					"qualification": "Function/source/cohort checks; explicit metadata-only and no native admission AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "registry.pause-gates",
+					"basis": "source",
+					"qualification": "Persistent state source path; existing OI-001 policy hypothesis deduplicated AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "both.output-refusal",
+					"basis": "source",
+					"qualification": "Logged production exceptions and no ring advancement; retry policy unestablished AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "synthetic.producer",
+					"basis": "source",
+					"qualification": "Case variants plus contextual non-vowels; explicit e/t exceptions for rolls/words AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "synthetic.magic-context",
+					"basis": "source",
+					"qualification": "Configured magic exclusion, non-regex membership, time/context gates AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "synthetic.transaction",
+					"basis": "source",
+					"qualification": "Prepare-only no send; actual buffer transaction succeeds only after send success AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "tests.legacy",
+					"basis": "source",
+					"qualification": "Reviewed timeout/endkey/unmapped/pause/ring/serialized tests; not executed on Linux AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "tests.registry",
+					"basis": "source",
+					"qualification": "Native helper test global-base-off gap vs real pending per-row callback AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				},
+				{
+					"aspect": "tests.tables",
+					"basis": "source",
+					"qualification": "Golden deviations/chain builder intent checked, no native run AHK routing is source-only; original shared Lua parsing and row-policy data executed. Native US text is an explicit assumption, not a measured Windows result.",
+					"evidence": [
+						{
+							"path": "windows/coverage.json",
+							"sha256": "e6b2b4faae8b812d4676fd546b8d932a3ec11e622425de5a4c3ff33d4bd59a92"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "macos",
+			"report": "macos/report.md",
+			"evidence": [
+				{
+					"path": "macos/handoff.json",
+					"sha256": "162d94ecf622b921bbfcc79b24f7aae0267d80160582f66cf1be000b0de5dea1"
+				},
+				{
+					"path": "macos/source-receipts.json",
+					"sha256": "552bed8db8eccdc8a73766c26d0f0a54448dce65a70d0977ffe03dc3c77223bd"
+				}
+			],
+			"ids": ["DKM-001", "DKM-002"],
+			"coverage": [
+				{
+					"aspect": "public.registration",
+					"basis": "actual-owner",
+					"qualification": "Keymap.add strict automatic registrations through unchanged driver function Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "public.callback",
+					"basis": "actual-owner",
+					"qualification": "Registered keyDown tap callback, not direct expander substitute Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "owner.provenance",
+					"basis": "actual-owner",
+					"qualification": "Exact init.lua, registry.lua, expander.lua, adapters/synthetic_input.lua for all 13 cases Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "native.fixture-boundary",
+					"basis": "actual-owner",
+					"qualification": "Event payloads constructed in memory; native NSEvent/dead state not represented Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "empty-event",
+					"basis": "actual-owner",
+					"qualification": "a then empty payload preserves a Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "composed-single",
+					"basis": "actual-owner",
+					"qualification": "a, empty marker, é ends aé with no expansion Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "spacing-accent",
+					"basis": "actual-owner",
+					"qualification": "a then ´ then Backspace leaves a Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "empty-backspace",
+					"basis": "actual-owner",
+					"qualification": "a, empty marker, Backspace empties logical buffer; no native defect inferred Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "escape",
+					"basis": "actual-owner",
+					"qualification": "Empty marker then Escape preserves a under fixture policy Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "navigation",
+					"basis": "actual-owner",
+					"qualification": "Default arrow clears logical hotstring buffer; native pending state unknown Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "shortcut-option",
+					"basis": "actual-owner",
+					"qualification": "Cmd/Ctrl reset policy differs from character-producing Option and Option+Backspace Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "two-ascii-tail",
+					"basis": "actual-owner",
+					"qualification": "DKM-001: ^0 misses, whole-string bucket then preview final-codepoint lookup Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "two-ascii-split",
+					"basis": "actual-owner",
+					"qualification": "Split ^,0 expands and consumes completing event Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "unicode-controls",
+					"basis": "actual-owner",
+					"qualification": "€0 and éà grouped events expand under established timing baseline Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "longer-ascii-control",
+					"basis": "actual-owner",
+					"qualification": "^00 grouped event expands under established timing baseline Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "suffix-accent-prefix",
+					"basis": "actual-owner",
+					"qualification": "DKM-002: ´0 consumed, returned EXPANDED only, buffer ´EXPANDED Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "suffix-nnbsp-prefix",
+					"basis": "actual-owner",
+					"qualification": "NNBSP+? consumed, returned EXPANDED only; init.lua explicitly supports this multi-codepoint shape Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "suffix-split-control",
+					"basis": "actual-owner",
+					"qualification": "Earlier ´ passes through; subsequent 0 returns EXPANDED appropriately Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "serializer",
+					"basis": "actual-owner",
+					"qualification": "leave_callback returns replacement event table with consume=true; not native application receipt Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "negative-delete",
+					"basis": "actual-owner",
+					"qualification": "Shared plan clamps negative erase counts; previous fix not recounted; prefix reconstruction is distinct Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "unseeded-control",
+					"basis": "actual-owner",
+					"qualification": "Exact one seed line removed from test scaffold; five first-event timing declines retained Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "ordinary-baseline",
+					"basis": "actual-owner",
+					"qualification": "Only scaffold seed replaced with x+Backspace; pre-carrier empty buffer; eight carrier outcomes match seeded record Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "timing-gate",
+					"basis": "actual-owner",
+					"qualification": "last_key_time initial zero; dt from epoch; mapping_delay_remaining conditional default threshold Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "semantic-checker",
+					"basis": "actual-owner",
+					"qualification": "13 exact cases, four exact owners, outputs/counters/tail calls; five adversarial negative controls Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "canonical.registry",
+					"basis": "actual-owner",
+					"qualification": "Exact selected registry suite executed; success does not cover grouped public callback input Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "canonical.expander",
+					"basis": "actual-owner",
+					"qualification": "Exact expander suite and delete-count sanity suite executed; no real receiver Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "native.api",
+					"basis": "actual-owner",
+					"qualification": "Hammerspoon 1.1.1 getCharacters(false) uses NSEvent.characters; documented empty Opt-E example Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "native.grouping-receiver",
+					"basis": "actual-owner",
+					"qualification": "Physical composition/fallback grouping and application outcome remain unknown Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				},
+				{
+					"aspect": "native.lifecycle",
+					"basis": "actual-owner",
+					"qualification": "No real pause/reload/focus/IME-state teardown measured; do not infer Windows-like expiry contract Original registered Lua callback with controlled in-memory event/output ports; no native macOS dead-state grouping or receiving application measured.",
+					"evidence": [
+						{
+							"path": "macos/coverage.json",
+							"sha256": "6201595d2f19e49b26541e85a1bd1226d45f0b9a37f8710708228444d3ff3dde"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "linux",
+			"report": "linux/report.md",
+			"evidence": [
+				{
+					"path": "linux/handoff.json",
+					"sha256": "3e204b1225f61622e6bdd41d392531bebdb92580c68b0c55b9d9938d4735786f"
+				},
+				{
+					"path": "linux/source-receipts.json",
+					"sha256": "bc0be9741f2c23994f7b54a533b43280e7a73f8d8fd7e0dcb1e5aefb779c6601"
+				}
+			],
+			"ids": ["DKL-001"],
+			"coverage": [
+				{
+					"aspect": "executed",
+					"basis": "actual-owner",
+					"qualification": "{\"public_original_owner_native_cases\": 7, \"capture_native_cases\": 10, \"registered_original_files\": 6, \"registered_cases_per_interpreter\": 122, \"interpreters\": [\"Lua5.4\", \"LuaJIT\"], \"final_sweeps\": 2, \"false_green_scan\": {\"observed\": 0, \"baseline\": 0}} Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				},
+				{
+					"aspect": "source_traced",
+					"basis": "source",
+					"qualification": "[\"capture process/peek/cancel/reset/load publication\", \"Hook capture-before-consume and repeat/release ownership\", \"actual public TapKeys admission/refusal and config reading\", \"deferred same-drain scheduling\", \"daemon consumer priority and active gating\", \"restart/source reacquisition reset/refusal\", \"separate native row commit path\"] Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				},
+				{
+					"aspect": "delegated_to_shared",
+					"basis": "source",
+					"qualification": "[\"registry chains and converter mappings\", \"native Compose inherited prefix conflicts\", \"magic-key base-level-only limits\"] Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				},
+				{
+					"aspect": "policy_differences",
+					"basis": "source",
+					"qualification": "[\"CANCELLED keeps current ordinary text without dead-key terminator; intentional local source policy, not claimed native platform impossibility.\"] Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				},
+				{
+					"aspect": "unmeasured",
+					"basis": "source",
+					"qualification": "[\"receiving desktop application\", \"real evdev/uinput/device hotplug\", \"Wayland/X11 layout authority\", \"full pause/reload/source race execution\", \"native modifier sequences in generated component (modifier definitions absent)\"] Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				},
+				{
+					"aspect": "evidence",
+					"basis": "actual-owner",
+					"qualification": "[\"report.md\", \"sweeps.json\", \"public-compose.lua\", \"native-controls.lua\", \"selected-tests.lua\", \"source-receipts.json\"] Original owner and genuine libxkbcommon over controlled Reader/ACK/broker/output ports; no real device, desktop or receiving application.",
+					"evidence": [
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5021e5d8d93bba0b0e0626be7c55aee2f80f568a7aea0a2da82e2441be4709fc"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "shared",
+			"report": "shared/report.md",
+			"evidence": [
+				{
+					"path": "shared/handoff.json",
+					"sha256": "af77550d355ae612dc0b8673f0001e64fc8ffedd66e76ca797c6b5335faa0557"
+				},
+				{
+					"path": "shared/source-receipts.json",
+					"sha256": "3f9bc3d68a33867754599f5a736314c74778cf69b491bb7e12aebda48ae76dc9"
+				}
+			],
+			"ids": ["DKS-001"],
+			"coverage": [
+				{
+					"aspect": "registry_layouts",
+					"basis": "native",
+					"qualification": "6 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "states",
+					"basis": "native",
+					"qualification": "140 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "converter_levels",
+					"basis": "native",
+					"qualification": "7 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "unique_wire_expectations",
+					"basis": "native",
+					"qualification": "4391 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "native_deviations",
+					"basis": "native",
+					"qualification": "9 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "new_roots",
+					"basis": "native",
+					"qualification": "1 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "known_magic_contexts",
+					"basis": "native",
+					"qualification": "8 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "original_python_tests_per_sweep",
+					"basis": "native",
+					"qualification": "51 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "final_sweeps",
+					"basis": "native",
+					"qualification": "2 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "runtime_parity",
+					"basis": "native",
+					"qualification": "[\"Python canonical vs Lua5.4/LuaJIT canonical\", \"Python symbols/Compose vs Lua5.4/LuaJIT bytes for each registry layout\"] Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "native_controls",
+					"basis": "native",
+					"qualification": "5 Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "qualification",
+					"basis": "native",
+					"qualification": "Reachable explicit converter output expectations over original parsed XML relations; not an independent native macOS oracle, not every unspecified fallback or physical desktop sequence. Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "excluded_harness",
+					"basis": "source",
+					"qualification": "rows_probe.lua failure due lossy JSON null decoding; not product defect or passing coverage Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				},
+				{
+					"aspect": "unmeasured",
+					"basis": "source",
+					"qualification": "[\"active compositor/desktop input layout\", \"receiving app\", \"real keyboard\", \"native macOS action execution\", \"AHK runtime\", \"OS-specific lifecycle races\"] Original Python/Lua converters and genuine fingerprinted libxkbcommon Compose table; pinned locale, no desktop, native macOS or AHK execution.",
+					"evidence": [
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d44dc904f3dbc3762a070e87d7c7918f4f362e903a83221ef7d966797eaf8af6"
+						}
+					]
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,87 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"qualification": "Synthetic identity controls only; no worker findings or dead-key behavior is inferred. Same-byte symlink, omitted entry/file and narrowly declared JSON-format cases isolate closed-role/value/type/byte guards.",
+	"program": {
+		"path": "check_custody.py",
+		"sha256": "aa9d64438f5f9016788d39069e7bbd2e5d6467f906e32e39a494f354a8476d45"
+	},
+	"control_program": {
+		"path": "validation/check_custody_controls.py",
+		"sha256": "046e1de5d238e841df79a9796a8414e9b38bed40d22529cd488517b728d1a2f2"
+	},
+	"positive_controls": 3,
+	"positive_roles": 4,
+	"positive_artifact_hashes": 20,
+	"negative_controls": [
+		{
+			"case": "changed-program",
+			"outcome": "rejected",
+			"marker": "artifact hash mismatch: probe.py"
+		},
+		{
+			"case": "traversal",
+			"outcome": "rejected",
+			"marker": "noncanonical artifact path"
+		},
+		{
+			"case": "same-byte-symlink",
+			"outcome": "rejected",
+			"marker": "symlink artifact"
+		},
+		{
+			"case": "unlisted-extra",
+			"outcome": "rejected",
+			"marker": "unlisted/missing archived artifact"
+		},
+		{
+			"case": "wrong-pin",
+			"outcome": "rejected",
+			"marker": "wrong handoff source pin"
+		},
+		{
+			"case": "omitted-source-receipt",
+			"outcome": "rejected",
+			"marker": "missing required role artifacts"
+		},
+		{
+			"case": "formatted-byte-drift",
+			"outcome": "rejected",
+			"marker": "formatted artifact hash mismatch"
+		},
+		{
+			"case": "formatted-value-change",
+			"outcome": "rejected",
+			"marker": "JSON values/types changed by archive transform"
+		},
+		{
+			"case": "boolean-number-confusion",
+			"outcome": "rejected",
+			"marker": "JSON values/types changed by archive transform"
+		},
+		{
+			"case": "wrong-worker-original",
+			"outcome": "rejected",
+			"marker": "worker hash differs from original format alias"
+		},
+		{
+			"case": "encoded-byte-drift",
+			"outcome": "rejected",
+			"marker": "encoded storage hash mismatch"
+		},
+		{
+			"case": "encoded-wrong-decoded",
+			"outcome": "rejected",
+			"marker": "decoded artifact hash mismatch"
+		},
+		{
+			"case": "unsupported-codec",
+			"outcome": "rejected",
+			"marker": "unsupported archive codec"
+		},
+		{
+			"case": "encoded-physical-collision",
+			"outcome": "rejected",
+			"marker": "encoded artifact physical collision"
+		}
+	]
+}

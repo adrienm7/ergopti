@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "Geen automatisch triggerherstel met Backspace; Ongedaan maken van de toepassing staat hier los van.",
 	"inventory.behavior.repeat_activation_window": "Activeringsvenster voor herhalen met de magische toets",
 	"inventory.behavior.repeat_window_untimed": "Geen afzonderlijk activeringsvenster voor de terugvalherhaling; een nieuw woord na een pauze staat hier los van.",
-	"inventory.behavior.repeat_window_macos": "Gebruikt het geldende activeringsvenster van de magische toets, inclusief tijdregels voor modificatietoetsen; nul schakelt dit venster uit. Een nieuw woord na een pauze staat hier los van."
+	"inventory.behavior.repeat_window_macos": "Gebruikt het geldende activeringsvenster van de magische toets, inclusief tijdregels voor modificatietoetsen; nul schakelt dit venster uit. Een nieuw woord na een pauze staat hier los van.",
+	"inventory.behavior.dead_composition": "Compositie met dode toetsen",
+	"inventory.behavior.dead_fallback": "Niet toegewezen vervolg na een dode toets",
+	"inventory.behavior.dead_lifetime": "Wachttijd van een dode toets",
+	"inventory.behavior.dead_windows_composition": "Ingebouwde tabellen voor dode toetsen en emulatie van registerindelingen.",
+	"inventory.behavior.dead_macos_composition": "De oorspronkelijke toetsenbordindeling beheert de compositie; groepering van fysieke tekens is niet geverifieerd.",
+	"inventory.behavior.dead_linux_composition": "Oorspronkelijke XKB/Compose met onafhankelijke tekstregistratie; onderschepte vervolgen kunnen afwijken.",
+	"inventory.behavior.dead_windows_fallback": "Een niet toegewezen vervolg geeft het afsluitteken van het accent en daarna het huidige teken weer.",
+	"inventory.behavior.dead_macos_fallback": "Terugval wordt door de oorspronkelijke indeling bepaald; fysieke gebeurtenissen en toepassingsuitvoer zijn niet geverifieerd.",
+	"inventory.behavior.dead_linux_fallback": "Geannuleerde registratie behoudt het huidige teken en verwerpt het vorige accent; oorspronkelijke uitvoer kan afwijken.",
+	"inventory.behavior.dead_windows_lifetime": "Ingebouwde tabellen wachten maximaal 2 seconden; de dode-toetsstatus van het register heeft geen tijdslimiet.",
+	"inventory.behavior.dead_native_lifetime": "Het oorspronkelijke systeem beheert wachtende compositie; registratie en reset staan los van een gedeelde tijdslimiet van het stuurprogramma."
 }

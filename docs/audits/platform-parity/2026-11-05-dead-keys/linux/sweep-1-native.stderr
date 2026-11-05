@@ -1,0 +1,2 @@
+xkbcommon: ERROR: [XKB-769] (input string):1:1: syntax error
+xkbcommon: ERROR: Failed to parse input xkb string
