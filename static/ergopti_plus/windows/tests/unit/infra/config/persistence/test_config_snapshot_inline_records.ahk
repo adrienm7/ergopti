@@ -779,6 +779,11 @@ _TNK_Boot(Kind) {
 			. " apply-threw=" . ApplyThrew . " applied=" . Applied . " default=" . Default
 			. " requested=" . Requested . " actual=" . Target["layout"]["ergopti_base"]
 			. " row-key-units=" . RowKeyUnits . " document-known=" . DocumentKnown . " cache-known=" . CacheKnown)
+		_TestPrint("# toml-key-boot-detail kind=" . Kind . " prepared=" . (Prepared is Map ? Prepared.Get("status", "<missing>") : String(Prepared))
+			. " detail=" . JsonStringLiteral(Boot.Get("detail", ""))
+			. " write-refusal=" . JsonStringLiteral(TOML_WriteRefusal(Path))
+			. " boot-from=" . JsonStringLiteral(String(Boot.Get("from", "")))
+			. " boot-to=" . JsonStringLiteral(String(Boot.Get("to", ""))))
 		AssertEqual(Source, FSReadUtf8Exact(Path), "a boot observation must never rewrite the subject identity")
 		if Negative {
 			AssertTrue(DecodeRejected, "the existing Unicode-scalar owner rejects NUL before any native Map receives it")
