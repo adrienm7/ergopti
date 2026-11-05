@@ -124,3 +124,7 @@ for _PWST_Mode in ["current", "close-create", "close-create-reject", "reopen-cre
 for _PWST_SubscriptionMode in ["subscription-current", "subscription-close"]
 	Test("Paths editor add-event retirement: " . _PWST_SubscriptionMode . " owns the actual HWND (paths-editor-native-subscription-retirement-owner)",
 		_PWST_Case.Bind(_PWST_SubscriptionMode))
+
+for _PWST_ExtraMode in ["subscription-reset-retain", "subscription-error-current", "subscription-error-reopen", "factory-error-current", "factory-error-reopen"]
+	Test("Paths editor subscription compatibility: " . _PWST_ExtraMode . " retains its exact owner (paths-editor-subscription-compat)",
+		_PWST_Case.Bind(_PWST_ExtraMode))
