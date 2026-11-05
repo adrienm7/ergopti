@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy dla pobierania",
 	"proxy_override.prompt": "Pozostaw puste, aby stosować ustawienia sieci systemu (łącznie z firmowym PAC). Wpisz direct, aby pobierać bez proxy, albo adres jednego proxy, na przykład http://proxy.example.com:3128.",
 	"proxy_override.invalid": "To nie jest adres proxy. Pozostaw pole puste, wpisz direct albo podaj adres taki jak http://proxy.example.com:3128 (http, https, socks5 lub socks5h, z portem).",
-	"proxy_override.not_saved": "Nie udało się zapisać ustawienia. Nic się nie zmieniło.",
+	"proxy_override.not_saved": "Nie udało się potwierdzić zapisania ustawienia.",
 	"proxy_override.saved_automatic": "Pobieranie znów stosuje ustawienia sieci systemu.",
 	"proxy_override.saved_direct": "Pobieranie łączy się teraz bez proxy.",
 	"proxy_override.saved_relay": "Pobieranie przechodzi teraz przez to proxy.",

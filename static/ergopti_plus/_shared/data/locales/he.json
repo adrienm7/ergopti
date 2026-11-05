@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "פרוקסי להורדות",
 	"proxy_override.prompt": "השאירו ריק כדי לפעול לפי הגדרות הרשת של המערכת (כולל קובץ PAC של החברה). הקלידו direct כדי להוריד בלי פרוקסי, או כתובת של פרוקסי אחד, למשל http://proxy.example.com:3128.",
 	"proxy_override.invalid": "זו אינה כתובת פרוקסי. השאירו את השדה ריק, הקלידו direct או הזינו כתובת כמו http://proxy.example.com:3128 (http, https, socks5 או socks5h, עם הפורט).",
-	"proxy_override.not_saved": "לא ניתן היה לשמור את ההגדרה. דבר לא השתנה.",
+	"proxy_override.not_saved": "לא ניתן היה לאשר שההגדרה נשמרה.",
 	"proxy_override.saved_automatic": "ההורדות שוב פועלות לפי הגדרות הרשת של המערכת.",
 	"proxy_override.saved_direct": "ההורדות מתחברות כעת בלי פרוקסי.",
 	"proxy_override.saved_relay": "ההורדות עוברות כעת דרך הפרוקסי הזה.",

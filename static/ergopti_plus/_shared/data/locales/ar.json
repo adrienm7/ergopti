@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "وكيل التنزيلات",
 	"proxy_override.prompt": "اتركه فارغًا لاتباع إعدادات الشبكة في النظام (بما في ذلك ملف PAC الخاص بالشركة). اكتب direct للتنزيل دون أي وكيل، أو عنوان وكيل واحد، مثل http://proxy.example.com:3128.",
 	"proxy_override.invalid": "هذا ليس عنوان وكيل. اترك الحقل فارغًا، أو اكتب direct، أو أدخل عنوانًا مثل http://proxy.example.com:3128 (http أو https أو socks5 أو socks5h، مع المنفذ).",
-	"proxy_override.not_saved": "تعذّر حفظ الإعداد. لم يتغير شيء.",
+	"proxy_override.not_saved": "تعذّر تأكيد حفظ الإعداد.",
 	"proxy_override.saved_automatic": "تتبع التنزيلات مجددًا إعدادات الشبكة في النظام.",
 	"proxy_override.saved_direct": "تتصل التنزيلات الآن دون أي وكيل.",
 	"proxy_override.saved_relay": "تمر التنزيلات الآن عبر هذا الوكيل.",

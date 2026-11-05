@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Прокси для загрузок",
 	"proxy_override.prompt": "Оставьте пустым, чтобы использовать сетевые настройки системы (включая корпоративный PAC). Введите direct, чтобы загружать без прокси, или адрес одного прокси, например http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Это не адрес прокси. Оставьте поле пустым, введите direct или укажите адрес вида http://proxy.example.com:3128 (http, https, socks5 или socks5h, с портом).",
-	"proxy_override.not_saved": "Не удалось сохранить настройку. Ничего не изменилось.",
+	"proxy_override.not_saved": "Не удалось подтвердить сохранение настройки.",
 	"proxy_override.saved_automatic": "Загрузки снова используют сетевые настройки системы.",
 	"proxy_override.saved_direct": "Загрузки теперь подключаются без прокси.",
 	"proxy_override.saved_relay": "Загрузки теперь идут через этот прокси.",

@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy pro stahování",
 	"proxy_override.prompt": "Ponechte prázdné, aby se použila síťová nastavení systému (včetně firemního PAC). Napište direct pro stahování bez proxy, nebo adresu jedné proxy, například http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Toto není adresa proxy. Ponechte pole prázdné, napište direct nebo zadejte adresu jako http://proxy.example.com:3128 (http, https, socks5 nebo socks5h, s portem).",
-	"proxy_override.not_saved": "Nastavení se nepodařilo uložit. Nic se nezměnilo.",
+	"proxy_override.not_saved": "Uložení nastavení se nepodařilo potvrdit.",
 	"proxy_override.saved_automatic": "Stahování se opět řídí síťovými nastaveními systému.",
 	"proxy_override.saved_direct": "Stahování se nyní připojuje bez proxy.",
 	"proxy_override.saved_relay": "Stahování nyní prochází touto proxy.",

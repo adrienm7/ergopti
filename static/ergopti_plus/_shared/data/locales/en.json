@@ -1399,7 +1399,7 @@
 	"proxy_override.title": "Proxy for downloads",
 	"proxy_override.prompt": "Leave empty to follow the system network settings (a company PAC included). Type direct to download without any proxy, or the address of one proxy, such as http://proxy.example.com:3128.",
 	"proxy_override.invalid": "This is not a proxy address. Leave the field empty, type direct, or give an address such as http://proxy.example.com:3128 (http, https, socks5 or socks5h, with its port).",
-	"proxy_override.not_saved": "The setting could not be saved. Nothing has changed.",
+	"proxy_override.not_saved": "The setting could not be confirmed as saved.",
 	"proxy_override.saved_automatic": "Downloads follow the system network settings again.",
 	"proxy_override.saved_direct": "Downloads now connect without any proxy.",
 	"proxy_override.saved_relay": "Downloads now go through this proxy.",

@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "ダウンロード用プロキシ",
 	"proxy_override.prompt": "空のままにすると、システムのネットワーク設定（会社の PAC を含む）に従います。プロキシを使わずにダウンロードするには direct と入力し、特定のプロキシを使うにはそのアドレス（例: http://proxy.example.com:3128）を入力します。",
 	"proxy_override.invalid": "これはプロキシのアドレスではありません。空のままにするか、direct と入力するか、http://proxy.example.com:3128 のようなアドレス（http、https、socks5、socks5h とポート番号）を入力してください。",
-	"proxy_override.not_saved": "設定を保存できませんでした。何も変更されていません。",
+	"proxy_override.not_saved": "設定が保存されたことを確認できませんでした。",
 	"proxy_override.saved_automatic": "ダウンロードは再びシステムのネットワーク設定に従います。",
 	"proxy_override.saved_direct": "ダウンロードはプロキシを使わずに接続するようになりました。",
 	"proxy_override.saved_relay": "ダウンロードはこのプロキシを経由するようになりました。",

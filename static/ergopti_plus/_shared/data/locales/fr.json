@@ -1399,7 +1399,7 @@
 	"proxy_override.title": "Proxy des téléchargements",
 	"proxy_override.prompt": "Laissez vide pour suivre les réglages réseau du système (PAC d'entreprise compris). Tapez direct pour télécharger sans aucun proxy, ou l'adresse d'un proxy, par exemple http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Ce n'est pas une adresse de proxy. Laissez le champ vide, tapez direct, ou donnez une adresse comme http://proxy.example.com:3128 (http, https, socks5 ou socks5h, avec son port).",
-	"proxy_override.not_saved": "Le réglage n'a pas pu être enregistré. Rien n'a changé.",
+	"proxy_override.not_saved": "L’enregistrement du réglage n’a pas pu être confirmé.",
 	"proxy_override.saved_automatic": "Les téléchargements suivent de nouveau les réglages réseau du système.",
 	"proxy_override.saved_direct": "Les téléchargements se connectent désormais sans aucun proxy.",
 	"proxy_override.saved_relay": "Les téléchargements passent désormais par ce proxy.",
