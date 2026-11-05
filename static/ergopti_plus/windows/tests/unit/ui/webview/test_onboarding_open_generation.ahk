@@ -126,3 +126,6 @@ for _OWOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reope
 for _OWOC_ShowMode in ["show-current", "show-close"]
 	Test("Onboarding initial native Show: " . _OWOC_ShowMode . " respects its bound Close (onboarding-show-native-close)",
 		_OWOC_Case.Bind(_OWOC_ShowMode))
+
+Test("Onboarding native host: manual Close after default plumbing Reset destroys only that host once (onboarding-reset-host-close)",
+	_OWOC_Case.Bind("reset-then-close"))
