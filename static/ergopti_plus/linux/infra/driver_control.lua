@@ -51,6 +51,7 @@ local function native_ports()
 	local FileSystem = require("adapters.file_system")
 	return {
 		read = FileSystem.read,
+		read_status = FileSystem.read_with_status,
 		write = FileSystem.write,
 		remove = function(path)
 			local ok, _, code = uv.fs_unlink(path)
@@ -187,9 +188,21 @@ end
 function Session:stop()
 	self.active = false
 	if self.token == nil then return true end
-	local current = self.ports.read(self:path("session"))
+	local path = self:path("session")
+	local current
+	if type(self.ports.read_status) == "function" then
+		local called, bytes, status = pcall(self.ports.read_status, path)
+		if not called or (status ~= "ok" and status ~= "absent")
+			or (status == "ok" and type(bytes) ~= "string") or (status == "absent" and bytes ~= nil) then
+			Logger.error(LOG, "The driver control session file could not be inspected; withdrawal remains pending.")
+			return false
+		end
+		current = bytes
+	else
+		current = self.ports.read(path)
+	end
 	if type(current) == "string" and current:find('"token":"' .. self.token .. '"', 1, true)
-		and not self.ports.remove(self:path("session")) then
+		and not self.ports.remove(path) then
 		Logger.error(LOG, "The driver control session file could not be withdrawn.")
 		return false
 	end
