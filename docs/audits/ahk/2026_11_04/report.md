@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **120 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **121 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1835,3 +1835,7 @@ The two actual proxy full-save failures extend072, and the simulated timezone se
 AHK-120 is independently confirmed by replay42004194057: after24 actual injected characters arm the real timer in excluded A, a focus-only switch to allowed B produces one genuine private HTTP POST with A context. The excluded-stays0POST and allowed-stays1POST controls pass; inverse repeats. Current focus alone cannot admit a retained excluded-source payload. Correction and native postfix qualification remain pending.
 
 Replay42006372296 at7cba520271a2568c094c7b475688ea40207c66ac executes no business cases: discovery stops on reserved variable Local in the new independent timezone test. Production compilation passes; neither E2E is selected. The fixture variable is renamed LocalTime before retry; the unexecuted134-case cohort receives no qualification.
+
+Replay42007542450 at9dd5c4f12fbdd56ad34394fb4c2443e8088d0149 executes152 selected cases:144 pass and8 fail, with identical failure names reversed. Production compile and90/90 native hotstrings pass. The selected HTTP override step passes its explicit11-case completion guard; its detailed TAP is not retained in these two archives. Selected SQL thinking-pause, timezone, proxy full-save and excluded-source debounce corrections are qualified; this is not a whole-suite result.
+
+The8 failures comprise personal/migration/locator stage ownership, two raw TOML update-name variants, successive ABC context ownership, mutable registry cache ownership and Sticky Kana capture. Only the mutable registry cache introduces a new distinct family (AHK-121); the others extend existing071/068/110/067. Correctors retain the original fail-before controls and exact native prerequisites. Replay42009207272 at7974f33b executes30 distinct targeted cases:29 pass and1 fails, identically reversed. Local/public prediction ownership and all3 queued proxy controls pass; the actual override-stage collision fails while its ordinary control passes.
