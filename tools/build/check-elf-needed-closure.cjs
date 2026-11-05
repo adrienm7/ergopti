@@ -101,6 +101,8 @@ function checkClosure(roots, readDynamic, recipient) {
 	const checked = [];
 	const provided = new Set();
 	const dynamics = new Map();
+	const elfFiles = files.filter(isElf);
+	const bundledElfPaths = new Set(elfFiles.map((file) => fs.realpathSync(file)));
 	for (const root of roots) {
 		// Symbolic links count as provided names: libfoo.so.1 is usually a link.
 		const pending = [root];
@@ -109,14 +111,21 @@ function checkClosure(roots, readDynamic, recipient) {
 			const stat = fs.lstatSync(current);
 			if (stat.isDirectory()) {
 				for (const entry of fs.readdirSync(current)) pending.push(path.join(current, entry));
-			} else {
-				provided.add(path.basename(current));
+			} else if (stat.isSymbolicLink()) {
+				let target;
+				try {
+					target = fs.realpathSync(current);
+				} catch (error) {
+					if (error.code === 'ENOENT' || error.code === 'ELOOP') continue;
+					throw error;
+				}
+				if (bundledElfPaths.has(target)) provided.add(path.basename(current));
 			}
 		}
 	}
-	for (const file of files) {
-		if (!isElf(file)) continue;
+	for (const file of elfFiles) {
 		checked.push(file);
+		provided.add(path.basename(file));
 		const dynamic = parseDynamic(readDynamic(file));
 		dynamics.set(file, dynamic);
 		if (dynamic.soname) provided.add(dynamic.soname);

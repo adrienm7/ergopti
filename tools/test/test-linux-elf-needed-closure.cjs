@@ -113,6 +113,26 @@ assert.deepEqual(
 	'an unbundled dependency that is not on the recipient list fails'
 );
 assert.equal(Closure.checkClosure([tree({ 'a.txt': 'x' })], injected, recipient).checked.length, 0);
+if (process.platform === 'linux') {
+	for (const kind of ['text', 'dangling', 'external']) {
+		const image = tree({ 'usr/bin/program': ELF });
+		const lib = path.join(image, 'usr/lib/libprivate.so.1');
+		fs.mkdirSync(path.dirname(lib), { recursive: true });
+		if (kind === 'text') fs.writeFileSync(lib, 'not a shared library');
+		else if (kind === 'dangling') fs.symlinkSync('missing.so', lib);
+		else {
+			const foreign = tree({ 'outside.so': ELF });
+			fs.symlinkSync(path.join(foreign, 'outside.so'), lib);
+		}
+		const checked = Closure.checkClosure([image], () => ' (NEEDED) Shared library: [libprivate.so.1]', recipient);
+		assert.deepEqual(checked.violations.map((entry) => entry.needed), ['libprivate.so.1'], `${kind} does not provide a bundled library`);
+	}
+	const image = tree({ 'usr/bin/program': ELF, 'usr/lib/actual.so': ELF });
+	fs.symlinkSync('actual.so', path.join(image, 'usr/lib/libprivate.so.1'));
+	const checked = Closure.checkClosure([image], (file) => path.basename(file) === 'program' ? ' (NEEDED) Shared library: [libprivate.so.1]' : '', recipient);
+	assert.deepEqual(checked.violations, [], 'a bundled symlink to a bundled ELF remains valid');
+}
+
 // The network runtime's curl closure needs the GLib closure the stager leaves
 // to the recipient (recipient_dependencies); the first hosted build refused it.
 const network = tree({ 'usr/bin/curl': ELF, 'usr/lib/libp11-kit.so.0': ELF });
