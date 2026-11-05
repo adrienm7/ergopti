@@ -55,9 +55,10 @@ global _I18nCacheFrLoaded := false
 ; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
 global _I18nFallbacksWarmed := false
 
-; Terminal record proving that a TSV cache reached the end of publication.
+; Terminal record proving a complete, globally validated String catalogue.
+; Version 2 retires older caches which erased invalid JSON value types.
 ; The count also rejects a complete-looking file whose record prefix was lost.
-global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v1 count="
+global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v2 count="
 
 
 
@@ -245,6 +246,13 @@ _I18nLoadLocaleMap(JsonPath, MagicKey, AllowFast := true) {
 		if (StrLen(RawJson) && Ord(SubStr(RawJson, 1, 1)) = 0xFEFF)
 			RawJson := SubStr(RawJson, 2)
 		Parsed := JsonParse(RawJson)
+		; Validate the whole catalogue before substitution or TSV publication.
+		; Valid JSON can still be a scalar, array or nested translation value.
+		if !(Parsed is Map)
+			throw TypeError("A locale catalogue must be a flat String-to-String object.")
+		for Key, Val in Parsed
+			if !(Key is String) || !(Val is String)
+				throw TypeError("A locale catalogue must contain only String keys and values.")
 	} catch as err {
 		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", JsonPath, err.Message)
 		return { Cache: Map(), Ok: false, Fast: false }

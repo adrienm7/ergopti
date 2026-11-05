@@ -693,7 +693,7 @@ _I18nShape_Case(Mode) {
 	Owned := false
 	Sources := Map("root-boolean", "true", "root-array", '["not a catalogue"]',
 		"nested-value", '{"fixture.key":{"nested":"invalid"}}',
-		"numeric-value", '{"fixture.key":7}', "null-value", '{"fixture.key":null}',
+		"numeric-value", '{"fixture.key":7}', "legacy-numeric-cache", '{"fixture.key":7}', "null-value", '{"fixture.key":null}',
 		"flat-control", '{"fixture.key":"valid translation"}', "empty-control", '{}')
 	try {
 		Created := FSCreateDirectoryExclusiveStrict(Root)
@@ -702,6 +702,15 @@ _I18nShape_Case(Mode) {
 		DirCreate(Root . "\data\locales")
 		Path := Root . "\data\locales\de.json"
 		AssertTrue(FSWriteCreateDurable(Path, Sources[Mode]))
+		if Mode == "legacy-numeric-cache" {
+			; Historical v1 caches stringify invalid numeric JSON, losing its
+			; original type before the next boot can validate the source.
+			Tsv := Root . "\data\locales\de.tsv"
+			AssertTrue(FSWriteCreateDurable(Tsv, "fixture.key`t7`n#!ergopti-i18n-cache-v1 count=1`n"))
+			FileSetTime("20000101000000", Path, "M")
+			FileSetTime("20000102000000", Tsv, "M")
+			AssertTrue(_I18nTsvIsFresh(Tsv, Path), "The real fast-cache freshness gate must admit the historical artefact")
+		}
 		_SharedDir := Root
 		_I18nLocale := "de"
 		_I18nCache := Map(), _I18nCacheLoaded := false, _I18nActiveCacheIdentity := false
@@ -720,7 +729,11 @@ _I18nShape_Case(Mode) {
 		AssertEqual(Mode == "flat-control" ? "valid translation" : "fixture.key", Actual)
 		if !Valid {
 			AssertEqual(0, _I18nCache.Count, "An invalid entry cannot publish a partial active catalogue")
-			AssertFalse(FSExists(Root . "\data\locales\de.tsv"), "An invalid JSON shape cannot be promoted into the self-healing fast cache")
+			if Mode == "legacy-numeric-cache"
+				AssertEqual("fixture.key`t7`n#!ergopti-i18n-cache-v1 count=1`n", FSReadUtf8Exact(Tsv),
+					"Refusing invalid source must not regenerate or bless its legacy cache")
+			else
+				AssertFalse(FSExists(Root . "\data\locales\de.tsv"), "An invalid JSON shape cannot be promoted into the self-healing fast cache")
 		}
 	} finally {
 		_SharedDir := Saved[1], _I18nLocale := Saved[2]
@@ -736,3 +749,6 @@ _I18nShape_Case(Mode) {
 }
 for _I18nShape_Mode in ["root-boolean", "root-array", "nested-value", "numeric-value", "null-value", "flat-control", "empty-control"]
 	Test("i18n public lookup: " . _I18nShape_Mode . " preserves safe source fallback (i18n-source-shape)", _I18nShape_Case.Bind(_I18nShape_Mode))
+
+Test("i18n public lookup: historical numeric cache cannot bypass source validation (i18n-source-shape)",
+	_I18nShape_Case.Bind("legacy-numeric-cache"))
