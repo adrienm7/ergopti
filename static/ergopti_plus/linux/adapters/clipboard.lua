@@ -385,13 +385,14 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 		if not restore_required then return true end
 		busy = true
 		local ok, restored = pcall(function()
-			-- Only a completed write proves the clipboard held our text. After a
-			-- failed write or a failed restore, a differing clipboard may be our
-			-- own damage, which the restore must still repair.
-			if written and not restore_attempted then
-				local held = holds_pasted_text(b, text)
-				if held == nil then return false end
-				if not held then return true end
+			-- A failed setter can have changed the clipboard, but an unrelated
+			-- copy may also have arrived. Keep the inverse pending if the bytes
+			-- do not identify either our payload or the saved snapshot.
+			local read_ok, current = read_backend_checked(b)
+			if not read_ok then return false end
+			if current ~= text and current ~= saved then
+				if written and not restore_attempted then return true end
+				return false
 			end
 			restore_attempted = true
 			return write_backend_checked(b, saved)
@@ -488,8 +489,10 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 
 	if not admitted(admission) then return false end
 	if not write_backend_checked(b, text) then
-		-- A failed launcher may already have transferred clipboard ownership.
-		local restored = write_backend_checked(b, saved)
+		-- A failed launcher may already have transferred ownership, or another
+		-- application may have copied. Restore only identifiable contents.
+		local read_ok, current = read_backend_checked(b)
+		local restored = read_ok and (current == text or current == saved) and write_backend_checked(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
 		if not restored then return false, "clipboard restoration failed" end
 		return false

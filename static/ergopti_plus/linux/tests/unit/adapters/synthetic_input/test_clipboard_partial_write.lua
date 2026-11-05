@@ -28,6 +28,7 @@ local function with_session(options, body)
 			state.writes[#state.writes + 1] = text
 			if #state.writes == 1 and options.fault then
 				if not options.before_mutation then state.current = text end
+				if options.external_after_failure then state.current = "external copy" end
 				if options.fault == "throw" then error("setter exited after ownership transfer", 0) end
 				return false
 			end
@@ -69,6 +70,13 @@ local function with_session(options, body)
 end
 
 helpers.describe("clipboard partial setter restoration", function()
+	helpers.it("does not overwrite an external copy after a failed paste setter", function()
+		with_session({ fault = "refuse", external_after_failure = true }, function(state)
+			helpers.assert_eq(state.call("paste"), false)
+			helpers.assert_eq(state.current, "external copy")
+			helpers.assert_eq(#state.writes, 1)
+		end)
+	end)
 	for _, kind in ipairs({ "paste", "uri-list" }) do
 		for _, fault in ipairs({ "false", "throw" }) do
 			helpers.it("restores " .. kind .. " after a setter " .. fault .. " beyond mutation", function()
