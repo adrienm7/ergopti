@@ -129,27 +129,41 @@ ScreenBrightnessCancel(Reason := "canceled", ExpectedId := 0) {
 }
 
 ; Runs while a worker or native retirement debt exists, including during Suspend.
-ScreenBrightnessPoll() {
-	Job := ScreenBrightnessOwner.job
-	if !IsObject(Job) {
-		SetTimer(ScreenBrightnessPoll, 0)
-		return
-	}
+ScreenBrightnessPoll(BeforeCancelFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		Job := ScreenBrightnessOwner.job
+		if !IsObject(Job) {
+			SetTimer(ScreenBrightnessPoll, 0)
+			return
+		}
+		Id := Job["id"]
+	} finally Critical(PreviousCritical)
 	if Job["canceled"] || A_IsSuspended
-		ScreenBrightnessCancel("suspended-or-canceled")
+		Reason := "suspended-or-canceled"
 	else if TickExpired(Job["started"], Job["data"]["worker_timeout_ms"])
-		ScreenBrightnessCancel("timeout")
+		Reason := "timeout"
+	else
+		return
+	if HasMethod(BeforeCancelFn, "Call")
+		BeforeCancelFn.Call()
+	ScreenBrightnessCancel(Reason, Id)
 }
 
 ; ShellRunner invokes this only after the child tree and its resources settle.
 ScreenBrightnessCompleted(Id, ExitCode, Stdout, Stderr, BeforeStopFn := 0) {
-	Job := ScreenBrightnessOwner.job
-	if !IsObject(Job) || Job["id"] != Id
-		return
-	ScreenBrightnessOwner.job := 0
-	if HasMethod(BeforeStopFn, "Call")
-		BeforeStopFn.Call()
-	SetTimer(ScreenBrightnessPoll, 0)
+	PreviousCritical := Critical("On")
+	try {
+		Job := ScreenBrightnessOwner.job
+		if !IsObject(Job) || Job["id"] != Id
+			return
+		; Detach and disarm as one short RAM/native-timer claim. A new job can
+		; start only after its predecessor has stopped its own polling timer.
+		ScreenBrightnessOwner.job := 0
+		if HasMethod(BeforeStopFn, "Call")
+			BeforeStopFn.Call()
+		SetTimer(ScreenBrightnessPoll, 0)
+	} finally Critical(PreviousCritical)
 	Receipt := 0
 	if ExitCode == 0 && StrLen(Stdout) <= Job["data"]["max_receipt_bytes"] {
 		try Receipt := JsonParse(Stdout)
