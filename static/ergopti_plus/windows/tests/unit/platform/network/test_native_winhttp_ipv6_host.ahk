@@ -45,7 +45,7 @@ _NativeWinHttpIpv6Host_Controls() {
 		AssertEqual(1, Receipt.Get("schema_version", 0))
 		AssertTrue(Receipt.Get("peer_joined", false))
 		AssertEqual(0, Receipt.Get("peer_failures", -1))
-		for Name in ["dns", "bracketed", "unbracketed", "refusing_proxy"]
+		for Name in ["dns", "bracketed", "unbracketed", "uri_host_case", "refusing_proxy"]
 			AssertTrue(Receipt[Name].Get("closed", false), "Every raw native handle must close: " . Name)
 		AssertTrue(_NativeWinHttpIpv6Host_Success(Receipt["dns"]), "The same owned named proxy must serve the DNS control")
 		AssertEqual(1, Receipt.Get("wire_dns", 0))
@@ -62,6 +62,16 @@ _NativeWinHttpIpv6Host_Controls() {
 		AssertTrue(!Refused.Get("completed", true) && Refused.Get("native_error", 0) != 0
 			&& Refused.Get("native_error", 0) != 12005,
 			"The accepted spelling must fail at a reserved refusing proxy rather than reach an IPv6 origin")
+		AssertTrue(_NativeWinHttpIpv6Host_Success(Receipt["uri_host_case"]),
+			"The actual Uri.Host representation must independently receive an exact native response")
+		AssertEqual(1, Receipt.Get("wire_uri_host", 0))
+		for Name in ["actual_dns", "actual_ipv4"] {
+			Control := Receipt[Name]
+			AssertTrue(Control.Get("retired", false) && Control.Get("completed", false)
+				&& Control.Get("status", 0) == 200 && Control.Get("body_exact", false),
+				"Production DNS and IPv4 routing must remain valid: " . Name)
+			AssertEqual(1, Receipt.Get("wire_" . Name, 0))
+		}
 		Actual := Receipt["actual"]
 		AssertTrue(Actual.Get("retired", false), "The production native callbacks must retire")
 		AssertTrue(Actual.Get("completed", false) && Actual.Get("status", 0) == 200
