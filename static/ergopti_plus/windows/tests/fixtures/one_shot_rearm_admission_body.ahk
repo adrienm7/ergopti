@@ -132,7 +132,7 @@ class _OSRA_Hook {
 		this.Input := "", this.EndKey := "", this.EndReason := "", this.EndMods := ""
 	}
 	KeyOpt(Keys, Options) {
-		_OSRA_Require(Keys == "{BackSpace}{Enter}{Delete}{Escape}" && Options == "ES", "the real one-shot control end keys must remain unchanged")
+		_OSRA_Require(Keys == "{BackSpace}{Enter}{Delete}{Escape}{Tab}" && Options == "ES", "the real one-shot control end keys must remain unchanged")
 	}
 	Start() {
 		global _OSRA, OneShotShiftEnabled
