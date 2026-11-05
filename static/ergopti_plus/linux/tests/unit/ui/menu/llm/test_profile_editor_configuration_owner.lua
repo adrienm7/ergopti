@@ -74,6 +74,26 @@ local function with_profile(body)
 end
 
 helpers.describe("profile editor originating configuration", function()
+	helpers.it("retains whitespace in an existing raw prompt through the real profile owner", function()
+		Fixture.with_configuration(function(f)
+			local profiles = require("modules.llm.profile_settings")
+			local raw = "  \tRésumé 漢字  \t"
+			local profile = { id = "user_raw", label = "Raw", system_single = "hidden", raw_prompt = raw, batch = false }
+			helpers.assert_true(profiles.save_user_profile(profile, false, false))
+			local bridge = helpers.load_module("ui.prompt_editor.bridge")
+			helpers.assert_true(bridge.open(profile, function(value) return profiles.save_user_profile(value, false, true) end))
+			local context = { app_name = "prompt_editor", epoch = f.host.current_epoch("prompt_editor"),
+				close_owned_window = function() return f.host.hide("prompt_editor") end }
+			local ready = bridge.on_message({ action = "ready" }, { webview_manager = f.host }, context)
+			helpers.assert_eq(ready.data.prompt, raw)
+			local result = bridge.on_message({ action = "save", edit_id = ready.data.edit_id,
+				epoch = ready.data.epoch, name = "Raw", prompt = raw, batch = false }, {}, context)
+			helpers.assert_true(result.saved)
+			local stored = profiles.list_user(true)
+			helpers.assert_eq(stored[1].raw_prompt, raw)
+		end)
+	end)
+
 	helpers.it("saves a draft in its unchanged opening folder (profile-editor-root-owner)", function()
 		with_profile(function(f, baseline, open)
 			helpers.assert_eq(assert(open())(), { saved = true, closed = true })

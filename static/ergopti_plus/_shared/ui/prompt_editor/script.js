@@ -605,9 +605,9 @@ function doCancel() {
 function doSave() {
 	var promptName = document.getElementById('p-name').value.trim();
 	var promptMode = document.getElementById('p-mode').value;
-	var promptContent = serializeEditor(editorElement).trim();
+	var promptContent = serializeEditor(editorElement);
 
-	if (!promptName || !promptContent) {
+	if (!promptName || !promptContent.trim()) {
 		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 
