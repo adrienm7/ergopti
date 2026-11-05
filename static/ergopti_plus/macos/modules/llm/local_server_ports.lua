@@ -86,7 +86,36 @@ M._home = function() return os.getenv("HOME") end
 --- @param accepted table Exit codes that are an answer.
 --- @param timeout_ms number Its deadline.
 --- @param on_done function Receives (stdout|nil, cause|nil).
+-- Tasks whose termination has not yet been acknowledged stay reachable; a
+-- subsequent sweep retries them before starting another native process.
+local pending_commands = {}
+
+local function command_settled(handle)
+	if type(handle) ~= "table" or type(handle.isSettled) ~= "function" then return false end
+	local ok, settled = pcall(handle.isSettled)
+	return ok and settled == true
+end
+
+local function retire_command(handle)
+	if type(handle) ~= "table" then return end
+	if command_settled(handle) then pending_commands[handle] = nil; return end
+	pending_commands[handle] = true
+	if type(handle.terminate) == "function" then pcall(handle.terminate) end
+	if command_settled(handle) then pending_commands[handle] = nil end
+end
+
+local function retry_commands()
+	local snapshot = {}
+	for handle in pairs(pending_commands) do snapshot[#snapshot + 1] = handle end
+	for _, handle in ipairs(snapshot) do retire_command(handle) end
+	return next(pending_commands) == nil
+end
+
 local function run_bounded(label, executable, args, accepted, timeout_ms, on_done)
+	if not retry_commands() then
+		on_done(nil, "previous port scan task is still retiring")
+		return
+	end
 	local settled, timer, handle = false, nil, nil
 	local function finish(output, cause)
 		if settled then return end
@@ -94,8 +123,19 @@ local function run_bounded(label, executable, args, accepted, timeout_ms, on_don
 		if timer then TimerScheduler.cancel(timer) end
 		on_done(output, cause)
 	end
+	local function fail_and_retire(cause, report)
+		if settled then return end
+		-- Fence business delivery before either timer or task cleanup can
+		-- synchronously reenter its completion callback.
+		settled = true
+		if timer then pcall(TimerScheduler.cancel, timer) end
+		retire_command(handle)
+		if report then pcall(report) end
+		on_done(nil, cause)
+	end
 	local started
 	started, handle = M._run(executable, args, function(exit_code, stdout)
+		if handle then pending_commands[handle] = nil end
 		if accepted[exit_code] ~= true then
 			Logger.warn(LOG, "%s failed (exit %s): no reading this sweep.", label, tostring(exit_code))
 			finish(nil, label .. " exited with " .. tostring(exit_code))
@@ -103,17 +143,29 @@ local function run_bounded(label, executable, args, accepted, timeout_ms, on_don
 		end
 		finish(type(stdout) == "string" and stdout or "")
 	end)
+	if settled then return end
 	if started ~= true then
-		Logger.error(LOG, "%s could not start.", label)
-		finish(nil, label .. " could not start")
+		fail_and_retire(label .. " could not start", function()
+			Logger.error(LOG, "%s could not start.", label)
+		end)
 		return
 	end
-	timer = TimerScheduler.after(timeout_ms / 1000, function()
+	local called, candidate, committed = pcall(TimerScheduler.after, timeout_ms / 1000, function()
 		if settled then return end
-		Logger.warn(LOG, "%s outlived its %d ms deadline; terminating it.", label, timeout_ms)
-		if handle and type(handle.terminate) == "function" then handle.terminate() end
-		finish(nil, label .. " outlived its " .. tostring(timeout_ms) .. " ms deadline")
+		fail_and_retire(label .. " outlived its " .. tostring(timeout_ms) .. " ms deadline", function()
+			Logger.warn(LOG, "%s outlived its %d ms deadline; terminating it.", label, timeout_ms)
+		end)
 	end)
+	timer = called and type(candidate) == "table" and candidate or nil
+	if settled then
+		if type(timer) == "table" then pcall(TimerScheduler.cancel, timer) end
+		return
+	end
+	if not called or timer == nil or committed ~= true then
+		fail_and_retire(label .. " deadline could not be armed", function()
+			Logger.error(LOG, "%s deadline could not be armed.", label)
+		end)
+	end
 end
 
 --- Joins pids for a command-line list.

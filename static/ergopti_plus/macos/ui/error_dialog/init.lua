@@ -268,7 +268,12 @@ end
 local function init_message(session)
 	local redaction = session.redaction
 	local function redact(text) return Redact.apply(text, redaction.rules, redaction.context) end
-	return DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
+	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
+	-- The details pane promises the exact share document, not the local error
+	-- report. Build it from the same captured snapshot as Copy and Report.
+	message.text = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+	return message
 end
 
 --- Performs one action of the page.

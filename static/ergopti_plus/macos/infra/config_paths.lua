@@ -659,7 +659,10 @@ function M.init(base_dir)
 	-- configured; otherwise the user ends up with an unwanted
 	-- ~/.config/ergopti_plus/ on every reload.
 	local resolved = config_dir()
-	if resolved == _default_config_dir then ensure_dir(_default_config_dir) end
+	if resolved == _default_config_dir and not ensure_dir(_default_config_dir) then
+		Logger.error(LOG, "The default configuration directory is unavailable; initialization refused.")
+		return false
+	end
 	_initialized = true
 	follow_config_dir_in_logs()
 	Logger.success(LOG, "Config paths initialized (base: '%s', config: '%s').", base_dir, resolved)

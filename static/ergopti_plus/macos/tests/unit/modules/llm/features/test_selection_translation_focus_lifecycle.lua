@@ -59,6 +59,25 @@ helpers.describe("selection translation retains its original focus", function()
 		end)
 	end)
 
+	helpers.it("refuses an unidentifiable native window before copying", function()
+		Fixture.with_world(SOURCE, "fr", function(world)
+			local retained = package.loaded["adapters.window_info"]
+			package.loaded["adapters.window_info"] = nil
+			local real = require("adapters.window_info")
+			package.loaded["adapters.window_info"] = retained
+			retained.focused_identity = real.focused_identity
+			-- Hammerspoon emits id 0 when _AXUIElementGetWindow failed.
+			world.native_destination.change_focus("7:0")
+			Fixture.settle(world)
+			helpers.assert_eq(world.flow.run("en"), false, "zero is not a proved window identity")
+			helpers.assert_eq(#world.keys, 0, "the selection must not be copied")
+			helpers.assert_eq(#world.posts, 0)
+			world.native_destination.change_focus("7:101")
+			Fixture.settle(world)
+			helpers.assert_eq(world.flow.run("en"), true, "a proved window remains usable")
+		end)
+	end)
+
 	helpers.it("does not rebind a copied selection to another window (translation-focus-copy)", function()
 		Fixture.with_world(SOURCE, "fr", function(world)
 			helpers.assert_true(world.flow.run("en"))

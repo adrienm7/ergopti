@@ -125,7 +125,9 @@ local function run_stream_case(case)
 		helpers.assert_eq(type(stream_on_done), "function",
 			"the real stream must hand its terminal callback to ShellRunner")
 		for index, chunk in ipairs(case.chunks) do
-			local keep_streaming = stream_on_chunk(nil, chunk, "")
+			local keep_streaming
+			if chunk == false then keep_streaming = stream_on_chunk(nil, nil, "")
+			else keep_streaming = stream_on_chunk(nil, chunk, "") end
 			helpers.assert_eq(keep_streaming, true,
 				"a valid SSE chunk must keep the transport alive")
 			if index == case.observe_before_blank_at then
@@ -137,7 +139,8 @@ local function run_stream_case(case)
 			context.stream.generation = context.stream.generation + 1
 			context.stream.task, context.stream.timeout = successor, successor_timeout
 		end
-		stream_on_done(case.exit_code or 0, case.remaining or "", "")
+		if case.lost_final then stream_on_done(case.exit_code or 0, nil, "")
+		else stream_on_done(case.exit_code or 0, case.remaining or "", "") end
 	end, debug.traceback)
 
 	shell_runner.spawn = original_spawn
@@ -239,6 +242,14 @@ local function run_stream_case(case)
 end
 
 helpers.describe("MLX SSE event parser", function()
+	helpers.it("rejects native undecodable terminal stdout", function()
+		run_stream_case({ chunks = { "data:" .. JSON_SINGLE .. "\n\n", SSE_DONE },
+			lost_final = true, expect_transport_incomplete = true })
+	end)
+	helpers.it("rejects native undecodable stdout between valid records", function()
+		run_stream_case({ chunks = { "data:" .. JSON_SINGLE .. "\n\n", false, SSE_DONE },
+			expect_transport_incomplete = true })
+	end)
 	for _, case in ipairs({
 		{ name = "rejects boolean choices after partial output",
 			chunks = { "data:" .. JSON_SINGLE .. "\n\n", 'data:{"choices":false}\n\n', SSE_DONE },

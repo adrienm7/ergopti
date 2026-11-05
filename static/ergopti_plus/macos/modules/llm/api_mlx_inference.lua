@@ -857,10 +857,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
-		if not chunk or chunk == "" then return true end
 		if failure_requested then return false end
 		-- Generation check: if a newer request superseded us, discard chunks silently
 		if my_generation ~= _ctx.stream.generation then return false end
+		-- hs.task reports nil after its native per-chunk UTF-8 decode fails. The
+		-- bytes cannot be recovered, so a later DONE must not publish a partial.
+		if chunk == nil then provider_failed = true; return true end
+		if chunk == "" then return true end
 		-- First chunk received — server is alive (logged once for diagnostics).
 		if not _ctx.stream.has_chunks then
 			_ctx.stream.has_chunks = true
@@ -947,6 +950,9 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			return
 		end
 
+		-- Native termination decodes unread stdout as one UTF-8 string; nil
+		-- means that terminal bytes were lost before Lua could inspect them.
+		if remaining == nil then provider_failed = true end
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()

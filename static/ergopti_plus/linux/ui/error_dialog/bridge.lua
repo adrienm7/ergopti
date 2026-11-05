@@ -209,7 +209,11 @@ end
 local function init_message(session)
 	local rules = session.documents.redaction
 	local function redact(text) return Redact.apply(text, rules, session.context) end
-	return DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
+	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
+	-- This pane promises the exact projected document used by Copy and Report.
+	message.text = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+	return message
 end
 
 

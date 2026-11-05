@@ -307,6 +307,9 @@ _TED_RealSharingSink() {
 			"reveal", (Path) => (Order.Push("reveal"), Revealed.Push(Path), true),
 			"open_url", (Url) => (Order.Push("browser"), Opened.Push(Url), true))
 		Perform := (Action, Paths, Config, Unused := 0, Retained := 0) => HealthCheck_PerformAction(Action, Paths, Config, Overrides, Retained)
+		Fields["record"] := Map("kind", "error", "module", "synthetic",
+			"message", "CANARY-private.invalid/notes", "time", "local")
+		Preview := JsonParse(_ErrorDialog_InitJson(Fields))["text"]
 		_ED_Session := Fields
 		_ED_ResetDone := true ; The response port refuses before any WebView use.
 		_ErrorDialog_Perform(_ED_WindowEpoch, "copy", Perform)
@@ -321,6 +324,7 @@ _TED_RealSharingSink() {
 		AssertEqual(5, Order.Length, "copy action and complete report action reach only their admitted ports")
 		for Index, Expected in ["copy", "copy", "save", "reveal", "browser"]
 			AssertEqual(Expected, Order[Index], "browser admission follows attachment save and reveal")
+		AssertEqual(Copied[1], Preview, "the displayed preview equals the copied report")
 		AssertEqual(Copied[1], Copied[2], "both actions use the same retained projection")
 		AssertFalse(InStr(Copied[1], "CANARY"), "private error details never leave")
 		AssertContains(Copied[1], "-1744", "admitted technical status remains useful")

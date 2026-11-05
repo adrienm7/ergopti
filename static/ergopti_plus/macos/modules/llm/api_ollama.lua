@@ -1808,9 +1808,11 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, _)
-		if not chunk or chunk == "" then return true end
-		-- Generation check: discard chunks from a stream that has been superseded
+		-- A nil stdout is Hammerspoon's failed per-chunk UTF-8 decoding, not an
+		-- empty pipe read. The bytes are already lost, so never publish a partial.
 		if my_generation ~= _stream_generation then return false end
+		if chunk == nil then stream_failed = true; return true end
+		if chunk == "" then return true end
 		if stream_failed then return true end
 		line_buf = line_buf .. chunk
 		flush_lines()
@@ -1845,6 +1847,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
+		-- The termination handler uses the same UTF-8 conversion for unread
+		-- stdout; nil means some terminal bytes could not be decoded.
+		if remaining == nil then stream_failed = true end
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()

@@ -94,16 +94,16 @@ end
 --- @return table Counts per section: {phoneprefixes, ssnprefixes, ibanprefixes}.
 function M.compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
 	local phone_n = 0
-	if #phone >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
-	if #phone >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
-	if #phone >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
-	if #fphone >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
+	if TextUtils.utf8_len(phone) >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
+	if TextUtils.utf8_len(phone) >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
+	if TextUtils.utf8_len(phone) >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
+	if TextUtils.utf8_len(fphone) >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
 
 	-- No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
-	local ssn_n = (#ssn_raw >= 5) and 2 or 0
+	local ssn_n = (TextUtils.utf8_len(ssn_raw) >= 5) and 2 or 0
 
 	-- 6 raw chars (no-space, case-insensitive) and 7-char spaced trigger
-	local iban_n = (#iban_raw >= 6) and 2 or 0
+	local iban_n = (TextUtils.utf8_len(iban_raw) >= 6) and 2 or 0
 
 	return { phoneprefixes = phone_n, ssnprefixes = ssn_n, ibanprefixes = iban_n }
 end

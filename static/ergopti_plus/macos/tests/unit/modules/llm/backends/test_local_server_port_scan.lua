@@ -41,21 +41,35 @@ end
 --- @param scenario function Receives (Scanner, world).
 local function with_scanner(scenario)
 	helpers.with_fresh_modules({ "modules.llm.local_server_ports", "adapters.timer_scheduler" }, function()
-		local world = { runs = {}, timers = {}, files = {}, terminated = 0 }
+		local world = { runs = {}, timers = {}, files = {}, terminated = 0, cancellations = {} }
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(seconds, fn)
+				if world.raise_timer then error("controlled scheduler failure") end
 				local timer = { seconds = seconds, fn = fn }
 				world.timers[#world.timers + 1] = timer
-				return timer, true
+				if world.deliver_timer_inline then fn() end
+				return timer, not world.refuse_timer
 			end,
-			cancel = function(timer) timer.cancelled = true; return true end,
+			cancel = function(timer)
+				world.cancellations[#world.cancellations + 1] = timer
+				timer.cancelled = true
+				return true
+			end,
 		}
 		local Scanner = require("modules.llm.local_server_ports")
 		Scanner._home = function() return "/Users/u" end
 		Scanner._read_file = function(path) return world.files[path] end
 		Scanner._run = function(executable, args, on_done)
 			world.runs[#world.runs + 1] = { executable = executable, args = args, on_done = on_done }
-			return true, { terminate = function() world.terminated = world.terminated + 1 end }
+			local done = false
+			return true, { terminate = function()
+				world.terminated = world.terminated + 1
+				if world.on_terminate then world.on_terminate(on_done) end
+				if world.refuse_termination then return false end
+				done = true
+				return true
+			end,
+				isSettled = function() return done end }
 		end
 		scenario(Scanner, world)
 	end)
@@ -70,6 +84,88 @@ local function expire_process_lookup(world)
 end
 
 helpers.describe("Local server port scan (local-server-ports)", function()
+	helpers.it("settles the scan when deadline activation is refused", function()
+		with_scanner(function(Scanner, world)
+			world.refuse_timer = true
+			local results, deliveries = nil, 0
+			Scanner.scan(catalogue_entries(), function(value) results = value; deliveries = deliveries + 1 end)
+			helpers.assert_not_nil(results, "a timer refusal must not strand the scan")
+			helpers.assert_true(world.terminated > 0, "a task without a deadline must be retired")
+			local before = deliveries
+			for _, run in ipairs(world.runs) do run.on_done(0, "") end
+			helpers.assert_eq(deliveries, before, "late native completions cannot publish twice")
+		end)
+	end)
+
+	helpers.it("fences a synchronous success callback delivered during failed-deadline cleanup", function()
+		with_scanner(function(Scanner, world)
+			world.refuse_timer = true
+			world.on_terminate = function(done) done(0, "777 omlx-server --port 7777\n") end
+			local result, deliveries
+			deliveries = 0
+			Scanner.scan(catalogue_entries(), function(value) result = value; deliveries = deliveries + 1 end)
+			helpers.assert_not_nil(result)
+			helpers.assert_eq(result.omlx.source, "default", "cleanup callback cannot publish its stale process list")
+			helpers.assert_eq(deliveries, 1)
+		end)
+	end)
+
+	helpers.it("settles the scan when the deadline scheduler raises", function()
+		with_scanner(function(Scanner, world)
+			world.raise_timer = true
+			local results
+			Scanner.scan(catalogue_entries(), function(value) results = value end)
+			helpers.assert_not_nil(results)
+			helpers.assert_true(world.terminated > 0, "the command remains owned when timer creation raises")
+			helpers.assert_eq(#world.cancellations, 0, "an exception message is not a timer handle")
+		end)
+	end)
+
+	helpers.it("retires a deadline handle returned after synchronous delivery", function()
+		with_scanner(function(Scanner, world)
+			world.deliver_timer_inline = true
+			local result, deliveries = nil, 0
+			Scanner.scan(catalogue_entries(), function(value) result = value; deliveries = deliveries + 1 end)
+			helpers.assert_not_nil(result)
+			helpers.assert_eq(deliveries, 1)
+			for _, timer in ipairs(world.timers) do
+				helpers.assert_true(timer.cancelled, "a synchronously delivered deadline must be released")
+			end
+		end)
+	end)
+
+	helpers.it("retains a task whose termination is refused and retries before a successor", function()
+		with_scanner(function(Scanner, world)
+			world.refuse_timer, world.refuse_termination = true, true
+			local first
+			Scanner.scan(catalogue_entries(), function(value) first = value end)
+			helpers.assert_not_nil(first)
+			helpers.assert_eq(#world.runs, 1)
+			local second
+			Scanner.scan(catalogue_entries(), function(value) second = value end)
+			helpers.assert_not_nil(second)
+			helpers.assert_eq(#world.runs, 1, "a pending exact task blocks another native command")
+			helpers.assert_true(world.terminated >= 2, "later scans retry the retained task")
+			world.runs[1].on_done(0, "")
+			world.refuse_timer, world.refuse_termination = false, false
+			Scanner.scan(catalogue_entries(), function() end)
+			helpers.assert_eq(#world.runs, 2, "native completion releases the task owner")
+		end)
+	end)
+
+	helpers.it("does not arm a deadline after synchronous command completion", function()
+		with_scanner(function(Scanner, world)
+			Scanner._run = function(_, _, done)
+				done(1, "")
+				return true, { terminate = function() return true end }
+			end
+			local results
+			Scanner.scan(catalogue_entries(), function(value) results = value end)
+			helpers.assert_not_nil(results)
+			helpers.assert_eq(#world.timers, 0, "settled work must not acquire a new timer")
+		end)
+	end)
+
 	helpers.it("a settings-file port needs one pgrep and no lsof", function()
 		with_scanner(function(Scanner, world)
 			world.files["/Users/u/.omlx/settings.json"] = '{"server":{"port":8181}}'
