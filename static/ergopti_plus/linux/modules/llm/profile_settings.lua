@@ -620,18 +620,19 @@ function M.delete_user_profile(profile_id, admission)
 	if active == profile_id then writes[KEY.LLM_PROFILES_ACTIVE] = "basic" end
 	-- An application mapped to the deleted profile would name nothing: its
 	-- override goes in the same write, as on Windows.
+	local overrides = load_app_overrides()
+	if not _app_overrides_source or not _registry_source
+			or _app_overrides_source.status ~= _registry_source.status
+			or _app_overrides_source.content ~= _registry_source.content then
+		forget_registry(true)
+		Logger.error(LOG, "Application profile overrides changed before profile deletion; retry required.")
+		return false
+	end
 	local kept, dropped = {}, false
-	for app, mapped in pairs(load_app_overrides()) do
+	for app, mapped in pairs(overrides) do
 		if mapped == profile_id then dropped = true else kept[app] = mapped end
 	end
 	if dropped and not _app_overrides_refused then
-		if not _app_overrides_source or not _registry_source
-				or _app_overrides_source.status ~= _registry_source.status
-				or _app_overrides_source.content ~= _registry_source.content then
-			forget_registry(true)
-			Logger.error(LOG, "Application profile overrides changed before profile deletion; retry required.")
-			return false
-		end
 		local payload = AppOverrides.encode(kept)
 		if payload == nil then return false end
 		writes[APP_OVERRIDES_KEY] = payload
@@ -645,7 +646,6 @@ function M.delete_user_profile(profile_id, admission)
 
 	forget_registry(false)
 	if active == profile_id then _values.active = "basic" end
-	if dropped and not _app_overrides_refused then _app_overrides = kept end
 	Logger.info(LOG, "User profile '%s' deleted.", profile_id)
 	return true
 end

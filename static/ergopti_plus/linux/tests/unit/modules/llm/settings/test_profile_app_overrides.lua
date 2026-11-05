@@ -150,6 +150,80 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 		end)
 	end)
 
+	for _, first_cache in ipairs({ "overrides", "registry", "overrides before reference" }) do
+		helpers.it("app-profile: refuses deletion across separate cache snapshots (" .. first_cache .. " first)", function()
+			local Sandbox = require("test.config_unused_keys_contract").sandbox
+			local Registry = require("llm.profile_registry_codec")
+			local external_profile = { id = "user_external", label = "External", system_single = "Keep external prompt",
+				system_multi = "", system_multi_template = "", batch = false }
+			local function document(registry, overrides)
+				return '[llm]\nuser_profiles = "' .. Registry.encode(registry)
+					.. '"\napp_profile_overrides = "' .. Overrides.encode(overrides)
+					.. '"\n\n[external]\nmarker = "keep external setting"\n'
+			end
+			local initial_overrides = { kate = "basic" }
+			if first_cache ~= "overrides before reference" then initial_overrides.firefox = USER.id end
+			local source = document({ USER }, initial_overrides)
+			local successor = document({ USER, external_profile }, { firefox = USER.id, kate = "advanced", terminal = "basic" })
+			Sandbox.with_config(source, function(path)
+				local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+				local saved = {}
+				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+				local ok, err = pcall(function()
+					package.loaded["infra.config_paths"] = { config = function() return path end }
+					local settings = require("modules.llm.profile_settings")
+					if first_cache ~= "registry" then
+						helpers.assert_eq(settings.app_overrides().kate, "basic")
+					else
+						helpers.assert_eq(#settings.list_user(), 1)
+					end
+					local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+					if first_cache ~= "registry" then
+						helpers.assert_eq(#settings.list_user(), 2)
+					else
+						helpers.assert_eq(settings.app_overrides().kate, "advanced")
+					end
+					helpers.assert_eq(settings.delete_user_profile(USER.id), false,
+						"registry and override candidates must come from the same source")
+					helpers.assert_eq(Sandbox.read_bytes(path), successor, "refusal preserves every external byte")
+					helpers.assert_true(settings.delete_user_profile(USER.id), "a retry reads one current source")
+					local actual = assert(require("toml_codec").decode(Sandbox.read_bytes(path)))
+					helpers.assert_eq(Overrides.decode(actual.llm.app_profile_overrides), { kate = "advanced", terminal = "basic" })
+					helpers.assert_eq(Registry.decode(actual.llm.user_profiles), { external_profile })
+					helpers.assert_eq(actual.external.marker, "keep external setting")
+					helpers.assert_true(settings.delete_user_profile(external_profile.id),
+						"a successful deletion must not leave an override cache without its source")
+				end)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+
+	helpers.it("app-profile: deleting a profile preserves unreadable overrides", function()
+		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local Registry = require("llm.profile_registry_codec")
+		local damaged = "v1:***not-base64***"
+		local source = '[llm]\nuser_profiles = "' .. Registry.encode({ USER })
+			.. '"\napp_profile_overrides = "' .. damaged .. '"\n\n[external]\nmarker = "keep external setting"\n'
+		Sandbox.with_config(source, function(path)
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local ok, err = pcall(function()
+				package.loaded["infra.config_paths"] = { config = function() return path end }
+				local settings = require("modules.llm.profile_settings")
+				helpers.assert_true(settings.delete_user_profile(USER.id))
+				local actual = assert(require("toml_codec").decode(Sandbox.read_bytes(path)))
+				helpers.assert_eq(actual.llm.app_profile_overrides, damaged)
+				helpers.assert_eq(Registry.decode(actual.llm.user_profiles or ""), {})
+				helpers.assert_eq(actual.external.marker, "keep external setting")
+			end)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("app-profile: deleting a profile drops its overrides in the same write", function()
 		local settings, storage = load_settings()
 		helpers.assert_true(settings.save_user_profile(USER, false, false))
