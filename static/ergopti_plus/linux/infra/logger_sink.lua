@@ -479,10 +479,12 @@ local function sink(line, variant)
 	-- The message is the untrusted/free-text part, including multiline errors.
 	local prefix, body = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[[A-Z]+%] %[[^%]]*%] )(.*)$")
 	line = prefix and (prefix .. _redact(body)) or _redact(line)
-	-- stdout first: it is the output that cannot fail, and under systemd it is
-	-- what journald records.
-	io.stdout:write(line, "\n")
-	io.stdout:flush()
+	-- A closed or otherwise failing stdout must not starve the durable files.
+	-- Under systemd this remains the mirror consumed by journald.
+	pcall(function()
+		io.stdout:write(line, "\n")
+		io.stdout:flush()
+	end)
 
 	if _stdout_only then return end
 

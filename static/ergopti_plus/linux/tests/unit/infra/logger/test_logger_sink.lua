@@ -237,6 +237,14 @@ local function with_write_receipts(channel, refusal, body)
 end
 
 helpers.describe("linux-logger-write-receipts", function()
+	helpers.it("linux-logger-write-receipts: closed stdout cannot starve durable channels", function()
+		with_write_receipts("none", {}, function(_, state)
+			io.stdout = { write = function() error("attempt to use a closed file") end }
+			state.emit("stdout closed", "warn")
+			helpers.assert_eq(state.files.main.writes, 1)
+			helpers.assert_eq(state.files.errors.writes, 1)
+		end)
+	end)
 	for _, channel in ipairs({ "main", "errors" }) do
 		for _, refusal in ipairs({
 			{ name = "nil write", stage = "write" }, { name = "nil flush", stage = "flush" },
