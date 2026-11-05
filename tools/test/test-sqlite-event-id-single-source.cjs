@@ -26,6 +26,28 @@ assert.match(policy, /M\.MAX_EXACT_LUA_CURSOR\s*=\s*2\s*\^\s*53\s*-\s*1/);
 assert.equal((policy.match(/M\.MAX_EXACT_LUA_CURSOR\s*=/g) || []).length, 1);
 
 let scanned = 0;
+function assertNoCursorCopy(code, driver) {
+	// Native device/inode identity needs its own exact-number admission. Those
+	// comparisons do not allocate event cursors or declare a cursor ceiling.
+	const cursorCode = code.replace(/\bstat\s*\.\s*(?:dev|ino)\s*>\s*=\s*2\s*\^\s*5\s*3\b/g, '');
+	assert.doesNotMatch(
+		cursorCode,
+		/(?:2\s*\^\s*5\s*3|9\s*0\s*0\s*7\s*1\s*9\s*9\s*2\s*5\s*4\s*7\s*4\s*0\s*9\s*9\s*1)/,
+		`${driver} must consume the shared exact cursor bound instead of copying it`
+	);
+}
+assertNoCursorCopy('stat . dev > = 2 ^ 5 3 or stat . ino > = 2 ^ 5 3', 'metadata fixture');
+for (const code of [
+	'local cursor = 2 ^ 5 3 - 1',
+	'local cursor = 9 0 0 7 1 9 9 2 5 4 7 4 0 9 9 1',
+	'stat . dev > = 2 ^ 5 3 or cursor > = 2 ^ 5 3',
+	'local cursor = stat . dev > = 9 0 0 7 1 9 9 2 5 4 7 4 0 9 9 1'
+]) {
+	assert.throws(
+		() => assertNoCursorCopy(code, 'cursor counterexample'),
+		/shared exact cursor bound/
+	);
+}
 for (const driver of ['linux', 'macos']) {
 	const source = fs.readFileSync(
 		path.join(root, driver, 'modules/keystats/sqlite_writer.lua'),
@@ -36,11 +58,7 @@ for (const driver of ['linux', 'macos']) {
 		.map((token) => token.value)
 		.join(' ');
 	scanned += 1;
-	assert.doesNotMatch(
-		code,
-		/(?:2\s*\^\s*5\s*3|9\s*0\s*0\s*7\s*1\s*9\s*9\s*2\s*5\s*4\s*7\s*4\s*0\s*9\s*9\s*1)/,
-		`${driver} must consume the shared exact cursor bound instead of copying it`
-	);
+	assertNoCursorCopy(code, driver);
 	assert.doesNotMatch(code, /MAX_EXACT_LUA_CURSOR\s*=/);
 	if (driver === 'linux') {
 		const withoutComments = stripComments(source, '.lua');
