@@ -8,6 +8,17 @@
 
 #Requires AutoHotkey v2.0
 class _TNLC_Ops extends _TakeNoteFakeOps {
+ static InlineSchedule := false
+ static InlineCalls := 0
+ static Schedule(Callback, DelayMs) {
+  if _TNLC_Ops.InlineSchedule {
+   _TNLC_Ops.InlineSchedule := false
+   _TNLC_Ops.InlineCalls += 1
+   Callback.Call()
+   return true
+  }
+  return _TakeNoteFakeOps.Schedule(Callback, DelayMs)
+ }
  static PauseAtFile := false
  static PauseAtClock := false
  static PauseCompleted := false
@@ -58,7 +69,7 @@ _TNLC_Main() {
  global _LCPC_World, _ConfigDir, _UserProgramPaused, _TakeNotePending, _TakeNoteNextId
  _LCPC_Require(A_Args.Length == 3, "A private mode, directory and shared source are required")
  Mode := A_Args[1]
- _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch" || Mode == "in-flight" || Mode == "acquire-in-flight", "Unknown mode")
+ _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch" || Mode == "in-flight" || Mode == "acquire-in-flight" || Mode == "same-epoch-inline", "Unknown mode")
  _LCPC_World := {Ports: Map()}
  _ConfigDir := A_Args[2]
  TimingsLoadShared(A_Args[3])
@@ -70,7 +81,21 @@ _TNLC_Main() {
  try {
   if Mode == "acquire-in-flight"
    _TNLC_Ops.PauseAtClock := true
+  if Mode == "same-epoch-inline" {
+   _TNLC_Ops.InlineSchedule := true
+   _TakeNoteFakeOps.file_exists := true, _TakeNoteFakeOps.window_exists := true
+  }
   JobId := TakeNoteRequest(false, A_Args[2], true, _TNLC_Ops)
+  if Mode == "same-epoch-inline" {
+   FileAppend("OBSERVATION takenote-inline id=" . JobId . " calls=" . _TNLC_Ops.InlineCalls
+    . " pending=" . _TakeNotePending.Count . " maximize=" . _TakeNoteFakeOps.maximize_count
+    . " errors=" . _TakeNoteFakeOps.errors.Length . "`n", "*")
+   _LCPC_Require(_TNLC_Ops.InlineCalls == 1 && JobId > 0 && _TakeNotePending.Count == 0
+    && _TakeNoteFakeOps.maximize_count == 1 && _TakeNoteFakeOps.launch_count == 0
+    && _TakeNoteFakeOps.send_count == 0 && _TakeNoteFakeOps.errors.Length == 0,
+    "A callback that completes in its original epoch must preserve the public request ID")
+   return
+  }
   if Mode == "acquire-in-flight" {
    FileAppend("OBSERVATION takenote-acquire-in-flight id=" . JobId . " pause=" . _TNLC_Ops.PauseCompleted
     . " pending=" . _TakeNotePending.Count . " timers=" . _TakeNoteFakeOps.timers.Length
