@@ -415,3 +415,102 @@ for _TPO_BootMode in ["unchanged-control", "external-before-queue", "external-af
 
 Test("Proxy automatic credential seal: a native BOM source retains usable boot authority (proxy-boot-seal-source)",
 	_TPO_BootSealSource.Bind("unchanged-bom-control"))
+
+; The real full-save collector must not undo a successfully stored proxy choice.
+_TPO_FullSavePersistence(Mode) {
+	global ConfigurationFile, Features, _IniCache, _BootConfigSnapshot, _LLM_Menu_Loaded
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	global _ProxyOverrideInitialized, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
+	global _ProxyOverrideDeclaration, _ProxyOverrideBootSealSource, PROXY_OVERRIDE_ENVIRONMENT
+	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
+	Saved := [Features, _IniCache, _ProxyOverrideInitialized, _ProxyOverrideStored,
+		_ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideDeclaration,
+		_ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries]
+	HadSnapshot := IsSet(_BootConfigSnapshot), SavedSnapshot := HadSnapshot ? _BootConfigSnapshot : 0
+	HadLoaded := IsSet(_LLM_Menu_Loaded), SavedLoaded := HadLoaded ? _LLM_Menu_Loaded : false
+	HadReceipt := IsSet(_ProxyOverrideBootSealSource), SavedReceipt := HadReceipt ? _ProxyOverrideBootSealSource : 0
+	EnvValue := EnvGet(PROXY_OVERRIDE_ENVIRONMENT)
+	DllCall("Kernel32\SetLastError", "UInt", 0)
+	EnvLength := DllCall("Kernel32\GetEnvironmentVariableW", "Str", PROXY_OVERRIDE_ENVIRONMENT,
+		"Ptr", 0, "UInt", 0, "UInt")
+	HadEnvironment := EnvLength != 0 || A_LastError != 203
+	Root := A_Temp . "\ergopti_proxy_full_save_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Owned := false
+	PreviousCritical := Critical("Off")
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "The private configuration role cannot discard an accepted save")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Owned := Creation is Integer && Creation == 1
+		AssertTrue(Owned)
+		Path := Root . "\config.toml"
+		Features := ManifestBuildFeaturesMap(), _LLM_Menu_Loaded := false
+		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
+		_CFGFS_Prepare(Path)
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, _CFGFS_Timer), "The actual default collector must establish a valid complete native source before the proxy scenario")
+		Declaration := ProxyOverride_Declaration()
+		RelayA := "http://fixture-user:fixture-a@proxy-a.invalid:8080"
+		RelayB := "http://fixture-user:fixture-b@proxy-b.invalid:8080"
+		StoredA := Mode == "auto-seal" ? RelayA : ProxyOverride_Seal(RelayA)
+		AssertTrue(StoredA is String)
+		AssertTrue(TOML_ConfigBatchWrite(Path, [{Section: Declaration["section"], Key: Declaration["key"], Value: StoredA}]))
+		_IniCache := ParseConfigTomlFile(Path)
+		Features := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Features, Path, &_BootConfigSnapshot) >= 0)
+		_ProxyOverrideInitialized := false
+		AssertTrue(ProxyOverride_Init(_IniCache))
+		AssertEqual(RelayA, _ProxyOverrideStored)
+		_TestPrint("# proxy-full-save mode=" . Mode . " seeded=1")
+		if Mode == "auto-seal" {
+			Scheduled := []
+			ProxyOverride_ScheduleSealAtStart((Callback) => Scheduled.Push(Callback))
+			AssertEqual(1, Scheduled.Length)
+			AssertTrue(Scheduled[1].Call(), "The actual automatic boot sealer must acknowledge A before full-save retention is assessed")
+		} else if Mode == "manual-store"
+			AssertTrue(_ProxyOverride_Store(RelayB), "The actual manual setter must acknowledge B before full-save retention is assessed")
+		Expected := Mode == "manual-store" ? RelayB : RelayA
+		Before := FSConfigReadUtf8Exact(Path)
+		LeafBefore := _TOML_DocumentLookup(TOML_ParseDocument(Before),
+			_TOML_ConfigPath(Declaration["section"], Declaration["key"]))
+		AssertTrue(LeafBefore["found"] && ProxyOverride_IsSealed(LeafBefore["value"]))
+		AssertEqual(Expected, ProxyOverride_Unseal(LeafBefore["value"]))
+		AssertEqual(Expected, _ProxyOverrideStored)
+		AssertTrue(_ProxyOverrideSealed)
+		Result := SaveFullConfig(0, _CFGFS_Timer)
+		After := FSConfigReadUtf8Exact(Path)
+		LeafAfter := _TOML_DocumentLookup(TOML_ParseDocument(After),
+			_TOML_ConfigPath(Declaration["section"], Declaration["key"]))
+		AssertTrue(LeafAfter["found"])
+		Preserved := ProxyOverride_IsSealed(LeafAfter["value"])
+			&& StrCompare(Expected, ProxyOverride_Unseal(LeafAfter["value"]), true) == 0
+		_TestPrint("# proxy-full-save mode=" . Mode . " result=" . Result
+			. " durable_preserved=" . Preserved . " sealed_after=" . ProxyOverride_IsSealed(LeafAfter["value"]))
+		AssertTrue(Preserved, "A full save cannot restore an older relay or unseal credentials acknowledged by the actual proxy owner")
+		if Mode == "current-control"
+			AssertEqual(CONFIG_SAVE_OK, Result, "A matching admitted boot image retains the genuine successful full-save route")
+		else if Result != CONFIG_SAVE_OK {
+			AssertEqual(CONFIG_SAVE_FAILED, Result, "Only an explicit refusal may preserve a mismatching source")
+			AssertEqual(Before, After, "A refused full save preserves every acknowledged durable byte")
+		}
+		AssertEqual(Expected, _ProxyOverrideStored, "Full-save collection does not silently replace the active route")
+		AssertTrue(_ProxyOverrideSealed)
+	} finally {
+		Features := Saved[1], _IniCache := Saved[2]
+		_ProxyOverrideInitialized := Saved[3], _ProxyOverrideStored := Saved[4]
+		_ProxyOverridePublished := Saved[5], _ProxyOverrideSealed := Saved[6], _ProxyOverrideDeclaration := Saved[7]
+		_ProxyOverrideBootSealSource := HadReceipt ? SavedReceipt : unset
+		_ConfigBootRejectedOverrides := Saved[8], _ConfigBootOutdatedEntries := Saved[9]
+		_BootConfigSnapshot := HadSnapshot ? SavedSnapshot : unset
+		_LLM_Menu_Loaded := HadLoaded ? SavedLoaded : unset
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CFGFS_RestoreRuntime(Runtime)
+		try {
+			AssertTrue(DllCall("Kernel32\SetEnvironmentVariableW", "Str", PROXY_OVERRIDE_ENVIRONMENT,
+				"Ptr", HadEnvironment ? StrPtr(EnvValue) : 0, "Int") != 0)
+			if Owned
+				DirDelete(Root, true)
+		} finally Critical(PreviousCritical)
+	}
+}
+for _TPO_FullSaveMode in ["current-control", "auto-seal", "manual-store"]
+	Test("Proxy full-save retention: " . _TPO_FullSaveMode . " preserves its acknowledged choice (proxy-full-save-persistence)",
+		_TPO_FullSavePersistence.Bind(_TPO_FullSaveMode))
