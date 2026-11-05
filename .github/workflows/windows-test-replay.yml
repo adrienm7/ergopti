@@ -269,6 +269,58 @@ jobs:
           if ($proxyExit -ne 0) { exit $proxyExit }
           if ($proxyOutput -notcontains '# 11 passed, 0 failed, 0 not executed') { throw 'The native HTTP override selection did not execute all eleven cases.' }
 
+      - name: Select native proxy relay owner E2E
+        id: relay_owner_selection
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-audit-20261104.json' }}
+        run: |
+          $selection = Get-Content -LiteralPath $env:ERGOPTI_REPLAY_SELECTION -Raw | ConvertFrom-Json
+          $option = $selection.PSObject.Properties['native_proxy_relay_owner_e2e']
+          if ($null -ne $option -and $option.Value -isnot [bool]) { throw 'The native proxy relay owner E2E selector must be Boolean.' }
+          $selected = $null -ne $option -and $option.Value
+          "selected=$($selected.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if ($selected) {
+              $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json | ConvertFrom-Json
+              if ($contract.go_version -notmatch '^go\d+\.\d+\.\d+$') { throw 'The managed Go version is invalid.' }
+              "go_version=$($contract.go_version.Substring(2))" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Install the pinned managed Go compiler
+        if: ${{ steps.relay_owner_selection.outputs.selected == 'true' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.relay_owner_selection.outputs.go_version }}
+          cache: false
+
+      - name: Validate the native proxy relay runtime owner
+        if: ${{ !cancelled() && steps.relay_owner_selection.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $log = Join-Path $evidence 'proxy-relay-owner.log'
+          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'native-proxy-relay-runtime-owner'; status = 'not-selected'; native_exit_code = $null; output_sha256 = $null; full_suite_qualified = $false }
+          try {
+              if ('${{ steps.relay_owner_selection.outputs.selected }}' -ne 'true') { return }
+              $receipt.status = 'failed'
+              & ./tools/build/build_windows_proxy_relay.ps1 -Publish
+              if (-not $?) { throw 'The pinned proxy relay build failed.' }
+              $env:ERGOPTI_AHK_EXE = $env:ERGOPTI_REPLAY_AHK
+              $output = & node tools/test/test-windows-proxy-relay-e2e.cjs --required '--only=regression c378cbe402: the real owner admits the real launcher receipt' 2>&1
+              $receipt.native_exit_code = $LASTEXITCODE
+              $output | ForEach-Object { Write-Host $_ }
+              $output | Set-Content -LiteralPath $log -Encoding utf8
+              $receipt.output_sha256 = (Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash.ToLowerInvariant()
+              $lines = @($output | ForEach-Object { "$_" })
+              if ($receipt.native_exit_code -ne 0 -or @($lines | Where-Object { $_ -ceq '1..1' }).Count -ne 1 -or @($lines | Where-Object { $_ -ceq '# 1 passed, 0 failed.' }).Count -ne 1 -or @($lines | Where-Object { $_ -ceq 'ok 1 - regression c378cbe402: the real owner admits the real launcher receipt' }).Count -ne 1 -or @($lines | Where-Object { $_ -match '^(not ok|ok) ' }).Count -ne 1) { throw 'The exact native proxy relay owner case did not pass.' }
+              $receipt.status = 'passed'
+          } finally {
+              $receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'proxy-relay-owner.receipt.json') -Encoding utf8
+          }
+
       - name: Replay every case alone and the selection in reverse
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
         shell: pwsh
