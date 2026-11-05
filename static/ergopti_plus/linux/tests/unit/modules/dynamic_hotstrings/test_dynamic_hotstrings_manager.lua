@@ -388,8 +388,11 @@ assert(next(manager.get_info()) == nil)
       local single_preview = dh.preview("@é\\", true)
       local single_fired, single_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@é\\", "\\")
       local fields = dh.resolve_combo("né")
+      local uppercase_fields = dh.resolve_combo("NÉ")
+      local uppercase_rows = dh.preview_candidates("@NÉ")
       local rows = dh.preview_candidates("@né")
       local combo_fired, combo_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@né\\", "\\")
+      local uppercase_fired, uppercase_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
 
       package.loaded["modules.hotstrings.injector"] = previous_injector
       os.remove(path)
@@ -402,6 +405,10 @@ assert(next(manager.get_info()) == nil)
         "single NFC alias erases @ + one codepoint + trigger")
       helpers.assert_eq(single_event.backspace_count, 3, "the single event publishes codepoint backspaces")
 
+      helpers.assert_eq(#uppercase_fields, 2, "uppercase accented aliases resolve like lowercase aliases")
+      helpers.assert_eq(#uppercase_rows, 1, "uppercase accented combo is offered before typing the trigger")
+      helpers.assert_true(uppercase_fired == true, "uppercase accented combo fires")
+      helpers.assert_eq(uppercase_event.backspace_count, 4)
       helpers.assert_eq(#fields, 2, "the mixed ASCII/NFC combo resolves both aliases")
       helpers.assert_eq(fields[1], "last_name", "the mixed combo preserves its first field")
       helpers.assert_eq(fields[2], "first_name", "the mixed combo preserves its NFC field")
@@ -418,6 +425,137 @@ assert(next(manager.get_info()) == nil)
         "mixed combo erases @ + two codepoints + trigger, not UTF-8 bytes")
       helpers.assert_eq(combo_event.backspace_count, 4, "the combo event publishes codepoint backspaces")
       helpers.assert_eq(combo_event.trigger, "@né\\", "the combo event preserves the exact NFC trigger")
+    end)
+
+    helpers.it("resolves configured uppercase accented aliases in combinations", function()
+      local path = os.tmpname()
+      local fh = assert(io.open(path, "w"))
+      fh:write('[info]\nfirst_name = "Élodie"\nlast_name = "Durand"\n[letters]\nn = "last_name"\n"É" = "first_name"\n')
+      fh:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function() return { ok = true } end }
+      local values = dh.resolve_combo_values("né")
+      local rows = dh.preview_candidates("@NÉ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous
+      os.remove(path)
+      helpers.assert_eq(values, { "Durand", "Élodie" })
+      helpers.assert_eq(#rows, 1)
+      helpers.assert_true(fired)
+    end)
+
+    helpers.it("refuses conflicting aliases and multi-codepoint case expansions", function()
+      local path = os.tmpname()
+      local text = '[info]\nfirst_name = "Élodie"\nlast_name = "Durand"\n'
+        .. '[letters]\nn = "last_name"\n"é" = "first_name"\n"É" = "last_name"\n'
+        .. 'i = "last_name"\n"i̇" = "first_name"\n'
+      local function write(value)
+        local file = assert(io.open(path, "w")); file:write(value); file:close()
+        dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      end
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected, single = {}, nil
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end, inject = function(_, value) single = value; return { ok = true } end }
+      write(text)
+      local single_preview = dh.preview("@É\\", true)
+      local single_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@É\\", "\\")
+      local rejected_rows = dh.preview_candidates("@nİ")
+      local rejected = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nİ\\", "\\")
+      write(text .. '"İ" = "first_name"\n')
+      local collision_rows = dh.preview_candidates("@NÉ")
+      local collision_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@NÉ\\", "\\")
+      local exact_rows = dh.preview_candidates("@nİ")
+      local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nİ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(single_preview, "Durand"); helpers.assert_true(single_fired); helpers.assert_eq(single, "Durand")
+      helpers.assert_eq(#rejected_rows, 0); helpers.assert_eq(rejected, false)
+      helpers.assert_eq(#collision_rows, 0); helpers.assert_eq(collision_fired, false)
+      helpers.assert_eq(#exact_rows, 1); helpers.assert_true(exact_fired)
+      helpers.assert_eq(injected[1], { "Durand", "Élodie" }, "exact İ remains distinct from the invalid decomposed key")
+    end)
+
+    helpers.it("independent: final sigma simple stays exact while a combo resolves uppercase", function()
+      local path = os.tmpname()
+      local file = assert(io.open(path, "w"))
+      file:write('[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n[letters]\nn = "last_name"\n"ς" = "first_name"\n'); file:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local single, values
+      package.loaded["modules.hotstrings.injector"] = {
+        inject = function(_, value) single = value; return { ok = true } end,
+        inject_fields = function(_, result) values = result; return { ok = true } end,
+      }
+      local missing = dh.preview("@Σ\\", true)
+      local missing_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@Σ\\", "\\")
+      local exact = dh.preview("@ς\\", true)
+      local exact_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@ς\\", "\\")
+      local rows = dh.preview_candidates("@nΣ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_nil(missing); helpers.assert_eq(missing_fired, false)
+      helpers.assert_eq(exact, "Anna"); helpers.assert_true(exact_fired); helpers.assert_eq(single, "Anna")
+      helpers.assert_eq(rows[1].parts, { "Demos", "Anna" }); helpers.assert_true(fired)
+      helpers.assert_eq(values, { "Demos", "Anna" })
+    end)
+
+    helpers.it("resolves uppercase Greek final-sigma aliases and refuses conflicts", function()
+      local path = os.tmpname()
+      local text = '[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n'
+        .. '[letters]\nn = "last_name"\n"ς" = "first_name"\n'
+      local function write(value)
+        local file = assert(io.open(path, "w")); file:write(value); file:close()
+        dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      end
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected = {}
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end }
+      write(text)
+      local rows = dh.preview_candidates("@nΣ")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      write(text .. '"σ" = "last_name"\n')
+      local preferred = dh.preview_candidates("@nΣ")
+      local preferred_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nΣ\\", "\\")
+      write('[info]\nfirst_name = "Anna"\nlast_name = "Demos"\n[letters]\nn = "last_name"\n'
+        .. '"ᲄ" = "first_name"\n"ᲅ" = "last_name"\n')
+      local ambiguous = dh.preview_candidates("@nТ")
+      local ambiguous_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nТ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(#rows, 1); helpers.assert_true(fired); helpers.assert_eq(injected[1], { "Demos", "Anna" })
+      helpers.assert_eq(#preferred, 0); helpers.assert_eq(preferred_fired, false)
+      helpers.assert_eq(#ambiguous, 0); helpers.assert_eq(ambiguous_fired, false)
+      helpers.assert_eq(#injected, 1, "ambiguous aliases cannot shift fields")
+    end)
+
+    helpers.it("resolves Kelvin and Angstrom aliases without normalizing their configuration", function()
+      local path = os.tmpname()
+      local file = assert(io.open(path, "w"))
+      file:write('[info]\nfirst_name = "Kelvin"\nlast_name = "Durand"\n[letters]\nn = "last_name"\n"K" = "first_name"\n"Å" = "first_name"\n'); file:close()
+      dh.init({ trigger_char = "\\", personal_info_path = path }); dh.set_enabled(true)
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected = {}
+      package.loaded["modules.hotstrings.injector"] = { inject_fields = function(_, values)
+        injected[#injected + 1] = values; return { ok = true }
+      end }
+      local rows = dh.preview_candidates("@nk")
+      local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nk\\", "\\")
+      local upper_rows = dh.preview_candidates("@nK")
+      local upper_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nK\\", "\\")
+      local angstrom_rows = dh.preview_candidates("@nå")
+      local angstrom_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nå\\", "\\")
+      local angstrom_upper = dh.preview_candidates("@nÅ")
+      local angstrom_upper_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@nÅ\\", "\\")
+      package.loaded["modules.hotstrings.injector"] = previous; os.remove(path)
+      helpers.assert_eq(#rows, 1); helpers.assert_true(fired)
+      helpers.assert_eq(#upper_rows, 1); helpers.assert_true(upper_fired)
+      helpers.assert_eq(#angstrom_rows, 1); helpers.assert_true(angstrom_fired)
+      helpers.assert_eq(#angstrom_upper, 1); helpers.assert_true(angstrom_upper_fired)
+      helpers.assert_eq(injected[1], { "Durand", "Kelvin" }); helpers.assert_eq(injected[2], injected[1])
+      helpers.assert_eq(injected[3], injected[1]); helpers.assert_eq(injected[4], injected[1])
     end)
 
   end)
