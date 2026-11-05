@@ -655,6 +655,8 @@ M.configure_program_admission = Actions.configure_program_admission
 M.program_admission_available = Actions.program_admission_available
 M.split_action_parameter_key = Actions.split_action_parameter_key
 M.replace_action_parameters = Actions.replace_action_parameters
+M.begin_click_binding_change = Actions.begin_click_binding_change
+M.finish_click_binding_change = Actions.finish_click_binding_change
 M.forceCleanup       = Actions.force_cleanup
 M.toggleRightClick   = Actions.toggle_right_click
 M.triggerLookup      = Actions.trigger_lookup
@@ -675,7 +677,7 @@ function M.get_action(slot)         return CoreState.ga[slot]                   
 --- @param slot string Gesture slot identifier.
 --- @param action string Action identifier.
 --- @return boolean committed
-function M.set_action(slot, action)
+function M.set_action(slot, action, defer_click_cleanup)
 	if type(slot) ~= "string" or type(action) ~= "string" then
 		Logger.error(LOG, "set_action(): slot and action must be strings.")
 		return false
@@ -688,7 +690,16 @@ function M.set_action(slot, action)
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action, slot)
 		return false
 	end
+	local previous = CoreState.ga[slot]
+	local change
+	if previous ~= action and not defer_click_cleanup then
+		change = Actions.begin_click_binding_change(slot, previous)
+		if not change then return false end
+	end
 	CoreState.ga[slot] = action
+	if change and Actions.finish_click_binding_change(change, true) ~= true then
+		Logger.error(LOG, "Gesture click cleanup remains pending for '%s'.", slot)
+	end
 	Logger.debug(LOG, "Gesture action '%s' → '%s'.", slot, action)
 	return true
 end
