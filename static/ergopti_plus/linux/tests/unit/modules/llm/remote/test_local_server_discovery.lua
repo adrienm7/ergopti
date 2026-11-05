@@ -39,7 +39,10 @@ local function isolated(body)
 	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)
 		local call = { url = url, headers = headers, options = options, callback = callback, cancelled = 0, listeners = {} }
 		local operation = { started = true }
-		function operation:is_settled() return call.settled == true end
+		function operation:is_settled()
+			if call.on_observe then call.on_observe() end
+			return call.settled == true
+		end
 		function operation:on_settled(fn) if call.settled then fn() else call.listeners[#call.listeners+1] = fn end; return true end
 		function operation:cancel() call.cancelled = call.cancelled + 1; return call.settled == true end
 		call.operation = operation
@@ -76,6 +79,123 @@ local function find(rows,label)
 	end
 end
 helpers.describe("Linux local server discovery ownership", function()
+	helpers.it("a shutdown during deferred source reading prevents later target lookup", function()
+		isolated(function(servers, entries, calls)
+			local loop = require("adapters.event_loop")
+			local defer, source, target = loop.defer, entries.source_is_current, servers.target
+			local pending, armed, stopping, ack, after = {}, false, false, nil, 0
+			loop.defer = function(fn) pending[#pending + 1] = fn; return true end
+			entries.source_is_current = function(...)
+				if armed then armed = false; stopping = true; ack = servers.shutdown() end
+				return source(...)
+			end
+			servers.target = function(...)
+				if stopping then after = after + 1 end
+				return target(...)
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end))
+				helpers.assert_true(#pending > 0)
+				armed = true
+				pending[1]()
+				helpers.assert_eq(ack, false)
+				helpers.assert_eq(after, 0)
+				helpers.assert_eq(#calls, 0)
+			end)
+			loop.defer, entries.source_is_current, servers.target = defer, source, target
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("a replaced GET observation cannot forge retirement", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(#calls, 1)
+			local first, original = calls[1], calls[1].operation.is_settled
+			first.settled = true
+			first.operation.is_settled = function() return true end
+			helpers.assert_eq(servers.cancel(), false)
+			first.operation.is_settled = original
+			helpers.assert_eq(servers.cancel(), true)
+		end)
+	end)
+
+	helpers.it("a reentrant old GET settlement cannot erase its acquired successor", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(#calls, 1)
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(#calls, 1)
+			local first, nested = calls[1], false
+			first.settled = true
+			first.on_observe = function()
+				if not nested then nested = true; first.listeners[1]() end
+			end
+			first.listeners[1]()
+			helpers.assert_eq(#calls, 2, "the successor acquired its own GET")
+			helpers.assert_eq(servers.cancel(), false, "the successor GET still owns native resources")
+			calls[2].finish(models("successor"))
+			helpers.assert_eq(servers.cancel(), true)
+		end)
+	end)
+
+	helpers.it("shutdown cannot acknowledge an active GET settlement observer", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			helpers.assert_true(servers.rescan(function() return true end))
+			local first, armed, during = calls[1], true, nil
+			first.settled = true
+			first.on_observe = function()
+				if armed then armed = false; during = servers.shutdown() end
+			end
+			first.listeners[1]()
+			helpers.assert_eq(during, false)
+			helpers.assert_eq(servers.shutdown(), true)
+		end)
+	end)
+
+	helpers.it("review-http-admit: shutdown cannot ACK inside a settled HTTP callback", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			local armed, during = false, nil
+			assert(servers.rescan(function()
+				if armed then armed = false; during = servers.shutdown() end
+				return true
+			end))
+			assert(#calls == 1)
+			armed = true
+			calls[1].finish(models("qwen3"))
+			helpers.assert_eq(during, false, "the settled HTTP delivery frame is still executing")
+		end)
+	end)
+
+	helpers.it("review-deferred-admit: shutdown cannot ACK before the deferred acquisition frame ends", function()
+		isolated(function(servers, entries)
+			local loop = require("adapters.event_loop")
+			local original_defer, original_current = loop.defer, entries.source_is_current
+			local pending, armed, ack, after = {}, false, nil, 0
+			loop.defer = function(fn) pending[#pending + 1] = fn; return true end
+			entries.source_is_current = function(...)
+				if ack == true then after = after + 1 end
+				return original_current(...)
+			end
+			local ok, err = pcall(function()
+				assert(servers.rescan(function()
+					if armed then armed = false; ack = servers.shutdown() end
+					return true
+				end))
+				assert(#pending > 0)
+				armed = true
+				pending[1]()
+				helpers.assert_eq(after, 0, "no source read may run after shutdown ACK")
+				helpers.assert_eq(ack, false, "the admitted callback still owns a deferred acquisition frame")
+			end)
+			loop.defer, entries.source_is_current = original_defer, original_current
+			assert(ok, err)
+		end)
+	end)
 	-- The maintainer's oMLX listened on 8181 (its settings file) while the sweep
 	-- probed the catalogue port 8000 only (field report 2026-10-27)
 	helpers.it("probes a server at the port its scan found and skips a server that does not run (local-server-ports)", function()
@@ -310,6 +430,438 @@ helpers.describe("Linux local server discovery ownership", function()
 				{ is_paused = function() return false end })
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
+	helpers.it("does not cancel a successor born from a retired scan callback", function()
+		isolated(function(servers)
+			local ports, previous = require("modules.llm.local_server_ports"), nil
+			previous = ports.scan_owned
+			local operations = {}
+			ports.scan_owned = function()
+				local operation = { closed = false, cancellations = 0 }
+				function operation:cancel()
+					self.cancellations = self.cancellations + 1
+					if #operations == 1 then self.closed = true end
+					return self.closed
+				end
+				function operation:is_settled() return self.closed end
+				operations[#operations + 1] = operation
+				return operation
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function()
+					helpers.assert_true(servers.rescan(function() return true end))
+				end))
+				helpers.assert_eq(servers.cancel(), false)
+				helpers.assert_eq(#operations, 2)
+				helpers.assert_eq(operations[2].cancellations, 0)
+				operations[2].closed = true
+				helpers.assert_eq(servers.cancel(), true)
+			end)
+			ports.scan_owned = previous
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("refuses a legacy port scanner that cannot return native ownership", function()
+		isolated(function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			local previous, scans = ports.scan_owned, 0
+			local prior_scan = ports.scan
+			ports.scan_owned = nil
+			ports.scan = function() scans = scans + 1 end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				helpers.assert_eq(scans, 0)
+				helpers.assert_eq(#calls, 0)
+				helpers.assert_eq(servers.cancel(), true)
+			end)
+			ports.scan_owned, ports.scan = previous, prior_scan
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("retains a process acquired while its scan constructor is cancelled", function()
+		local scanner = require("modules.llm.local_server_ports")
+		local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+		local during, closed, cancelled = nil, false, 0
+		scanner._list_proc = function() return { "1" } end
+		scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+		local ok, failure = pcall(isolated, function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			ports.scan_owned = scanner.scan_owned
+			scanner._owned_process = function(_, _, options)
+				during = servers.cancel()
+				helpers.assert_eq(options.authorized(), false)
+				return { started = true, cancel = function() cancelled = cancelled + 1; return false end,
+					is_settled = function() return closed end }
+			end
+			helpers.assert_eq(servers.rescan(function() return true end), false)
+			helpers.assert_eq(during, false)
+			helpers.assert_true(cancelled > 0)
+			helpers.assert_eq(servers.cancel(), false)
+			closed = true
+			helpers.assert_eq(servers.cancel(), true)
+		end)
+		scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+		assert(ok, failure)
+	end)
+
+	helpers.it("a cancel during owned scan construction prevents subsequent native acquisition", function()
+		local scanner = require("modules.llm.local_server_ports")
+		local list, read_cmdline, timer, process = scanner._list_proc, scanner._read_cmdline,
+			scanner._owned_timer, scanner._owned_process
+		local starts, during = 0, nil
+		local pids = {}; for i = 1, 129 do pids[i] = tostring(i) end
+		scanner._read_cmdline = function() return nil end
+		scanner._owned_timer = function() starts = starts + 1; error("must not arm a timer") end
+		scanner._owned_process = function() starts = starts + 1; error("must not spawn a process") end
+		local ok, failure = pcall(isolated, function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			ports.scan_owned = scanner.scan_owned
+			scanner._list_proc = function() during = servers.cancel(); return pids end
+			servers.rescan(function() return true end)
+			helpers.assert_eq(during, false)
+			helpers.assert_eq(starts, 0)
+			helpers.assert_eq(servers.cancel(), true)
+		end)
+		scanner._list_proc, scanner._read_cmdline, scanner._owned_timer, scanner._owned_process = list, read_cmdline, timer, process
+		assert(ok, failure)
+	end)
+
+	helpers.it("a cancel during rescan admission cannot acknowledge or launch a scan", function()
+		isolated(function(servers)
+			local ports, during, starts = require("modules.llm.local_server_ports"), nil, 0
+			local previous = ports.scan_owned
+			ports.scan_owned = function() starts = starts + 1; error("must not launch") end
+			local ok, failure = pcall(function()
+				local result = servers.rescan(function()
+					during = servers.cancel()
+					return true
+				end)
+				helpers.assert_eq(during, false)
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(starts, 0)
+			end)
+			ports.scan_owned = previous
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("a cancel during source capture fences the constructing rescan", function()
+		isolated(function(servers, entries)
+			local ports, capture = require("modules.llm.local_server_ports"), entries.capture_source
+			local previous, during, starts = ports.scan_owned, nil, 0
+			ports.scan_owned = function() starts = starts + 1; error("must not launch") end
+			entries.capture_source = function()
+				during = servers.cancel()
+				return capture()
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				helpers.assert_eq(during, false)
+				helpers.assert_eq(starts, 0)
+			end)
+			ports.scan_owned, entries.capture_source = previous, capture
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("review-reentrant-cancel: new synchronously completed scan remains physical debt", function()
+		isolated(function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			local prior, calls, old_closed, new_closed = ports.scan_owned, 0, false, false
+			ports.scan_owned = function(entries, callback)
+				calls = calls + 1
+				if calls == 1 then
+					return { cancel = function() old_closed = true; return true end,
+						is_settled = function() return old_closed end }
+				end
+				local results = {}
+				for _, entry in ipairs(entries) do results[entry.id] = { id = entry.id, running = false, pids = {} } end
+				callback(results)
+				return { cancel = function() return false end, is_settled = function() return new_closed end }
+			end
+			local ok, err = pcall(function()
+				assert(servers.rescan(function() return true end, function()
+					assert(servers.rescan(function() return true end))
+				end))
+				helpers.assert_eq(servers.cancel(), false, "a reentrant successor still owns physical cleanup")
+				new_closed = true
+			end)
+			new_closed = true
+			ports.scan_owned = prior
+			assert(ok, err)
+		end)
+	end)
+
+
+	helpers.it("review-reentrant-cancel: shutdown cannot ACK while a cancelled waiter executes", function()
+		isolated(function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			local prior, closed, during = ports.scan_owned, false, nil
+			ports.scan_owned = function()
+				return { cancel = function() closed = true; return true end,
+					is_settled = function() return closed end }
+			end
+			local ok, err = pcall(function()
+				assert(servers.rescan(function() return true end, function() during = servers.shutdown() end))
+				servers.cancel()
+				helpers.assert_eq(during, false, "the waiter callback itself has not returned")
+			end)
+			ports.scan_owned = prior
+			assert(ok, err)
+		end)
+	end)
+
+
+	helpers.it("releases a waiter frame after its callback raises", function()
+		isolated(function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			local prior, closed, during = ports.scan_owned, false, nil
+			ports.scan_owned = function()
+				return { cancel = function() closed = true; return true end,
+					is_settled = function() return closed end }
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function()
+					during = servers.shutdown()
+					error("synthetic waiter failure")
+				end))
+				helpers.assert_eq(servers.cancel(), true)
+				helpers.assert_eq(during, false)
+				helpers.assert_eq(servers.shutdown(), true)
+			end)
+			ports.scan_owned = prior
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("a waiter failure diagnostic cannot acknowledge the active delivery", function()
+		isolated(function(servers)
+			local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+			local prior, previous_error, closed, during = ports.scan_owned, logger.error, false, nil
+			ports.scan_owned = function()
+				return { cancel = function() return false end, is_settled = function() return closed end }
+			end
+			logger.error = function() during = servers.shutdown() end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function()
+					error("synthetic waiter failure")
+				end))
+				helpers.assert_eq(servers.cancel(), false)
+				closed = true
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				helpers.assert_eq(during, false)
+				helpers.assert_eq(servers.shutdown(), true)
+			end)
+			ports.scan_owned, logger.error = prior, previous_error
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("a waiter retired by a new rescan cannot acknowledge its own active frame", function()
+		isolated(function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			local prior, closed, during = ports.scan_owned, false, nil
+			ports.scan_owned = function()
+				return { cancel = function() return false end, is_settled = function() return closed end }
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function()
+					during = servers.shutdown()
+				end))
+				helpers.assert_eq(servers.cancel(), false)
+				closed = true
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				helpers.assert_eq(during, false)
+				helpers.assert_eq(servers.shutdown(), true)
+			end)
+			ports.scan_owned = prior
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("keeps unknown native debt when an owned scanner constructor raises", function()
+		isolated(function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			local previous, pending = ports.scan_owned, nil
+			local all_down = {}
+			for _, id in ipairs(CATALOGUE.server_order) do all_down[id] = { running = false, pids = {} } end
+			ports.scan_owned = function(_, callback) pending = callback; error("unknown native owner") end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				helpers.assert_eq(servers.shutdown(), false)
+				pending(all_down)
+				helpers.assert_eq(servers.shutdown(), false, "a logical callback cannot settle unknown native ownership")
+				helpers.assert_eq(#calls, 0)
+			end)
+			ports.scan_owned = previous
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("joins a real port-scan process exit during server shutdown", function()
+		local scanner, uv = require("modules.llm.local_server_ports"), require("luv")
+		local list, read_cmdline, process = scanner._list_proc, scanner._read_cmdline, scanner._owned_process
+		scanner._list_proc = function() return { "1" } end
+		scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
+		scanner._owned_process = function(_, _, options, callback)
+			return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
+		end
+		local ok, failure = pcall(isolated, function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			ports.scan_owned = scanner.scan_owned
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(servers.shutdown(), false)
+			for _ = 1, 2000 do
+				uv.run("nowait")
+				if servers.shutdown() then return end
+				uv.sleep(1)
+			end
+			error("the actual process did not settle")
+		end)
+		scanner._list_proc, scanner._read_cmdline, scanner._owned_process = list, read_cmdline, process
+		assert(ok, failure)
+	end)
+
+	helpers.it("joins a real port-scan timer close during server shutdown", function()
+		local scanner, uv = require("modules.llm.local_server_ports"), require("luv")
+		local list, read_cmdline = scanner._list_proc, scanner._read_cmdline
+		local pids = {}
+		for i = 1, 129 do pids[i] = tostring(i) end
+		scanner._list_proc = function() return pids end
+		scanner._read_cmdline = function() return nil end
+		local ok, failure = pcall(isolated, function(servers)
+			local ports = require("modules.llm.local_server_ports")
+			ports.scan_owned = scanner.scan_owned
+			helpers.assert_true(servers.rescan(function() return true end))
+			helpers.assert_eq(servers.shutdown(), false)
+			for _ = 1, 100 do uv.run("nowait"); if servers.shutdown() then return end end
+			error("the actual timer close did not settle")
+		end)
+		scanner._list_proc, scanner._read_cmdline = list, read_cmdline
+		assert(ok, failure)
+	end)
+
+	helpers.it("joins the actual owned port scanner timer on shutdown", function()
+		local scanner = require("modules.llm.local_server_ports")
+		local list, read_cmdline, timer = scanner._list_proc, scanner._read_cmdline, scanner._owned_timer
+		local pids, closed, cancelled = {}, false, 0
+		for i = 1, 129 do pids[i] = tostring(i) end
+		scanner._list_proc = function() return pids end
+		scanner._read_cmdline = function() return nil end
+		scanner._owned_timer = function()
+			return { started = true, cancel = function() cancelled = cancelled + 1; return true end,
+				is_settled = function() return closed end }
+		end
+		local ok, failure = pcall(isolated, function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			ports.scan_owned = scanner.scan_owned
+			local completions = {}
+			helpers.assert_true(servers.rescan(function() return true end, function(changed)
+				completions[#completions + 1] = changed
+			end))
+			helpers.assert_eq(servers.shutdown(), false)
+			helpers.assert_true(cancelled > 0)
+			helpers.assert_eq(completions, {})
+			closed = true
+			helpers.assert_eq(servers.shutdown(), true)
+			helpers.assert_eq(completions, { false })
+			helpers.assert_eq(#calls, 0)
+		end)
+		scanner._list_proc, scanner._read_cmdline, scanner._owned_timer = list, read_cmdline, timer
+		assert(ok, failure)
+	end)
+
+	helpers.it("keeps the original native scan receipt methods after replacement", function()
+		isolated(function(servers)
+			local ports, closed = require("modules.llm.local_server_ports"), false
+			local prior = ports.scan_owned
+			local receipt = { cancel = function() return false end, is_settled = function() return closed end }
+			ports.scan_owned = function() return receipt end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end))
+				receipt.is_settled = function() return true end
+				helpers.assert_eq(servers.shutdown(), false)
+				closed = true
+				helpers.assert_eq(servers.shutdown(), true)
+			end)
+			ports.scan_owned = prior
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("retires a cancelled owned port scan without relying on its business callback", function()
+		isolated(function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			local prior, closed, cancelled, completions = ports.scan_owned, false, 0, {}
+			ports.scan_owned = function()
+				return { cancel = function() cancelled = cancelled + 1; return true end,
+					is_settled = function() return closed end }
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function(changed)
+					completions[#completions + 1] = changed
+				end))
+				helpers.assert_eq(servers.shutdown(), false)
+				helpers.assert_true(cancelled > 0)
+				helpers.assert_eq(completions, {})
+				closed = true
+				helpers.assert_eq(servers.shutdown(), true)
+				helpers.assert_eq(completions, { false })
+				helpers.assert_eq(#calls, 0)
+			end)
+			ports.scan_owned = prior
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("retains an uncertain port scan after its constructor raises", function()
+		isolated(function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			local previous, pending, completions = ports.scan, nil, {}
+			local all_down = {}
+			for _, id in ipairs(CATALOGUE.server_order) do all_down[id] = { running = false, pids = {} } end
+			ports.scan = function(_, callback) pending = callback; error("constructor failed") end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(servers.rescan(function() return true end, function(changed)
+					completions[#completions + 1] = changed
+				end), false)
+				helpers.assert_eq(servers.cancel(), false, "a throwing constructor may have started a scan")
+				helpers.assert_eq(servers.rescan(function() return true end), false)
+				pending(all_down)
+				helpers.assert_eq(completions, { false })
+				helpers.assert_eq(#calls, 0)
+				helpers.assert_eq(servers.cancel(), false, "callback alone cannot settle an unknown native receipt")
+			end)
+			ports.scan = previous
+			assert(ok, failure)
+		end)
+	end)
+
+	helpers.it("cancelling a pending port scan retains its callback and starts no probe", function()
+		isolated(function(servers, _, calls)
+			local ports = require("modules.llm.local_server_ports")
+			local previous, pending, completions = ports.scan, nil, {}
+			local all_down = {}
+			for _, id in ipairs(CATALOGUE.server_order) do all_down[id] = { running = false, pids = {} } end
+			ports.scan = function(_, callback) pending = callback end
+			local ok, failure = pcall(function()
+				helpers.assert_true(servers.rescan(function() return true end, function(changed)
+					completions[#completions + 1] = changed
+				end))
+				helpers.assert_eq(servers.cancel(), false, "a pending scan has not completed")
+				helpers.assert_eq(servers.rescan(function() return true end), false,
+					"a successor cannot borrow the cancelled scan")
+				pending(all_down)
+				helpers.assert_eq(servers.cancel(), true)
+				helpers.assert_eq(completions, { false })
+				helpers.assert_eq(#calls, 0)
+			end)
+			ports.scan = previous
+			assert(ok, failure)
 		end)
 	end)
 
