@@ -400,8 +400,8 @@ local function purge_old()
 			end
 			-- lstat again: the entry may have been replaced since the listing.
 			if stat and stat.kind == "file" and stat.modified and stat.modified < cutoff then
-				local removed, remove_error = os.remove(path)
-				if not removed then report_purge_refusal("delete", path, remove_error) end
+				local called, removed, remove_error = pcall(os.remove, path)
+				if not called or not removed then report_purge_refusal("delete", path, called and remove_error or removed) end
 			end
 		end
 	end
