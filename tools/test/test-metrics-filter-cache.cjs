@@ -1,10 +1,10 @@
 /**
  * tools/test/test-metrics-filter-cache.cjs
- * =======================================================================for (const host of ['windows', 'macos', 'linux']) {
+ * ==============================================================================
  * MODULE: Metrics Filter Projection Cache Regression Tests
  * DESCRIPTION:
  * Exercises the scripts loaded by the real dashboards, including native updates.
- * =======================================================================for (const host of ['windows', 'macos', 'linux']) {
+ * ==============================================================================
  */
 
 'use strict';
@@ -1192,7 +1192,10 @@ for (const host of ['windows', 'macos', 'linux']) {
 					!html.includes(`<title>${vector.future} — `),
 					'a UTC date change must not insert tomorrow'
 				);
-				if (vector.archived) assert.ok(html.includes(`<title>${vector.archived} — 2 car.</title>`));
+				if (vector.archived) {
+					const unit = page.context.escapeHtml(page.context._t('ui_apps.col_chars'));
+					assert.ok(html.includes(`<title>${vector.archived} — 2 ${unit}</title>`));
+				}
 				assert.equal(
 					page.diagnostics.some((entry) => entry.level === 'error'),
 					false
