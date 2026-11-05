@@ -60,6 +60,13 @@ rm -f "$DESTINATION/bin/ergopti"
 # copied prefix, where it will remain valid after the package is installed.
 IFS= read -r -d '' COPIED_PREFIX < <(CDPATH= cd -Pe -- "$DESTINATION" && printf '%s\0' "$PWD")
 while IFS= read -r -d '' link; do
+	if ! IFS= read -r -d '' literal_target < <(readlink -z -- "$link"); then
+		echo "[ERR] Private runtime link cannot be read: $link" >&2
+		exit 1
+	fi
+	case "$literal_target" in
+		/*) echo "[ERR] Private runtime contains a nonrelocatable absolute link: $link" >&2; exit 1 ;;
+	esac
 	if ! IFS= read -r -d '' target < <(readlink -ze -- "$link"); then
 		echo "[ERR] Private runtime contains an unresolved link: $link" >&2
 		exit 1
