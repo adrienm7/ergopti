@@ -301,6 +301,63 @@ fi
 SRC_SHARED="${DRIVERS_ROOT}/_shared"
 DEST_SHARED="${LIB_DIR}/_shared"
 
+# Tar replaces an incumbent symlink with a payload entry (and a linked root
+# can direct extraction outside the prefix). Preserve user links before any
+# dependency or payload change, without rejecting unrelated links in the tree.
+_install_payload_links_clear() {
+	local destination="$1" source="$2" copy_mode="${3:-tar}" item relative target links
+	if [ -L "$destination" ]; then
+		printf '[install] code=linked-payload path=%q\n' "$destination" >&2
+		return 1
+	fi
+	[ -d "$destination" ] || return 0
+	# Enumerate the source plan, never arbitrary user subdirectories. The source
+	# directory itself is checked above; every subsequent entry maps to its
+	# exact destination, including an ancestor that a later entry would use.
+	find "$source" -mindepth 1 -print0 | while IFS= read -r -d '' item; do
+		relative="${item#"$source"/}"
+		target="$destination/$relative"
+		if [ -L "$target" ]; then
+			printf '[install] code=linked-payload path=%q\n' "$target" >&2
+			exit 1
+		fi
+		# cp -r overwrites an existing regular file in place, changing all its
+		# hard links. Only source-file collisions on cp's two trees need this.
+		if [ "$copy_mode" = cp ] && [ -f "$item" ] && [ ! -L "$item" ] && [ -f "$target" ]; then
+			links="$(stat -c '%h' -- "$target")" || exit 1
+			[[ "$links" =~ ^[0-9]+$ ]] || exit 1
+			if [ "$links" -gt 1 ]; then
+				printf '[install] code=hardlinked-payload path=%q\n' "$target" >&2
+				exit 1
+			fi
+		fi
+	done
+}
+if ! $SETUP_PERMS_ONLY; then
+	_install_payload_links_clear "${LIB_DIR}/linux" "$SRC_DRIVER" || exit 1
+	_install_payload_links_clear "$DEST_SHARED" "$SRC_SHARED" cp || exit 1
+	# A checkout adds this registry from outside the driver source. Its parent
+	# directories and every supplied child are part of the same copy plan.
+	checkout_registry="${DRIVERS_ROOT}/../layouts/registry"
+	if [ ! -f "$SRC_DRIVER/static/layouts/registry/index.json" ] && [ -f "$checkout_registry/index.json" ]; then
+		for registry_parent in "${LIB_DIR}/linux/static" "${LIB_DIR}/linux/static/layouts"; do
+			if [ -L "$registry_parent" ]; then
+				printf '[install] code=linked-payload path=%q\n' "$registry_parent" >&2
+				exit 1
+			fi
+		done
+		_install_payload_links_clear "${LIB_DIR}/linux/static/layouts/registry" "$checkout_registry" cp || exit 1
+	fi
+	# These files and parents are always generated, even when absent from the
+	# source tree; conditional luv publication is admitted at its actual branch.
+	for owned_launcher in "${LIB_DIR}/linux/bin" "${LIB_DIR}/linux/bin/libergopti_archive_publication.so" \
+		"${LIB_DIR}/bin" "${LIB_DIR}/bin/ergopti-hotstrings"; do
+		if [ -L "$owned_launcher" ]; then
+			printf '[install] code=linked-payload path=%q\n' "$owned_launcher" >&2
+			exit 1
+		fi
+	done
+fi
 
 # ====================================
 # ====================================
@@ -1106,6 +1163,17 @@ fi
 	ergopti_msg install.native_backend_unavailable >&2
 	exit 1
 }
+
+# A freshly built luv is published only on this path. Preserve an incumbent
+# user link when the current run would otherwise replace it.
+if [ -n "$NATIVE_LUV_STAGE" ]; then
+	for luv_path in "${LIB_DIR}/linux/native_modules" "${LIB_DIR}/linux/native_modules/luv.so"; do
+		if [ -L "$luv_path" ]; then
+			printf '[install] code=linked-payload path=%q\n' "$luv_path" >&2
+			exit 1
+		fi
+	done
+fi
 
 # Create destination directories.
 install -d "${LIB_DIR}/linux"

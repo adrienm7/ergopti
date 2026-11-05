@@ -327,6 +327,273 @@ try {
 			assert.deepEqual(fs.readdirSync(receipt), ['personal']);
 		}
 	}
+	// A package extraction must not replace or traverse an existing user link.
+	{
+		const installer = path.join(ROOT, 'static/ergopti_plus/linux/install.sh');
+		const cases = [
+			'linux/infra',
+			'linux/adapters/keyboard_hook.lua',
+			'_shared',
+			'_shared/lua',
+			'linux/static/layouts/registry',
+			'linux/bin',
+			'linux/bin/libergopti_archive_publication.so',
+			'bin',
+			'bin/ergopti-hotstrings'
+		];
+		for (const [index, relative] of cases.entries()) {
+			const prefix = path.join(sandbox, `linked-payload-${index}`);
+			const library = path.join(prefix, 'lib/ergopti');
+			const link = path.join(library, relative);
+			const foreign = path.join(sandbox, `linked-target-${index}`);
+			fs.mkdirSync(path.dirname(link), { recursive: true });
+			fs.mkdirSync(foreign);
+			fs.writeFileSync(path.join(foreign, 'personal'), 'keep');
+			fs.symlinkSync(foreign, link);
+			const config = path.join(sandbox, `linked-config-${index}`);
+			const result = spawnSync(
+				bashExecutable(),
+				[bashPath(installer), '--prefix', bashPath(prefix), '--no-deps', '--no-service'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						...process.env,
+						HOME: bashPath(sandbox),
+						XDG_CONFIG_HOME: bashPath(config),
+						LC_ALL: 'C'
+					}
+				}
+			);
+			assert.notEqual(result.status, 0, `linked payload ${relative} must refuse`);
+			assert.match(result.stderr, /code=linked-payload/);
+			assert.ok(fs.lstatSync(link).isSymbolicLink(), `${relative}: preserve the link`);
+			assert.equal(fs.readFileSync(path.join(foreign, 'personal'), 'utf8'), 'keep');
+			assert.equal(fs.existsSync(config), false, 'refuse before creating configuration');
+			if (index === 0) {
+				fs.unlinkSync(link);
+				fs.symlinkSync(path.join(sandbox, 'missing-target'), link);
+				const dangling = spawnSync(
+					bashExecutable(),
+					[bashPath(installer), '--prefix', bashPath(prefix), '--no-deps', '--no-service'],
+					{
+						encoding: 'utf8',
+						timeout: 15000,
+						env: {
+							...process.env,
+							HOME: bashPath(sandbox),
+							XDG_CONFIG_HOME: bashPath(config),
+							LC_ALL: 'C'
+						}
+					}
+				);
+				assert.notEqual(dangling.status, 0);
+				assert.match(dangling.stderr, /code=linked-payload/);
+				assert.ok(fs.lstatSync(link).isSymbolicLink(), 'preserve dangling link');
+			}
+		}
+		// cp overwrites regular-file collisions in place: protect other hard
+		// links to each copied tree without changing the existing topology.
+		for (const [index, relative] of [
+			'_shared/data/locales/en.json',
+			'linux/static/layouts/registry/index.json'
+		].entries()) {
+			const prefix = path.join(sandbox, `hardlinked-payload-${index}`);
+			const target = path.join(prefix, 'lib/ergopti', relative);
+			const foreign = path.join(sandbox, `hardlinked-foreign-${index}`);
+			const config = path.join(sandbox, `hardlinked-config-${index}`);
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.writeFileSync(foreign, 'personal bytes\n');
+			fs.linkSync(foreign, target);
+			const before = fs.statSync(foreign);
+			const result = spawnSync(
+				bashExecutable(),
+				[bashPath(installer), '--prefix', bashPath(prefix), '--no-service', '--no-deps'],
+				{
+					encoding: 'utf8',
+					timeout: 15000,
+					env: {
+						...process.env,
+						HOME: bashPath(sandbox),
+						XDG_CONFIG_HOME: bashPath(config),
+						LC_ALL: 'C'
+					}
+				}
+			);
+			assert.notEqual(result.status, 0, relative);
+			assert.match(result.stderr, /code=hardlinked-payload/);
+			assert.equal(fs.readFileSync(foreign, 'utf8'), 'personal bytes\n');
+			assert.equal(fs.statSync(foreign).ino, before.ino);
+			assert.equal(fs.statSync(target).ino, before.ino);
+			assert.equal(fs.existsSync(config), false, 'refuse before configuration changes');
+		}
+		// An unrelated link is user data but is not a tar destination.
+		const text = fs.readFileSync(installer, 'utf8');
+		const helper = text.match(/_install_payload_links_clear\(\) \{[\s\S]*?\n\}/);
+		assert.ok(helper, 'actual payload collision owner');
+		const unrelated = path.join(sandbox, 'unrelated-payload');
+		fs.mkdirSync(unrelated);
+		fs.symlinkSync(path.join(sandbox, 'missing-target'), path.join(unrelated, 'personal-link'));
+		const check = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				`${helper[0]}\nDRIVERS_ROOT="$1"\n_install_payload_links_clear "$2" "$3" linux`,
+				'probe',
+				bashPath(path.join(ROOT, 'static/ergopti_plus')),
+				bashPath(unrelated),
+				bashPath(path.join(ROOT, 'static/ergopti_plus/linux'))
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000
+			}
+		);
+		assert.equal(check.status, 0, check.stderr);
+		assert.ok(fs.lstatSync(path.join(unrelated, 'personal-link')).isSymbolicLink());
+		const planSource = path.join(sandbox, 'cp-plan-source');
+		const planDest = path.join(sandbox, 'cp-plan-destination');
+		const planForeign = path.join(sandbox, 'cp-plan-foreign');
+		fs.mkdirSync(planSource);
+		fs.mkdirSync(planDest);
+		fs.writeFileSync(path.join(planSource, 'owned'), 'new');
+		fs.writeFileSync(path.join(planDest, 'owned'), 'old');
+		fs.writeFileSync(planForeign, 'personal');
+		fs.linkSync(planForeign, path.join(planDest, 'unrelated'));
+		const checkCp = () =>
+			spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					`${helper[0]}\n_install_payload_links_clear "$1" "$2" cp`,
+					'probe',
+					bashPath(planDest),
+					bashPath(planSource)
+				],
+				{ encoding: 'utf8', timeout: 10000 }
+			);
+		assert.equal(checkCp().status, 0, 'ordinary collision and unrelated hard link remain allowed');
+		fs.linkSync(path.join(planDest, 'owned'), path.join(sandbox, 'cp-plan-owned-alias'));
+		const conflict = checkCp();
+		assert.notEqual(conflict.status, 0);
+		assert.match(conflict.stderr, /code=hardlinked-payload/);
+		assert.equal(fs.readFileSync(planForeign, 'utf8'), 'personal');
+		// A private directory outside the source plan must not be traversed by
+		// the collision owner. The separate checkout scan remains unchanged.
+		const inaccessible = path.join(unrelated, 'private');
+		fs.mkdirSync(inaccessible, { mode: 0o000 });
+		try {
+			const privateCheck = spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					`${helper[0]}\n_install_payload_links_clear "$1" "$2"`,
+					'probe',
+					bashPath(unrelated),
+					bashPath(path.join(ROOT, 'static/ergopti_plus/linux'))
+				],
+				{ encoding: 'utf8', timeout: 10000 }
+			);
+			assert.equal(privateCheck.status, 0, privateCheck.stderr);
+		} finally {
+			fs.chmodSync(inaccessible, 0o700);
+		}
+		// The generated native helper is part of the plan even when no bin
+		// directory exists in the source tree.
+		const planStart = text.indexOf('_install_payload_links_clear() {');
+		const planEnd = text.indexOf('\n\n# ====================================', planStart);
+		assert.ok(planStart >= 0 && planEnd > planStart);
+		const emptySource = path.join(sandbox, 'empty-payload-source');
+		const planLibrary = path.join(sandbox, 'generated-plan-library');
+		const nativeParent = path.join(planLibrary, 'linux/bin');
+		const nativeTarget = path.join(sandbox, 'generated-plan-foreign');
+		fs.mkdirSync(emptySource);
+		fs.mkdirSync(path.dirname(nativeParent), { recursive: true });
+		fs.mkdirSync(nativeTarget);
+		fs.writeFileSync(
+			path.join(nativeTarget, 'libergopti_archive_publication.so'),
+			'personal library'
+		);
+		fs.symlinkSync(nativeTarget, nativeParent);
+		const planned = spawnSync(bashExecutable(), ['-c', text.slice(planStart, planEnd)], {
+			encoding: 'utf8',
+			timeout: 10000,
+			env: {
+				...process.env,
+				SETUP_PERMS_ONLY: 'false',
+				LIB_DIR: planLibrary,
+				SRC_DRIVER: emptySource,
+				DEST_SHARED: path.join(planLibrary, '_shared'),
+				SRC_SHARED: emptySource,
+				DRIVERS_ROOT: emptySource
+			}
+		});
+		assert.notEqual(planned.status, 0);
+		assert.match(planned.stderr, /code=linked-payload/);
+		assert.ok(fs.lstatSync(nativeParent).isSymbolicLink());
+		assert.equal(
+			fs.readFileSync(path.join(nativeTarget, 'libergopti_archive_publication.so'), 'utf8'),
+			'personal library'
+		);
+		// The luv publication guard checks both the parent and its leaf, and
+		// only when the current installation has built luv to publish.
+		const marker = text.indexOf('# A freshly built luv');
+		const start = text.indexOf('if [ -n "$NATIVE_LUV_STAGE" ]; then', marker);
+		const end = text.indexOf('\nfi', start);
+		assert.ok(marker >= 0 && start > marker && end > start);
+		const luvBlock = text.slice(start, end + 3);
+		for (const role of ['parent', 'leaf']) {
+			const lib = path.join(sandbox, `linked-luv-${role}`);
+			const modules = path.join(lib, 'linux/native_modules');
+			const foreign = path.join(sandbox, `foreign-luv-${role}`);
+			fs.mkdirSync(path.dirname(modules), { recursive: true });
+			fs.mkdirSync(foreign);
+			fs.writeFileSync(path.join(foreign, 'luv.so'), 'personal binary');
+			const link = role === 'parent' ? modules : path.join(modules, 'luv.so');
+			if (role === 'leaf') fs.mkdirSync(modules);
+			fs.symlinkSync(role === 'parent' ? foreign : path.join(foreign, 'luv.so'), link);
+			for (const [stage, expected] of [
+				['', 0],
+				['built-stage', 1]
+			]) {
+				const result = spawnSync(bashExecutable(), ['-c', luvBlock], {
+					encoding: 'utf8',
+					timeout: 10000,
+					env: { ...process.env, LIB_DIR: lib, NATIVE_LUV_STAGE: stage }
+				});
+				assert.equal(result.status, expected, result.stderr);
+				assert.ok(fs.lstatSync(link).isSymbolicLink());
+				assert.equal(fs.readFileSync(path.join(foreign, 'luv.so'), 'utf8'), 'personal binary');
+			}
+		}
+		// In the complete installer the pre-existing native parent guard also
+		// refuses a linked native_modules before any payload copy.
+		const prefix = path.join(sandbox, 'linked-native-parent');
+		const modules = path.join(prefix, 'lib/ergopti/linux/native_modules');
+		const foreign = path.join(sandbox, 'linked-native-parent-target');
+		fs.mkdirSync(path.dirname(modules), { recursive: true });
+		fs.mkdirSync(foreign);
+		fs.writeFileSync(path.join(foreign, 'luv.so'), 'personal binary');
+		fs.symlinkSync(foreign, modules);
+		const native = spawnSync(
+			bashExecutable(),
+			[bashPath(installer), '--prefix', bashPath(prefix), '--no-service', '--no-deps'],
+			{
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					...process.env,
+					HOME: bashPath(sandbox),
+					XDG_CONFIG_HOME: bashPath(path.join(sandbox, 'native-parent-config')),
+					LC_ALL: 'C'
+				}
+			}
+		);
+		assert.notEqual(native.status, 0);
+		assert.ok(fs.lstatSync(modules).isSymbolicLink());
+		assert.equal(fs.readFileSync(path.join(foreign, 'luv.so'), 'utf8'), 'personal binary');
+		assert.equal(fs.existsSync(path.join(sandbox, 'native-parent-config')), false);
+	}
 	// A root shell need not have sudo installed: execute the detected package
 	// manager directly, while retaining its actual failure as a failure.
 	{
