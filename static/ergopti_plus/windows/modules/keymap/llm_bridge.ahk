@@ -1897,19 +1897,42 @@ LLM_Bridge_ReissueLiveAfterExpansion() {
  */
 LLM_Bridge_OnBackspace() {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus, _LLM_Engine
-	if !_LLM_Bridge_Active || A_IsSuspended
-		return false
-	Source := _LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), true)
-	if !IsObject(Source)
-		return false
+	global _LLM_Bridge_ContentGeneration, _LLM_Bridge_BufferAgentSafe, _PrefixDeferredGeneration, SFD_FIELD_CACHE
 	PreviousCritical := Critical("On")
 	try {
-		_LLM_Bridge_ApplyBufferEdit(_TextTailCodeUnits(_LLM_Bridge_Buffer, 1), "")
-		LLM_Engine_CancelTimer()
-		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
-		_LLM_Engine["active_request_signature"] := ""
+		if !_LLM_Bridge_Active || A_IsSuspended
+			return false
+		EntryEpoch := _PrefixDeferredGeneration
+		EntryGeneration := _LLM_Bridge_ContentGeneration
+		EntryFieldGeneration := SFD_FIELD_CACHE["focus_generation"]
+		EntryElement := SFD_FIELD_CACHE["current_element_id"]
+		FreshFocus := _LLM_Bridge_ReadLiveFocus.Call()
+		if !_LLM_Bridge_Active || A_IsSuspended || EntryEpoch != _PrefixDeferredGeneration
+			|| EntryGeneration != _LLM_Bridge_ContentGeneration
+			|| EntryFieldGeneration != SFD_FIELD_CACHE["focus_generation"]
+			|| EntryElement !== SFD_FIELD_CACHE["current_element_id"]
+			return false
+		Source := _LLM_Bridge_BindTypingSource(FreshFocus, true)
+		if !IsObject(Source)
+			return false
+		CapturedSecure := _LLM_Bridge_CachedTypingSecure(Source, FreshFocus)
+		NativePrivate := FreshFocus.Has("NativeConclusive") && FreshFocus.Has("NativeSecure")
+			&& FreshFocus.Get("NativeConclusive", false) is Integer
+			&& FreshFocus.Get("NativeConclusive", false) == true
+			&& FreshFocus.Get("NativeSecure", true) is Integer
+			&& FreshFocus.Get("NativeSecure", true) == true
+		if NativePrivate && _LLM_Engine.Get("disable_password_fields", true) {
+			_LLM_Bridge_RejectPrivateTyping(true, Source, _LLM_Bridge_ContentGeneration)
+		} else {
+			_LLM_Bridge_ApplyBufferEdit(_TextTailCodeUnits(_LLM_Bridge_Buffer, 1), "")
+			if CapturedSecure && !_LLM_Engine.Get("disable_password_fields", true)
+				_LLM_Bridge_BufferAgentSafe := false
+			LLM_Engine_CancelTimer()
+			_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
+			_LLM_Engine["active_request_signature"] := ""
+		}
 		return _LLM_Bridge_SchedulePrefixObserver("", TimerSetCallback, _LLM_Bridge_ReadLiveFocus,
-			Source, _LLM_Bridge_CachedTypingSecure(Source))
+			Source, CapturedSecure)
 	} finally Critical(PreviousCritical)
 }
 
