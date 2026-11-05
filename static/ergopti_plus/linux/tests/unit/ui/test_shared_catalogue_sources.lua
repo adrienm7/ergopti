@@ -1,3 +1,4 @@
+-- tests/unit/ui/test_shared_catalogue_sources.lua
 --- Tests the actual pinned reader and the two UI consumers' native boundaries.
 local helpers = require("tests.helpers")
 
