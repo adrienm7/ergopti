@@ -10,8 +10,8 @@
  * FEATURES & RATIONALE:
  * 1. check-elf-glibc-ceiling.cjs proves the symbol versions; this proves the
  *    other half of "self-contained": every DT_NEEDED entry of every ELF file in
- *    the tree resolves to a file of the tree (by file name or by the SONAME of
- *    one of its ELF files) or to _shared/data/linux_appimage_recipient_libraries.json,
+ *    the tree has a file name or symlink in the tree or is listed in
+ *    _shared/data/linux_appimage_recipient_libraries.json,
  *    the documented list of what the recipient supplies (glibc and its loader,
  *    GLib and the C++ runtime, GTK 3). A library a build host linked by accident
  *    fails here, on the runner, instead of at the first launch on a machine
