@@ -426,6 +426,61 @@ helpers.describe("installer-native-publication", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("(installer-staging-cleanup) reports retained staging after extraction refusal", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local fixture = Fixture.create(Installer)
+		local ops, work_dir = {}, nil
+		for name, operation in pairs(fixture.ops) do ops[name] = operation end
+		ops.make_work_dir = function(parent)
+			work_dir = Installer.DEFAULT_OPS.make_work_dir(parent)
+			return work_dir
+		end
+		ops.extract = function(_, path)
+			Fixture.write(path .. "/retained.marker", "staged bytes\n")
+			return false
+		end
+		ops.remove_tree = function() return false end
+		local ok, err = pcall(function()
+			local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = ops })
+			helpers.assert_eq(installed, false)
+			helpers.assert_contains(reason, "archive extraction failed")
+			helpers.assert_contains(reason, work_dir)
+			helpers.assert_eq(Fixture.read(work_dir .. "/retained.marker"), "staged bytes\n")
+			helpers.assert_eq(Fixture.read(fixture.installed .. "/old.marker"), "original installation\n")
+		end)
+		Fixture.remove(fixture.root)
+		if not ok then error(err, 0) end
+	end)
+
+	for _, boundary in ipairs({ "activation", "smoke" }) do
+		helpers.it("(installer-staging-cleanup) reports retained staging after " .. boundary .. " rollback", function()
+			local Installer = helpers.load_module("modules.updater.installer")
+			local fixture = Fixture.create(Installer)
+			local ops, work_dir = {}, nil
+			for name, operation in pairs(fixture.ops) do ops[name] = operation end
+			ops.make_work_dir = function(parent)
+				work_dir = Installer.DEFAULT_OPS.make_work_dir(parent)
+				return work_dir
+			end
+			ops.move = function(source, destination)
+				if boundary == "activation" and source == work_dir .. "/candidate" then return false end
+				return Installer.DEFAULT_OPS.move(source, destination)
+			end
+			if boundary == "smoke" then ops.smoke = function() return false end end
+			ops.remove_tree = function() return false end
+			local ok, err = pcall(function()
+				local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = ops })
+				helpers.assert_eq(installed, false)
+				helpers.assert_contains(reason, "previous installation restored")
+				helpers.assert_contains(reason, "staging cleanup failed at " .. work_dir)
+				helpers.assert_true(uv.fs_stat(work_dir) ~= nil)
+				helpers.assert_eq(Fixture.read(fixture.installed .. "/old.marker"), "original installation\n")
+			end)
+			Fixture.remove(fixture.root)
+			if not ok then error(err, 0) end
+		end)
+	end
+
 	helpers.it("(installer-native-publication) genuine absent destinations still install and retain the rollback root", function()
 		local Installer = helpers.load_module("modules.updater.installer")
 		local fixture = Fixture.create(Installer)
