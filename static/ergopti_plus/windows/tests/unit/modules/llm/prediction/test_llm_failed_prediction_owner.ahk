@@ -611,7 +611,27 @@ _LDP_Char(State, IH, Char) {
         AssertEqual(State.TypedControl, WIGetFocusedControlToken())
         EntryOrder := State.InputCallbacks, EntryUnits := StrLen(State.InputChars)
         Before := _LDP_PrivacyTraceState()
-        _LLM_Bridge_OnDispatcherChar(IH, Char)
+        if State.HasOwnProp("StylePrefix") && State.StylePrefix {
+            MirrorCritical := Critical("On")
+            try {
+                NativePassword := !!(WinGetStyle("ahk_id " . State.TypedControl) & 0x20)
+                State.StylePasswordCallbacks += NativePassword ? 1 : 0
+                State.StyleMaxInputAge := Max(State.StyleMaxInputAge, TickElapsed64(State.StyleOriginAt))
+                if State.InputCallbacks == 1 {
+                    global SFD_FIELD_CACHE
+                    State.StyleFirstNegative := SFD_FIELD_CACHE["hwnd"] == State.TypedControl
+                        && !SFD_FIELD_CACHE["secure"]
+                        && SFD_FIELD_CACHE["focus_generation"] == State.StyleOriginGeneration
+                        && SFD_FIELD_CACHE["current_element_id"] == State.StyleOriginElement
+                }
+                global _LLM_Bridge_Buffer
+                UnitsBefore := StrLen(_LLM_Bridge_Buffer)
+                LLM_Bridge_FeedCharForPrefix(Char)
+                if NativePassword
+                    State.StylePrivateMirroredUnits += Max(0, StrLen(_LLM_Bridge_Buffer) - UnitsBefore)
+            } finally Critical(MirrorCritical)
+        } else
+            _LLM_Bridge_OnDispatcherChar(IH, Char)
         After := _LDP_PrivacyTraceState()
         State.InputCompleted += 1
         State.PrivacyTrace.Push(Map("entry", EntryOrder, "completion", State.InputCompleted,
@@ -745,10 +765,12 @@ _LDP_Native(Mode, Calls, Lines) {
     global SFD_FIELD_CACHE
     global _LLM_Bridge_BufferSource, _LLM_Bridge_AgentBufferSource, _LLM_Bridge_AgentContentGeneration
     global _LLM_Bridge_BufferAgentSafe, _LLM_Bridge_PrivacyAppCache
+    global _AHK_DRY_RUN, SFD_FIELD_CACHE_TTL_MS
+    StyleProbe := Mode == "style-password-prefix" || Mode == "style-plain-prefix"
     Retyped := Mode == "excluded-switches-typed" || Mode == "password-switches-typed"
-    PasswordProbe := Mode == "password-stays" || Mode == "password-switches" || Mode == "plain-stays" || Mode == "password-switches-typed"
-    SecretOrigin := PasswordProbe && Mode != "plain-stays"
-    AllowedOrigin := Mode == "allowed-stays" || Mode == "plain-stays"
+    PasswordProbe := StyleProbe || Mode == "password-stays" || Mode == "password-switches" || Mode == "plain-stays" || Mode == "password-switches-typed"
+    SecretOrigin := PasswordProbe && Mode != "plain-stays" && !StyleProbe
+    AllowedOrigin := Mode == "allowed-stays" || Mode == "plain-stays" || Mode == "style-plain-prefix"
     Switches := Mode == "excluded-switches" || Mode == "password-switches" || Retyped
     AssertFalse(A_IsCritical)
     AssertFalse(A_IsSuspended)
@@ -772,6 +794,9 @@ _LDP_Native(Mode, Calls, Lines) {
         GuiA: 0, Hook: 0, InputActive: false, InputChars: "", InputCallbacks: 0, InputDowns: 0,
         TypedHwnd: 0, TypedControl: 0, Failure: 0, Id: 0, Entry: 0, Engine: _LLM_Engine,
         Endpoint: "", OwnEntries: Map(), PrivacyTrace: [], InputCompleted: 0, SfdOwned: false, SfdPrevious: 0, SfdCache: 0, SecureSource: -1, SecureFocus: -1}
+    State.StylePrefix := StyleProbe
+    State.StylePrivateMirroredUnits := 0, State.StylePasswordCallbacks := 0
+    State.StyleMaxInputAge := 0, State.StyleFirstNegative := false
     Primary := 0
     try {
         AssertFalse(SFD_FIELD_CACHE.Get("focus_tracking_active", false), "do not borrow a live native secure-field observer")
@@ -846,15 +871,37 @@ _LDP_Native(Mode, Calls, Lines) {
         LLM_Engine_Init(Map("backend", "api", "api_entries", [Entry], "api_entry_id", "source-owned",
             "profile_id", "basic", "n_predictions", 1, "disabled_apps", PasswordProbe ? [] : [AApp],
             "disable_password_fields", true,
-            "debounce_ms", 1000, "instant_on_word_end", false, "show_info_bar", false))
-        State.TypedHwnd := AllowedOrigin ? BHwnd : AHwnd
-        State.TypedControl := AllowedOrigin ? BControl : AControl
+            "debounce_ms", StyleProbe ? 100 : 1000, "instant_on_word_end", false, "show_info_bar", false))
+        State.TypedHwnd := AllowedOrigin && !StyleProbe ? BHwnd : AHwnd
+        State.TypedControl := AllowedOrigin && !StyleProbe ? BControl : AControl
         WinActivate("ahk_id " . State.TypedHwnd)
         AssertTrue(WinWaitActive("ahk_id " . State.TypedHwnd, , 2))
         ControlFocus(State.TypedControl)
         AssertEqual(State.TypedControl, WIGetFocusedControlToken())
         AssertEqual(!PasswordProbe && Mode != "allowed-stays", _LLM_Engine_ShouldSuppressForDisabledApps(),
             "native app identity establishes the real excluded/allowed precondition")
+        if StyleProbe {
+            AssertEqual(100, _LLM_Engine["debounce_ms"], "the actual user debounce remains shorter than the unmodified detector TTL")
+            AssertEqual(1000, SFD_FIELD_CACHE_TTL_MS, "the style probe must retain the actual native detector TTL")
+            ; Only the synchronous hook acquisition opts out of the suite's
+            ; dry-run sentinel. Restore it before yielding or delivering input.
+            TrackingCritical := Critical("On")
+            DryRunWasSet := IsSet(_AHK_DRY_RUN)
+            if DryRunWasSet
+                SavedDryRun := _AHK_DRY_RUN
+            try {
+                _AHK_DRY_RUN := unset
+                AssertTrue(SFD_EnsureFocusTracking(), "the style composition requires a genuinely acquired native focus hook")
+            } finally {
+                if DryRunWasSet
+                    _AHK_DRY_RUN := SavedDryRun
+                else
+                    _AHK_DRY_RUN := unset
+                Critical(TrackingCritical)
+            }
+            Sleep(100)
+            AssertEqual(State.TypedControl, WIGetFocusedControlToken())
+        }
         if PasswordProbe {
             AssertTrue(_LLM_Engine["disable_password_fields"], "the real typed engine option must enable password protection")
             AssertEqual(SecretOrigin, !!(WinGetStyle("ahk_id " . State.TypedControl) & 0x20), "the actual source Edit must carry the intended native ES_PASSWORD style")
@@ -867,6 +914,23 @@ _LDP_Native(Mode, Calls, Lines) {
             State.SecureSource := SFD_IsSecureField()
             AssertFalse(State.SecureSource)
         }
+        if StyleProbe {
+            State.StyleOriginAt := SFD_FIELD_CACHE["at"]
+            State.StyleOriginGeneration := SFD_FIELD_CACHE["focus_generation"]
+            State.StyleOriginElement := SFD_FIELD_CACHE["current_element_id"]
+            AssertTrue(SFD_FIELD_CACHE["focus_hook"] && SFD_FIELD_CACHE["focus_callback"]
+                && SFD_FIELD_CACHE["focus_tracking_active"] && !SFD_FIELD_CACHE["secure"]
+                && SFD_FIELD_CACHE["hwnd"] == State.TypedControl && State.StyleOriginElement != "",
+                "the original normal receipt must belong to the real native focus hook and exact Edit")
+            if Mode == "style-password-prefix"
+                EditA.Opt("+Password")
+            Sleep(50)
+            AssertEqual(AHwnd, WIGetForegroundHwnd())
+            AssertEqual(AControl, WIGetFocusedControlToken())
+            NativeStyleSecure := SFD_DetectNative(AControl, &NativeStyleConclusive)
+            AssertTrue(NativeStyleConclusive)
+            AssertEqual(Mode == "style-password-prefix", NativeStyleSecure)
+        }
         Canary := AllowedOrigin ? "allowed_context_b_canary" : "private_context_a_canary"
         State.Hook := InputHook("V L0 I1")
         State.Hook.KeyOpt("{All}", "+N")
@@ -877,10 +941,17 @@ _LDP_Native(Mode, Calls, Lines) {
         State.Hook.Start()
         AssertTrue(State.Hook.InProgress)
         PreviousSendLevel := A_SendLevel
+        PreviousKeyDelay := A_KeyDelay, PreviousKeyDuration := A_KeyDuration
         try {
+            if StyleProbe
+                SetKeyDelay(-1, -1)
             SendLevel(2)
             SendEvent("{Text}" . Canary)
-        } finally SendLevel(PreviousSendLevel)
+        } finally {
+            SendLevel(PreviousSendLevel)
+            if StyleProbe
+                SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+        }
         Started := A_TickCount
         while State.InputChars != Canary && TickElapsed64(Started) < 2000
             Sleep(5)
@@ -888,6 +959,16 @@ _LDP_Native(Mode, Calls, Lines) {
             throw State.Failure
         AssertEqual(Canary, State.InputChars, "the actual I1 native callback observes the complete typed canary")
         AssertEqual(Canary, ControlGetText(State.TypedControl), "the same actual text is present in the original native Edit")
+        if StyleProbe {
+            Started := A_TickCount
+            while (State.InputCompleted != State.InputCallbacks || IsObject(_LLM_Bridge_PrefixObserver))
+                && TickElapsed64(Started) < 2000
+                Sleep(5)
+            if IsObject(State.Failure)
+                throw State.Failure
+            AssertEqual(State.InputCallbacks, State.InputCompleted, "the native producer must finish before its context is sampled")
+            AssertFalse(IsObject(_LLM_Bridge_PrefixObserver), "the real deferred prefix owner must finish before the request receipt is sampled")
+        }
         SnapshotCritical := Critical("On")
         try {
             PrivatePurged := !AllowedOrigin && _LLM_Bridge_Buffer == ""
@@ -916,8 +997,11 @@ _LDP_Native(Mode, Calls, Lines) {
         }
         if PasswordProbe {
             AssertEqual(Switches ? BControl : State.TypedControl, SFD_FocusedHwnd())
-            State.SecureFocus := SFD_IsSecureField()
-            AssertEqual(SecretOrigin && !Switches, State.SecureFocus, "the real current-field detector must distinguish source password A from the current plain B")
+            ; The new style observer is passive: do not refresh the subject's
+            ; secure cache before its own deferred input/HTTP path gets to read it.
+            State.SecureFocus := StyleProbe ? !!(WinGetStyle("ahk_id " . State.TypedControl) & 0x20) : SFD_IsSecureField()
+            if !StyleProbe
+                AssertEqual(SecretOrigin && !Switches, State.SecureFocus, "the real current-field detector must distinguish source password A from the current plain B")
         }
         OriginHwnd := State.TypedHwnd, OriginControl := State.TypedControl
         if Retyped {
@@ -999,6 +1083,19 @@ _LDP_Native(Mode, Calls, Lines) {
             "focus_hwnd", WIGetForegroundHwnd(),
             "native_request_delta", NativeDelta, "http_posts", Posts, "source_a_received", SourceA,
             "source_b_received", SourceB, "remaining_requests", _LLM_Remote_Async.Count)))
+        if StyleProbe {
+            _TestPrint("# LLM_PREFIX_NATIVE_STYLE " . KL_JsonEncode(Map("mode", Mode,
+                "native_chars", State.InputCallbacks, "native_password_callbacks", State.StylePasswordCallbacks,
+                "first_cached_negative", State.StyleFirstNegative, "mirrored_private_units", State.StylePrivateMirroredUnits,
+                "max_input_age_ms", State.StyleMaxInputAge, "ttl_ms", SFD_FIELD_CACHE_TTL_MS,
+                "http_posts", Posts, "private_canary_posts", SourceA, "plain_canary_posts", SourceB)))
+            AssertTrue(State.StyleMaxInputAge < SFD_FIELD_CACHE_TTL_MS,
+                "the actual input must arrive within the original unmodified negative-cache TTL")
+            AssertEqual(Mode == "style-password-prefix" ? State.InputCallbacks : 0, State.StylePasswordCallbacks,
+                "each actually observed input character must belong to its real intended native password style")
+            AssertEqual(0, State.StylePrivateMirroredUnits,
+                "the RAM prefix producer must not retain characters whose unchanged native Edit is already private")
+        }
         if Retyped && (!FreshBBufferExact || !FreshBEngineExact)
             _TestPrint("# LLM_DEBOUNCE_PRIVACY_TRACE " . KL_JsonEncode(State.PrivacyTrace))
         if Retyped {
@@ -1068,3 +1165,10 @@ for _LDP_PasswordMode in ["password-stays", "plain-stays", "password-switches"]
 for _LDP_RetypedMode in ["excluded-switches-typed", "password-switches-typed"]
     Test("Debounce private rolling context: " . _LDP_RetypedMode . " never taints fresh allowed native input (llm-debounce-private-retyped-context)",
         _LDP_Run.Bind(_LDP_RetypedMode))
+
+
+; These additional modes retain all eight old mode definitions and oracles.
+; Input is real SendEvent at level2 into the owned Edit, not hardware typing.
+for _LDP_StyleMode in ["style-password-prefix", "style-plain-prefix"]
+    Test("Native prefix style privacy: " . _LDP_StyleMode . " retains actual capture-time style (llm-prefix-native-style-privacy)",
+        _LDP_Run.Bind(_LDP_StyleMode))
