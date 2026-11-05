@@ -1316,3 +1316,110 @@ _KTAC_DurableCase(Mode) {
 for _KTAC_Mode in ["app-control", "title-control", "app-stop", "title-stop"]
 	Test("Keystats context clock ACK: " . _KTAC_Mode . " respects accepted-row and native-stop ownership (context-clock-ack-owner)",
 		_KTAC_DurableCase.Bind(_KTAC_Mode))
+
+
+_KCTR_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Source := StrReplace(Source, "`nKL_LogWindowSwitch(Values*) {", "`n_KCTR_ObservedLogWindowSwitch(Values*) {")
+	AssertTrue(InStr(Source, "`n_KCTR_ObservedLogWindowSwitch(Values*) {") > 0,
+		"The observation wrapper alone is renamed; its genuine native logger and central sink remain unchanged")
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	return SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+		. "#Include " . _DriverDir . "\tests\fixtures\context_tail_retry_owner_body.ahk`n"
+}
+_KCTR_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_context_tail_retry_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCTR_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# context-tail-retry-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS context-tail-retry " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KCTR_DurableCase(Mode) {
+	Output := _KCTR_Case(Mode)
+	Db := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			for Sql in KL_BuildInserts(JsonParse(SubStr(Line, 5)))
+				AssertTrue(SQLite_Exec(Db, Sql), "Actual acknowledged tail rows must enter canonical SQLite unchanged")
+		}
+		AppRows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_app_switch WHERE prev_app='fixture-tail-retry-a.exe'")[1]["n"]
+		TitleRows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_window_switch WHERE app='fixture-tail-retry-a.exe'")[1]["n"]
+		AssertEqual(Mode == "privacy-terminal" ? 0 : 1, AppRows)
+		AssertEqual(Mode == "privacy-terminal" ? 0 : 1, TitleRows)
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		Ms := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app='fixture-tail-retry-a.exe'")[1]["ms"]
+		if Mode == "privacy-terminal"
+			AssertEqual(0, Ms)
+		else
+			AssertTrue(Ms >= 30, "The actual final interval must survive its independently acknowledged retry and cold rebuild")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KCTR_Mode in ["complete-control", "partial-retry", "privacy-terminal", "transition-retry"]
+	Test("Keystats context tail: " . _KCTR_Mode . " consumes only independently acknowledged intervals (context-tail-retry-owner)",
+		_KCTR_DurableCase.Bind(_KCTR_Mode))
