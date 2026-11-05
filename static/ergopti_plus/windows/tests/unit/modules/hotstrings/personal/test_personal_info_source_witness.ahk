@@ -469,6 +469,9 @@ _PIWS_Case(Kind) {
 		}
 		_TestPrint("# personal-info-write-scalar kind=" . Kind . " result=" . Result
 			. " parsed=" . DiskAccepted . " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		_TestPrint("# personal-info-write-scalar candidate=" . _PIWS_Units(Value)
+			. " live=" . _PIWS_Units(PersonalInformation["first_name"])
+			. " disk=" . (DiskAccepted ? _PIWS_Units(Document["info"]["first_name"]) : "<refused>"))
 		if Kind == "nul" {
 			AssertFalse(Result, "a public edit must refuse a value its canonical reader cannot represent")
 			_PISW_Bytes(Before, After, "refusing an unsupported value must preserve the original durable identity")
@@ -504,3 +507,10 @@ _PIWS_Case(Kind) {
 }
 for _PIWS_Kind in ["nul", "control", "literal"]
 	Test("personal info write scalar admission: " . _PIWS_Kind . " (personal-info-write-scalar)", _PIWS_Case.Bind(_PIWS_Kind))
+
+_PIWS_Units(Value) {
+	Units := "length=" . StrLen(Value) . ":"
+	Loop StrLen(Value)
+		Units .= Format("{:04X}", NumGet(StrPtr(Value), (A_Index - 1) * 2, "UShort")) . ","
+	return Units
+}
