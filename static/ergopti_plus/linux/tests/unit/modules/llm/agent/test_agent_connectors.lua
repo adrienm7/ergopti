@@ -167,6 +167,16 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		end)
 	end)
 
+	helpers.it("opens a draft for a valid recipient beginning with a hyphen", function()
+		with_connectors({ has_xdg_email = true }, function(Connectors, world, done)
+			local action = { type = "mail", to = { "-billing@example.com" }, body = "Bonjour" }
+			Connectors.run(config(), action, done)
+			helpers.assert_eq(world.runs[1].executable, "xdg-email")
+			helpers.assert_eq(world.runs[1].args, { Agent.mailto(action) },
+			"xdg-email treats a positional address starting with '-' as an option")
+		end)
+	end)
+
 	helpers.it("without xdg-email, a mail is the mailto: link opened with xdg-open", function()
 		with_connectors({}, function(Connectors, world, done)
 			local action = { type = "mail", body = "Bonjour" }

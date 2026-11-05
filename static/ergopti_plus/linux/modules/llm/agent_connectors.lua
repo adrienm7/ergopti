@@ -409,6 +409,13 @@ local function open_mail(action, on_done)
 	local has_email = _deps.has_command("xdg-email")
 	if _stopping then return false end
 	if has_email then
+		for _, address in ipairs(action.to or {}) do
+			if address:sub(1, 1) == "-" then
+				-- A positional address beginning with '-' is parsed as an option
+				-- by xdg-email. Its documented mailto URI form is unambiguous.
+				return start_desktop("xdg-email", { Agent.mailto(action) }, on_done)
+			end
+		end
 		local args = { "--utf8" }
 		if action.subject then
 			args[#args + 1] = "--subject"
