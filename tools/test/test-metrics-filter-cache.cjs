@@ -4855,4 +4855,21 @@ test('apps burst histogram labels the open-ended class above 500', () => {
 	assert.deepEqual(Array.from(chart.data.labels), ['≤ 500', '> 500']);
 	assert.deepEqual(Array.from(chart.data.datasets[0].data), [2, 1]);
 });
+test('apps transition diagram keeps prototype-named applications on both sides', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('dom_utils.js'), context);
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	const container = {};
+	context.document.getElementById = (id) => (id === 'sankey_container' ? container : null);
+	const manifest = JSON.parse(
+		'{"2026-10-25":{"Editor":{"app_time_ms":1000,"switches_to":{"__proto__":1}},"__proto__":{"app_time_ms":2000,"switches_to":{"Editor":1,"Other":1}}}}'
+	);
+	context.window.bootstrapMetricsAppsData(manifest, {}, {});
+	fixture.set("currentPeriod = 'all';");
+	context.renderSankey(fixture.get());
+	assert.ok(container.innerHTML.includes('Editor → __proto__ (1)'));
+	assert.ok(container.innerHTML.includes('__proto__ → Editor (1)'));
+	assert.doesNotMatch(container.innerHTML, /NaN|\[object Object\]/);
+});
 console.log(`${passed} passed, 0 failed.`);
