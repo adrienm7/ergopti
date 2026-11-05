@@ -18,10 +18,20 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 		CachePath := KLR_CachePath(_KLRDC_Root())
 		Script := _KLRDC_Root() . "stage_owner.ahk"
 		Receipt := _KLRDC_Root() . "stage_owner.txt"
+		; A bound native clock-domain observation, not a claim that this runner
+		; has physically remained up for one or several DWORD eras.
+		ClockExpression := Mode == "native64-one" ? "(A_TickCount + 0x100000000)"
+			: Mode == "native64-wide" ? "(A_TickCount + 0x300000000)" : "A_TickCount"
+		NativeSave := _DriverFuncBody("_KLR_CacheSaveGuarded")
+		AssertTrue(RegExMatch(NativeSave, "m)^\h*Staged :=[^\r\n]+", &NameStatement) > 0,
+			"The stage name statement must come from the actual production cache writer")
+		BoundName := StrReplace(Trim(NameStatement[0]), "A_TickCount", "ObservedTick", , &BoundReads)
+		AssertEqual(1, BoundReads, "Only the unique native stage-clock observation is bound")
 		FileAppend("#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
-			. 'Stage := A_Args[1] . ".stage." . A_ScriptHwnd . "." . A_TickCount' . "`n"
-			. 'FileCopy(A_Args[1], Stage)' . "`n"
-			. 'FileAppend(Stage, A_Args[2], "UTF-8-RAW")' . "`nExitApp(0)`n", Script, "UTF-8")
+			. "ObservedTick := " . ClockExpression . "`n"
+			. 'Path := A_Args[1]' . "`n" . BoundName . "`n"
+			. 'FileCopy(Path, Staged)' . "`n"
+			. 'FileAppend(Staged, A_Args[2], "UTF-8-RAW")' . "`nExitApp(0)`n", Script, "UTF-8")
 		AssertEqual(0, RunWait('"' . A_AhkPath . '" /ErrorStdOut "' . Script . '" "'
 			. CachePath . '" "' . Receipt . '"', , "Hide"))
 		DeadStage := FileRead(Receipt, "UTF-8")
@@ -107,3 +117,10 @@ Test("KLR cache stages: retire obsolete window visit count images (window-title-
 
 Test("KLR cache stages: retire missing Wi-Fi mobility images (wifi-dashboard-kpi-owner)",
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-wifi-kpi")))
+
+
+; CacheSave names its real preparation files from the full native A_TickCount.
+; The same existing child/SQLite fixture also accepts those legal long-uptime names.
+for _KLRCS_ClockMode in ["native64-one", "native64-wide"]
+	Test("KLR cache stages: " . _KLRCS_ClockMode . " reaps an actual dead producer in the native tick domain (klr-cache-stage-native64)",
+		_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind(_KLRCS_ClockMode)))
