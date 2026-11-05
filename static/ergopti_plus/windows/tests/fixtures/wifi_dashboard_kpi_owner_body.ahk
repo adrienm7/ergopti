@@ -8,6 +8,9 @@ _KSD_WifiSample() {
 
 _KSD_WifiReportExercise() {
 	global _KSD
+	; This extra exercise bypasses the ordinary _KSD_Exercise initializer.
+	Keystats.initialized := true
+	MetricsFilters.secure_field := false
 	ChangedNetwork := A_Args[1] == "wifi-report-switch"
 	_KSD_Acquire({App: "fixture-wifi-report.exe", Title: "Fixture public Wi-Fi report", Hwnd: 301})
 	_KSD_Require(KL_Hook_RefreshContext(true) && Keystats._pending_entries.Length == 0,

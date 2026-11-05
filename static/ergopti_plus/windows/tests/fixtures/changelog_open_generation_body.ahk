@@ -92,11 +92,21 @@ class _CWOC_Environment {
 ; Show was still on its stack; absence of that receipt is setup failure only.
 _CWOC_ShowCloseProbe(State, WParam, LParam, Msg, Hwnd) {
 	global _CLW_Gui, _CLW_WindowEpoch
-	if State.Fired || !WParam
+	if State.Fired || !WParam || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+		return
+	; WM_SHOWWINDOW also observes unrelated native windows and windows which
+	; disappeared before inspection. Neither belongs to this fixture's attempt.
+	try OwnerPid := WinGetPID("ahk_id " . Hwnd)
+	catch
+		return
+	if OwnerPid != ProcessExist()
+		return
+	try Caption := WinGetTitle("ahk_id " . Hwnd)
+	catch
+		return
+	if Caption != State.Caption
 		return
 	try {
-		if WinGetPID("ahk_id " . Hwnd) != ProcessExist() || WinGetTitle("ahk_id " . Hwnd) != State.Caption
-			return
 		State.Fired := true
 		State.Hwnd := Hwnd
 		State.OwnerAbsent := !IsSet(_CLW_Gui)
@@ -216,7 +226,7 @@ try {
 		"The UI component must preserve the absent constructor role.")
 	FileAppend("PASS changelog-open-generation " . A_Args[1] . "`n", "*", "UTF-8")
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL changelog-opening " . Failure.Message . " at " . Failure.File . ":" . Failure.Line . "`n", "*", "UTF-8")
+} catch Any as ChangelogEntryFailure {
+	FileAppend("FAIL changelog-opening " . ChangelogEntryFailure.Message . " at " . ChangelogEntryFailure.File . ":" . ChangelogEntryFailure.Line . "`n", "*", "UTF-8")
 	ExitApp(1)
 }
