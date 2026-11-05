@@ -220,6 +220,8 @@ _HNRC_Run() {
 		if IsObject(_HNRC.ReopenFailure)
 			FileAppend("DIAGNOSTIC hcw-native-destroy reopen_type=" . Type(_HNRC.ReopenFailure)
 				. " reopen_message=" . JsonStringLiteral(_HNRC.ReopenFailure.Message) . "`n", "*", "UTF-8-RAW")
+		for Index, Line in _HNRC.Errors
+			FileAppend("DIAGNOSTIC hcw-native-destroy error_index=" . Index . " logger_error=" . JsonStringLiteral(Line) . "`n", "*", "UTF-8-RAW")
 		_HNRC_Require(_HNRC.DestroySeen && _HNRC.Errors.Length == 0 && !DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int"),
 			"The actual reset completion must destroy A without technical errors")
 		if _HNRC.Mode == "destroy-reopen"
