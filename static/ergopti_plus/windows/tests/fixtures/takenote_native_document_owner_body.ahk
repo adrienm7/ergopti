@@ -151,6 +151,83 @@ _TNDO_Cleanup() {
 			Clean := false
 	return Clean
 }
+
+; Diagnostics only: no raw accessible text or unowned window is disclosed.
+_TNDO_IdentityCurrent(Hwnd) {
+	global _TNDO
+	return Hwnd && _TNDO.Windows.Has(Hwnd) && _TNDO_WindowCurrent(_TNDO.Windows[Hwnd])
+}
+_TNDO_IdentityValue(Value) {
+	global _TNDO
+	if !(Value is String)
+		return "<non-string>"
+	Result := "units=" . StrLen(Value)
+	for Label in ["A", "B"] {
+		PrivatePath := _TNDO.Root . "\" . Label . "\Notes.txt"
+		Canary := Label == "A" ? _TNDO.CanaryA : _TNDO.CanaryB
+		if Value == PrivatePath
+			Result .= ",exact_path=" . Label
+		else if InStr(Value, PrivatePath, true)
+			Result .= ",contains_path=" . Label
+		if Value == Canary
+			Result .= ",exact_canary=" . Label
+	}
+	; Only independently authored private identities are classified. Unknown
+	; properties, document contents and surrounding text are never emitted.
+	return Result
+}
+_TNDO_InspectDocumentIdentity(Hwnd, Phase) {
+	global _TNDO
+	try {
+		if !_TNDO_IdentityCurrent(Hwnd)
+			return
+		RootElement := UIA.ElementFromHandle(Hwnd, , false)
+		Walker := UIA.TreeWalkerTrue
+		Pending := [{Element: RootElement, Depth: 0}], Count := 0
+		while Pending.Length && Count < 96 {
+			if !_TNDO_IdentityCurrent(Hwnd)
+				return
+			Item := Pending.Pop(), Element := Item.Element
+			ElementPid := Element.GetPropertyValue("ProcessId")
+			if !_TNDO_IdentityCurrent(Hwnd) || ElementPid != _TNDO.Windows[Hwnd].Process.Pid
+				continue
+			Count += 1
+			Line := "IDENTITY takenote phase=" . Phase . " index=" . Count . " depth=" . Item.Depth
+			for Property in ["ControlType", "AutomationId", "Name", "HelpText", "ItemStatus",
+				"ValueValue", "LegacyIAccessibleValue", "LegacyIAccessibleDescription", "FullDescription", "SelectionItemIsSelected"] {
+				if !_TNDO_IdentityCurrent(Hwnd)
+					return
+				try Value := Element.GetPropertyValue(Property)
+				catch {
+					Line .= " " . Property . "=<unavailable>"
+					continue
+				}
+				if Property == "ControlType" && Value is Integer && Value >= 50000 && Value <= 50100
+					Line .= " " . Property . "=" . Value
+				else if Property == "SelectionItemIsSelected" && Value is Integer && (Value == 0 || Value == 1)
+					Line .= " " . Property . "=" . Value
+				else
+					Line .= " " . Property . "=[" . _TNDO_IdentityValue(Value) . "]"
+			}
+			FileAppend(Line . "`n", "*")
+			if Item.Depth < 8 {
+				if !_TNDO_IdentityCurrent(Hwnd)
+					return
+				Child := Walker.TryGetFirstChildElement(Element)
+				while IsObject(Child) && Pending.Length + Count < 96 {
+					Pending.Push({Element: Child, Depth: Item.Depth + 1})
+					if !_TNDO_IdentityCurrent(Hwnd)
+						return
+					Child := Walker.TryGetNextSiblingElement(Child)
+				}
+			}
+		}
+		FileAppend("IDENTITY takenote phase=" . Phase . " scanned=" . Count . "`n", "*")
+	} catch Any {
+		FileAppend("IDENTITY takenote phase=" . Phase . " inspection_failed=1`n", "*")
+	}
+}
+
 _TNDO_Main() {
 	global _TNDO, _TakeNotePending
 	_TNDO_Require(A_Args.Length == 2, "A mode and exclusively owned directory are required")
@@ -158,7 +235,7 @@ _TNDO_Main() {
 	_TNDO_Require(Mode == "same-folder" || Mode == "different-folder", "Unknown document mode")
 	_TNDO_Require(!ProcessExist("notepad.exe") && WinGetList("ahk_exe notepad.exe").Length == 0,
 		"A private Notepad probe cannot borrow an existing process or window")
-	_TNDO := {Processes: Map(), Windows: Map(), CanaryA: "owned_note_A_" . A_ScriptHwnd,
+	_TNDO := {Root: Root, Processes: Map(), Windows: Map(), CanaryA: "owned_note_A_" . A_ScriptHwnd,
 		CanaryB: "owned_note_B_" . A_ScriptHwnd, ObserveError: ""}
 	Clean := false
 	try {
@@ -168,14 +245,17 @@ _TNDO_Main() {
 		FileAppend(_TNDO.CanaryB, FileB, "UTF-8-RAW")
 		_TNDO_WaitJob(TakeNoteRequest(false, Root . "\A", false, _TNDO_Ops))
 		First := WinActive("ahk_exe notepad.exe")
-		_TNDO_Require(First && _TNDO.Windows.Has(First) && _TNDO_ReadDocument(First) == _TNDO.CanaryA,
+		_TNDO_Require(_TNDO_IdentityCurrent(First) && _TNDO_ReadDocument(First) == _TNDO.CanaryA,
 			"The first genuine request must expose actual document A in its owned Notepad")
+		_TNDO_InspectDocumentIdentity(First, "first-A")
 		BeforeLaunches := _TNDO_Ops.Launches.Length
 		Target := Mode == "same-folder" ? "A" : "B"
 		_TNDO_WaitJob(TakeNoteRequest(false, Root . "\" . Target, false, _TNDO_Ops))
 		Active := WinActive("ahk_exe notepad.exe")
-		Text := Active ? _TNDO_ReadDocument(Active) : ""
+		Text := _TNDO_IdentityCurrent(Active) ? _TNDO_ReadDocument(Active) : ""
 		Actual := Text == _TNDO.CanaryA ? "A" : Text == _TNDO.CanaryB ? "B" : "unknown"
+		if _TNDO_IdentityCurrent(Active)
+			_TNDO_InspectDocumentIdentity(Active, "second-" . Target)
 		FileAppend("OBSERVATION takenote-document mode=" . Mode . " target=" . Target . " actual=" . Actual
 			. " first_hwnd=" . First . " active_hwnd=" . Active . " launches_before=" . BeforeLaunches
 			. " launches_after=" . _TNDO_Ops.Launches.Length . " pending=" . _TakeNotePending.Count

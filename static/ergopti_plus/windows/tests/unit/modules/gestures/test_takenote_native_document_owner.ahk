@@ -12,6 +12,7 @@
 _TNDO_Source() {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
+	Source .= "#Include " . _DriverDir . "\vendor\UIA.ahk`n"
 	for Symbol in ["TickElapsed64", "TakeNoteRequest"] {
 		OwnerPath := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(OwnerPath != "", "The probe must use the actual production owner of " . Symbol)
