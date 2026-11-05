@@ -152,6 +152,37 @@ helpers.describe("caps word auto-off: the settings", function()
 		end)
 	end)
 
+	helpers.it("caps word auto-off, keeps an unknown delimiter when editing a known one", function()
+		with_caps_word('[shortcuts.caps_word]\nterminators = ["space", "future_key"]\n', function(c)
+			helpers.assert_true(c.AutoOff.set_terminator("comma", true))
+			local f = assert(io.open(c.path, "rb"))
+			local text = assert(f:read("*a")); assert(f:close())
+			local document = require("toml_codec").decode(text)
+			helpers.assert_eq(table.concat(document.shortcuts.caps_word.terminators, ","), "space,comma,future_key")
+			helpers.assert_eq(table.concat(c.AutoOff.settings().terminators, ","), "space,comma")
+			helpers.assert_true(c.AutoOff.set_terminator("space", false))
+			local second = assert(io.open(c.path, "rb"))
+			local updated = assert(second:read("*a")); assert(second:close())
+			local again = require("toml_codec").decode(updated)
+			helpers.assert_eq(table.concat(again.shortcuts.caps_word.terminators, ","), "comma,future_key")
+		end)
+	end)
+
+	helpers.it("caps word auto-off, refuses to replace an unreadable delimiter list", function()
+		for _, source in ipairs({
+			'[shortcuts.caps_word]\nterminators = "space"\n',
+			'[shortcuts.caps_word]\nterminators = {}\n',
+			'[shortcuts.caps_word]\nterminators = ["space", 42]\n',
+		}) do
+			with_caps_word(source, function(c)
+				helpers.assert_eq(c.AutoOff.set_terminator("comma", true), false)
+				local f = assert(io.open(c.path, "rb"))
+				local text = assert(f:read("*a")); assert(f:close())
+				helpers.assert_eq(text, source)
+			end)
+		end
+	end)
+
 	helpers.it("caps word auto-off, persists a change sparsely and in catalogue order", function()
 		with_caps_word(nil, function(c)
 			helpers.assert_true(c.AutoOff.set_terminator("minus", true))
