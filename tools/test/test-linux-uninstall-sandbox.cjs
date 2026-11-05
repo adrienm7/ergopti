@@ -325,6 +325,24 @@ try {
 	assert.notEqual(run('--yes').status, 0, 'a registered checkout ancestor prevents removal');
 	assert.ok(fs.existsSync(wrapper));
 	fs.unlinkSync(gitMarker);
+	{
+		const checkout = path.join(sandbox, 'checkout\n');
+		const nestedPrefix = path.join(checkout, 'prefix');
+		const nestedLibrary = path.join(nestedPrefix, 'lib/ergopti');
+		const nestedWrapper = path.join(nestedPrefix, 'bin/ergopti-hotstrings');
+		fs.cpSync(prefix, nestedPrefix, { recursive: true });
+		fs.writeFileSync(path.join(checkout, '.git'), 'gitdir: elsewhere');
+		const quoted = spawnSync(bashExecutable(), ['-c', 'printf %q "$1"', 'quote', bashPath(`${nestedLibrary}/linux`)], { encoding: 'utf8' });
+		assert.equal(quoted.status, 0, quoted.stderr);
+		fs.writeFileSync(nestedWrapper, `#!/bin/bash\nDRIVER_ROOT=${quoted.stdout}\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`);
+		const nested = spawnSync(bashExecutable(), [bashPath(script), '--prefix', bashPath(nestedPrefix), '--check'], {
+			encoding: 'utf8', timeout: 15000,
+			env: { HOME: bashPath(home), PATH: `${bashPath(stubs)}:/usr/bin:/bin` }
+		});
+		assert.notEqual(nested.status, 0, 'a checkout ancestor ending in newline prevents removal');
+		assert.match(nested.stderr, /checkout/i);
+		assert.ok(fs.existsSync(nestedWrapper));
+	}
 	const unit = path.join(home, '.config/systemd/user/ergopti-hotstrings.service');
 	fs.mkdirSync(path.dirname(unit), { recursive: true });
 	fs.writeFileSync(unit, `[Service]\nExecStart=${bashPath(wrapper)} --tray\n`);

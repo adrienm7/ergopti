@@ -392,7 +392,8 @@ while [ "$ancestor" != / ]; do
 		ergopti_msg uninstall.inside_source_checkout >&2
 		exit 1
 	fi
-	ancestor="$(dirname -- "$ancestor")"
+	ancestor="${ancestor%/*}"
+	[ -n "$ancestor" ] || ancestor=/
 done
 MANIFEST="$LIBRARY/.ergopti-owned-files"
 UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
