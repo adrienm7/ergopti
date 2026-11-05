@@ -92,7 +92,7 @@ class KLSensors {
 ; ======================================
 ; ======================================
 
-KL_Sensors_Tick() {
+KL_Sensors_Tick(PowerFn := 0) {
 	if !Keystats.initialized
 		return
 	; A periodic sample is not a lifecycle closer exempted by the append gate.
@@ -164,7 +164,7 @@ KL_Sensors_Tick() {
 	; BatteryFullLifeTime(4) = 12 bytes.
 	; BatteryLifePercent = 255 when unknown (no battery / desktop).
 	pwr := Buffer(12, 0)
-	if DllCall("kernel32\GetSystemPowerStatus", "Ptr", pwr, "Int") {
+	if HasMethod(PowerFn, "Call") ? PowerFn.Call(pwr) : DllCall("kernel32\GetSystemPowerStatus", "Ptr", pwr, "Int") {
 		ac_line  := NumGet(pwr, 0, "UChar")   ; 0=battery, 1=AC, 255=unknown
 		batt_pct := NumGet(pwr, 2, "UChar")   ; 255 = unknown
 		if (batt_pct != 255) {

@@ -437,3 +437,6 @@ _KCSP_Case(Mode) {
 for _KCSP_Mode in ["collection", "driver"]
 	Test("keystats sensors: actual " . _KCSP_Mode . " pause silences native publication (sensor-collection-pause)",
 		_KCSP_Case.Bind(_KCSP_Mode))
+
+for _KCSP_PowerMode in ["power-unknown", "power-ac", "power-dc", "power-battery-unknown"]
+	Test("keystats sensor power: " . _KCSP_PowerMode . " preserves unknown status (sensor-power-unknown)", _KCSP_Case.Bind(_KCSP_PowerMode))
