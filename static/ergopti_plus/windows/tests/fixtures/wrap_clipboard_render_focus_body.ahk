@@ -118,7 +118,7 @@ _WRF_SeedDelayed() {
 	global _WRF
 	_WRF_Require(CB_OpenClipboardWithin(_WRF.A.Hwnd), "The fixture must acquire its own native clipboard lease.")
 	try {
-		_WRF_Require(DllCall("User32\EmptyClipboard", "Int") != 0)
+		_WRF_Require(DllCall("User32\EmptyClipboard", "Int") != 0, "The owned native clipboard lease must accept the delayed-format seed.")
 		_WRF.Mutated := true
 		DllCall("Kernel32\SetLastError", "UInt", 0)
 		DllCall("User32\SetClipboardData", "UInt", 13, "Ptr", 0, "Ptr")
@@ -151,7 +151,7 @@ _WRF_Main() {
 		_WRF.A.Show()
 		_WRF.B.Show()
 		WinActivate("ahk_id " . _WRF.A.Hwnd)
-		_WRF_Require(WinWaitActive("ahk_id " . _WRF.A.Hwnd, , 1))
+		_WRF_Require(WinWaitActive("ahk_id " . _WRF.A.Hwnd, , 1), "The selected source window must become active before the public wrapper runs.")
 		_WRF.EditA.Focus()
 		DllCall("SendMessageW", "Ptr", _WRF.EditA.Hwnd, "UInt", 0xB1, "Ptr", 0, "Ptr", -1)
 		Before := _WRF_OwnedFocus()

@@ -107,7 +107,7 @@ _OSPC_Main() {
 	try {
 		_OSPC.Window.Show()
 		WinActivate("ahk_id " . _OSPC.Window.Hwnd)
-		_OSPC_Require(WinWaitActive("ahk_id " . _OSPC.Window.Hwnd, , 2))
+		_OSPC_Require(WinWaitActive("ahk_id " . _OSPC.Window.Hwnd, , 2), "The owned receiver window must become active before original control injection.")
 		_OSPC.A.Focus()
 		DllCall("SendMessageW", "Ptr", _OSPC.A.Hwnd, "UInt", 0xB1, "Ptr", -1, "Ptr", -1)
 		_OSPC_Target()
