@@ -163,6 +163,9 @@ function regularFiles(roots, includeSymlinks = false) {
  */
 function parseInterpreter(output) {
 	const match = output.match(/^\s*\[Requesting program interpreter: (.*)\]\s*$/m);
+	if (!match && output.includes('Requesting program interpreter:')) {
+		throw new Error('readelf returned an unreadable program interpreter');
+	}
 	return match ? match[1] : null;
 }
 
