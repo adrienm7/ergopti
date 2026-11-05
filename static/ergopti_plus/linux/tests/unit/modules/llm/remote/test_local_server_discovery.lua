@@ -313,6 +313,29 @@ helpers.describe("Linux local server discovery ownership", function()
 		end)
 	end)
 
+	for _, source in ipairs({ "port scan", "completion" }) do
+		helpers.it("does not log private text from a local server " .. source .. " exception", function()
+			isolated(function(servers, _, _, _, scan)
+				for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
+					scan[id] = { running = false, pids = {} }
+				end
+				local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+				local original_scan, original_error, messages = ports.scan, logger.error, {}
+				if source == "port scan" then ports.scan = function() error("synthetic-private-token") end end
+				logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+				local called, result = pcall(servers.rescan, function() return true end,
+					function() if source == "completion" then error("synthetic-private-token") end end)
+				ports.scan, logger.error = original_scan, original_error
+				assert(called, result)
+				helpers.assert_eq(result, source == "completion")
+				helpers.assert_true(#messages > 0)
+				for _, message in ipairs(messages) do
+					helpers.assert_true(not message:find("synthetic-private-token", 1, true))
+				end
+			end)
+		end)
+	end
+
 	helpers.it("a closed model page receives no invalid local address error", function()
 		isolated(function()
 			local live, errors = true, 0
