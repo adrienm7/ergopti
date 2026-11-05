@@ -752,6 +752,7 @@ _GSRZ_RealPng(Width, Height, MaxEdge, ExpectedWidth, ExpectedHeight) {
 		}
 	}
 }
-for _GSRZ_Case in [[12, 6, 4, 4, 2], [6, 12, 4, 2, 4], [12, 6, 0, 12, 6], [6, 3, 20, 6, 3]]
+for _GSRZ_Case in [[12, 6, 4, 4, 2], [6, 12, 4, 2, 4], [12, 6, 0, 12, 6],
+	[6, 3, 20, 6, 3], [1, 12, 4, 1, 4]]
 	Test("screenshot: real PNG preserves bounded geometry " . _GSRZ_Case[1] . "x" . _GSRZ_Case[2]
 		. " max=" . _GSRZ_Case[3] . " (screenshot-native-resize)", _GSRZ_RealPng.Bind(_GSRZ_Case*))
