@@ -1170,3 +1170,58 @@ _G4LOR_NoErrorObserver() {
 }
 Test("managed bootstrap observers: valid runtime without optional diagnostics still retires (managed-bootstrap-observer-retirement)",
 	_G4LOR_NoErrorObserver)
+
+
+; Constructor-failure witnesses hold no callback, partial object or timer root.
+; No Begin call occurs: the refused endpoint precedes source/native acquisition.
+class _G4CF_AcyclicFailure {
+	__New(Counter) {
+		this.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		throw ValueError("acyclic-constructor-lifetime-control")
+	}
+}
+
+class _G4CF_ObservedBootstrap extends OllamaManagedBootstrap {
+	__New(Counter, Arguments*) {
+		this.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		; Delegate the complete genuine constructor, with no overridden source,
+		; scheduler, cancellation, native factory or method implementation.
+		super.__New(Arguments*)
+	}
+}
+
+_G4CF_Case(Mode) {
+	global LLM_OLLAMA_BASE_URL, _LLM_Deps_Epoch
+	Counter := {Deleted: 0}, Thrown := false, Observed := ""
+	PreviousEndpoint := LLM_OLLAMA_BASE_URL
+	PreviousCritical := Critical("On")
+	try {
+		if Mode == "acyclic" {
+			try CtorUnreachable :=  _G4CF_AcyclicFailure(Counter)
+			catch ValueError as CtorFailure {
+				Thrown := true
+				Observed := CtorFailure.Message
+			}
+			AssertTrue(Thrown && Observed == "acyclic-constructor-lifetime-control",
+				"The actual AHK constructor-failure path must release its acyclic object synchronously")
+		} else {
+			LLM_OLLAMA_BASE_URL := "https://invalid-managed-endpoint.example"
+			try CtorUnreachable :=  _G4CF_ObservedBootstrap(Counter, "", _LLM_Deps_Epoch, 0, 0)
+			catch ValueError as CtorFailure {
+				Thrown := true
+				Observed := CtorFailure.Message
+			}
+			AssertTrue(Thrown && Observed == "Managed runtime requires the selected loopback Ollama endpoint.",
+				"Only the genuine pre-acquisition endpoint refusal qualifies this constructor-failure witness")
+		}
+		_TestPrint("# MANAGED_CONSTRUCTOR_LIFETIME mode=" . Mode . " threw=" . Thrown . " owner_deleted=" . Counter.Deleted)
+		AssertEqual(1, Counter.Deleted,
+			"A failed constructor with no acquired native task, armed timer or external callback must not retain its partial owner")
+	} finally {
+		LLM_OLLAMA_BASE_URL := PreviousEndpoint
+		Critical(PreviousCritical)
+	}
+}
+for _G4CF_Mode in ["acyclic", "endpoint"]
+	Test("managed bootstrap constructor lifetime: " . _G4CF_Mode . " releases an unowned failed construction (managed-bootstrap-constructor-failure-lifetime)",
+		_G4CF_Case.Bind(_G4CF_Mode))
