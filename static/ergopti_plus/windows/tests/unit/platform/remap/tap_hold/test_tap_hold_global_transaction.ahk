@@ -596,23 +596,24 @@ _THST_ForeignStageOwned(Collision, TargetPath) {
 	SplitPath(TargetPath, , &Root)
 	Created := FSCreateDirectoryExclusiveStrict(Root)
 	Assert((Created is Integer) && Created == 1, "the staging fixture exclusively owns its private directory")
-	Owner := FSWriteDurable, HadOwn := Owner.HasOwnProp("Call")
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call")
 	if HadOwn
 		SavedCall := Owner.GetOwnPropDesc("Call")
 	Installed := false
 	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0,
 		originalEntered: 0, originalCompleted: 0, defaultPorts: false}
 	Sentinel := "Foreign tap-hold stage: é😀 unchanged"
-	Observe(This, StagePath, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
+	Observe(This, Path, Content, Suffix, &Detail := "", StageFn := 0, BeforeFn := 0, AdmissionFn := 0, ReplaceExisting := true, &Publication := 0, FlushFn := 0) {
+		StagePath := Path . Suffix
 		Prefix := TargetPath . "." . A_ScriptHwnd . "-"
 		Mine := (StagePath is String) && SubStr(StagePath, 1, StrLen(Prefix)) == Prefix
 			&& RegExMatch(SubStr(StagePath, StrLen(Prefix) + 1), "^\d+\.tmp$")
 		if Mine {
 			State.hits += 1
 			State.stagePath := StagePath
-			State.defaultPorts := (OpenFn is Integer) && OpenFn == 0
-				&& (DeleteFn is Integer) && DeleteFn == 0 && (FlushFn is Integer) && FlushFn == 0
-				&& (WriteFn is Integer) && WriteFn == 0
+			State.defaultPorts := (StageFn is Integer) && StageFn == 0
+				&& (FlushFn is Integer) && FlushFn == 0
+				&& HasMethod(BeforeFn, "Call") && HasMethod(AdmissionFn, "Call")
 			if Collision {
 				State.createdSentinel := FSWriteCreateDurable(StagePath, Sentinel)
 				AssertEqual(1, State.createdSentinel, "the competing exact stage must really be created exclusively")
@@ -620,7 +621,7 @@ _THST_ForeignStageOwned(Collision, TargetPath) {
 			}
 			State.originalEntered += 1
 		}
-		NativeResult := Func.Prototype.Call.Call(This, StagePath, Content, OpenFn, DeleteFn, FlushFn, WriteFn)
+		NativeResult := Func.Prototype.Call.Call(This, Path, Content, Suffix, &Detail, StageFn, BeforeFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
 		if Mine
 			State.originalCompleted += 1
 		return NativeResult
@@ -644,8 +645,8 @@ _THST_ForeignStageOwned(Collision, TargetPath) {
 			. " before_bytes=" . Before.Size . " after_bytes=" . After.Size
 			. " live_tap=" . TapHold["keys"]["caps_lock"]["tap_action"])
 		AssertEqual(1, State.hits, "the public setter must reach the actual default staging producer")
-		AssertTrue(State.defaultPorts, "no custom opener, delete, flush, writer, or fake ACK replaces the real default producer")
-		AssertEqual(1, State.originalEntered, "the original default FSWriteDurable must really be entered")
+		AssertTrue(State.defaultPorts, "no custom stage or flush replaces the real default producer; preflight and admission remain bound")
+		AssertEqual(1, State.originalEntered, "the original default FSWriteReplaceOwned must really be entered")
 		AssertEqual(1, State.originalCompleted, "its genuine return must reach the caller before business assertions")
 		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
 		if Collision {
