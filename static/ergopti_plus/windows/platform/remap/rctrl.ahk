@@ -67,11 +67,19 @@ _RCtrlHoldModKey() {
 	; Cleanup retires this callback even when the key remains held after resume.
 	RepeatEpoch := _TH_SyntheticEpoch
 	if KS_IsDown("LShift") { ; LShift physically held → Delete
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Delete", "")
 	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") { ; LAlt(=OneShotShift) physically held
 		; Cannot simply send Delete — RCtrl+LAlt would be Ctrl+Alt+Delete
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		OneShotShiftFix()
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Right", "")
+		if A_IsSuspended || RepeatEpoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("BackSpace", "")
 	} else {
 		if A_IsSuspended or RepeatEpoch != _TH_SyntheticEpoch
@@ -251,13 +259,24 @@ _RCtrlTabTap() {
 }
 
 _RCtrlBackspaceTap() {
+	Epoch := _TH_SyntheticEpoch
 	if KS_IsDown("LShift") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Delete", "")
 	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		OneShotShiftFix()
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("Right", "")
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TextPressKey("BackSpace", "")
 	} else {
+		if A_IsSuspended || Epoch != _TH_SyntheticEpoch
+			return
 		TapHoldEmitKeyTap("BackSpace")
 	}
 }
