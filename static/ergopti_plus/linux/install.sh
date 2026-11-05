@@ -232,6 +232,16 @@ if ! $SETUP_PERMS_ONLY && { [ -e "$LIB_DIR" ] || [ -L "$LIB_DIR" ]; }; then
 	fi
 fi
 
+# A receipt must be a direct regular file or absent. Refuse an existing user
+# directory/link before installing dependencies or replacing any payload.
+if ! $SETUP_PERMS_ONLY; then
+	ownership_target="${LIB_DIR}/.ergopti-owned-files"
+	if [ -L "$ownership_target" ] || { [ -e "$ownership_target" ] && [ ! -f "$ownership_target" ]; }; then
+		printf '[install] code=invalid-receipt path=%q\n' "$ownership_target" >&2
+		exit 1
+	fi
+fi
+
 # The public launcher is outside the payload tree. Do not truncate a foreign
 # command or follow a link when installing over an existing prefix.
 if ! $SETUP_PERMS_ONLY; then

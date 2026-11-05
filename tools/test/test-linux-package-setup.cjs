@@ -223,6 +223,110 @@ try {
 		);
 		assert.equal(setup.status, 64, 'empty prefix cannot fall through to permission setup');
 	}
+	// Receipt publication must never report success by moving into a directory,
+	// nor replace an administrator's linked receipt.
+	{
+		const owner = path.join(ROOT, 'static/ergopti_plus/linux/install/ownership.sh');
+		const installer = path.join(ROOT, 'static/ergopti_plus/linux/install.sh');
+		const fixture = path.join(sandbox, 'receipt-type');
+		const driver = path.join(fixture, 'driver');
+		const shared = path.join(fixture, 'shared');
+		fs.mkdirSync(driver, { recursive: true });
+		fs.mkdirSync(path.join(shared, 'data/locales'), { recursive: true });
+		fs.writeFileSync(path.join(driver, 'ergopti_hotstrings.lua'), 'runtime');
+		fs.writeFileSync(path.join(shared, 'data/locales/en.json'), '{}');
+		const regular = path.join(fixture, 'regular');
+		fs.mkdirSync(regular);
+		fs.writeFileSync(path.join(regular, '.ergopti-owned-files'), 'old receipt\n');
+		const replaced = spawnSync(
+			bashExecutable(),
+			[bashPath(owner), bashPath(driver), bashPath(shared), bashPath(regular)],
+			{ encoding: 'utf8', timeout: 10000 }
+		);
+		assert.equal(replaced.status, 0, replaced.stderr);
+		assert.match(
+			fs.readFileSync(path.join(regular, '.ergopti-owned-files'), 'utf8'),
+			/\tlinux\/ergopti_hotstrings\.lua/
+		);
+		// A directory arriving after admission must not turn mv into a move
+		// inside that directory, nor create a misleading successful receipt.
+		const raced = path.join(fixture, 'raced');
+		const raceBin = path.join(fixture, 'race-bin');
+		fs.mkdirSync(raced);
+		fs.mkdirSync(raceBin);
+		fs.writeFileSync(
+			path.join(raceBin, 'mv'),
+			'#!/bin/bash\nmkdir -p -- "${!#}"\nprintf preserve > "${!#}/personal"\nexec /usr/bin/mv "$@"\n',
+			{ mode: 0o755 }
+		);
+		const changed = spawnSync(
+			bashExecutable(),
+			[bashPath(owner), bashPath(driver), bashPath(shared), bashPath(raced)],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, PATH: `${raceBin}:/usr/bin:/bin` }
+			}
+		);
+		assert.notEqual(changed.status, 0);
+		assert.deepEqual(fs.readdirSync(path.join(raced, '.ergopti-owned-files')), ['personal']);
+		assert.equal(
+			fs.readFileSync(path.join(raced, '.ergopti-owned-files/personal'), 'utf8'),
+			'preserve'
+		);
+		for (const kind of ['directory', 'symlink']) {
+			const prefix = path.join(fixture, kind);
+			const library = path.join(prefix, 'lib/ergopti');
+			const receipt = path.join(library, '.ergopti-owned-files');
+			const foreign = path.join(fixture, `${kind}-foreign`);
+			fs.mkdirSync(library, { recursive: true });
+			fs.mkdirSync(foreign);
+			fs.writeFileSync(path.join(foreign, 'personal'), 'preserve');
+			if (kind === 'directory') {
+				fs.mkdirSync(receipt);
+				fs.writeFileSync(path.join(receipt, 'personal'), 'preserve');
+			} else fs.symlinkSync(foreign, receipt);
+			const owned = spawnSync(
+				bashExecutable(),
+				[bashPath(owner), bashPath(driver), bashPath(shared), bashPath(library)],
+				{
+					encoding: 'utf8',
+					timeout: 10000
+				}
+			);
+			assert.notEqual(owned.status, 0, `owner refuses ${kind}`);
+			assert.match(owned.stderr, /code=invalid_destination/);
+			assert.deepEqual(fs.readdirSync(receipt), ['personal']);
+			assert.equal(fs.readFileSync(path.join(foreign, 'personal'), 'utf8'), 'preserve');
+			const installed = spawnSync(
+				bashExecutable(),
+				[bashPath(installer), '--prefix', bashPath(prefix), '--no-deps'],
+				{
+					encoding: 'utf8',
+					timeout: 10000,
+					env: {
+						...process.env,
+						HOME: bashPath(sandbox),
+						XDG_CONFIG_HOME: bashPath(path.join(fixture, 'config')),
+						LC_ALL: 'C'
+					}
+				}
+			);
+			assert.notEqual(installed.status, 0, `installer refuses ${kind}`);
+			assert.match(installed.stderr, /code=invalid-receipt/);
+			assert.equal(
+				fs.existsSync(path.join(library, 'linux')),
+				false,
+				'receipt refused before payload copy'
+			);
+			assert.equal(
+				fs.existsSync(path.join(fixture, 'config')),
+				false,
+				'receipt refused before config creation'
+			);
+			assert.deepEqual(fs.readdirSync(receipt), ['personal']);
+		}
+	}
 	// A root shell need not have sudo installed: execute the detected package
 	// manager directly, while retaining its actual failure as a failure.
 	{
