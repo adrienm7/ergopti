@@ -464,6 +464,31 @@ try {
 			fs.readFileSync(manifest, 'utf8').split('\n').includes(lastRow),
 			'an unterminated final ownership row survives startup changes'
 		);
+		// Startup changes must not adopt user-modified or previously unowned entries.
+		const oldDigest = createHash('sha256').update(disabled).digest('hex');
+		const customDesktop = disabled + '# personal setting\n';
+		for (const kind of ['modified', 'unowned', 'unchanged']) {
+			fs.writeFileSync(desktop, kind === 'modified' ? customDesktop : disabled);
+			const initial = `${'a'.repeat(64)}\tlinux/retained-file\n` +
+				(kind === 'unowned' ? '' : `${oldDigest}\t@autostart\n`);
+			fs.writeFileSync(manifest, initial);
+			assert.equal(run('enable').status, 0, `${kind} startup update`);
+			const result = fs.readFileSync(manifest, 'utf8');
+			if (kind === 'modified') {
+				assert.ok(result.includes(`${oldDigest}\t@autostart\n`), 'modified entry keeps its prior digest');
+				assert.match(fs.readFileSync(desktop, 'utf8'), /^# personal setting$/m);
+			} else if (kind === 'unowned') {
+				assert.doesNotMatch(result, /\t@autostart\n/, 'an unowned entry is not adopted');
+			} else {
+				const digest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
+				assert.ok(result.includes(`${digest}\t@autostart\n`), 'an unchanged owned entry receives its new digest');
+			}
+		}
+		fs.unlinkSync(desktop);
+		fs.writeFileSync(manifest, `${'a'.repeat(64)}\tlinux/retained-file\n`);
+		assert.equal(run('enable').status, 0, 'a new desktop entry is owned');
+		const newDigest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
+		assert.ok(fs.readFileSync(manifest, 'utf8').includes(`${newDigest}\t@autostart\n`));
 		fs.writeFileSync(desktop, disabled);
 		for (const invalid of [
 			'',

@@ -223,6 +223,13 @@ if "$receipt_present"; then
 	cp -p -- "$receipt_previous" "$receipt_tmp"
 	declare -A receipt_seen=()
 	receipt_count=0
+	previous_desktop_digest=
+	if [ -n "$desktop_previous" ]; then
+		previous_desktop_digest="$(sha256sum < "$desktop_previous")"
+		previous_desktop_digest="${previous_desktop_digest%% *}"
+	fi
+	update_desktop_receipt=false
+	if [ -z "$desktop_previous" ]; then update_desktop_receipt=true; fi
 	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
 		case "$relative" in
@@ -235,11 +242,21 @@ if "$receipt_present"; then
 		[ -z "${receipt_seen[$relative]:-}" ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
 		receipt_seen["$relative"]=1
 		((receipt_count += 1))
-		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi
+		if [ "$relative" = @autostart ]; then
+			if [ -z "$desktop_previous" ] || [ "$digest" = "$previous_desktop_digest" ]; then
+				update_desktop_receipt=true
+			else
+				printf '%s\t%s\n' "$digest" "$relative"
+			fi
+		else
+			printf '%s\t%s\n' "$digest" "$relative"
+		fi
 	done < "$receipt_previous" > "$receipt_tmp"
 	[ "$receipt_count" -gt 0 ] || { startup_record invalid-receipt receipt "$manifest"; exit 78; }
-	digest="$(sha256sum < "$desktop_tmp")"
-	printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
+	if "$update_desktop_receipt"; then
+		digest="$(sha256sum < "$desktop_tmp")"
+		printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
+	fi
 	mv -f -- "$receipt_tmp" "$manifest"
 	receipt_published=true
 fi
