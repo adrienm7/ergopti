@@ -126,6 +126,19 @@ local function gsettings_children(world)
 end
 
 helpers.describe("diagnostics probes (linux)", function()
+	helpers.it("(healthcheck-http-refusal) preserves an inline completion despite a false dispatch receipt", function()
+		with_probes(true, function(Probes)
+			package.loaded["adapters.http_client"].get = function(_, _, _, done)
+				done({ status = 200, body = "{}" }); return false
+			end
+			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
+				get_base_url = function() return "http://127.0.0.1:11434" end } })
+			helpers.assert_eq(answers.github_api.result.state, "ok")
+			helpers.assert_eq(answers.ai_health.result.state, "ok")
+			run.cancel()
+		end)
+	end)
+
 	helpers.it("(healthcheck-http-refusal) completes probes when HTTP admission refuses without callback", function()
 		with_probes(true, function(Probes, world)
 			package.loaded["adapters.http_client"].get = function() return false end
@@ -137,6 +150,8 @@ helpers.describe("diagnostics probes (linux)", function()
 			select(2, gsettings_children(world)).callback({ ok = true, stdout = "'http://pac.example.invalid/a.pac'" })
 			helpers.assert_eq(answers.proxy_pac.result.state, "error")
 			run.cancel()
+			helpers.assert_eq(world.cancelled_owners, { "diagnostics.pac", "diagnostics.ai", "diagnostics.github" },
+				"the display result must not discard the native cancellation owners")
 		end)
 	end)
 
