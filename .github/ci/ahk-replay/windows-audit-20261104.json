@@ -1,27 +1,35 @@
 {
-	"expected_count": 5,
-	"native_http_client_e2e": true,
+	"expected_count": 18,
+	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
-	"native_proxy_relay_owner_e2e": true,
+	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "native-ipv6-relay-upstream1",
+			"contains": "hcw-native-numeric-domain-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "hcw-native-numeric-companion",
+			"expected_count": 4
+		},
+		{
+			"contains": "config-window-delay-write-per-keystroke",
+			"expected_count": 4
+		},
+		{
+			"contains": "llm-integer-input-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "hotstrings_config_window: numeric debounce preserves distinct fields",
 			"expected_count": 1
 		},
 		{
-			"contains": "native-relay-hop-branches1",
+			"contains": "hotstrings_config_window: field reset cancels only its matching debounce",
 			"expected_count": 1
 		},
 		{
-			"contains": "native-winhttp-ipv6-host1",
-			"expected_count": 1
-		},
-		{
-			"contains": "native-ipv6-http-socks1",
-			"expected_count": 1
-		},
-		{
-			"contains": "native-ipv6-http-socks-port1",
+			"contains": "hotstrings_config_window: refused numeric drafts remain retryable",
 			"expected_count": 1
 		}
 	]
