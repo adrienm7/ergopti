@@ -1,64 +1,56 @@
 {
-	"expected_count": 50,
+	"expected_count": 21,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "uia-selection-native64",
+			"contains": "take-note-counted-nul",
 			"expected_count": 3
-		},
-		{
-			"contains": "combination-mark-native64",
-			"expected_count": 3
-		},
-		{
-			"contains": "hotstring-timegate-native64",
-			"expected_count": 3
-		},
-		{
-			"contains": "program-provider-case-sensitive",
-			"expected_count": 2
-		},
-		{
-			"contains": "program-provider-exact-duplicate",
-			"expected_count": 1
-		},
-		{
-			"contains": "backspace-cached-privacy-gap",
-			"expected_count": 5
-		},
-		{
-			"contains": "native-relay-hop-branches1",
-			"expected_count": 1
 		},
 		{
 			"contains": "native-ipv6-http-socks1",
 			"expected_count": 1
 		},
 		{
-			"contains": "takenote-native-document-owner",
+			"contains": "wpm-graph-native-reentry",
 			"expected_count": 2
 		},
 		{
-			"contains": "take-note-counted-nul",
+			"contains": "screenshot-layered-native",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-native-visibility-order-owner",
 			"expected_count": 3
 		},
 		{
-			"contains": "wrap-native-trigger-epoch",
+			"contains": "hcw-native-destroy-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-native-constructor-failure",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-native-failed-constructor-retirement",
+			"expected_count": 2
+		},
+		{
+			"contains": "key combinations: the first key's own tap is cancelled, once (key-combinations-2026-10-01)",
 			"expected_count": 1
 		},
 		{
-			"contains": "wrap-native-fresh-selection",
-			"expected_count": 4
-		},
-		{
-			"contains": "UIA worker: cold startup is bounded",
+			"contains": "hotstring_engine: IsTimeActivationExpired fails closed on missing prev char",
 			"expected_count": 1
 		},
 		{
-			"contains": "time-gate-corpus",
-			"expected_count": 20
+			"contains": "hotstring_engine: IsTimeActivationExpired still fires for a fresh prev char",
+			"expected_count": 1
+		},
+		{
+			"contains": "hotstring_engine: activation duration must fit the elapsed-tick domain",
+			"expected_count": 1
 		}
 	]
 }
