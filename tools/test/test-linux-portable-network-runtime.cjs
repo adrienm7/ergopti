@@ -577,10 +577,19 @@ if (process.platform === 'linux') {
 			[
 				'-c',
 				`
-import contextlib,importlib.util,io,pathlib,sys,types
+import contextlib,importlib.util,io,os,pathlib,sys,types
 s=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 p=pathlib.Path(sys.argv[2]);d=p/'components';d.mkdir();a=d/'a';b=d/'b';a.write_bytes(b'owned A');b.write_bytes(b'owned B');owners={}
+
 m.copy_unique(a,d/'out',owners);m.copy_unique(a,d/'out',owners)
+for changed in ('source','destination'):
+ source=d/('mutable-source-'+changed);target=d/('mutable-target-'+changed);source.write_bytes(b'original');ledger={}
+ m.copy_unique(source,target,ledger)
+ changed_file=source if changed=='source' else target;old=changed_file.stat();changed_file.write_bytes(b'modified');os.utime(changed_file,ns=(old.st_atime_ns,old.st_mtime_ns))
+ try:m.copy_unique(source,target,ledger)
+ except m.RuntimeRefused:pass
+ else:raise AssertionError('Changed '+changed+' cannot reuse a copy receipt')
+
 for operation in [lambda:m.copy_unique(b,d/'out',owners),lambda:m.regular_source(d/'absent'),lambda:m.dependency_paths('libmissing.so.0 => not found\\n'),lambda:m.dependency_paths('unrecognized private output\\n')]:
  try:operation()
  except (m.RuntimeRefused,OSError):pass
