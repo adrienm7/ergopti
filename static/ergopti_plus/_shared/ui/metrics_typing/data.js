@@ -1310,10 +1310,39 @@ function render_sfb_kpi() {
 		if (!_sfb_include_same_key && is_same_key) return;
 
 		sfb_total += count;
-		const finger_fr = FINGER_LABELS_FR[col_a] || col_a;
-		const fp = finger_fr.split(' ');
-		const hand = fp[fp.length - 1];
-		const finger = fp.slice(0, -1).join(' ');
+		// Some languages join finger and hand without a space. Only expose a
+		// side when both translations prove the same finger stem with opposite,
+		// unambiguous hand suffixes; otherwise retain the full name and no side.
+		const finger = FINGER_LABELS_FR[col_a] || col_a;
+		const strings = window._i18n_strings || {};
+		const left = strings['ui_typing.finger.hand_l'];
+		const right = strings['ui_typing.finger.hand_r'];
+		const otherKey = col_a.startsWith('l_')
+			? `r_${col_a.slice(2)}`
+			: col_a.startsWith('r_')
+				? `l_${col_a.slice(2)}`
+				: null;
+		const other = otherKey && FINGER_LABELS_FR[otherKey];
+		let hand = '—';
+		if (
+			typeof left === 'string' &&
+			left &&
+			typeof right === 'string' &&
+			right &&
+			typeof other === 'string'
+		) {
+			const lm = finger.endsWith(left),
+				rm = finger.endsWith(right);
+			const olm = other.endsWith(left),
+				orm = other.endsWith(right);
+			if (lm !== rm && olm !== orm && lm !== olm) {
+				const suffix = lm ? left : right,
+					otherSuffix = olm ? left : right;
+				const stem = finger.slice(0, -suffix.length).trim();
+				const otherStem = other.slice(0, -otherSuffix.length).trim();
+				if (stem && stem === otherStem) hand = suffix;
+			}
+		}
 		sfb_list.push({ pair: k, count, kc_a, kc_b, finger, hand });
 	});
 
@@ -1479,11 +1508,8 @@ function render_sfb_table() {
 		rows_html = sorted
 			.slice(0, 200)
 			.map((d) => {
-				// finger and hand are pre-computed in render_sfb_kpi() for sortability
-				// "doigt" / "main" share the same FINGER_LABELS_FR convention as the
-				// distance card; strip the trailing G/D from the finger label since the
-				// hand is already shown in its own column.
-				const doigt_str = (d.finger || '').replace(/\s+[GD]$/, '');
+				// The finger label is intentionally kept whole in every language.
+				const doigt_str = d.finger || '';
 				const main_str = d.hand || '';
 				const pair_html = `<span class="seq-chips">${format_seq_chips(d.pair)}</span>`;
 				return `<tr>
