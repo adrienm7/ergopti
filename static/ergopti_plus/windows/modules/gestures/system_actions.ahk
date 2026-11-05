@@ -100,15 +100,19 @@ _GestureSys(Sys) {
 ; capture the loop variable, and every action would run the last one.
 ; @param {Object} Sys The SystemControl that defers it (a double in tests).
 _GestureMakeSystemRunner(ActionId, ActionFn, Sys := 0) {
-	return (*) => _GestureSys(Sys).Defer(_GestureRunSystemAction.Bind(ActionId, ActionFn))
+	global _LifecycleLatestTransition
+	; Capture on each invocation: the factory itself is built once at boot.
+	return (*) => _GestureSys(Sys).Defer(
+		_GestureRunSystemAction.Bind(ActionId, ActionFn, _LifecycleLatestTransition))
 }
 
 ; Runs one deferred system action. Its body runs after _GestureRunAction's
 ; containment has returned, so a failure is contained and logged here rather
 ; than escaping the timer thread into the global error handler.
-_GestureRunSystemAction(ActionId, ActionFn) {
-	if A_IsSuspended {
-		LoggerInfo("gestures", "System action '{1}' was cancelled before its deferred execution: the script is suspended.", ActionId)
+_GestureRunSystemAction(ActionId, ActionFn, Transition) {
+	global _LifecycleLatestTransition
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "System action '{1}' was cancelled before its deferred execution: suspended or original lifecycle transition retired.", ActionId)
 		return false
 	}
 	try {
@@ -125,9 +129,11 @@ _GestureMakeConfirmedSystemRunner(ActionId, ActionFn) {
 }
 
 _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	try {
-		Sys.Defer(_GestureRunConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+		Sys.Defer(_GestureRunConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys, Transition))
 		if IsObject(Target) && Target.HasOwnProp("ProcessLease")
 			Target.ProcessLeaseDeferred := true
 		return true
@@ -139,9 +145,9 @@ _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
 
 ; The second callback owns cleanup even when the ordinary runner refuses pause
 ; before invoking its action, or contains an exception from native validation.
-_GestureRunConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+_GestureRunConfirmedSystemAction(ActionId, ActionFn, Target, Sys, Transition) {
 	try return _GestureRunSystemAction(ActionId,
-		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys))
+		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys), Transition)
 	finally _GestureReleaseProcessTarget(Target, Sys)
 }
 
@@ -195,14 +201,16 @@ GESTURE_ACTIONS["open_app"] := { Fn: (BindingId := "") => GestureSysOpenApp(Bind
 ; Powers the monitors off, as their own sleep timeout does, once the keys that
 ; fired the action have had time to be released.
 GestureSysSleepDisplays(Sys := 0) {
-	global GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS
+	global GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS, _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
-	Sys.Defer(_GestureSysPowerOffDisplays.Bind(Sys), GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS)
+	Sys.Defer(_GestureSysPowerOffDisplays.Bind(Sys, Transition), GESTURE_SYS_DISPLAY_SLEEP_DELAY_MS)
 }
 
-_GestureSysPowerOffDisplays(Sys) {
-	if A_IsSuspended {
-		LoggerInfo("gestures", "Display sleep was cancelled before its delayed execution: the script is suspended.")
+_GestureSysPowerOffDisplays(Sys, Transition) {
+	global _LifecycleLatestTransition
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "Display sleep was cancelled before its delayed execution: suspended or original lifecycle transition retired.")
 		return false
 	}
 	global GESTURE_SYS_WM_SYSCOMMAND, GESTURE_SYS_SC_MONITORPOWER, GESTURE_SYS_MONITOR_OFF
