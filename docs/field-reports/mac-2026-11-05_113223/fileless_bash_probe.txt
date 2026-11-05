@@ -1,0 +1,3 @@
+path script: exit=0 output=started survived 
+unlinked /dev/fd/3 script: exit=0 output=started survived 
+both finished after 12s

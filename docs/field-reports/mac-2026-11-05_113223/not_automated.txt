@@ -1,0 +1,8 @@
+typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;
+  synthetic key events (CGEvent) never reach it, and macOS offers no HID injection without a signed driver. The
+  field run's tap-hold, chord and hotstring checks prove the rules and the Quartz path; typing on the internal keyboard
+  stays a person's check.
+sleep and wake: refused. Waking the Mac on its own needs a pmset power schedule, a system setting this collector never
+  writes, and a sleeping Mac cannot run the collector.
+driver approval and administrator password: a person's steps. macOS forbids clicking them for the user; the run waits.
+reload: automated (the field run's owned_install_reload and driver_reload steps).

@@ -1,0 +1,36 @@
+{
+ "continuations": 0,
+ "counters": {},
+ "error_keys": [],
+ "errors": [],
+ "field_checks": {
+  "counts": {
+   "info": 1,
+   "pass": 1
+  },
+  "items": [
+   {
+    "id": "privacy_pane_urls",
+    "source": "privacy_pane_urls",
+    "verdict": "info"
+   },
+   {
+    "id": "system_bash",
+    "source": "system_bash",
+    "verdict": "pass"
+   }
+  ]
+ },
+ "lifecycle": {},
+ "lines": 0,
+ "logs": [],
+ "performance": [],
+ "previous": "mac-2026-11-05_111400",
+ "records": 0,
+ "schema": 1,
+ "span": {
+  "first": null,
+  "last": null
+ },
+ "top_fixes": []
+}

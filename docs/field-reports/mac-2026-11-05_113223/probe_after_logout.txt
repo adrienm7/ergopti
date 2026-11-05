@@ -1,0 +1,2 @@
+probe v5 after-logout
+P10 INFO no logout since 2026-10-28T11:05:19Z (loginwindow pid 449 unchanged); EPProbeKeep6125 kept for the next run

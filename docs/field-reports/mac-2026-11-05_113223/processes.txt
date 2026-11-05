@@ -1,0 +1,11 @@
+581 /Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon
+582 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+697 /Library/SystemExtensions/9EFC2659-31E3-451D-8D2C-CE38E09D8183/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice org.pqrs.Karabiner-DriverKit-VirtualHIDDevice 0x100001171 org.pqrs.Karabiner-DriverKit-VirtualHIDDevice
+2247 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+2253 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+2254 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-NotificationWindow.app/Contents/MacOS/Karabiner-NotificationWindow
+2259 /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service
+6608 /Applications/oMLX.app/Contents/MacOS/oMLX
+6636 omlx-server ptr_munge= main_stack= executable_file=0x1a01000011,0x41d62a9 dyld_file=0x1a01000011,0xfffffff000a9547 executable_cdhash=3af32e98331491c46756a22efea3fabda03bb2f9 executable_boothash=9d2f8840d5ab4171a151ee1a4b07627be3c7050c th_port=
+56088 /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+56093 /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
