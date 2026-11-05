@@ -993,7 +993,7 @@
 			"reproduction": "Collect a real diagnostic replacement through a handle whose write rights are refused, then inspect the acknowledged target bytes.",
 			"root_cause": "FSWriteUtf8ReplaceStrict uses buffered FileOpen writing without requiring the native write receipt before replacement.",
 			"silent_failure": "Run41954012438 in both orders acknowledges Result1 with publishedBytes0; the genuine skipped-collection control passes.",
-			"regression_test": "Use the owned native replacement stage, require WriteFile and flush acknowledgement, preserve foreign stages, and assert refusal with Win32 error5."
+			"regression_test": "Use the owned native replacement stage, require WriteFile and flush acknowledgement, preserve foreign stages, and assert refusal with Win32 error5. Native post-fix at a735586, run41960804242: Both collection-guided native file cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-091",
@@ -1004,7 +1004,7 @@
 			"reproduction": "Feed official OpenAI-compatible Mistral content arrays containing typed text, with and without a preceding thinking chunk, through actual request completion.",
 			"root_cause": "The canonical choices.message.content reader admits only String, although the provider contract also admits typed text arrays.",
 			"silent_failure": "Run41954012438 classifies both actual answers canonical_empty, invokes one empty callback and retires the real request; string and reasoning-only controls pass.",
-			"regression_test": "Concatenate ordered strictly typed text chunks; ignore reasoning and nontext chunks, refuse malformed text arrays, preserve no-decoy fallback and exactly-once request retirement."
+			"regression_test": "Concatenate ordered strictly typed text chunks; ignore reasoning and nontext chunks, refuse malformed text arrays, preserve no-decoy fallback and exactly-once request retirement. Native post-fix at a735586, run41960804242: All11 Mistral content cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-092",
@@ -1015,7 +1015,7 @@
 			"reproduction": "Start an independently owned delayed calendar reader, execute a second real connector action, then release the first reader.",
 			"root_cause": "LLM_AgentConnector_Execute deletes previous temporary files without any consumption acknowledgement from the asynchronous native handler.",
 			"silent_failure": "Run41954012438 observes existsbefore_release0 and MISSING in the joined real reader; the single-action reader control reads the complete calendar bytes.",
-			"regression_test": "Retain each calendar handoff in an exclusively created user-private directory; delayed-reader and independent native ACL, collision, UTF-8 and NUL controls cover publication."
+			"regression_test": "Retain each calendar handoff in an exclusively created user-private directory; delayed-reader and independent native ACL, collision, UTF-8 and NUL controls cover publication. Native post-fix at a735586, run41960804242: Both delayed native-reader cases and the independently inspected private-ACL/collision case pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-093",
@@ -1026,7 +1026,7 @@
 			"reproduction": "Produce canonical baseline, network-switch and signal rows through the genuine Wi-Fi poll, ingest them into real SQLite and rebuild the manifest.",
 			"root_cause": "KLR_RebuildAggregates counts legacy events_system wifi_change rows while the active producer writes events_network network_change.",
 			"silent_failure": "Run41954012438 retains three genuine network rows but exposes manifest wifi_changes0 instead of1; signal-only control passes.",
-			"regression_test": "Count known connectivity and SSID transitions from canonical metadata, preserve legacy events, exclude startup/signal/unknown observations, and invalidate obsolete cache/checkpoint versions."
+			"regression_test": "Count known connectivity and SSID transitions from canonical metadata, preserve legacy events, exclude startup/signal/unknown observations, and invalidate obsolete cache/checkpoint versions. Native post-fix at a735586, run41960804242: All4 dashboard/cache and both real connectivity-flow cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-094",
@@ -1037,7 +1037,7 @@
 			"reproduction": "Type abc in application A, switch context without a delimiter, type def and space in application B through actual context and ROI producers.",
 			"root_cause": "The in-progress ROI word has no canonical focus owner and survives context discontinuities.",
 			"silent_failure": "Run41954012438 reports compound_count5 and a compound candidate across applications, with zero hook errors; same-application continuity control passes.",
-			"regression_test": "Bind fragments to immutable app/title/HWND identity; discard on context, caret, privacy, synthetic and lifecycle gaps without promoting incomplete words; preserve same-context refresh continuity."
+			"regression_test": "Bind fragments to immutable app/title/HWND identity; discard on context, caret, privacy, synthetic and lifecycle gaps without promoting incomplete words; preserve same-context refresh continuity. Native post-fix at a735586, run41960804242: All6 context/synthetic continuity cases,5 native ROI half-life cases and3 prune controls pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-095",
@@ -1048,7 +1048,7 @@
 			"reproduction": "Deliver one native Enter or Tab to an owned receiver while observing the actual installed InputHook key and character callbacks.",
 			"root_cause": "The key intent records the named control event and the following character intent records its control-code echo as another text unit.",
 			"silent_failure": "Run41954012438 observes one receiver keydown, one hook keydown and one LF or TAB callback, but two canonical events and text units in both orders; letter and Backspace controls pass.",
-			"regression_test": "Associate an echo with its exact hook, lifecycle, generation and successfully recorded predecessor; preserve genuine OnChar-only Unicode packets and unrelated-key release behavior."
+			"regression_test": "Associate an echo with its exact hook, lifecycle, generation and successfully recorded predecessor; preserve genuine OnChar-only Unicode packets and unrelated-key release behavior. Native post-fix at a735586, run41960804242: All4 installed InputHook cases and9 echo-protocol controls pass. The genuine standalone LF packet passes; standalone Tab stops at its receiving-control prerequisite and remains unqualified. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-096",
@@ -1059,7 +1059,7 @@
 			"reproduction": "Create a private registry subtree, deny value-query permission with a reversible native DACL, and call the real storage clear path.",
 			"root_cause": "Reg_EnumValues collapses registry enumeration refusal into an empty array, which ST_Clear treats as complete discovery.",
 			"silent_failure": "Run41954012438 measures native query5 and enum5 while ST_Clear returns1; accessible and genuinely empty controls pass and the exact original ACL is restored.",
-			"regression_test": "Use an explicit complete-enumeration receipt, publish no partial names on error, distinguish absent keys from denied access, and grow buffers for legal long names."
+			"regression_test": "Use an explicit complete-enumeration receipt, publish no partial names on error, distinguish absent keys from denied access, and grow buffers for legal long names. Native post-fix at a735586, run41960804242: All5 native registry enumeration cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-097",
@@ -1070,7 +1070,7 @@
 			"reproduction": "Let an independent clipboard writer replace the published payload after its authentic sequence receipt and before the actual paste.",
 			"root_cause": "SendInstant does not revalidate the original owned sequence at the final native paste boundary.",
 			"silent_failure": "Run41954012438 independently verifies payload sequence23/40 changes to28/45 and the actual Edit receives foreign text while ok remains1; inverse repeats the defect.",
-			"regression_test": "Reject a changed sequence immediately before paste, retain the original cleanup ownership, and test actual receiver bytes plus a stable positive control. The initial positive case reached correct receiving assertions but failed fixture cleanup, repaired separately."
+			"regression_test": "Reject a changed sequence immediately before paste, retain the original cleanup ownership, and test actual receiver bytes plus a stable positive control. The initial positive case reached correct receiving assertions but failed fixture cleanup, repaired separately. Native post-fix at a735586, run41960804242: All3 post-receipt cases and3 earlier SendInstant ownership controls pass, including physical receipt-preserving cleanup. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-098",
@@ -1081,7 +1081,7 @@
 			"reproduction": "During the real ClipboardAll rendering callback, focus another native Edit before the pending wrap or gesture emits its text.",
 			"root_cause": "SendInstant captures no native window/process/control authority across the yielding clipboard snapshot and final injection.",
 			"silent_failure": "Run41954012438 records wrong_target1, one emission and transformed old text in EditB for both wrap and gesture in both orders.",
-			"regression_test": "Capture and revalidate native target identity across clipboard and send boundaries; refuse the wrap fallback after focus loss. Initial unchanged-target cases receive the correct output but require the separate fixture cleanup repair."
+			"regression_test": "Capture and revalidate native target identity across clipboard and send boundaries; refuse the wrap fallback after focus loss. Initial unchanged-target cases receive the correct output but require the separate fixture cleanup repair. Native post-fix at a735586, run41960804242: Both wrap-render and both gesture-render focus cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
 		},
 		{
 			"id": "AHK-099",
@@ -1092,7 +1092,29 @@
 			"reproduction": "During the initial real ClipboardAll renderer, move focus from EditA to EditB inside one foreground HWND, then complete selection transformation.",
 			"root_cause": "GetSelectionAsync binds foreground identity and physical generation but not the focused control before its first clipboard call.",
 			"silent_failure": "Run41954012438 records wrong_control1 and transforms bravo in EditB instead of the original selection in both orders.",
-			"regression_test": "Bind every real capture to a nonzero native control token, revalidate after callouts and before delivery, preserve manually built legacy jobs, and retain exact owner cleanup. The stable positive receiver case initially fails cleanup only."
+			"regression_test": "Bind every real capture to a nonzero native control token, revalidate after callouts and before delivery, preserve manually built legacy jobs, and retain exact owner cleanup. The stable positive receiver case initially fails cleanup only. Native post-fix at a735586, run41960804242: Both same-window selection-control cases and the selected32 admitted-sequence cases pass. Every quoted result repeats in inverse order; the mixed289-case cohort remains red."
+		},
+		{
+			"id": "AHK-100",
+			"title": "Malformed locale catalogues escape safe translation fallback",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Call the actual public translator with genuine locale JSON containing a Boolean root, array root, nested value, numeric value or null value.",
+			"root_cause": "_I18nLoadLocaleMap in infra/locale.ahk catches JSON syntax errors but does not validate the flat String-to-String catalogue before iteration, substitution and TSV caching.",
+			"silent_failure": "Run41962516263 reaches the real private source in all5 malformed modes: Boolean/nested/null values throw, array is incorrectly loaded and numeric translation returns Integer. Flat and empty-object controls pass; inverse repeats.",
+			"regression_test": "Validate the entire catalogue inside the existing protected parse boundary; refuse before any cache publication, and retire v1 TSV files whose serialization erased bad source types. Eight cases include a genuine newer legacy cache."
+		},
+		{
+			"id": "AHK-101",
+			"title": "Program providers reject an absolute UNC share root",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Call the actual ProgramProviders_ConfigRoute with configuration at a UNC volume root, with and without a trailing separator.",
+			"root_cause": "ProgramProviderAbsolute in the Windows shared AHK owner requires a descendant character after the UNC server/share separator instead of admitting the complete share root itself.",
+			"silent_failure": "Run41962516263 returns false for both complete UNC roots while drive-root, UNC descendant and malformed/device controls pass. No SMB access or discovery success is inferred.",
+			"regression_test": "Nine independent real route/admission cases admit complete UNC roots and preserve all malformed/device refusals; the path policy permits an optional descendant suffix."
 		}
 	]
 }

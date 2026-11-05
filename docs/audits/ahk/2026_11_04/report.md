@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **99 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **101 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1647,3 +1647,47 @@ The profile source guard now compares the complete persisted LLM projection thro
 ## WPM compensation follow-up for AHK-081
 
 The original104 native fail-before remains the evidence for the lost acknowledged successor. The correction now reserves each two-coordinate storage operation, captures its previous pair atomically in RAM, and publishes an opaque success receipt. Enclosing TOML failures can compensate only that exact receipt; a later success with identical coordinates also retires it. The local owner is released before failure notification so a notifier can legitimately publish its own successor. Storage and notification execute outside Critical, including for callers which inherited it. Eight additional tests cover two ABA cases, local callout reentrance, ordinary refusal, inherited Critical and a failure-notifier successor. Two separate Registry values are not represented as an atomic cross-process transaction; repeated native rollback refusal remains a reported failure. Native post-fix qualification is pending.
+
+## Native qualification at a735586
+
+Run41960804242 strictly discovers289 cases. Each order records267 successes and the same22 failures; complete production compilation succeeds and the selected native hotstring E2E corpus executes90/90 successfully. HTTP E2E is not selected and the full OS suite is not qualified. All090–099 corrections pass their primary native probes, as detailed in the register;095 standalone Unicode Tab remains blocked by a receiver prerequisite, while LF and all named-key InputHook cases pass. Profiles35, boot-feature6, clipboard receiving/selection, Wi-Fi, ROI, storage and diagnostics pass.
+
+Two optional full-save probes confirm a072 extension: physical max_words21 becomes15 while RAM stays15 and the save returns1. Reload-B and unchanged-A controls pass. Four stronger WPM cases stop at an overly narrow native contention-code prerequisite; the inverse native operation will distinguish both5 and32 from unrelated failures. Seven Prompt fixtures omit a genuine request-plan constant, two final-context fixtures read an absent pre-start registration property, one meta mutant no longer changes its assignment, and two Changelog fixtures miss their native notification. These fixture failures do not establish new product findings. Escape and captured-Ctrl controls extend053/067 with actual receiving evidence, and are corrected separately.
+
+## Native qualification at c5eda7e
+
+Run41962516263 discovers72 different targeted cases:34 pass and38 fail in each order with identical failing names. Production compilation succeeds; both optional E2E groups are unselected. The run establishes100–101 below. It extends existing families: five personal-information syntax/type cases erase authored fields or aliases during an unrelated edit (projection/preservation family068); two API aggregation cases publish infinity or a positively wrapped Int64 total (066); two Backspace repeat frames emit after pause/restart (036); a pre-existing Wrap stage is overwritten and consumed (071); and the true default full collector overwrites an independently changed non-LLM locale during a profile edit (072). Their ordinary controls pass. These variants do not inflate the distinct count.
+
+The newly introduced WPM authority object incorrectly used AutoHotkey's reserved base slot for a storage path and raises Invalid base before assertions. It is immediately corrected to storagePath at fec406d, without counting an introduced regression as a new finding. Two clipboard snapshot probes stop at an independent-owner prerequisite, and the redirected long-transform probe fails to establish its intended timing boundary. They remain unconfirmed hypotheses.
+
+## AHK-100: Malformed locale catalogues escape safe translation fallback
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+\_I18nLoadLocaleMap in infra/locale.ahk catches JSON syntax errors but does not validate the flat String-to-String catalogue before iteration, substitution and TSV caching.
+
+Reproduction: Call the actual public translator with genuine locale JSON containing a Boolean root, array root, nested value, numeric value or null value.
+
+Observation: Run41962516263 reaches the real private source in all5 malformed modes: Boolean/nested/null values throw, array is incorrectly loaded and numeric translation returns Integer. Flat and empty-object controls pass; inverse repeats.
+
+Regression: Validate the entire catalogue inside the existing protected parse boundary; refuse before any cache publication, and retire v1 TSV files whose serialization erased bad source types. Eight cases include a genuine newer legacy cache.
+
+The correction is integrated; post-fix native qualification is pending.
+
+## AHK-101: Program providers reject an absolute UNC share root
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+ProgramProviderAbsolute in the Windows shared AHK owner requires a descendant character after the UNC server/share separator instead of admitting the complete share root itself.
+
+Reproduction: Call the actual ProgramProviders_ConfigRoute with configuration at a UNC volume root, with and without a trailing separator.
+
+Observation: Run41962516263 returns false for both complete UNC roots while drive-root, UNC descendant and malformed/device controls pass. No SMB access or discovery success is inferred.
+
+Regression: Nine independent real route/admission cases admit complete UNC roots and preserve all malformed/device refusals; the path policy permits an optional descendant suffix.
+
+The correction is integrated; post-fix native qualification is pending.
+
+## Additional integrated corrections awaiting qualification
+
+The071 Wrap publisher now retains its exclusively created stage and folder handles through native rename and cleanup. Pre-existing stages remain untouched. A structured receipt distinguishes actual rename from complete durability, and a failed post-rename flush fences only the obsolete live projection; a newer real reload remains usable. True writes, rename, close and retry controls retain explicit partial-failure feedback. The066 request aggregator independently bounds each counter and cost and retains unknown fields until finalization. One-shot053/067 controls replay Escape as a named key and preserve captured logical modifier flags without adding one-shot Shift. All require their next targeted native receipts.
