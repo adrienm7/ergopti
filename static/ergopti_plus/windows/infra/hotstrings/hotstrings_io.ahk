@@ -111,7 +111,7 @@ HotstringsConfigInit(OverridePath) {
 		}
 		_HotstringsOverridesPath    := OverridePath
 		try {
-				_HotstringsOverrides := _ParseOverrides(OverridePath)
+				_HotstringsOverrides := _ParseOverrides(OverridePath, &Legacy)
 		} catch ValueError as Err {
 				try LoggerError("HotstringsConfig", "The override file '{1}' is not valid TOML: {2} ({3}). No user override applies until it is repaired.",
 						OverridePath, Err.Message, Err.Extra)
@@ -119,23 +119,62 @@ HotstringsConfigInit(OverridePath) {
 		}
 		; The word and consumed delimiter strings of earlier builds: read once so
 		; HotstringsDelimitersBoot can move them to config.toml, never used as a state.
-		_HotstringsLegacyDelimiters := { Word: _ParseGlobalKey(OverridePath, "word_delimiters"),
-				Consumed: _ParseGlobalKey(OverridePath, "consumed_delimiters") }
+		_HotstringsLegacyDelimiters := Legacy
 		HotstringsResolveBumpGen()
 		try LoggerInfo("HotstringsConfig", "Initialized (override file: '{1}').", OverridePath)
 }
 
-; Read a quoted-string key from the ``[__global__]`` section of the override file.
-; Returns "" when the file is missing or the key is absent.
-; A decoded replacement character is not proof of the source bytes it replaces.
-; Keep empty valid input distinct from a failed exact native UTF-8 read.
-_HotstringsOverrideReadDocument(Path, &Records := 0, &Physical := 0) {
-	Source := FSReadUtf8Exact(Path)
-	if !(Source is String)
-		throw ValueError("Hotstring overrides must be readable exact UTF-8.")
-	return TOML_ParseDocument(Source, &Records, &Physical)
+; This receipt belongs to one actual parsed/published Map identity. It carries
+; no reference back to that Map, so replaced owners form no reference cycle.
+_HotstringsOverrideBindSource(Owner, Path, Snapshot) {
+	if !(Owner is Map) || !(Snapshot is Map)
+			|| (Snapshot.Get("status", "") != FS_STATUS_OK && Snapshot.Get("status", "") != FS_STATUS_ABSENT)
+			|| !(Snapshot.Get("content", 0) is String)
+		throw ValueError("An override source receipt requires an exact classified image.")
+	Receipt := { MapIdentity: ObjPtr(Owner), PathKey: _ConfigWriteLeaseKey(Path),
+		Source: Map("status", Snapshot["status"], "content", Snapshot["content"]) }
+	Owner.DefineProp("_HotstringsSourceReceipt", {Value: Receipt})
+	return Receipt
 }
 
+_HotstringsOverrideSourceFor(Owner, Path) {
+	if !(Owner is Map) || !Object.Prototype.HasOwnProp.Call(Owner, "_HotstringsSourceReceipt")
+		return 0
+	Property := Object.Prototype.GetOwnPropDesc.Call(Owner, "_HotstringsSourceReceipt")
+	if !Property.HasOwnProp("Value")
+		return 0
+	Receipt := Property.Value
+	if !IsObject(Receipt) || !Receipt.HasOwnProp("MapIdentity") || Receipt.MapIdentity != ObjPtr(Owner)
+			|| !Receipt.HasOwnProp("PathKey") || Receipt.PathKey != _ConfigWriteLeaseKey(Path)
+			|| !Receipt.HasOwnProp("Source") || !(Receipt.Source is Map)
+		return 0
+	return Receipt
+}
+
+_HotstringsOverrideCommitSourceCurrent(Origin, Receipt, Path, AuthorizeFn, HasAuthorizer, RequiresLive) {
+	global _HotstringsOverrides
+	if _HotstringsOverrideSourceFor(Origin, Path) != Receipt || (RequiresLive && Origin != _HotstringsOverrides)
+		return false
+	; Admission may yield/reenter. Its effects precede the final physical source
+	; comparison, never grant permission to replace a newly read source image.
+	if HasAuthorizer && !_FSNativeAdmissionAccepted(AuthorizeFn)
+		return false
+	return _HotstringsOverrideSourceFor(Origin, Path) == Receipt
+		&& (!RequiresLive || Origin == _HotstringsOverrides)
+		&& _FSSourceIsUnchanged(Path, Receipt.Source)
+}
+
+; A decoded replacement character is not proof of the source bytes it replaces.
+; Keep empty valid input distinct from a failed exact native UTF-8 read.
+_HotstringsOverrideReadDocument(Path, &Records := 0, &Physical := 0, &Snapshot := 0) {
+	Snapshot := FSReadWithStatus(Path)
+	if Snapshot["status"] != FS_STATUS_OK && Snapshot["status"] != FS_STATUS_ABSENT
+		throw ValueError("Hotstring overrides must be readable exact UTF-8.")
+	return TOML_ParseDocument(Snapshot["content"], &Records, &Physical)
+}
+
+; Read a quoted-string key from the ``[__global__]`` section of the override file.
+; Returns "" when the file is missing or the key is absent.
 _ParseGlobalKey(Path, KeyName) {
 	if Path == "" || !FileExist(Path)
 		return ""
@@ -173,6 +212,11 @@ HotstringsDelimitersBoot(MigrateFn := 0) {
 		Legacy := _HotstringsLegacyDelimiters
 		if Legacy.Word == "" and Legacy.Consumed == ""
 				return true
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, _HotstringsOverridesPath)
+		if !IsObject(Origin) || !_FSSourceIsUnchanged(_HotstringsOverridesPath, Origin.Source) {
+				try LoggerError("HotstringsConfig", "Cannot retire legacy delimiter strings because the admitted source changed or is unavailable. Reload is required.")
+				return false
+		}
 		RetiredLegacy := { Word: Legacy.Word, Consumed: Legacy.Consumed }
 		Moved := HasMethod(MigrateFn, "Call")
 				? MigrateFn.Call(RetiredLegacy.Word, RetiredLegacy.Consumed)
@@ -186,7 +230,7 @@ HotstringsDelimitersBoot(MigrateFn := 0) {
 		Persisted := false
 		if (OwnerToken is Object) {
 				try Persisted := _HotstringsPersistOverrideCandidate(_HotstringsOverrides, OwnerToken,
-						_HotstringsOverridesPath, 0, 0, RetiredLegacy)
+						_HotstringsOverridesPath, 0, 0, RetiredLegacy, Origin)
 				finally _HotstringsOverrideLeaseRelease(OwnerToken)
 		}
 		if !Persisted {
@@ -309,11 +353,11 @@ _HotstringsOverrideProjectCategory(Result, CategoryName, Values) {
 	}
 }
 
-_ParseOverrides(Path) {
-	Result := Map()
-	if Path == "" || !FileExist(Path)
+_ParseOverrides(Path, &Legacy := 0) {
+	Result := Map(), Legacy := { Word: "", Consumed: "" }
+	if Path == ""
 		return Result
-	Document := _HotstringsOverrideReadDocument(Path, &Records, &Physical)
+	Document := _HotstringsOverrideReadDocument(Path, &Records, &Physical, &Snapshot)
 	for Record in Physical
 		if Record.Kind == "opaque"
 			throw ValueError("The override file contains an uninterpreted TOML record.")
@@ -326,6 +370,14 @@ _ParseOverrides(Path) {
 		} else
 			_HotstringsOverrideProjectCategory(Result, StrLower(Name), Values)
 	}
+	if Document.Has("__global__") && Document["__global__"] is Map {
+		Values := Document["__global__"]
+		if Values.Has("word_delimiters") && Values["word_delimiters"] is String
+			Legacy.Word := Values["word_delimiters"]
+		if Values.Has("consumed_delimiters") && Values["consumed_delimiters"] is String
+			Legacy.Consumed := Values["consumed_delimiters"]
+	}
+	_HotstringsOverrideBindSource(Result, Path, Snapshot)
 	return Result
 }
 
@@ -462,7 +514,7 @@ _HotstringsDelayLine(Record, Base) {
 ; swap; omitting it retains compatibility for internal full-state saves.
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
-		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0, RetiredLegacy := 0) {
+		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0, RetiredLegacy := 0, ExpectedSource := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath
 		InheritedCritical := A_IsCritical
 		if InheritedCritical
@@ -485,6 +537,23 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				try LoggerError("HotstringsConfig", "Cannot write overrides: the candidate state is not a Map. The change is NOT persisted.")
 				return false
 		}
+		Origin := Source
+		if IsObject(ExpectedSource) {
+				if _HotstringsOverrideSourceFor(Source, Path) != ExpectedSource
+						Origin := _HotstringsOverrides
+		} else
+				ExpectedSource := _HotstringsOverrideSourceFor(Source, Path)
+		if !IsObject(ExpectedSource) || _HotstringsOverrideSourceFor(Origin, Path) != ExpectedSource {
+				try LoggerError("HotstringsConfig", "Cannot write overrides without the source receipt captured with the candidate. Reload is required.")
+				return false
+		}
+		FinalAdmission := _HotstringsOverrideCommitSourceCurrent.Bind(Origin, ExpectedSource, Path,
+				AuthorizeFn, HasAuthorizer, HasPublisher)
+		if !FinalAdmission.Call() {
+				try LoggerError("HotstringsConfig", "Cannot write overrides because their admitted source changed. Reload is required.")
+				return false
+		}
+
 		if !_HotstringsOverrideCandidateIdentifiersAreValid(
 				Source, &IdentifierDetail) {
 				try LoggerError("HotstringsConfig",
@@ -615,11 +684,18 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		ReplaceError := ""
 		MoveError := 0
 		if Authorized {
-				; Atomic replacement can block in filesystem/AV code and must never hold
-				; Critical. The exact logical owner remains held across this call.
-				try Published := HasMethod(ReplaceFn, "Call")
-						? ReplaceFn.Call(StagePath, Path)
-						: FSAtomicMoveReplace(StagePath, Path)
+				; The native gate consumes the retained source and logical admission
+				; immediately before moving. Optional adapters remain outside Critical.
+				try {
+						if HasMethod(ReplaceFn, "Call") {
+								if FinalAdmission.Call()
+										Published := ReplaceFn.Call(StagePath, Path)
+						}
+						else if ExpectedSource.Source["status"] == FS_STATUS_ABSENT
+								Published := FSConfigAtomicMoveCreate(StagePath, Path, FinalAdmission)
+						else
+								Published := FSConfigAtomicMoveReplace(StagePath, Path, &MoveError, FinalAdmission)
+				}
 				catch as Err {
 						Published := false
 						ReplaceError := Err.Message
@@ -629,6 +705,12 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 						MoveError := A_LastError
 		}
 
+		if Published && !FSUtf8ExactMatches(Path, Out) {
+				_HotstringsRemoveOverrideStage(StagePath)
+				try LoggerError("HotstringsConfig", "The published override image is not the staged candidate. Reload is required.")
+				return false
+		}
+
 		LivePublished := !HasPublisher
 		PublishError := ""
 		if Published && HasPublisher {
@@ -636,14 +718,20 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				; publisher is constrained to memory projection plus generation updates.
 				PreviousCritical := Critical("On")
 				try {
-						try LivePublished := PublishFn.Call()
-						catch as Err {
+						try {
+								LivePublished := PublishFn.Call()
+								if (LivePublished is Integer) && LivePublished == 1
+										_HotstringsOverrideBindSource(Source, Path, Map("status", FS_STATUS_OK, "content", Out))
+						} catch as Err {
 								LivePublished := false
 								PublishError := Err.Message
 						}
 				} finally Critical(PreviousCritical)
 				LivePublished := (LivePublished is Integer) && LivePublished == 1
 		}
+
+		if Published && !HasPublisher
+				_HotstringsOverrideBindSource(Source, Path, Map("status", FS_STATUS_OK, "content", Out))
 
 		if !Authorized {
 				_HotstringsRemoveOverrideStage(StagePath)

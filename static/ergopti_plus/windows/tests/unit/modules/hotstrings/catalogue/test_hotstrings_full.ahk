@@ -42,7 +42,7 @@ TestHotstringsFull_SectionDelayBeatsCategory() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_full_precedence_overrides.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	Cat := "_hsfull_precedence_probe"
@@ -433,7 +433,7 @@ TestHSFull_BadDelayFallsBackToTheGlobalDefault() {
 	SavedPath := _HotstringsOverridesPath
 	Path := A_Temp . "\hotstrings_full_bad_delay_overrides.toml"
 	try FileDelete(Path)
-	_HotstringsOverrides := Map()
+	_HotstringsOverrides := _ParseOverrides(Path)
 	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
 	Cat := "_hsfull_baddelay_probe"

@@ -195,6 +195,12 @@ _HotstringsRecordAdoptLegacy(Record) {
 ; migrated values.
 _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath, Features
+		BoundPath := _HotstringsOverridesPath
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, BoundPath)
+		if !IsObject(Origin) || !_FSSourceIsUnchanged(BoundPath, Origin.Source) {
+				try LoggerError("HotstringsConfig", "Cannot migrate legacy delays because the admitted source changed or is unavailable. Reload is required.")
+				return false
+		}
 		Candidate := Map()
 		GlobalDelay := ""
 		for Cat, Entry in _HotstringsOverrides {
@@ -228,15 +234,19 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 		Persisted := false
 		if (OwnerToken is Object) {
 				try Persisted := _HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
-						_HotstringsOverridesPath, 0, 0)
+						BoundPath, 0, 0, 0, Origin)
 				finally _HotstringsOverrideLeaseRelease(OwnerToken)
 		}
 		if !Persisted {
 				try LoggerError("HotstringsConfig",
 						"The delay overrides could not be rewritten as offsets of the base expansion delay; they apply for this session and the rewrite is retried at the next start.")
 				PreviousCritical := Critical("On")
-				try _HotstringsPublishOverrideCandidate(Candidate)
-				finally Critical(PreviousCritical)
+				try {
+						if _HotstringsOverrideSourceFor(_HotstringsOverrides, _HotstringsOverridesPath) == Origin {
+								_HotstringsOverrideBindSource(Candidate, BoundPath, Origin.Source)
+								_HotstringsPublishOverrideCandidate(Candidate)
+						}
+				} finally Critical(PreviousCritical)
 				return false
 		}
 		try LoggerInfo("HotstringsConfig", "Delay overrides migrated to offsets of the base expansion delay.")
@@ -574,11 +584,11 @@ _HotstringsPublishOverrideCandidate(Candidate) {
 ; Persist one detached catalogue while retaining the exact owner and path that
 ; admitted its snapshot.
 _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
-		WriterFn, ReplaceFn, RetiredLegacy := 0) {
+		WriterFn, ReplaceFn, RetiredLegacy := 0, ExpectedSource := 0) {
 		return _SaveOverrides(Candidate, WriterFn, ReplaceFn,
 				BoundPath,
 				_HotstringsAuthorizeOverrideCommit.Bind(OwnerToken, BoundPath),
-				_HotstringsPublishOverrideCandidate.Bind(Candidate), RetiredLegacy)
+				_HotstringsPublishOverrideCandidate.Bind(Candidate), RetiredLegacy, ExpectedSource)
 }
 
 ; Validate the shared priority domain before any backend can stage or publish a
@@ -670,6 +680,11 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 				try LoggerError("HotstringsConfig", "Cannot set override: the admitted owner no longer owns the exact override path. The change is NOT persisted.")
 				return false
 		}
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, BoundPath)
+		if !IsObject(Origin) || !_FSSourceIsUnchanged(BoundPath, Origin.Source) {
+				try LoggerError("HotstringsConfig", "Cannot set an override because the admitted source changed or is unavailable. Reload is required.")
+				return false
+		}
 		Candidate := _HotstringsOverrides.Clone()
 
 		if Candidate.Has(Cat) {
@@ -704,7 +719,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 		}
 
 		if !_HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
-				BoundPath, WriterFn, ReplaceFn)
+				BoundPath, WriterFn, ReplaceFn, 0, Origin)
 				return false
 
 		try LoggerDebug("HotstringsConfig", "Override set: {1}{2}.{3} = {4}.",
@@ -759,6 +774,11 @@ _HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
 		if !_HotstringsOverrides.Has(Cat) {
 				return true
 		}
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, BoundPath)
+		if !IsObject(Origin) || !_FSSourceIsUnchanged(BoundPath, Origin.Source) {
+				try LoggerError("HotstringsConfig", "Cannot clear an override because the admitted source changed or is unavailable. Reload is required.")
+				return false
+		}
 		Candidate := _HotstringsOverrides.Clone()
 		Entry := _HotstringsCloneOverrideCategory(Candidate[Cat])
 		Candidate[Cat] := Entry
@@ -790,7 +810,7 @@ _HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
 		}
 
 		if !_HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
-				BoundPath, WriterFn, ReplaceFn)
+				BoundPath, WriterFn, ReplaceFn, 0, Origin)
 				return false
 
 		try LoggerDebug("HotstringsConfig", "Override cleared: {1}{2}{3}.",
@@ -838,6 +858,11 @@ _HotstringsConfigReloadOwned(OwnerToken, BoundPath, ParseFn := 0) {
 				try LoggerError("HotstringsConfig",
 						"Cannot reload overrides from '{1}': the parser returned no Map. The live catalogue is unchanged.",
 						BoundPath)
+				return false
+		}
+
+		if !IsObject(_HotstringsOverrideSourceFor(Candidate, BoundPath)) {
+				try LoggerError("HotstringsConfig", "Cannot reload overrides without the exact parsed source receipt.")
 				return false
 		}
 

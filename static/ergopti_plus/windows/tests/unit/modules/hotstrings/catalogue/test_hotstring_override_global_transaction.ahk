@@ -30,21 +30,28 @@ global _HSOT_WrittenContents := []
 global _HSOT_ParseCalls := 0
 global _HSOT_ParseCritical := []
 
+global _HSOT_FixtureRoot := ""
+
 _HSOT_SaveState() {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
 	return {
 		Path: _HotstringsOverridesPath,
 		Overrides: _HotstringsOverrides,
-		Generation: _HSResolveGen
+		Generation: _HSResolveGen,
+		Root: _HSOT_FixtureRoot
 	}
 }
 
 _HSOT_RestoreState(Saved) {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
+	RetireRoot := _HSOT_FixtureRoot
 	_HotstringsOverridesPath := Saved.Path
 	_HotstringsOverrides := Saved.Overrides
 	_HSResolveGen := Saved.Generation
 	_HSOT_ResetFakes()
+	if RetireRoot != "" && RetireRoot != Saved.Root
+		DirDelete(RetireRoot, true)
+	_HSOT_FixtureRoot := Saved.Root
 }
 
 _HSOT_ResetFakes() {
@@ -63,16 +70,20 @@ _HSOT_ResetFakes() {
 }
 
 _HSOT_Seed(Name) {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
-	_HotstringsOverridesPath := A_Temp . "\ergopti_hotstring_override_"
-		. Name . "_" . A_TickCount . ".toml"
-	_HotstringsOverrides := Map("rolls", {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen, _HSOT_FixtureRoot
+	AssertEqual("", _HSOT_FixtureRoot, "An unretired private transaction fixture must remain owned for cleanup")
+	CandidateRoot := A_Temp . "\ergopti_hotstring_override_" . Name . "_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	FSCreateDirectoryExclusiveStrict(CandidateRoot)
+	_HSOT_FixtureRoot := CandidateRoot
+	_HotstringsOverridesPath := _HSOT_FixtureRoot . "\overrides.toml"
+	_HotstringsOverrides := _ParseOverrides(_HotstringsOverridesPath)
+	_HotstringsOverrides["rolls"] := {
 		Delay: 0.4,
 		Color: "#111111",
 		ShowTooltip: "",
 		Priority: "",
 		Sections: Map()
-	})
+	}
 	_HSResolveGen := 100
 	_HSOT_ResetFakes()
 }
@@ -82,7 +93,7 @@ _HSOT_AcceptWriter(StagePath, Content) {
 	_HSOT_WriteCalls += 1
 	_HSOT_WriterCritical.Push(A_IsCritical)
 	_HSOT_WrittenContents.Push(Content)
-	return 1
+	return FSWriteDurable(StagePath, Content)
 }
 
 _HSOT_FalseWriter(StagePath, Content) {
@@ -123,7 +134,7 @@ _HSOT_RecordReplace() {
 
 _HSOT_AcceptReplace(StagePath, TargetPath) {
 	_HSOT_RecordReplace()
-	return 1
+	return FSAtomicMoveReplace(StagePath, TargetPath)
 }
 
 _HSOT_FalseReplace(StagePath, TargetPath) {
@@ -140,13 +151,11 @@ _HSOT_AcceptParser(Path) {
 	global _HSOT_ParseCalls, _HSOT_ParseCritical
 	_HSOT_ParseCalls += 1
 	_HSOT_ParseCritical.Push(A_IsCritical)
-	return Map("rolls", {
-		Delay: 0.75,
-		Color: "#333333",
-		ShowTooltip: "",
-		Priority: "",
-		Sections: Map()
-	})
+	Source := "[rolls]`ndelay_offset = " . HotstringsSerialiseDelayOffset(0.75 - HotstringsBaseDelay())
+		. '`ncolor = "#333333"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	Candidate := _ParseOverrides(Path)
+	return Candidate
 }
 
 _HSOT_RebaseParser(Path) {
@@ -154,14 +163,12 @@ _HSOT_RebaseParser(Path) {
 	global _HotstringsOverridesPath
 	_HSOT_ParseCalls += 1
 	_HSOT_ParseCritical.Push(A_IsCritical)
+	Source := "[rolls]`ndelay_offset = " . HotstringsSerialiseDelayOffset(0.95 - HotstringsBaseDelay())
+		. '`ncolor = "#444444"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	Candidate := _ParseOverrides(Path)
 	_HotstringsOverridesPath .= ".rebased"
-	return Map("rolls", {
-		Delay: 0.95,
-		Color: "#444444",
-		ShowTooltip: "",
-		Priority: "",
-		Sections: Map()
-	})
+	return Candidate
 }
 
 _HSOT_ThrowingParser(Path) {
@@ -492,20 +499,21 @@ Test("hotstring-override-global-transaction-20260813: reload parses outside "
 	_HSOT_ReloadRevalidatesAfterNonCriticalParse)
 
 _HSOT_DirectSerializerCompatibilityDoesNotImplyLivePublish() {
-	global _HotstringsOverrides, _HSResolveGen, _HSOT_WrittenContents
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HSResolveGen, _HSOT_WrittenContents
 	global _HSOT_WriterCritical, _HSOT_ReplaceCritical
 	Saved := _HSOT_SaveState()
 	try {
 		_HSOT_Seed("direct_compatibility")
 		BeforeOverrides := _HotstringsOverrides
 		BeforeGeneration := _HSResolveGen
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, _HotstringsOverridesPath)
 		Candidate := _HotstringsOverrides.Clone()
 		CandidateEntry := _HotstringsCloneOverrideCategory(Candidate["rolls"])
 		CandidateEntry.Color := "#222222"
 		Candidate["rolls"] := CandidateEntry
 
 		AssertTrue(_SaveOverrides(Candidate,
-			_HSOT_AcceptWriter, _HSOT_AcceptReplace),
+			_HSOT_AcceptWriter, _HSOT_AcceptReplace, _HotstringsOverridesPath, 0, 0, 0, Origin),
 			"legacy direct serializers must keep their atomic write-only contract")
 		AssertEqual(0, _HSOT_WriterCritical[1])
 		AssertEqual(0, _HSOT_ReplaceCritical[1])
