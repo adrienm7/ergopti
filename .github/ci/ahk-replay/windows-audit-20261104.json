@@ -1,63 +1,219 @@
 {
-	"expected_count": 45,
-	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
-	"filters": [
-		{
-			"contains": "agent-payload-line-breaks",
-			"expected_count": 10
-		},
-		{
-			"contains": "personal-info-write-scalar",
-			"expected_count": 5
-		},
-		{
-			"contains": "provider-multipart-091",
-			"expected_count": 10
-		},
-		{
-			"contains": "context-clock-ack-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "open-app-native-quoted-path",
-			"expected_count": 1
-		},
-		{
-			"contains": "toml-stage-collision",
-			"expected_count": 2
-		},
-		{
-			"contains": "paths-byte-admission",
-			"expected_count": 2
-		},
-		{
-			"contains": "keystats-native-unicode-packet",
-			"expected_count": 2
-		},
-		{
-			"contains": "TOML native decoded key admission: escaped-spelling-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "TOML native decoded key admission: non-nul-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "TOML native decoded key admission: known-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "jev-native-requester",
-			"expected_count": 2
-		},
-		{
-			"contains": "changelog-show-native-close",
-			"expected_count": 2
-		},
-		{
-			"contains": "gesture-title-native-transform-target",
-			"expected_count": 2
-		}
-	]
+  "expected_count": 142,
+  "native_http_client_e2e": false,
+  "native_hotstring_e2e": true,
+  "filters": [
+    {
+      "contains": "sendinstant-native-snapshot-copy",
+      "expected_count": 3
+    },
+    {
+      "contains": "sendinstant-post-receipt-owner",
+      "expected_count": 3
+    },
+    {
+      "contains": "sendinstant-clipboard-owner",
+      "expected_count": 3
+    },
+    {
+      "contains": "sendinstant-clip-contention",
+      "expected_count": 3
+    },
+    {
+      "contains": "send-instant-sleep-clipboard-on-keyboard-thread",
+      "expected_count": 3
+    },
+    {
+      "contains": "hotstrings: SendInstant restores only its own clipboard sequence",
+      "expected_count": 1
+    },
+    {
+      "contains": "wrap-native-render-focus",
+      "expected_count": 2
+    },
+    {
+      "contains": "gesture-transform-native-render-focus",
+      "expected_count": 2
+    },
+    {
+      "contains": "selection-capture-native-control-focus",
+      "expected_count": 2
+    },
+    {
+      "contains": "gesture-title-native-transform-target",
+      "expected_count": 2
+    },
+    {
+      "contains": "wrap-native-fresh-selection",
+      "expected_count": 4
+    },
+    {
+      "contains": "selection sequence: cancelled with new user copy",
+      "expected_count": 1
+    },
+    {
+      "contains": "selection sequence: foreground changed with new user copy",
+      "expected_count": 1
+    },
+    {
+      "contains": "selection sequence: native cancellation preserves a newer copy",
+      "expected_count": 1
+    },
+    {
+      "contains": "paths-byte-admission",
+      "expected_count": 4
+    },
+    {
+      "contains": "pathstoml-read-missing-utf8-encoding",
+      "expected_count": 1
+    },
+    {
+      "contains": "personal-info-raw-decode-compat",
+      "expected_count": 1
+    },
+    {
+      "contains": "personal-info-encoding",
+      "expected_count": 7
+    },
+    {
+      "contains": "changelog-open-generation",
+      "expected_count": 6
+    },
+    {
+      "contains": "changelog-show-native-close",
+      "expected_count": 2
+    },
+    {
+      "contains": "changelog-native-destroy-successor",
+      "expected_count": 2
+    },
+    {
+      "contains": "changelog-native-show-fault",
+      "expected_count": 2
+    },
+    {
+      "contains": "jev-native-requester",
+      "expected_count": 2
+    },
+    {
+      "contains": "open-app-native-quoted-path",
+      "expected_count": 1
+    },
+    {
+      "contains": "open-app-native-shortcut",
+      "expected_count": 1
+    },
+    {
+      "contains": "open-app-probe-pause",
+      "expected_count": 1
+    },
+    {
+      "contains": "open-app-probe-resume",
+      "expected_count": 1
+    },
+    {
+      "contains": "toml-stage-collision",
+      "expected_count": 2
+    },
+    {
+      "contains": "toml-held-publication",
+      "expected_count": 5
+    },
+    {
+      "contains": "toml-write-through-atomic",
+      "expected_count": 9
+    },
+    {
+      "contains": "config commit gateway:",
+      "expected_count": 4
+    },
+    {
+      "contains": "toml-build-updated-content-detached",
+      "expected_count": 1
+    },
+    {
+      "contains": "toml-build-updated-content-fresh-read",
+      "expected_count": 1
+    },
+    {
+      "contains": "toml-batchwrite-fresh-read",
+      "expected_count": 1
+    },
+    {
+      "contains": "toml-build-updated-content-old-authority",
+      "expected_count": 1
+    },
+    {
+      "contains": "toml-build-updated-content-render-failure",
+      "expected_count": 1
+    },
+    {
+      "contains": "configuration snapshot: duplicate namespaces",
+      "expected_count": 1
+    },
+    {
+      "contains": "configuration snapshot: boot readers share",
+      "expected_count": 1
+    },
+    {
+      "contains": "configuration snapshot: unknown scalars survive",
+      "expected_count": 1
+    },
+    {
+      "contains": "configuration snapshot: real native read refusal",
+      "expected_count": 1
+    },
+    {
+      "contains": "configuration snapshot: actual full save retains",
+      "expected_count": 1
+    },
+    {
+      "contains": "optional boot full-save source ownership:",
+      "expected_count": 4
+    },
+    {
+      "contains": "config-full-save-debt-matching",
+      "expected_count": 1
+    },
+    {
+      "contains": "config-full-save-debt-conflict",
+      "expected_count": 1
+    },
+    {
+      "contains": "config-full-save-debt-generation",
+      "expected_count": 1
+    },
+    {
+      "contains": "WPM compensation ownership:",
+      "expected_count": 4
+    },
+    {
+      "contains": "wpm-compensation-authority",
+      "expected_count": 8
+    },
+    {
+      "contains": "llm-profile-opening-image",
+      "expected_count": 18
+    },
+    {
+      "contains": "llm-profile-memory-source",
+      "expected_count": 2
+    },
+    {
+      "contains": "llm-profile-nonllm-source",
+      "expected_count": 2
+    },
+    {
+      "contains": "llm-profile-nonllm-scope",
+      "expected_count": 2
+    },
+    {
+      "contains": "config journal: post-boot direct",
+      "expected_count": 4
+    },
+    {
+      "contains": "config journal: default native older-source migration retains registry custody",
+      "expected_count": 3
+    }
+  ]
 }
