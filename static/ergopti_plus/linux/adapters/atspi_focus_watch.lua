@@ -36,15 +36,20 @@ local function native_transport()
 	local directory = assert(uv.fs_mkdtemp("/tmp/ergopti-focus-XXXXXX"))
 	local transport = { directory = directory, events_path = directory .. "/events", control_path = directory .. "/control" }
 	local events_fd, control_fd = nil, nil
+	-- A failed close is ambiguous: Linux may already have released the number,
+	-- so retrying it could close a different owner's descriptor.
+	local close_ambiguous = false
 	local files = {}
 	local buffer = ffi.new("char[4096]")
 	function transport.close()
-		local accepted = true
 		for _, descriptor in ipairs({ events_fd or -1, control_fd or -1 }) do
-			if descriptor >= 0 and ffi.C.close(descriptor) ~= 0 then accepted = false end
+			if descriptor >= 0 then
+				local called, result = pcall(ffi.C.close, descriptor)
+				if not called or result ~= 0 then close_ambiguous = true end
+			end
 		end
 		events_fd, control_fd = nil, nil
-		return accepted
+		return not close_ambiguous
 	end
 	function transport.cleanup()
 		local accepted = true
