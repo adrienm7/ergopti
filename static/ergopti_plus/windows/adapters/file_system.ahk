@@ -1757,9 +1757,8 @@ _FSSourceIsUnchanged(Path, Expected) {
 		&& (Expected["status"] != FS_STATUS_OK || Current["content"] == Expected["content"])
 }
 
-; Publishes through a same-directory stage named as FSAtomicTempOwnerIsGone expects.
-; The check and the rename are not one kernel operation: a writer of another
-; process is excluded by the configuration lease, not here.
+; Retains the created same-directory stage through publication and refusal.
+; Source checks are preconditions, not a kernel compare-and-swap with other writers.
 _FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
 	static StageSerial := 0
 	Refuse(Category) => Map("committed", false, "detail", _FSReportFailure(OnError, Category))
@@ -1767,20 +1766,22 @@ _FSPublishIfUnchanged(Path, Content, Expected, OnError, AdmissionFn) {
 			|| !Expected.Has("status") || (Expected["status"] != FS_STATUS_ABSENT
 				&& (Expected["status"] != FS_STATUS_OK || !(Expected.Get("content", 0) is String)))
 		return Refuse("a publication needs a path, a string payload and a source precondition")
+	; Capture relative targets before a source read or admission can yield.
+	try Path := FSResolveAbsolutePath(Path)
+	catch
+		return Refuse("the publication target cannot be captured")
 	if !_FSSourceIsUnchanged(Path, Expected)
 		return Refuse("the source changed since it was read")
-	Stage := Path . "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
-	if !FSWriteDurable(Stage, Content)
-		return Refuse("the publication stage cannot be written")
+	Suffix := "." . A_ScriptHwnd . "-" . (++StageSerial) . ".tmp"
 	; Staging and logical admission may yield or change the source. Revalidate
 	; after the caller's final admission, inside the publication boundary.
 	FinalAdmission := () => _FSNativeAdmissionAccepted(AdmissionFn) && _FSSourceIsUnchanged(Path, Expected)
-	Committed := Expected["status"] == FS_STATUS_ABSENT
-		? FSConfigAtomicMoveCreate(Stage, Path, FinalAdmission)
-		: FSConfigAtomicMoveReplace(Stage, Path, , FinalAdmission)
-	if Committed
+	if FSWriteReplaceOwned(Path, Content, Suffix, &Detail, 0, 0, FinalAdmission,
+			Expected["status"] == FS_STATUS_OK, &Publication)
 		return Map("committed", true, "detail", "")
-	FSDelete(Stage)
+	; Fixed categories keep this portable diagnostic free of paths and file text.
+	if Publication.renamed
+		return Refuse("the publication changed the target but durability was not acknowledged")
 	return Refuse("the publication was refused")
 }
 
