@@ -178,6 +178,8 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_eq(result.probability, 0.7e-9)
 		helpers.assert_eq(Agent.should_act(result, 0.7), false, "a tiny probability cannot trigger the agent")
 		helpers.assert_nil(Agent.parse_system1(config, "INTENT: mail\nPROBABILITY: 0.9%"))
+		helpers.assert_nil(Agent.parse_system1(config, "INTENT: calendar_other\nPROBABILITY: 0.9"),
+			"an unknown compound intent is not the calendar intent")
 	end)
 
 	helpers.it("rejects malformed Unicode in model-generated action text", function()

@@ -124,7 +124,7 @@ end
 --- @return table|nil triage { intent, probability }, nil when unreadable.
 function M.parse_system1(config, raw)
 	if type(raw) ~= "string" then return nil end
-	local intent = raw:match("[Ii][Nn][Tt][Ee][Nn][Tt]%s*:%s*([%a]+)")
+	local intent = raw:match("[Ii][Nn][Tt][Ee][Nn][Tt]%s*:%s*([^%s]+)")
 	-- Read the whole token: stopping at the exponent of 0.7e-9 would turn
 	-- an almost-zero probability into 0.7 and spuriously wake System 2.
 	local token = raw:match("[Pp][Rr][Oo][Bb][Aa][Bb][Ii][Ll][Ii][Tt][Yy]%s*:%s*([^%s]+)")
