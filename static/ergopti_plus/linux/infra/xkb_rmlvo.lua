@@ -150,8 +150,22 @@ end
 --- @return table|nil
 function M.parse_keyboard_defaults(text)
 	local fields = {}
-	for key, value in tostring(text or ""):gmatch("(XKB%u+)%s*=%s*\"?([^\"\n]*)\"?") do
-		fields[key] = value
+	for line in (tostring(text or "") .. "\n"):gmatch("([^\n]*)\n") do
+		local key, raw = line:match("^%s*(XKB%u+)%s*=%s*(.-)%s*$")
+		if key then
+			local quote = raw:sub(1, 1)
+			local value
+			if quote == "'" or quote == '"' then
+				local finish = raw:find(quote, 2, true)
+				if finish then
+					local tail = raw:sub(finish + 1)
+					if tail:match("^%s*$") or tail:match("^%s+#") then value = raw:sub(2, finish - 1) end
+				end
+			else
+				value = trim((raw:gsub("%s+#.*$", "")))
+			end
+			if value ~= nil then fields[key] = value end
+		end
 	end
 	local layouts = split_commas(fields.XKBLAYOUT)
 	if #layouts == 0 then return nil end
