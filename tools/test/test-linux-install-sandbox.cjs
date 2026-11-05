@@ -136,7 +136,7 @@ function runInstaller(scenario) {
 		stub(
 			stubs,
 			'mv',
-			`for arg in "$@"; do case "$arg" in ${destination}) exit 1 ;; esac; done\nexec /usr/bin/mv "$@"`
+			`for arg in "$@"; do case "$arg" in ${destination}) printf '[fixture] publish-refused\\n' >&2; exit 1 ;; esac; done\nexec /usr/bin/mv "$@"`
 		);
 	}
 	if (scenario.refuseUnitMode || scenario.refuseLauncherMode || scenario.refuseAutostartMode) {
@@ -148,7 +148,7 @@ function runInstaller(scenario) {
 		stub(
 			stubs,
 			'chmod',
-			`for arg in "$@"; do case "$arg" in ${temporary}) exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"`
+			`for arg in "$@"; do case "$arg" in ${temporary}) printf '[fixture] mode-refused\\n' >&2; exit 1 ;; esac; done\nexec /usr/bin/chmod "$@"`
 		);
 	}
 	if (scenario.protectSystemPrefix) {
@@ -228,7 +228,7 @@ function runInstaller(scenario) {
 				: '') +
 			(scenario.refuseLauncherWrite ? 'cat() { return 1; }\n' : '') +
 			(scenario.refuseAutostartWrite
-				? 'cat() { local target; target="$(readlink "/proc/$$/fd/1")"; [[ "$target" = */.ergopti-autostart.* ]] && return 1; command cat "$@"; }\n'
+				? 'cat() { local target; target="$(readlink "/proc/$$/fd/1")"; [[ "$target" = */.ergopti-autostart.* ]] && { printf "[fixture] write-refused\\n" >&2; return 1; }; command cat "$@"; }\n'
 				: '')
 	);
 	env.TEST_STUBS = bashPath(stubs);
@@ -1130,12 +1130,14 @@ for (const fault of ['refuseAutostartWrite', 'refuseAutostartMode', 'refuseAutos
 			fs.mkdirSync(path.dirname(file), { recursive: true });
 			fs.writeFileSync(
 				file,
-				`Exec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`
+				`[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`
 			);
 		}
 	});
 	try {
 		assert.notEqual(run.status, 0);
+		const expected = fault === 'refuseAutostartWrite' ? 'write' : fault === 'refuseAutostartMode' ? 'mode' : 'publish';
+		assert.ok(run.output.includes(`[fixture] ${expected}-refused`), 'the intended failure was reached');
 		const directory = path.join(run.configRoot, 'autostart');
 		assert.match(
 			fs.readFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), 'utf8'),
