@@ -1,5 +1,5 @@
 {
-	"expected_count": 23,
+	"expected_count": 63,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
@@ -8,40 +8,96 @@
 			"expected_count": 2
 		},
 		{
+			"contains": "llm-typing-source-privacy",
+			"expected_count": 10
+		},
+		{
+			"contains": "profile-suffix-menu-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-suffix-menu-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "duplicate-user-profile-label-menu-collapse",
+			"expected_count": 2
+		},
+		{
+			"contains": "menu_helpers: unique descriptions pass through unchanged",
+			"expected_count": 1
+		},
+		{
+			"contains": "menu_helpers: duplicate descriptions get a unique numeric suffix",
+			"expected_count": 1
+		},
+		{
+			"contains": "menu_helpers: three-way duplicate descriptions each get a distinct suffix",
+			"expected_count": 1
+		},
+		{
+			"contains": "menu: personal-section Check/Uncheck uses disambiguated labels",
+			"expected_count": 1
+		},
+		{
+			"contains": "menu-native-case-receipt",
+			"expected_count": 1
+		},
+		{
 			"contains": "override-reserved-root-roundtrip",
 			"expected_count": 2
 		},
 		{
-			"contains": "Reg_KeyExists: known system key returns true",
-			"expected_count": 1
-		},
-		{
-			"contains": "Reg_KeyExists: empty registry key returns true",
-			"expected_count": 1
-		},
-		{
-			"contains": "Reg_KeyExists: non-existent key returns false",
-			"expected_count": 1
-		},
-		{
-			"contains": "one-shot-native-kana-flags",
+			"contains": "hotstrings-override-rollback-on-write-failure",
 			"expected_count": 2
 		},
 		{
-			"contains": "one-shot-native-control-flags",
-			"expected_count": 4
-		},
-		{
-			"contains": "one-shot-native-tab-flags",
-			"expected_count": 2
+			"contains": "hotstrings-override-lease-reentrant-writer",
+			"expected_count": 1
 		},
 		{
 			"contains": "agent-pause-timer-owner",
 			"expected_count": 3
 		},
 		{
+			"contains": "LLM agent: with the prediction bridge stopped, a typing pause is triaged and nothing predicts",
+			"expected_count": 1
+		},
+		{
+			"contains": "LLM agent: with the prediction bridge stopped, the agent on action watches no typing",
+			"expected_count": 1
+		},
+		{
+			"contains": "LLM agent: leaving the automatic mode stops the typing feed, entering it starts it",
+			"expected_count": 1
+		},
+		{
+			"contains": "LLM agent: a pause stops the typing feed, the resume lets it start again",
+			"expected_count": 1
+		},
+		{
+			"contains": "ai-off-auto",
+			"expected_count": 6
+		},
+		{
+			"contains": "agent-caret-context",
+			"expected_count": 11
+		},
+		{
+			"contains": "LLM agent: active prediction context matches native Unicode Backspace (unicode-erase)",
+			"expected_count": 1
+		},
+		{
+			"contains": "LLM agent: agent-only context matches native Unicode Backspace (unicode-erase)",
+			"expected_count": 1
+		},
+		{
 			"contains": "takenote-pause-lifecycle-owner",
 			"expected_count": 5
+		},
+		{
+			"contains": "tap-hold-external-source",
+			"expected_count": 4
 		}
 	]
 }
