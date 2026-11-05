@@ -74,7 +74,10 @@ try {
 	);
 	const fragment = path.join(sandbox, 'selected-unit.service');
 	const selectedLauncher = path.resolve(installed, '../../../../bin/ergopti-hotstrings');
-	fs.writeFileSync(fragment, `[Service]\nExecStart=/bin/bash "${posix(selectedLauncher)}" --tray\n`);
+	fs.writeFileSync(
+		fragment,
+		`[Service]\nExecStart=/bin/bash "${posix(selectedLauncher)}" --tray\n`
+	);
 	const env = {
 		...process.env,
 		HOME: posix(sandbox),
@@ -227,7 +230,11 @@ try {
 		assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(callOffset), /--no-reload disable/);
 	}
 	const offlineCalls = fs.readFileSync(calls, 'utf8').length;
-	assert.equal(run('enable', { SHOW_REFUSE: '1' }).status, 0, 'offline disabled service permits XDG startup');
+	assert.equal(
+		run('enable', { SHOW_REFUSE: '1' }).status,
+		0,
+		'offline disabled service permits XDG startup'
+	);
 	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
 	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
@@ -244,10 +251,21 @@ try {
 		assert.notEqual(run('enable').status, 0, 'ambiguous desktop command must be preserved');
 		assert.equal(fs.readFileSync(desktop, 'utf8'), mixed);
 	}
-	fs.writeFileSync(desktop, ownedDesktop.replace('[Desktop Entry]', ' [Desktop Entry] ').replace(/^Exec=/m, ' Exec = '));
-	assert.equal(run('status').stdout.trim(), 'disabled', 'GLib whitespace is accepted for the owned command');
+	fs.writeFileSync(
+		desktop,
+		ownedDesktop.replace('[Desktop Entry]', ' [Desktop Entry] ').replace(/^Exec=/m, ' Exec = ')
+	);
+	assert.equal(
+		run('status').stdout.trim(),
+		'disabled',
+		'GLib whitespace is accepted for the owned command'
+	);
 	fs.writeFileSync(desktop, `${ownedDesktop}[Desktop Action Example]\nExec=/other/program\n`);
-	assert.equal(run('status').stdout.trim(), 'disabled', 'unrelated desktop actions do not change the main command');
+	assert.equal(
+		run('status').stdout.trim(),
+		'disabled',
+		'unrelated desktop actions do not change the main command'
+	);
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 	assert.equal(
 		run('status').stdout.trim(),
@@ -524,23 +542,27 @@ try {
 		fs.unlinkSync(manifest);
 		fs.unlinkSync(path.join(stubs, 'mv'));
 		const foreignFragment = path.join(sandbox, 'foreign-unit.service');
-	fs.writeFileSync(foreignFragment, '[Service]\nExecStart=/other/program\n');
-	for (const extra of [
-		{ UNIT_FRAGMENT: posix(foreignFragment), UNIT_STATE: 'enabled' },
-		{ UNIT_DROPINS: '/some/override.conf', UNIT_STATE: 'enabled' },
-		{ SHOW_REFUSE: '1', UNIT_STATE: 'enabled' }
-	]) {
-		const before = fs.readFileSync(desktop, 'utf8');
-		const callOffset = fs.readFileSync(calls, 'utf8').length;
-		assert.notEqual(run('enable', extra).status, 0, 'unverified service cannot be disabled');
-		assert.equal(fs.readFileSync(desktop, 'utf8'), before, 'refusal restores startup choice');
-		assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(callOffset), /--no-reload disable/);
-	}
-	const offlineCalls = fs.readFileSync(calls, 'utf8').length;
-	assert.equal(run('enable', { SHOW_REFUSE: '1' }).status, 0, 'offline disabled service permits XDG startup');
-	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
-	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
-	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
+		fs.writeFileSync(foreignFragment, '[Service]\nExecStart=/other/program\n');
+		for (const extra of [
+			{ UNIT_FRAGMENT: posix(foreignFragment), UNIT_STATE: 'enabled' },
+			{ UNIT_DROPINS: '/some/override.conf', UNIT_STATE: 'enabled' },
+			{ SHOW_REFUSE: '1', UNIT_STATE: 'enabled' }
+		]) {
+			const before = fs.readFileSync(desktop, 'utf8');
+			const callOffset = fs.readFileSync(calls, 'utf8').length;
+			assert.notEqual(run('enable', extra).status, 0, 'unverified service cannot be disabled');
+			assert.equal(fs.readFileSync(desktop, 'utf8'), before, 'refusal restores startup choice');
+			assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(callOffset), /--no-reload disable/);
+		}
+		const offlineCalls = fs.readFileSync(calls, 'utf8').length;
+		assert.equal(
+			run('enable', { SHOW_REFUSE: '1' }).status,
+			0,
+			'offline disabled service permits XDG startup'
+		);
+		assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
+		assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
+		fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 		assert.deepEqual(
 			receiptRefusals,
 			[],

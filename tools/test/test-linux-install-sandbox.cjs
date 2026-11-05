@@ -121,7 +121,7 @@ function runInstaller(scenario) {
 	stub(
 		stubs,
 		'systemctl',
-		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0; }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? "enabled" : "disabled"} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0; }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
 	if (
 		scenario.refuseUnitPublish ||
@@ -972,17 +972,23 @@ for (const kind of ['duplicate', 'key-space', 'key-tab', 'group-space', 'action-
 				'key-tab': 'Exec\t=/other/program',
 				'group-space': ' [Desktop Entry] \nExec=/other/program'
 			};
-			original = kind === 'action-decoy'
-				? `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`
-				: `[Desktop Entry]\nExec=${launcher} --tray\n${foreign[kind]}\n`;
+			original =
+				kind === 'action-decoy'
+					? `[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\nExec=${launcher} --tray\n`
+					: `[Desktop Entry]\nExec=${launcher} --tray\n${foreign[kind]}\n`;
 			fs.writeFileSync(desktop, original);
 		}
 	});
 	try {
 		assert.notEqual(run.status, 0, `${kind} main entry must be refused`);
-		assert.equal(fs.readFileSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop'), 'utf8'), original);
+		assert.equal(
+			fs.readFileSync(path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop'), 'utf8'),
+			original
+		);
 		assert.equal(fs.existsSync(path.join(run.home, '.local/lib/ergopti')), false);
-	} finally { run.cleanup(); }
+	} finally {
+		run.cleanup();
+	}
 }
 
 // A valid receipt's last row remains authoritative without a trailing newline.
