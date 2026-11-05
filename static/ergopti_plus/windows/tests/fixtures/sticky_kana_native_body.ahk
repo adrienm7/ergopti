@@ -5,7 +5,7 @@
 ; This is injected input, not a physical-key witness.
 if A_Args.Length != 2 || A_Args[1] != "--allow-owned-native-kana-sticky"
 	throw Error("Explicit native modifier injection opt-in is required.")
-if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held" || A_Args[2] == "kana-released" || A_Args[2] == "kana-up-before-key")
+if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held" || A_Args[2] == "kana-released" || A_Args[2] == "kana-up-before-key" || A_Args[2] == "kana-preheld-released")
 	throw Error("The exact 64-bit INPUT40 probe and known case are required.")
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2, TEXT_SENDER_SEND_LEVEL := 0
 ; A valid production policy keeps shortcut words open. Its actual complete-scalar
@@ -14,7 +14,7 @@ global HSE_ArrowResetsWord := false, HSE_ShortcutResetsWord := false, HSE_TapHol
 global HSE_Buffer := "seed", _PrefixBuffer := "seed"
 global _TH_OwnedModifiers := Map(), LayerEnabled := false, _TapHoldTapInDispatch := ""
 global _SKN := {Mode: A_Args[2], Window: 0, Edit: 0, Hook: 0, Received: [], Payloads: [], Errors: [],
-	Injected: 0, OemOwed: false, F6Owed: false, Observer: 0, NativeEvents: [], ReleasedAtReplay: false, Failure: 0, TransactionCritical: false, Finishes: []}
+	Injected: 0, OemOwed: false, F6Owed: false, Observer: 0, NativeEvents: [], ReleasedAtReplay: false, Failure: 0, TransactionCritical: false, Finishes: [], InitialOEM: 0, PreheldBeforeCapture: false}
 global _ALTGR_KANA_FIXUP := _SKN.Mode != "plain"
 global _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0xDF)
 global _TextSenderKeyIsDown := (Name) => GetKeyState(Name)
@@ -91,9 +91,16 @@ _SKN_Inject() {
 		; A newest, fully visible I1 observer independently receives native
 		; VK/SC pairs before the suppressive hook sees them. Sender-level0 replay
 		; stays below this observer, so a constructed packet is never its proof.
-		_SKN.Observer := InputHook("V L0 I1")
-		_SKN.Observer.KeyOpt("{All}", "N")
-		_SKN.Observer.OnKeyDown := _SKN_OriginalDown
+		if !IsObject(_SKN.Observer) {
+			_SKN.Observer := InputHook("V L0 I1")
+			_SKN.Observer.KeyOpt("{All}", "N")
+			_SKN.Observer.OnKeyDown := _SKN_OriginalDown
+		} else {
+			; The preheld Down was observed before Sticky existed. Rearm the
+			; exact passive observer newest so the SUT cannot hide its F6 witness.
+			_SKN.Observer.Stop()
+			_SKN_Require(!_SKN.Observer.InProgress, "The original passive observer must stop before its exact rearm")
+		}
 		_SKN.Observer.Start()
 		_SKN_Require(_SKN.Observer.InProgress, "The passive native ABI observer must be admitted before injection.")
 		; The native OEM8/extended-SC138 pair matches Kana AltGr's event ABI.
@@ -106,6 +113,8 @@ _SKN_Inject() {
 			Rows := [[0xDF, 0x38, 1], [0x75, 0x40, 0], [0x75, 0x40, 2], [0xDF, 0x38, 3]]
 		if _SKN.Mode == "kana-up-before-key"
 			Rows := [[0xDF, 0x38, 1], [0xDF, 0x38, 3], [0x75, 0x40, 0], [0x75, 0x40, 2]]
+		if _SKN.Mode == "kana-preheld-released"
+			Rows := [[0x75, 0x40, 0], [0x75, 0x40, 2], [0xDF, 0x38, 3]]
 		Packets := _SKN_Packets(Rows)
 		_SKN.Injected := DllCall("SendInput", "UInt", Rows.Length, "Ptr", Packets, "Int", 40, "UInt")
 		for Index, Row in Rows {
@@ -142,6 +151,29 @@ _SKN_Main() {
 		for Modifier in ["Ctrl", "Alt", "Shift", "LWin", "RWin", "vkDF", "F6"]
 			_SKN_Require(!GetKeyState(Modifier, "P") && !GetKeyState(Modifier), "Native probe requires released modifiers.")
 		OnMessage(0x100, _SKN_Receiver)
+		if _SKN.Mode == "kana-preheld-released" {
+			_SKN_Require(SIHO_Count() == 0, "Initial native hold precedes every suppressive capture")
+			_SKN.Observer := InputHook("V L0 I1")
+			_SKN.Observer.KeyOpt("{All}", "N")
+			_SKN.Observer.OnKeyDown := _SKN_OriginalDown
+			_SKN.Observer.Start()
+			_SKN_Require(_SKN.Observer.InProgress, "The initial native OEM witness must be armed")
+			_SKN_Target()
+			Initial := _SKN_Packets([[0xDF, 0x38, 1]])
+			_SKN.InitialOEM := DllCall("SendInput", "UInt", 1, "Ptr", Initial, "Int", 40, "UInt")
+			_SKN.OemOwed := _SKN.InitialOEM == 1
+			_SKN_Require(_SKN.InitialOEM == 1, "The initial actual OEM Down must be acknowledged before capture")
+			Started := A_TickCount
+			while (_SKN.NativeEvents.Length != 1 || _SKN.Received.Length != 1 || !GetKeyState("vkDF"))
+				&& A_TickCount - Started < 1000
+				Sleep(5)
+			_SKN.PreheldBeforeCapture := _SKN.NativeEvents.Length == 1 && _SKN.Received.Length == 1
+				&& _SKN.NativeEvents[1].Vk == 0xDF && _SKN.NativeEvents[1].Sc == 0x138
+				&& _SKN.Received[1].Vk == 0xDF && _SKN.Received[1].Extra == 0x53534D01
+				&& GetKeyState("vkDF") && !!(DllCall("GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
+				&& SIHO_Count() == 0
+			_SKN_Require(_SKN.PreheldBeforeCapture, "The native receiver and independent observer must witness OEM held before Sticky is called")
+		}
 		SetTimer(_SKN_Inject, -1)
 		Accepted := StickyModifier("sticky_ctrl")
 		if IsObject(_SKN.Failure)
@@ -178,14 +210,19 @@ _SKN_Main() {
 			. " f6_ctrl=" . (F6.Length ? F6[1].Ctrl : -1) . " f6_oem=" . (F6.Length ? F6[1].Oem : -1)
 			. " released_before_replay=" . _SKN.ReleasedAtReplay
 			. " payload=" . (_SKN.Payloads.Length ? _SKN.Payloads[1] : "") . "`n", "*")
-		if _SKN.Mode == "kana-released" || _SKN.Mode == "kana-up-before-key"
+		if _SKN.Mode == "kana-preheld-released" {
+			FileAppend("OBSERVATION sticky-kana-preheld initial_ack=" . _SKN.InitialOEM
+				. " held_before_capture=" . _SKN.PreheldBeforeCapture . "`n", "*")
+			_SKN_Require(_SKN.PreheldBeforeCapture && _SKN.InitialOEM == 1, "The initial native hold receipt must precede the real capture")
+		}
+		if _SKN.Mode == "kana-released" || _SKN.Mode == "kana-up-before-key" || _SKN.Mode == "kana-preheld-released"
 			_SKN_Require(_SKN.ReleasedAtReplay, "The actual OEM8 logical and asynchronous states must be released before the genuine replay port is called.")
 		_SKN_Require(Accepted && _SKN.Errors.Length == 0 && _SKN.Payloads.Length == 1,
 			"The real sticky capture and real TextPressKey must emit one native replay without errors.")
 		_SKN_Require(F6.Length == 1 && F6[1].Ctrl && OriginalF6 == 0,
 			"Kana AltGr must remain an intervening modifier so the following F6, not OEM8, consumes the requested sticky Ctrl.")
 		_SKN_Require(OriginalOem == (_SKN.Mode != "plain")
-			&& F6[1].Oem == (_SKN.Mode == "kana-held" || _SKN.Mode == "kana-released"),
+			&& F6[1].Oem == (_SKN.Mode == "kana-held" || _SKN.Mode == "kana-released" || _SKN.Mode == "kana-preheld-released"),
 			"The receiver must retain the original native Kana modifier through the actual modified F6.")
 		if _SKN.Mode == "kana-held"
 			_SKN_Require(!!(DllCall("GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000),
@@ -220,7 +257,8 @@ _SKN_Main() {
 				_SKN.OemOwed := false
 			}
 			if (_SKN.Mode == "kana-released" && _SKN.Injected == 4)
-				|| (_SKN.Mode == "kana-up-before-key" && _SKN.Injected >= 2) {
+				|| (_SKN.Mode == "kana-up-before-key" && _SKN.Injected >= 2)
+				|| (_SKN.Mode == "kana-preheld-released" && _SKN.Injected == 3) {
 				Started := A_TickCount
 				while GetKeyState("vkDF") && A_TickCount - Started < 1000
 					Sleep(5)

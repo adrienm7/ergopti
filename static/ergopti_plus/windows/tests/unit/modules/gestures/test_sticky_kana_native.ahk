@@ -65,3 +65,6 @@ Test("sticky native Kana release: captured original flags survive native modifie
 
 Test("sticky native Kana endpoint: a custom modifier released before F6 does not leak into replay (sticky-kana-native-up-before)",
 	_SKN_Case.Bind("kana-up-before-key"))
+
+Test("sticky native Kana initial hold: native OEM held before admission survives release at endpoint (sticky-kana-native-preheld)",
+	_SKN_Case.Bind("kana-preheld-released"))
