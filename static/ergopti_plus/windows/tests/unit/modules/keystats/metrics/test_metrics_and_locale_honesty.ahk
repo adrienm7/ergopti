@@ -54,9 +54,11 @@ _MLH_WatermarkNeverOvershoots() {
 	SavedTitle := KLHook.title_entered_at
 	SavedTransition := KLHook.context_transition
 	SavedStop := KLHook.context_stop
+	SavedObservations := KLHook.context_observations, SavedObservationHead := KLHook.context_observation_head
 	try {
 		KLHook.context_transition := false
 		KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		Past := A_TickCount - 10000
 		KLHook.app_entered_at := Past
 		KLHook.title_entered_at := Past - 1000
@@ -80,6 +82,7 @@ _MLH_WatermarkNeverOvershoots() {
 		KLHook.title_entered_at := SavedTitle
 		KLHook.context_transition := SavedTransition
 		KLHook.context_stop := SavedStop
+		KLHook.context_observations := SavedObservations, KLHook.context_observation_head := SavedObservationHead
 	}
 }
 
@@ -238,9 +241,11 @@ Test("metrics-locale-honesty: a resolved key does not warn",
 _MLH_ContextOriginsRetainNative64Domain() {
 	SavedApp := KLHook.app_entered_at, SavedTitle := KLHook.title_entered_at
 	SavedTransition := KLHook.context_transition, SavedStop := KLHook.context_stop
+	SavedObservations := KLHook.context_observations, SavedObservationHead := KLHook.context_observation_head
 	try {
 		Origin := 0x100000000 + 17
 		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 		KLHook.app_entered_at := Origin, KLHook.title_entered_at := Origin + 3
 		KL_Hook_AdvanceContextWatermarks(11, Origin + 1000)
 		AssertEqual(Origin + 11, KLHook.app_entered_at, "A native app origin above one DWORD era must retain its exact compensation")
@@ -251,6 +256,7 @@ _MLH_ContextOriginsRetainNative64Domain() {
 	} finally {
 		KLHook.app_entered_at := SavedApp, KLHook.title_entered_at := SavedTitle
 		KLHook.context_transition := SavedTransition, KLHook.context_stop := SavedStop
+		KLHook.context_observations := SavedObservations, KLHook.context_observation_head := SavedObservationHead
 	}
 }
 Test("Keystats native64 context: watermark and acknowledged endpoint retain full native origins (context-native64-origin-contract)",

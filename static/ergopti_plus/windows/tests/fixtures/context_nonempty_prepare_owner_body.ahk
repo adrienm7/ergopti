@@ -19,9 +19,9 @@ _KCNP_Timer() {
 			"The original A snapshot must already be detached while its real flush is active")
 		_KSD_Require(MetricsFocusCache.state.process_name == _KCNP.B.App,
 			"The actual canonical privacy owner must already identify the public B input")
-		if _KCNP.Mode == "external-active" || _KCNP.Mode == "abc-deferred" {
+		if _KCNP.Mode == "external-active" || InStr(_KCNP.Mode, "abc-deferred") {
 			_KCNP.RefreshReturned := KL_Hook_RefreshContext(true)
-			if _KCNP.Mode == "abc-deferred"
+			if InStr(_KCNP.Mode, "abc-deferred")
 				_KSD_Require(!_KCNP.RefreshReturned && Keystats._flush_in_progress
 					&& IsObject(KLHook.context_transition),
 					"The real B context frame must remain deferred behind the older active flush")
@@ -32,9 +32,9 @@ _KCNP_Timer() {
 			"Only the genuine preexisting A live buffer may precede this new public B sample")
 		KL_Mouse_ParkTick(, _KCNP_Position)
 		_KSD_Require(Keystats.mouse_distance == BeforeDistance + 5
-			&& _KCNP.Samples == (_KCNP.Mode == "abc-deferred" ? 3 : _KCNP.ExpectedSamples),
+			&& _KCNP.Samples == (InStr(_KCNP.Mode, "abc-deferred") ? 3 : _KCNP.ExpectedSamples),
 			"The genuine public pointer producer must add exactly five new B units")
-		if _KCNP.Mode == "abc-deferred" {
+		if InStr(_KCNP.Mode, "abc-deferred") {
 			BeforeGeneration := MetricsFocusCache.generation
 			_KSD_Acquire(_KCNP.C)
 			_KSD_Require(MetricsFocusCache.generation > BeforeGeneration && !MF_ShouldFilter(),
@@ -43,13 +43,23 @@ _KCNP_Timer() {
 			_KSD_Require(!_KCNP.CRefreshReturned && Keystats._flush_in_progress
 				&& IsObject(KLHook.context_transition),
 				"The prior B frame must still be deferred when C input arrives")
+			if _KCNP.Mode == "abc-deferred-shift" {
+				_KSD_Require(KLHook.context_observation_head <= KLHook.context_observations.Length,
+					"The real deferred C refresh must own an observation before compensation")
+				Last := KLHook.context_observations[-1]
+				Now := A_TickCount
+				KL_Hook_AdvanceContextWatermarks(100000, Now)
+				KL_Hook_AdvanceContextWatermarks(100000, Now)
+				_KSD_Require(Last.Shift == TickElapsed64(Last.EndTick, Now),
+					"Repeated overlapping gap compensation must not move C into the future")
+			}
 			_KCNP.SessionAtCInput := Keystats.session_app
 			BeforeC := Keystats.mouse_distance
 			KL_Mouse_ParkTick(, _KCNP_Position)
 			_KSD_Require(Keystats.mouse_distance == BeforeC + 5 && _KCNP.Samples == 4,
 				"The real public pointer producer must add exactly five new C units")
 		}
-		if _KCNP.Mode == "stop-during-prepare" || _KCNP.Mode == "existing-retry-stop" {
+		if _KCNP.Mode == "stop-during-prepare" || _KCNP.Mode == "existing-retry-stop" || _KCNP.Mode == "abc-deferred-stop" {
 			_KCNP.FirstStop := KL_Hook_Stop()
 			_KSD_Require(!_KCNP.FirstStop && KLHook.capture_stopping && IsObject(KLHook.context_stop),
 				"The nested real Stop must retain its close while the original nonempty flush is still active")
@@ -93,7 +103,7 @@ _KCNP_Main() {
 	A := {App: "fixture-prepare-a.exe", Title: "Public prepare A", Hwnd: 1801}
 	_KCNP.B := {App: "fixture-prepare-b.exe", Title: "Public prepare B", Hwnd: 1802}
 	_KCNP.C := {App: "fixture-prepare-c.exe", Title: "Public prepare C", Hwnd: 1803}
-	if _KCNP.Mode == "abc-deferred"
+	if InStr(_KCNP.Mode, "abc-deferred")
 		_KCNP.ExpectedSamples := 4
 	KLAppCat.file_path := _KSD.Log . ".categories"
 	for Identity in [A, _KCNP.B, _KCNP.C]
@@ -123,7 +133,7 @@ _KCNP_Main() {
 	Sleep(30)
 	_KSD_Acquire(_KCNP.B)
 	_KCNP.Armed := true
-	_KCNP.RefreshReturned := (_KCNP.Mode == "external-active" || _KCNP.Mode == "abc-deferred")
+	_KCNP.RefreshReturned := (_KCNP.Mode == "external-active" || InStr(_KCNP.Mode, "abc-deferred"))
 		? KL_FlushBuffer() : KL_Hook_RefreshContext(true)
 	if IsObject(_KCNP.Failure)
 		throw _KCNP.Failure
@@ -156,7 +166,7 @@ _KCNP_Main() {
 	_KSD_Require(_KSD.Errors == 0 && !IsObject(_KSD.Failure), "No dependency failure may impersonate a context transition refusal")
 	if _KCNP.Mode == "existing-retry-stop"
 		_KSD_Require(SeedSeen, "The original retry identity and payload must survive staging and Stop without adoption")
-	if _KCNP.Mode == "abc-deferred"
+	if InStr(_KCNP.Mode, "abc-deferred")
 		_KSD_Require(AUnits == 5 && BUnits == 5 && CUnits == 5 && Rows == 3,
 			"A, B and C public samples retain their own contexts across a deferred preparation")
 	else
@@ -164,7 +174,7 @@ _KCNP_Main() {
 			"A new public B input admitted during nonempty preparation must never be flushed under the older A context after Stop or retry")
 }
 if A_Args.Length != 2 || !(A_Args[1] == "ordinary-control" || A_Args[1] == "stop-during-prepare"
-	|| A_Args[1] == "existing-retry-stop" || A_Args[1] == "external-active" || A_Args[1] == "abc-deferred")
+	|| A_Args[1] == "existing-retry-stop" || A_Args[1] == "external-active" || A_Args[1] == "abc-deferred" || A_Args[1] == "abc-deferred-stop" || A_Args[1] == "abc-deferred-shift")
 	throw Error("The private nonempty context probe requires its exact mode and owned source directory")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 global _KCNP := {Mode: A_Args[1], B: 0, Armed: false, Samples: 0, Cutpoints: 0, TimerDone: false,

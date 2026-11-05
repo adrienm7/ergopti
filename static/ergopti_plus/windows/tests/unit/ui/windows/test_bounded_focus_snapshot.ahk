@@ -347,6 +347,8 @@ _BFS_KeystatsRejectsInvalidCanonicalSnapshot() {
 	SavedAppEnteredAt := KLHook.app_entered_at
 	SavedTitleEnteredAt := KLHook.title_entered_at
 	SavedSuspendTick := KLHook.suspend_tick
+	SavedTransition := KLHook.context_transition, SavedStop := KLHook.context_stop
+	SavedObservations := KLHook.context_observations, SavedObservationHead := KLHook.context_observation_head
 	try {
 		Keystats.initialized := true
 		Keystats.session_app := "old.exe"
@@ -357,6 +359,8 @@ _BFS_KeystatsRejectsInvalidCanonicalSnapshot() {
 		KLHook.app_entered_at := 0
 		KLHook.title_entered_at := 0
 		KLHook.suspend_tick := 0
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.context_observations := [], KLHook.context_observation_head := 1
 
 		MetricsFocusCache.state := _BFS_State(false, "", "", "", 0,
 			"title_unavailable", true, 1000)
@@ -384,6 +388,8 @@ _BFS_KeystatsRejectsInvalidCanonicalSnapshot() {
 		KLHook.app_entered_at := SavedAppEnteredAt
 		KLHook.title_entered_at := SavedTitleEnteredAt
 		KLHook.suspend_tick := SavedSuspendTick
+		KLHook.context_transition := SavedTransition, KLHook.context_stop := SavedStop
+		KLHook.context_observations := SavedObservations, KLHook.context_observation_head := SavedObservationHead
 	}
 }
 

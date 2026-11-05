@@ -61,6 +61,6 @@ _KCNP_Case(Mode) {
 		throw Primary
 	AssertTrue(Retired, "The exact native owner must retire before recursive source cleanup")
 }
-for _KCNP_Mode in ["ordinary-control", "stop-during-prepare", "existing-retry-stop", "external-active", "abc-deferred"]
+for _KCNP_Mode in ["ordinary-control", "stop-during-prepare", "existing-retry-stop", "external-active", "abc-deferred", "abc-deferred-stop", "abc-deferred-shift"]
 	Test("Keystats nonempty context prepare: " . _KCNP_Mode . " preserves new input attribution (context-nonempty-prepare-owner)",
 		_KCNP_Case.Bind(_KCNP_Mode))
