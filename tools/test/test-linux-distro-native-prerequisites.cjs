@@ -203,6 +203,12 @@ function runControls(scratch) {
 				data.lua54.url = 'https://example.invalid/lua.tar.gz';
 			},
 			(data) => {
+				data.lua54.mirror_url = 'https://example.invalid/lua.tar.gz';
+			},
+			(data) => {
+				delete data.lua54.mirror_url;
+			},
+			(data) => {
 				data.luv.revision = 'latest';
 			},
 			(data) => {

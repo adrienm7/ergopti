@@ -7,7 +7,7 @@ import re
 import sys
 
 FIELDS = {
-    "lua54": {"version", "url", "sha256"},
+    "lua54": {"version", "url", "mirror_url", "sha256"},
     "luv": {"repository", "revision"},
     "lfs": {"repository", "revision"},
 }
@@ -47,6 +47,13 @@ def read_pins():
                 raise ValueError("Lua source identity refused")
             if entry["url"] != "https://www.lua.org/ftp/lua-" + entry["version"] + ".tar.gz":
                 raise ValueError("Lua source URL refused")
+            # Debian's orig archive is byte-identical to lua.org's; the digest still admits it.
+            if entry["mirror_url"] != (
+                "https://deb.debian.org/debian/pool/main/l/lua5.4/lua5.4_"
+                + entry["version"]
+                + ".orig.tar.gz"
+            ):
+                raise ValueError("Lua source mirror URL refused")
         elif not re.fullmatch(
             r"https://github\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+\.git", entry["repository"]
         ) or not re.fullmatch(r"[0-9a-f]{40}", entry["revision"]):
