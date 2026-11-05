@@ -4768,4 +4768,66 @@ test('apps radial top eight use the same focus ranking as the top-app bars', () 
 		'App03'
 	]);
 });
+test('apps error ranking admits a qualifying application with no corrections', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-tx-error-app': {},
+		'kpi-tx-error-app-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 200, bs_total: 0, app_time_ms: 20000 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-tx-error-app'].textContent, 'Editor');
+	assert.equal(elements['kpi-tx-error-app-detail'].textContent, '0.0 % de backspaces');
+});
+test('apps recovery ranking admits qualifying zero-delay corrections', () => {
+	const fixture = appsFixture(true);
+	const context = fixture.context;
+	for (const name of ['dom_utils.js', 'metrics_apps/modal.js', 'metrics_apps/charts.js'])
+		vm.runInContext(read(name), context);
+	const elements = {
+		'kpi-switches': {},
+		'kpi-unlocks': {},
+		'kpi-wifi': {},
+		'render-error-banner': {},
+		'kpi-tx-recovery-app': {},
+		'kpi-tx-recovery-app-detail': {}
+	};
+	context.document.getElementById = (id) => elements[id] || null;
+	context.document.createElement = () => ({ style: {}, appendChild() {}, addEventListener() {} });
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { chars: 5, recovery_time_count: 5, recovery_time_sum_ms: 0 } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderDashboard();
+	assert.ok(
+		!elements['render-error-banner'].textContent,
+		elements['render-error-banner'].textContent
+	);
+	assert.equal(elements['kpi-tx-recovery-app'].textContent, 'Editor');
+	assert.equal(elements['kpi-tx-recovery-app-detail'].textContent, '0 ms en moyenne');
+});
 console.log(`${passed} passed, 0 failed.`);
