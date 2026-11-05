@@ -119,7 +119,7 @@ function getCmdGroups() {
 function normToken(name) {
 	const canonical = TOKEN_NORM[name.toLowerCase()];
 	if (canonical) return canonical;
-	return name.charAt(0).toUpperCase() + name.slice(1);
+	return name;
 }
 
 /**
@@ -815,11 +815,18 @@ function dispTrig(s) {
 
 function dispOutput(s) {
 	if (!s) return '';
-	let out = escapeHtml(toDisplay(s));
-	out = out.replace(/\{([^}]+)\}/g, function (_, name) {
-		const canon = normToken(name);
-		return '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
-	});
+	const display = toDisplay(s);
+	const tokens = /\{([^}]+)\}/g;
+	let out = '';
+	let last = 0;
+	let match;
+	while ((match = tokens.exec(display)) !== null) {
+		out += escapeHtml(display.slice(last, match.index));
+		const canon = normToken(match[1]);
+		out += '<span class="tc" data-tok="' + escapeHtml(canon) + '">' + escapeHtml(canon) + '</span>';
+		last = tokens.lastIndex;
+	}
+	out += escapeHtml(display.slice(last));
 	if (!compactView) {
 		out = out.replace(/<span class="tc" data-tok="Enter">Enter<\/span>/g, '<br>');
 	}

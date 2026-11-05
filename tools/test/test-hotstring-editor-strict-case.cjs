@@ -341,4 +341,52 @@ test('editing retains the snapshot identity, while new rows receive their own id
 	);
 });
 
+test('rendered token text escapes entities exactly once', () => {
+	const context = vm.createContext({
+		console,
+		document: {},
+		makeHostBridge: () => function () {},
+		setTimeout() {},
+		clearTimeout() {}
+	});
+	context.window = context;
+	vm.runInContext(
+		fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/_shared/ui/dom_utils.js'), 'utf8'),
+		context
+	);
+	vm.runInContext(modelSource, context, { filename: SCRIPT });
+	const rendered = context.dispOutput('before {a&b} and {x<😀} after');
+	assert.match(rendered, /data-tok="a&amp;b">a&amp;b<\/span>/);
+	assert.match(rendered, /data-tok="x&lt;😀">x&lt;😀<\/span>/);
+	assert.doesNotMatch(rendered, /&amp;amp;|&amp;lt;/);
+});
+
+test('editing literal brace content preserves its spelling and symbols', () => {
+	const context = vm.createContext({
+		console,
+		document: {
+			createTextNode: (text) => ({ nodeType: 3, textContent: text }),
+			createElement: (tag) => {
+				const node = {
+					nodeType: 1,
+					tagName: tag.toUpperCase(),
+					dataset: {},
+					className: '',
+					textContent: ''
+				};
+				node.classList = { contains: (name) => node.className.split(' ').includes(name) };
+				return node;
+			}
+		},
+		makeHostBridge: () => function () {},
+		setTimeout() {},
+		clearTimeout() {}
+	});
+	context.window = context;
+	vm.runInContext(modelSource, context, { filename: SCRIPT });
+	context.original = 'x {a&b} {x<😀} {foo}';
+	vm.runInContext('result = serializeEditor({childNodes: parseToNodes(original)})', context);
+	assert.equal(context.result, context.original);
+});
+
 console.log(`\nResults: ${passed} passed, 0 failed.`);
