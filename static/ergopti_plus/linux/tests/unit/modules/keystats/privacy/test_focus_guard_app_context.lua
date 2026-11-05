@@ -104,6 +104,23 @@ local function fixture(body)
 end
 
 helpers.describe("Native field application privacy context", function()
+	helpers.it("(localized-private-context) protects metrics and hotstrings only while the filter is enabled", function()
+		fixture(function(guard, logger, state)
+			state.app, state.title = "firefox", "Exemple — NAVIGATION PRIVÉE de Mozilla Firefox"
+			helpers.assert_true(guard.prime())
+			helpers.assert_true(guard.blocks_text())
+			state.press("x", 30)
+			helpers.assert_eq(logger._pending_buffer_count_for_test(), 0, "private input cannot reach metrics")
+			helpers.assert_eq(state.engine_calls or 0, 0, "private input cannot reach the hotstring engine")
+			local configuration = assert(logger.configuration_snapshot())
+			configuration.private_filter_enabled = false
+			helpers.assert_true(logger.apply_configuration(configuration))
+			helpers.assert_eq(guard.blocks_text(), false, "the user-disabled filter is respected")
+			state.press("y", 31)
+			helpers.assert_eq(logger._pending_buffer_count_for_test(), 1)
+			helpers.assert_eq(state.engine_calls, 1)
+		end)
+	end)
 	for _, policy in ipairs({ "password application", "private window" }) do
 		helpers.it("(focus-context-join) " .. policy .. " cannot borrow the previous ordinary context", function()
 			fixture(function(guard, logger, state, environment)
