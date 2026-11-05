@@ -313,7 +313,10 @@ def package_arguments(arguments):
 # bounds one stalled read only, and a Common "Install native validation tools"
 # step once hung for more than 95 minutes, so a call that outlives this is
 # killed and fails the step instead of holding the runner for its six hours.
-APT_COMMAND_TIMEOUT_SECONDS = 600
+# The runners' Azure mirror moved for hours at a few hundred KB/s on
+# 2026-11-05: the 114 MB Playwright install kept downloading when 600 s
+# stopped it, three times in a row. Twenty minutes still ends a hung call.
+APT_COMMAND_TIMEOUT_SECONDS = 1200
 
 
 def command_prefix(directory):
