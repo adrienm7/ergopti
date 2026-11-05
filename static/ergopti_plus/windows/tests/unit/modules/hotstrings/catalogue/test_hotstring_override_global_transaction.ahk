@@ -469,6 +469,8 @@ _HSOT_ReloadRevalidatesAfterNonCriticalParse() {
 		AssertEqual(BeforeGeneration + 1, _HSResolveGen,
 			"the accepted Map and exactly one generation must publish together")
 
+		; Retire the first owned native source before acquiring the second scope.
+		_HSOT_RestoreState(Saved)
 		_HSOT_Seed("reload_rebase")
 		BoundPath := _HotstringsOverridesPath
 		BeforeOverrides := _HotstringsOverrides
