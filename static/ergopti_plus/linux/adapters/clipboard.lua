@@ -354,9 +354,15 @@ end
 --- property of the desktop rather than a choice available here.
 --- @param uinput table Channel exposing emit(code, value) -> boolean.
 --- @param admission function|nil Full-phase destination check.
+--- @param selected_backend table Captured clipboard command owner.
+--- @param text string Expected clipboard payload.
 --- @return boolean True only when the complete chord reached the wire.
-local function press_paste(uinput, admission)
+local function press_paste(uinput, admission, selected_backend, text)
 	local key_v = M.paste_keycode()
+	if not admitted(admission) then return false end
+	-- A copy during the settle delay changes what Ctrl+V would insert. A
+	-- successful setter alone cannot authorize pasting another owner's bytes.
+	if holds_pasted_text(selected_backend, text) ~= true then return false end
 	if not admitted(admission) then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_DOWN) ~= true then return false end
@@ -433,13 +439,16 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 		if not prepared then stage.close() end
 		return prepared
 	end
-	--- Pastes already-prepared bytes without a new lookup, write or settle delay.
+	--- Pastes only while the clipboard still contains the prepared bytes.
+	--- The final read may retire the destination, so admission follows it again.
 	--- @param channel table Checked short output transaction.
 	--- @return boolean issued
 	function stage.paste(channel)
 		if busy or revoked or not prepared then return false end
 		busy = true
 		local ok, issued = pcall(function()
+			if not current() then return false end
+			if holds_pasted_text(b, text) ~= true then return false end
 			if not current() then return false end
 			if channel.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
 			if not current() then return false end
@@ -503,7 +512,7 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
 		-- The shortcut lookup may query the layout, so validate after it and
 		-- immediately before Ctrl DOWN, not merely before the settle delay.
-		if not press_paste(uinput, admission) then return false end
+		if not press_paste(uinput, admission, b, text) then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return admitted(admission)
 	end)
