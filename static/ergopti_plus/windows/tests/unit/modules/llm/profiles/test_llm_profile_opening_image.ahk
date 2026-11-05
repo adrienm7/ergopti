@@ -470,7 +470,7 @@ _PFI_InstallMemoryRetirement(State) {
 	State.RetirementScope := []
 	State.Retired := false
 	State.Rebuilds := 0
-	for Spec in [[_TOML_StageMatches, _PFI_RetirementStage.Bind(State)],
+	for Spec in [[FSWriteReplaceOwned, _PFI_RetirementHeldPublish.Bind(State)],
 		[_LLM_Menu_ObservationEnd, _PFI_RetirementObservation.Bind(State)],
 		[LLM_Menu_RequestBuild, _PFI_RetirementRebuild.Bind(State)]] {
 		AssertFalse(Spec[1].HasOwnProp("Call"), "The retirement probe delegates genuine unmodified function bodies")
@@ -489,15 +489,56 @@ _PFI_ReleaseMemoryRetirement(State) {
 	}
 }
 
-_PFI_RetirementStage(State, Self, Args*) {
-	Result := Func.Prototype.Call.Call(Self, Args*)
-	if State.Mode == "edit-memory-retire-before-ack" && State.Collects > 0 && !State.Retired {
-		AssertTrue(Args.Length >= 2 && InStr(Args[1], State.World.ConfigPath . ".") == 1,
-			"The real post-projection stage verification must belong to this actual config writer")
-		AssertTrue(Result is Integer && Result == 1, "The native writer must genuinely flush and verify its complete staged image")
-		_PFI_RetireActualDependencies(State)
+_PFI_RetirementHandlePath(Handle) {
+	Wide := Buffer(65536, 0)
+	Length := DllCall("kernel32\GetFinalPathNameByHandleW", "Ptr", Handle,
+		"Ptr", Wide, "UInt", 32768, "UInt", 0, "UInt")
+	AssertTrue(Length > 0 && Length < 32768, "the native owned file must expose its exact complete path")
+	return StrGet(Wide, Length, "UTF-16")
+}
+
+_PFI_RetirementCaptureStage(Receipt, Create, Folder, Name, Attributes) {
+	Handle := Create.Call(Folder, Name, Attributes)
+	Receipt.handle := Handle
+	return Handle
+}
+
+_PFI_RetirementHeldPreflight(State, Receipt, Before) {
+	Result := Before.Call()
+	AssertTrue(Result is Integer && Result == 1, "the native writer must genuinely flush and verify its complete staged image")
+	AssertTrue(Receipt.handle != -1, "the actual exclusive stage factory must have returned its retained handle")
+	; Compare native handle names rather than a pathname passed to readback:
+	; the held reader intentionally no longer reopens its stage by that name.
+	Target := DllCall("kernel32\CreateFileW", "Str", State.World.ConfigPath,
+		"UInt", 0, "UInt", 7, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+	AssertTrue(Target != -1, "the existing real configured target must remain queryable")
+	try {
+		StagePath := _PFI_RetirementHandlePath(Receipt.handle)
+		TargetPath := _PFI_RetirementHandlePath(Target)
+		AssertTrue(InStr(StagePath, TargetPath . ".", false) == 1,
+			"the actual retained native stage must belong to this exact configured target")
+	} finally {
+		AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Target, "Int") != 0,
+			"the fixture must acknowledge retirement of its own target query handle")
 	}
+	_PFI_RetireActualDependencies(State)
 	return Result
+}
+
+_PFI_RetirementHeldPublish(State, Self, Path, Content, Suffix, &Detail := "", StageFn := 0,
+		BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true, &Publication := 0, FlushFn := 0) {
+	if State.Mode == "edit-memory-retire-before-ack" && State.Collects > 0 && !State.Retired
+			&& Path == State.World.ConfigPath {
+		AssertTrue(HasMethod(StageFn, "Call") && HasMethod(BeforePublishFn, "Call"),
+			"the genuine config writer must retain its actual stage and exact-source preflight callbacks")
+		Receipt := {handle: -1}
+		return Func.Prototype.Call.Call(Self, Path, Content, Suffix, &Detail,
+			_PFI_RetirementCaptureStage.Bind(Receipt, StageFn),
+			_PFI_RetirementHeldPreflight.Bind(State, Receipt, BeforePublishFn),
+			AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+	}
+	return Func.Prototype.Call.Call(Self, Path, Content, Suffix, &Detail, StageFn,
+		BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
 }
 
 _PFI_RetirementObservation(State, Self, Stage, Started, Result) {

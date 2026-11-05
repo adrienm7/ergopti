@@ -560,3 +560,34 @@ _THPA_DayLog() {
 	HealthCheck_DayLogDiscard(Snapshot)
 }
 Test("Diagnostics export: the opt-in day log is redacted, saved with the report and never copied (day-log-host)", _THPA_DayLog)
+
+
+; Public collector coverage: UTF-16 preview boundaries must retain complete
+; supplementary code points while leaving the full attachment unchanged.
+_THPA_DayLogUnicodePreview() {
+	Config := HealthCheck_Config()
+	Limits := Config["day_log"].Clone()
+	Limits["preview_head_lines"] := 1
+	Limits["preview_tail_lines"] := 1
+	Context := Map("home", "", "user", "", "config_dir", "", "case_insensitive", true)
+	Face := Chr(0x1F600)
+	Raw := "A" . Face . "B`nmiddle`n" . Face . "AB`n"
+	Expected := [
+		["A" . Chr(0x2026), Face . Chr(0x2026)],
+		["A" . Face . Chr(0x2026), Face . "A" . Chr(0x2026)],
+		["A" . Face . "B", Face . "AB"],
+		["A" . Face . "B", Face . "AB"]
+	]
+	for Limit, Preview in Expected {
+		Limits["preview_line_max_chars"] := Limit
+		Result := DayLog_Collect(Raw, StrPut(Raw, "UTF-8") - 1, Config["redaction"], Context, Limits)
+		AssertTrue(Result["ok"])
+		AssertEqual(Preview[1], Result["head"][1], "head at code-point limit " . Limit)
+		AssertEqual(Preview[2], Result["tail"][1], "tail at code-point limit " . Limit)
+		AssertEqual(Raw, Result["text"], "preview cutting must not truncate the attachment")
+		AssertEqual(StrPut(Raw, "UTF-8") - 1, Result["bytes"])
+		AssertEqual(3, Result["lines"])
+	}
+}
+Test("Diagnostics day log: supplementary characters survive head and tail preview boundaries (day-log-unicode-preview)",
+	_THPA_DayLogUnicodePreview)
