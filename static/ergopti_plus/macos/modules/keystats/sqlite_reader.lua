@@ -552,7 +552,7 @@ local NGRAM_TYPE_TABLE = {
 	w_bg  = "ngram_word_bigrams",
 }
 
---- Tables whose MIN/MAX(date) bound the days a paced n-gram read visits.
+--- Standalone tables whose dates also contribute to a paced n-gram read.
 local NGRAM_STANDALONE_TABLES = { "ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes" }
 
 --- Returns an empty n-gram dict in the legacy `today_idx[app]` shape.
@@ -589,38 +589,35 @@ local function _merge_ngram_row(item, r)
 end
 
 
---- Lists the days a paced read must visit: the requested bounds clamped to the
---- first and last day any n-gram table holds.
+--- Lists only present days in the requested range across all n-gram families.
 --- @param db userdata Open handle.
 --- @param start_date string|nil Inclusive lower bound.
 --- @param end_date string|nil Inclusive upper bound.
 --- @return table days Ascending YYYY-MM-DD strings.
 --- @return boolean complete False when any bounds query failed.
 local function _ngram_days(db, start_date, end_date)
-	local lo, hi = nil, nil
+	local found = {}
 	local complete = true
 	local tables = { table.unpack(NGRAM_STANDALONE_TABLES) }
 	for _, tbl in pairs(NGRAM_TYPE_TABLE) do tables[#tables + 1] = tbl end
+	local clauses = {}
+	if start_date and start_date ~= "" then clauses[#clauses + 1] = "date >= " .. _q(start_date) end
+	if end_date and end_date ~= "" then clauses[#clauses + 1] = "date <= " .. _q(end_date) end
+	local where = #clauses > 0 and (" WHERE " .. table.concat(clauses, " AND ")) or ""
 	for _, tbl in ipairs(tables) do
 		local accepted = _safe_query(tbl .. "(bounds)", function()
-			-- Two scalar subqueries keep SQLite's single-MIN/MAX index shortcut
-			for r in db:nrows(string.format(
-				"SELECT (SELECT MIN(date) FROM %s) AS lo, (SELECT MAX(date) FROM %s) AS hi", tbl, tbl)) do
-				if r.lo and (not lo or r.lo < lo) then lo = r.lo end
-				if r.hi and (not hi or r.hi > hi) then hi = r.hi end
+			for r in db:nrows("SELECT DISTINCT date FROM " .. tbl .. where .. " ORDER BY date") do
+				if type(r.date) ~= "string" or not r.date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+					error("invalid n-gram date in census")
+				end
+				found[r.date] = true
 			end
 		end)
 		if accepted ~= true then complete = false end
 	end
-	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
-	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local days = {}
-	if not lo or not hi then return days, complete end
-	local day = lo
-	while day <= hi do
-		days[#days + 1] = day
-		day = M.next_day(day)
-	end
+	for day in pairs(found) do days[#days + 1] = day end
+	table.sort(days)
 	return days, complete
 end
 
@@ -902,7 +899,7 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 	return today_idx, complete
 end
 
---- Convenience wrapper: returns { historical = …, today = today_app_idx }
+--- Convenience wrapper: returns { historical = non-today rows, today = today_app_idx }
 --- so the legacy metrics_typing JS can keep its split. `today_app_idx` is
 --- shaped like `today_idx[app] = {c, bg, …}` for compatibility.
 --- @param sqlite_path  string Path to db.sqlite.
@@ -917,6 +914,15 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 	local bounds = M.split_bounds(start_date, end_date, today_str)
 	local historical, history_complete = M.read_ngrams(sqlite_path, start_date, bounds.historical_end,
 		selected_apps, pacer)
+	local future_requested = (end_date and end_date ~= "" and end_date > today_str)
+		or (start_date and start_date ~= "" and start_date > today_str and (not end_date or end_date == ""))
+	if future_requested then
+		local first = M.next_day(today_str)
+		if start_date and start_date > first then first = start_date end
+		local future, complete = M.read_ngrams(sqlite_path, first, end_date, selected_apps, pacer)
+		M.merge_ngrams(historical, future, pacer)
+		history_complete = history_complete == true and complete == true
+	end
 	local today_idx, today_complete = M.read_today_split(sqlite_path, start_date, end_date, selected_apps,
 		pacer, today_str)
 	return { historical = historical, today = today_idx }, history_complete == true and today_complete == true

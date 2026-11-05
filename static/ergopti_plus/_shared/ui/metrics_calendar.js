@@ -66,20 +66,43 @@ function parseDateKey(dateStr) {
 /** Captures the existing current-and-previous-hour chart selection from one clock. */
 function createMetricsHourWindow(now) {
 	const previous = new Date(now.getTime() - METRICS_HOUR_MILLISECONDS);
-	return Object.freeze({
-		start_date: formatMetricsDateKey(metricsLocalDayOrdinal(previous)),
-		start_hour: previous.getHours(),
-		end_date: formatMetricsDateKey(metricsLocalDayOrdinal(now)),
-		end_hour: now.getHours()
-	});
+	const before = {
+		date: formatMetricsDateKey(metricsLocalDayOrdinal(previous)),
+		hour: previous.getHours()
+	};
+	const after = { date: formatMetricsDateKey(metricsLocalDayOrdinal(now)), hour: now.getHours() };
+	const backwards =
+		before.date > after.date || (before.date === after.date && before.hour > after.hour);
+	const start = backwards ? after : before;
+	const end = backwards ? before : after;
+	const result = {
+		start_date: start.date,
+		start_hour: start.hour,
+		end_date: end.date,
+		end_hour: end.hour
+	};
+	if (backwards) {
+		// Persisted five-minute buckets retain local date and hour, not offsets.
+		// Observe the actual elapsed hour so a clock rollback across midnight does
+		// not select unrelated hours between the two wall-clock endpoints.
+		const hours = {};
+		for (let stamp = previous.getTime(); stamp <= now.getTime(); stamp += 60000) {
+			const instant = new Date(stamp);
+			const date = formatMetricsDateKey(metricsLocalDayOrdinal(instant));
+			(hours[date] ||= {})[instant.getHours()] = true;
+		}
+		result.rollback_hours = hours;
+	}
+	return Object.freeze(result);
 }
 
 function metricsHourWindowContains(hourWindow, dateKey, hour) {
+	if (hourWindow.rollback_hours) return hourWindow.rollback_hours[dateKey]?.[hour] === true;
 	if (hourWindow.start_date === hourWindow.end_date)
 		return (
 			dateKey === hourWindow.start_date &&
-			hour >= hourWindow.start_hour &&
-			hour <= hourWindow.end_hour
+			hour >= Math.min(hourWindow.start_hour, hourWindow.end_hour) &&
+			hour <= Math.max(hourWindow.start_hour, hourWindow.end_hour)
 		);
 	if (dateKey === hourWindow.start_date) return hour >= hourWindow.start_hour;
 	if (dateKey === hourWindow.end_date) return hour <= hourWindow.end_hour;
@@ -88,12 +111,19 @@ function metricsHourWindowContains(hourWindow, dateKey, hour) {
 
 /** Keeps the existing extra context hour at the chart's right edge. */
 function metricsHourWindowBounds(hourWindow) {
+	// A local clock can move backwards by more than an hour. Hour buckets
+	// contain no offset, so retain both wall-clock hours in their natural order.
+	const sameDay = hourWindow.start_date === hourWindow.end_date;
+	const startHour = sameDay
+		? Math.min(hourWindow.start_hour, hourWindow.end_hour)
+		: hourWindow.start_hour;
+	const endHour = sameDay
+		? Math.max(hourWindow.start_hour, hourWindow.end_hour)
+		: hourWindow.end_hour;
 	return {
-		start: new Date(
-			`${hourWindow.start_date}T${String(hourWindow.start_hour).padStart(2, '0')}:00:00`
-		),
+		start: new Date(`${hourWindow.start_date}T${String(startHour).padStart(2, '0')}:00:00`),
 		end: new Date(
-			`${hourWindow.end_date}T${String(Math.min(hourWindow.end_hour + 1, 23)).padStart(2, '0')}:59:59`
+			`${hourWindow.end_date}T${String(Math.min(endHour + 1, 23)).padStart(2, '0')}:59:59`
 		)
 	};
 }

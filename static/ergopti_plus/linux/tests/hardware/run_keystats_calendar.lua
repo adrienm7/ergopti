@@ -33,15 +33,15 @@ end
 local function scenario(day, body)
 	local base = assert(original_time({ year = 2026, month = day.month, day = day.day, hour = day.hour or 23,
 		min = day.min or 59, sec = day.sec or 59 }))
-	local elapsed, path = 0, os.tmpname()
+	local elapsed, wall_shift, path = 0, 0, os.tmpname()
 	Monotonic.now_ms = function() return 1000 + elapsed end
 	Calendar.capture = function()
-		local wall = base + elapsed / 1000
+		local wall = base + elapsed / 1000 + wall_shift
 		return { wall_ms = wall * 1000, mono_ms = Monotonic.now_ms(),
 			date = original_date("%Y-%m-%d", math.floor(wall)), ts = original_date("!%Y-%m-%d %H:%M:%S", math.floor(wall)) }
 	end
-	os.time = function(value) if value then return original_time(value) end; return math.floor(base + elapsed / 1000) end
-	os.date = function(format, value) return original_date(format, value or math.floor(base + elapsed / 1000)) end
+	os.time = function(value) if value then return original_time(value) end; return math.floor(base + elapsed / 1000 + wall_shift) end
+	os.date = function(format, value) return original_date(format, value or math.floor(base + elapsed / 1000 + wall_shift)) end
 	local ok, failure = xpcall(function()
 		Preferences.with(function()
 			Fixture.with(function(k)
@@ -50,7 +50,7 @@ local function scenario(day, body)
 				local writer = require("modules.keystats.sqlite_writer")
 				local function advance(ms) elapsed = elapsed + ms end
 				local function rows(sql) return assert(writer.query_rows(sql)) end
-				body(k, writer, advance, rows)
+				body(k, writer, advance, rows, function(seconds) wall_shift = wall_shift + seconds end)
 			end)
 		end)
 	end, debug.traceback)
@@ -60,6 +60,27 @@ local function scenario(day, body)
 	os.execute("rm -rf -- " .. require("text_utils").shell_quote(path .. ".logs"))
 	assert(ok, failure)
 end
+
+scenario({ month = 10, day = 26, hour = 0, min = 0, sec = 20 }, function(k, _, advance, _, shift)
+	k.on_app_focus("rollback-app", Monotonic.now_ms())
+	k.on_keydown("a", Monotonic.now_ms(), "rollback-app")
+	advance(1000); shift(-3600)
+	k.on_keydown("b", Monotonic.now_ms(), "rollback-app")
+	local function check_range()
+		local range = assert(k.get_range_payload("2026-10-25", "2026-10-26", { "rollback-app" }))
+		equal(range.historical.c.a and range.historical.c.a.c, 1)
+		equal(range.today["rollback-app"].c.b.c, 1)
+		local future = assert(k.get_range_payload("2026-10-26", "2026-10-26", { "rollback-app" }))
+		equal(future.historical.c.a and future.historical.c.a.c, 1)
+		equal(next(future.today), nil)
+		local current = assert(k.get_range_payload("2026-10-25", "2026-10-25", { "rollback-app" }))
+		equal(current.historical.c.a, nil)
+		equal(current.today["rollback-app"].c.b.c, 1)
+	end
+	check_range()
+	Fixture.flush(k)
+	check_range()
+end)
 
 scenario({ month = 10, day = 25 }, function(k, _, advance, rows)
 	k.on_app_focus("calendar-app", Monotonic.now_ms())

@@ -1572,8 +1572,9 @@ local function add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 		if type(app) == "string" and app ~= "" then selected[app] = true end
 	end
 	local unrestricted = next(selected) == nil
+	local future_requested = SqliteReader.includes_future(start_date, end_date, clock.date)
 	for date, entries in pairs(snapshot_calendar(clock).values) do
-		if date <= clock.date and SqliteReader.includes_date(date, start_date, end_date) then
+		if (date <= clock.date or future_requested) and SqliteReader.includes_date(date, start_date, end_date) then
 			for app, stats in pairs(entries) do
 				if unrestricted or selected[app] then
 					local target = payload.historical

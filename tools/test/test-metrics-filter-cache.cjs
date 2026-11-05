@@ -4095,4 +4095,53 @@ assert.equal(
 	'all native structured endpoint, subset and refresh controls must execute'
 );
 
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of [
+		{
+			name: 'two-hour clock rollback',
+			zone: 'Antarctica/Troll',
+			now: '2026-10-25T01:30:00Z',
+			start: '2026-10-25',
+			end: '2026-10-25',
+			first: '01:05',
+			second: '02:35'
+		},
+		{
+			name: 'clock rollback across midnight',
+			zone: 'Antarctica/Casey',
+			now: '2010-03-04T15:30:00Z',
+			start: '2010-03-04',
+			end: '2010-03-05',
+			first: '23:05',
+			second: '01:35'
+		}
+	])
+		test(`${host} last-hour chart keeps both buckets across ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = typingChartPage(host, vector.now);
+				publishTypingPage(page, host, typingHourManifest(vector));
+				page.elements.get('quick_range').value = 'last_hour';
+				runTypingControlChange(page, 'quick_range');
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('app_state.range_request_selection', page.context)),
+					[vector.start, vector.end, ['Editor']]
+				);
+				const activity = page.lastChart('wpm_chart');
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.y),
+					[7, 3]
+				);
+				for (const point of activity.data.datasets[0].data) {
+					assert.ok(activity.options.scales.x.min <= point.x);
+					assert.ok(activity.options.scales.x.max >= point.x);
+				}
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+}
+
 console.log(`${passed} passed, 0 failed.`);
