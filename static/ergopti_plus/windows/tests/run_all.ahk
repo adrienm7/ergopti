@@ -551,6 +551,7 @@ InstallSendNoOps()
 #Include unit/adapters/uia/test_uia_worker_cleanup_debt.ahk
 #Include unit/adapters/uia/test_uia_worker_exit_reentry.ahk
 #Include unit/adapters/uia/test_secure_field_worker_context.ahk
+#Include unit/adapters/uia/test_secure_field_native_style_change.ahk
 
 #Include unit/infra/config/persistence/test_config.ahk
 #Include unit/infra/config/persistence/test_feature_state_boot.ahk
