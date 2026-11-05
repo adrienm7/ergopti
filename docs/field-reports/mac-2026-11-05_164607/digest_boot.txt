@@ -1,0 +1,263 @@
+2026-11-05 10:10:17:171 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 4.1 ms (+5.1 ms, total 362.2 ms, cpu 1.2 ms).
+2026-11-05 10:10:17:186 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 11.3 ms (+14.4 ms, total 376.6 ms, cpu 8.6 ms).
+2026-11-05 10:10:17:186 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 377.0 ms, cpu 0.1 ms).
+2026-11-05 10:10:17:188 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.3 ms (+1.5 ms, total 378.5 ms, cpu 0.8 ms).
+2026-11-05 10:10:17:188 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.8 ms, total 379.3 ms, cpu 0.5 ms).
+2026-11-05 10:10:17:509 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 320.8 ms (+321.0 ms, total 700.2 ms, cpu 81.9 ms).
+2026-11-05 10:10:17:556 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 46.1 ms (+46.9 ms, total 747.1 ms, cpu 38.3 ms).
+2026-11-05 10:10:17:559 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 2.5 ms (+2.8 ms, total 749.9 ms, cpu 1.3 ms).
+2026-11-05 10:10:34:579 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 17019.5 ms (+17019.7 ms, total 17769.6 ms, cpu 640.3 ms).
+2026-11-05 10:10:34:874 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 293.8 ms (+295.2 ms, total 18064.8 ms, cpu 49.3 ms).
+2026-11-05 10:10:34:877 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.0 ms (+2.8 ms, total 18067.6 ms, cpu 0.4 ms).
+2026-11-05 10:10:34:887 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 9.7 ms (+10.1 ms, total 18077.7 ms, cpu 5.9 ms).
+2026-11-05 10:10:34:890 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.3 ms (+2.8 ms, total 18080.5 ms, cpu 0.2 ms).
+2026-11-05 10:10:34:908 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 17.9 ms (+18.2 ms, total 18098.7 ms, cpu 11.8 ms).
+2026-11-05 10:10:35:180 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 271.3 ms (+272.3 ms, total 18371.0 ms, cpu 262.7 ms).
+2026-11-05 10:10:35:186 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.0 ms (+5.3 ms, total 18376.3 ms, cpu 5.0 ms).
+2026-11-05 10:10:35:235 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 48.8 ms (+49.0 ms, total 18425.3 ms, cpu 24.2 ms).
+2026-11-05 10:10:35:726 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 491.2 ms (+491.5 ms, total 18916.8 ms, cpu 348.2 ms).
+2026-11-05 10:10:35:906 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 179.2 ms (+179.6 ms, total 19096.4 ms, cpu 144.7 ms).
+2026-11-05 10:10:35:908 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.7 ms (+2.1 ms, total 19098.5 ms, cpu 0.2 ms).
+2026-11-05 10:10:35:922 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 13.0 ms (+13.9 ms, total 19112.4 ms, cpu 2.3 ms).
+2026-11-05 10:10:35:923 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 10:10:35:923 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 0.3 ms (+1.3 ms, total 19113.7 ms, cpu 0.2 ms).
+2026-11-05 10:10:35:924 [SUCCESS] [BootProfile] Boot complete in 19115 ms.
+2026-11-05 10:10:35:925 [INFO] [BootProfile] Boot CPU: 1854 ms of process CPU over 19115 ms of boot.
+2026-11-05 10:10:36:159 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 10:10:36:159 [WARNING] [runtime] An hs.timer.new callback (...s/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1581 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: boot.stage=491.2 ms, boot.stage_cpu=348.2 ms, boot.stage=271.3 ms, boot.stage_cpu=262.7 ms, boot.stage=179.2 ms. Lua heap 21->32 MB.
+2026-11-05 10:10:56:503 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.0 ms (+2.6 ms, total 274.0 ms, cpu 1.0 ms).
+2026-11-05 10:10:56:511 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.2 ms (+7.8 ms, total 281.8 ms, cpu 2.7 ms).
+2026-11-05 10:10:56:516 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 1.7 ms (+5.1 ms, total 286.9 ms, cpu 0.2 ms).
+2026-11-05 10:10:56:517 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.6 ms (+1.8 ms, total 288.8 ms, cpu 0.8 ms).
+2026-11-05 10:10:56:518 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.8 ms, total 289.6 ms, cpu 0.4 ms).
+2026-11-05 10:10:56:692 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 173.9 ms (+174.1 ms, total 463.7 ms, cpu 62.6 ms).
+2026-11-05 10:10:56:718 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 25.8 ms (+26.1 ms, total 489.8 ms, cpu 25.1 ms).
+2026-11-05 10:10:56:720 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.4 ms (+1.7 ms, total 491.5 ms, cpu 1.1 ms).
+2026-11-05 10:10:56:721 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.4 ms (+0.6 ms, total 492.1 ms, cpu 0.4 ms).
+2026-11-05 10:10:56:893 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 171.5 ms (+171.7 ms, total 663.9 ms, cpu 23.5 ms).
+2026-11-05 10:10:56:898 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 4.5 ms (+5.1 ms, total 668.9 ms, cpu 0.4 ms).
+2026-11-05 10:10:56:903 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 4.8 ms (+5.0 ms, total 673.9 ms, cpu 4.2 ms).
+2026-11-05 10:10:56:905 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.3 ms (+2.0 ms, total 675.9 ms, cpu 0.1 ms).
+2026-11-05 10:10:56:912 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 6.7 ms (+7.6 ms, total 683.5 ms, cpu 5.2 ms).
+2026-11-05 10:10:57:103 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 190.2 ms (+191.0 ms, total 874.5 ms, cpu 185.0 ms).
+2026-11-05 10:10:57:109 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.7 ms (+6.0 ms, total 880.5 ms, cpu 5.7 ms).
+2026-11-05 10:10:57:142 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 31.0 ms (+32.9 ms, total 913.4 ms, cpu 21.8 ms).
+2026-11-05 10:10:57:253 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 104.1 ms (+110.4 ms, total 1023.8 ms, cpu 79.8 ms).
+2026-11-05 10:10:57:368 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 114.9 ms (+115.5 ms, total 1139.3 ms, cpu 106.0 ms).
+2026-11-05 10:10:57:373 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.5 ms (+5.0 ms, total 1144.3 ms, cpu 0.4 ms).
+2026-11-05 10:10:57:382 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 8.4 ms (+9.1 ms, total 1153.4 ms, cpu 6.6 ms).
+2026-11-05 10:10:57:382 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 10:10:57:383 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 0.2 ms (+0.5 ms, total 1153.9 ms, cpu 0.1 ms).
+2026-11-05 10:10:57:383 [SUCCESS] [BootProfile] Boot complete in 1154 ms.
+2026-11-05 10:10:57:383 [INFO] [BootProfile] Boot CPU: 716 ms of process CPU over 1154 ms of boot.
+2026-11-05 10:10:57:603 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 10:42:50:950 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 10.4 ms (+11.4 ms, total 261.8 ms, cpu 1.1 ms).
+2026-11-05 10:42:50:963 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 11.8 ms (+12.3 ms, total 274.1 ms, cpu 7.6 ms).
+2026-11-05 10:42:50:963 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.5 ms, total 274.5 ms, cpu 0.1 ms).
+2026-11-05 10:42:50:964 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.0 ms (+1.5 ms, total 276.0 ms, cpu 0.7 ms).
+2026-11-05 10:42:50:965 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.7 ms, total 276.8 ms, cpu 0.4 ms).
+2026-11-05 10:42:51:106 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 140.3 ms (+140.5 ms, total 417.2 ms, cpu 63.4 ms).
+2026-11-05 10:42:51:129 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 22.9 ms (+23.3 ms, total 440.5 ms, cpu 22.3 ms).
+2026-11-05 10:42:51:130 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.2 ms (+1.4 ms, total 441.9 ms, cpu 0.9 ms).
+2026-11-05 10:44:53:199 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.5 ms (+3.2 ms, total 223.1 ms, cpu 1.1 ms).
+2026-11-05 10:44:53:205 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 5.4 ms (+5.9 ms, total 229.0 ms, cpu 2.6 ms).
+2026-11-05 10:44:53:206 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.4 ms (+0.9 ms, total 229.8 ms, cpu 0.1 ms).
+2026-11-05 10:44:53:207 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.4 ms (+1.6 ms, total 231.4 ms, cpu 0.7 ms).
+2026-11-05 10:44:53:209 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.8 ms (+1.1 ms, total 232.5 ms, cpu 0.4 ms).
+2026-11-05 10:44:53:372 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 162.9 ms (+163.1 ms, total 395.6 ms, cpu 56.3 ms).
+2026-11-05 10:44:53:399 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 26.9 ms (+27.3 ms, total 422.9 ms, cpu 26.2 ms).
+2026-11-05 10:44:53:401 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.3 ms (+1.7 ms, total 424.5 ms, cpu 1.0 ms).
+2026-11-05 10:45:08:997 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.5 ms (+2.4 ms, total 223.5 ms, cpu 0.8 ms).
+2026-11-05 10:45:09:003 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 5.6 ms (+6.1 ms, total 229.6 ms, cpu 2.3 ms).
+2026-11-05 10:45:09:003 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.5 ms, total 230.1 ms, cpu 0.1 ms).
+2026-11-05 10:45:09:004 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 0.9 ms (+1.2 ms, total 231.3 ms, cpu 0.6 ms).
+2026-11-05 10:45:09:006 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 1.6 ms (+1.8 ms, total 233.1 ms, cpu 0.4 ms).
+2026-11-05 10:45:09:142 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 135.2 ms (+135.4 ms, total 368.5 ms, cpu 53.6 ms).
+2026-11-05 10:45:09:168 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 26.0 ms (+26.3 ms, total 394.8 ms, cpu 24.7 ms).
+2026-11-05 10:45:09:170 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.8 ms (+2.2 ms, total 397.0 ms, cpu 1.0 ms).
+2026-11-05 10:45:56:701 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.7 ms (+2.3 ms, total 243.4 ms, cpu 1.0 ms).
+2026-11-05 10:45:56:707 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 6.2 ms (+6.6 ms, total 250.0 ms, cpu 5.9 ms).
+2026-11-05 10:45:56:708 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.3 ms (+0.8 ms, total 250.8 ms, cpu 0.1 ms).
+2026-11-05 10:45:56:709 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 0.9 ms (+1.0 ms, total 251.8 ms, cpu 0.6 ms).
+2026-11-05 10:45:56:710 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.7 ms, total 252.6 ms, cpu 0.4 ms).
+2026-11-05 10:45:56:846 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 135.4 ms (+135.6 ms, total 388.2 ms, cpu 54.4 ms).
+2026-11-05 10:45:56:872 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 26.3 ms (+26.7 ms, total 414.8 ms, cpu 24.9 ms).
+2026-11-05 10:45:56:874 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.3 ms (+1.6 ms, total 416.4 ms, cpu 0.9 ms).
+2026-11-05 10:47:40:512 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.4 ms (+2.0 ms, total 243.2 ms, cpu 0.8 ms).
+2026-11-05 10:47:40:518 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 5.2 ms (+5.6 ms, total 248.8 ms, cpu 2.3 ms).
+2026-11-05 10:47:40:518 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 249.2 ms, cpu 0.1 ms).
+2026-11-05 10:47:40:519 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 0.9 ms (+1.0 ms, total 250.2 ms, cpu 0.6 ms).
+2026-11-05 10:47:40:520 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.5 ms (+0.7 ms, total 250.9 ms, cpu 0.3 ms).
+2026-11-05 10:47:40:677 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 156.6 ms (+156.8 ms, total 407.7 ms, cpu 56.3 ms).
+2026-11-05 10:47:40:705 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 27.6 ms (+28.0 ms, total 435.7 ms, cpu 25.8 ms).
+2026-11-05 10:47:40:707 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.9 ms (+2.1 ms, total 437.8 ms, cpu 1.0 ms).
+2026-11-05 10:48:29:416 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.8 ms (+2.6 ms, total 220.3 ms, cpu 1.0 ms).
+2026-11-05 10:48:29:421 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 4.9 ms (+5.3 ms, total 225.6 ms, cpu 2.5 ms).
+2026-11-05 10:48:29:421 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 226.0 ms, cpu 0.1 ms).
+2026-11-05 10:48:29:423 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.1 ms (+1.3 ms, total 227.4 ms, cpu 0.7 ms).
+2026-11-05 10:48:29:425 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 1.5 ms (+1.8 ms, total 229.2 ms, cpu 0.4 ms).
+2026-11-05 10:48:29:559 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 134.5 ms (+134.7 ms, total 363.9 ms, cpu 57.0 ms).
+2026-11-05 10:48:29:583 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 23.0 ms (+23.4 ms, total 387.3 ms, cpu 22.0 ms).
+2026-11-05 10:48:29:584 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.3 ms (+1.6 ms, total 388.9 ms, cpu 1.0 ms).
+2026-11-05 10:49:21:681 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.6 ms (+3.2 ms, total 216.1 ms, cpu 0.9 ms).
+2026-11-05 10:49:21:687 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 6.2 ms (+6.9 ms, total 223.0 ms, cpu 6.4 ms).
+2026-11-05 10:49:21:688 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.3 ms, total 223.4 ms, cpu 0.1 ms).
+2026-11-05 10:49:21:690 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.6 ms (+1.9 ms, total 225.2 ms, cpu 0.7 ms).
+2026-11-05 10:49:21:690 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.7 ms, total 226.0 ms, cpu 0.4 ms).
+2026-11-05 10:49:21:828 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 137.3 ms (+137.5 ms, total 363.5 ms, cpu 56.8 ms).
+2026-11-05 10:49:21:855 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 27.0 ms (+27.4 ms, total 390.9 ms, cpu 26.4 ms).
+2026-11-05 10:49:21:858 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 2.4 ms (+2.7 ms, total 393.5 ms, cpu 1.1 ms).
+2026-11-05 10:51:02:829 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.8 ms (+2.4 ms, total 213.9 ms, cpu 1.0 ms).
+2026-11-05 10:51:02:834 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 4.2 ms (+4.6 ms, total 218.5 ms, cpu 2.2 ms).
+2026-11-05 10:51:02:834 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 218.9 ms, cpu 0.1 ms).
+2026-11-05 10:51:02:836 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 2.1 ms (+2.3 ms, total 221.1 ms, cpu 0.7 ms).
+2026-11-05 10:51:02:837 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.5 ms (+0.7 ms, total 221.8 ms, cpu 0.3 ms).
+2026-11-05 10:51:02:980 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 143.3 ms (+143.5 ms, total 365.3 ms, cpu 54.4 ms).
+2026-11-05 10:51:03:008 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 27.0 ms (+27.4 ms, total 392.7 ms, cpu 26.0 ms).
+2026-11-05 10:51:03:010 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.6 ms (+1.9 ms, total 394.5 ms, cpu 1.0 ms).
+2026-11-05 11:14:10:906 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 2.1 ms (+2.8 ms, total 253.0 ms, cpu 1.0 ms).
+2026-11-05 11:14:10:916 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 9.8 ms (+10.2 ms, total 263.2 ms, cpu 6.6 ms).
+2026-11-05 11:14:10:916 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.3 ms (+0.5 ms, total 263.7 ms, cpu 0.1 ms).
+2026-11-05 11:14:10:918 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.1 ms (+1.3 ms, total 265.0 ms, cpu 0.7 ms).
+2026-11-05 11:14:10:919 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 1.0 ms (+1.2 ms, total 266.2 ms, cpu 0.5 ms).
+2026-11-05 11:14:11:071 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 152.1 ms (+152.3 ms, total 418.4 ms, cpu 59.6 ms).
+2026-11-05 11:14:11:098 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 26.7 ms (+27.0 ms, total 445.5 ms, cpu 25.8 ms).
+2026-11-05 11:14:11:100 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.4 ms (+1.7 ms, total 447.2 ms, cpu 1.0 ms).
+2026-11-05 11:15:14:300 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.8 ms (+2.6 ms, total 199.4 ms, cpu 1.0 ms).
+2026-11-05 11:15:14:306 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 5.5 ms (+6.0 ms, total 205.4 ms, cpu 2.7 ms).
+2026-11-05 11:15:14:307 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.3 ms, total 205.7 ms, cpu 0.1 ms).
+2026-11-05 11:15:14:308 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.1 ms (+1.3 ms, total 207.0 ms, cpu 0.6 ms).
+2026-11-05 11:15:14:309 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.9 ms, total 207.9 ms, cpu 0.4 ms).
+2026-11-05 11:15:14:468 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 158.6 ms (+159.6 ms, total 367.5 ms, cpu 54.9 ms).
+2026-11-05 11:15:14:498 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 29.0 ms (+29.3 ms, total 396.9 ms, cpu 27.1 ms).
+2026-11-05 11:15:14:500 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 2.1 ms (+2.5 ms, total 399.4 ms, cpu 1.1 ms).
+2026-11-05 11:16:51:853 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.8 ms (+2.5 ms, total 225.3 ms, cpu 0.9 ms).
+2026-11-05 11:16:51:859 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 5.5 ms (+6.1 ms, total 231.4 ms, cpu 2.3 ms).
+2026-11-05 11:16:51:860 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.3 ms, total 231.8 ms, cpu 0.1 ms).
+2026-11-05 11:16:51:861 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 0.8 ms (+0.9 ms, total 232.7 ms, cpu 0.6 ms).
+2026-11-05 11:16:51:861 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.4 ms (+0.6 ms, total 233.3 ms, cpu 0.3 ms).
+2026-11-05 11:16:52:019 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 157.2 ms (+157.6 ms, total 390.9 ms, cpu 55.5 ms).
+2026-11-05 11:16:52:047 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 27.8 ms (+28.3 ms, total 419.1 ms, cpu 27.0 ms).
+2026-11-05 11:16:52:049 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.6 ms (+1.8 ms, total 421.0 ms, cpu 1.0 ms).
+2026-11-05 11:17:06:051 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 14001.6 ms (+14001.8 ms, total 14422.8 ms, cpu 312.5 ms).
+2026-11-05 11:17:06:274 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 221.9 ms (+223.3 ms, total 14646.0 ms, cpu 40.0 ms).
+2026-11-05 11:17:06:276 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.9 ms (+2.2 ms, total 14648.2 ms, cpu 0.4 ms).
+2026-11-05 11:17:06:284 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 7.2 ms (+7.4 ms, total 14655.7 ms, cpu 6.0 ms).
+2026-11-05 11:17:06:287 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.5 ms (+3.3 ms, total 14658.9 ms, cpu 0.2 ms).
+2026-11-05 11:17:06:301 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 13.6 ms (+14.5 ms, total 14673.5 ms, cpu 6.9 ms).
+2026-11-05 11:17:06:508 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 206.0 ms (+206.3 ms, total 14879.8 ms, cpu 198.3 ms).
+2026-11-05 11:17:06:513 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 5.0 ms (+5.3 ms, total 14885.1 ms, cpu 4.8 ms).
+2026-11-05 11:17:06:571 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 57.6 ms (+57.8 ms, total 14942.9 ms, cpu 18.8 ms).
+2026-11-05 11:17:06:687 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 115.4 ms (+115.9 ms, total 15058.8 ms, cpu 104.6 ms).
+2026-11-05 11:17:06:844 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 157.1 ms (+157.5 ms, total 15216.3 ms, cpu 128.9 ms).
+2026-11-05 11:17:06:845 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.2 ms (+0.5 ms, total 15216.8 ms, cpu 0.1 ms).
+2026-11-05 11:17:06:851 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 5.7 ms (+5.9 ms, total 15222.8 ms, cpu 3.5 ms).
+2026-11-05 11:17:06:851 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 11:17:06:851 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 0.2 ms (+0.6 ms, total 15223.4 ms, cpu 0.2 ms).
+2026-11-05 11:17:06:852 [SUCCESS] [BootProfile] Boot complete in 15224 ms.
+2026-11-05 11:17:06:852 [INFO] [BootProfile] Boot CPU: 1083 ms of process CPU over 15224 ms of boot.
+2026-11-05 11:17:07:042 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 11:17:18:592 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.5 ms (+2.2 ms, total 204.5 ms, cpu 0.8 ms).
+2026-11-05 11:17:18:600 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.8 ms (+8.3 ms, total 212.8 ms, cpu 2.3 ms).
+2026-11-05 11:17:18:601 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.3 ms (+0.7 ms, total 213.5 ms, cpu 0.1 ms).
+2026-11-05 11:17:18:602 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.2 ms (+1.5 ms, total 215.0 ms, cpu 0.6 ms).
+2026-11-05 11:17:18:603 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.7 ms (+0.9 ms, total 215.9 ms, cpu 0.3 ms).
+2026-11-05 11:17:18:757 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 153.3 ms (+153.8 ms, total 369.7 ms, cpu 54.8 ms).
+2026-11-05 11:17:18:785 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 27.9 ms (+28.2 ms, total 397.9 ms, cpu 26.9 ms).
+2026-11-05 11:17:18:787 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.5 ms (+1.8 ms, total 399.8 ms, cpu 1.0 ms).
+2026-11-05 11:17:18:788 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.4 ms (+0.7 ms, total 400.5 ms, cpu 0.4 ms).
+2026-11-05 11:17:18:922 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 133.7 ms (+133.9 ms, total 534.4 ms, cpu 23.9 ms).
+2026-11-05 11:17:18:923 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.0 ms (+1.5 ms, total 535.9 ms, cpu 0.4 ms).
+2026-11-05 11:17:18:932 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 7.9 ms (+8.3 ms, total 544.2 ms, cpu 5.0 ms).
+2026-11-05 11:17:18:938 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 1.1 ms (+6.1 ms, total 550.3 ms, cpu 0.2 ms).
+2026-11-05 11:17:18:956 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 12.5 ms (+18.2 ms, total 568.5 ms, cpu 6.5 ms).
+2026-11-05 11:17:19:149 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 192.3 ms (+193.3 ms, total 761.8 ms, cpu 180.2 ms).
+2026-11-05 11:17:19:154 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 4.9 ms (+5.3 ms, total 767.1 ms, cpu 4.7 ms).
+2026-11-05 11:17:19:178 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 23.4 ms (+23.7 ms, total 790.7 ms, cpu 18.9 ms).
+2026-11-05 11:17:19:260 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 81.5 ms (+81.8 ms, total 872.6 ms, cpu 75.0 ms).
+2026-11-05 11:17:19:362 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 101.3 ms (+101.6 ms, total 974.2 ms, cpu 90.7 ms).
+2026-11-05 11:17:19:362 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.4 ms (+0.9 ms, total 975.1 ms, cpu 0.1 ms).
+2026-11-05 11:17:19:369 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 6.3 ms (+6.7 ms, total 981.8 ms, cpu 4.1 ms).
+2026-11-05 11:17:19:370 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 11:17:19:371 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 1.2 ms (+1.9 ms, total 983.7 ms, cpu 1.1 ms).
+2026-11-05 11:17:19:373 [SUCCESS] [BootProfile] Boot complete in 985 ms.
+2026-11-05 11:17:19:373 [INFO] [BootProfile] Boot CPU: 666 ms of process CPU over 985 ms of boot.
+2026-11-05 11:17:19:520 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 11:32:33:072 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.8 ms (+2.4 ms, total 233.8 ms, cpu 0.9 ms).
+2026-11-05 11:32:33:080 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 7.5 ms (+7.9 ms, total 241.7 ms, cpu 6.3 ms).
+2026-11-05 11:32:33:081 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.4 ms, total 242.1 ms, cpu 0.1 ms).
+2026-11-05 11:32:33:082 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.2 ms (+1.6 ms, total 243.8 ms, cpu 0.6 ms).
+2026-11-05 11:32:33:083 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.5 ms (+0.7 ms, total 244.4 ms, cpu 0.4 ms).
+2026-11-05 11:32:33:225 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 142.2 ms (+142.3 ms, total 386.8 ms, cpu 57.1 ms).
+2026-11-05 11:32:33:249 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 23.7 ms (+24.1 ms, total 410.8 ms, cpu 22.9 ms).
+2026-11-05 11:32:33:251 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.5 ms (+1.9 ms, total 412.7 ms, cpu 1.0 ms).
+2026-11-05 11:32:33:259 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 7.6 ms (+7.9 ms, total 420.6 ms, cpu 0.4 ms).
+2026-11-05 11:32:33:445 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 185.3 ms (+185.5 ms, total 606.1 ms, cpu 25.6 ms).
+2026-11-05 11:32:33:446 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.6 ms (+0.9 ms, total 607.0 ms, cpu 0.3 ms).
+2026-11-05 11:32:33:450 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 4.6 ms (+4.7 ms, total 611.8 ms, cpu 4.0 ms).
+2026-11-05 11:32:33:453 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.2 ms (+2.6 ms, total 614.4 ms, cpu 0.1 ms).
+2026-11-05 11:32:33:460 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 6.5 ms (+6.7 ms, total 621.0 ms, cpu 5.0 ms).
+2026-11-05 11:32:33:653 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 192.8 ms (+193.0 ms, total 814.1 ms, cpu 185.8 ms).
+2026-11-05 11:32:33:659 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 6.3 ms (+6.6 ms, total 820.7 ms, cpu 6.3 ms).
+2026-11-05 11:32:33:713 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 53.1 ms (+53.3 ms, total 874.0 ms, cpu 26.6 ms).
+2026-11-05 11:32:33:808 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 95.4 ms (+95.7 ms, total 969.7 ms, cpu 88.9 ms).
+2026-11-05 11:32:33:936 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 127.7 ms (+127.9 ms, total 1097.6 ms, cpu 112.5 ms).
+2026-11-05 11:32:33:937 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.4 ms (+1.2 ms, total 1098.8 ms, cpu 1.3 ms).
+2026-11-05 11:32:33:946 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 7.7 ms (+8.1 ms, total 1107.0 ms, cpu 6.2 ms).
+2026-11-05 11:32:33:947 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 11:32:33:948 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 0.8 ms (+2.5 ms, total 1109.5 ms, cpu 0.6 ms).
+2026-11-05 11:32:33:948 [SUCCESS] [BootProfile] Boot complete in 1110 ms.
+2026-11-05 11:32:33:949 [INFO] [BootProfile] Boot CPU: 760 ms of process CPU over 1110 ms of boot.
+2026-11-05 11:32:34:147 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 11:33:08:809 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 1.5 ms (+2.2 ms, total 206.9 ms, cpu 0.9 ms).
+2026-11-05 11:33:08:818 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 8.4 ms (+8.9 ms, total 215.8 ms, cpu 2.4 ms).
+2026-11-05 11:33:08:818 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.5 ms, total 216.3 ms, cpu 0.1 ms).
+2026-11-05 11:33:08:819 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 0.9 ms (+1.2 ms, total 217.5 ms, cpu 0.6 ms).
+2026-11-05 11:33:08:820 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.6 ms (+0.8 ms, total 218.3 ms, cpu 0.4 ms).
+2026-11-05 11:33:08:965 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 144.8 ms (+145.0 ms, total 363.3 ms, cpu 55.0 ms).
+2026-11-05 11:33:08:989 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 24.0 ms (+24.4 ms, total 387.7 ms, cpu 23.3 ms).
+2026-11-05 11:33:08:991 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.3 ms (+1.6 ms, total 389.3 ms, cpu 0.9 ms).
+2026-11-05 11:33:08:992 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.5 ms (+0.7 ms, total 390.0 ms, cpu 0.4 ms).
+2026-11-05 11:33:09:147 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 155.0 ms (+155.2 ms, total 545.1 ms, cpu 21.7 ms).
+2026-11-05 11:33:09:148 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 0.7 ms (+1.2 ms, total 546.3 ms, cpu 0.3 ms).
+2026-11-05 11:33:09:154 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 5.7 ms (+5.9 ms, total 552.3 ms, cpu 4.8 ms).
+2026-11-05 11:33:09:155 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 0.3 ms (+1.6 ms, total 553.9 ms, cpu 0.2 ms).
+2026-11-05 11:33:09:163 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 7.5 ms (+7.9 ms, total 561.8 ms, cpu 6.0 ms).
+2026-11-05 11:33:09:350 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 187.0 ms (+187.3 ms, total 749.1 ms, cpu 183.0 ms).
+2026-11-05 11:33:09:355 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 4.7 ms (+5.1 ms, total 754.1 ms, cpu 4.6 ms).
+2026-11-05 11:33:09:377 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 21.8 ms (+22.1 ms, total 776.2 ms, cpu 18.7 ms).
+2026-11-05 11:33:09:460 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 82.6 ms (+82.9 ms, total 859.1 ms, cpu 77.7 ms).
+2026-11-05 11:33:09:588 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 127.7 ms (+128.1 ms, total 987.1 ms, cpu 94.4 ms).
+2026-11-05 11:33:09:589 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.4 ms (+0.7 ms, total 987.9 ms, cpu 0.1 ms).
+2026-11-05 11:33:09:597 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 7.5 ms (+8.0 ms, total 995.9 ms, cpu 4.9 ms).
+2026-11-05 11:33:09:597 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 11:33:09:600 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 2.6 ms (+3.4 ms, total 999.3 ms, cpu 2.4 ms).
+2026-11-05 11:33:09:601 [SUCCESS] [BootProfile] Boot complete in 1001 ms.
+2026-11-05 11:33:09:602 [INFO] [BootProfile] Boot CPU: 677 ms of process CPU over 1001 ms of boot.
+2026-11-05 11:33:09:720 [INFO] [init] Boot complete — triggering Karabiner async deploy…
+2026-11-05 11:38:41:587 [SUCCESS] [BootProfile] Boot stage completed: Path: log file open (retention purge deferred) in 3.4 ms (+4.3 ms, total 269.7 ms, cpu 0.9 ms).
+2026-11-05 11:38:41:596 [SUCCESS] [BootProfile] Boot stage completed: Path: native asynchronous logger transport committed in 8.3 ms (+8.9 ms, total 278.6 ms, cpu 2.5 ms).
+2026-11-05 11:38:41:596 [SUCCESS] [BootProfile] Boot stage completed: Path: runtime error capture installed in 0.2 ms (+0.6 ms, total 279.2 ms, cpu 0.1 ms).
+2026-11-05 11:38:41:598 [SUCCESS] [BootProfile] Boot stage completed: Factory-reset recovery reconciled in 1.6 ms (+1.9 ms, total 281.1 ms, cpu 0.6 ms).
+2026-11-05 11:38:41:599 [SUCCESS] [BootProfile] Boot stage completed: TOML hotstring cache wired in 0.7 ms (+1.0 ms, total 282.1 ms, cpu 0.3 ms).
+2026-11-05 11:38:41:774 [SUCCESS] [BootProfile] Boot stage completed: Config-dependent module requires in 175.0 ms (+175.2 ms, total 457.3 ms, cpu 56.3 ms).
+2026-11-05 11:38:41:804 [SUCCESS] [BootProfile] Boot stage completed: Config schema migration in 29.3 ms (+29.7 ms, total 487.0 ms, cpu 27.3 ms).
+2026-11-05 11:38:41:806 [SUCCESS] [BootProfile] Boot stage completed: First-launch guard (onboarding check) in 1.9 ms (+2.2 ms, total 489.1 ms, cpu 1.0 ms).
+2026-11-05 11:38:41:807 [SUCCESS] [BootProfile] Boot stage completed: Accessibility permission in 0.5 ms (+0.8 ms, total 489.9 ms, cpu 0.4 ms).
+2026-11-05 11:38:42:027 [SUCCESS] [BootProfile] Boot stage completed: Shortcuts pre-start in 220.2 ms (+220.5 ms, total 710.4 ms, cpu 31.4 ms).
+2026-11-05 11:38:42:039 [SUCCESS] [BootProfile] Boot stage completed: Script control engine started (panic-button eventtap) in 1.6 ms (+11.6 ms, total 721.9 ms, cpu 0.6 ms).
+2026-11-05 11:38:42:058 [SUCCESS] [BootProfile] Boot stage completed: MLX server cleanup started asynchronously in 18.2 ms (+19.0 ms, total 740.9 ms, cpu 7.8 ms).
+2026-11-05 11:38:42:071 [SUCCESS] [BootProfile] Boot stage completed: LLM backend bootstrap in 2.9 ms (+12.6 ms, total 753.5 ms, cpu 0.3 ms).
+2026-11-05 11:38:42:089 [SUCCESS] [BootProfile] Boot stage completed: TOML discovery + ordering in 16.9 ms (+18.0 ms, total 771.6 ms, cpu 9.3 ms).
+2026-11-05 11:38:42:280 [SUCCESS] [BootProfile] Boot stage completed: Hotstring groups registered (personal + dynamic + common) in 190.9 ms (+191.3 ms, total 962.9 ms, cpu 178.6 ms).
+2026-11-05 11:38:42:285 [SUCCESS] [BootProfile] Boot stage completed: Final mapping sort + tail-index rebuild in 4.7 ms (+5.0 ms, total 967.9 ms, cpu 4.6 ms).
+2026-11-05 11:38:42:311 [SUCCESS] [BootProfile] Boot stage completed: Keymap engine started in 25.9 ms (+26.1 ms, total 994.0 ms, cpu 20.4 ms).
+2026-11-05 11:38:42:402 [SUCCESS] [BootProfile] Boot stage completed: UI: karabiner.init in 91.0 ms (+91.3 ms, total 1085.3 ms, cpu 80.9 ms).
+2026-11-05 11:38:42:550 [SUCCESS] [BootProfile] Boot stage completed: UI: menu.start (menubar + state sync + engines + LLM handler) in 147.0 ms (+147.9 ms, total 1233.3 ms, cpu 95.6 ms).
+2026-11-05 11:38:42:552 [SUCCESS] [BootProfile] Boot stage completed: UI: menu ready in 0.9 ms (+1.3 ms, total 1234.5 ms, cpu 0.8 ms).
+2026-11-05 11:38:42:592 [SUCCESS] [BootProfile] Boot stage completed: File watchers armed in 39.3 ms (+40.2 ms, total 1274.8 ms, cpu 5.5 ms).
+2026-11-05 11:38:42:594 [START] [BootProfile] Boot stage started: Boot complete (post-init deferrals scheduled).
+2026-11-05 11:38:42:601 [SUCCESS] [BootProfile] Boot stage completed: Boot complete (post-init deferrals scheduled) in 6.7 ms (+9.1 ms, total 1283.9 ms, cpu 2.5 ms).
+2026-11-05 11:38:42:602 [SUCCESS] [BootProfile] Boot complete in 1285 ms.
+2026-11-05 11:38:42:602 [INFO] [BootProfile] Boot CPU: 704 ms of process CPU over 1285 ms of boot.
+2026-11-05 11:38:43:048 [INFO] [init] Boot complete — triggering Karabiner async deploy…

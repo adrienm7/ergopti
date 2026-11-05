@@ -1,0 +1,59 @@
+2026-11-05 10:10:35:743 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 10:10:35:802 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 10:10:35:784 and 2026-11-05 10:10:35:785 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 10:10:35:816 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 10:10:36:462 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 10:10:35:876 and 2026-11-05 10:10:35:876 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 10:10:56:012 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 7).
+2026-11-05 10:10:56:012 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 8, in-flight warmup invalidated.
+2026-11-05 10:10:56:042 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 10:10:56:024 and 2026-11-05 10:10:56:024 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 9).).
+2026-11-05 10:10:56:042 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-05 10:10:56:024 and 2026-11-05 10:10:56:024 (last: stop_warmup() — gen bumped to 10, in-flight warmup invalidated.).
+2026-11-05 10:10:57:262 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 10:10:57:296 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 10:10:57:290 and 2026-11-05 10:10:57:290 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 10:10:57:304 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 10:10:59:509 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 10:10:57:355 and 2026-11-05 10:10:57:355 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 11:01:03:034 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:01:03:034 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 2, in-flight warmup invalidated.
+2026-11-05 11:01:03:068 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:01:03:051 and 2026-11-05 11:01:03:051 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 3).).
+2026-11-05 11:01:03:068 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-05 11:01:03:051 and 2026-11-05 11:01:03:051 (last: stop_warmup() — gen bumped to 4, in-flight warmup invalidated.).
+2026-11-05 11:17:06:697 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:17:06:744 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 11:17:06:723 and 2026-11-05 11:17:06:723 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 11:17:06:759 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 11:17:07:312 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:17:06:822 and 2026-11-05 11:17:06:822 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 11:17:18:163 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 7).
+2026-11-05 11:17:18:163 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 8, in-flight warmup invalidated.
+2026-11-05 11:17:18:192 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:17:18:174 and 2026-11-05 11:17:18:174 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 9).).
+2026-11-05 11:17:18:192 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-05 11:17:18:174 and 2026-11-05 11:17:18:174 (last: stop_warmup() — gen bumped to 10, in-flight warmup invalidated.).
+2026-11-05 11:17:19:266 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:17:19:295 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 11:17:19:289 and 2026-11-05 11:17:19:290 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 11:17:19:305 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 11:17:21:499 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:17:19:350 and 2026-11-05 11:17:19:350 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 11:32:33:817 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:32:33:852 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 11:32:33:842 and 2026-11-05 11:32:33:842 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 11:32:33:871 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 11:32:36:262 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:32:33:919 and 2026-11-05 11:32:33:919 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 11:33:08:449 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 7).
+2026-11-05 11:33:08:449 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 8, in-flight warmup invalidated.
+2026-11-05 11:33:08:466 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:33:08:457 and 2026-11-05 11:33:08:457 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 9).).
+2026-11-05 11:33:08:466 [DEBUG] [llm.api_ollama] ↑ "stop_warmup() — gen bumped to %d, in-flight warmup invalidated." repeated 1 more time between 2026-11-05 11:33:08:457 and 2026-11-05 11:33:08:457 (last: stop_warmup() — gen bumped to 10, in-flight warmup invalidated.).
+2026-11-05 11:33:09:467 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:33:09:507 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 11:33:09:491 and 2026-11-05 11:33:09:491 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 11:33:09:515 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 11:33:10:083 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:33:09:563 and 2026-11-05 11:33:09:563 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).
+2026-11-05 11:34:31:976 [START] [ollama_deps] Bootstrapping Ollama backend…
+2026-11-05 11:34:32:143 [INFO] [ollama_deps] Progress marker 'OLLAMA_INSTALLING' observed — updating UI.
+2026-11-05 11:34:32:198 [INFO] [ollama_deps] [script] [OLLAMA-DEPS] stage: python_bootstrap
+2026-11-05 11:36:52:032 [ERROR] [llm.api_ollama] Ollama native lifecycle receipt unsettled left unsettled native ownership; retry fenced.
+2026-11-05 11:36:52:032 [ERROR] [llm.api_ollama] Ollama native lifecycle receipt unsettled did not commit (result: false); launch remains retryable.
+2026-11-05 11:36:52:032 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] Ollama startup cleanup remains unsettled; sibling launch fenced.
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] ensure_running() did not commit: false
+2026-11-05 11:36:55:077 [DEBUG] [llm.api_ollama] The local server's model list is still unavailable (read 2): HTTP 0.
+2026-11-05 11:37:44:021 [INFO] [ollama_deps] ↑ "[script] %s" repeated 12 more times between 2026-11-05 11:34:32:277 and 2026-11-05 11:36:50:362 (last: [script] OLLAMA_INSTALLED).
+2026-11-05 11:37:44:022 [INFO] [ollama_deps] ↑ "Progress marker '%s' observed — updating UI." repeated 1 more time between 2026-11-05 11:36:50:362 and 2026-11-05 11:36:50:362 (last: Progress marker 'OLLAMA_VERIFIED' observed — updating UI.).
+2026-11-05 11:37:44:023 [DEBUG] [llm.api_ollama] stop_warmup() — gen bumped to 7, in-flight warmup invalidated.
+2026-11-05 11:37:44:023 [ERROR] [llm.api_ollama] Ollama warmup resume is waiting for prior cancellation: true.
+2026-11-05 11:38:29:166 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 8).
+2026-11-05 11:38:42:412 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 1).
+2026-11-05 11:38:42:443 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 3 more times between 2026-11-05 11:38:42:435 and 2026-11-05 11:38:42:435 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 4).).
+2026-11-05 11:38:42:454 [DEBUG] [llm.api_ollama] Ollama readiness flag reset — next warmup must re-confirm (gen 5).
+2026-11-05 11:38:43:506 [DEBUG] [llm.api_ollama] ↑ "Ollama readiness flag reset — next warmup must re-confirm (gen %d)." repeated 1 more time between 2026-11-05 11:38:42:502 and 2026-11-05 11:38:42:502 (last: Ollama readiness flag reset — next warmup must re-confirm (gen 6).).

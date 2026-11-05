@@ -1,0 +1,144 @@
+2026-11-05 10:10:35:925 [WARNING] [BootProfile] Over budget: boot took 19115 ms (budget 2500 ms).
+2026-11-05 10:10:36:159 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 10:10:36:159 [WARNING] [runtime] An hs.timer.new callback (...s/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1581 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: boot.stage=491.2 ms, boot.stage_cpu=348.2 ms, boot.stage=271.3 ms, boot.stage_cpu=262.7 ms, boot.stage=179.2 ms. Lua heap 21->32 MB.
+2026-11-05 10:10:36:463 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 10:10:52:726 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 10:10:56:041 [WARNING] [field_run] Field run mac-2026-11-05_100853 cut short by a reload (menu) during step 'field_lease'; closed as interrupted.
+2026-11-05 10:10:57:251 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 10:10:57:603 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 10:10:57:742 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 11:01:03:029 [ERROR] [accessibility_wait] Accessibility still not granted after 600 s.
+2026-11-05 11:01:03:030 [ERROR] [init] ErgoptiPlus runtime dependency failed (accessibility: Accessibility permission was not granted within 600 s) — shutting down embedded Hammerspoon.
+2026-11-05 11:01:03:030 [ERROR] [init] Fatal abort at boot stage 'accessibility': Accessibility permission was not granted within 600 s.
+2026-11-05 11:01:03:045 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable: caller
+stack traceback:
+	[C]: in function 'xpcall'
+	...ources/static/ergopti_plus/macos/platform/remap/init.lua:7457: in function 'platform.remap.teardown_local'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1059: in function <...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1056>
+	[C]: in function 'xpcall'
+	...static/ergopti_plus/macos/infra/teardown_transaction.lua:80: in function 'infra.teardown_transaction.run'
+	...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1071: in function <...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:868>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/infra/termination_coordinator.lua:381: in upvalue 'run_teardown_attempt'
+	...tic/ergopti_plus/macos/infra/termination_coordinator.lua:452: in upvalue 'teardown_once'
+	...	(skipping 8 levels)
+	...s/static/ergopti_plus/macos/adapters/timer_scheduler.lua:137: in upvalue 'settle_handle'
+	...s/static/ergopti_plus/macos/adapters/timer_scheduler.lua:364: in function 'adapters.timer_scheduler.cancel'
+	[C]: in function 'pcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:975: in upvalue 'stop_periodic_handle'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:996: in upvalue 'stop_idle_waiter'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1035: in upvalue 'settle_idle_waiter'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1046: in function <...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1045>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:288: in upvalue 'run_logged'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:357: in upvalue 'drain_deferred_lifecycle'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:379: in function <...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:378>
+2026-11-05 11:17:06:686 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:17:06:852 [WARNING] [BootProfile] Over budget: boot took 15224 ms (budget 2500 ms).
+2026-11-05 11:17:07:042 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:17:07:395 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 11:17:18:190 [WARNING] [field_run] Field run mac-2026-11-05_111400 cut short by a reload (menu) during step 'field_lease'; closed as interrupted.
+2026-11-05 11:17:19:259 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:17:19:520 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:17:19:711 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 11:20:45:933 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-11-05 11:20:47:206 [WARNING] [menu] Over budget: menu.rebuild took 352 ms (budget 250 ms).
+2026-11-05 11:20:47:212 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-11-05 11:20:47:212 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-11-05 11:30:46:093 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried." repeated 1 more time between 2026-11-05 11:20:48:250 and 2026-11-05 11:20:48:250.
+2026-11-05 11:30:47:593 [WARNING] [adapters.hotkey_registrar] ↑ "bind(): the OS refused 'Ctrl+.' — nil." repeated 1 more time between 2026-11-05 11:20:49:884 and 2026-11-05 11:20:49:884.
+2026-11-05 11:30:47:593 [WARNING] [shortcuts.keyboard_shortcuts] ↑ "Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried." repeated 1 more time between 2026-11-05 11:20:49:884 and 2026-11-05 11:20:49:884.
+2026-11-05 11:32:33:807 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:32:34:147 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:32:34:309 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 11:33:08:433 [ERROR] [remap.runtime_install] Owned runtime install refused (install_refused): helper_signature
+2026-11-05 11:33:09:459 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:33:09:720 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:33:09:859 [WARNING] [managed_ollama_hint] Owned Ollama runtime metadata refused (exit=78): refused: RuntimeRefusal at managed_ollama_hint.py:39 candidate
+2026-11-05 11:33:10:118 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-11-05 11:34:27:231 [WARNING] [keymap.selftest_gate] A field-run selftest key was consumed (no_dev_source); no application received it.
+2026-11-05 11:36:52:032 [WARNING] [managed_ollama_daemon] Managed Ollama daemon exited (status=78): Managed Ollama daemon admission refused: operation.
+2026-11-05 11:36:52:032 [ERROR] [llm.api_ollama] Ollama native lifecycle receipt unsettled left unsettled native ownership; retry fenced.
+2026-11-05 11:36:52:032 [ERROR] [llm.api_ollama] Ollama native lifecycle receipt unsettled did not commit (result: false); launch remains retryable.
+2026-11-05 11:36:52:032 [ERROR] [ollama_deps] Ollama daemon start failed (exit=-1) — Impossible de lancer le démon Ollama.
+2026-11-05 11:36:52:032 [WARNING] [download_window] Progress UI flipped to error state: Impossible de lancer le démon Ollama.
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] The local server's model list is unavailable: HTTP 0 (Network request failed: Connection failed: Could not connect to the server. - http://127.0.0.1:11435/api/tags).
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] Ollama startup cleanup remains unsettled; sibling launch fenced.
+2026-11-05 11:36:53:073 [ERROR] [llm.api_ollama] ensure_running() did not commit: false
+2026-11-05 11:37:43:969 [ERROR] [adapters.file_system] read_with_status(): cannot inspect '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json' safely — missing path prefix: ~/Library/Application Support/ErgoptiPlus/karabiner
+2026-11-05 11:37:44:023 [ERROR] [llm.api_ollama] Ollama warmup resume is waiting for prior cancellation: true.
+2026-11-05 11:37:44:023 [ERROR] [shortcuts.script_control] Pause rollback failed: api_ollama.pause_warmup rollback returned false: nil.
+2026-11-05 11:37:44:036 [ERROR] [shortcuts.script_control] Local pause quiescence failed; restoring native RESUMED before publication: api_ollama.pause_warmup returned false: nil; rollback failures: api_ollama.pause_warmup rollback returned false: nil.
+2026-11-05 11:37:44:038 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:37:44:038 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:37:44:038 [WARNING] [karabiner] Karabiner lease could not be provisioned on resume (owned-runtime-not-admitted); resuming without a live lease.
+2026-11-05 11:37:44:038 [ERROR] [shortcuts.script_control] Script pause transaction failed; settled state preserved: api_ollama.pause_warmup returned false: nil; rollback failures: api_ollama.pause_warmup rollback returned false: nil.
+2026-11-05 11:38:42:401 [WARNING] [remap.runtime_owner] Owned runtime unavailable (runtime_not_installed): The owned runtime is not installed: /Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli is missing. The verified artifact waits at ~/Library/Application Support/Ergopti/RemapRuntime/16.3.0-ergopti.3/payload for the administrator install.
+2026-11-05 11:38:42:602 [WARNING] [init] Over budget: reload took 13444 ms (budget 4000 ms).
+2026-11-05 11:38:43:048 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:42:10:903 [WARNING] [menu] Over budget: menu.rebuild took 580 ms (budget 250 ms).
+2026-11-05 11:42:13:425 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-11-05 11:42:14:565 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-11-05 11:42:14:565 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
+2026-11-05 11:51:54:869 [WARNING] [HotPath] Slow preview.rebuild: 10.55 ms own, 10.55 ms total, parent keydown (0 similar since the last line).
+2026-11-05 12:09:49:070 [WARNING] [keymap.utils] Slow ignored-window probe 502 ms (watchers=0 focused_window=502 ms).
+2026-11-05 13:53:36:467 [WARNING] [keymap.utils] Slow ignored-window probe 504 ms (watchers=0 focused_window=504 ms).
+2026-11-05 13:53:37:201 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (unexpected-worker-loss).
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 1 failed: owned-runtime-not-admitted.
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (owned-runtime-not-admitted).
+2026-11-05 13:53:45:671 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (layout-settled).
+2026-11-05 13:54:00:579 [WARNING] [HotPath] Slow preview.rebuild: 7.82 ms own, 7.82 ms total, parent keydown (0 similar since the last line).
+2026-11-05 13:54:02:473 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 2 failed: owned-runtime-not-admitted.
+2026-11-05 13:54:02:473 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 3/3 in 30.0 s (owned-runtime-not-admitted).
+2026-11-05 13:54:16:308 [WARNING] [HotPath] Slow preview.rebuild: 5.88 ms own, 5.88 ms total, parent keydown (1 similar since the last line).
+2026-11-05 13:54:39:307 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 3 failed: owned-runtime-not-admitted.
+2026-11-05 13:54:39:307 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (owned-runtime-not-admitted).
+2026-11-05 13:55:20:159 [WARNING] [HotPath] Slow hotstring.match: 10.48 ms own, 12.84 ms total, parent keydown (0 similar since the last line).
+2026-11-05 14:03:39:486 [WARNING] [karabiner] ↑ "Regenerate skipped — the owned Karabiner runtime is not admitted." repeated 2 more times between 2026-11-05 13:54:02:473 and 2026-11-05 13:54:39:307.
+2026-11-05 14:11:27:125 [WARNING] [keymap.utils] Slow ignored-window probe 768 ms (watchers=0 focused_window=768 ms).
+2026-11-05 14:11:33:037 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 14:22:09:611 [WARNING] [keymap.utils] Slow ignored-window probe 640 ms (watchers=0 focused_window=640 ms).
+2026-11-05 14:23:45:473 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 14:34:12:900 [WARNING] [keymap.utils] Slow ignored-window probe 519 ms (watchers=0 focused_window=519 ms).
+2026-11-05 14:35:05:895 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 14:36:25:603 [WARNING] [shortcuts.actions.screen_capture] Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime.
+2026-11-05 14:42:52:725 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 669 key-down(s), 669 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 14:42:56:725 [WARNING] [key_event_health] A non-character key stayed down 4.0 s with no further event: its key-up was lost before the keymap taps; session totals: 674 key-down(s), 674 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 14:44:47:725 [WARNING] [key_event_health] A non-character key stayed down 21.5 s with no further event: its key-up was lost before the keymap taps; session totals: 849 key-down(s), 849 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 14:46:28:954 [WARNING] [HotPath] Slow preview.rebuild: 5.96 ms own, 5.96 ms total, parent keydown (0 similar since the last line).
+2026-11-05 14:50:55:205 [WARNING] [HotPath] Slow tooltip.show_predictions: 14.75 ms own, 14.75 ms total, parent none (0 similar since the last line).
+2026-11-05 14:51:12:585 [WARNING] [HotPath] Slow keydown: 5.24 ms own, 5.24 ms total, parent none (0 similar since the last line).
+2026-11-05 14:52:12:769 [WARNING] [HotPath] Slow preview.rebuild: 6.90 ms own, 6.90 ms total, parent keydown (2 similar since the last line).
+2026-11-05 14:54:54:446 [WARNING] [HotPath] Slow preview.rebuild: 8.50 ms own, 8.50 ms total, parent keydown (2 similar since the last line).
+2026-11-05 15:12:35:068 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 15:13:01:528 [WARNING] [HotPath] Slow preview.rebuild: 5.96 ms own, 5.96 ms total, parent keydown (0 similar since the last line).
+2026-11-05 15:13:11:772 [WARNING] [key_event_health] A character key stayed down 3.0 s with no further event: its key-up was lost before the keymap taps; session totals: 1501 key-down(s), 1498 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 15:13:12:772 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 1511 key-down(s), 1508 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 15:13:53:764 [WARNING] [HotPath] Slow preview.rebuild: 6.68 ms own, 6.68 ms total, parent keydown (0 similar since the last line).
+2026-11-05 15:22:35:068 [ERROR] [karabiner] ↑ "Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled)." repeated 1 more time between 2026-11-05 15:12:40:327 and 2026-11-05 15:12:40:327.
+2026-11-05 15:39:19:458 [WARNING] [HotPath] Slow preview.rebuild: 5.76 ms own, 5.76 ms total, parent keydown (0 similar since the last line).
+2026-11-05 15:42:46:116 [WARNING] [HotPath] Slow preview.rebuild: 5.41 ms own, 5.41 ms total, parent keydown (2 similar since the last line).
+2026-11-05 15:43:15:684 [WARNING] [HotPath] Slow preview.rebuild: 7.60 ms own, 7.60 ms total, parent keydown (0 similar since the last line).
+2026-11-05 15:44:02:001 [WARNING] [HotPath] Slow tooltip.show_predictions: 6.01 ms own, 6.01 ms total, parent none (2 similar since the last line).
+2026-11-05 15:44:05:793 [WARNING] [key_event_health] A non-character key stayed down 3.2 s with no further event: its key-up was lost before the keymap taps; session totals: 2102 key-down(s), 2100 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 15:48:37:574 [WARNING] [keystats.log_manager] Slow ingest tick 960 ms (drain=0 foreign=0 outbox=2 read=129 build=2 apply=5 commit=0 append=819 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=2 write=807 clear=1 settle=6 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-05 15:54:13:511 [WARNING] [HotPath] Slow preview.rebuild: 5.52 ms own, 5.52 ms total, parent keydown (1 similar since the last line).
+2026-11-05 16:09:47:237 [WARNING] [keystats.log_manager] Slow ingest tick 586 ms (drain=0 foreign=0 outbox=6 read=77 build=3 apply=37 commit=0 append=460 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=3 write=423 clear=1 settle=31 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-05 16:11:32:757 [WARNING] [HotPath] Slow preview.rebuild: 5.79 ms own, 5.79 ms total, parent keydown (0 similar since the last line).
+2026-11-05 16:25:42:188 [WARNING] [keystats.log_manager] Slow ingest tick 536 ms (drain=8 foreign=0 outbox=2 read=30 build=3 apply=19 commit=8 append=463 notify=0 ms; append: lock=1 journal=7 prepare=0 publish=47 write=345 clear=40 settle=20 release=0 ms; metadata_commands=0 in 0 ms; entries=1 statements=1).
+2026-11-05 16:28:20:451 [WARNING] [HotPath] Slow preview.rebuild: 6.49 ms own, 6.49 ms total, parent keydown (1 similar since the last line).
+2026-11-05 16:39:57:242 [WARNING] [keystats.log_manager] Slow ingest tick 582 ms (drain=0 foreign=0 outbox=13 read=108 build=6 apply=148 commit=3 append=301 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=7 write=277 clear=4 settle=10 release=0 ms; metadata_commands=0 in 0 ms; entries=17 statements=17).
+2026-11-05 16:39:57:297 [WARNING] [HotPath] Slow preview.rebuild: 6.18 ms own, 6.18 ms total, parent keydown (0 similar since the last line).
+2026-11-05 16:39:57:842 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 2387 key-down(s), 2386 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 586 ms), 0 late key event(s) passed untouched, 0 key(s) held across a sleep (0 released after it), 0 Karabiner lease failure(s).
+2026-11-05 16:41:08:425 [WARNING] [HotPath] Slow preview.rebuild: 5.02 ms own, 5.02 ms total, parent keydown (0 similar since the last line).
+2026-11-05 16:41:21:668 [WARNING] [HotPath] Slow preview.rebuild: 10.36 ms own, 10.36 ms total, parent keydown (1 similar since the last line).
+2026-11-05 16:42:52:193 [WARNING] [keystats.log_manager] Slow ingest tick 530 ms (drain=0 foreign=0 outbox=4 read=25 build=2 apply=10 commit=0 append=486 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=2 write=259 clear=6 settle=217 release=0 ms; metadata_commands=0 in 0 ms; entries=2 statements=2).
+2026-11-05 16:51:11:150 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (key '.' is not in the active keyboard layout); the other shortcuts stay active and it is retried.
+2026-11-05 16:51:11:506 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 16:51:12:152 [WARNING] [adapters.hotkey_registrar] bind(): the OS refused 'Ctrl+.' — nil.
+2026-11-05 16:51:12:152 [WARNING] [shortcuts.keyboard_shortcuts] Shortcut Ctrl+. (slot 'secondary_period') could not be registered (the registrar or macOS refused the registration); the other shortcuts stay active and it is retried.
