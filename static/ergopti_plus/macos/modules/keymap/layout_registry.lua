@@ -451,9 +451,13 @@ local function settle_enable(deps, id, entry, path, listed, reason, update, call
 				callback({ enabled = true, pending_activation = false, consent = not update })
 				return
 			end
+			if deps.pending.record(id, entry.keyboard_name) ~= true then
+				Logger.error(LOG, "The '%s' layout is installed but its pending activation could not be confirmed.", id)
+				callback({ enabled = false, pending_activation = false, consent = false, reason = "pending_record_failed" })
+				return
+			end
 			Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but a fresh process does not see it on (listed=%s); macOS turns it on at the next login (reason=not_enabled:%s).",
 				id, tostring(state.listed), M.REASON_REQUIRES_LOGOUT)
-			deps.pending.record(id, entry.keyboard_name)
 			callback({ enabled = false, pending_activation = true, consent = false, reason = M.REASON_REQUIRES_LOGOUT })
 		end)
 	if dispatched ~= true then
@@ -581,7 +585,7 @@ function M.install(id, on_done, deps)
 			deps.enable_source(path, entry.name, function(listed, _output, reason)
 				settle_enable(deps, id, entry, path, listed == true, reason, record.layouts[id] ~= nil, function(state)
 					finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
-						pending_activation = state.pending_activation, consent = state.consent })
+						pending_activation = state.pending_activation, consent = state.consent, reason = state.reason })
 				end)
 			end)
 		end)
@@ -755,7 +759,7 @@ function M.install_local(entry, text, on_done, deps)
 		deps.enable_source(path, entry.name, function(listed, _output, enable_reason)
 			settle_enable(deps, id, entry, path, listed == true, enable_reason, record.layouts[id] ~= nil, function(state)
 				finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
-					pending_activation = state.pending_activation, consent = state.consent })
+					pending_activation = state.pending_activation, consent = state.consent, reason = state.reason })
 			end)
 		end)
 	end)

@@ -859,11 +859,13 @@ function M.run_command()
 	local backend = admit()
 	if not backend then return false end
 	local focus = WindowInfo.getFocused()
-	_generation = _generation + 1
-	local generation = _generation
-	-- A modal dialog must not open inside the event tap that dispatched the action
-	local _, committed = TimerScheduler.after(0, function()
-		if not is_current(generation, "command") then return end
+	local previous = _generation
+	local generation = previous + 1
+	local published = false
+	-- The previous request stays current while native timer admission can reenter.
+	-- A modal dialog must not open inside the event tap that dispatched the action.
+	local called, handle, committed = pcall(TimerScheduler.after, 0, function()
+		if not published or not is_current(generation, "command") then return end
 		local dialog = dependency("infra.dialog_util", "text_prompt")
 		if not dialog then return end
 		local ok_label = i18n.get("button.ok")
@@ -880,10 +882,13 @@ function M.run_command()
 		if not is_current(generation, "command") then return end
 		run_agent(generation, "command", TextUtils.trim(typed), focus, backend, nil)
 	end)
-	if committed ~= true then
+	if not called or type(handle) ~= "table" or committed ~= true or _generation ~= previous then
+		if called and type(handle) == "table" then pcall(TimerScheduler.cancel, handle) end
 		Logger.error(LOG, "Agent command dialog could not be scheduled.")
 		return false
 	end
+	_generation = generation
+	published = true
 	Logger.info(LOG, "Agent run %d waits for a command.", generation)
 	return true
 end

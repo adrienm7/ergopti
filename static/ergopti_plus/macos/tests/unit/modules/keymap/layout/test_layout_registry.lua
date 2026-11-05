@@ -370,6 +370,22 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_nil(state.pending.ergol, "an uninstalled layout is no longer pending")
 	end)
 
+	helpers.it("does not claim a pending activation when its record is refused", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files(), pending_logout = true })
+		deps.pending.record = function() return false end
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, "the layout files were installed")
+		helpers.assert_eq(result.detail.enabled, false)
+		helpers.assert_eq(result.detail.pending_activation, false, "a refused record cannot promise a later retry")
+		helpers.assert_eq(result.detail.reason, "pending_record_failed")
+		helpers.assert_nil(state.pending.ergol)
+		local entry = entry_of("ergol")
+		local local_result = run(function(done) LayoutRegistry.install_local(entry, registry_file(entry.file), done, deps) end)
+		helpers.assert_true(local_result.ok)
+		helpers.assert_eq(local_result.detail.pending_activation, false)
+		helpers.assert_eq(local_result.detail.reason, "pending_record_failed")
+	end)
+
 	-- The macOS 26 TIS probe showed the preference turns the layout on at once, seen by
 	-- a process started after the write, and that a rewritten enabled file applies once registered again.
 	helpers.it("confirms a new layout from a fresh process and asks the user to expect the consent (composer-macos26)", function()

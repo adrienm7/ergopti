@@ -436,6 +436,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local preference_checkpoint = nil
 	local llm_handler = nil
 	local base_delay_owner = nil
+	local chatgpt_url_owner = nil
 	local script_chords_owner = nil
 	local script_action_owner = nil
 	local apply_preference_scope
@@ -755,6 +756,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		snapshot_view       = session_demotions.persisted_view,
 		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
+			if chatgpt_url_owner and chatgpt_url_owner.pending()
+				and chatgpt_url_owner.restore_runtime() ~= true then return false end
 			if base_delay_owner and base_delay_owner.pending()
 				and base_delay_owner.restore_runtime() ~= true then return false end
 			local rollback_modules = core_mods
@@ -768,7 +771,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				rollback_modules = script_action_owner.rollback_modules(rollback_modules)
 				if type(rollback_modules) ~= "table" then return false end
 			end
+			if chatgpt_url_owner and chatgpt_url_owner.pending() then
+				rollback_modules = chatgpt_url_owner.rollback_modules(rollback_modules)
+				if type(rollback_modules) ~= "table" then return false end
+			end
 			if sync_state_to_modules(snapshot, false, true, rollback_modules) ~= true then return false end
+			if chatgpt_url_owner and chatgpt_url_owner.pending()
+				and chatgpt_url_owner.restore_runtime() ~= true then return false end
 			if script_chords_owner and script_chords_owner.pending()
 				and script_chords_owner.restore_runtime() ~= true then return false end
 			if script_action_owner and script_action_owner.pending()
@@ -1573,6 +1582,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		state = state, keymap = keymap, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
 	})
+	chatgpt_url_owner = require("ui.menu.chatgpt_url_transaction").new({
+		state = state, shortcuts = core_mods.shortcuts_mod, admission = run_global_exclusive,
+		paused = live_pause, save_prefs = transactional_save_prefs,
+	})
 	script_chords_owner = require("ui.menu.script_chords_transaction").new({
 		state = state, script_control = core_mods.shortcuts_mod, admission = run_global_exclusive,
 		paused = live_pause, save_prefs = transactional_save_prefs,
@@ -1605,6 +1618,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		save_prefs               = save_prefs,
 		commit_preview           = preview_owner.toggle,
 		commit_base_delay        = base_delay_owner.set,
+		commit_chatgpt_url       = chatgpt_url_owner.set,
 		commit_script_chords     = script_chords_owner.toggle,
 		commit_script_action     = script_action_owner.assign,
 		notify_feature           = notify_feature,
