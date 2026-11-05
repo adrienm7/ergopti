@@ -274,6 +274,10 @@ _KLSCR_ShutdownCloseNativeChain() {
 		ContextOwner := _DriverProductionFileForSymbol("_KL_ContextProject", _DriverDir)
 		AssertTrue(ContextOwner != "", "The actual inactive context close still needs its genuine owner")
 		Source .= "#Include " . ContextOwner . "`n"
+		FocusOwner := _DriverProductionFileForSymbol("MF_GetFocusSnapshot", _DriverDir)
+		AssertTrue(FocusOwner != "", "The genuine context privacy owner requires the real focus-cache state class")
+		AssertTrue(RegExMatch(FileRead(FocusOwner, "UTF-8"), "ms)^class MetricsFocusCache \{.*?^\}", &FocusClass) > 0)
+		Source .= FocusClass[0] . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\..\modules\keystats\keystats_session_events.ahk' . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\fixtures\keystats_shutdown_close_fixture.ahk' . "`n"
 		AssertTrue(FSWriteCreateDurable(Script, Source) != 0)
