@@ -193,22 +193,26 @@ _OpenTarget_ValidTail(Tail) {
 ; @returns {Boolean} Whether the text is an IPv6 address without brackets,
 ;   port or zone.
 _OpenTarget_ValidIPv6(Text) {
-	if !RegExMatch(Text, "^[0-9A-Fa-f:]+$") || !RegExMatch(Text, "[0-9A-Fa-f]")
+	if !RegExMatch(Text, "^[0-9A-Fa-f:]+$")
 		return false
 	Colons := _OpenTarget_Count(Text, ":")
 	Compressed := _OpenTarget_Count(Text, "::")
-	if (Colons < 2 || Colons > 7 || Compressed > 1 || InStr(Text, ":::"))
+	if (Colons < 2 || Compressed > 1 || InStr(Text, ":::"))
 		return false
 	if (Compressed = 0 && Colons != 7)
 		return false
 	if ((SubStr(Text, 1, 1) == ":" && SubStr(Text, 1, 2) != "::")
 			|| (SubStr(Text, -1) == ":" && SubStr(Text, -2) != "::"))
 		return false
+	Groups := 0
 	for _, Group in StrSplit(Text, ":") {
 		if (StrLen(Group) > 4)
 			return false
+		if (Group != "")
+			Groups += 1
 	}
-	return true
+	; A double colon replaces one or more of eight groups, including all in ::.
+	return (Compressed == 1 && Groups < 8) || (Compressed == 0 && Groups == 8)
 }
 
 ; @returns {String} The top-level domain when Host is a domain name, else "".
