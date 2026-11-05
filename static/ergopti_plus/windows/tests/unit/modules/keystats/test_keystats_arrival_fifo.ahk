@@ -479,3 +479,124 @@ _KLF_ZeroSessionClock() {
 }
 Test("keystats session: tick zero remains a valid accepted session boundary",
 	_KLF_WithState.Bind(_KLF_ZeroSessionClock))
+
+
+; Resolve the actual declaration once by authored-source identity, not a pinned path.
+_KID_ClassOwner(ClassName) {
+	global _DriverDir
+	Owners := []
+	for Path in _DriverProductionSourceCensus(_DriverDir).Paths {
+		Text := FileRead(Path, "UTF-8")
+		Mask := _DriverMaskNonCode(&Text)
+		if RegExMatch(Mask, "m)^\h*class\h+" . ClassName . "\b\s*\{")
+			Owners.Push(Path)
+	}
+	AssertEqual(1, Owners.Length, "The actual native dispatcher constants must have exactly one authored class declaration")
+	return Owners[1]
+}
+
+; Actual keyboard callbacks are fed by one real InputHook in an owned native Edit.
+_KID_ChildSource() {
+	global _DriverDir
+	Source := _KSD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1), "The actual KSD source exposes its one fixture footer")
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	Fixture := FileRead(_DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk", "UTF-8")
+	Entry := "_KSD_Main()"
+	Fixture := RTrim(Fixture, "`r`n")
+	AssertEqual(Entry, SubStr(Fixture, StrLen(Fixture) - StrLen(Entry) + 1))
+	Fixture := SubStr(Fixture, 1, StrLen(Fixture) - StrLen(Entry))
+	; Its real privacy acquisition, log observation and unchanged empty flush
+	; helpers remain available; only the old test entry call is omitted.
+	Source .= Fixture . "`n"
+	for Spec in [["KL_CommitPwCache", "KLPasswordCache"], ["", "HookDispatcherConst"]] {
+		Owner := Spec[1] == "" ? _KID_ClassOwner(Spec[2])
+			: _DriverProductionFileForSymbol(Spec[1], _DriverDir)
+		AssertTrue(Owner != "")
+		AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^class " . Spec[2] . " \{.*?^\}", &Definition) > 0)
+		Source .= Definition[0] . "`n"
+	}
+	Owner := _DriverProductionFileForSymbol("KL_Hook_OnChar", _DriverDir)
+	AssertTrue(RegExMatch(FileRead(Owner, "UTF-8"), "ms)^global KLHOOK_SPECIAL := Map\(.*?^\)", &Specials) > 0)
+	Source .= Specials[0] . "`n"
+	for Symbol in ["KL_Hook_NoteActivity", "KL_Hook_HasPendingInput", "_KL_Hook_CaptureInput",
+		"_KL_Hook_InputLifecycleCurrent", "_KL_Hook_PrepareInput", "_KL_Hook_InputCurrent",
+		"_KL_Hook_InvalidateTabInput", "_KL_Hook_FinishInput", "_KL_Hook_CompleteInput",
+		"_KL_Hook_DrainInput", "_KL_Hook_CommitInput", "KL_Hook_OnChar", "KL_Hook_OnKeyDown",
+		"KL_Hook_RecordedChar", "_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent",
+		"KL_InvalidatePasswordFocus", "KLW_PopLast"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "", "The actual callback graph requires its genuine definition: " . Symbol)
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_native_key_char_body.ahk`n"
+}
+
+_KID_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_native_key_char_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KID_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory, "--allow-explicit-owned-edit-sendevent"], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact native-keyboard child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# native-keystats-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS native-keystats " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+for _KID_Mode in ["letter", "backspace", "enter", "tab"]
+	Test("Keystats real InputHook: " . _KID_Mode . " records one delivered native keystroke (keystats-native-key-char-owner)",
+		_KID_Case.Bind(_KID_Mode))
