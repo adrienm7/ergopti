@@ -956,7 +956,7 @@ function renderBurstHistogram(aggData) {
 	const data = [];
 	ORDER.forEach((k) => {
 		if (buckets[k] != null) {
-			labels.push(`≤ ${k}`);
+			labels.push(k === '500+' ? '> 500' : `≤ ${k}`);
 			data.push(buckets[k]);
 		}
 	});
