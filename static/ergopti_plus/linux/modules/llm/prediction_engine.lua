@@ -409,7 +409,7 @@ local function clear_offer(defer_hide)
 		local shown = {}
 		for index, candidate in ipairs(_suggestions) do shown[index] = candidate.to_type end
 		local ok, err = pcall(_observers.dismiss, _suggestion_context, shown)
-		if not ok then Logger.warn(LOG, "Prediction dismissal observer failed: %s", tostring(err)) end
+		if not ok then Logger.warn(LOG, "Prediction dismissal observer failed: %s", require("modules.llm.error_log").describe(err)) end
 	end
 	-- Revoke the old offer before a native hide callback can publish a successor.
 	-- Accepted output defers that callback until its transport has been retired.
@@ -425,7 +425,7 @@ local function show_candidates(candidates, meta)
 		_offer_notified = true
 		if _observers.offer then
 			local ok, err = pcall(_observers.offer, _suggestion_context, #_suggestions)
-			if not ok then Logger.warn(LOG, "Prediction offer observer failed: %s", tostring(err)) end
+			if not ok then Logger.warn(LOG, "Prediction offer observer failed: %s", require("modules.llm.error_log").describe(err)) end
 		end
 	end
 	if not _overlay or type(_overlay.show) ~= "function" then return #_suggestions > 0 end
@@ -1147,7 +1147,7 @@ function M.predict(context, output_context, override)
 					total_tokens = tokens.prompt + tokens.completion, est_cost_usd = tokens.cost } or {}
 				reported.count = #candidates
 				local observed, observe_err = pcall(_observers.generation, _suggestion_context, reported)
-				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", tostring(observe_err)) end
+				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 			end
 			if #candidates > 0 then publish() else clear_offer() end
 		end)
@@ -1487,7 +1487,7 @@ local function finish_tone(generation, plan, focus, receipt, full_text, err)
 		if _on_output then
 			-- No context: the daemon attributes the output to the focused application.
 			local observed, observe_err = pcall(_on_output, text, nil)
-			if not observed then Logger.warn(LOG, "Tone output observer failed: %s", tostring(observe_err)) end
+			if not observed then Logger.warn(LOG, "Tone output observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 		end
 	end
 	local ok, accepted = pcall(_replace_selection, text, receipt, authorized, replaced)
@@ -3239,7 +3239,7 @@ local function accept_candidate(index, complete)
 			context.acceptance = { chosen_index = tonumber(index), all_predictions = shown, deletes = candidate.deletes or 0 }
 		end
 		local observed, observe_err = pcall(output, candidate.to_type, context)
-		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
+		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", require("modules.llm.error_log").describe(observe_err)) end
 	end
 	if continuation_current and not continuation_current() then complete(true); return true end
 	if not current() then complete(true); return true end
