@@ -23,6 +23,28 @@ timeout_seconds=${1:-60}
 case "$timeout_seconds" in
 	'' | *[!0-9]*) echo "timeout must be a whole number of seconds" >&2; exit 64 ;;
 esac
+# Shell arithmetic interprets leading zeroes as octal. Normalize the user's
+# decimal input and prove the deadline representable before publishing or
+# signalling any request; an arithmetic failure must not follow a reload.
+timeout_seconds=$(printf '%s' "$timeout_seconds" | sed 's/^0*//')
+timeout_seconds=${timeout_seconds:-0}
+if ! exact_timeout=$( (printf '%s' "$((timeout_seconds))") 2>/dev/null ) || [ "$exact_timeout" != "$timeout_seconds" ]; then
+	echo "timeout exceeds the supported deadline" >&2
+	exit 64
+fi
+now=$(date +%s)
+if ! deadline=$( (printf '%s' "$((now + timeout_seconds))") 2>/dev/null ); then
+	echo "timeout exceeds the supported deadline" >&2
+	exit 64
+fi
+deadline_digits=${deadline#-}
+case "$deadline_digits" in
+	'' | *[!0-9]*) echo "timeout exceeds the supported deadline" >&2; exit 64 ;;
+esac
+if [ "$deadline" -lt "$now" ]; then
+	echo "timeout exceeds the supported deadline" >&2
+	exit 64
+fi
 
 linux_control=no
 case "$(uname -s)" in
@@ -107,7 +129,6 @@ if [ "$driver" = "linux" ]; then
 	fi
 fi
 
-deadline=$(( $(date +%s) + timeout_seconds ))
 last=""
 while [ "$(date +%s)" -lt "$deadline" ]; do
 	if [ -f "$result" ] && grep -q "\"request_id\":\"$request_id\"" "$result" 2>/dev/null; then
