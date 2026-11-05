@@ -339,14 +339,15 @@ local function run_hold(transition, expected, options)
 		local hook = helpers.load_module("adapters.keyboard_hook")
 		local forwarded = {}
 		local changed = false
+		local code = options.code or 30
 		local stream = {
-			{ type = 1, code = 30, value = 1 },
-			{ type = 1, code = 30, value = 2 },
-			{ type = 1, code = 30, value = 0 },
+			{ type = 1, code = code, value = 1 },
+			{ type = 1, code = code, value = 2 },
+			{ type = 1, code = code, value = 0 },
 		}
 		if options.second then
-			stream[#stream + 1] = { type = 1, code = 30, value = 1 }
-			stream[#stream + 1] = { type = 1, code = 30, value = 0 }
+			stream[#stream + 1] = { type = 1, code = code, value = 1 }
+			stream[#stream + 1] = { type = 1, code = code, value = 0 }
 		end
 		local physical_index = 0
 		hook._test_drive(stream, {
@@ -368,8 +369,9 @@ local function run_hold(transition, expected, options)
 				return true
 			end,
 		}, true)
-		helpers.assert_eq(table.concat(forwarded, " "), options.second and "30:1 30:2 30:0 30:1 30:0"
-			or "30:1 30:2 30:0", "physical delivery is unchanged")
+		local sequence = code .. ":1 " .. code .. ":2 " .. code .. ":0"
+		if options.second then sequence = sequence .. " " .. code .. ":1 " .. code .. ":0" end
+		helpers.assert_eq(table.concat(forwarded, " "), sequence, "physical delivery is unchanged")
 		logger.flush()
 		local total = 0
 		for _, entry in ipairs(writer.kc_hold) do total = total + entry.row.sum_ms end
@@ -381,6 +383,15 @@ local function run_hold(transition, expected, options)
 end
 
 helpers.describe("physical hold exclusion epochs", function()
+	Preferences.it("records an allowed modifier hold through the main metrics callback", function()
+		run_hold(function() end, 300, { code = 42 })
+	end)
+	Preferences.it("drops a modifier hold interrupted by private focus", function()
+		run_hold(function(logger) logger.set_private_window(true); logger.set_private_window(false) end, 0, { code = 42 })
+	end)
+	Preferences.it("records an allowed CapsLock hold through the main metrics callback", function()
+		run_hold(function() end, 300, { code = 58 })
+	end)
 	Preferences.it("retires the whole hold across a private interval without another key", function()
 		run_hold(function(logger) logger.set_private_window(true); logger.set_private_window(false) end, 0)
 	end)
