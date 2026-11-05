@@ -26,7 +26,8 @@ resolve_user() {
 	local uid="$1" entry name password resolved_uid rest
 	[[ "$uid" =~ ^[0-9]+$ ]] && [ "$uid" -ge 1000 ] && [ "$uid" -ne 65534 ] \
 		|| { ergopti_msg permissions.non_desktop_account >&2; return 1; }
-	entry="$(getent passwd "$uid")"
+	entry="$(getent passwd "$uid")" || return 1
+	case "$entry" in *$'\n'*) ergopti_msg permissions.identity_mismatch >&2; return 1 ;; esac
 	IFS=: read -r name password resolved_uid rest <<< "$entry"
 	[ "$resolved_uid" = "$uid" ] && [ -n "$name" ] || { ergopti_msg permissions.identity_mismatch >&2; return 1; }
 	printf '%s\n' "$name"
