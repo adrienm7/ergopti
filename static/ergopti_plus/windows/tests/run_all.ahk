@@ -428,6 +428,7 @@ InstallSendNoOps()
 #Include unit/adapters/test_app_launcher_native_targets.ahk
 #Include unit/ui/windows/test_spotlight_ownership.ahk
 #Include unit/modules/gestures/test_take_note_async_job.ahk
+#Include unit/modules/gestures/test_take_note_counted_nul.ahk
 #Include unit/modules/gestures/test_takenote_pause_lifecycle_owner.ahk
 #Include unit/modules/gestures/test_system_action_lifecycle_timer.ahk
 #Include unit/modules/gestures/test_system_action_inflight_lifecycle.ahk
