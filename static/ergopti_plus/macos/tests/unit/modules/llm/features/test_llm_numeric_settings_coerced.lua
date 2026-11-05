@@ -372,5 +372,20 @@ helpers.describe("prediction_engine — a throwing PromptBuilder is contained an
 	end)
 end)
 
+
+helpers.describe("LLM context length admission", function()
+	helpers.it("accepts 4000 and refuses larger or invalid persisted values without mutation", function()
+		helpers.assert_eq(PE.set_llm_context_length(4000), true)
+		for _, value in ipairs({ 4001, 4.5, math.huge, -math.huge, 0/0, "invalid" }) do
+			helpers.assert_eq(PE.set_llm_context_length(value), false)
+			helpers.assert_eq(select(2, PE.get_llm_runtime_setting("llm_context_length")), 4000)
+		end
+		helpers.assert_eq(PE.set_llm_context_length("3500"), true)
+		helpers.assert_eq(select(2, PE.get_llm_runtime_setting("llm_context_length")), 3500)
+		helpers.assert_eq(PE.set_llm_context_length(0), true)
+		helpers.assert_eq(select(2, PE.get_llm_runtime_setting("llm_context_length")), 0)
+	end)
+end)
+
 -- Restore the pre-existing script_control entry so this file leaves no stub behind.
 package.loaded["modules.shortcuts.script_control"] = _prev_script_control

@@ -20,6 +20,7 @@ local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
 local ComposedText = require("infra.composed_text")
+local LlmContext = require("modules.keymap.llm_context")
 local EventProvenance = require("adapters.event_provenance")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
@@ -154,6 +155,7 @@ local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_
 -- them out of init.lua prevents three separate files (Registry, Expander,
 -- LLMBridge) from silently assuming divergent field sets.
 local CoreState = CoreStateM.new(M.DEFAULT_STATE, M.DELAYS_DEFAULT)
+LlmContext.reset(CoreState)
 -- Prospective UI cannot know which modifiers the next physical magic-key event
 -- will carry. Expose the largest policy multiplier so a visible timed literal
 -- remains a valid promise for every event shape the tap can still accept. The
@@ -222,7 +224,7 @@ local function observe_context_epoch(epoch)
 	if epoch ~= SyntheticInput.current_action_epoch() then return false end
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
-		CoreState.llm_buffer = ""
+		LlmContext.reset(CoreState)
 		CoreState.llm_private_mark = ""
 		-- Deliberately not governed by hotstrings.arrow_resets_word or
 		-- shortcut_resets_word. An epoch is an opaque token for "an Ergopti
@@ -402,7 +404,7 @@ end
 local function invalidate_observed_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
-	CoreState.llm_buffer = ""
+	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
@@ -423,7 +425,7 @@ local function discard_paused_text_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	if _tap_copy then _tap_copy:stop() end
 	CoreState.buffer = ""
-	CoreState.llm_buffer = ""
+	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
@@ -436,7 +438,7 @@ end
 --- destination is known-normal; ignored/unknown destinations never reopen LLM.
 local function invalidate_window_context()
 	CoreState.buffer = ""
-	CoreState.llm_buffer = ""
+	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	CoreState.start_is_word_boundary = false
@@ -975,6 +977,9 @@ M.has_trigger_suffix = Registry.has_trigger_suffix
 --- @param duration number|nil Suppression window in seconds (default 0.5 s).
 function M.suppress_rescan(duration)
 	CoreState.suppress_rescan(duration)
+	-- External fallback emitters do not supply a logical edit; forget the
+	-- independent context rather than infer what their output changed.
+	LlmContext.reset(CoreState)
 end
 
 --- Centralized entry point for external modules (rules_engine, personal_info)
@@ -1002,7 +1007,7 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 		Logger.error(LOG, "Dynamic replacement cursor context is invalid; output rejected: %s.",
 			tostring(splice_error))
 		CoreState.buffer = ""
-		CoreState.llm_buffer = ""
+		LlmContext.reset(CoreState)
 		CoreState.llm_private_mark = ""
 		CoreState.start_is_word_boundary = false
 		CoreState.start_is_line_start = false
@@ -1019,6 +1024,7 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 		emit_action,
 		function()
 			CoreState.buffer = next_buffer
+			LlmContext.replace_tail(CoreState, deletes, result_text)
 		end,
 		true, -- is_final (suppress rescan)
 		false, -- is_ignored
@@ -1119,7 +1125,8 @@ local function publication_receipt(transaction, capture)
 		if notified or receipt.is_settled() ~= true then return end
 		notified = true
 		if transaction.completion_status ~= "complete" and capture.input == _user_hotstring_input then
-			CoreState.buffer, CoreState.llm_buffer, CoreState.llm_private_mark = "", "", ""
+			CoreState.buffer, CoreState.llm_private_mark = "", ""
+			LlmContext.reset(CoreState)
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
 		end
@@ -1751,7 +1758,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			CoreState.start_is_word_boundary = true
 			CoreState.start_is_line_start = false
 		end
-		CoreState.llm_buffer = ""
+		-- A hotstring word timeout does not discard the independent AI context.
 		-- The mark describes the hotstring buffer: it goes with it, and stays while a
 		-- bare Backspace keeps the word before the pause (and so a secret in it).
 		if CoreState.buffer == "" then CoreState.llm_private_mark = "" end
@@ -1863,7 +1870,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 				CoreState.buffer = ""
 				CoreState.start_is_word_boundary = false
 				CoreState.start_is_line_start = false
+				LlmContext.reset(CoreState)
 			end
+			LlmContext.backspace(CoreState)
 			update_preview_with_action_recovery(CoreState.buffer)
 		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
 			-- The start of an empty line: the Backspace deleted nothing.
@@ -1876,6 +1885,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			-- triggers refuse to fire until a real terminator is observed.
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
+			LlmContext.backspace(CoreState)
 			cancel_action_preview_recovery()
 		end
 		return false
@@ -1917,6 +1927,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- utf8.offset call against a count that didn't exist returned nil, leaving
 	-- the buffer untrimmed. The fast-path byte gate avoids paying for the
 	-- utf8 scan on every keystroke.
+	local observed = pcall(LlmContext.append, CoreState, chars)
+	if not observed then
+		invalidate_observed_context()
+		return false
+	end
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
 		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
@@ -1924,8 +1939,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		-- Only a raised offset error proves the tail is malformed.
 		local removed = not ok and #CoreState.buffer or (off and off - 1 or 0)
 		if removed > 0 then
-			-- The private mark loses the same head as the visible buffer.
-			LLMBridge.private_context_trimmed(CoreState.buffer, removed)
 			CoreState.buffer = CoreState.buffer:sub(removed + 1)
 			-- A trimmed start is no longer a known word boundary on screen.
 			CoreState.start_is_word_boundary = false
@@ -2900,7 +2913,7 @@ function M.stop(teardown)
 	_context_reconcile_quiet = false
 	_window_context_reconcile_pending = false
 	CoreState.buffer = ""
-	CoreState.llm_buffer = ""
+	LlmContext.reset(CoreState)
 	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false

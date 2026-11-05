@@ -134,6 +134,7 @@ local function preview_via_provider(bridge, value, buf)
 		DELAYS                    = {},
 		SECTION_DELAYS            = {},
 	}
+	require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
 	bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 	bridge.set_preview_star_enabled(true)
 	bridge.set_preview_autocorrect_enabled(true)

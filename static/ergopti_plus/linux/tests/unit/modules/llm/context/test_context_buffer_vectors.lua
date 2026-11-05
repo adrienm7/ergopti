@@ -53,6 +53,18 @@ helpers.describe("AI context buffer corpus", function()
 end)
 
 helpers.describe("AI context buffer strictness", function()
+	helpers.it("validates capacity before trimming and keeps complete Unicode characters", function()
+		local buffer = ContextBuffer.new()
+		buffer:append("aé😀z")
+		for _, value in ipairs({ 0, -1, 1.5, ContextBuffer.MAX_CONTEXT_LENGTH + 1, math.huge }) do
+			helpers.assert_eq(buffer:set_capacity(value), false)
+			helpers.assert_eq(buffer:text(), "aé😀z")
+		end
+		helpers.assert_true(buffer:set_capacity(2))
+		helpers.assert_eq(buffer:text(), "😀z")
+		helpers.assert_eq(buffer:length(), 2)
+	end)
+
 	helpers.it("rejects non-text and invalid UTF-8 instead of drifting from the field", function()
 		local buffer = ContextBuffer.new()
 		helpers.assert_throws(function() buffer:append(12) end)

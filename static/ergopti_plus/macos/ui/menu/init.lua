@@ -856,6 +856,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return type(apply_preference_scope) == "function" and apply_preference_scope(scope, mode) == true
 			end,
 			state          = state,
+			demotions      = session_demotions,
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
 			reset_menubar  = reset_menubar,

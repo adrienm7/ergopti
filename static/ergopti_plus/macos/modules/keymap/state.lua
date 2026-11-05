@@ -190,7 +190,7 @@ function M.new(defaults, delays_default)
 		s.no_rescan_until = deadline
 		s.no_rescan_keeps_buffer = false
 		s.buffer = ""
-		s.llm_buffer = ""
+		if s.llm_context_text == nil then s.llm_buffer = "" end
 		s.llm_private_mark = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed

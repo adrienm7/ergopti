@@ -234,6 +234,7 @@ local function make_state(sentinel)
 		DELAYS           = {},
 		is_repeat_feature_enabled  = function() return false end,
 	}
+	require("modules.keymap.llm_context").seed(state, "", "")
 	local defaults = {
 		preview_star_enabled        = true,
 		preview_autocorrect_enabled = true,

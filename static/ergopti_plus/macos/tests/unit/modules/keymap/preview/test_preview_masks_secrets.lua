@@ -284,6 +284,8 @@ local function capture_rows(register, buf)
 		register(Registry)
 		Registry.sort_mappings()
 
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
+
 		helpers.assert_eq(Bridge.init(state,
 			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
 		helpers.assert_eq(Expander.init(state, Registry, Bridge), true)

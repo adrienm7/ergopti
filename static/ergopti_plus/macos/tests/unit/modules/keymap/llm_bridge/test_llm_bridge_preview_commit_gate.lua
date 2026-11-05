@@ -57,6 +57,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		handle.observers[#handle.observers + 1] = observer
 		return true
 	end
+	function scheduler.hotstring_time() return 0 end
 	function scheduler.after(delay, callback)
 			fixture.schedule_calls = fixture.schedule_calls + 1
 			if options.schedule_error_on == fixture.schedule_calls then
@@ -240,6 +241,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		preview_providers = {},
 		is_repeat_feature_enabled = function() return false end,
 	}
+	require("modules.keymap.llm_context").seed(fixture.state, fixture.state.buffer, "")
 	Bridge.init(fixture.state, {
 		preview_star_enabled = previews_enabled,
 		preview_autocorrect_enabled = previews_enabled,
@@ -553,6 +555,7 @@ helpers.describe("llm_bridge: ordinary timer starts are strict and contained", f
 				timer_error = case.error,
 			})
 			fixture.state.buffer = "abc "
+			require("modules.keymap.llm_context").append(fixture.state, " ")
 			local ok, err = pcall(fixture.bridge.update_preview, fixture.state.buffer)
 			helpers.assert_true(ok, "word-end failure must not escape the keyboard callback: " .. tostring(err))
 			helpers.assert_eq(fixture.starts[1], "word")

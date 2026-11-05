@@ -513,20 +513,6 @@ end
 -- =================================
 -- =================================
 
---- JSON-encode a Lua value compactly, unquoted: the catalogue slot quotes it, and
---- the typing builder must encrypt the payload first.
---- @param v any
---- @return string The encoded JSON, or "{}" when encoding fails.
-local function _json_text(v)
-	if v == nil then return "{}" end
-	local ok, encoded = pcall(json.encode, v)
-	if not ok then
-		Logger.warn(LOG, "_json_text: json.encode failed (%s) — storing empty object.", tostring(encoded))
-		return "{}"
-	end
-	return encoded
-end
-
 --- Raw event JSON is replay source data: an empty fallback would permanently
 --- discard the event's keystrokes or system metadata from reconstruction.
 local function _required_event_json(value, label)
@@ -667,8 +653,8 @@ function _builders.llm(e, id, kind)
 		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		context = _opt_text(e.context), prediction = _opt_text(e.prediction),
-		predictions_json = e.predictions and _json_text(e.predictions) or nil,
-		all_predictions_json = e.all_predictions and _json_text(e.all_predictions) or nil,
+		predictions_json = e.predictions ~= nil and _required_event_json(e.predictions, "LLM predictions") or nil,
+		all_predictions_json = e.all_predictions ~= nil and _required_event_json(e.all_predictions, "LLM all predictions") or nil,
 		chosen_index = tonumber(e.chosen_index), deletes = tonumber(e.deletes),
 		deleted_text = _opt_text(e.deleted_text), net_saved_chars = tonumber(e.net_saved_chars),
 		count = tonumber(e.count),
