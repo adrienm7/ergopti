@@ -907,3 +907,75 @@ _MCC_Run(Mode) {
 for _MCC_Mode in ["string", "text-chunk", "thinking-plus-text", "thinking-only", "multi-text", "empty-text-before-answer",
     "empty-array", "untyped-decoy", "malformed-text-after-answer", "malformed-entry-after-answer", "nontext-decoy-before-answer"]
     Test("Mistral response: " . _MCC_Mode . " reaches the actual response consumer (mistral-content-chunks)", _MCC_Run.Bind(_MCC_Mode))
+
+; The official SDK text projections concatenate ordinary blocks/parts in order.
+; The existing exact managed transport fixture publishes actual response bytes;
+; no network, fake classifier, fake RawPost or replacement parser is used.
+_PMP091_Row(Provider, Mode) {
+    if Provider == "anthropic" {
+        switch Mode {
+            case "ordinary":
+                Content := '[{"type":"text","text":"owned-answer"}]', Expected := "owned-answer"
+            case "multipart":
+                Content := '[{"type":"text","text":"first "},{"type":"tool_use","id":"toolu_fixture","name":"fixture","input":{}},{"type":"thinking","thinking":"reasoning-decoy","signature":"fixture"},{"type":"text","text":"second"},{"type":"text","text":"!"}]'
+                Expected := "first second!"
+            case "empty-before-answer":
+                Content := '[{"type":"text","text":""},{"type":"text","text":"owned-answer"}]', Expected := "owned-answer"
+            case "reasoning-only":
+                Content := '[{"type":"thinking","thinking":"reasoning-decoy","signature":"fixture"}]', Expected := ""
+            case "malformed-after-answer":
+                Content := '[{"type":"text","text":"partial-must-not-escape"},{"type":"text","text":42}]', Expected := ""
+            default: throw ValueError("Unknown provider multipart fixture mode.")
+        }
+        Body := '{"id":"msg_fixture","type":"message","role":"assistant","model":"claude-haiku-4-5",'
+            . '"content":' . Content . ',"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":2,"output_tokens":3}}'
+        Model := "claude-haiku-4-5", BaseUrl := "https://api.anthropic.com/v1"
+    } else {
+        AssertEqual("gemini", Provider)
+        switch Mode {
+            case "ordinary":
+                Content := '[{"text":"owned-answer"}]', Expected := "owned-answer"
+            case "multipart":
+                Content := '[{"text":"first "},{"functionCall":{"name":"fixture","args":{}}},{"thought":true,"text":"reasoning-decoy"},{"text":"second"},{"text":"!"}]'
+                Expected := "first second!"
+            case "empty-before-answer":
+                Content := '[{"text":""},{"text":"owned-answer"}]', Expected := "owned-answer"
+            case "reasoning-only":
+                Content := '[{"thought":true,"text":"reasoning-decoy"}]', Expected := ""
+            case "malformed-after-answer":
+                Content := '[{"text":"partial-must-not-escape"},{"text":42}]', Expected := ""
+            default: throw ValueError("Unknown provider multipart fixture mode.")
+        }
+        Body := '{"candidates":[{"content":{"role":"model","parts":' . Content
+            . '},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":2,"candidatesTokenCount":3,"totalTokenCount":5}}'
+        Model := "gemini-2.0-flash", BaseUrl := "https://generativelanguage.googleapis.com/v1beta"
+    }
+    Resolved := _LLMRemoteResolveEntry(Map("Provider", Provider, "Model", Model,
+        "Token", "owned-fixture-secret", "BaseUrl", BaseUrl))
+    AssertTrue(Resolved is Map)
+    AssertEqual(Provider, Resolved["Format"], "the genuine shipped provider selects its canonical dialect")
+    Classified := _LLMRemoteClassifyResponse(Resolved["Format"], Body, Resolved["Model"])
+    Poll := _MCC_Poll(Resolved, Body), Verdict := Poll["verdict"]
+    _TestPrint("# PROVIDER_MULTIPART_091 " . KL_JsonEncode(Map("provider", Provider, "mode", Mode,
+        "classifier_ok", Classified["ok"], "classifier_text", Classified["text"], "classifier_reason", Classified["reason"],
+        "poll_ok", Verdict["ok"], "poll_text", Verdict.Get("text", ""), "poll_reason", Verdict.Get("info", Map()).Get("reason", ""),
+        "callbacks", Poll["callbacks"], "reservation_present", Poll["reservation_present"], "http_handle_retired", Poll["http_handle_retired"])))
+    AssertEqual(Expected != "", Classified["ok"])
+    AssertEqual(Expected, Classified["text"], "all ordinary text chunks must concatenate verbatim without reasoning or tool data")
+    AssertEqual(Expected != "", Verdict["ok"], "the real RawPost/Poll route must preserve the canonical complete text projection")
+    if Expected != ""
+        AssertEqual(Expected, Verdict["text"])
+    else
+        AssertEqual("canonical_empty", Verdict["info"]["reason"])
+    AssertEqual(1, Poll["callbacks"])
+    AssertFalse(Poll["reservation_present"])
+    AssertTrue(Poll["http_handle_retired"])
+}
+_PMP091_Run(Provider, Mode) {
+    _ManagedRemoteFixtureWithLlmTimings(_PMP091_Row.Bind(Provider, Mode))
+}
+for _PMP091_Provider in ["anthropic", "gemini"] {
+    for _PMP091_Mode in ["ordinary", "multipart", "empty-before-answer", "reasoning-only", "malformed-after-answer"]
+        Test("Provider complete text: " . _PMP091_Provider . "/" . _PMP091_Mode . " (provider-multipart-091)",
+            _PMP091_Run.Bind(_PMP091_Provider, _PMP091_Mode))
+}
