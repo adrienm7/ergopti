@@ -249,14 +249,16 @@ _TSRC_FailedComboDownRollsBackBeforePublishing() {
 
 		AssertEqual(false, Ok,
 			"a failed 0->1 combination transaction must return false")
-		AssertEqual(3, _TSRC_Sent.Length,
-			"the sender must attempt two Downs and exactly one rollback")
+		AssertEqual(4, _TSRC_Sent.Length,
+			"the ledger must settle both the uncertain failed Down and the prior proven Down")
 		AssertEqual("{LCtrl Down}", _TSRC_Sent[1],
 			"the first modifier Down must lead the transaction")
 		AssertEqual("{LShift Down}", _TSRC_Sent[2],
 			"the deterministic seam must fail on the second modifier Down")
-		AssertEqual("{LCtrl Up}", _TSRC_Sent[3],
-			"partial Downs must roll back in reverse order before failure returns")
+		AssertEqual("{LShift Up}", _TSRC_Sent[3],
+			"the uncertain failed Down is recovered first")
+		AssertEqual("{LCtrl Up}", _TSRC_Sent[4],
+			"the prior proven Down then rolls back before failure returns")
 		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
 			"no active count may publish for an OS transaction that failed")
 		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
@@ -281,23 +283,25 @@ _TSRC_FailedComboRollbackRemainsReleasePending() {
 
 		AssertEqual(false, Ok,
 			"a combination whose Down and rollback both fail must return false")
-		AssertEqual(3, _TSRC_Sent.Length,
-			"the failed transaction must attempt two Downs and one compensating Up")
-		AssertEqual("{LCtrl Up}", _TSRC_Sent[3],
-			"the rollback failure seam must target the first proven Down")
+		AssertEqual(3 + TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS, _TSRC_Sent.Length,
+			"the failed transaction settles its uncertain Down, then bounds the refused earlier rollback")
+		AssertEqual("{LShift Up}", _TSRC_Sent[3],
+			"the uncertain failed Down receives its own acknowledged Up")
+		AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS, _TSRC_Count("{LCtrl Up}"),
+			"the first proven Down's failed rollback must exhaust exactly the production retry bound")
 		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
 			"a failed combination must never publish ordinary active counts")
 		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl"),
 			"a failed rollback Up must remain owned even though the Down transaction returned false")
 		AssertTrue(!_TH_SyntheticReleasePendingKeys.Has("LShift"),
-			"the modifier whose Down failed must not acquire fictional release ownership")
+			"the uncertain failed Down's acknowledged Up has already retired its release debt")
 
 		_AHK_SendInput := _TSRC_Record
 		AssertEqual(true, TapHoldReleaseSyntheticKeys(),
 			"a later lifecycle cleanup must retry and prove the retained rollback Up")
-		AssertEqual(4, _TSRC_Sent.Length,
+		AssertEqual(4 + TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS, _TSRC_Sent.Length,
 			"cleanup must emit exactly one later retry for the retained key")
-		AssertEqual("{LCtrl Up}", _TSRC_Sent[4],
+		AssertEqual("{LCtrl Up}", _TSRC_Sent[4 + TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS],
 			"cleanup must retry the exact rollback key, not the failed Down key")
 		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
 			"only the later proven Up may retire rollback ownership")

@@ -315,3 +315,100 @@ _TSUH_TabFallbackAndFinallyShareReceipt() {
 	}
 }
 Test("taphold-synthetic: Tab Up and its waiting frame share one acknowledged release (synthetic-owner-tab)", _TSUH_TabFallbackAndFinallyShareReceipt)
+
+
+; Model the port's actual effect separately from its ACK. The production sender
+; and synthetic ledger must reconcile a delivered Down followed by an exception.
+_TSFD_EffectBeforeRefusal(Mode) {
+	global _AHK_SendInput, _TSUH_Sent, _TSUH_Logical, _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TSUH_Physical
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	SavedKana := _ALTGR_KANA_FIXUP, SavedProbe := _ALTGR_LAYOUT_PROBE
+	Combo := Mode == "combo" || Mode == "preheld-combo" || Mode == "other-owner-combo"
+	User := Mode == "preheld" || Mode == "preheld-combo"
+	Sibling := Mode == "other-owner" || Mode == "other-owner-combo"
+	Initial := User ? Map("LCtrl", true) : Map()
+	_TSUH_Begin(Initial, User || Mode == "suppressed-own" ? Map("LCtrl", true) : Map())
+	State := {downs: 0, ups: 0, throws: 0, nested: false, other: 0, otherResult: false, newUser: false}
+	Emit(Keys) {
+		_TSUH_Sent.Push(Keys)
+		for Name in ["LCtrl", "LShift"] {
+			if Keys == "{" . Name . " Down}" {
+				State.downs += 1
+				_TSUH_Logical[Name] := true
+				if Name == (Combo ? "LShift" : "LCtrl") {
+					if Sibling {
+						if State.nested
+							return 0
+						State.nested := true
+						State.other := TapHoldNewOwner()
+						State.otherResult := TapHoldSyntheticKeyDown("LCtrl", State.other)
+						State.nested := false
+					}
+					if Mode == "new-user" {
+						_TSUH_Physical[Name] := true
+						State.newUser := true
+					}
+					State.throws += 1
+					throw Error("Port refused AFTER its modeled Down effect")
+				}
+			} else if Keys == "{" . Name . " Up}" {
+				State.ups += 1
+				if _TSUH_Logical.Has(Name)
+					_TSUH_Logical.Delete(Name)
+			}
+		}
+		return 0
+	}
+	try {
+		_AHK_SendInput := Emit
+		if Mode == "no-payload" {
+			_ALTGR_KANA_FIXUP := true
+			_ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0)
+		}
+		Owner := TapHoldNewOwner()
+		Key := Combo ? ["LCtrl", "LShift"] : Mode == "no-payload" ? "SC138" : "LCtrl"
+		Result := TapHoldSyntheticKeyDown(Key, Owner)
+		_TestPrint("# synthetic failed-down mode=" . Mode . " result=" . Result . " downs=" . State.downs
+			. " throws=" . State.throws . " held=" . _TH_SyntheticHeldKeys.Count . " pending=" . _TH_SyntheticReleasePendingKeys.Count)
+		AssertFalse(Result)
+		AssertFalse(Owner.Held, "a refused transaction cannot publish a successful owner")
+		if Mode == "no-payload" {
+			AssertEqual(0, State.downs, "an absent layout VK must refuse before calling the native port")
+			AssertEqual(0, State.throws)
+			AssertTrue(TapHoldReleaseSyntheticKeys())
+			AssertEqual(0, State.ups, "format refusal cannot manufacture an unaddressable Up debt")
+			AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count)
+		} else {
+			AssertEqual(1, State.throws, "the effect-before-error cutpoint must genuinely be reached")
+			if Sibling {
+				AssertTrue(State.otherResult && State.other.Held, "the real sibling Down must acknowledge before the outer port fails")
+				AssertEqual(Combo ? 1 : 0, State.ups, "the failed older operation releases only its own uncertain key, never the sibling's proven Down")
+				AssertTrue(_TSUH_Logical.Has("LCtrl"))
+				AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"], "the sibling keeps its exact count")
+				AssertTrue(TapHoldSyntheticKeyUp("LCtrl", State.other))
+				AssertEqual(Combo ? 2 : 1, State.ups)
+			} else {
+				AssertTrue(TapHoldReleaseSyntheticKeys(), "the real lifecycle resolves every owned release debt")
+				if User || Mode == "new-user" {
+					if Mode == "new-user"
+						AssertTrue(State.newUser && _TSUH_Physical.Has("LCtrl"), "a separate physical event really establishes new user custody during the port call")
+					AssertEqual(Combo ? 1 : 0, State.ups, "a user hold delivered before the failed Down remains the user's")
+					AssertTrue(_TSUH_Logical.Has("LCtrl"))
+					AssertFalse(_TSUH_Logical.Has("LShift"))
+				} else {
+					AssertFalse(_TSUH_Logical.Has("LCtrl") || _TSUH_Logical.Has("LShift"),
+						"a failed first or later Down must not strand any modeled native key after lifecycle")
+					AssertEqual(Combo ? 2 : 1, State.ups, "each potentially delivered key receives exactly one proven release")
+				}
+			}
+			AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+			AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count)
+		}
+	} finally {
+		_ALTGR_KANA_FIXUP := SavedKana, _ALTGR_LAYOUT_PROBE := SavedProbe
+		_TSUH_End()
+	}
+}
+for _TSFD_Mode in ["first", "combo", "preheld", "preheld-combo", "other-owner", "other-owner-combo", "new-user", "suppressed-own", "no-payload"]
+	Test("synthetic failed Down: " . _TSFD_Mode . " preserves actual release ownership (synthetic-down-effect-refusal)",
+		_TSFD_EffectBeforeRefusal.Bind(_TSFD_Mode))

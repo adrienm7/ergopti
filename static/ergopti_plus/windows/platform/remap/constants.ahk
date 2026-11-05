@@ -894,7 +894,7 @@ TapHoldReleasePhysicalKey(Key) {
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key, Owner := 0) {
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
-	global _TH_ModifierOwners, _TH_OwnedModifiers
+	global _TH_ModifierOwners, _TH_OwnedModifiers, _TapHoldKeyIsDown
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -944,25 +944,56 @@ TapHoldSyntheticKeyDown(Key, Owner := 0) {
 
 			; Snapshot, before this owner presses them, the keys the user already
 			; holds down and delivered: the last owner leaves those to the user.
-			UserHeld := []
+			UserHeld := [], PhysicalBefore := Map()
 			if Ok {
 				for _, Name in KeysToPress {
+					PhysicalBefore[Name] := !!_TapHoldKeyIsDown.Call(Name, "P")
 					if _TH_UserHoldsDeliveredKey(Name)
 						UserHeld.Push(Name)
 				}
 			}
-			; TextPressKey's Array branch is the sender-owned transaction: a
-			; second Down failure rolls earlier Downs back in reverse order and
-			; reports any rollback Up that could not be proven. Those keys may
-			; still be down at the OS, so retain them before leaving Critical.
+			; The sender retains proven and uncertain Down attempts. This owner
+			; defers rollback so user and sibling custody are checked before every
+			; release, and an unproven Up survives in the existing pending ledger.
 			if Ok and KeysToPress.Length > 0 {
-				Transition := { RollbackFailedKeys: [] }
+				Transition := { RollbackFailedKeys: [], SentKeys: [], AttemptedKey: "", DeferRollback: true }
 				if !TextPressKey(KeysToPress, "Down", false, Transition) {
 					Ok := false
 					FailureKind := "down transaction"
-					for _, Name in Transition.RollbackFailedKeys {
+					; The failed port may have emitted its Down before refusing.
+					; Recover every edge through this ledger, never an adapter's
+					; blind Up of a key a user or reentrant sibling now owns.
+					Recover := Transition.SentKeys.Clone()
+					if Transition.AttemptedKey != ""
+						Recover.Push(Transition.AttemptedKey)
+					for _, Name in Transition.RollbackFailedKeys
+						Recover.Push(Name)
+					Admitted := Map(), UserOwned := Map(), Recovered := Map()
+					for _, Name in KeysToPress
+						Admitted[Name] := true
+					for _, Name in UserHeld
+						UserOwned[Name] := true
+					loop Recover.Length {
+						Name := Recover[Recover.Length - A_Index + 1]
+						if !Admitted.Has(Name) || Recovered.Has(Name)
+							continue
+						Recovered[Name] := true
+						if _TH_SyntheticHeldKeys.Has(Name)
+							continue
+						if UserOwned.Has(Name) {
+							if _TapHoldKeyIsDown.Call(Name, "P")
+								continue
+						} else if !PhysicalBefore[Name] && _TH_UserHoldsDeliveredKey(Name)
+							continue
+						; A new physical hold can arrive while the native port runs.
+						; An already suppressed own press is not that new custody:
+						; our uncertain injected Down alone made it logically down.
+						; Recheck after the key-state port before touching counts.
+						if _TH_SyntheticHeldKeys.Has(Name)
+							continue
 						_TH_MarkSyntheticKeyReleasePending(Name)
-						RollbackFailedKeys.Push(Name)
+						if !_TH_RetrySyntheticKeyRelease(Name)
+							RollbackFailedKeys.Push(Name)
 					}
 				}
 				if Ok {
