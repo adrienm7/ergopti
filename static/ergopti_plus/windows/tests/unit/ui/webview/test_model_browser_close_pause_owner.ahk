@@ -322,3 +322,7 @@ Test("Native model backend admission: replacement at the real second writer entr
 for _MBBK_VisibilityMode in ["native-hide-current", "native-hide-reopen"]
 	Test("Native model visibility: " . _MBBK_VisibilityMode . " observes real Show during Hide (model-browser-native-show-hide-owner)",
 		_MBPT_Case.Bind(_MBBK_VisibilityMode))
+
+for _MBBK_ConstructorMode in ["native-ctor-current", "native-ctor-malformed"]
+	Test("Native model constructor: " . _MBBK_ConstructorMode . " retires its exact window and callbacks (model-browser-native-constructor-failure)",
+		_MBPT_Case.Bind(_MBBK_ConstructorMode))

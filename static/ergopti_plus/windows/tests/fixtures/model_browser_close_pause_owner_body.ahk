@@ -132,14 +132,32 @@ _MBPO_Destroy(WParam, LParam, Message, Hwnd) {
 _MBPO_Prepare() {
 	global _MBPO, ConfigurationFile, Features, _IniCache, _LLM_Menu, _LLM_Menu_Loaded, LLM_Defaults
 	global _LLM_MenuBuildCoordinator, _LLM_MBW_Gui, _LLM_MBW_SessionEpoch
+	global _LLM_IndexCache, _LLM_PresetsCache
 	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_WarmupHttp, _LLM_ManagedBootstrap, _OllamaWV_Gui
 	global _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub, _LLM_MBW_ResetDone, _LLM_MBW_Ready
 	Directory := A_Args[2] . "\config"
 	Creation := FSCreateDirectoryExclusiveStrict(Directory)
 	_MBPO_Require((Creation is Integer) && Creation == 1, "The private configuration directory must be acquired exclusively")
 	ConfigurationFile := Directory . "\config.toml"
+	if _MBPO.Mode == "native-ctor-malformed" {
+		_MBPO_Require(!IsSet(_LLM_IndexCache) && !IsSet(_LLM_PresetsCache), "Malformed metadata must enter the genuine cold reader, not an overwritten cache")
+		ModelsPath := LLM_GetSharedPath("models.json")
+		RawModels := FSReadUtf8Exact(ModelsPath)
+		ChangedModels := RegExReplace(RawModels, '("speed_tok_s"\s*:\s*)[0-9]+(?:\.[0-9]+)?', '$1{"unexpected":"object-speed"}', &ChangedFields, 1)
+		_MBPO_Require(ChangedFields == 1 && JsonParse(ChangedModels) is Array,
+			"Only one actual shipped numeric speed leaf may become a valid JSON object")
+		_MBPO_Require(FSWriteDurable(ModelsPath, ChangedModels), "The exclusively owned private asset must reach disk before the real reader")
+	}
 	Index := LLM_GetModelIndex()
 	_MBPO.ModelA := _MBPO.Mode == "native-sort" ? "Qwen3.5-9B" : LLM_Defaults["llm_model"]
+	if _MBPO.Mode == "native-ctor-malformed" {
+		BadSpeeds := 0
+		for Name, Info in Index
+			if Info.Get("speed_tok_s", 0) is Map
+				BadSpeeds += 1
+		_MBPO_Require(BadSpeeds == 1, "The genuine JSON parser and metadata decoder must expose exactly the changed object leaf")
+		_MBPO.BadMetadataDecoded := true
+	}
 	_MBPO_Require(Index is Map && Index.Has(_MBPO.ModelA), "The baseline must come from the real shared model catalogue/defaults.")
 	for Name in Index {
 		if Name != _MBPO.ModelA {
@@ -366,6 +384,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed" {
+		_MBPO_ConstructorFailure()
+		return
+	}
 	if _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen" {
 		_MBPO_ShowHide()
 		return
@@ -442,7 +464,8 @@ _MBPO_Main() {
 	_MBPO_Require(_MBPO.Mode == "current" || _MBPO.Mode == "during-close" || _MBPO.Mode == "paused-entry" || _MBPO.Mode == "native-refused" || _MBPO.Mode == "native-paused" || _MBPO.Mode == "native-sort"
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
 		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced"
-		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen",
+		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen"
+		|| _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -850,4 +873,102 @@ _MBPO_ShowHide() {
 		Critical(PreviousCritical)
 	}
 	_MBPO_Require(!State.Debt, "The exact native subclass must retire before its callback memory is released")
+}
+
+
+; This marker holds only its independent scalar state, never the observed Gui.
+class _MBPC_Finalizer {
+	__New(State) {
+		this.State := State
+	}
+	__Delete() {
+		this.State.Disposed += 1
+	}
+}
+_MBPC_Create(This, Params*) {
+	global _MBPO
+	Window := Func.Prototype.Call.Call(This, Params*)
+	State := _MBPO.CtorState
+	if State.Armed {
+		State.Created += 1
+		State.Hwnd := Window.Hwnd, State.GuiPtr := ObjPtr(Window)
+		State.Pid := WinGetPID("ahk_id " . State.Hwnd)
+		Window.CtorWitness := _MBPC_Finalizer(State)
+	}
+	return Window
+}
+_MBPO_ConstructorFailure() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _VendorDir, _DriverDir, ConfigurationFile
+	_MBPO_Require(!IsSet(_LLM_ModelBrowser_Gui), "A cold constructor cannot borrow a cached native GUI")
+	HadVendor := IsSet(_VendorDir)
+	if HadVendor
+		OriginalVendor := _VendorDir
+	else
+		_VendorDir := _DriverDir . "\vendor"
+	Factory := Gui_Create, HadCall := Factory.HasOwnProp("Call")
+	if HadCall
+		OriginalCall := Factory.GetOwnPropDesc("Call")
+	State := {Armed: false, Created: 0, Hwnd: 0, GuiPtr: 0, Pid: 0, Disposed: 0}
+	_MBPO.CtorState := State
+	Installed := false, Product := 0, Threw := false, FailureType := ""
+	try {
+		_MBPO_Require(!_LLM_MBW_WebView2Available(), "This constructor role requires genuine absence of the browser binding")
+		Factory.DefineProp("Call", {Call: _MBPC_Create}), Installed := true, State.Armed := true
+		try Product := LLM_ModelBrowser_Show()
+		catch Any as Failure {
+			Threw := true, FailureType := Type(Failure)
+		}
+		State.Armed := false
+		_MBPO_Observe()
+		Alive := !!DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+		FileAppend("OBSERVATION native-model-constructor mode=" . _MBPO.Mode . " created=" . State.Created
+			. " threw=" . Threw . " failure_type=" . FailureType . " native_alive=" . Alive
+			. " published=" . IsSet(_LLM_ModelBrowser_Gui) . " disposed=" . State.Disposed . "`n", "*", "UTF-8-RAW")
+		_MBPO_Require(State.Created == 1 && State.Pid == ProcessExist() && State.Hwnd != 0 && State.GuiPtr != 0,
+			"The observer must delegate exactly one real production factory without retaining its object")
+		_MBPO_Require(_MBPO.Errors.Length == 0 && _MBPO.WriterEntries == 0
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+			"Constructor input failure must not be confused with a configuration or runtime refusal")
+		if _MBPO.Mode == "native-ctor-malformed" {
+			_MBPO_Require(_MBPO.BadMetadataDecoded && Threw && FailureType == "TypeError",
+				"The real malformed speed leaf must reach the actual native renderer before cleanup is judged")
+			_MBPO_Require(!Alive && !IsSet(_LLM_ModelBrowser_Gui) && State.Disposed == 1,
+				"An unsuccessful native constructor must retire its hidden HWND and captured callback graph")
+		} else
+			_MBPO_Require(!Threw && Product is Gui && IsSet(_LLM_ModelBrowser_Gui)
+				&& _LLM_ModelBrowser_Gui == Product && Alive && DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int"),
+				"The ordinary real catalogue must still produce its actual visible cached native browser")
+	} finally {
+		State.Armed := false
+		if Installed {
+			if HadCall
+				Factory.DefineProp("Call", OriginalCall)
+			else
+				Factory.DeleteProp("Call")
+		}
+		Cleanup := IsSet(_LLM_ModelBrowser_Gui) && ObjPtr(_LLM_ModelBrowser_Gui) == State.GuiPtr ? _LLM_ModelBrowser_Gui : 0
+		if !IsObject(Cleanup) && DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+			Cleanup := GuiFromHwnd(State.Hwnd)
+		if IsObject(Cleanup) {
+			_MBPO_Require(ObjPtr(Cleanup) == State.GuiPtr && WinGetPID("ahk_id " . State.Hwnd) == ProcessExist(),
+				"Only the exact originally observed live Gui may be adopted for failure-path cleanup")
+			if IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Cleanup
+				_LLM_ModelBrowser_Gui := unset
+			if Cleanup.HasOwnProp("FilterDebounce") {
+				Timer := Cleanup.FilterDebounce
+				SetTimer(Timer, 0)
+				Cleanup.FilterDebounce := 0, Timer := 0
+			}
+			Cleanup.Destroy()
+			if Cleanup.HasOwnProp("ListView")
+				Cleanup.DeleteProp("ListView")
+		}
+		Product := 0, Cleanup := 0
+		if HadVendor
+			_VendorDir := OriginalVendor
+		else
+			_VendorDir := unset
+	}
+	_MBPO_Require(!DllCall("IsWindow", "Ptr", State.Hwnd, "Int") && State.Disposed == 1,
+		"The exact privately observed native window and lifetime marker must settle before child exit")
 }
