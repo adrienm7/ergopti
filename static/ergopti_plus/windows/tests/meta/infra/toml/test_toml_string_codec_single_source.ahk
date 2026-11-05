@@ -62,3 +62,17 @@ _TSCS_PersonalTokensRemainCanonical() {
 }
 Test("TOML strings: personal Enter and Tab policy remains canonical (toml-string-codec-single-source)",
 	_TSCS_PersonalTokensRemainCanonical)
+
+_TSCS_LegacyScalarCoercionAndUnicodeRemain() {
+	AssertEqual("0", TOML_EscapeBasicStringContents(0), "legacy numeric coercion remains text")
+	AssertEqual("17.5", TOML_EscapeBasicStringContents(17.5), "legacy decimal coercion remains text")
+	AssertEqual("005", TOML_EscapeBasicStringContents("005"), "an original numeric-looking String retains its spelling")
+	Text := "Zoë😀"
+	Decoded := TOML_ParseDocument("value = " . TOML_RenderString(Text))["value"]
+	AssertEqual(StrLen(Text), StrLen(Decoded), "valid supplementary scalars retain their complete original UTF-16 pairs")
+	Loop StrLen(Text)
+		AssertEqual(NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"),
+			NumGet(StrPtr(Decoded), (A_Index - 1) * 2, "UShort"))
+}
+Test("TOML strings: scalar admission preserves legacy coercion and Unicode (toml-string-codec-single-source)",
+	_TSCS_LegacyScalarCoercionAndUnicodeRemain)
