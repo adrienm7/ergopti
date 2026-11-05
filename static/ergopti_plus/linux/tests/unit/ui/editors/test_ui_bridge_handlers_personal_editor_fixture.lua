@@ -14,6 +14,18 @@ local helpers, OPENING_SOURCE, OPENING_FOREIGN, opening_model, with_opening_file
 
 
 
+helpers.describe("personal editor literal brace payload", function()
+	helpers.it("persists literal symbols and non-BMP text through the real bridge", function()
+		with_opening_file(function(f)
+			helpers.assert_true(f.ready())
+			local output = "x {a&b} {x<😀} {foo}"
+			helpers.assert_true(f.save(output).saved)
+			local decoded = assert(require("toml_codec").decode(f.read()))
+			helpers.assert_eq(decoded.english.old.output, output)
+		end)
+	end)
+end)
+
 helpers.describe("personal editor row origins", function()
 	helpers.it("preserves source metadata and comment across move, rename and later save", function()
 		with_opening_file(function(f)
