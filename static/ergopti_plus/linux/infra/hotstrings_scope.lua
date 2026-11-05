@@ -166,13 +166,17 @@ function M.new(options)
 	local function restore(snapshot)
 		if snapshot.programmable and Dynamic.user_code_scope_current(snapshot.programmable) ~= true then return false end
 		if secondary and secondary.restore() ~= true then return false end
+		-- Preferences may already have been restored by a previous failed
+		-- inverse. Compare the dynamic owner itself when retrying that debt.
+		local current = Dynamic and type(Dynamic.get_trigger_char) == "function"
+			and Dynamic.get_trigger_char() or MagicKey.get()
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
 		if WordReset.restore_configuration(snapshot.word_reset) ~= true then return false end
 		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
-		local current = MagicKey.get()
+		if not apply_dependents(snapshot.trigger, current, snapshot.programmable, true) then return false end
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
-		return apply_dependents(snapshot.trigger, current, snapshot.programmable, true)
+		return true
 	end
 
 	local transaction = Transaction.new({
@@ -212,8 +216,8 @@ function M.new(options)
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
-			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
+			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			-- A first write creates the configuration folder the two files share.
 			local directory = NativePath.dirname(options.path)
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end
