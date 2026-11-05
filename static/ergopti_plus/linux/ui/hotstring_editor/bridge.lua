@@ -257,7 +257,9 @@ end
 --- @param open_mode string|nil "menu" or "shortcut".
 --- @param parsed table Projection of the exact displayed source.
 --- @return table
-local function build_payload(state, open_mode, parsed)
+local function build_payload(state, open_mode, parsed, opening)
+	opening.row_origins = {}
+	local row_number = 0
 	local sections = {}
 
 	if type(parsed) == "table" and type(parsed.sections_order) == "table" then
@@ -269,7 +271,11 @@ local function build_payload(state, open_mode, parsed)
 			if type(sec) == "table" then
 				local entries = {}
 				for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
+					row_number = row_number + 1
+					local id = "row:" .. row_number
+					opening.row_origins[id] = { section = name, trigger = e.trigger }
 					entries[#entries + 1] = {
+						origin_id         = id,
 						trigger           = type(e.trigger) == "string" and e.trigger or "",
 						output            = type(e.output) == "string" and e.output or "",
 						is_word           = e.is_word == true,
@@ -306,6 +312,7 @@ local function build_payload(state, open_mode, parsed)
 	local star = MagicKey.default()
 	return {
 		sections         = sections,
+		row_identity     = true,
 		-- The key in effect, which is the user's if they chose one. `star` stays
 		-- the shipped character: the UI uses it for the literal it inserts from its
 		-- symbol palette, and that must not drift when someone rebinds the trigger.
@@ -440,13 +447,20 @@ local function save_all(state, data, context)
 		end
 	end
 
+	local next_origins, seen_ids = {}, {}
 	for _, name in ipairs(order) do
 		local sec = data.sections[name]
 		if type(sec) == "table" then
 			local entries = {}
 			for _, e in ipairs(type(sec.entries) == "table" and sec.entries or {}) do
 				if type(e.trigger) == "string" and e.trigger ~= "" then
+					local id = e.origin_id
+					if id ~= nil and (type(id) ~= "string" or seen_ids[id]
+						or (not opening.row_origins[id] and not id:match("^new:%d+$"))) then return false end
+					if id then seen_ids[id] = true; next_origins[id] = { section = name, trigger = e.trigger } end
 					entries[#entries + 1] = {
+						_origin = id and opening.row_origins[id] or nil,
+						_identity_new = id ~= nil and opening.row_origins[id] == nil,
 						trigger           = e.trigger,
 						output            = type(e.output) == "string" and e.output or "",
 						is_word           = e.is_word == true,
@@ -481,6 +495,7 @@ local function save_all(state, data, context)
 		return false
 	end
 	opening.source = { status = "ok", content = committed }
+	opening.row_origins = next_origins
 
 	local count = 0
 	for _, sec in pairs(toml.sections) do count = count + #sec.entries end
@@ -612,7 +627,7 @@ function M.push_init(state, context)
 	end
 
 	local ok_payload, encoded = pcall(function()
-		return json_mod.encode(build_payload(state, _pending_mode, opening.parsed))
+		return json_mod.encode(build_payload(state, _pending_mode, opening.parsed, opening))
 	end)
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push initData(): payload encoding failed (%s).", tostring(encoded))
