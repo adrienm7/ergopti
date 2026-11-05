@@ -26,5 +26,27 @@ try {
 		assert.notEqual(stagingOnly.status, 69);
 		assert.match(stagingOnly.stdout, /Driver bundle not found/);
 	}
+	// Replay the real publication tail with a producer that fails after writing.
+	const script = fs.readFileSync(path.join(root, 'tools/build/build-linux-flatpak.sh'), 'utf8');
+	const start = script.indexOf('echo "Building the Flatpak..."');
+	const end = script.indexOf('\nbundle_size=', start);
+	assert.ok(start >= 0 && end > start);
+	const artifact = path.join(build, 'existing.flatpak');
+	fs.writeFileSync(artifact, 'previous bundle\n');
+	const publication = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\nflatpak-builder() { :; }\nflatpak() { printf 'partial' > "$3"; return 42; }\n${script.slice(start, end)}`], {
+		encoding: 'utf8', timeout: 10000,
+		env: { ...process.env, BUILD_DIR: build, REPO_DIR: path.join(build, 'repo'), BUILDER_DIR: path.join(build, 'builder'), MANIFEST_FILE: path.join(build, 'manifest'), FLATPAK_FILE: artifact, APP_ID: 'org.ergopti.Ergopti', BRANCH: 'stable' }
+	});
+	assert.notEqual(publication.status, 0, 'producer refusal must fail');
+	assert.equal(fs.readFileSync(artifact, 'utf8'), 'previous bundle\n', 'failed packaging preserves the prior artifact');
+	assert.deepEqual(fs.readdirSync(build).sort(), ['existing.flatpak', 'flatpak']);
+	const success = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\nflatpak-builder() { :; }\nflatpak() { printf 'new bundle' > "$3"; }\n${script.slice(start, end)}`], {
+		encoding: 'utf8', timeout: 10000,
+		env: { ...process.env, BUILD_DIR: build, REPO_DIR: path.join(build, 'repo'), BUILDER_DIR: path.join(build, 'builder'), MANIFEST_FILE: path.join(build, 'manifest'), FLATPAK_FILE: artifact, APP_ID: 'org.ergopti.Ergopti', BRANCH: 'stable' }
+	});
+	assert.equal(success.status, 0, success.stderr);
+	assert.equal(fs.readFileSync(artifact, 'utf8'), 'new bundle');
+	assert.deepEqual(fs.readdirSync(build).sort(), ['existing.flatpak', 'flatpak']);
+
 	console.log('Flatpak build checks its producer before staging.');
 } finally { fs.rmSync(scratch, { recursive: true, force: true }); }

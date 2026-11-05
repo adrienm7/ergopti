@@ -442,13 +442,24 @@ echo "Building the Flatpak..."
 flatpak-builder --force-clean --disable-rofiles-fuse \
   --repo="$REPO_DIR" "$BUILDER_DIR" "$MANIFEST_FILE"
 
-rm -f "$FLATPAK_FILE"
-flatpak build-bundle "$REPO_DIR" "$FLATPAK_FILE" "$APP_ID" "$BRANCH"
+# Preserve an existing bundle until the producer has completed a fresh one.
+FLATPAK_STAGE="$(mktemp -d "$BUILD_DIR/.ergopti-flatpak.XXXXXX")"
+FLATPAK_STAGE_FILE="$FLATPAK_STAGE/bundle.flatpak"
+cleanup_flatpak_stage() {
+  status=$?
+  trap - EXIT
+  rm -f -- "$FLATPAK_STAGE_FILE" || status=1
+  rmdir -- "$FLATPAK_STAGE" || status=1
+  exit "$status"
+}
+trap cleanup_flatpak_stage EXIT
+flatpak build-bundle "$REPO_DIR" "$FLATPAK_STAGE_FILE" "$APP_ID" "$BRANCH"
 
-if [ ! -f "$FLATPAK_FILE" ]; then
-  echo "[ERR] flatpak build-bundle did not produce a bundle file."
+if [ ! -f "$FLATPAK_STAGE_FILE" ] || [ -L "$FLATPAK_STAGE_FILE" ] || [ ! -s "$FLATPAK_STAGE_FILE" ]; then
+  echo "[ERR] flatpak build-bundle did not produce a nonempty direct bundle file." >&2
   exit 1
 fi
+mv -T -- "$FLATPAK_STAGE_FILE" "$FLATPAK_FILE"
 
 bundle_size=$(du -h "$FLATPAK_FILE" | cut -f1)
 echo ""
