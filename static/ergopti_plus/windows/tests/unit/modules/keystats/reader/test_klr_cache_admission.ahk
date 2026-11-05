@@ -266,3 +266,6 @@ Test("KLR durable cache: pre-collision-fix image forces rebuild (klr-newest-firs
 
 Test("KLR durable cache: ambiguous tuple image forces rebuild (walker-composite-cache)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("17")))
+
+Test("KLR durable cache: window visit counts force reconstruction as typing counts (window-title-app-attribution)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("18")))
