@@ -734,18 +734,34 @@ GestureCaseTransforms() {
 ; Win+U / Win+W shortcuts go through here too.
 ; @param {Func} Transform String -> String.
 GestureTransformSelection(Transform) {
-		GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform))
+		EntryCritical := Critical("On")
+		try {
+				Owner := TapHoldNewOwner()
+				InputGeneration := KS_GetPhysicalInputGeneration()
+				ExpectedTarget := _SendInstantCaptureTarget()
+		} finally Critical(EntryCritical)
+		if !(ExpectedTarget is Map)
+				return false
+		ExpectedTarget["admission"] := () => !A_IsSuspended && TapHoldOwnerCurrent(Owner)
+				&& KS_GetPhysicalInputGeneration() == InputGeneration
+		if !_SendInstantTargetCurrent(ExpectedTarget)
+				return false
+		return GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform, ExpectedTarget))
 }
 
-_GestureSendTransformedSelection(Text, Transform) {
+_GestureSendTransformedSelection(Text, Transform, ExpectedTarget := unset) {
 		; No-op on an empty/failed capture: async cancellation must never turn into
 		; a stale SendInstant paste.
 		if (Text = "")
 				return
+		if !IsSet(ExpectedTarget)
+				ExpectedTarget := _SendInstantCaptureTarget()
+		if !_SendInstantTargetCurrent(ExpectedTarget)
+				return
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
-				SendInstant(Transform.Call(Text))
+				SendInstant(Transform.Call(Text), "", ExpectedTarget)
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -TimingsGet("gestures", "synthetic_clear_ms"))
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
