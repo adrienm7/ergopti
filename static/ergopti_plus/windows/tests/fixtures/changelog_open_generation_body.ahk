@@ -120,8 +120,12 @@ _CWOC_ShowRegister(State, Window, Name, Callback, Options*) {
 	if Name != "Close" || Callback != _CLW_OnClose || State.Hwnd
 		return Result
 	Hwnd := Window.Hwnd
+	; The genuine registration precedes Show. Native HWND ownership ignores
+	; DetectHiddenWindows, unlike a WinTitle lookup of this still-hidden GUI.
+	OwnerPid := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &OwnerPid, "UInt")
 	_CWOC_Require(DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
-		&& WinGetPID("ahk_id " . Hwnd) == ProcessExist(),
+		&& ThreadId != 0 && OwnerPid == ProcessExist(),
 		"The real Close registration must identify the exact new owned native GUI.")
 	State.Window := Window, State.Hwnd := Hwnd
 	; Fast callbacks preserve the caller's actual thread/Critical state; this

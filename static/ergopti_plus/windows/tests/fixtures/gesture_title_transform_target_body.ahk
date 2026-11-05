@@ -149,7 +149,10 @@ _WRF_Main() {
 			_WRF.Payload .= "Alpha Beta "
 		}
 		_WRF.A := Gui(, "Ergopti original selection owner")
-		_WRF.EditA := _WRF.A.AddEdit("w320 r3 Limit1000000", _WRF.Initial)
+		; AHK applies EM_LIMITTEXT only after CreateWindowEx. Install the long
+		; real selection after creating the control, not as its window caption.
+		_WRF.EditA := _WRF.A.AddEdit("w320 r3 Limit1000000")
+		_WRF.EditA.Value := _WRF.Initial
 		_WRF.B := Gui(, "Ergopti independent receiver")
 		_WRF.EditB := _WRF.B.AddEdit("w320 r3")
 		_WRF.A.Show()
