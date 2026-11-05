@@ -172,7 +172,8 @@ ConfigRegistryCacheCodeIdentity() {
 	if A_IsCompiled
 		return CryptoSha256Bytes(FSReadBytesStrict(A_ScriptFullPath))
 	SplitPath(A_LineFile, , &Directory)
-	Files := [Directory . "\config_migrate.ahk", Directory . "\..\_generated\config_migration_ops.ahk", A_LineFile]
+	Files := [Directory . "\config_migrate.ahk", Directory . "\manifest_reader.ahk",
+		Directory . "\..\_generated\config_migration_ops.ahk", A_LineFile]
 	loop files Directory . "\toml\*.ahk", "F"
 		Files.Push(A_LoopFileFullPath)
 	Identity := "typed-registry-cache-v1`n" . A_AhkVersion . "`n"
@@ -264,8 +265,11 @@ ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, Va
 	Registry := Validate.Call(Model)
 	if IsSet(SourceHash) && StrLen(SourceHash) == 64
 		_ConfigRegistryRememberPristine(Path, SourceHash, Registry)
-	if IsSet(Identity)
-		_ConfigRegistryCachePending := {Path: CachePath, Identity: Identity, Model: Model}
+	if IsSet(Identity) {
+		; The validator may share ops/typed values with its returned runtime.
+		; Deferred publication owns the raw source parse before that runtime escapes.
+		_ConfigRegistryCachePending := {Path: CachePath, Identity: Identity, Model: ManifestCloneValue(Model)}
+	}
 	try LoggerInfo("ConfigMigration", "Registry parse cache miss, authoritative parse validated in {1} ms.", TickElapsed(Started))
 	return Registry
 }
