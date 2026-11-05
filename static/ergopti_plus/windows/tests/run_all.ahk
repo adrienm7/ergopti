@@ -798,6 +798,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/prefix/test_prefix_char_admission.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_llm_typing_privacy.ahk
 #Include unit/modules/hotstrings/prefix/test_llm_native_admission_order.ahk
+#Include unit/modules/hotstrings/prefix/test_llm_native_entry_lifecycle.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_llm_observer_lifetime.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_idle_click_reset.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_event_word_reset.ahk
