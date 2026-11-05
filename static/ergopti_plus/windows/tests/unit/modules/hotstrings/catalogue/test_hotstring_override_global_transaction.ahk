@@ -754,3 +754,107 @@ _HSGP_Outcome(Denied) {
 for _HSGP_Denied in [true, false]
 	Test("hotstring override partial: actual rename declined durable ack=" . _HSGP_Denied
 		. " (hotstring-override-partial-publication)", _HSGP_Outcome.Bind(_HSGP_Denied))
+
+_HSPA_PostAckFailure(Mode) {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Root := A_Temp . "\ergopti_override_post_ack_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	Native := FSWriteReplaceOwned, Reporter := ConfigReportPersistenceFailure
+	HadNative := Native.HasOwnProp("Call"), HadReporter := Reporter.HasOwnProp("Call")
+	if HadNative
+		SavedNative := Native.GetOwnPropDesc("Call")
+	if HadReporter
+		SavedReporter := Reporter.GetOwnPropDesc("Call")
+	InstalledNative := false, InstalledReporter := false
+	State := {nativeCalls: 0, nativeAck: 0, lock: 0, reports: 0, unchanged: "unset", publisherCalls: 0}
+	ObserveNative(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if (Target is String) && StrCompare(Target, Path, true) == 0 {
+			State.nativeCalls += 1
+			State.nativeAck := Result
+			if Mode == "readback" && Result == 1 {
+				State.lock := FileOpen(Path, "r-rwd")
+				AssertTrue(IsObject(State.lock), "the real post-ACK readback must be denied by an acquired private native handle")
+			}
+		}
+		return Result
+	}
+	ObserveReport(This, Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
+		State.reports += 1
+		State.unchanged := StateUnchanged
+		return Func.Prototype.Call.Call(This, Context, NotifyFn, Detail, StateUnchanged)
+	}
+	RefusePublisher() {
+		State.publisherCalls += 1
+		return 0
+	}
+	try {
+		AssertFalse(_ConfigFullSaveHasPending())
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[rolls]`ncolor = "#111111"`n'))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		Origin := _HotstringsOverrideSourceFor(_HotstringsOverrides, Path)
+		OriginalMap := _HotstringsOverrides, BeforeGen := _HSResolveGen
+		Candidate := _HotstringsOverrides.Clone()
+		Candidate["rolls"] := _HotstringsCloneOverrideCategory(Candidate["rolls"])
+		Candidate["rolls"].Color := "#222222"
+		Native.DefineProp("Call", {Call: ObserveNative}), InstalledNative := true
+		Reporter.DefineProp("Call", {Call: ObserveReport}), InstalledReporter := true
+		Result := _SaveOverrides(Candidate, 0, 0, Path, 0, RefusePublisher, 0, Origin)
+		HeldReadback := IsObject(State.lock)
+		if HeldReadback {
+			State.lock.Close()
+			State.lock := 0
+		}
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		_TestPrint("# override-post-ack mode=" . Mode . " native_calls=" . State.nativeCalls
+			. " native_ack=" . State.nativeAck . " readback_lock=" . HeldReadback . " result=" . Result
+			. " reports=" . State.reports . " state_unchanged=" . State.unchanged
+			. " publisher_calls=" . State.publisherCalls . " disk_color=" . Disk["rolls"]["color"])
+		AssertEqual(1, State.nativeCalls)
+		AssertEqual(1, State.nativeAck, "the genuine writer must fully acknowledge its real rename/durability before the later refusal")
+		AssertEqual(Mode == "readback", HeldReadback)
+		AssertEqual(Mode == "publisher" ? 1 : 0, State.publisherCalls)
+		AssertFalse(Result)
+		AssertEqual("#222222", Disk["rolls"]["color"])
+		AssertTrue(_HotstringsOverrides == OriginalMap)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		AssertEqual(BeforeGen, _HSResolveGen)
+		AssertEqual(1, State.reports)
+		AssertTrue((State.unchanged is Integer) && State.unchanged == 0,
+			"a post-ACK refusal must not report that the durable file was left unchanged")
+	} finally {
+		if IsObject(State.lock)
+			State.lock.Close()
+		if InstalledReporter {
+			if HadReporter
+				Reporter.DefineProp("Call", SavedReporter)
+			else
+				Reporter.DeleteProp("Call")
+		}
+		if InstalledNative {
+			if HadNative
+				Native.DefineProp("Call", SavedNative)
+			else
+				Native.DeleteProp("Call")
+		}
+		_HotstringsOverridesPath := SavedPath, _HotstringsOverrides := SavedMap, _HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSPA_Mode in ["readback", "publisher"]
+	Test("hotstring override post-ACK failure: " . _HSPA_Mode
+		. " (override-post-ack-truthful-feedback)", _HSPA_PostAckFailure.Bind(_HSPA_Mode))
