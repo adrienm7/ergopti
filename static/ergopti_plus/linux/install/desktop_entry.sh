@@ -40,21 +40,23 @@ ergopti_systemd_exec() {
 ergopti_desktop_entry_owned() {
 	local file="$1" launcher="$2" expected line trimmed value group= main_groups=0 commands=0
 	expected="$(ergopti_desktop_exec "$launcher")" || return 1
-	while IFS= read -r line || [ -n "$line" ]; do
+	while :; do
+		line=
+		if IFS= read -r line; then line="${line%$'\r'}"; else [ -n "$line" ] || break; fi
 		# GLib ignores leading whitespace, whitespace around keys, and trailing
 		# whitespace around group headers. Preserve value bytes for comparison.
-		trimmed="${line#"${line%%[!$' \t']*}"}"
+		trimmed="${line#"${line%%[![:space:]]*}"}"
 		case "$trimmed" in
 			\[*\]*)
-				trimmed="${trimmed%"${trimmed##*[!$' \t']}"}"
+				trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
 				if [ "$trimmed" = '[Desktop Entry]' ]; then
 					group=main; main_groups=$((main_groups + 1))
 				else group=other; fi ;;
 			*)
-				if [ "$group" = main ] && [[ "$trimmed" =~ ^Exec[[:blank:]]*= ]]; then
+				if [ "$group" = main ] && [[ "$trimmed" =~ ^Exec[[:space:]]*= ]]; then
 					commands=$((commands + 1))
 					value="${trimmed#*=}"
-					value="${value#"${value%%[!$' \t']*}"}"
+					value="${value#"${value%%[![:space:]]*}"}"
 					case "Exec=$value" in
 						"$expected"|"Exec=$launcher --tray"|"Exec=$launcher --session-start --tray") ;;
 						*) return 1 ;;
@@ -63,4 +65,28 @@ ergopti_desktop_entry_owned() {
 		esac
 	done < "$file"
 	[ "$main_groups" -eq 1 ] && [ "$commands" -eq 1 ]
+}
+
+# Match GLib's effective values in the primary group; later duplicate keys win.
+ergopti_desktop_entry_disabled() {
+	local file="$1" line trimmed key value group= hidden= gnome=
+	while :; do
+		line=
+		if IFS= read -r line; then line="${line%$'\r'}"; else [ -n "$line" ] || break; fi
+		trimmed="${line#"${line%%[![:space:]]*}"}"
+		case "$trimmed" in
+			\[*\]*)
+				trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+				if [ "$trimmed" = '[Desktop Entry]' ]; then group=main; else group=other; fi ;;
+			*)
+				[ "$group" = main ] || continue
+				[[ "$trimmed" =~ ^(Hidden|X-GNOME-Autostart-enabled)[[:space:]]*= ]] || continue
+				key="${trimmed%%=*}"
+				key="${key%"${key##*[![:space:]]}"}"
+				value="${trimmed#*=}"
+				value="${value#"${value%%[![:space:]]*}"}"
+				case "$key" in Hidden) hidden="$value" ;; X-GNOME-Autostart-enabled) gnome="$value" ;; esac ;;
+		esac
+	done < "$file"
+	[ "$hidden" = true ] || [ "$gnome" = false ]
 }

@@ -79,7 +79,7 @@ if [ "$ACTION" = status ]; then
 	# A separately enabled unit starts even if the XDG entry is hidden.
 	if systemctl --user is-enabled --quiet ergopti-hotstrings.service 2>/dev/null; then
 		printf 'enabled\n'
-	elif [ -f "$DESKTOP_FILE" ] && grep -Eq '^(Hidden=true|X-GNOME-Autostart-enabled=false)$' "$DESKTOP_FILE"; then
+	elif [ -f "$DESKTOP_FILE" ] && ergopti_desktop_entry_disabled "$DESKTOP_FILE"; then
 		printf 'disabled\n'
 	elif [ -f "$DESKTOP_FILE" ] || [ -f "/etc/xdg/autostart/$DESKTOP_NAME" ]; then
 		printf 'enabled\n'
