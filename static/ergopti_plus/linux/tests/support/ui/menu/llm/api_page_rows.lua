@@ -22,8 +22,8 @@ local M = {}
 --- @param changed function|nil
 --- @param context table|nil
 --- @return table rows
-function M.rows(Rows, llm, dialogs, changed, context)
-	local api = Rows.api_page(llm, dialogs, changed, context)
+function M.rows(Rows, llm, dialogs, changed, context, page_current)
+	local api = Rows.api_page(llm, dialogs, changed, context, nil, page_current)
 	local rows, active = {}, nil
 	local former = {}
 	for _, row in ipairs(api.rows) do

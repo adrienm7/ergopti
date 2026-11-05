@@ -109,6 +109,8 @@ local function ollama_install(frame, blocked, ollama_ok)
 	return { state = "available", failed_key = frame.install_refused }
 end
 
+local projection_current
+
 local function build_payload(frame)
 	local installed = installed_lookup(frame)
 	local current = frame.llm_ports.get_current_model() or ""
@@ -131,7 +133,7 @@ local function build_payload(frame)
 		end
 	end
 	local api = _bound and require("ui.menu.llm_backend_rows").api_page(frame.llm, _bound.dialogs,
-		_bound.on_changed, _bound.context, frame.listings) or { rows = {}, providers = {}, tools = {} }
+		_bound.on_changed, _bound.context, frame.listings, function() return projection_current(frame) end) or { rows = {}, providers = {}, tools = {} }
 	local api_active = nil
 	for _, row in ipairs(api.rows) do if row.current then api_active = row.name end end
 	local blocked = require("ui.menu.llm_config_guard").reason()
@@ -185,7 +187,7 @@ local function retained(frame)
 	return true
 end
 
-local function projection_current(frame)
+projection_current = function(frame)
 	if not retained(frame) then return false end
 	local ports = frame.manager_ports
 	local state, epoch = ports.get_daemon_state(), ports.current_epoch(APP_NAME)

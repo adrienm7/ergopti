@@ -119,17 +119,23 @@ end
 --- @param entry table
 --- @param name string The entry's automatic name.
 --- @param admit function|nil Exact source-bound runtime admission.
-local function run_test(remote, dialogs, entry, name, admit)
+--- @param page_current function|nil Whether this page may still display a result.
+local function run_test(remote, dialogs, entry, name, admit, page_current)
 	local function allowed()
 		if admit == nil then return true end
 		local ok, value = pcall(admit)
 		return ok and value == true
 	end
-	if not allowed() then return false end
+	local function visible()
+		if page_current == nil then return true end
+		local ok, value = pcall(page_current)
+		return ok and value == true
+	end
+	if not allowed() or not visible() then return false end
 	local dispatched = remote.test(entry, function(ok, detail, elapsed_ms)
-		if not allowed() then return end
+		if not allowed() or not visible() then return end
 		Logger.info(LOG, "API test of '%s': %s.", name, ok and "answered" or "failed")
-		if not allowed() then return end
+		if not allowed() or not visible() then return end
 		report_test(dialogs, name, ok, detail, elapsed_ms)
 	end, admit)
 	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", name) end
@@ -144,7 +150,7 @@ end
 --- @param dialogs table { prompt, error, info }
 --- @param provider table
 --- @param on_changed function|nil
-local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
+local function add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current)
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
 	local fields = UrlTemplate.fields(provider.base_url)
@@ -253,7 +259,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	end
 	if type(on_changed) == "function" then on_changed() end
 	if chat and not published_current() then return false end
-	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id], chat and published_current or nil)
+	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id], chat and published_current or nil, page_current)
 end
 
 --- The name of the model that answers predictions: the active API entry's
@@ -352,8 +358,9 @@ end
 --- @param on_changed function|nil Called after a change (menu and page refresh).
 --- @param context table|nil { paused, is_paused } for the local servers.
 --- @param listings table|nil Provider listing state by entry id (llm.api_model_listing); nil when never asked.
+--- @param page_current function|nil Exact page projection owner.
 --- @return table api { rows, providers, tools }
-function M.api_page(llm, dialogs, on_changed, context, listings)
+function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	local function changed() if type(on_changed) == "function" then on_changed() end end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
@@ -399,7 +406,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 			-- retires the running request (set_backend) before deleting it.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"), run = function()
 				if not active_commands_ready() then return false end
-				return run_test(remote, dialogs, active, active_name)
+				return run_test(remote, dialogs, active, active_name, nil, page_current)
 			end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
@@ -413,7 +420,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 		elseif not chat then
 			-- Never the predictions' entry: its own test and removal instead.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
-				run = function() return run_test(remote, dialogs, entry, label) end }
+				run = function() return run_test(remote, dialogs, entry, label, nil, page_current) end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
@@ -480,7 +487,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings)
 	end
 	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do
-		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end
+		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current) end
 		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = function()
 			-- A chat key becomes the predictions' entry, under the API backend;
 			-- a System 1 key leaves the backend as it is.
