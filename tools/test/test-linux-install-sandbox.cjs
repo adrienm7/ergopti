@@ -121,7 +121,7 @@ function runInstaller(scenario) {
 	stub(
 		stubs,
 		'systemctl',
-		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0; }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
+		`${log}\n[ "$2" = is-enabled ] && [ "${scenario.systemdEnabled ? 1 : 0}" = 1 ] && exit 0\n[ "$2" = show ] && { ${scenario.refuseShow ? 'exit 1;' : `printf 'FragmentPath=%s\\nDropInPaths=\\n' "\${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/ergopti-hotstrings.service"; exit 0;`} }\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service ${scenario.systemdEnabled ? 'enabled' : 'disabled'} enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`
 	);
 	if (
 		scenario.refuseUnitPublish ||
@@ -1293,6 +1293,7 @@ for (const kind of ['unowned', 'modified', 'owned']) {
 {
 	const run = runInstaller({
 		desktopProvided: true,
+		refuseShow: true,
 		seed(home) {
 			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
 			fs.mkdirSync(path.dirname(desktop), { recursive: true });
