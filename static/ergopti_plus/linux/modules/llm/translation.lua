@@ -66,11 +66,19 @@ function M.parse(config_text, names_text, order_text)
 	if type(order) ~= "table" or type(order.order) ~= "table" or #order.order == 0 then
 		return nil, "locale_order.json is missing or has no order"
 	end
+	local seen = {}
 	for _, code in ipairs(order.order) do
+		if type(code) ~= "string" or seen[code] then
+			return nil, "locale_order.json has an invalid or duplicated locale"
+		end
+		seen[code] = true
 		local entry = names.locales[code]
 		if type(entry) ~= "table" or type(entry.name) ~= "string" or type(entry.flag) ~= "string" then
 			return nil, "locale_names.json has no name or flag for " .. tostring(code)
 		end
+	end
+	for code in pairs(names.locales) do
+		if not seen[code] then return nil, "locale_order.json omits " .. tostring(code) end
 	end
 	return { config = config, names = names, order = order }, nil
 end
