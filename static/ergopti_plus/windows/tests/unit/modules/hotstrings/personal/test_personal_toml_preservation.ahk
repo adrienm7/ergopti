@@ -281,3 +281,71 @@ Test("personal-editor-preservation: unchanged fallbacks preserve invisible descr
 Test("personal-editor-preservation: edited fallbacks refuse replacing invisible description data", _PTIO_PreservationUnownedDescriptions.Bind(true))
 
 #Include test_personal_info_editor_consent.ahk
+
+_PNOS_Case(Invalid) {
+	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
+	OldCache := _ReadPersonalTomlCache
+	HadPath := ScriptInformation.Has("PersonalTomlPath")
+	OldPath := ScriptInformation.Get("PersonalTomlPath", "")
+	Root := A_Temp . "\ergopti_personal_output_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\personal_hotstrings.toml", Created := false
+	try {
+		AssertFalse(_ConfigFullSaveHasPending(), "the private personal path must not detach a foreign accepted full-save obligation")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		ScriptInformation["PersonalTomlPath"] := Path
+		_ReadPersonalTomlCache := false
+		Source := '[[words]]`n"hello" = { output = "Original", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		Observed := ReadPersonalToml(true)
+		AssertEqual(1, Observed["sections"]["words"]["entries"].Length)
+		AssertEqual("Original", Observed["sections"]["words"]["entries"][1]["output"])
+		Candidate := _PersonalTomlCloneDetached(Observed)
+		Payload := JsonParse(Invalid ? '{"output":"A\u0000B"}' : '{"output":"A\nB\tC"}')
+		Value := Payload["output"]
+		AssertTrue(Value is String)
+		if Invalid {
+			AssertEqual(3, StrLen(Value))
+			AssertEqual(65, NumGet(StrPtr(Value), 0, "UShort"))
+			AssertEqual(0, NumGet(StrPtr(Value), 2, "UShort"))
+			AssertEqual(66, NumGet(StrPtr(Value), 4, "UShort"))
+		} else
+			AssertEqual("A`nB`tC", Value)
+		Candidate["sections"]["words"]["entries"][1]["output"] := Value
+		Before := FSReadBytesStrict(Path)
+		Result := WritePersonalToml(Candidate)
+		After := FSReadBytesStrict(Path)
+		Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		Actual := Disk["words"][1]["hello"]["output"]
+		_TestPrint("# personal-output-scalar invalid=" . Invalid . " result=" . Result
+			. " requested-length=" . StrLen(Value) . " actual-length=" . StrLen(Actual)
+			. " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Invalid {
+			AssertFalse(Result, "a public personal edit must refuse before normalization can truncate its original scalar")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "the unsupported JSON output must not replace the original complete source")
+			AssertEqual("Original", Actual)
+		} else {
+			AssertTrue(Result, "ordinary newline/tab input retains its canonical personal token policy")
+			AssertEqual("A{Enter}B{Tab}C", Actual)
+			Reloaded := ReadPersonalToml(true)
+			AssertEqual("A{Enter}B{Tab}C", Reloaded["sections"]["words"]["entries"][1]["output"])
+		}
+	} finally {
+		if Created {
+			_PersonalTomlInvalidateCaches(Path)
+			if _TomlUnreadableFiles.Has(Path)
+				_TomlUnreadableFiles.Delete(Path)
+			DirDelete(Root, true)
+		}
+		if HadPath
+			ScriptInformation["PersonalTomlPath"] := OldPath
+		else
+			ScriptInformation.Delete("PersonalTomlPath")
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal output scalar: JSON NUL cannot disappear during normalization (personal-output-scalar)", _PNOS_Case.Bind(true))
+Test("personal output scalar: newline and tab remain canonical tokens (personal-output-scalar)", _PNOS_Case.Bind(false))
