@@ -681,6 +681,17 @@ NATIVE_LUV_CMAKE_OPTIONS=("-DLUA_BUILD_TYPE=System" "-DWITH_LUA_ENGINE=LuaJIT" "
 # END GENERATED LINUX SOURCE NETWORK BUILD
 
 NATIVE_LUV_STAGE=""
+# Lua C paths use semicolons as separators and question marks as substitutions.
+# The builder also requires an absolute stage. Keep ordinary TMPDIR values,
+# but use /tmp when its spelling cannot be represented in a Lua search path.
+_native_luv_stage_create() {
+	local root="${TMPDIR:-/tmp}"
+	case "$root" in
+		/*) case "$root" in *';'*|*'?'*) root=/tmp ;; esac ;;
+		*) root=/tmp ;;
+	esac
+	TMPDIR="$root" mktemp -d
+}
 _prepare_source_network_runtime() {
 	local repository manager packages package_name builder
 	repository="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
@@ -695,7 +706,7 @@ _prepare_source_network_runtime() {
 	for package_name in $packages; do
 		_install_required_package "$manager" "$package_name" || return 1
 	done
-	NATIVE_LUV_STAGE="$(mktemp -d)"
+	NATIVE_LUV_STAGE="$(_native_luv_stage_create)"
 	if ! bash "$builder" "$NATIVE_LUV_STAGE" "$NATIVE_LUV_SOURCE_URL" \
 		"$NATIVE_LUV_SOURCE_REVISION" "${NATIVE_LUV_CMAKE_OPTIONS[@]}"; then
 		ergopti_msg install.network_build_refused "$NATIVE_LUV_STAGE" >&2
