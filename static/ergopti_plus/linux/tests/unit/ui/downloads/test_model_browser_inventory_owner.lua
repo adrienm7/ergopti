@@ -37,6 +37,40 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	for _, mode in ipairs({ "throw", "refuse", "inline" }) do
+		helpers.it("(model-selector-listing-refusal) reports " .. mode .. " without leaking an exception", function()
+			local previous, states = package.loaded["ui.menu.llm_backend_rows"], {}
+			package.loaded["ui.menu.llm_backend_rows"] = { api_page = function(_, _, _, _, listings)
+				if listings and listings.e1 then states[#states + 1] = listings.e1.state end
+				return { rows = {}, providers = {}, tools = {} }
+			end }
+			local ok, failure = pcall(with_browser, function(f, bridge)
+				bridge.bind({ dialogs = {}, delete_model = function() return false end,
+					ollama_state = function() return true end, ollama_install_phase = function() return "idle" end,
+					install_ollama = function() return true end,
+					listing = { targets = function() return { { id = "e1", token = "synthetic-private-token" } } end,
+						list = function(entry, callback)
+							if mode == "throw" then error(entry.token) end
+							if mode == "inline" then callback({ state = "listed", ids = {} }) end
+							return false
+						end } })
+				local logger, messages = require("logger.shim"), {}
+				local previous_error = logger.error
+				logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+				local called, result = pcall(f.handshake)
+				logger.error = previous_error
+				assert(called, result)
+				if mode ~= "inline" then helpers.assert_true(#messages > 0) end
+				for _, message in ipairs(messages) do
+					helpers.assert_true(not message:find("synthetic-private-token", 1, true))
+				end
+				helpers.assert_eq(states[#states], mode == "inline" and "listed" or "failed")
+			end)
+			package.loaded["ui.menu.llm_backend_rows"] = previous
+			assert(ok, failure)
+		end)
+	end
+
 	helpers.it("(model-selector-private-error) keeps action exceptions out of the log", function()
 		local previous = package.loaded["ui.menu.llm_backend_rows"]
 		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()

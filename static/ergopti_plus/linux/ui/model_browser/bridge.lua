@@ -218,15 +218,20 @@ local function next_listing(frame, list)
 	local queue = frame.listing_queue
 	if type(queue) ~= "table" or #queue == 0 or not projection_current(frame) then return false end
 	local entry = table.remove(queue, 1)
-	local called, err = pcall(list, entry, function(listing)
-		if not projection_current(frame) then return end
+	local delivered = false
+	local called, dispatched = pcall(list, entry, function(listing)
+		if delivered or not projection_current(frame) then return end
+		delivered = true
 		frame.listings[entry.id] = type(listing) == "table" and listing or { state = "failed", reason = "unavailable" }
 		push_payload(frame)
 		next_listing(frame, list)
 	end)
-	if not called then
-		Logger.error(LOG, "Remote model listing dispatch failed: %s", tostring(err))
+	if (not called or dispatched == false) and not delivered then
+		Logger.error(LOG, "Remote model listing could not be dispatched.")
+		if not projection_current(frame) then return false end
+		delivered = true
 		frame.listings[entry.id] = { state = "failed", reason = "unavailable" }
+		push_payload(frame)
 		return next_listing(frame, list)
 	end
 	return true
