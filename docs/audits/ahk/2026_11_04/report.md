@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **88 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **89 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1473,3 +1473,19 @@ The production correction is integrated; post-fix native qualification is pendin
 Run41950173319 stops before discovery with AutoHotkey exit2: a test assertion and its following else share line570 of test_key_combination_chord_engine.ahk. None of the86 selected subjects executes, so this run qualifies no behavioral fix. The production entry compiles and both optional E2E groups remain explicitly unselected. The fixture syntax is repaired before replay. The next selection adds uncounted source-ownership, final-publication, argument-representation, boot-admission, case-only caption, native-window-close and profile-navigation-source probes; they remain hypotheses until the actual production path reaches its business assertion.
 
 Cross-driver inspection for086 finds no equivalent mutable global display store: Linux and macOS retain the parser display metadata in result records. No Lua correction is justified by the demonstrated Windows store race. Argument-representation probes separately retain the actual JSON-decoded input length before native dispatch; the Linux process adapter already rejects embedded NUL, while macOS shortcut input travels in a file rather than as a native argument. These comparisons establish scope, not unexecuted Windows success.
+
+## Native qualification at b70dd87
+
+Run41950852781 discovers and executes113 selected cases:92 pass and21 fail, with the same names in reverse. The production graph compiles; both optional E2E groups remain unselected. Scalar receiving6/6 now proves the053 suppression fix, including the formerly leaked Backspace. Typed chord boot12/12, marker legacy controls3/3, updater cadence5/5, request parse-gap2/2, refused layout retry3/3 with foreign-stage controls, configuration publication3/3 and same-caption cross-app2/2 pass. The genuine CapsWord store/candidate integration now passes with the registered boot-cache guard.
+
+The run establishes089 below. It also extends existing families: a same-app caption changing only case retains its old title clock (085); profile editing overwrites a different navigation preference written before opening (072); wrap-symbol add/toggle overwrites externally changed source (072), and wrap publication still proceeds after native-boundary suspension or reinitialization (038). These extensions do not create new IDs. Two malformed real boot cases exit1 without exporting their child diagnostic and remain under investigation. Four spent-control and two clipboard-render probes stop at missing fixture arguments; two Wi-Fi probes lack their initialization prerequisite; both native Show probes inspect an unrelated vanished window. None of those ten fixture failures is counted as a product defect. Their setup is being repaired before the next targeted replay.
+
+## AHK-089: Native shortcut arguments silently lose text after NUL
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+AL_QuoteArgument accepts embedded NUL although Windows native command lines terminate at that code unit. The genuine System2 JSON action decoder retains the full string, and the shortcut connector acknowledges native launch without detecting truncation.
+
+Reproduction: Run41950852781 dispatches head, middle and tail NUL inputs with complete pre-dispatch lengths7/13/7. The actual independently identified child receives respectively0/6/6 units; connector_ok stays1. All three outcomes repeat in reverse. The legal12-unit Unicode/quoting control passes.
+
+Regression: Four actual JSON/discovery/connector/native-launch cases preserve complete producer input before dispatch, verify child PID and creation FILETIME, inspect actual A_Args code units and join the owned receiver. The integrated guard uses length-aware NUL matching and refuses before native launch with an explicit unsupported-argument reason. Post-fix native qualification is pending. Linux already refuses NUL in its process argument adapter; macOS sends shortcut input through a file, so this Windows argument guard does not change its supported representation.

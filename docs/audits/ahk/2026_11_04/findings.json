@@ -972,6 +972,17 @@
 			"root_cause": "Updater_LoadCheckInterval in modules/updater/core.ahk reads the compatibility cache and coerces/truncates wrong source types before interval admission.",
 			"silent_failure": "Native run41947380519 resolves all three malformed values to0 instead of the86400-second default, disabling checks; legitimate0 and3600 controls pass.",
 			"regression_test": "Five actual boot snapshot/loader cases preserve legitimate disabled and hourly settings while malformed source types fall to the canonical default; runtime guards cover strings, negative and huge values."
+		},
+		{
+			"id": "AHK-089",
+			"title": "Native shortcut arguments silently lose text after NUL",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Dispatch an actual parsed System2 shortcut input containing NUL at the head, middle or tail to an exclusively owned AHK receiver.",
+			"root_cause": "AL_QuoteArgument in adapters/app_launcher.ahk admits strings containing embedded NUL into the Windows command-line ABI; the genuine connector treats successful native launch as complete input delivery.",
+			"silent_failure": "Native run41950852781 preserves decoded lengths7/13/7 before dispatch, but actual child A_Args receives0/6/6 units while connector_ok remains1. Exact child PID and creation FILETIME are verified; the legal12-unit Unicode control passes.",
+			"regression_test": "Four genuine parser/discovery/connector/native-receiver cases require refusal before child creation for NUL and exact delivery for legal Unicode; retain independent owned process joining and strict cleanup."
 		}
 	]
 }
