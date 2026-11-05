@@ -2236,7 +2236,7 @@ _Updater_FetchCacheEntry(Channel, Url) {
 ; stage that replaces the previous copy in one rename. A refused save is logged
 ; and this session keeps its in-memory copy; the next start sends a full request.
 ; @returns {Boolean} True when the stored copy now holds this ETag.
-_Updater_PersistListCache(Url, Etag, Json) {
+_Updater_PersistListCache(Url, Etag, Json, StageClockFn := 0) {
 	global UPDATER_LIST_CACHE_MAGIC, _UpdaterListDiskEntry
 	if (Url != Updater_ReleaseApiUrl() || !_Updater_JsonIsList(Json))
 		return false
@@ -2247,7 +2247,13 @@ _Updater_PersistListCache(Url, Etag, Json) {
 	try {
 		Path := _Updater_ListCachePath()
 		FSEnsureDirectoryStrict(RegExReplace(Path, "[\\/][^\\/]*$"))
-		Stage := Path . "." . A_TickCount . ".tmp"
+		; Tests may freeze only the naming clock; the native filesystem stays real.
+		if !HasMethod(StageClockFn, "Call") && !((StageClockFn is Integer) && StageClockFn == 0)
+			throw TypeError("The release-list stage clock must be callable or zero.")
+		StageTick := HasMethod(StageClockFn, "Call") ? StageClockFn.Call() : A_TickCount
+		if !(StageTick is Integer) || StageTick < 0
+			throw TypeError("The release-list stage clock must return a nonnegative integer.")
+		Stage := Path . "." . StageTick . ".tmp"
 		if !FSWriteDurable(Stage, UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . Etag . "`n" . Json)
 			throw Error("the stage could not be written")
 		if !FSAtomicMoveReplace(Stage, Path)
@@ -2637,7 +2643,8 @@ _Updater_RateLimitDetail(Status, Remaining, Reset) {
 	return Format("HTTP {1}: the GitHub API rate limit is exhausted{2}", Status, When)
 }
 
-_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, RateLimit := 0) {
+_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
+		RateLimit := 0, StageClockFn := 0) {
 	global _UpdaterFetchCache
 	Json := ""
 	; The list is decoded once per response (once per cached entry on a 304)
@@ -2658,10 +2665,10 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, R
 				Index := _Updater_ReleaseListIndex(Json)
 			if IsSet(Request) {
 				if _Updater_TryPublishFetchCache(Channel, Etag, Json, Request, Index)
-					_Updater_PersistListCache(Url, Etag, Json)
+					_Updater_PersistListCache(Url, Etag, Json, StageClockFn)
 			} else {
 				_UpdaterFetchCache[Channel] := _Updater_NewFetchCacheEntry(Etag, Json, Index)
-				_Updater_PersistListCache(Url, Etag, Json)
+				_Updater_PersistListCache(Url, Etag, Json, StageClockFn)
 			}
 		}
 	} else if (Status == 403 || Status == 429) {
