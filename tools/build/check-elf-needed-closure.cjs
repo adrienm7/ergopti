@@ -75,6 +75,11 @@ function recipientLibraries(data) {
 			throw new Error(
 				`recipient library group ${group.id}: an id and a reason (40+ characters) are required`
 			);
+		for (const key of ['sonames', 'prefixes']) {
+			if (group[key] !== undefined &&
+				(!Array.isArray(group[key]) || group[key].some((value) => typeof value !== 'string' || value.length === 0)))
+				throw new Error(`recipient library group ${group.id}: ${key} must contain nonempty strings`);
+		}
 		for (const name of group.sonames || []) {
 			if (sonames.has(name)) throw new Error(`recipient library ${name} is listed twice`);
 			sonames.set(name, group.id);
