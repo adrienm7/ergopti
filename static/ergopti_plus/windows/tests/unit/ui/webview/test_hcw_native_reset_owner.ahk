@@ -145,3 +145,7 @@ Test("Native hotstrings reset: old completion preserves reopened window (hcw-nat
 for _HNRT_DestroyMode in ["destroy-current", "destroy-reopen"]
 	Test("Native hotstrings reset destruction: " . _HNRT_DestroyMode . " preserves actual reopened widgets (hcw-native-destroy-owner)",
 		_HNRT_Case.Bind(_HNRT_DestroyMode))
+
+for _HNRT_RetirementMode in ["retire-pre", "retire-post"]
+	Test("Native hotstrings reset retirement: " . _HNRT_RetirementMode . " retains exact cleanup custody (hcw-native-reset-retirement-owner)",
+		_HNRT_Case.Bind(_HNRT_RetirementMode))

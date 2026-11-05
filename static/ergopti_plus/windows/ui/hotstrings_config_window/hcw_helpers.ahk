@@ -19,6 +19,7 @@
 global _HCWGui      := 0
 global _HCWWidgets  := 0
 global _HCW_LastSelection := 0
+global _HCW_RetiredNativeResets := []
 
 ; Debounce window for the numeric Edit fields (delay / priority). Their "Change"
 ; event fires on every keystroke, but persisting on every digit rewrites the
@@ -432,6 +433,7 @@ _HCW_RefreshExistingControls(Selection) {
 
 OpenHotstringsConfigWindow() {
 	global _HCWGui, _HCWWidgets
+	_HCW_RetryRetiredNativeResets()
 	; Prefer the shared WebView2 frontend (identical UI to macOS). It falls back
 	; to the native Gui below only when the WebView2 runtime is unavailable.
 	if _HCWWeb_TryOpen()
@@ -565,7 +567,7 @@ OpenHotstringsConfigWindow() {
 	ColorReset.OnEvent("Click",    (*) => _HCW_ClearField("color"))
 	TooltipChk.OnEvent("Click",    (*) => _HCW_OnTooltipChanged())
 	TooltipReset.OnEvent("Click",  (*) => _HCW_ClearField("show_tooltip"))
-	G.OnEvent("Close",             (*) => _HCW_OnClose())
+	G.OnEvent("Close",             _HCW_OnClose)
 
 	_HCW_OnGroupChanged()    ; populate file + section dropdowns and first load
 

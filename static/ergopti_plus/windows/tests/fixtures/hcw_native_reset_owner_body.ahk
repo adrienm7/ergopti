@@ -80,7 +80,11 @@ _HNRC_Actor() {
 _HNRC_Log(Line) {
 	global _HNRC, _HSLR_Active, HSE_RebuildInProgress
 	try {
-		if InStr(Line, "[ERROR]") || InStr(Line, "[WARNING]")
+		ExpectedFault := _HNRC_FaultMode() && _HNRC.FaultInjected
+			&& InStr(Line, "[WARNING] [HotstringsConfigWindow] Native reset retirement remains pending (error_type=Error).")
+		if ExpectedFault
+			_HNRC.FaultWarnings += 1
+		else if InStr(Line, "[ERROR]") || InStr(Line, "[WARNING]")
 			_HNRC.Errors.Push(Line)
 		if !_HNRC.Running || !InStr(Line, "[DEBUG] [HotstringsConfig] Override cleared:")
 			return
@@ -122,7 +126,7 @@ _HNRC_DestroyProc(Hwnd, Message, WParam, LParam, Id, Data) {
 		if !_HNRC.Running || _HNRC.DestroySeen || Hwnd != _HNRC.AHwnd || Message != 0x2
 			return Result
 		_HNRC.DestroySeen := true
-		if _HNRC.Mode == "destroy-reopen" {
+		if _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode() {
 			_HNRC.ReopenCalls += 1
 			try {
 				OpenHotstringsConfigWindow()
@@ -179,13 +183,15 @@ _HNRC_Run() {
 		}
 	}
 	_HNRC_Require(Found == 1, "The actual native reset button must be uniquely identified")
-	if InStr(_HNRC.Mode, "destroy-") == 1 {
+	if InStr(_HNRC.Mode, "destroy-") == 1 || _HNRC_FaultMode() {
 		_HNRC_Require(WinGetPID("ahk_id " . _HNRC.AHwnd) == ProcessExist(), "The native destruction witness must target this exact child")
 		_HNRC.DestroyProc := CallbackCreate(_HNRC_DestroyProc, , 6)
 		_HNRC_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", _HNRC.AHwnd, "Ptr", _HNRC.DestroyProc,
 			"UPtr", 0x484E5244, "UPtr", 0, "Int"), "The actual current GUI must admit its exact destruction witness")
 		_HNRC.DestroyInstalled := true
 	}
+	if _HNRC_FaultMode()
+		_HNRC_InstallDestroyFault()
 	_HNRC.Button.OnEvent("Click", _HNRC_Entry, -1)
 	_HNRC.Running := true
 	Result := RebuildHotstringsLive(_HNRC_Worker)
@@ -212,6 +218,10 @@ _HNRC_Run() {
 		. " registry_worker=Refused tray_render=Absent browser=Absent`n", "*", "UTF-8-RAW")
 	_HNRC_Require(Cleared && FinalHash != _HNRC.SeedHash && !IsObject(_ConfigWriteLeaseCurrent(_HNRC.OverridePath))
 		&& !_ConfigPublicationHasRecoveryDebt(_HNRC.OverridePath), "The real reset must durably clear the source and release its exact writer")
+	if _HNRC_FaultMode() {
+		_HNRC_CheckRetirementFault(FinalHash)
+		return
+	}
 	if InStr(_HNRC.Mode, "destroy-") == 1 {
 		FileAppend("OBSERVATION hcw-native-destroy mode=" . _HNRC.Mode . " destroy_seen=" . _HNRC.DestroySeen
 			. " reopen_calls=" . _HNRC.ReopenCalls . " before_b=" . _HNRC.BeforeB . " after_b=" . AfterB
@@ -247,8 +257,10 @@ _HNRC_Main() {
 	_HNRC := {Mode: A_Args[1], A: 0, AHwnd: 0, B: 0, BHwnd: 0, BWidgets: 0, Button: 0,
 		Running: false, ClickEntries: 0, ClickSends: 0, WorkerCalls: 0, ClearLogs: 0, ActorCalls: 0,
 		ActorArmed: false, ActorDone: false, AClosed: false, BeforeB: false, Errors: [], Failure: 0,
-		DestroyProc: 0, DestroyInstalled: false, DestroyActive: 0, DestroySeen: false, ReopenCalls: 0, ReopenFailure: 0}
-	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen"), "The private mode and root must be explicit")
+		DestroyProc: 0, DestroyInstalled: false, DestroyActive: 0, DestroySeen: false, ReopenCalls: 0, ReopenFailure: 0,
+		DestroyDescriptor: 0, DestroyPortInstalled: false, DestroyCalls: 0, NativeDestroyReturns: 0,
+		FaultInjected: false, FaultWarnings: 0, Fault: Error("Controlled native reset Destroy observer refusal"), LastThrown: 0}
+	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode()), "The private mode and root must be explicit")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_HNRC_OnError)
 	LoggerSetTestSink(_HNRC_Log)
@@ -264,6 +276,13 @@ _HNRC_Main() {
 		Primary := IsObject(_HNRC.Failure) ? _HNRC.Failure : Failure
 	} finally {
 		_HNRC.Running := false
+		if _HNRC.DestroyPortInstalled {
+			try {
+				Gui.Prototype.DefineProp("Destroy", _HNRC.DestroyDescriptor)
+				_HNRC.DestroyPortInstalled := false
+			} catch Any as Failure
+				Cleanup := Failure
+		}
 		Removed := !_HNRC.DestroyInstalled || !DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int")
 		if !Removed
 			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", _HNRC.AHwnd, "Ptr", _HNRC.DestroyProc, "UPtr", 0x484E5244, "Int")
@@ -280,6 +299,8 @@ _HNRC_Main() {
 					Cleanup := Failure
 			}
 		}
+		if _HNRC_FaultMode() && IsSet(_HCW_RetryRetiredNativeResets)
+			try _HCW_RetryRetiredNativeResets()
 		for Pair in [[_HNRC.A, _HNRC.AHwnd], [_HNRC.B, _HNRC.BHwnd]] {
 			try {
 				if Pair[1] is Gui && DllCall("User32\IsWindow", "Ptr", Pair[2], "Int")
@@ -309,6 +330,86 @@ _HNRC_Main() {
 	}
 	FileAppend("PASS hcw-native-reset-owner " . _HNRC.Mode . "`n", "*", "UTF-8-RAW")
 	ExitApp(0)
+}
+
+
+_HNRC_FaultMode() {
+	global _HNRC
+	return _HNRC.Mode == "retire-pre" || _HNRC.Mode == "retire-post"
+}
+
+_HNRC_InstallDestroyFault() {
+	global _HNRC, _HCW_RetiredNativeResets
+	_HNRC_Require(IsSet(_HCW_RetryRetiredNativeResets) && _HCW_RetiredNativeResets.Length == 0,
+		"These postfix controls require the genuine independent native reset retirement protocol")
+	_HNRC.DestroyDescriptor := Gui.Prototype.GetOwnPropDesc("Destroy")
+	Gui.Prototype.DefineProp("Destroy", {Call: _HNRC_DestroyFault})
+	_HNRC.DestroyPortInstalled := true
+}
+
+; This is an explicit observer fault, not a claim that Win32 Destroy itself
+; refused. Every successful native delegation still uses the original method.
+_HNRC_DestroyFault(Window, Params*) {
+	global _HNRC
+	Native := _HNRC.DestroyDescriptor.Call
+	if Window != _HNRC.A
+		return Native.Call(Window, Params*)
+	_HNRC.DestroyCalls += 1
+	if !_HNRC.FaultInjected && _HNRC.Mode == "retire-pre" {
+		_HNRC_Require(DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int"),
+			"The pre-effect observer must refuse while the exact original window is still native")
+		_HNRC.FaultInjected := true, _HNRC.LastThrown := _HNRC.Fault
+		throw _HNRC.Fault
+	}
+	Result := Native.Call(Window, Params*)
+	_HNRC.NativeDestroyReturns += 1
+	if !_HNRC.FaultInjected {
+		_HNRC_Require(!DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int"),
+			"The post-effect observer must first delegate genuine native destruction")
+		_HNRC.FaultInjected := true, _HNRC.LastThrown := _HNRC.Fault
+		throw _HNRC.Fault
+	}
+	return Result
+}
+
+_HNRC_CheckRetirementFault(FinalHash) {
+	global _HNRC, _HCW_RetiredNativeResets, _HCWGui, _HCWWidgets
+	_HNRC_Require(_HNRC.FaultInjected && _HNRC.LastThrown == _HNRC.Fault
+		&& _HNRC.FaultWarnings == 1 && _HNRC.Errors.Length == 0 && _HNRC.DestroyCalls == 1,
+		"Exactly the explicit Destroy observer failure must remain visible without other technical errors")
+	_HNRC_Require(_HCW_RetiredNativeResets.Length == 1,
+		"A failed native retirement must retain one independent cleanup owner")
+	Record := _HCW_RetiredNativeResets[1]
+	_HNRC_Require(Record.window == _HNRC.A && Record.widgets.Gui == _HNRC.A && !Record.closing,
+		"The retained debt must own the exact old form and widgets")
+	if _HNRC.Mode == "retire-pre"
+		_HNRC_Require(DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int") && !_HNRC_Visible(_HNRC.AHwnd)
+			&& _HNRC.NativeDestroyReturns == 0 && _HCWGui == 0 && _HCWWidgets == 0,
+			"Pre-effect refusal retains hidden A independently of the detached singleton")
+	else
+		_HNRC_Require(!DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int") && _HNRC.NativeDestroyReturns == 1
+			&& _HNRC.BeforeB && _HCWGui == _HNRC.B,
+			"Post-effect refusal retains exact debt without restoring A above the real B")
+	_HNRC.Running := true
+	try OpenHotstringsConfigWindow()
+	finally _HNRC.Running := false
+	if IsObject(_HNRC.Failure)
+		throw _HNRC.Failure
+	AfterB := _HNRC.BeforeB && _HCWGui == _HNRC.B && _HNRC_Visible(_HNRC.BHwnd)
+		&& _HCWWidgets.Gui == _HNRC.B && DllCall("IsWindow", "Ptr", _HCWWidgets.DelayEdit.Hwnd, "Int")
+	FileAppend("OBSERVATION hcw-retirement-fault mode=" . _HNRC.Mode . " destroy_calls=" . _HNRC.DestroyCalls
+		. " native_returns=" . _HNRC.NativeDestroyReturns . " warnings=" . _HNRC.FaultWarnings
+		. " debt=" . _HCW_RetiredNativeResets.Length . " reopen_calls=" . _HNRC.ReopenCalls
+		. " before_b=" . _HNRC.BeforeB . " after_b=" . AfterB . " errors=" . _HNRC.Errors.Length . "`n", "*", "UTF-8-RAW")
+	_HNRC_Require(_HNRC.DestroyCalls == 2 && _HNRC.ReopenCalls == 1 && !IsObject(_HNRC.ReopenFailure)
+		&& AfterB && _HNRC.Errors.Length == 0 && _HNRC.FaultWarnings == 1,
+		"The next real public Open must retry exact A and preserve the independently reopened B")
+	_HNRC_Require(_HCW_RetiredNativeResets.Length == 0 && Record.window == 0 && Record.widgets == 0
+		&& !DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int")
+		&& _HNRC.NativeDestroyReturns == (_HNRC.Mode == "retire-pre" ? 1 : 2),
+		"Real retirement or native-idempotent retry must completely release exact cleanup debt")
+	_HNRC_Require(CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath)) == FinalHash,
+		"Cleanup retry cannot change the genuine already-cleared durable override")
 }
 
 _HNRC_Main()
