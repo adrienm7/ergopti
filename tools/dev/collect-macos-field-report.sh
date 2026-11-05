@@ -279,6 +279,9 @@ step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/
 # The app's field check only sees codesign's exit code; keep both tools' own
 # reasons so a failed signature check names its cause.
 step karabiner_signature sh -c 'codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app; echo "codesign exit=$?"; spctl -a -vv /Applications/Karabiner-Elements.app; echo "spctl exit=$?"'
+# The managed Ollama guardian refuses a launcher whose strict signature fails
+# (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
+step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
 # Only a Mac compiles AppleScript, so a .applescript edited elsewhere leaves
 # its .scpt stale (the Encryptor comment of the keystats rename). The rebuilt

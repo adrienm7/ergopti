@@ -1,0 +1,200 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "Two repetitions of the same bounded final scope after CW-S002; not additional distinct coverage or exhaustive native certification.",
+	"sweeps": [
+		{
+			"sweep": "A",
+			"new_confirmed_roots": 0,
+			"processes": [
+				{
+					"name": "policy-lua54",
+					"program": "policy-probe.lua",
+					"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-policy-lua54.txt",
+					"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+					"stderr": "dry-A-policy-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "policy-luajit",
+					"program": "policy-probe.lua",
+					"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-policy-luajit.txt",
+					"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+					"stderr": "dry-A-policy-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "magic-lua54",
+					"program": "magic-key-policy.lua",
+					"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/magic-key-policy.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-magic-lua54.txt",
+					"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+					"stderr": "dry-A-magic-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "magic-luajit",
+					"program": "magic-key-policy.lua",
+					"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/magic-key-policy.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-magic-luajit.txt",
+					"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+					"stderr": "dry-A-magic-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "declarations",
+					"program": "declaration-probe.cjs",
+					"program_sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/declaration-probe.cjs",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-declarations.txt",
+					"stdout_sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+					"stderr": "dry-A-declarations.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "pinned-source",
+					"program": "source-contract.py",
+					"program_sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+					"command": [
+						"python3",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/source-contract.py",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-A-pinned-source.txt",
+					"stdout_sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+					"stderr": "dry-A-pinned-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			],
+			"scope": "Shared policy/corpus, declared rows/requirements/site/menu/locales, source-only AHK relationships; native event and timer admission remains driver-owned."
+		},
+		{
+			"sweep": "B",
+			"new_confirmed_roots": 0,
+			"processes": [
+				{
+					"name": "policy-lua54",
+					"program": "policy-probe.lua",
+					"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-policy-lua54.txt",
+					"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+					"stderr": "dry-B-policy-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "policy-luajit",
+					"program": "policy-probe.lua",
+					"program_sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/policy-probe.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-policy-luajit.txt",
+					"stdout_sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+					"stderr": "dry-B-policy-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "magic-lua54",
+					"program": "magic-key-policy.lua",
+					"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+					"command": [
+						"lua",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/magic-key-policy.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-magic-lua54.txt",
+					"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+					"stderr": "dry-B-magic-lua54.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "magic-luajit",
+					"program": "magic-key-policy.lua",
+					"program_sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+					"command": [
+						"luajit",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/magic-key-policy.lua",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-magic-luajit.txt",
+					"stdout_sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+					"stderr": "dry-B-magic-luajit.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "declarations",
+					"program": "declaration-probe.cjs",
+					"program_sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+					"command": [
+						"node",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/declaration-probe.cjs",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-declarations.txt",
+					"stdout_sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+					"stderr": "dry-B-declarations.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				},
+				{
+					"name": "pinned-source",
+					"program": "source-contract.py",
+					"program_sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+					"command": [
+						"python3",
+						"/workspace/scratch/parity-capsword-2026-11-05/shared/source-contract.py",
+						"/workspace/worktrees/parity-capsword-2026-11-05/shared"
+					],
+					"exit_code": 0,
+					"stdout": "dry-B-pinned-source.txt",
+					"stdout_sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+					"stderr": "dry-B-pinned-source.stderr.txt",
+					"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			],
+			"scope": "Shared policy/corpus, declared rows/requirements/site/menu/locales, source-only AHK relationships; native event and timer admission remains driver-owned."
+		}
+	]
+}

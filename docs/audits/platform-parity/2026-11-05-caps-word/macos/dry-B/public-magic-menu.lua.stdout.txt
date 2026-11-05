@@ -1,0 +1,1 @@
+menu=§ : Magic key	catalogue=§	policy_old_star=true	policy_current_magic=nil	new_magic_keeps_active=true	old_star_clears=true

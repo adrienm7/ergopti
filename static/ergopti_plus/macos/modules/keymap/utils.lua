@@ -1673,6 +1673,27 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 end
 
 
+--- Classifies the window the field run published before its first selftest key,
+--- without replacing the ignored-title rules the keymap passed last. Typing
+--- into a window still unclassified dropped the leading space and cleared the
+--- buffer again on the next key, so no hotstring could see its word start
+--- (field report 2026-11-05).
+--- @return boolean|nil ignored Nil until the published window is classified.
+--- @return integer context_generation Increments on every focus/title invalidation.
+function M.selftest_window_context()
+	if _ignored_win_stopped then return nil, _ignored_win_context_generation end
+	if FieldRunSelftest.window_id() ~= _ignored_win_cache_selftest_window then
+		invalidate_ignored_win_cache()
+		return nil, _ignored_win_context_generation
+	end
+	if _ignored_win_cache_dirty or _ignored_win_cache_value == nil then
+		schedule_ignored_win_refresh()
+		return nil, _ignored_win_context_generation
+	end
+	return _ignored_win_cache_value, _ignored_win_context_generation
+end
+
+
 --- Returns the cached secure-field classification without performing AX work.
 --- The cache shares focus identity, TTL, invalidation, and refresh ownership with
 --- is_ignored_window(); nil means the current field is not yet classified.

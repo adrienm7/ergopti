@@ -1,0 +1,190 @@
+[
+	{
+		"id": "CWLF-C001",
+		"aspect": "catalogue-enter-checked-but-not-observed",
+		"basis": "actual-owner",
+		"classification": "existing-root-extension",
+		"finding_ids": ["WRSL-001"],
+		"observation": {
+			"active": true,
+			"capture_caps": true,
+			"emitted_code": 28,
+			"emitted_downs": 1,
+			"emitted_ups": 1
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C002",
+		"aspect": "logical-keyboard-slot-enter-checked-but-not-observed",
+		"basis": "actual-owner",
+		"classification": "existing-root-extension",
+		"finding_ids": ["WRSL-001"],
+		"observation": {
+			"active": true,
+			"capture_caps": true,
+			"emitted_code": 28,
+			"emitted_downs": 1,
+			"emitted_ups": 1,
+			"binding": "primary_a",
+			"consumed_chords": 1,
+			"next_text": "B"
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C003",
+		"aspect": "physical-enter-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C004",
+		"aspect": "literal-injector-enter-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false,
+			"emitted_code": 28,
+			"emitted_downs": 1,
+			"emitted_ups": 1,
+			"observer_calls": 1
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C005",
+		"aspect": "tap-engine-enter-semantic-relay-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false,
+			"emitted_code": 28,
+			"hook_emitted_downs": 1,
+			"catalogue_tap_callbacks": 0
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C006",
+		"aspect": "catalogue-tab-checked-but-not-observed",
+		"basis": "actual-owner",
+		"classification": "existing-root-extension",
+		"finding_ids": ["WRSL-001"],
+		"observation": {
+			"active": true,
+			"capture_caps": true,
+			"emitted_code": 15,
+			"emitted_downs": 1,
+			"emitted_ups": 1
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C007",
+		"aspect": "logical-keyboard-slot-tab-checked-but-not-observed",
+		"basis": "actual-owner",
+		"classification": "existing-root-extension",
+		"finding_ids": ["WRSL-001"],
+		"observation": {
+			"active": true,
+			"capture_caps": true,
+			"emitted_code": 15,
+			"emitted_downs": 1,
+			"emitted_ups": 1,
+			"binding": "primary_a",
+			"consumed_chords": 1,
+			"next_text": "B"
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C008",
+		"aspect": "physical-tab-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C009",
+		"aspect": "literal-injector-tab-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false,
+			"emitted_code": 15,
+			"emitted_downs": 1,
+			"emitted_ups": 1,
+			"observer_calls": 1
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C010",
+		"aspect": "tap-engine-tab-semantic-relay-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false,
+			"emitted_code": 15,
+			"hook_emitted_downs": 1,
+			"catalogue_tap_callbacks": 0
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C011",
+		"aspect": "qualified-ctrl-tab-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	},
+	{
+		"id": "CWLF-C012",
+		"aspect": "qualified-shift-idle-control",
+		"basis": "actual-owner",
+		"classification": "positive-control",
+		"finding_ids": [],
+		"observation": {
+			"active": false,
+			"capture_caps": false
+		},
+		"evidence": ["probe.lua", "final/A-lua.stdout.txt"],
+		"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension."
+	}
+]

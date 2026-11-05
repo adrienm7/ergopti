@@ -1,0 +1,26 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"scope": "linux-capsword-synthetic-followup",
+	"new_independent_roots": 0,
+	"known_root_extensions": 1,
+	"findings": [
+		{
+			"id": "WRSL-001",
+			"observation_status": "existing-root-extension",
+			"prior_record": "docs/audits/platform-parity/2026-11-05-word-reset/linux/findings.json",
+			"prior_audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+			"title": "Generic action output also omits the CapsWord checked-delimiter consumer",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["caps_word_delimiter_output_publication"],
+			"basis": "actual-owner",
+			"reproduction": "Before activation set CapsWord idle0, terminators=[enter] (then independently [tab]) and all six pointer auto-off kinds false. Activate CapsWord, persist primary_a=enter/tab through the actual keyboard binding owner, then deliver physical Ctrl+A through actual Hook and Keyboard.consume with admitted deferral. Real action catalogue/emitter/writer acknowledges exactly one KEY_ENTER28 or KEY_TAB15 DOWN/UP. CapsWord and capture CapsLock remain active; the following B capture is uppercase. Bare physical, literal-injector and ordinary KEY_TAPS controls end the checked session.",
+			"root_cause": "The existing WRSL-001 generic catalogue-output branch lacks canonical effect publication. Its already documented arrow/word/AI omission also leaves the independent CapsWord consumer uninformed for Enter/Tab. Main observes Hook semantics and literal injector output only; ComboEmitter has no CapsWord observer and own uinput is excluded from physical feedback.",
+			"silent_failure": "The real writer acknowledges the complete recorded key chord and the executor reports execution; no diagnostic names the absent CapsWord consumer. Successful emitter-order, physical-delimiter and literal-injector tests do not join generic catalogue output to this consumer.",
+			"regression_test": "Extend WRSL-001 regression/implementation to the CapsWord Enter/Tab consumer: real keyboard assignment, admitted queued delivery, checked/unchecked delimiters, ACK/refusal/partial output, next-key case and exact lifecycle/admission ownership. Preserve ordinary KEY_TAPS semantic relay and literal observer without double notifications; do not substitute WordReset/AI options for CapsWord delimiter settings.",
+			"overlap_rationale": "Same generic catalogue emission connector explicitly identified in prior WRSL-001 root(A); this is one newly demonstrated consumer and acceptance requirement, not a new independent architectural root or an ordinary tap Enter/Tab failure.",
+			"qualification": "Actual Lua owners, configuration and recorded native ACK boundary; no full Main closure or physical receiving application. Source-only Main forwarding and the existing root record are independently authenticated."
+		}
+	]
+}

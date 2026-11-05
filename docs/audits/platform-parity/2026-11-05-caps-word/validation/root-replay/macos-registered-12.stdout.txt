@@ -1,0 +1,8 @@
+
+=== a hotstring replacement reports its typed output to CapsWord ===
+  ok   the expander reports the committed replacement text
+
+=== CapsWord auto-off lists live in the manifest and the catalogue ===
+  ok   the watcher maps exactly the declared macOS pointer kinds
+  ok   the settings owners spell no pointer kind and no source a catalogue delimiter
+AUDIT_RESULT	3	0

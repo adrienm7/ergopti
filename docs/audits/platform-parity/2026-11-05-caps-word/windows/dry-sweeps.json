@@ -1,0 +1,31 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"after_last_new_root": true,
+	"sweeps": [
+		{
+			"label": "A",
+			"artifact": "dry-A.json",
+			"sha256": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"scope": [
+				"Direct and remapped tap admission, empty AI tooltip gate, non-intercepting Tab/CapsLock carriers",
+				"Shared typed-delimiter contract, actual catalogue keys and hidden synthetic-key funnel",
+				"Callback generations, native Space send/wait, fatal and pause cleanup"
+			],
+			"new_confirmed_roots": 0,
+			"qualification": "Final bounded source/control sweep, not additional runtime coverage."
+		},
+		{
+			"label": "B",
+			"artifact": "dry-B.json",
+			"sha256": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"scope": [
+				"Idle zero/all-keydown resets, pointer native mappings and fresh activation state",
+				"Persisted policy versus active Armed snapshot, native/clipboard queue acknowledgment",
+				"Shutdown native CapsLock restoration and same-activation idle scheduler remain explicitly unverified",
+				"Existing marker tests and include-order prose do not prove native HotIf priority"
+			],
+			"new_confirmed_roots": 0,
+			"qualification": "Final bounded source/control sweep, not additional runtime coverage."
+		}
+	]
+}

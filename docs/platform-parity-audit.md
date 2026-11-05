@@ -10,6 +10,10 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## CapsWord activation and termination continuation
+
+The [November 5 CapsWord audit](audits/platform-parity/2026-11-05-caps-word/report.md) follows public activation, accepted output, configurable termination, timers, pointer identity and retirement at `f2a7dba5fc580aad61e6a0ed16ede84406aed2b0`. Four pinned OS/shared reviewers retain159 initial qualified rows and nine new findings. A further synthetic-key countercheck extends existing WRSL-001 with a CapsWord consumer instead of counting a second connector root. The [generated capability comparison](audits/platform-parity/2026-11-05-caps-word/capabilities.md) distinguishes deliberate Windows next-activation settings, macOS fixed exits, gesture constraints, ambiguous common policy and the observed menu/timer/publication mismatches. Native receiving and corrected fixture limits are explicit.
+
 ## Word-reset and AI-context continuation
 
 The [November 5 word-reset audit](audits/platform-parity/2026-11-05-word-reset/report.md) follows the repeat/recovery closure at the same `b17e47e` source. Four reviewers compare independent word/AI lifetimes through the following key, synthetic action origins, edited controls, terminal receipts and lifecycle retirement: 98 coverage rows and five qualified findings. The [generated comparison](audits/platform-parity/2026-11-05-word-reset/capabilities.md) retains explicit macOS tap-hold-origin limits, idle architectures, conditional keypad-Enter receiving and unresolved modifier policy. Root replays include a matched-default physical/action Linux arrow control; no native desktop or AHK receiving is claimed.

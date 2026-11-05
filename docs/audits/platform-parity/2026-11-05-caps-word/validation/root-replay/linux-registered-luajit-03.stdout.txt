@@ -1,0 +1,5 @@
+
+=== injector: CapsLock does not invert the replacement ===
+  ok   releases the lock before typing and restores it after
+  ok   leaves CapsLock alone when it is not locked
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":2}

@@ -1,0 +1,49 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"created_at": "2026-11-05",
+	"scope": "shared-capsword",
+	"findings": [
+		{
+			"id": "CW-S001",
+			"title": "Accepted positive sub-millisecond idle delay becomes immediate expiry on Lua and disabled expiry in the AHK port",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["cross_driver_idle_policy_parity"],
+			"basis": "actual-owner",
+			"qualification": "Actual shared Lua 5.4/LuaJIT; Windows is source-only, with no AHK execution. The Linux reviewer corroborates actual Manager admission through controlled native ports, not native desktop elapsed-time measurement. macOS public timer receiving remains owned by its reviewer. This requires a hand-edited or programmatic positive delay below 0.0005 s; shipped menu presets and the 10 s defaults are unaffected.",
+			"reproduction": "Set shortcuts.caps_word.idle_timeout_seconds = 0.0001 with valid terminators and pointer settings; activate CapsWord. The shared validator accepts this positive number. Both ports round 0.1 ms to zero. Lua keeps numeric zero and represents disabled only by nil, so idle_expired(policy, 100, 100) is true. The AHK port represents disabled by zero and requires idle_ms > 0 before expiry, so this rounded positive value disables automatic expiry there. Controls: seconds = 0 disables; seconds = 0.0005 and 0.001 become 1 ms and expire at the 1 ms boundary. The Linux reviewer records actual Manager queueing a 0 ms check on activation, with the recorded scheduler ending the session when that due callback runs.",
+			"root_cause": "Millisecond quantization is not validated against the disabled sentinel. Lua and AHK assign different meanings to the rounded numeric zero produced from an accepted positive setting.",
+			"silent_failure": "The ordinary menu only offers whole-second presets. The existing shared corpus covers zero, positive whole seconds, and 2.5 s, but no value whose millisecond representation rounds to zero. It therefore misses the representation collision.",
+			"regression_test": "Extend the handwritten shared corpus with 0, 0.0001, 0.00049, 0.0005 and 0.001; define one cross-driver rejection or minimum-positive quantization rule and replay both actual policy ports. Include public timer admission controls: disabled zero creates no expiry, while every accepted positive value has an enabled positive delay. Preserve whole-second presets, 2.5 s and exact thresholds. Windows AHK execution and native timer receiving remain required.",
+			"evidence": [
+				"policy-probe.lua",
+				"dry-A-policy-lua54.txt",
+				"dry-A-policy-luajit.txt",
+				"source-contract.py",
+				"source-contract.txt"
+			]
+		},
+		{
+			"id": "CW-S002",
+			"title": "CapsWord delimiter menus display the renamed magic key while the active policy still reads the literal star",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["truthful_setting_labels"],
+			"basis": "actual-owner",
+			"qualification": "Actual shared Lua mutation/load controls; actual macOS/Linux public menu/event corroboration is retained by the OS reviewers and independently replayed by the root. Windows documents a separate fresh built-in catalogue; its full translated caption has not been established here. No physical native key receiving is claimed.",
+			"reproduction": "With the ordinary shared policy already loaded, choose the valid magic key \u00a7 through the driver owner, choose only the built-in star CapsWord delimiter, disable other auto-off causes for isolation, and activate CapsWord. The macOS/Linux menu substitutes \u00a7 in the checked delimiter caption. The actual active rule still matches literal \u2605: \u00a7 leaves CapsWord active while \u2605 ends it. In shared Lua, loading the policy after a real Terminators.update_magic_key(\"\u00a7\") reverses the captured scalar, which characterizes load-order sensitivity rather than universal boot behavior.",
+			"root_cause": "The menu substitutes the current hotstring magic key in a stable built-in CapsWord slot label, but the CapsWord policy reads a separately captured catalogue. On macOS, replacing the star definition chars table leaves the policy module holding the previous table. On Linux, the production magic-key owners update their own metadata without a production Terminators.update_magic_key caller, so the actual CapsWord rule remains literal. Windows explicitly documents a fresh built-in catalogue separate from hotstring renaming; the intended cross-driver literal-versus-dynamic policy is not settled.",
+			"silent_failure": "The shared star corpus and default menus use the shipped \u2605 glyph, where menu and policy agree. Existing tests do not jointly change the public magic key, draw the actual CapsWord delimiter checkbox and deliver both old and new scalars through its active owner. A source check for label substitution alone would certify the misleading caption.",
+			"regression_test": "Decide whether CapsWord star means the literal built-in scalar or the current magic key, then make the actual policy and its menu label agree. Test a public rename to \u00a7 with an already-loaded policy and with fresh startup order, draw the actual menu, activate the actual mode and deliver both scalars under the single selected slot. Cover macOS replacement-table capture and Linux metadata ownership independently. Do not prescribe dynamic renaming merely because the menu currently substitutes it; preserve an explicitly chosen literal policy if that is the product decision.",
+			"evidence": [
+				"magic-key-policy.lua",
+				"magic-key-lua54.txt",
+				"magic-key-luajit.txt",
+				"source-receipt.json"
+			]
+		}
+	]
+}

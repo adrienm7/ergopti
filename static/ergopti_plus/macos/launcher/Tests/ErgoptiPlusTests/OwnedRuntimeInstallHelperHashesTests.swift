@@ -1,5 +1,6 @@
 // Tests/ErgoptiPlusTests/OwnedRuntimeInstallHelperHashesTests.swift
 // The published installer helper carries one SHA-256 code directory per slice; the install must admit it.
+import CryptoKit
 import Foundation
 import Security
 import XCTest
@@ -17,6 +18,23 @@ final class OwnedRuntimeInstallHelperHashesTests: XCTestCase {
 	func testBothHashTypesStayAdmitted() {
 		let pair = [Data(repeating: 1, count: 20), Data(repeating: 2, count: 32)]
 		XCTAssertEqual(OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields(pair)), pair)
+	}
+
+	func testEverySliceOfAUniversalBinaryGivesItsTwentyByteCdhash() throws {
+		// codesign --all-architectures checks each slice: the requirement must name a cdhash for every one
+		let slices = try XCTUnwrap(OwnedRuntimeInstallMainOperation.sliceCodeHashes(URL(fileURLWithPath: "/usr/bin/true")))
+		XCTAssertFalse(slices.isEmpty)
+		XCTAssertTrue(slices.allSatisfy { $0.count == 20 }, "the requirement language reads the truncated hash")
+		XCTAssertEqual(Set(slices).count, slices.count)
+	}
+
+	func testTheStagedRequirementNamesEachSliceAndTheLeaf() {
+		let leaf = Data("leaf".utf8)
+		let requirement = OwnedRuntimeInstallMainOperation.stagedRequirement(
+			leaf: leaf, slices: [Data(repeating: 0xbb, count: 20), Data(repeating: 0xaa, count: 20)])
+		XCTAssertEqual(requirement, "identifier \"" + Identifiers.SigningIds.runtimeInstaller + "\" and certificate leaf = H\""
+			+ Insecure.SHA1.hash(data: leaf).map { String(format: "%02x", $0) }.joined() + "\" and (cdhash H\""
+			+ String(repeating: "aa", count: 20) + "\" or cdhash H\"" + String(repeating: "bb", count: 20) + "\")")
 	}
 
 	func testAbsentDuplicatedOversizedOrMalformedHashesAreRefused() {

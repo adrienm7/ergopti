@@ -1,0 +1,34 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"scope": "linux-capsword",
+	"findings": [
+		{
+			"id": "CW-L001",
+			"title": "Absolute pointer motion never reaches CapsWord pointer-motion auto-off",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["declared_pointer_motion_coverage"],
+			"basis": "actual-owner",
+			"reproduction": "Before activation set shortcuts.caps_word.idle_timeout_seconds=0, pointer.gesture=false and pointer.pointer_motion=true. Use an accepted EV_ABS touchpad. Activate CapsWord; a BTN_TOUCH down is unchecked. Report initial ABS_X=100, ABS_Y=200, SYN_REPORT, then changed ABS_X=127, ABS_Y=212, SYN_REPORT. CapsWord and its capture lock remain active; the original Hook emits only press/frame notifications, no motion. A subsequent EV_REL/REL_X=1 on the relative-mouse control emits motion and ends/unlocks the same session.",
+			"root_cause": "adapters.keyboard_hook._dispatch_pointer publishes motion exclusively for InputEvent.EV_REL, while modules.hotstrings.device_finder accepts EV_ABS touchpads/tablets and the shared manifest declares pointer_motion supported. Main forwards only the events it receives; the missing absolute reports cannot reach the compiled policy.",
+			"silent_failure": "The pointer stream is readable and its SYN_REPORT callbacks continue normally; no missing-dispatch warning is logged. Default gesture=true can mask the missing motion route by ending the session on the initial touch, and existing pointer-policy tests call already-classified kinds.",
+			"regression_test": "Drive an accepted absolute pointer through the genuine reader/pump and original dispatch: establish prior ABS_X/Y, change one coordinate meaningfully, then SYN_REPORT. With gesture=false,pointer_motion=true,idle0, end and unlock exactly once; unchecked pointer_motion must retain the session. Keep relative-mouse and default-contact controls, and qualify native compositor receiving separately.",
+			"qualification": "Executed original Hook dispatch, actual Manager/settings/lock and emitter/writer over faithful native ports. Device selection is executed against a real-format synthetic proc block; no physical evdev reader, full Main process or compositor was exercised. Main forwarding is source-only. No already-reported absolute multitouch centroid/reset defect is re-counted."
+		},
+		{
+			"id": "CW-L002",
+			"title": "Published CapsWord menu changes leave the active session on its old policy",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["live_configuration_consistency"],
+			"basis": "actual-owner",
+			"reproduction": "Before activation disable all six CapsWord pointer auto-off kinds so navigating/clicking the menu preserves the session. Activate CapsWord. Invoke the original Space checkbox callback: it persists unchecked and the settings policy no longer contains space, but the next typed space still ends/unlocks the session. In a separate session with left_click initially false, invoke the original left-click checkbox callback to enable it. The rebuilt original submenu is checked and the cached policy is true, yet the next native BTN_LEFT press leaves CapsWord active. After toggling off and activating a new session the same settings take effect. Idle0\u21921 and10\u21921 public setters show the same stale active snapshot.",
+			"root_cause": "modules.shortcuts.manager.start_caps_word stores the then-current CapsWordAutoOff.policy object in _caps_word_policy. caps_word_auto_off.persist publishes a new settings and policy object after an acknowledged write, but neither the menu callback nor active manager observers refresh _caps_word_policy or its scheduled idle chain. ui.menu.menu_shortcuts explicitly promises each change applies to the running CapsWord from its next event.",
+			"silent_failure": "The file write, cached settings, rebuilt checkboxes and menu-change notification all succeed, with no failure warning. Existing menu tests stop at saved bytes/rebuilt rows; existing session tests select policy before activation, so neither tests the publication-to-active-session transition.",
+			"regression_test": "Through original menu callbacks and actual active Manager/Hook, test enabling and disabling each terminator/pointer choice while CapsWord is active, including all-pointer-off preconditions needed to reach the menu. Assert the next event follows the acknowledged setting without restarting. Test idle0\u2192positive, shorter/longer and positive\u21920 with exact timer custody and session-generation protection; retain conditional-write refusal and next-session controls.",
+			"qualification": "Executed original CapsWord submenu closure with actual shared renderer, real settings writer, active Manager and real Hook/lock/emitter/writer over controlled native ports. Only outer unrelated menu group rendering is intercepted; native tray clicks and a desktop application are not executed. External hand-edits being activation-scoped are distinct from the explicitly promised immediate menu path."
+		}
+	]
+}

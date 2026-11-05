@@ -1,0 +1,36 @@
+
+=== karabiner variables: serialized latest-wins writes ===
+  ok   announces a poisoned generation before requesting its exact fence
+  ok   ke-variables-latest-wins keeps one writer active and finishes OFF
+  ok   coalescing keeps unrelated single-variable writes
+  ok   a refused launch releases the executor for the next state
+  ok   a failed completed writer still releases the final OFF state
+  ok   a same-generation timeout fences before a terminated child can apply late
+  ok   validates the watchdog before start so timer failure has zero side effect
+  ok   rejects an uncommitted watchdog and retains exact rollback debt
+  ok   still terminates and fences when watchdog cancellation throws
+  ok   retries an accepted pending launch refusal without another user action
+  ok   retries a lone accepted nonzero exit and settles its callback once
+  ok   fences after exactly three failed attempts without an unbounded retry
+  ok   fails closed when the retry timer itself is unavailable
+  ok   a new lease token preempts a hung old-generation writer immediately
+  ok   a timeout from A never stops a replacement B lease
+  ok   retries a refused exact fence and makes a late child harmless
+  ok   settles an obsolete active callback as superseded even after exit zero
+  ok   survives a superseded callback that re-enters under a replacement token
+  ok   rejects a stale outer set when retirement callback installs a third token
+  ok   contains a throwing optional callback and still drains pending state
+  ok   contains a throwing timer cancellation and still settles then drains
+  ok   retains an explicitly refused timer cancellation and retries the exact handle
+  ok   retains every unsettled child termination and retries the same exact handle
+  ok   a rejected activation cannot claim a later personal CapsLock clear
+  ok   clears a completed local CapsWord activation without an unsupported CLI read
+  ok   records exact-token Karabiner edges without launching a writer and fences stale LED revisions
+  ok   supersedes a local in-flight CapsWord activation through the shared writer
+  ok   keeps accepting the settled active state until PAUSED acknowledges
+  ok   logs the actual LeaseController.status exception
+
+=== karabiner variables: generation namespaces are reserved ===
+  ok   rejects current and legacy generation names before any CLI side effect
+  ok   rejects unknown bare names instead of overwriting personal variables
+AUDIT_RESULT	31	0

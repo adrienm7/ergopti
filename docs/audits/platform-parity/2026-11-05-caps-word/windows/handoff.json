@@ -1,0 +1,65 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"platform": "windows",
+	"module": "capsword",
+	"findings": 2,
+	"coverage_rows": 37,
+	"source_files": 32,
+	"lexical_checks": 39,
+	"runtime_cases": 0,
+	"qualification": "All Windows findings source-derived. Native CapsLock restoration, physical HotIf priority and receiving remain qualified. CW-W001 primary physical Tab->Backspace and symmetric CapsLock->Enter avoid ambiguous native Space priority.",
+	"artifacts": [
+		{
+			"path": "report.md",
+			"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "d19d1c51d5fc097bf875a3781271dca490db09a76eb288cdd89cac6cb3f8e626"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "b8592a36417b6f085f49545bc33bb71119bd650335d28daa09f0279a91bbee0d"
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36"
+		},
+		{
+			"path": "source-contract.json",
+			"sha256": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd"
+		},
+		{
+			"path": "dry-A.json",
+			"sha256": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790"
+		},
+		{
+			"path": "dry-B.json",
+			"sha256": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1"
+		},
+		{
+			"path": "dry-sweeps.json",
+			"sha256": "74376bda07160285d80759d8becfdb8bed596f6c9ba2036f0f14d55dd9e7790a"
+		},
+		{
+			"path": "reader-controls.json",
+			"sha256": "ee9dc128ed3f322a8cd74ae67ac580cfd53e3fdc12e004b22299e8f63d000744"
+		},
+		{
+			"path": "prior-search.json",
+			"sha256": "d1e716100a5041e7537044bc3d48dc323e4da584e61c31f1d1461087ec6eee17"
+		},
+		{
+			"path": "false-green-scan.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+		},
+		{
+			"path": "format.txt",
+			"sha256": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a"
+		},
+		{
+			"path": "format-dry.txt",
+			"sha256": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98"
+		}
+	]
+}

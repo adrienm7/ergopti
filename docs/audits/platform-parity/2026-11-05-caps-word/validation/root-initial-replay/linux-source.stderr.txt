@@ -1,0 +1,2 @@
+usage: source-probe.py [-h] --output OUTPUT repository
+source-probe.py: error: the following arguments are required: --output

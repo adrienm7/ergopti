@@ -1,0 +1,1 @@
+{"after_real_magic_key_rename":"§","caps_policy_loaded_after_rename":{"section":true,"star":false},"caps_policy_loaded_before_rename":{"section":false,"star":true},"hotstring_magic":{"section":true,"star":false},"qualification":"Actual shared mutation and real policy module loads; not full boot order, menu label, keymap admission or native receiving."}

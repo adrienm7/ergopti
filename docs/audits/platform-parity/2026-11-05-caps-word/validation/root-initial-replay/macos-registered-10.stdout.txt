@@ -1,0 +1,34 @@
+
+=== Karabiner catalogue actions: keystroke family ===
+  ok   home posts Home
+  ok   end posts End
+  ok   page_up posts Page Up
+  ok   page_down posts Page Down
+  ok   save posts Cmd+S
+  ok   spotlight posts Cmd+Space
+  ok   opt_backspace deletes the previous word with Option
+  ok   cmd_backspace deletes to the line start with Command
+  ok   cmd_delete_fwd deletes to the line end
+  ok   the two F17 window actions reach the driver's own hotkeys
+
+=== Karabiner catalogue actions: engine variables ===
+  ok   layer_on writes only the live layer authority
+  ok   layer_off writes only the live layer authority
+  ok   capsword locks CapsLock only after the variable write settles
+  ok   capsword leaves CapsLock unchanged when the variable write is refused
+  ok   capsword leaves CapsLock unchanged when an accepted write fails
+  ok   capsword discards a successful callback superseded by newer intent
+  ok   capsword discards a successful callback after the lease pauses
+
+=== Karabiner catalogue actions: sticky modifiers ===
+  ok   sticky_shift arms the shared one-shot owner
+  ok   sticky_option arms Option, spelled alt
+  ok   sticky_cmd_shift arms both
+  ok   sticky_option_shift_ctrl arms all three
+  ok   sticky_hyper arms all four
+  ok   passes the user's delay through, converted to seconds
+  ok   refuses to arm when the remap layer cannot supply a delay
+
+=== Karabiner catalogue: hold-only actions are not gestures ===
+  ok   no hold-only action is registered
+AUDIT_RESULT	25	0

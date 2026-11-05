@@ -1,0 +1,186 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "Immutable worker hash values identify original bytes. Repository formatting can change presentation; exact originals are retained as .txt and canonical root evidence hashes identify formatted archive bytes. JSON values and Python AST equality are checked where applicable; Markdown formatting is formatter provenance, not a formal syntax-equivalence proof.",
+	"rows": [
+		{
+			"role": "linux-synthetic-followup",
+			"original_bytes": "validation/original-submissions/linux-synthetic-followup/coverage.json.txt",
+			"original_sha256": "7e07dc050f44177feeaae4c7e046d7e97d8efba72d784b15de5af1730299bcf8",
+			"formatted_archive": "linux-synthetic-followup/coverage.json",
+			"formatted_sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux-synthetic-followup",
+			"original_bytes": "validation/original-submissions/linux-synthetic-followup/final/receipts.json.txt",
+			"original_sha256": "b1c92d6fc316b868d13f2cc311b83812661b27023f0472ddac2bad698877eb28",
+			"formatted_archive": "linux-synthetic-followup/final/receipts.json",
+			"formatted_sha256": "b241cae844793e9219bb2605de6f8a340b928483365da6f098145c6acd2577e7",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux-synthetic-followup",
+			"original_bytes": "validation/original-submissions/linux-synthetic-followup/findings.json.txt",
+			"original_sha256": "e36870a866a578e3cbf5de6b747c95dbc82ffa19cc6d2a72c8f3f02ab9f0b440",
+			"formatted_archive": "linux-synthetic-followup/findings.json",
+			"formatted_sha256": "5474f50e0d06a75b73b67effd892c11e39b8b38a7b6f9036f2eb1585bf8be230",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux-synthetic-followup",
+			"original_bytes": "validation/original-submissions/linux-synthetic-followup/handoff.json.txt",
+			"original_sha256": "b9289002ab5a872f2d94da958566f06ab5e9765c81983fd0ac6e34d417f84b25",
+			"formatted_archive": "linux-synthetic-followup/handoff.json",
+			"formatted_sha256": "900f9ad22064f2e7f2589273921345c49ed68ab7cd2459a6c9d68b2056a286cc",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux-synthetic-followup",
+			"original_bytes": "validation/original-submissions/linux-synthetic-followup/source-receipt.json.txt",
+			"original_sha256": "50b7b37fa32955300589e69bf65fbcbe5ebdc934aea446aabcc6a03b65084712",
+			"formatted_archive": "linux-synthetic-followup/source-receipt.json",
+			"formatted_sha256": "41319c9d14c73713301d22799f3dbc87ecdeab71764ee69a18d9203c7424ff7f",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/coverage.json.txt",
+			"original_sha256": "80484a424d6cf974501a948c205918ed9ebdd6751c9e5f29b829e74f7c91155c",
+			"formatted_archive": "linux/coverage.json",
+			"formatted_sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/final-proofs/receipts.json.txt",
+			"original_sha256": "248954f92f93f115ddc6624890339c6f8226c8b447b686b7c3383fd0dc53f935",
+			"formatted_archive": "linux/final-proofs/receipts.json",
+			"formatted_sha256": "3570f789a083f989d7224f0223f765ca24de53e307cb78c72c7b78abfe5148a3",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/findings.json.txt",
+			"original_sha256": "23c5928f286e95bf101611e809d7174d152a6a796c245df24d7067a94c7d3a1e",
+			"formatted_archive": "linux/findings.json",
+			"formatted_sha256": "e2d520d4ea5804a262fd620343d44780cc8631817775b4053fa197965120da86",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/handoff.json.txt",
+			"original_sha256": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+			"formatted_archive": "linux/handoff.json",
+			"formatted_sha256": "f9ad6ed847cdbd6b5511b43f2036f5ea7d88da7f44b26ecc4ca826ad5b5901d7",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/pre-isolation-proofs/receipts.json.txt",
+			"original_sha256": "9f8929e8148e9b7912fb7d93ef08a974ef798e549f3348c6bbf2b8ebe4f156e0",
+			"formatted_archive": "linux/pre-isolation-proofs/receipts.json",
+			"formatted_sha256": "886dd5e71f7ee70a720cf2476abdc5d4bc5c44239d94073d0da4a80d81e5e05b",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "linux",
+			"original_bytes": "validation/original-submissions/linux/source-receipt.json.txt",
+			"original_sha256": "fd42494d7e1ab4884ed8cb41d1cd8df26c885a4ecb287480dd15f6e63dcf6e7b",
+			"formatted_archive": "linux/source-receipt.json",
+			"formatted_sha256": "1b5b7bb1b4b0e614c692f188c134253f5d7cfb455df2ead74342977414506c50",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/coverage.json.txt",
+			"original_sha256": "b8592a36417b6f085f49545bc33bb71119bd650335d28daa09f0279a91bbee0d",
+			"formatted_archive": "windows/coverage.json",
+			"formatted_sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"original_sha256": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"formatted_archive": "windows/dry-A.json",
+			"formatted_sha256": "66f9aefc315b72f57041347c823b9d8360745e7bcb7d4f0d9200cfedb5b99522",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"original_sha256": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"formatted_archive": "windows/dry-B.json",
+			"formatted_sha256": "05aac30a3bf0a5ea162c9009caa6e4cca3adf5492e0bdf5e383d7bafb038b141",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/dry-sweeps.json.txt",
+			"original_sha256": "74376bda07160285d80759d8becfdb8bed596f6c9ba2036f0f14d55dd9e7790a",
+			"formatted_archive": "windows/dry-sweeps.json",
+			"formatted_sha256": "13ff238a7265d58c7772b8a0efbb5112cbf21e3953233dfa76ead9ec5bd6e3a5",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/findings.json.txt",
+			"original_sha256": "d19d1c51d5fc097bf875a3781271dca490db09a76eb288cdd89cac6cb3f8e626",
+			"formatted_archive": "windows/findings.json",
+			"formatted_sha256": "62fd77c4df0dad036a1be4edb824fd614da3d1a2f49ad02c221fd932ad71d4f5",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/handoff.json.txt",
+			"original_sha256": "6ffe9f21a83c354556a21b6b066fe2289d825af4d6a57fbeaa03d2884f9463c1",
+			"formatted_archive": "windows/handoff.json",
+			"formatted_sha256": "305fa35a1e4d9bf4fb66107d2e3406fbf7fb810ae4293667ab9ed6daaac8098f",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/prior-search.json.txt",
+			"original_sha256": "d1e716100a5041e7537044bc3d48dc323e4da584e61c31f1d1461087ec6eee17",
+			"formatted_archive": "windows/prior-search.json",
+			"formatted_sha256": "77600dc0889dcdf61ad53b4dedc7f95ebaf3bf4d136c61534ee81aa94b38b03e",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/reader-controls.json.txt",
+			"original_sha256": "ee9dc128ed3f322a8cd74ae67ac580cfd53e3fdc12e004b22299e8f63d000744",
+			"formatted_archive": "windows/reader-controls.json",
+			"formatted_sha256": "d7ffaef8ecccf6c90350ae9ac80cb214d89bb41237c0ef1497cbf40ba94cfad2",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		},
+		{
+			"role": "windows",
+			"original_bytes": "validation/original-submissions/windows/source-contract.json.txt",
+			"original_sha256": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd",
+			"formatted_archive": "windows/source-contract.json",
+			"formatted_sha256": "b4e77e6cfcbb0507021f163fbabfe0ac16349bedccbca3c663e853637a548b10",
+			"formatter": "Repository-pinned Prettier with repository config",
+			"json_values_equal": true
+		}
+	]
+}

@@ -1,0 +1,5 @@
+
+=== CapsWord native graph and shared control tags ===
+  ok   emits an activation edge for the actual AltGr plus CapsLock path
+  ok   keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords
+AUDIT_RESULT	2	0

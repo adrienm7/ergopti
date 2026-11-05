@@ -1,0 +1,132 @@
+{
+  "audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+      "sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+      "sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+      "sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+      "sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+      "sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+      "sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+      "sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+      "sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb"
+    },
+    {
+      "path": "static/ergopti_plus/linux/adapters/event_loop.lua",
+      "sha256": "d9583f9e74735bf287b46da5c74f3359e15d30c87d1daf78d044d69737ecd5f2"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/input_event.lua",
+      "sha256": "ed7f21f545f682607bde2626c9c327935bb5996910b2b813f259cbe830b2fbe7"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/evdev_codes.lua",
+      "sha256": "0ccc74128959cf544abc809f35fd763eebf9aac0e3369669b926f0943ccb63b8"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/monotonic.lua",
+      "sha256": "4adacad769b9958666143fe8519b09da000778fd594539c9a401b6d59b9ed767"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+      "sha256": "d15fbe1e2a5af2ca23023e097625b4dff5266bd3012dda7ab57e58879e6b332d"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/manifest_reader.lua",
+      "sha256": "90a161f14bf6056bf8255a85338f6310864fd3d25801c496384586d18adfc85e"
+    },
+    {
+      "path": "static/ergopti_plus/linux/infra/manifest_menu.lua",
+      "sha256": "e5dfdc5a694b1dc8b7d49dc8460b6fe62e71443f3842638aecac8e0a53cc3849"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+      "sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/hotstrings/device_finder.lua",
+      "sha256": "a5d0c4830dd56868f0f5881f988e60b066106cea30d9e95cbf5d5e4bf3150931"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+      "sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+      "sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+      "sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7"
+    },
+    {
+      "path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+      "sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a"
+    },
+    {
+      "path": "static/ergopti_plus/linux/ui/menu/builder.lua",
+      "sha256": "a64d1140a9f5c1371cffab6303644e5b4921c9a77b085e9a94b07a5ca47b2fa3"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+      "sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+      "sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+      "sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+      "sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e"
+    }
+  ],
+  "checks": [
+    "nonempty original pointer dispatch includes relative motion publication and omits absolute motion handling",
+    "nonempty Main pointer callback forwards actual kinds and ignores report frames",
+    "activation retains one policy object while settings publish replacement objects",
+    "actual menu explicitly promises current-session application at its next event",
+    "actual menu calls the actual public settings setters for all three setting families"
+  ],
+  "external_kernel_abi": {
+    "qualification": "Linux UAPI constants corroborated against this host header, outside the audited Git source.",
+    "path": "/usr/include/linux/input-event-codes.h",
+    "sha256": "7593bf38463ed7404fea256638c30ee74001dce986104b445b22b49873ebeadb",
+    "constants": {
+      "EV_ABS": 3,
+      "ABS_X": 0,
+      "ABS_Y": 1,
+      "BTN_TOUCH": 330
+    }
+  },
+  "qualification": "Selected source files only, not transitive whole-repository coverage. Source checks support public wiring; pointer/Main native receiving remains unexecuted."
+}

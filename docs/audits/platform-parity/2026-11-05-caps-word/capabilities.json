@@ -1,0 +1,1066 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"created_at": "2026-11-05",
+	"module": "caps-word",
+	"capabilities": [
+		{
+			"id": "action-identities",
+			"contract": "An equivalent CapsWord action exists on all three OSes",
+			"windows": "caps_word resolves to the Windows state toggle.",
+			"macos": "capsword is the explicitly declared equivalent; actual generated/control and catalogue owners exist.",
+			"linux": "caps_word resolves to the actual shortcuts manager session toggle.",
+			"classification": "explicit_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared actions.toml explicitly maps caps_word and capsword as equivalents while retaining a separate macOS Karabiner implementation; action-ID differences are not missing whole features.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "repeated-action",
+			"contract": "Repeated invocation of the advertised action has an explicit behavior",
+			"windows": "The generic action toggles; the AltGr producer has the separately confirmed pre-clear defect.",
+			"macos": "The catalogue action requests ACTIVE again; generated native-key on/off manipulators are a different origin.",
+			"linux": "The catalogue action toggles the same active session.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Observed local action contracts; no common product decision requiring toggle or idempotent enable for all origins was found. The macOS catalogue handler is not equated with the separate physical CapsLock graph.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "native-lock",
+			"contract": "Capitalization is owned by the desktop CapsLock level",
+			"windows": "State owner requests SetCapsLockState from CapsWord or genuine user lock intent.",
+			"macos": "Actual graph emits CapsLock; catalogue completion requests true via KeyState.",
+			"linux": "Manager locks through actual Hook/capture and uinput emitter, refusing mappings that cannot lock.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual native API requests and recorded wire only. Receiving layout, CapsLock persistence and desktop per-keyboard grouping are not measured.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "preexisting-lock",
+			"contract": "The user's preexisting CapsLock has a qualified lifetime",
+			"windows": "Separate genuine-lock intent survives CapsWord deactivation in the source state owner.",
+			"macos": "Catalogue activation requests true; successful watcher clear requests false without a saved prior lock. Native key activation emits a toggle.",
+			"linux": "Actual recorded controls ride an existing lock and preserve it; owned lock is released on end.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "unverified",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows/Linux preservation mechanisms are explicit. macOS native initial-lock effects and intended restoration policy remain unqualified; absence of a saved field is not a physical restoration measurement.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "default-policy",
+			"contract": "Default auto-off parameters are shared",
+			"windows": "Ten-second idle; eight delimiter selections; five pointer kinds.",
+			"macos": "Same idle/delimiter defaults; six pointer kinds.",
+			"linux": "Same idle/delimiter defaults; six pointer kinds.",
+			"classification": "explicit_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Manifest cites the October20 maintainer decisions: 10s and space/nbsp/nnbsp/tab/enter/comma/semicolon/period; Windows gesture exclusion has its own explicit platform reason.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "unicode-delimiters",
+			"contract": "Checked built-in characters in composed and multi-scalar text are recognized",
+			"windows": "AHK port scans BMP catalogue characters and literal output observer.",
+			"macos": "Actual shared policy and watcher payload controls include Unicode spaces and multi-scalar output.",
+			"linux": "Actual policy/Manager and injector-output controls include these characters.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared corpus contains eight cases; extended controls cover 25 built-in keys/26 characters. Windows is source-only and custom user delimiters are explicitly outside this built-in chooser.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "magic-caption",
+			"contract": "A checked delimiter caption describes the actual active character",
+			"windows": "The policy deliberately uses a fresh fixed built-in catalogue; native translated menu glyph outcome is not certified.",
+			"macos": "Actual menu shows § after trigger formatting; checked policy still ends ★ and lets § remain. Shared module-load order can also change the captured character.",
+			"linux": "Actual public MagicKey configuration and menu show §; active policy still ends ★. Linux does not share the macOS runtime mutation route.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWS-002"],
+			"availability": {
+				"windows": "unverified",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Common truthful-setting-label mismatch, not an assumed requirement to follow renamed magic keys. Windows explicitly separates CapsWord built-ins from the hotstring engine's renamed instance; choose literal-versus-dynamic policy before implementation.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "editing-exits",
+			"contract": "Fixed editing/navigation exits are distinct from configurable delimiters",
+			"windows": "The auto-off key-down path re-arms idle; editing keys are not automatically delimiter keys by their physical identity alone.",
+			"macos": "Actual generator tests retain fixed Escape/navigation/Delete/F-key exits while removing the settings-owned Space/Enter/Tab exits.",
+			"linux": "Root matched idle0/empty-terminator controls keep the actual session active after Hook dispatch of Escape and Left.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "macOS fixed exits are an explicit generated construction. A common permanent OS-exception decision was not found. Root validation/root-fixed-exits.lua executes two additional Linux controls, not a native Karabiner keyboard graph.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "tap-carrier",
+			"contract": "Tap-hold termination follows emitted meaning rather than a remapped physical carrier",
+			"windows": "Tab→Backspace pre-ends with checked tab; CapsLock→Enter can miss checked Enter. Space priority is explicitly unresolved.",
+			"macos": "Generated settings-owned exits are removed, but this exact remapped-key native receiving sequence is not certified.",
+			"linux": "The ordinary tap Enter/Tab native semantic relay is a separate path from direct catalogue emission; supplemental controls qualify it.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWW-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows public route is source-derived, including declined AI acceptance and no completing hotstring in the chosen blank context. No blanket claim is made about every OS synthetic-key path.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "altgr-toggle",
+			"contract": "A supported AltGr CapsWord action can toggle off",
+			"windows": "Accepted isolated AltGr pre-clears state before invoking the generic toggle, so its second invocation leaves CapsWord on.",
+			"macos": "Separate Karabiner origins; an identical Windows admission sequence is not claimed.",
+			"linux": "Generic catalogue toggle exists; this exact native AltGr producer is not certified.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWW-002"],
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows executable source only; actual Lua owners over recorded ports where stated. A declaration, generated graph, requested LED state or written event is not native application receiving.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "ordinary-idle",
+			"contract": "Zero disables idle and ordinary positive presets expire",
+			"windows": "Zero suppresses timer admission; positive key-down callbacks re-arm the same session owner.",
+			"macos": "Actual zero/positive expiry, change-to-zero and next-activation controls.",
+			"linux": "Actual zero/positive expiry, exact threshold and session-generation controls.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "The shared default is10s; selected menu presets are whole seconds. Deterministic clocks establish logical deadlines, not latency or native scheduler precision.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "fractional-idle",
+			"contract": "Every accepted positive delay has consistent enabled semantics",
+			"windows": "Source rounds0.0001s to0ms, the disabled sentinel, and never admits expiry.",
+			"macos": "Actual policy/owner quantizes to enabled numeric0; zero-delay admission can end immediately.",
+			"linux": "Actual settings/Manager queues0ms and ends at the due callback; zero has no timer and1ms expires at1ms.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWS-001"],
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Only accepted manually edited/programmatic positive values below0.0005s trigger this collision; shipped defaults/presets are unaffected. Windows AHK timer execution remains absent.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "numeric-upper-edge",
+			"contract": "Accepted finite numeric ranges have qualified conversion limits",
+			"windows": "Upper-edge arithmetic and native timer admission were not executed.",
+			"macos": "Actual shared Lua compile accepts1e308 seconds and overflows milliseconds to infinity; native admission untested.",
+			"linux": "Same shared compile observation; no actual timer failure is asserted.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Retained numeric characterization only, not another confirmed finding, measured resource issue or runtime crash.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "live-idle-change",
+			"contract": "Menu changes have a precise current-session lifetime",
+			"windows": "Menu and Store explicitly defer settings to the next activation.",
+			"macos": "Accepted0→1 leaves no timer even after next letter;10→1 waits for the old deadline. Opposite changes and refused-save controls distinguish the failure.",
+			"linux": "Acknowledged setters/cache change but active snapshot/timer chain remains old, contradicting the menu's next-event promise.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWM-001", "CWL-002"],
+			"availability": {
+				"windows": "absent",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows next-activation behavior is explicitly documented, not an inferred defect. Linux has conflicting local live-apply/snapshot contracts requiring alignment. Disable pointer exits before menu traversal to keep the original session reachable.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "live-delimiter-change",
+			"contract": "A live delimiter checkbox reaches its promised running owner",
+			"windows": "Explicit next-activation policy.",
+			"macos": "Actual next-key delimiter change works.",
+			"linux": "Original menu callback unchecks Space and rebuilds unchecked, but next Space still ends the old session; next activation uses new values.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWL-002"],
+			"availability": {
+				"windows": "absent",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows executable source only; actual Lua owners over recorded ports where stated. A declaration, generated graph, requested LED state or written event is not native application receiving.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "live-pointer-change",
+			"contract": "A live pointer checkbox reaches its promised running owner",
+			"windows": "Explicit next-activation policy.",
+			"macos": "Actual settings apply supplies current policy to pointer admission; not a native tray measurement.",
+			"linux": "From initial all-off, original menu enables left-click and shows checked; next click does not end current session, but does end the next session.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWL-002"],
+			"availability": {
+				"windows": "absent",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows executable source only; actual Lua owners over recorded ports where stated. A declaration, generated graph, requested LED state or written event is not native application receiving.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "pointer-gesture",
+			"contract": "Gesture auto-off has an explicit OS support boundary",
+			"windows": "Not declared: Windows keeps touchpad gestures and may only deliver resulting scrolling.",
+			"macos": "Declared gesture/eventtap/any-touch routes; actual watcher admission controls.",
+			"linux": "Declared touch-contact classification; actual BTN_TOUCH default ends.",
+			"classification": "native_constraint",
+			"finding_ids": [],
+			"availability": {
+				"windows": "absent",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Explicit platform_reason.caps_word_gestures_stay_with_windows. This is an intentional declared exclusion, not absence inferred from an implementation search or a promise about every physical touchpad.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "absolute-motion",
+			"contract": "Pointer-motion auto-off covers accepted absolute devices",
+			"windows": "Screen-coordinate polling is source-audited, not physical device receiving.",
+			"macos": "Native eventtap movement is source/port-audited, not physical receiving.",
+			"linux": "With gesturefalse,pointer_motiontrue,idle0, accepted absolute coordinate changes produce no motion notification; relative mouse positive control ends.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWL-001"],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual original Linux Hook dispatch and Manager over recorded callback/syscall ports; Main forwarding is source-only. No copied production body is executed; physical evdev reader/compositor remains unexecuted.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "pointer-after-activation",
+			"contract": "A new activation does not inherit an inactive pointer gate",
+			"windows": "Arming resets pointer baseline and binds callbacks to a fresh generation.",
+			"macos": "Inactive motion at0ms stamps gate; activation10ms then checked pointer50ms is dropped. Fresh/no-prior and100ms controls clear.",
+			"linux": "Actual session has no corresponding100ms pointer throttle in the observed route.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWM-002"],
+			"availability": {
+				"windows": "present",
+				"macos": "partial",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual macOS watcher and real variable owner over native ports with controlled clocks;100ms is logical policy admission, not measured eventtap latency.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "pending-old-clear",
+			"contract": "Old asynchronous completion cannot discard a newer delimiter",
+			"windows": "Retirement detaches callbacks and checks generation before terminal publication.",
+			"macos": "Native clear payload0 published, new activation1 observed, delimiter arrives before old exit callback: global pending flag drops it; old completion preserves new state but never replays that delimiter.",
+			"linux": "Session tokens reject old idle callbacks; this exact Karabiner/CLI race is not a Linux architecture.",
+			"classification": "observed_defect",
+			"finding_ids": ["CWM-003"],
+			"availability": {
+				"windows": "present",
+				"macos": "partial",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Real macOS watcher, serialized variable writer and control sentinel; native publication and exit callback are separate recorded ports. Do not assume arbitrary native activation while engine variable is still1.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "modifier-activity",
+			"contract": "The idle clock's definition of a keystroke is qualified",
+			"windows": "Every observed key-down re-arms, including modifier VKs.",
+			"macos": "Watcher subscribes keyDown, not flagsChanged/keyUp; isolated modifiers do not run that observer.",
+			"linux": "Actual Shift at9s does not refresh; Left at9s refreshes the10s session to19s.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Different observed activity signals, not a new confirmed bug. Shared keystroke wording does not settle a universal modifier policy; no real-time measurement is claimed.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "modified-control-payload",
+			"contract": "Native control identity and reported text are not interchangeable",
+			"windows": "InputHook/native-key routes remain source-only for modified physical payloads.",
+			"macos": "Actual payload controls distinguish CR/LF/Tab, ETX and modifier-only cases; keypad physical receiving remains unmeasured.",
+			"linux": "Modified Enter/Tab may reach control-name observation rather than typed-text observation.",
+			"classification": "unknown_intent",
+			"finding_ids": [],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Recorded payload characterization does not establish what every terminal or application emits/receives for Ctrl/Shift/keypad Enter. No duplicate keypad bug is created.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "driver-output",
+			"contract": "Literal injected delimiters have an explicit observation relay",
+			"windows": "CapsWordAutoOffObserveOutput covers literal text hidden from I1.",
+			"macos": "Actual text sender/output observer relays literal text and payload controls.",
+			"linux": "Actual injector output callback forwards literal payload to Manager; native key catalogue route is separately qualified.",
+			"classification": "raw_parity",
+			"finding_ids": [],
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Literal-output observation is distinguished from key-command emission; acknowledged wire writes do not prove application consumption.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "lifecycle-lock",
+			"contract": "Pause and shutdown retain exact resource/lock ownership qualifications",
+			"windows": "Explicit pause deactivates; quit/reload native CapsLock restoration and Space priority remain unexecuted gaps.",
+			"macos": "Watcher teardown retains failed resources; stop alone does not prove restoration of a prior desktop lock.",
+			"linux": "Recorded controls release owned lock on cancellation/stop while preserving a ridden user lock; desktop grouping remains unverified.",
+			"classification": "observed_limit",
+			"finding_ids": [],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No whole-driver native shutdown or application receiving certificate. These gaps are not classified as intentional permanent exclusions.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			]
+		},
+		{
+			"id": "catalogue-control-output",
+			"contract": "Direct catalogue Enter/Tab reaches CapsWord just as ordinary tap-key output does",
+			"windows": "The separately confirmed tap carrier problem remains source-only; exact direct catalogue receiving is not certified.",
+			"macos": "Literal relay is explicit; exact native key-command delivery order is not certified.",
+			"linux": "Supplemental actual catalogue control-key emission can succeed without notifying CapsWord; ordinary tap Enter/Tab relays are positive controls.",
+			"classification": "observed_defect",
+			"finding_ids": ["WRSL-001"],
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Windows executable source only; actual Lua owners over recorded ports where stated. A declaration, generated graph, requested LED state or written event is not native application receiving.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				},
+				{
+					"path": "linux-synthetic-followup/report.md",
+					"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+				},
+				{
+					"path": "linux-synthetic-followup/probe.lua",
+					"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+				}
+			]
+		}
+	]
+}

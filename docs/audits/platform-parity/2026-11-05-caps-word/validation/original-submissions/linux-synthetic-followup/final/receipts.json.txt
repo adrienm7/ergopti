@@ -1,0 +1,64 @@
+{
+  "audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+  "program_sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989",
+  "replay_sha256": "f41c97119e5fd0f817110cb933f2243574548675cc5aae66d774122cafbfdc37",
+  "qualification": "Separate completed-scope follow-up: two bounded full-program sweeps; actual owners over native recording ports; no native desktop receiving.",
+  "processes": [
+    {
+      "name": "A-lua",
+      "command": [
+        "lua",
+        "/workspace/scratch/parity-capsword-2026-11-05/linux-synthetic-followup/probe.lua",
+        "/workspace/worktrees/parity-capsword-2026-11-05/linux"
+      ],
+      "exit_code": 0,
+      "stdout": "A-lua.stdout.txt",
+      "stderr": "A-lua.stderr.txt",
+      "stdout_sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observation_rows": 12
+    },
+    {
+      "name": "A-luajit",
+      "command": [
+        "luajit",
+        "/workspace/scratch/parity-capsword-2026-11-05/linux-synthetic-followup/probe.lua",
+        "/workspace/worktrees/parity-capsword-2026-11-05/linux"
+      ],
+      "exit_code": 0,
+      "stdout": "A-luajit.stdout.txt",
+      "stderr": "A-luajit.stderr.txt",
+      "stdout_sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observation_rows": 12
+    },
+    {
+      "name": "B-lua",
+      "command": [
+        "lua",
+        "/workspace/scratch/parity-capsword-2026-11-05/linux-synthetic-followup/probe.lua",
+        "/workspace/worktrees/parity-capsword-2026-11-05/linux"
+      ],
+      "exit_code": 0,
+      "stdout": "B-lua.stdout.txt",
+      "stderr": "B-lua.stderr.txt",
+      "stdout_sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observation_rows": 12
+    },
+    {
+      "name": "B-luajit",
+      "command": [
+        "luajit",
+        "/workspace/scratch/parity-capsword-2026-11-05/linux-synthetic-followup/probe.lua",
+        "/workspace/worktrees/parity-capsword-2026-11-05/linux"
+      ],
+      "exit_code": 0,
+      "stdout": "B-luajit.stdout.txt",
+      "stderr": "B-luajit.stderr.txt",
+      "stdout_sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observation_rows": 12
+    }
+  ]
+}

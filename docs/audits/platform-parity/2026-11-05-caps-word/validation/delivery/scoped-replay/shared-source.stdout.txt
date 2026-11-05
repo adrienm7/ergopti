@@ -1,0 +1,46 @@
+{
+  "audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+      "sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+      "sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba"
+    },
+    {
+      "path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+      "sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+    },
+    {
+      "path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+      "sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1"
+    },
+    {
+      "path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+      "sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+      "sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb"
+    },
+    {
+      "path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+      "sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b"
+    }
+  ],
+  "checks": {
+    "lua_positive_seconds_rounded_independently_of_nil_disabled": true,
+    "lua_zero_millisecond_policy_is_enabled": true,
+    "ahk_positive_seconds_rounded_into_zero_sentinel": true,
+    "ahk_expiry_requires_strictly_positive_ms": true,
+    "lua_nonnegative_fraction_not_integer_only": true,
+    "ahk_nonnegative_fraction_not_integer_only": true,
+    "macos_owner_publishes_each_live_apply": true,
+    "linux_resolver_uses_real_policy_validator": true,
+    "linux_active_owner_snapshots_policy": true,
+    "linux_idle_zero_nonnil_queues_check": true
+  },
+  "qualification": "Exact pinned source relationships. No AHK execution or Python reimplementation of AHK output."
+}

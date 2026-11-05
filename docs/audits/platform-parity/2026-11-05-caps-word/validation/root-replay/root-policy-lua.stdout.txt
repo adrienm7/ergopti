@@ -1,0 +1,8 @@
+seconds=0.00000 idle_ms=nil expired_at_0=false expired_at_1=false
+seconds=0.00010 idle_ms=0 expired_at_0=true expired_at_1=true
+seconds=0.00049 idle_ms=0 expired_at_0=true expired_at_1=true
+seconds=0.00050 idle_ms=1 expired_at_0=false expired_at_1=true
+seconds=0.00100 idle_ms=1 expired_at_0=false expired_at_1=true
+seconds=1.00000 idle_ms=1000 expired_at_0=false expired_at_1=false
+seconds=10.00000 idle_ms=10000 expired_at_0=false expired_at_1=false
+Independent root policy controls passed; no AHK or desktop execution.

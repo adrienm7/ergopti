@@ -1,0 +1,11 @@
+
+=== keyboard_hook: lock state is seeded at acquisition ===
+  ok   (linux-numlock-seed) restores keypad text from a lit NumLock LED
+  ok   (linux-numlock-seed) keeps keypad navigation when the NumLock LED is off
+  ok   (linux-numlock-seed) restores independent Caps Num and Scroll LEDs once
+  ok   (linux-numlock-seed) refuses an unsuccessful native lock capture update
+  ok   (linux-numlock-seed) does not toggle a held NumLock twice during report recovery
+  ok   locks the capture state when the LED is on
+  ok   leaves it unlocked when the LED is off
+  ok   runs after both kinds of acquisition
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":8}

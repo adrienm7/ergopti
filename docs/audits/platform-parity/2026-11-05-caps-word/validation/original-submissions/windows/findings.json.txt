@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "module": "capsword",
+  "platform": "windows",
+  "audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+  "created_at": "2026-11-05",
+  "report_path": "report.md",
+  "findings": [
+    {
+      "id": "CW-W001",
+      "title": "Physical tap carrier identity replaces real emitted delimiter identity",
+      "severity": "medium",
+      "confidence": "high",
+      "guarantees": ["G2"],
+      "basis": "source",
+      "qualification": "Authenticated executable AutoHotkey and shared catalogue control flow only; no AutoHotkey execution, native send, LED or receiving application tested.",
+      "reproduction": "Set idle0, all pointer kinds false, terminators=[tab], no AI tooltip/nav layer/modifiers. Configure tap_hold inherit_defaults=false and tab.tap_action=backspace without a hold; activate CapsWord independently, type two letters then press Tab. Its generic tap-only SC00F route deactivates before real Backspace despite no typed delimiter. Opposite control: terminators=[enter], caps_lock.tap_action=enter without hold: actual action emits Enter yet CapsWord survives. CapsWord native SC039/SC01C bindings do not intercept either carrier. Native sending/case/receiving unexecuted.",
+      "root_cause": "The automatic-end predicate asks physical KeyId before the real configured action runs. Physical tab falsely ends before configured Backspace; physical caps_lock misses configured Enter. Emitted SendLevel0 native keys are invisible to the I1 observer and their synthetic buffer effect never publishes a CapsWord delimiter to repair the decision.",
+      "silent_failure": "The chosen tap callback can run successfully, so no sender/configuration error is raised. Existing tap-unlatch regression passes only a marker callback and never emits a remapped action.",
+      "regression_test": "Exercise public Tab/CapsLock tap-only producers, real action resolver and state owner over passive send/LED ports. Compare native Tab, Tab->Backspace, CapsLock->Enter/Space, held modifiers, checked/unchecked delimiters and send refusal. Require automatic ending to follow qualifying acknowledged output. Qualify native Space HotIf priority independently; direct dispatcher calls cannot prove it.",
+      "evidence": ["report.md", "source-contract.py", "source-contract.json"]
+    },
+    {
+      "id": "CW-W002",
+      "title": "AltGr pre-clears CapsWord before its configured toggle so a second tap cannot switch it off",
+      "severity": "medium",
+      "confidence": "high",
+      "guarantees": ["G2"],
+      "basis": "source",
+      "qualification": "Deduced from authenticated actual producer/action/state-owner statement order. No AutoHotkey execution or native AltGr receiving measured.",
+      "reproduction": "Set idle0, no terminators and every pointer kind false; configure AltGr tap caps_word with Shift hold. Two separate short isolated admitted AltGr taps first turn CapsWord on, then unconditionally disable and toggle it back on instead of turning it off. AltGr->Backspace with all automatic ends disabled demonstrates the same pre-clear as a sibling symptom.",
+      "root_cause": "_AltGrHandleHold calls DisableCapsWord unconditionally in the accepted isolated-tap branch, then AltGrTapHoldDispatchV2 resolves and runs the configured action. caps_word invokes ToggleCapsWord, which flips the freshly cleared Boolean, losing the prior toggle intent.",
+      "silent_failure": "Both individual state operations and the configured action succeed, leaving LED/state on; direct two-toggle state tests bypass the AltGr producer.",
+      "regression_test": "Drive real _AltGrHandleHold, action lookup and CapsWord state owner with recorded hold/send/LED boundaries. Require two admitted caps_word taps off->on->off; cover actual checked delimiter, Backspace, refused tap and pass-through guards/fake-LCtrl ownership.",
+      "evidence": ["report.md", "source-contract.py", "source-contract.json"]
+    }
+  ]
+}

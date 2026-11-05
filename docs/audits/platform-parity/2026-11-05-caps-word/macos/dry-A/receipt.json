@@ -1,0 +1,67 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "Actual Lua owners over explicit recorded native ports; generated graph/model is not native Karabiner; Windows not executed; no latency/memory measurement.",
+	"new_confirmed_roots": 0,
+	"processes": [
+		{
+			"program": "public-idle.lua",
+			"sha256": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/macos/public-idle.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"stdout_sha256": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"program": "public-admission.lua",
+			"sha256": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/macos/public-admission.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"stdout_sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"program": "public-payload.lua",
+			"sha256": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/macos/public-payload.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"stdout_sha256": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"program": "public-magic-menu.lua",
+			"sha256": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/macos/public-magic-menu.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"stdout_sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"program": "activation-graph.lua",
+			"sha256": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-capsword-2026-11-05/macos/activation-graph.lua",
+				"/workspace/worktrees/parity-capsword-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"stdout_sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	]
+}

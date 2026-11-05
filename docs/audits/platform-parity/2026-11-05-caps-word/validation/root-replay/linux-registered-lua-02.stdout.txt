@@ -1,0 +1,31 @@
+
+=== keyboard_hook: the CapsLock a CapsWord session holds ===
+  ok   (linux-caps-word-lock) locks CapsLock before the next key and reads capitals until released
+  ok   (linux-caps-word-lock) refuses a keymap whose CapsLock key does not lock, sending the desktop nothing
+  ok   (linux-caps-word-lock) puts the capture state back when the CapsLock tap cannot be emitted
+  ok   (linux-caps-word-unlock-debt) retries only the original pre-output refused
+  ok   (linux-caps-word-unlock-debt) retries only the original pre-output unavailable
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after false
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after exception
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after truthy string
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after foreign exception
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after native_failed
+  ok   (linux-caps-word-unlock-debt) never retries an unknown unlock after custody_unresolved
+  ok   (linux-caps-word-reseed-debt) capture reset cannot acknowledge an owned lock: false
+  ok   (linux-caps-word-reseed-debt) capture reset cannot acknowledge an owned lock: true
+  ok   (linux-caps-word-unlock-debt) refuses a recursive unlock until its original emission settles
+  ok   (linux-caps-word-unlock-debt) reports a stopped session once while retaining its unlock
+  ok   (linux-caps-word-unlock-debt) retains an unknown initial CapsLock emission: unclassified
+  ok   (linux-caps-word-unlock-debt) retains an unknown initial CapsLock emission: native_failed
+  ok   (linux-caps-word-unlock-debt) retires a proved pre-output initial refusal without an unlock
+  ok   (linux-caps-word-boundary-debt) a failed capture rollback cannot authorize another native toggle
+  ok   (linux-caps-word-boundary-debt) a modal cannot bypass a pending CapsLock unlock: refused
+  ok   (linux-caps-word-boundary-debt) a modal cannot bypass a pending CapsLock unlock: native_failed
+  ok   (linux-caps-word-lock) rides a CapsLock the user locked and leaves it locked
+  ok   (linux-caps-word-lock) ends the hold on the user's CapsLock and never toggles it back
+  ok   (linux-caps-word-lock) unlocks the session's CapsLock on stop
+  ok   (linux-caps-word-lock) unlocks the session's CapsLock on emergency stop
+  ok   (linux-caps-word-lock) keeps the session's lock through a reseed from a stale LED
+  ok   (linux-caps-word-lock) ends the session before a dialog takes the keyboard
+  ok   (linux-caps-word-lock) refuses a second hold and a hook that captures nothing
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":28}

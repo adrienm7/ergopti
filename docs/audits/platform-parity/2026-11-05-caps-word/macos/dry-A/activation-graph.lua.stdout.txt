@@ -1,0 +1,4 @@
+generated-key-activation	caps_lock_emissions=1	control_tags=1	variable=1	native_initial_capslock_unmeasured=true
+generated-key-exit	caps_lock_emissions=1	control_tags=1	variable=0
+catalogue-action	recorded_initial=false	after_write_settles_requested=true	preexisting_state_not_read_by_handler=true
+catalogue-action	recorded_initial=true	after_write_settles_requested=true	preexisting_state_not_read_by_handler=true

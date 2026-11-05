@@ -1,0 +1,48 @@
+{
+	"validated_candidate": "25e224d3f8ff958ae616f67088c956ac5ac2f114",
+	"audited_capsword_pin": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "The candidate integrates current dev. All named reviewed source bytes still match the audit pin; unclaimed transitive dependencies are not certified. A later receipt commit changes audit documentation and retained logs only.",
+	"verify_change": {
+		"command": ["node", "tools/test/verify-change.cjs", "--range=origin/dev..HEAD"],
+		"exit_code": 0,
+		"selected_gates": ["format", "js"],
+		"js_selected": 572,
+		"js_passed": 572,
+		"failed_check_lines": [],
+		"log": "verify-change.txt",
+		"log_sha256": "327d9100df272cb7fab76c3400880b00e8739b377b874e98e2b7d04178b5e7dc"
+	},
+	"scoped_replay": {
+		"processes": 53,
+		"failed": 0,
+		"registered_cases": 324,
+		"qualification": "Existing registered cases re-executed; not new independent coverage or native receiving.",
+		"evidence": "scoped-replay/receipts.json"
+	},
+	"source_check": {
+		"claims": 177,
+		"distinct_paths": 136,
+		"all_pinned_and_current_match": true,
+		"evidence": "source-claims.json"
+	},
+	"preflight": {
+		"conclusion": "",
+		"databaseId": 42080841534,
+		"headSha": "25e224d3f8ff958ae616f67088c956ac5ac2f114",
+		"status": "in_progress",
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/42080841534",
+		"os_lanes": "all",
+		"qualification": "Captured workflow status, not an inferred completed CI/native pass."
+	},
+	"delivery_policy": {
+		"source": "docs/memory/maintainer-decisions.md",
+		"rule": "Maintainer workflow: partial work is delivered into dev after the feasible container or CI work, with native or device gaps documented rather than holding a branch.",
+		"authorization": "The user explicitly requested putting all work on dev and pushing."
+	},
+	"remaining_limits": [
+		"No AutoHotkey runtime or native application receiving is established by this audit.",
+		"Actual Lua owners execute over recorded native ports, with initial fixture limitations and supplemental controls explicitly retained.",
+		"No G4 latency or long-duration memory-growth measurement is claimed.",
+		"Nine new findings and one known-root WRSL-001 extension remain implementation TODOs; a green test suite does not certify their repair."
+	]
+}

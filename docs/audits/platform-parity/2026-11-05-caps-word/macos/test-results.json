@@ -1,0 +1,119 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+	"qualification": "Independent registered module execution over recorded native ports; meta modules are lexical controls; no macOS physical receiving.",
+	"runs": [
+		{
+			"module": "unit/platform/remap/watchers/test_watchers_capsword",
+			"exit_code": 0,
+			"passed": 5,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_watchers_capsword.txt",
+			"source_sha256": "629d5beea6d5fe6052f24f562ac6e9fe6c99013e7297d25464f6d96e4cf925ec"
+		},
+		{
+			"module": "unit/platform/remap/watchers/test_watchers_capsword_auto_off",
+			"exit_code": 0,
+			"passed": 22,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"source_sha256": "ad9c29746e8e263ac0a312e197a345cb2852abfd4b6e1032bc7af28ab4aacc05"
+		},
+		{
+			"module": "unit/platform/remap/watchers/test_watchers_capsword_release_race",
+			"exit_code": 0,
+			"passed": 15,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_watchers_capsword_release_race.txt",
+			"source_sha256": "212d5e2a27a8a90a524b72e55884bbabd319c9d1bc890d6719b3ec58d821006f"
+		},
+		{
+			"module": "unit/platform/remap/watchers/test_capsword_control_signal",
+			"exit_code": 0,
+			"passed": 2,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_capsword_control_signal.txt",
+			"source_sha256": "b3dff4972bdbf6811c0a7c4e4725e1bb162c5c26d0fdff080d0dd013c6c093bd"
+		},
+		{
+			"module": "unit/platform/remap/watchers/test_caps_word_auto_off_policy",
+			"exit_code": 0,
+			"passed": 8,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_caps_word_auto_off_policy.txt",
+			"source_sha256": "e8043175f30dd3596bd01c40dfd5a85b8ba5414607daa1fd3e8d90a1e07413b3"
+		},
+		{
+			"module": "unit/platform/remap/watchers/test_watchers_teardown_retry",
+			"exit_code": 0,
+			"passed": 25,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"source_sha256": "6af8ede7e804867d6223d5709e12569aad0370f902b21fba600e549058523c20"
+		},
+		{
+			"module": "unit/platform/remap/generator/test_generator_capsword_setting_exits",
+			"exit_code": 0,
+			"passed": 2,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_generator_test_generator_capsword_setting_exits.txt",
+			"source_sha256": "e548971af6c447b96dbede1ca893f71ccbcccce7397bcc120f0a2b0e9ed13fbf"
+		},
+		{
+			"module": "unit/infra/config/test_capsword_auto_off_settings",
+			"exit_code": 0,
+			"passed": 3,
+			"failed": 0,
+			"log": "tests/unit_infra_config_test_capsword_auto_off_settings.txt",
+			"source_sha256": "74e79e690e0c39041d7e2083e938f2ed2dfd5449f444c997eae9607d425a9e71"
+		},
+		{
+			"module": "unit/ui/menu/shortcuts/test_menu_caps_word",
+			"exit_code": 0,
+			"passed": 3,
+			"failed": 0,
+			"log": "tests/unit_ui_menu_shortcuts_test_menu_caps_word.txt",
+			"source_sha256": "fc5a0f0846560f1f104d355aaf84ea76daf65a998158440516813608856b4a2e"
+		},
+		{
+			"module": "unit/adapters/synthetic_input/test_text_sender_capsword_output",
+			"exit_code": 0,
+			"passed": 1,
+			"failed": 0,
+			"log": "tests/unit_adapters_synthetic_input_test_text_sender_capsword_output.txt",
+			"source_sha256": "f48be21ee2b4aaeba0331db52d56cf38ddfefb3b1890310c4a9e31f1069380bd"
+		},
+		{
+			"module": "unit/modules/gestures/actions/test_karabiner_actions_reachable",
+			"exit_code": 0,
+			"passed": 25,
+			"failed": 0,
+			"log": "tests/unit_modules_gestures_actions_test_karabiner_actions_reachable.txt",
+			"source_sha256": "e2a0abee8d2eb2174978a01845da70b84effc6e83addb47ae9c61f40f5a562b4"
+		},
+		{
+			"module": "unit/platform/remap/ke_lifecycle/test_ke_variables_serialized_batches",
+			"exit_code": 0,
+			"passed": 31,
+			"failed": 0,
+			"log": "tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"source_sha256": "c4f5b3bdef7392d97a585171abc4ca6e2a29599e1ab279e4e3a7caea384907d0"
+		},
+		{
+			"module": "meta/architecture/test_capsword_auto_off_single_source",
+			"exit_code": 0,
+			"passed": 3,
+			"failed": 0,
+			"log": "tests/meta_architecture_test_capsword_auto_off_single_source.txt",
+			"source_sha256": "d006ff6f6691570fb4126758b8da8fec4a4cd04d7c990f4d6f7710b6b847fc7c"
+		},
+		{
+			"module": "meta/architecture/test_karabiner_capsword_lock_release",
+			"exit_code": 0,
+			"passed": 3,
+			"failed": 0,
+			"log": "tests/meta_architecture_test_karabiner_capsword_lock_release.txt",
+			"source_sha256": "364c35cac818b9d59c5bee97ba7836717d4787609a3196662dd25f757ac6cfa1"
+		}
+	]
+}

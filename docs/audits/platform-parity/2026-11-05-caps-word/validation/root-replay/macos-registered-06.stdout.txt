@@ -1,0 +1,5 @@
+
+=== Generator: CapsWord exits the settings own are not deployed ===
+  ok   drops the delimiter keys and the clicks, keeps the fixed exits
+  ok   keeps capsword.json whole as the historical anchor
+AUDIT_RESULT	2	0

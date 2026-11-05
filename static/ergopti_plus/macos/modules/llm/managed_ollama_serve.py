@@ -44,25 +44,39 @@ PULL = load("ergopti_serve_admission_owner", SHARED / "python/managed_ollama_pul
 class ServeRefusal(RuntimeError):
     """Fixed reason retains primary and cleanup failures without secret projection."""
 
-    def __init__(self, reason, *, primary=None, cleanup=None):
+    def __init__(self, reason, *, primary=None, cleanup=None, facts=None):
         super().__init__(reason)
         self.primary, self.cleanup = primary, cleanup
+        # Bounded scalars only (an errno, an exit status), never a path or a value
+        self.facts = dict(facts or {})
 
 
-def serve_refusal_facts(refusal):
+def serve_refusal_facts(refusal, prefix=""):
     """Name a refusal's fixed reason and its retained failures, path-free.
 
     Args:
         refusal: The ServeRefusal main() caught.
+        prefix: The retained failure this refusal is, for a nested one.
 
     Returns:
-        "reason", then ", primary=..." and ", cleanup=..." for each failure it retains.
+        "reason", its scalar facts, then ", primary=..." and ", cleanup=..." for
+        each failure it retains; a nested ServeRefusal names its own the same way.
     """
-    facts = [str(refusal)]
+    facts = [str(refusal)] if not prefix else []
+    for key, value in refusal.facts.items():
+        if type(value) is int and -65535 <= value <= 65535:
+            facts.append("%s%s=%d" % (prefix, key, value))
     for name in ("primary", "cleanup"):
         error = getattr(refusal, name)
-        if error is not None:
-            facts.append("%s=%s" % (name, RUNTIME.describe_refusal(error, __file__)))
+        if error is None:
+            continue
+        if isinstance(error, ServeRefusal):
+            facts.append("%s%s=%s" % (prefix, name, error))
+            nested = serve_refusal_facts(error, prefix + name + "_")
+            if nested:
+                facts.append(nested)
+        else:
+            facts.append("%s%s=%s" % (prefix, name, RUNTIME.describe_refusal(error, __file__)))
     return ", ".join(facts)
 
 
@@ -572,7 +586,17 @@ class ServeOwner:
             if self.operation.physically_retired is not True:
                 return False
             if settled is not True and self._cleanup_debt is None:
-                self._cleanup_debt = ServeRefusal("cleanup")
+                # The guardian's own refusal (errno) and exit status name which
+                # native check refused (field run 2026-11-05 named none).
+                receipt = self.operation.public_receipt()
+                self._cleanup_debt = ServeRefusal(
+                    "cleanup",
+                    primary=self.operation._failure,
+                    facts={
+                        "guardian_refused": receipt.get("refused"),
+                        "guardian_status": receipt.get("guardian_status"),
+                    },
+                )
         for owner in (self.authority, self.bootstrap, self.session, self.alias):
             if owner is not None:
                 try:
@@ -756,10 +780,12 @@ def main():
         # READY with no trace of which check refused it). A startup failure
         # whose cleanup failed too carried both errors yet printed only
         # "operation" (field run 2026-11-05): both are named, path-free.
-        print(
-            "Managed Ollama daemon admission refused: %s." % serve_refusal_facts(refusal),
-            file=sys.stderr,
-        )
+        try:
+            facts = serve_refusal_facts(refusal)
+        except Exception:
+            # Naming the failures must never cost the line the driver logs
+            facts = str(refusal)
+        print("Managed Ollama daemon admission refused: %s." % facts, file=sys.stderr)
         return 78
     except Exception as error:
         print(

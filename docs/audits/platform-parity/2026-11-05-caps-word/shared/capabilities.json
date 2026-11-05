@@ -1,0 +1,172 @@
+[
+	{
+		"id": "capsword-action",
+		"capability": "CapsWord activation through catalogue actions",
+		"classification": "explicit_intent",
+		"availability": {
+			"windows": "present",
+			"macos": "present",
+			"linux": "present"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "source",
+			"linux": "source"
+		},
+		"platform_notes": {
+			"windows": "caps_word action.",
+			"macos": "capsword action, explicitly equivalent to caps_word.",
+			"linux": "caps_word action."
+		},
+		"basis": "Actual catalogue platform and equivalent fields; declarations do not certify native activation."
+	},
+	{
+		"id": "capsword-autooff-parameters",
+		"capability": "Idle, typed delimiters and supported pointer settings",
+		"classification": "raw_parity",
+		"availability": {
+			"windows": "present",
+			"macos": "present",
+			"linux": "present"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "actual-owner",
+			"linux": "actual-owner"
+		},
+		"platform_notes": {
+			"windows": "AHK policy port; idle zero sentinel is numeric zero.",
+			"macos": "Actual shared Lua policy; disabled idle is nil.",
+			"linux": "Actual shared Lua policy; disabled idle is nil."
+		},
+		"basis": "Eight actual declarations with 24 generated OS flags, shared defaults and recommendations; full driver admission remains separately qualified."
+	},
+	{
+		"id": "capsword-pointer-gesture",
+		"capability": "Gesture ends CapsWord when selected",
+		"classification": "native_constraint",
+		"availability": {
+			"windows": "absent",
+			"macos": "present",
+			"linux": "present"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "source",
+			"linux": "source"
+		},
+		"platform_notes": {
+			"windows": "Explicit current-driver exclusion: OS keeps gestures; translated reason is declared.",
+			"macos": "Gesture pointer kind declared.",
+			"linux": "Gesture pointer kind declared."
+		},
+		"basis": "Manifest platforms and platform_reason.caps_word_gestures_stay_with_windows. Not a claim future Windows interfaces cannot implement it."
+	},
+	{
+		"id": "capsword-custom-terminators",
+		"capability": "User-created hotstring delimiters offered as CapsWord stop choices",
+		"classification": "explicit_intent",
+		"availability": {
+			"windows": "absent",
+			"macos": "absent",
+			"linux": "absent"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "actual-owner",
+			"linux": "actual-owner"
+		},
+		"platform_notes": {
+			"windows": "Fresh built-in catalogue only.",
+			"macos": "Custom runtime delimiters excluded and refused.",
+			"linux": "Custom runtime delimiters excluded and refused."
+		},
+		"basis": "Built-in-only shared validation and registered custom-delimiter control; this is an explicit scope decision."
+	},
+	{
+		"id": "capsword-positive-idle-precision",
+		"capability": "Accepted positive idle remains an enabled positive duration after conversion",
+		"classification": "observed_defect",
+		"finding_ids": ["CW-S001"],
+		"availability": {
+			"windows": "partial",
+			"macos": "partial",
+			"linux": "partial"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "actual-owner",
+			"linux": "actual-owner"
+		},
+		"platform_notes": {
+			"windows": "An accepted positive value below 0.0005 s rounds to zero and disables expiry in the source-only AHK port.",
+			"macos": "The same value rounds to numeric zero, enabled under the actual Lua policy.",
+			"linux": "The same value rounds to numeric zero, enabled under the actual Lua policy."
+		},
+		"basis": "Actual Lua boundary controls plus exact AHK expressions. Ordinary presets and 10 s defaults are unaffected; driver timer admission corroborates separately."
+	},
+	{
+		"id": "capsword-setting-apply-lifetime",
+		"capability": "When saved changes affect an active session",
+		"classification": "documentation_only",
+		"availability": {
+			"windows": "present",
+			"macos": "unverified",
+			"linux": "partial"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "source",
+			"linux": "source"
+		},
+		"platform_notes": {
+			"windows": "Explicit publication for the next activation.",
+			"macos": "Settings owner promises next-event live apply; actual timer scheduling must be adjudicated in macOS scope.",
+			"linux": "Session captures policy, while actual menu promises next-event live apply; Linux scope owns its confirmed caller consequence."
+		},
+		"basis": "Do not classify Linux snapshot behavior as intentional: Manager implementation and menu promise disagree. No universal shared live-apply policy invented."
+	},
+	{
+		"id": "capsword-magic-key-meaning",
+		"capability": "Meaning and label of the built-in star delimiter after magic-key rename",
+		"classification": "observed_defect",
+		"availability": {
+			"windows": "unverified",
+			"macos": "partial",
+			"linux": "partial"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "actual-owner",
+			"linux": "actual-owner"
+		},
+		"platform_notes": {
+			"windows": "Explicit fresh built-in literal-star instance, separate from hotstring magic-key rename.",
+			"macos": "Menu substitutes current magic key; an already-loaded policy still reads captured literal star. Actual public owner corroborates the mismatch.",
+			"linux": "Menu substitutes current magic key; actual policy remains literal. Linux production metadata updates do not call the shared catalogue mutation."
+		},
+		"basis": "CW-S002 is a truthful-setting-label mismatch, not a decision to force dynamic meaning. Literal versus dynamic product intent remains unresolved; Windows full translated caption remains unverified.",
+		"finding_ids": ["CW-S002"]
+	},
+	{
+		"id": "capsword-repeated-activation",
+		"capability": "Repeated invocation while CapsWord is already active",
+		"classification": "unknown_intent",
+		"availability": {
+			"windows": "present",
+			"macos": "present",
+			"linux": "present"
+		},
+		"observation_basis": {
+			"windows": "source",
+			"macos": "source",
+			"linux": "source"
+		},
+		"platform_notes": {
+			"windows": "Catalogue invokes ToggleCapsWord, reaching CapsWordActivationToggle which flips CapsWordEnabled.",
+			"macos": "Catalogue gesture sets the active variable to one and refreshes activation; generated physical Karabiner action has variable_unless one. These are distinct origins, not one universal toggle.",
+			"linux": "Catalogue action invokes Manager.toggle_caps_word and ends an active session."
+		},
+		"basis": "Source-derived variant and macOS owner corroboration. The aliases declare equivalent capability names, but no common rule deciding toggle versus idempotent activation was located. Do not turn this difference into a confirmed bug without a product contract."
+	}
+]

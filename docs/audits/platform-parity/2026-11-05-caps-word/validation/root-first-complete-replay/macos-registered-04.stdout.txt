@@ -1,0 +1,11 @@
+
+=== Shared CapsWord auto-off policy ===
+  ok   compiles valid settings and refuses each malformed one by name
+  ok   ends CapsWord on a typed payload only through a checked delimiter
+  ok   answers native key bindings by delimiter key and refuses unknown keys
+  ok   answers pointer kinds and refuses undeclared ones
+  ok   expires only after the whole delay and never at 0
+  ok   stores a checkbox change in catalogue order and refuses invalid ones
+  ok   draws the delimiter rows from the catalogue, separators included
+  ok   draws and stores no custom delimiter appended to the catalogue at run time
+AUDIT_RESULT	8	0

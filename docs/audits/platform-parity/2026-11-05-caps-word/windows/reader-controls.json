@@ -1,0 +1,25 @@
+{
+	"qualification": "Python source-reader controls only, not driver tests",
+	"controls": [
+		{
+			"name": "valid-body-with-literal/comment-braces",
+			"passed": true
+		},
+		{
+			"name": "missing-symbol",
+			"rejected": true
+		},
+		{
+			"name": "empty-body",
+			"rejected": true
+		},
+		{
+			"name": "unclosed-body",
+			"rejected": true
+		},
+		{
+			"name": "duplicate-symbol",
+			"rejected": true
+		}
+	]
+}

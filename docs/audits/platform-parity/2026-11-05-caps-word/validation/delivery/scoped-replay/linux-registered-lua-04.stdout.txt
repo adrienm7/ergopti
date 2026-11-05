@@ -1,0 +1,7 @@
+
+=== injector: output observer ===
+  ok   injector output, reports the replacement and its replayed terminator
+  ok   injector output, reports nothing a refused injection did not type
+  ok   injector output, keeps one owner and survives a failing observer
+  ok   injector output, the daemon ends CapsWord on a delimiter the daemon typed
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":4}

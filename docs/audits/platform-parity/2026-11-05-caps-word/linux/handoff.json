@@ -1,0 +1,53 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"finding_ids": ["CW-L001", "CW-L002"],
+	"coverage_rows": 55,
+	"owner_observation_rows": 55,
+	"isolated_registered_modules": 8,
+	"registered_cases_per_runtime_per_sweep": 88,
+	"final_sweeps": 2,
+	"actual_processes": 36,
+	"source_files": 27,
+	"files": [
+		{
+			"path": "owner-probe.lua",
+			"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+		},
+		{
+			"path": "run-registered.lua",
+			"sha256": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7"
+		},
+		{
+			"path": "run-proofs.py",
+			"sha256": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858"
+		},
+		{
+			"path": "source-probe.py",
+			"sha256": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed"
+		},
+		{
+			"path": "source-receipt.json",
+			"sha256": "fd42494d7e1ab4884ed8cb41d1cd8df26c885a4ecb287480dd15f6e63dcf6e7b"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "80484a424d6cf974501a948c205918ed9ebdd6751c9e5f29b829e74f7c91155c"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "23c5928f286e95bf101611e809d7174d152a6a796c245df24d7067a94c7d3a1e"
+		},
+		{
+			"path": "report.md",
+			"sha256": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd"
+		},
+		{
+			"path": "final-proofs/receipts.json",
+			"sha256": "248954f92f93f115ddc6624890339c6f8226c8b447b686b7c3383fd0dc53f935"
+		},
+		{
+			"path": "false-green-baseline.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+		}
+	]
+}

@@ -1,0 +1,4 @@
+../../../scratch/parity-capsword-2026-11-05/shared/report.md 103ms (unchanged)
+../../../scratch/parity-capsword-2026-11-05/shared/coverage.json 56ms
+../../../scratch/parity-capsword-2026-11-05/shared/capabilities.json 9ms
+../../../scratch/parity-capsword-2026-11-05/shared/source-receipt.json 5ms

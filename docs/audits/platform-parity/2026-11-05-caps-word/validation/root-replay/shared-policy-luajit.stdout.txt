@@ -1,0 +1,9 @@
+corpus compiles valid settings and refuses each malformed one by name
+corpus ends CapsWord on a typed payload only through a checked delimiter
+corpus answers native key bindings by delimiter key and refuses unknown keys
+corpus answers pointer kinds and refuses undeclared ones
+corpus expires only after the whole delay and never at 0
+corpus stores a checkbox change in catalogue order and refuses invalid ones
+corpus draws the delimiter rows from the catalogue, separators included
+corpus draws and stores no custom delimiter appended to the catalogue at run time
+{"catalogue_characters":26,"catalogue_keys":25,"extended_assertions":116,"finite_upper_edge":{"accepted_seconds":"1e308","compiled_milliseconds":"positive infinity","finite_clock_expired":false,"qualification":"Shared policy only; no actual timer admission or AHK arithmetic execution."},"fractional_idle":[{"delay":"disabled","expires_at_activation":false,"seconds":0},{"delay":0,"expires_at_activation":true,"seconds":0.0001},{"delay":0,"expires_at_activation":true,"seconds":0.00048999999999999998},{"delay":1,"expires_at_activation":false,"seconds":0.00050000000000000001},{"delay":1,"expires_at_activation":false,"seconds":0.001},{"delay":2500,"expires_at_activation":false,"seconds":2.5}],"qualification":"Actual shared Lua policy and actual registered corpus owner; no AHK execution, native timer, compositor or keyboard receiving.","registered_corpus_assertions":166,"registered_corpus_cases":8,"total_assertions":282}

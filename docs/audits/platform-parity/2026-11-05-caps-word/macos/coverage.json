@@ -1,0 +1,300 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "macos",
+	"rows": [
+		{
+			"aspect": "canonical_action_alias",
+			"outcome": "capsword is the macOS equivalent of Windows/Linux caps_word; separate IDs are not a missing whole feature.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "deployed_graph_activation",
+			"outcome": "RightOption+CapsLock sets scoped variable1 and emits one CapsLock event plus one control tag.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "deployed_graph_priority",
+			"outcome": "CapsWord rule remains first in actual generated graph.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "setting_exit_removal",
+			"outcome": "Space/Return/Tab/g/v/button1/button2 are dropped from deployable graph, retained in historical anchor.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "fixed_exit_retention",
+			"outcome": "CapsLock/Escape/Delete/arrows/Page/Home/End/F1-F12 stay fixed Karabiner exits; bounded probes explicitly cover a subset.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "catalogue_activation_settlement",
+			"outcome": "Catalogue handler requests lock true only after write settles; preexisting recorder false/true both request true.",
+			"basis": "actual-owner",
+			"evidence": "activation-graph.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "idle_zero",
+			"outcome": "Zero creates no idle timer.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "idle_positive_boundary",
+			"outcome": "1-second idle requests clear at its due clock; existing module also tests last-keystroke residual delay.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "live_idle_enable",
+			"outcome": "CW-M001:0\u21921 via actual menu leaves no timer, including after next letter.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "live_idle_shorten",
+			"outcome": "CW-M001:10\u21921 remains on past new deadline until original10-second callback.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "live_idle_disable_extend",
+			"outcome": "1\u21920 and1\u219210 alter existing callback behavior, refuting an intentional frozen active policy on macOS.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "live_idle_reenable",
+			"outcome": "CW-M001:1\u21920\u21921 after zero callback loses idle clock until a new activation.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "menu_refusal_rollback",
+			"outcome": "Failed save restores prior state/policy; save acknowledgement is a port, not disk persistence.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "menu_delimiter_live_change",
+			"outcome": "Actual comma checkbox change takes effect on next key in the same active session.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "next_activation_control",
+			"outcome": "New activation acquires newly selected1-second policy.",
+			"basis": "actual-owner",
+			"evidence": "public-idle.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "fractional_idle_rounding",
+			"outcome": "Shared-only issue:0.0001seconds compiles0ms and schedules0, distinct from zero never;0.001compiles1ms.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "typed_nbsp",
+			"outcome": "Checked U+00A0 deactivates.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "typed_nnbsp",
+			"outcome": "Checked U+202F deactivates.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "typed_multiscalar",
+			"outcome": "Carrier containing checked NBSP/semicolon deactivates; ordinary letters do not.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "typed_cr_lf_tab",
+			"outcome": "CR/LF/Tab payload controls deactivate.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "typed_etx",
+			"outcome": "ETX payload does not deactivate; physical keypad-Enter payload remains unqualified.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "pointer_kind_switches",
+			"outcome": "Each configured kind and disabled counterpart are covered in registered watcher auto-off22-case module.",
+			"basis": "actual-owner",
+			"evidence": "tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "inactive_pointer_throttle",
+			"outcome": "CW-M002:inactive motion stamps gate; new activation checked click/gesture/scroll50ms later is discarded.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "pointer_threshold_controls",
+			"outcome": "Fresh activation with no preceding inactive event and exact100ms boundary both clear.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "immediate_vs_pointer_gate",
+			"outcome": "Typed delimiter bypasses100ms pointer throttle when no pending clear exists.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "pending_clear_new_activation",
+			"outcome": "CW-M003:old completion-pending flag discards new activation delimiter; native publication0 precedes reactivation.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "stale_led_revision",
+			"outcome": "Old clear completion correctly declines stale LED write after newer revision; lost delimiter still is not retried.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "after_settlement_control",
+			"outcome": "Later delimiter after completion queues current clear and requests LED false.",
+			"basis": "actual-owner",
+			"evidence": "public-admission.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "direct_sender_accepted",
+			"outcome": "Actual TextSender accepted output reports a checked delimiter and clears.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "direct_sender_refused",
+			"outcome": "Actual TextSender refused output does not clear.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "relay_invalid_empty",
+			"outcome": "Empty/nonstring output relay is ignored.",
+			"basis": "actual-owner",
+			"evidence": "public-payload.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "renamed_magic_menu",
+			"outcome": "Actual submenu renders \u00a7 caption through supplied production-equivalent context formatter; checked policy still matches old\u2605 after real Terminators.rename. Shared root only.",
+			"basis": "actual-owner",
+			"evidence": "public-magic-menu.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "watcher_teardown_retry",
+			"outcome": "25 registered retry/retention cases pass; retained capabilities are not discarded on refused stop.",
+			"basis": "actual-owner",
+			"evidence": "tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "control_generation_guard",
+			"outcome": "Actual serialized/control tests reject wrong token/paused lease and gate stale revisions.",
+			"basis": "actual-owner",
+			"evidence": "tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"qualification": "Actual Lua owners over explicit native ports; no physical receiving."
+		},
+		{
+			"aspect": "initial_capslock_restoration",
+			"outcome": "No previous-lock snapshot is kept by watcher; its owned clear requests false. Native key toggle outcome with initialCapsLock on is unmeasured.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "action_reinvocation_semantics",
+			"outcome": "Catalogue action writes1; keyboard-native action has variable_unless1; this differs from a generic toggle and needs cross-OS intent classification.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "hold_action_limit",
+			"outcome": "Native capsword action is holdable=false; do not promise Linux while_released behavior.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "modifier_transition_idle",
+			"outcome": "Watcher subscribes keyDown but not flagsChanged/keyUp; pure modifier edges are not this owner's idle activity. Shared keystroke intent remains qualified.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "pause_stop_capslock",
+			"outcome": "Watcher stop clears observers/timers/watchers, not an explicit native CapsLock reset; broader lease/native receiving still requires qualification.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "expander_output_relay",
+			"outcome": "Committed expansion publishes logical_text to CapsWordOutput after canonical state commit.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "setting_loader_acceptance",
+			"outcome": "Preference scalar validator accepts finite nonnegative seconds by shared policy, including tiny positive values.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/infra/preferences.lua",
+			"qualification": "Source-derived; no native execution."
+		},
+		{
+			"aspect": "live_apply_contract",
+			"outcome": "Menu says applies at once; settings owner/menu_state say next event. This supportsCW-M001 without assuming Windows same-session policy.",
+			"basis": "source",
+			"evidence": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"qualification": "Source-derived; no native execution."
+		}
+	]
+}

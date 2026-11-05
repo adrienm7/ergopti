@@ -1,0 +1,45 @@
+
+=== caps word auto-off: the settings ===
+  ok   caps word auto-off, reads the manifest defaults from an empty configuration
+  ok   caps word auto-off, declares exactly the manifest's pointer kinds
+  ok   caps word auto-off, reads stored values and drops what this build does not know
+  ok   caps word auto-off, reads a malformed delay or list as its default
+  ok   caps word auto-off, persists a change sparsely and in catalogue order
+
+=== caps word auto-off: evdev pointer kinds ===
+  ok   caps word auto-off, names the kind of every pointer press
+
+=== caps word auto-off: the manager session ===
+  ok   caps word auto-off, a checked delimiter ends CapsWord
+  ok   caps word auto-off, an unchecked delimiter keeps CapsWord on
+  ok   caps word auto-off, a checked no-break space ends CapsWord and a space does not
+  ok   caps word auto-off, the delay ends a silent CapsWord and a keystroke postpones it
+  ok   caps word auto-off, a key after the delay ends CapsWord before it is read
+  ok   caps word auto-off, a whole-second clock never reads two quick keys as a pause
+  ok   caps word auto-off, never times out at a delay of 0
+  ok   caps word auto-off, the shipped 10 s delay ends a silent CapsWord
+  ok   caps word auto-off, the shipped delimiters end CapsWord on typed punctuation and no-break spaces
+  ok   caps word auto-off, a checked pointer kind ends CapsWord and an unchecked one keeps it
+  ok   caps word auto-off, a new CapsWord reads the settings stored since the last one
+  ok   caps word auto-off, a session locks CapsLock and every way it ends unlocks it
+  ok   caps word auto-off, a CapsLock that cannot be locked refuses the session
+  ok   caps word auto-off, a hold the hook ends ends the session without a second unlock
+  ok   caps word auto-off, the session presses the CapsLock key on the daemon's device
+  ok   (linux-caps-word-unlock-debt) retains the native output outcome through the manager emitter
+  ok   caps word auto-off, a shortcut configuration transaction ends the session and unlocks
+  ok   (linux-caps-word-trigger) the catalogue action toggles the tray's session
+
+=== caps word session: the shared corpus ===
+  ok   (linux-caps-word-lock) every typed-text vector ends the session and unlocks only on a checked delimiter
+  ok   (linux-caps-word-lock) every native-key vector ends the session and unlocks only on a checked delimiter
+  ok   (linux-caps-word-lock) every pointer vector ends the session and unlocks only on a checked kind
+
+=== caps word auto-off: daemon and hook wiring ===
+  ok   caps word auto-off, the daemon reports characters, controls, presses and motion
+  ok   caps word auto-off, the daemon types no capital of its own and a pause ends the session
+  ok   caps word auto-off, every typed character reaches the delimiter check, whatever produced it
+  ok   caps word auto-off, a delimiter in the daemon's own output ends CapsWord
+  ok   caps word auto-off, the hook hands every pointer press and EV_REL report to the callback
+  ok   caps word auto-off, the manager maps a native press and motion to their declared kinds
+  ok   caps word auto-off, the daemon's main() stays within LuaJIT's 60 upvalues
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":34}

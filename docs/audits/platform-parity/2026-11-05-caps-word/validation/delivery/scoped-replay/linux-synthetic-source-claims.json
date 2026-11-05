@@ -1,0 +1,106 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/action_handlers.lua",
+			"sha256": "e218a293d0c52a9b5162cd31f83c44b41435d31d73aaa94e4d329e82bfde563d"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+			"sha256": "b83f459977dd92b208fc13ce8ffcb16a37286226bf4660ebed8a56d835194e88"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+			"sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+			"sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+			"sha256": "e3d8970dd41e7e1239b370ecbc9e0d04edf2f8a1f2c4a4fbfb5a0ed6d3b1522b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_layout.lua",
+			"sha256": "a1114103fbfc238572c562e5b9842fc51207b866997774e630c63979d8fbb15b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/input_event.lua",
+			"sha256": "ed7f21f545f682607bde2626c9c327935bb5996910b2b813f259cbe830b2fbe7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120"
+		},
+		{
+			"path": "static/ergopti_plus/linux/_generated/gesture_emit_actions.lua",
+			"sha256": "aaff68b8707131cc7271f371dc02885f7ff55a97be36868f29eee7d07ee96822"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+		},
+		{
+			"path": "docs/audits/platform-parity/2026-11-05-word-reset/linux/findings.json",
+			"sha256": "4cb550f57c6934f0fd04cc1f30b4967302d9e4c75712b3d9241105fd337277d8"
+		}
+	],
+	"checks": [
+		"Existing WRSL-001 identifies the same catalogue-output publication connector for the arrow/word/AI consumer.",
+		"Nonempty original generic emission branch reaches ComboEmitter without CapsWord publication.",
+		"Original emitter has no CapsWord/output observer publication hook.",
+		"Ordinary tap Enter/Tab are KEY_TAPS native rows, refuting generalization to generic tap callbacks.",
+		"Actual literal injector output notifies its owner; Main source forwards that text to CapsWord.",
+		"Main generic tap callback applies WordReset, not an additional CapsWord notification; ordinary KEY_TAPS do not use this path."
+	],
+	"qualification": "Scoped full-file source authentication and qualified lexical wiring checks. Actual Main closures, native compositor receiving and arbitrary layouts are not executed."
+}

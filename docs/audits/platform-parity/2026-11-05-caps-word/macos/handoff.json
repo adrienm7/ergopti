@@ -1,0 +1,240 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "macos",
+	"findings": ["CW-M001", "CW-M002", "CW-M003"],
+	"coverage_rows": 42,
+	"registered_modules": 14,
+	"positive_cases": 148,
+	"decisive_programs": 5,
+	"final_dry_sweeps": 2,
+	"source_files": 46,
+	"runtime": "genuine Lua5.4.8",
+	"qualification": "No production/test fixes; actual owners over recorded native ports; model/graph and lexical controls identified; no physical macOS keyboard receiving, no measured latency/memory. Shared tiny-positive/magiclabel roots not duplicated.",
+	"diagnostics_not_credited": [
+		"public-idle-initial.txt: early audit fixture selected wrong menu-title spelling; no production finding derives from that failure.",
+		"public-admission-luajit.txt: optional LuaJIT fixture attempt lacks table.pack in macOS test helpers; LuaJIT is not the macOS production runtime."
+	],
+	"artifacts": [
+		{
+			"path": "activation-graph.lua",
+			"sha256": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0"
+		},
+		{
+			"path": "activation-graph.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+		},
+		{
+			"path": "dry-A/activation-graph.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A/activation-graph.lua.stdout.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+		},
+		{
+			"path": "dry-A/public-admission.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A/public-admission.lua.stdout.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+		},
+		{
+			"path": "dry-A/public-idle.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A/public-idle.lua.stdout.txt",
+			"sha256": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d"
+		},
+		{
+			"path": "dry-A/public-magic-menu.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A/public-magic-menu.lua.stdout.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689"
+		},
+		{
+			"path": "dry-A/public-payload.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-A/public-payload.lua.stdout.txt",
+			"sha256": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22"
+		},
+		{
+			"path": "dry-A/receipt.json",
+			"sha256": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62"
+		},
+		{
+			"path": "dry-B/activation-graph.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B/activation-graph.lua.stdout.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+		},
+		{
+			"path": "dry-B/public-admission.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B/public-admission.lua.stdout.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+		},
+		{
+			"path": "dry-B/public-idle.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B/public-idle.lua.stdout.txt",
+			"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+		},
+		{
+			"path": "dry-B/public-magic-menu.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B/public-magic-menu.lua.stdout.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689"
+		},
+		{
+			"path": "dry-B/public-payload.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "dry-B/public-payload.lua.stdout.txt",
+			"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+		},
+		{
+			"path": "dry-B/receipt.json",
+			"sha256": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1"
+		},
+		{
+			"path": "false-greens.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87"
+		},
+		{
+			"path": "public-admission.lua",
+			"sha256": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4"
+		},
+		{
+			"path": "public-admission.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+		},
+		{
+			"path": "public-idle.lua",
+			"sha256": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92"
+		},
+		{
+			"path": "public-idle.txt",
+			"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+		},
+		{
+			"path": "public-magic-menu.lua",
+			"sha256": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429"
+		},
+		{
+			"path": "public-magic-menu.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689"
+		},
+		{
+			"path": "public-payload.lua",
+			"sha256": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a"
+		},
+		{
+			"path": "public-payload.txt",
+			"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+		},
+		{
+			"path": "replay.py",
+			"sha256": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59"
+		},
+		{
+			"path": "report.md",
+			"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+		},
+		{
+			"path": "run-module.lua",
+			"sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab"
+		},
+		{
+			"path": "run-tests.py",
+			"sha256": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58"
+		},
+		{
+			"path": "source-hashes.json",
+			"sha256": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86"
+		},
+		{
+			"path": "test-results.json",
+			"sha256": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b"
+		},
+		{
+			"path": "tests/meta_architecture_test_capsword_auto_off_single_source.txt",
+			"sha256": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb"
+		},
+		{
+			"path": "tests/meta_architecture_test_karabiner_capsword_lock_release.txt",
+			"sha256": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c"
+		},
+		{
+			"path": "tests/unit_adapters_synthetic_input_test_text_sender_capsword_output.txt",
+			"sha256": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61"
+		},
+		{
+			"path": "tests/unit_infra_config_test_capsword_auto_off_settings.txt",
+			"sha256": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a"
+		},
+		{
+			"path": "tests/unit_modules_gestures_actions_test_karabiner_actions_reachable.txt",
+			"sha256": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4"
+		},
+		{
+			"path": "tests/unit_platform_remap_generator_test_generator_capsword_setting_exits.txt",
+			"sha256": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a"
+		},
+		{
+			"path": "tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"sha256": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_caps_word_auto_off_policy.txt",
+			"sha256": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_capsword_control_signal.txt",
+			"sha256": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword.txt",
+			"sha256": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"sha256": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword_release_race.txt",
+			"sha256": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801"
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"sha256": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87"
+		},
+		{
+			"path": "tests/unit_ui_menu_shortcuts_test_menu_caps_word.txt",
+			"sha256": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05"
+		}
+	],
+	"presentation": "All final submitted JSON and Markdown use repository Prettier; SHA receipts name these final bytes."
+}

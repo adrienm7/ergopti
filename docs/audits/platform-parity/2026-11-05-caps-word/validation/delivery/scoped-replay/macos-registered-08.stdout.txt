@@ -1,0 +1,6 @@
+
+=== CapsWord auto-off menu (caps_word_auto_off_group) ===
+  ok   draws the presets, the delimiter catalogue and every pointer kind
+  ok   a fresh install ticks exactly the eight shipped delimiters and the 10 s delay
+  ok   a pointer and a delimiter click apply and save; a refused save restores
+AUDIT_RESULT	3	0

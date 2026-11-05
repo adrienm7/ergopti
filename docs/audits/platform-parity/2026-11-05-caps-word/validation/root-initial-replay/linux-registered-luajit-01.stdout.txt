@@ -1,0 +1,4 @@
+
+=== keyboard_hook: caps_lock_on reads the keyboard's LED ===
+  ok   answers true and false from the open keyboard, without guessing
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":1}

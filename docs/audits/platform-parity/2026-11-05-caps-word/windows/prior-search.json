@@ -1,0 +1,19 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"searches": [
+		{
+			"pattern": "altgr.{0,70}capsword|capsword.{0,70}altgr|alt_gr.{0,70}caps_word|caps_word.{0,70}alt_gr",
+			"scope": "docs/audits markdown/finding JSON and TODO.md",
+			"exit_code": 1,
+			"matches": [],
+			"qualification": "A bounded prior-report duplicate search, not proof no historic issue exists anywhere."
+		},
+		{
+			"pattern": "physical.*tap.*capsword|capsword.*carrier|CapsWord.*Backspace.*Tab",
+			"scope": "docs/audits markdown/finding JSON and TODO.md",
+			"exit_code": 1,
+			"matches": [],
+			"qualification": "A bounded prior-report duplicate search, not proof no historic issue exists anywhere."
+		}
+	]
+}
