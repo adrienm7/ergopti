@@ -247,10 +247,16 @@ end
 function M.unescape_text(s)
 	if type(s) ~= "string" then return "" end
 
-	-- 1. Decode Unicode escapes: \uXXXX
+	-- Decode UTF-16 pairs first; a surrogate by itself is not a Unicode scalar.
+	s = s:gsub("\\u([dD][89aAbB]%x%x)\\u([dD][cCdDeEfF]%x%x)", function(high, low)
+		local code = 0x10000 + (tonumber(high, 16) - 0xD800) * 0x400 + (tonumber(low, 16) - 0xDC00)
+		return utf8_lib.char(code)
+	end)
+
+	-- 1. Decode remaining Unicode escapes: \uXXXX
 	s = s:gsub("\\u(%x%x%x%x)", function(hex)
 		local code = tonumber(hex, 16)
-		if code then
+		if code and (code < 0xD800 or code > 0xDFFF) then
 			local ok, char = pcall(utf8_lib.char, code)
 			if ok then return char end
 		end

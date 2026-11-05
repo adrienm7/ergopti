@@ -781,9 +781,8 @@ function _renderMagicKey(page, state) {
 	var input = document.createElement('input');
 	input.type = 'text';
 	input.className = 'magic-input';
-	// A supplementary Unicode symbol occupies two browser UTF-16 units, but
-	// the Linux runtime still validates exactly one scalar before saving.
-	input.maxLength = choice.max_characters * (choice.validation === 'safe_magic_key' ? 2 : 1);
+	// maxlength counts UTF-16 code units; one accepted Unicode scalar may need two.
+	input.maxLength = choice.max_characters * 2;
 	input.value = isPreset
 		? state.custom
 		: state.magic === CUSTOM_MAGIC_VALUE
@@ -1126,7 +1125,17 @@ function _pageComplete(page) {
 		Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)
 	)
 		return true;
-	if (_magicValue(page) !== '') return true;
+	var value = _magicValue(page);
+	var scalars = Array.from(value);
+	if (
+		scalars.length > 0 &&
+		scalars.length <= page.magic_key.max_characters &&
+		scalars.every(function (scalar) {
+			var cp = scalar.codePointAt(0);
+			return cp > 0x1f && !(cp >= 0x7f && cp <= 0x9f) && !(cp >= 0xd800 && cp <= 0xdfff);
+		})
+	)
+		return true;
 	var input = document.getElementById('page-magic-options').querySelector('.magic-input');
 	if (input) {
 		input.classList.add('invalid');
