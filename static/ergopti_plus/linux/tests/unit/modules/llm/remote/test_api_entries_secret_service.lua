@@ -209,6 +209,41 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		return
 	end
 
+	helpers.it("secret-service-revision: restart in the same second cannot overwrite a published key", function()
+		local saved_time, saved_module = os.time, package.loaded["modules.llm.api_token_store"]
+		local records = {}
+		local backend = { unavailable = function() end, store = function(name, token) records[name] = token; return true end }
+		local ok, err = pcall(function()
+			os.time = function() return 123456 end
+			local first = helpers.load_module("modules.llm.api_token_store")
+			first._set_backend_for_test(backend)
+			local old = assert(first.store("provider", "old-key"))
+			local restarted = helpers.load_module("modules.llm.api_token_store")
+			restarted._set_backend_for_test(backend)
+			local new = assert(restarted.store("provider", "new-key"))
+			helpers.assert_true(old ~= new, "a new process must not reuse the published reference")
+			helpers.assert_eq(records[old:sub(#first.REFERENCE_PREFIX + 1)], "old-key")
+		end)
+		os.time, package.loaded["modules.llm.api_token_store"] = saved_time, saved_module
+		assert(ok, err)
+	end)
+
+	helpers.it("secret-service-revision: unavailable randomness refuses before storing", function()
+		local previous_uv, previous_store = package.loaded["luv"], package.loaded["modules.llm.api_token_store"]
+		local writes = 0
+		local ok, err = pcall(function()
+			package.loaded["luv"] = { random = function() return nil, "unavailable" end }
+			local Store = helpers.load_module("modules.llm.api_token_store")
+			Store._set_backend_for_test({ unavailable = function() end, store = function() writes = writes + 1; return true end })
+			local reference, reason = Store.store("provider", "private-key")
+			helpers.assert_nil(reference)
+			helpers.assert_eq(reason, "secure random revision unavailable")
+			helpers.assert_eq(writes, 0)
+		end)
+		package.loaded["luv"], package.loaded["modules.llm.api_token_store"] = previous_uv, previous_store
+		assert(ok, err)
+	end)
+
 	--- A stand-in secret-tool: records its arguments and stdin, answers as told.
 	--- @param body string Shell lines run after recording.
 	--- @return string tool, string dir
