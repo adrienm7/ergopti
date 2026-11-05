@@ -40,6 +40,14 @@
 			"tracked": "none"
 		},
 		{
+			"id": "CONF-LINUX-RELOAD-CLI",
+			"driver": "linux",
+			"subject": "tools/control/request_driver_reload.sh — Linux client locking, native signals and deadline admission",
+			"status": "environment",
+			"reason": "The integration fixtures exercise Linux flock ownership, SIGUSR1 delivery, FIFO admission and /proc/self/fd against real processes. A Windows host cannot reproduce those Linux kernel semantics, so only that host defers the fixtures. On Linux, missing required utilities or a failed fixture fail the test; dash and bash are also checked when available.",
+			"tracked": "none"
+		},
+		{
 			"id": "CONF-LINUX-PROC-SELF",
 			"driver": "linux",
 			"subject": "modules/updater/restarter.lua — own_pid() read from /proc/self/stat",

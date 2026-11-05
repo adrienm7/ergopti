@@ -29,7 +29,7 @@ local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.j
 local FOLDER = "/run/user/1000/ergopti_plus/control"
 
 if require("tests.win_compat").is_windows() then
-	helpers.it("SKIP [linux-reload-cli-overlap] — native flock and SIGUSR1 require Linux", function()
+	helpers.it("SKIP [CONF-LINUX-RELOAD-CLI] — a Windows host lacks Linux flock, SIGUSR1 and procfs descriptors", function()
 		helpers.assert_eq(package.config:sub(1, 1), "\\")
 	end)
 else
