@@ -56,6 +56,12 @@ else
 	# Retain this owned stage for the external build-process owner to settle.
 	exit "$TASK_COMPILE_STATUS"
 fi
+if [[ ! -f "${STAGE_DIR}/libergopti_archive_publication.so" \
+	|| -L "${STAGE_DIR}/libergopti_archive_publication.so" \
+	|| ! -s "${STAGE_DIR}/libergopti_archive_publication.so" ]]; then
+	echo "Native compiler did not produce a nonempty ordinary file" >&2
+	exit 1
+fi
 chmod 755 "${STAGE_DIR}/libergopti_archive_publication.so"
 # Atomic no-replace publication, including a concurrent destination arrival.
 ln -T -- "${STAGE_DIR}/libergopti_archive_publication.so" "$DESTINATION"
