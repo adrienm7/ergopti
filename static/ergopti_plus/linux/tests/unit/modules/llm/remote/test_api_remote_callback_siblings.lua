@@ -164,6 +164,31 @@ local function check_outcome_delivery(delivered, outcome)
 end
 
 helpers.describe("api_remote_callback_siblings: protected public wrappers", function()
+	helpers.it("settles model listing once when HTTP refuses synchronously", function()
+		isolated(function(remote)
+			local http = require("adapters.http_client")
+			http.get = function(_, _, _, callback)
+				callback({ ok = false, status = 0, error = "preflight refused" })
+				return false
+			end
+			local results = {}
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "fixture-key", base_url = "https://example.invalid/v1" }
+			helpers.assert_eq(remote.list_models(entry, function(state) results[#results + 1] = state end), false)
+			helpers.assert_eq(results, { { state = "failed", reason = "unavailable" } })
+		end)
+	end)
+	helpers.it("settles model listing once under a reentrant repeated callback", function()
+		isolated(function(remote, calls)
+			local results = {}
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "fixture-key", base_url = "https://example.invalid/v1" }
+			helpers.assert_true(remote.list_models(entry, function(state)
+				results[#results + 1] = state
+				calls[1].callback({ ok = false, status = 0 })
+			end))
+			calls[1].callback({ ok = true, status = 200, body = '{"data":[{"id":"one"}]}' })
+			helpers.assert_eq(results, { { state = "listed", ids = { "one" } } })
+		end)
+	end)
 	helpers.it("lists a Gemini model named alongside a null optional id", function()
 		isolated(function(remote, calls)
 			local listed

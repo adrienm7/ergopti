@@ -1439,7 +1439,10 @@ end
 --- @return boolean dispatched
 function M.list_models(entry, on_done)
 	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
+	local finished = false
 	local function finish(state)
+		if finished then return end
+		finished = true
 		local ok, err = pcall(on_done, state)
 		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s",
 			(type(err) == "string" or type(err) == "number") and "details withheld"
