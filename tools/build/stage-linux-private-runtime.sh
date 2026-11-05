@@ -41,7 +41,7 @@ mkdir -p "$DESTINATION/lib"
 cp -a "$SOURCE/bin" "$DESTINATION/bin"
 cp -a "$SOURCE/share" "$DESTINATION/share"
 # Everything under lib except the driver tree, which is the packager's.
-for entry in "$SOURCE/lib"/* "$SOURCE/lib"/.[!.]*; do
+for entry in "$SOURCE/lib"/* "$SOURCE/lib"/.[!.]* "$SOURCE/lib"/..?*; do
 	[ -e "$entry" ] || [ -L "$entry" ] || continue
 	[ "$(basename -- "$entry")" = ergopti ] && continue
 	cp -a "$entry" "$DESTINATION/lib/"
