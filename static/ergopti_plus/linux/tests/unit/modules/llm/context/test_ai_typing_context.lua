@@ -31,7 +31,8 @@ local function scenario(options, body)
 	for _, name in ipairs(KEYS) do saved[name] = package.loaded[name] end
 	local initial = {}
 	if options.reset_on_nav ~= nil then initial["llm.generation.reset_on_nav"] = options.reset_on_nav end
-	package.loaded["infra.llm_preferences"] = PreferencesFixture.new({ initial = initial })
+	if options.context_length ~= nil then initial["llm.generation.context_length"] = options.context_length end
+	package.loaded["infra.llm_preferences"] = PreferencesFixture.new({ initial = initial, writes_fail = options.writes_fail })
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["modules.llm.context"] = nil
 	require("modules.llm.settings")._reset()
@@ -48,7 +49,8 @@ local function scenario(options, body)
 		settings.idle_seconds = 0
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
 		assert(word_reset.restore_configuration(settings))
-		body({ engine = engine, context = context, word_reset = word_reset, ai = ai })
+		body({ engine = engine, context = context, word_reset = word_reset, ai = ai,
+			settings = require("modules.llm.settings") })
 	end, debug.traceback)
 	for _, name in ipairs(KEYS) do package.loaded[name] = saved[name] end
 	if not ok then error(failure, 0) end
@@ -60,6 +62,31 @@ local function type_text(s, text)
 end
 
 helpers.describe("AI typing context: fed by the typed text", function()
+	helpers.it("retains the configured context length and applies a smaller limit", function()
+		scenario({}, function(s)
+			helpers.assert_true(s.settings.set("context_length", 4000))
+			local input = "A" .. string.rep("é", 4000)
+			type_text(s, input)
+			helpers.assert_eq(s.context:text(), string.rep("é", 4000),
+				"the real input observer must retain exactly the configured 4000 characters")
+			helpers.assert_true(s.settings.set("context_length", 100))
+			helpers.assert_eq(s.context:text(), string.rep("é", 100), "the smaller setting releases the older text")
+			helpers.assert_true(s.settings.set("context_length", 4000))
+			helpers.assert_eq(s.context:text(), string.rep("é", 100), "discarded text cannot reappear")
+		end)
+	end)
+
+	helpers.it("retains the old context limit on a refused setting and clears private output", function()
+		scenario({ context_length = 4000, writes_fail = true }, function(s)
+			type_text(s, string.rep("x", 2200))
+			helpers.assert_eq(s.settings.set("context_length", 100), false)
+			helpers.assert_eq(s.settings.get("context_length"), 4000)
+			helpers.assert_eq(#s.context:text(), 2200, "a refused change cannot truncate the current context")
+			s.context:replaced(0, "private secret", true)
+			helpers.assert_eq(s.context:text(), "", "private output stays out of the context")
+		end)
+	end)
+
 	helpers.it("(ai-context) accumulates what is typed and follows Backspace", function()
 		scenario({}, function(s)
 			type_text(s, "Bonjour tout")

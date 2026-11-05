@@ -263,6 +263,10 @@ function M.run(options)
 			suppress_count = suppress_count + 1
 		end,
 	}
+	local context = (options.llm_private_mark or "") .. (options.llm_buffer or options.buffer or "prefix ")
+	-- Malformed hotstring buffers exercise rejection independently of AI state.
+	if not utf8.len(context) then context = "" end
+	require("modules.keymap.llm_context").seed(state, context, options.llm_private_mark or "")
 	bridge.init(state, {
 		preview_star_enabled = true,
 		preview_autocorrect_enabled = true,

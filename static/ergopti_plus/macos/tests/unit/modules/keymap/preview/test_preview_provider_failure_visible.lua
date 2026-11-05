@@ -136,6 +136,7 @@ local function run_scenario()
 			},
 			is_repeat_feature_enabled = function() return false end,
 		}
+		require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
 		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 
 		local delivered = 0

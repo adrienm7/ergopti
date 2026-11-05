@@ -86,6 +86,7 @@ local function fresh_runtime(effects)
 	state.preview_providers = {}
 	state.is_repeat_feature_enabled = function() return false end
 	Registry.init(state)
+	require("modules.keymap.llm_context").seed(state, state.buffer or "", "")
 	Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
 	Expander.init(state, Registry, Bridge)
 	Bridge.set_preview_star_enabled(true)

@@ -20,6 +20,7 @@ local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
 local TableUtil = require("table_util")
 local ConfigKeys = require("config_keys")
+local ContextLimit = require("infra.llm_context_limit")
 
 local LOG = "menu_llm.settings"
 
@@ -314,6 +315,11 @@ function M.new(deps)
 		deps.state[snapshot.key] = clone_value(snapshot.state_value)
 
 		local failures = {}
+		if debt.released_demotions then
+			local called, restored = pcall(deps.demotions.readopt, debt.released_demotions)
+			if called and restored == true then debt.released_demotions = nil
+			else failures[#failures + 1] = "session preference restoration" end
+		end
 		if debt.menu then
 			if refresh_menu(deps, "LLM setting menu rollback") then
 				debt.menu = false
@@ -321,7 +327,7 @@ function M.new(deps)
 				failures[#failures + 1] = "menu rollback"
 			end
 		end
-		if debt.persist then
+		if debt.persist and debt.released_demotions == nil then
 			local persisted = publish_setting(debt, "LLM setting preference rollback")
 			-- The outer preference owner may restore its last committed candidate
 			-- when this compensating write refuses, so reclaim this key immediately
@@ -394,6 +400,11 @@ function M.new(deps)
 			return false
 		end
 		if options.publication_guard ~= nil and type(options.publication_guard) ~= "function" then return false end
+		if options.key == "llm_context_length" and (type(options.value) ~= "number"
+			or not ContextLimit.valid(options.value) or options.value % 1 ~= 0) then
+			Logger.error(LOG, "LLM context length refused outside the supported integer range.")
+			return false
+		end
 		if not is_finite_number(options.value) then
 			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
 				tostring(options.key))
@@ -469,6 +480,20 @@ function M.new(deps)
 		end
 
 		deps.state[options.key] = clone_value(candidate)
+		-- A user can explicitly confirm the currently displayed fallback. Detach
+		-- only this key's boot demotion during publication, and reclaim it before
+		-- any compensating save if a later boundary refuses.
+		if options.key == "llm_context_length" and deps.demotions ~= nil then
+			if type(deps.demotions) ~= "table" or type(deps.demotions.release_feature) ~= "function"
+				or type(deps.demotions.readopt) ~= "function" then
+				return reject_transition("session preference ownership")
+			end
+			local called, released = pcall(deps.demotions.release_feature, "ai", { [options.key] = true })
+			if not called or type(released) ~= "table" then
+				return reject_transition("session preference release")
+			end
+			debt.released_demotions = released
+		end
 		debt.persist = true
 		if not publish_setting(debt, "LLM setting preference save") then
 			return reject_transition("preference save")
@@ -655,7 +680,13 @@ function M.new(deps)
 
 	--- Sets the size of the text buffer sent as context to the AI.
 	function obj.set_context_length()
-		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
+		local function apply_context(options)
+			if not ContextLimit.valid(options.value) then
+				return reject_numeric_input(i18n.get("menu.settings.context_length_title"), "numeric_prompt.out_of_range")
+			end
+			return obj.apply_setting_transaction(options)
+		end
+		return generic_numeric_prompt(deps, apply_context,
 			i18n.get("menu.settings.context_length_title"),
 			i18n.get("menu.llm.context_length_prompt"),
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length,

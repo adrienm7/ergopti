@@ -115,6 +115,13 @@ end
 
 local INVALID_ROUTES = {
 	{
+		name = "context above retention limit",
+		raw = "4001",
+		title = "menu.settings.context_length_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_context_length() end,
+	},
+	{
 		name = "temperature decimal comma",
 		raw = "0,8",
 		title = "menu.settings.temperature_title",
@@ -215,6 +222,14 @@ helpers.describe("settings_manager numeric validation feedback", function()
 			end)
 		end)
 	end
+
+	helpers.it("accepts the maximum context length without clamping", function()
+		with_fixture("4000", function(manager, observations)
+			helpers.assert_eq(manager.set_context_length(), true)
+			helpers.assert_eq(observations.applications[1].value, 4000)
+			helpers.assert_eq(#observations.notifications, 0)
+		end)
+	end)
 
 	helpers.it("keeps valid temperature input on the mutation path without a warning", function()
 		with_fixture("0.75", function(manager, observations)

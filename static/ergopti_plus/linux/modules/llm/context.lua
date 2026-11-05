@@ -51,7 +51,16 @@ function M.new(ports)
 	--- Whether the AI is on; forgets everything while it is not.
 	--- @return boolean
 	local function active()
-		if ports.is_active() == true then return true end
+		if ports.is_active() == true then
+			-- The settings owner publishes only after durable commit. Synchronize
+			-- before every public read/edit so reductions discard old text without
+			-- prematurely truncating a transaction that may still be refused.
+			local ok, limit = pcall(Settings.get, ConfigKeys.LEAF.CONTEXT_LENGTH)
+			if ok and buffer:set_capacity(limit) then return true end
+			buffer:clear()
+			Logger.error(LOG, "AI context limit unavailable — typing context forgotten.")
+			return false
+		end
 		if buffer:length() > 0 then
 			buffer:clear()
 			Logger.debug(LOG, "AI off — typing context forgotten.")

@@ -395,6 +395,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
+	-- A refused context setting must never be mirrored into the plist until
+	-- the exact runtime value has been read back.
+	local context_storage_safe = true
 	-- Sync keymap AI options
 	if keymap then
 		local llm_enabled_setter = type(apply_llm_enabled) == "function"
@@ -459,7 +462,29 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then
-					try("ai", "keymap." .. item.fn, keymap[item.fn], item.val)
+					if item.fn == "set_llm_context_length" and item.val ~= nil then
+						if not try_exact("ai", "keymap." .. item.fn, keymap[item.fn], item.val) then
+							context_storage_safe = false
+							local ok, found, actual = pcall(function()
+								return keymap.get_llm_runtime_setting("llm_context_length")
+							end)
+							if ok and found == true and type(actual) == "number"
+								and require("infra.llm_context_limit").valid(actual) then
+								report.demotions[#report.demotions + 1] = {
+									feature = "ai", key = "llm_context_length",
+									persisted = clone_value(state.llm_context_length), demoted = actual,
+								}
+								Logger.error(LOG, "Saved AI context length %s was refused; this session uses %s, while config.toml stays unchanged.",
+									tostring(state.llm_context_length), tostring(actual))
+								state.llm_context_length = actual
+								context_storage_safe = true
+							else
+								unsettled("ai", "keymap.get_llm_runtime_setting llm_context_length", ok and actual or found)
+							end
+						end
+					else
+						try("ai", "keymap." .. item.fn, keymap[item.fn], item.val)
+					end
 				end
 			end
 		end
@@ -471,7 +496,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
 		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
 	}) do
-		if state[key] ~= nil then try("ai", "Storage.set " .. key, Storage.set, key, state[key]) end
+		if state[key] ~= nil and (key ~= "llm_context_length" or context_storage_safe) then
+			try("ai", "Storage.set " .. key, Storage.set, key, state[key])
+		end
 	end
 
 	-- Sync editor options

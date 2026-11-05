@@ -97,7 +97,8 @@ local function mapping(t)
 		-- — so a fixture that omits it fails loudly instead of silently matching
 		-- case-insensitively, which is what "conform is the else branch" used to do.
 		match_mode    = t.case_conform and "conform" or (t.match_mode or "exact"),
-		tlen          = t.tlen or #trigger,
+		-- Registry stores Unicode character count here; trigger_bytes stays bytes.
+		tlen          = t.tlen or assert(utf8.len(trigger)),
 	}
 end
 

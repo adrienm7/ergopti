@@ -32,6 +32,7 @@ local Logger     = require("infra.logger")
 local HotPath    = require("infra.hotpath_profiler")
 local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
+local LlmContext = require("modules.keymap.llm_context")
 local TextSender = require("adapters.text_sender")
 local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
@@ -288,9 +289,26 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
+	-- Output is still reversible here. Preserve both logical buffers so a
+	-- rejected context edit or privacy mark cannot leave unpublished text live.
+	local prior = {
+		buffer = _state.buffer, llm_buffer = _state.llm_buffer,
+		llm_context_text = _state.llm_context_text, llm_context_mark = _state.llm_context_mark,
+		llm_private_mark = _state.llm_private_mark,
+		start_is_word_boundary = _state.start_is_word_boundary,
+		start_is_line_start = _state.start_is_line_start,
+	}
+	local function restore_before_output()
+		_state.buffer, _state.llm_buffer = prior.buffer, prior.llm_buffer
+		_state.llm_context_text, _state.llm_context_mark = prior.llm_context_text, prior.llm_context_mark
+		_state.llm_private_mark = prior.llm_private_mark
+		_state.start_is_word_boundary, _state.start_is_line_start = prior.start_is_word_boundary, prior.start_is_line_start
+		_state.llm_context_generation = (_state.llm_context_generation or 0) + 1
+	end
 	if type(buffer_action) == "function" then
 		local ok_buf, buf_err = pcall(buffer_action)
 		if not ok_buf then
+			restore_before_output()
 			-- Buffer commit and synthetic output are one transaction. Since the batch
 			-- is still only being built, roll it back instead of displaying output the
 			-- engine cannot describe afterwards.
@@ -307,6 +325,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		-- be displayed that a prompt could later repeat.
 		local ok_mark, mark_err = pcall(_llm.mark_private_context, _state.buffer)
 		if not ok_mark then
+			restore_before_output()
 			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
 			pcall(SyntheticInput.cancel, transaction)
 			Logger.error(LOG, "private AI context mark failed: %s.", tostring(mark_err))
@@ -1130,6 +1149,10 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		end,
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
+			if _state.llm_context_text ~= nil then
+				if m.plain_repl == m.repl then LlmContext.replace_tail(_state, trig_len, repl_text)
+				else LlmContext.reset(_state) end
+			end
 			forget_buffer_after_keys(m)
 		end,
 		is_final,
@@ -1271,6 +1294,11 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
 				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
+				if _state.llm_context_text ~= nil and m.plain_repl == m.repl then
+					local extra_count = extra_bs_bytes > 0 and 1 or 0
+					LlmContext.replace_tail(_state, trig_len + char_len + extra_count,
+						to_type .. (replay_tail and chars or ""))
+				elseif _state.llm_context_text ~= nil then LlmContext.reset(_state) end
 				forget_buffer_after_keys(m)
 			end,
 			is_final,
@@ -1368,7 +1396,10 @@ function M.try_repeat_feature(chars, is_ignored)
 	local replaced = M.perform_text_replacement(
 		is_ignored and char_len or 0,
 		function() return km_utils.emit_text(last_char) end,
-		function() _state.buffer = next_buffer end,
+		function()
+			_state.buffer = next_buffer
+			if _state.llm_context_text ~= nil then LlmContext.replace_tail(_state, char_len, last_char) end
+		end,
 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
 	if replaced ~= true then return false end
 
