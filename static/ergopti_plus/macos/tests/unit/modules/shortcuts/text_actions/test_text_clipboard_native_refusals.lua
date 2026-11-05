@@ -9,9 +9,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local previous_destination = package.loaded["modules.keymap.utils"]
+local Destination = require("tests.support.text_destination_receipt")
 
 
 local function load_fixture(options)
+	Destination.install()
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
@@ -223,3 +226,5 @@ helpers.describe("text actions: clipboard refusals fail closed", function()
 			"ownership remains closed until an exact restore actually succeeds")
 	end)
 end)
+
+package.loaded["modules.keymap.utils"] = previous_destination

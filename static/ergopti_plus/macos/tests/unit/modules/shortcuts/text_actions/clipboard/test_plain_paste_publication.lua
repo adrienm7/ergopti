@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
 require("logger")
 
@@ -42,6 +43,7 @@ end
 
 local function with_plain(callback)
 	helpers.with_stub_scope({
+		"modules.keymap.utils",
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
 	}, function()
@@ -51,6 +53,7 @@ local function with_plain(callback)
 			hs.pasteboard.getContents = board.getContents
 			package.loaded["infra.paths"] = { shared = function() return nil end }
 			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			Destination.install()
 			f.text = require("modules.shortcuts.actions.text")
 			function f.queue()
 				helpers.assert_true(f.text.paste_as_plain_text())
