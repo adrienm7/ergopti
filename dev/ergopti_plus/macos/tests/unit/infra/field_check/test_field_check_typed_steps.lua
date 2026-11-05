@@ -138,9 +138,19 @@ helpers.describe("prediction tooltip probe", function()
 		helpers.assert_nil(world.keys, "nothing is typed when predictions are off")
 	end)
 
-	helpers.it("fails a model not on this Mac without typing", function()
+	helpers.it("skips a remote backend without typing (remote-backend-is-skip)", function()
+		local world = { readiness = { enabled = true, installed = false, backend = "api" }, typed = typed_as("") }
+		local steps, result = run("prediction_tooltip", world)
+		helpers.assert_true(result.passed, "a remote backend has no model on this Mac to find")
+		helpers.assert_eq(steps.prediction_ready.state, "skip")
+		helpers.assert_eq(steps.prediction_ready.value, "remote_backend")
+		helpers.assert_nil(world.keys, "the run's text is never sent to a remote backend")
+	end)
+
+	helpers.it("fails a local model not on this Mac without typing", function()
 		for _, case in ipairs({
-			{ readiness = { enabled = true, installed = false, backend = "api" }, code = "no_installed_model" },
+			{ readiness = { enabled = true, installed = false, backend = "ollama" }, code = "no_installed_model" },
+			{ readiness = { enabled = true, installed = false, backend = "mlx" }, code = "no_installed_model" },
 		}) do
 			local world = { readiness = case.readiness, typed = typed_as("") }
 			local steps, result = run("prediction_tooltip", world)

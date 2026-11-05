@@ -8,20 +8,23 @@
 --- relaunch.
 ---
 --- FEATURES & RATIONALE:
---- 1. Stale grant first: the packaged app is signed ad hoc, so each build or
----    update has a new code identity. System Settings keeps showing the old
----    switch as checked while macOS refuses the new binary. The entry is reset
----    before the prompt so the switch the user turns on is the current one.
---- 2. Everything is opened for the user: the macOS prompt, the exact Settings
----    pane, and a native dialog naming the entry to turn on. The dialog needs
----    no notification permission, which a fresh install may not have, and the
----    wait closes it as soon as the grant arrives.
+--- 1. Stale grant first, once per install: a new build or update can have a
+---    new code identity. System Settings keeps showing the old switch as
+---    checked while macOS refuses the new binary. The entry is reset before the
+---    prompt so the switch the user turns on is the current one. Only the first
+---    boot of an install resets: a reload or relaunch of the same install that
+---    reset at every boot erased the entry the user had just added (field report
+---    2026-11-05), so the reset is remembered by install identity.
+--- 2. macOS's own prompt only, with the Settings pane opened behind it. Its
+---    button adds and selects the right entry; a second Ergopti dialog asking
+---    to find the app with Cmd+Shift+G and + only competed with it (field
+---    report 2026-11-05).
 --- 3. No relaunch: trust is polled, and the boot continues as soon as it is
 ---    granted. A bounded deadline keeps an ignored request from leaving a
 ---    process with no input and no menu running forever.
---- 4. Never a dead end: the dialog can be closed, and there is no menu yet to
----    bring it back. Opening ErgoptiPlus again while the wait runs shows the
----    steps again instead of doing nothing.
+--- 4. Never a dead end: the prompt can be dismissed, and there is no menu yet
+---    to bring it back. Opening ErgoptiPlus again while the wait runs asks
+---    macOS for its prompt again instead of doing nothing.
 --- ==============================================================================
 
 local M = {}
@@ -52,11 +55,17 @@ local function validate(opts)
 			error("accessibility_wait.start: permission." .. name .. " must be a function", 3)
 		end
 	end
-	for _, name in ipairs({ "every", "cancel", "show_guidance", "close_guidance", "watch_reopen",
-		"on_trusted", "on_timeout" }) do
+	for _, name in ipairs({ "every", "cancel", "watch_reopen", "on_trusted", "on_timeout" }) do
 		if type(opts[name]) ~= "function" then
 			error("accessibility_wait.start: " .. name .. " must be a function", 3)
 		end
+	end
+	if type(opts.install_identity) ~= "string" or opts.install_identity == "" then
+		error("accessibility_wait.start: install_identity must be a non-empty string", 3)
+	end
+	local memory = opts.reset_memory
+	if type(memory) ~= "table" or type(memory.get) ~= "function" or type(memory.set) ~= "function" then
+		error("accessibility_wait.start: reset_memory must have get and set functions", 3)
 	end
 end
 
@@ -72,10 +81,17 @@ local function prompt_user(permission)
 	end
 end
 
---- Clears this app's stale entry, then prompts once tccutil has settled.
+--- Clears this app's stale entry once per install, then prompts once tccutil has settled.
 --- @param permission table Accessibility permission adapter.
 --- @param state table The active wait.
-local function reset_then_prompt(permission, state)
+--- @param opts table Wait options (install_identity, reset_memory).
+local function reset_then_prompt(permission, state, opts)
+	if opts.reset_memory.get() == opts.install_identity then
+		Logger.info(LOG, "Accessibility entry already reset for install %s; keeping the user's entry.",
+			opts.install_identity)
+		prompt_user(permission)
+		return
+	end
 	local bundle_id, bundle_err = permission.bundle_id()
 	if bundle_id == nil then
 		Logger.warn(LOG, "Stale Accessibility grant not reset: %s.", tostring(bundle_err))
@@ -87,6 +103,10 @@ local function reset_then_prompt(permission, state)
 		if state.finished then return end
 		if ok then
 			Logger.success(LOG, "Accessibility entry of %s reset.", bundle_id)
+			if opts.reset_memory.set(opts.install_identity) ~= true then
+				Logger.error(LOG, "The reset of install %s could not be remembered; the next boot resets again.",
+					opts.install_identity)
+			end
 		else
 			Logger.warn(LOG, "Accessibility entry of %s not reset: %s.", bundle_id, tostring(detail))
 		end
@@ -110,7 +130,6 @@ local function finish(state, opts, continuation)
 		Logger.warn(LOG, "Accessibility poll timer did not settle on cancel.")
 	end
 	if state.stop_reopen_watch ~= nil then state.stop_reopen_watch() end
-	opts.close_guidance()
 	continuation()
 end
 
@@ -123,10 +142,11 @@ end
 
 --- Starts waiting for Accessibility trust.
 --- @param opts table {permission, every(seconds, fn) -> handle, committed,
----        cancel(handle) -> settled, show_guidance(), close_guidance(),
----        watch_reopen(fn) -> stop|nil, detail (calls fn each time the user
+---        cancel(handle) -> settled, watch_reopen(fn) -> stop|nil, detail (calls fn each time the user
 ---        opens ErgoptiPlus again), on_trusted(), on_timeout(elapsed_seconds),
----        poll_seconds?, deadline_seconds?}.
+---        install_identity (this install's code identity), reset_memory
+---        {get() -> identity|nil, set(identity) -> ok} (the install whose stale
+---        entry was last reset), poll_seconds?, deadline_seconds?}.
 --- @return boolean started True when the poll timer is armed.
 --- @return string|nil detail Exact refusal when started is false.
 function M.start(opts)
@@ -159,18 +179,17 @@ function M.start(opts)
 	_active = state
 
 	Logger.info(LOG, "Waiting for the Accessibility permission (up to %d s)…", deadline_seconds)
-	opts.show_guidance()
 	local stop_watch, watch_err = opts.watch_reopen(function()
 		if state.finished then return end
-		Logger.info(LOG, "ErgoptiPlus was opened again while waiting; showing the steps again.")
-		opts.show_guidance()
+		Logger.info(LOG, "ErgoptiPlus was opened again while waiting; asking macOS for its prompt again.")
+		prompt_user(opts.permission)
 	end)
 	if type(stop_watch) == "function" then
 		state.stop_reopen_watch = stop_watch
 	else
-		Logger.warn(LOG, "Reopening ErgoptiPlus will not show the steps again: %s.", tostring(watch_err))
+		Logger.warn(LOG, "Reopening ErgoptiPlus will not ask for the prompt again: %s.", tostring(watch_err))
 	end
-	reset_then_prompt(opts.permission, state)
+	reset_then_prompt(opts.permission, state, opts)
 	return true
 end
 

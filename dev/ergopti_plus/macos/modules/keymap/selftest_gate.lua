@@ -9,9 +9,12 @@
 --- typing calls; every other tap keeps them as the driver's own output.
 ---
 --- FEATURES & RATIONALE:
---- 1. Three conditions, read for every key: the process is a developer runtime
----    (infra/dev_source.lua), the field run published its scratch window
----    (infra/field_run_selftest.lua), and that window is the focused one.
+--- 1. Three conditions, read for every key: a field run is running
+---    (infra/field_run.lua, in a developer runtime or in the installed app the
+---    collector opened with its clone), the field run published its scratch
+---    window (infra/field_run_selftest.lua), and that window is the focused
+---    one. Requiring a developer runtime swallowed every key of the installed
+---    app's field run (field report 2026-11-05).
 --- 2. Fail closed: any other answer, a duplicate Quartz delivery or a read that
 ---    raised consumes the key, so it never reaches an application.
 --- 3. One diagnostic per run: the first refusal of a publication is logged,
@@ -34,11 +37,16 @@ M._ports = nil
 local _logged_generation = nil
 
 --- The system reads, resolved at call time so the keymap loads none of them.
---- @return table ports { dev_source_active(), focused_own_window_id() }
+--- @return table ports { field_run_running(), focused_own_window_id() }
 local function ports()
 	if M._ports then return M._ports end
 	return {
-		dev_source_active = function() return require("infra.dev_source").is_active() end,
+		-- Read from package.loaded: the keymap must not load the field run, and
+		-- a runtime that never started one has none to admit keys for.
+		field_run_running = function()
+			local field_run = package.loaded["infra.field_run"]
+			return type(field_run) == "table" and field_run.holds_reload() == true
+		end,
 		focused_own_window_id = function() return require("adapters.own_window").focused_window_id() end,
 	}
 end
@@ -58,12 +66,12 @@ end
 --- @param provenance table Owned metadata whose selftest field is true.
 --- @return boolean admitted True when the key may be decoded as typing.
 --- @return string|nil reason Closed refusal token when it is not:
----         duplicate, no_dev_source, no_active_step, other_window or gate_error.
+---         duplicate, no_field_run, no_active_step, other_window or gate_error.
 function M.admits(provenance)
 	local ok, admitted, reason = pcall(function()
 		if provenance.duplicate == true then return false, "duplicate" end
 		local reads = ports()
-		if reads.dev_source_active() ~= true then return false, "no_dev_source" end
+		if reads.field_run_running() ~= true then return false, "no_field_run" end
 		local window_id = FieldRunSelftest.window_id()
 		if window_id == nil then return false, "no_active_step" end
 		if reads.focused_own_window_id() ~= window_id then return false, "other_window" end

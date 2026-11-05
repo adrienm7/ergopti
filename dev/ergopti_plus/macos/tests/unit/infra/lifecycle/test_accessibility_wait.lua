@@ -7,7 +7,9 @@
 --- macOS kept the previous switch checked in System Settings while refusing
 --- the new binary. Boot then exited asking for a permission the user believed
 --- granted. The wait must reset that stale entry before prompting, open the
---- exact pane, and continue the boot by itself once trust arrives.
+--- exact pane, and continue the boot by itself once trust arrives. The reset
+--- runs once per install: resetting at every reload erased the entry the user
+--- had just added (field report 2026-11-05).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -36,14 +38,17 @@ local function harness(overrides)
 		permission = h.permission,
 		every = function(_, fn) h.ticks = fn; return "timer", true end,
 		cancel = function(handle) h.cancelled = handle; return true end,
-		show_guidance = function() event("show") end,
-		close_guidance = function() event("close") end,
 		watch_reopen = function(on_reopen)
 			h.reopen = on_reopen
 			return function() event("unwatch") end
 		end,
 		on_trusted = function() event("trusted") end,
 		on_timeout = function(elapsed) event("timeout:" .. tostring(elapsed)) end,
+		install_identity = "0.0.0-dev.162:16777230:4242",
+		reset_memory = {
+			get = function() return h.remembered end,
+			set = function(identity) event("remember:" .. identity); h.remembered = identity; return true end,
+		},
 		poll_seconds = 1,
 		deadline_seconds = 3,
 	}
@@ -65,7 +70,31 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		local reset_at = h.index("reset:com.ergoptiplus.app.hammerspoon")
 		helpers.assert_true(reset_at ~= nil and reset_at < h.index("prompt")
 			and h.index("prompt") < h.index("settings"), table.concat(h.events, ","))
-		helpers.assert_true(h.index("show") ~= nil, "the banner names the entry to turn on")
+		helpers.assert_eq(h.remembered, "0.0.0-dev.162:16777230:4242", "the reset is remembered by install")
+	end)
+
+	helpers.it("a reload of the same install keeps the user's entry and only prompts", function()
+		local h = harness()
+		h.remembered = "0.0.0-dev.162:16777230:4242"
+		helpers.assert_eq(h.wait.start(h.opts), true)
+		helpers.assert_eq(h.reset_done, nil, "the entry the user just added must not be reset again")
+		helpers.assert_true(h.index("prompt") ~= nil and h.index("settings") ~= nil, table.concat(h.events, ","))
+	end)
+
+	helpers.it("a new install resets once more", function()
+		local h = harness()
+		h.remembered = "0.0.0-dev.161:16777230:4100"
+		h.wait.start(h.opts)
+		helpers.assert_true(h.reset_done ~= nil, "a reinstall can carry a new code identity")
+		h.reset_done(true)
+		helpers.assert_eq(h.remembered, "0.0.0-dev.162:16777230:4242")
+	end)
+
+	helpers.it("a failed reset is not remembered", function()
+		local h = harness()
+		h.wait.start(h.opts)
+		h.reset_done(false, "tccutil exited with 1")
+		helpers.assert_eq(h.remembered, nil)
 	end)
 
 	helpers.it("still prompts when the reset fails or cannot start", function()
@@ -78,7 +107,7 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_true(h2.index("prompt") ~= nil and h2.index("settings") ~= nil)
 	end)
 
-	helpers.it("resumes the boot once trusted, exactly once, and closes the banner", function()
+	helpers.it("resumes the boot once trusted, exactly once", function()
 		local h = harness()
 		h.wait.start(h.opts)
 		h.ticks()
@@ -90,7 +119,6 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		for _, e in ipairs(h.events) do if e == "trusted" then count = count + 1 end end
 		helpers.assert_eq(count, 1)
 		helpers.assert_eq(h.cancelled, "timer")
-		helpers.assert_true(h.index("close") < h.index("trusted"), "banner closes before the boot resumes")
 		helpers.assert_eq(h.wait.is_waiting(), false)
 	end)
 
@@ -110,26 +138,30 @@ helpers.describe("accessibility wait (accessibility-wait-resumes)", function()
 		helpers.assert_contains(detail, "already running")
 		local _, refusal = pcall(h.wait.start, { permission = h.permission })
 		helpers.assert_contains(tostring(refusal), "every must be a function")
+		h.opts.install_identity = ""
+		local _, identity_refusal = pcall(h.wait.start, h.opts)
+		helpers.assert_contains(tostring(identity_refusal), "install_identity must be a non-empty string")
 	end)
 
-	helpers.it("shows the steps again each time ErgoptiPlus is reopened while waiting", function()
+	helpers.it("asks macOS for its prompt again each time ErgoptiPlus is reopened while waiting", function()
 		local h = harness()
 		h.wait.start(h.opts)
-		local function shown()
+		h.reset_done(true)
+		local function prompts()
 			local count = 0
-			for _, e in ipairs(h.events) do if e == "show" then count = count + 1 end end
+			for _, e in ipairs(h.events) do if e == "prompt" then count = count + 1 end end
 			return count
 		end
-		helpers.assert_eq(shown(), 1)
+		helpers.assert_eq(prompts(), 1)
 		h.reopen()
 		h.reopen()
-		helpers.assert_eq(shown(), 3, "a dialog closed with Later is not a dead end")
+		helpers.assert_eq(prompts(), 3, "a dismissed prompt is not a dead end")
 		h.trusted = true
 		h.ticks()
 		helpers.assert_true(h.index("unwatch") ~= nil and h.index("unwatch") < h.index("trusted"),
 			"the boot resumes without the reopen watch")
 		h.reopen()
-		helpers.assert_eq(shown(), 3, "a reopen after the grant shows nothing")
+		helpers.assert_eq(prompts(), 3, "a reopen after the grant asks nothing")
 	end)
 
 	helpers.it("keeps waiting when reopening cannot be watched", function()

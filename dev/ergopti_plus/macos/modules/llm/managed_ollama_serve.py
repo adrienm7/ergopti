@@ -49,6 +49,23 @@ class ServeRefusal(RuntimeError):
         self.primary, self.cleanup = primary, cleanup
 
 
+def serve_refusal_facts(refusal):
+    """Name a refusal's fixed reason and its retained failures, path-free.
+
+    Args:
+        refusal: The ServeRefusal main() caught.
+
+    Returns:
+        "reason", then ", primary=..." and ", cleanup=..." for each failure it retains.
+    """
+    facts = [str(refusal)]
+    for name in ("primary", "cleanup"):
+        error = getattr(refusal, name)
+        if error is not None:
+            facts.append("%s=%s" % (name, RUNTIME.describe_refusal(error, __file__)))
+    return ", ".join(facts)
+
+
 class _CallerInput:
     """Borrow the caller's actual pipe; only the original guardian owns retirement.
 
@@ -736,8 +753,13 @@ def main():
     except ServeRefusal as refusal:
         # The driver logs this line. The reason is a fixed word, never a path
         # or a value (field run 2026-10-30 17:37: the daemon exited before
-        # READY with no trace of which check refused it).
-        print("Managed Ollama daemon admission refused: %s." % refusal, file=sys.stderr)
+        # READY with no trace of which check refused it). A startup failure
+        # whose cleanup failed too carried both errors yet printed only
+        # "operation" (field run 2026-11-05): both are named, path-free.
+        print(
+            "Managed Ollama daemon admission refused: %s." % serve_refusal_facts(refusal),
+            file=sys.stderr,
+        )
         return 78
     except Exception as error:
         print(
