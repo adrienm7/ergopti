@@ -400,6 +400,37 @@ show-session) case "$2" in
 		fs.unlinkSync(config);
 		fs.writeFileSync(config, original);
 	}
+	// A directory cannot provide rules or module configuration either.
+	for (const relative of [
+		'etc/udev/rules.d/99-ergopti-uinput.rules',
+		'etc/modules-load.d/ergopti-uinput.conf'
+	]) {
+		const config = path.join(sandbox, relative);
+		const original = fs.readFileSync(config);
+		fs.unlinkSync(config);
+		fs.mkdirSync(config);
+		fs.writeFileSync(callLog, '');
+		const refused = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
+		});
+		assert.equal(refused.status, 78, 'directory cannot supply required configuration');
+		assert.match(refused.stderr, /code=invalid-configuration/);
+		assert.ok(fs.statSync(config).isDirectory());
+		assert.equal(fs.readFileSync(callLog, 'utf8'), '', 'no privileged mutation on refusal');
+		fs.rmdirSync(config);
+		fs.symlinkSync('/dev/null', config);
+		const masked = spawnSync(bashExecutable(), [bashPath(script), '--user', '1000'], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
+		});
+		assert.equal(masked.status, 0, 'administrator mask stays supported');
+		assert.ok(fs.lstatSync(config).isSymbolicLink());
+		fs.unlinkSync(config);
+		fs.writeFileSync(config, original);
+	}
 	// Exercise the actual BusyBox branch with only command availability
 	// replaced. Group mutations still go through the recorded stubs.
 	stub('addgroup', 'printf "addgroup %s\\n" "$*" >> "$CALL_LOG"');
