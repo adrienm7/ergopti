@@ -412,7 +412,8 @@ end
 --- @param text string
 --- @return string
 local function ics_text(text)
-	return (text:gsub("\\", "\\\\"):gsub(";", "\\;"):gsub(",", "\\,"):gsub("\r?\n", "\\n"))
+	return (text:gsub("\\", "\\\\"):gsub(";", "\\;"):gsub(",", "\\,")
+		:gsub("\r\n", "\n"):gsub("[\r\n]", "\\n"))
 end
 
 --- Folds one content line at 75 octets without splitting a UTF-8 sequence.

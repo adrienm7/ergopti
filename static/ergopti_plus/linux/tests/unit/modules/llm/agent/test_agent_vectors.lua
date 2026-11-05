@@ -190,6 +190,14 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_nil(action, "an email address cannot contain malformed UTF-8")
 	end)
 
+	helpers.it("encodes a lone carriage return in calendar text as a line break", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, { type = "reminder", title = "first\rsecond" }, { tools = {} }))
+		local payload = Agent.ics(config, action, "test", "20260101T000000Z")
+		helpers.assert_contains(payload, "SUMMARY:first\\nsecond\r\n")
+		helpers.assert_nil(payload:find("first\rsecond", 1, true), "the iCalendar field cannot contain a bare CR")
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }
