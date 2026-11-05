@@ -1915,3 +1915,55 @@ _HSAC_LastAuthorizer(ChangeSource) {
 for _HSAC_Change in [true, false]
 	Test("hotstring override authorization: last arbitrary callback source edit=" . _HSAC_Change
 		. " (override-last-authorizer-source)", _HSAC_LastAuthorizer.Bind(_HSAC_Change))
+
+_HSBR_PublicNamespace(ExtensionControl) {
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
+	SavedPath := _HotstringsOverridesPath, SavedMap := _HotstringsOverrides, SavedGen := _HSResolveGen
+	Root := A_Temp . "\ergopti_override_namespace_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	Category := ExtensionControl ? "ext.demo" : "ext"
+	try {
+		AssertFalse(_ConfigFullSaveHasPending())
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[rolls]`ncolor = "#111111"`n'))
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := _ParseOverrides(Path)
+		AssertEqual("#111111", _HotstringsOverrides["rolls"].Color)
+		Before := FSReadBytesStrict(Path)
+		Result := HotstringsSetOverride(Category, "", "color", "#222222")
+		AfterSetter := FSReadBytesStrict(Path)
+		Reloaded := HotstringsConfigReload()
+		Retained := _HotstringsOverrides.Has(Category)
+		ReloadedColor := Retained ? _HotstringsOverrides[Category].Color : "<absent>"
+		NextWrite := HotstringsSetOverride("rolls", "", "priority", 23)
+		_TestPrint("# override-reserved-root category=" . Category . " result=" . Result
+			. " reload=" . Reloaded . " retained=" . Retained . " reloaded_color=" . ReloadedColor
+			. " next_write=" . NextWrite . " before_bytes=" . Before.Size . " setter_bytes=" . AfterSetter.Size)
+		AssertTrue(Reloaded, "the actual reload must complete before a persistence roundtrip verdict")
+		if Result {
+			AssertTrue(Retained, "a durable setter ACK must survive the actual override loader")
+			AssertEqual("#222222", ReloadedColor)
+		} else {
+			AssertFalse(ExtensionControl, "a real extension category remains a supported positive control")
+			AssertEqual(Before.Size, AfterSetter.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", AfterSetter, "UPtr", Before.Size, "UPtr"), "a reserved unsupported category must refuse before replacing the original source")
+		}
+		AssertTrue(NextWrite, "a category setter cannot turn its source into an unrepresentable document that blocks unrelated valid changes")
+		AssertEqual(23, TOML_ParseDocument(FSReadUtf8Exact(Path))["rolls"]["priority"])
+	} finally {
+		_HotstringsOverridesPath := SavedPath, _HotstringsOverrides := SavedMap, _HSResolveGen := SavedGen
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSBR_Control in [false, true]
+	Test("hotstring override reserved namespace: extension_control=" . _HSBR_Control
+		. " (override-reserved-root-roundtrip)", _HSBR_PublicNamespace.Bind(_HSBR_Control))
