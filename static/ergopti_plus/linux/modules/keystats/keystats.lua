@@ -2199,7 +2199,11 @@ end
 --- @return string
 function M.export_json()
 	local data = M.export_session()
-	return _to_json(data)
+	-- Application ids and evdev codes are maps even when empty or when their
+	-- numeric keys happen to form an array prefix.
+	local objects = { [data.apps] = true }
+	for _, app in pairs(data.apps) do objects[app.physical_scancodes] = true end
+	return _to_json(data, objects)
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
@@ -3096,7 +3100,7 @@ end
 --- NOTE: assigned (not "local function") so it writes to the forward-declared
 --- upvalue.  Using "local function" would create a shadow local and leave the
 --- upvalue nil for closures defined between the forward-decl and this point.
-_to_json = function(val)
+_to_json = function(val, objects)
 	if type(val) == "nil" then return "null" end
 	if type(val) == "boolean" then return val and "true" or "false" end
 	if type(val) == "number" then
@@ -3121,15 +3125,15 @@ _to_json = function(val)
 		end) .. '"'
 	end
 	if type(val) == "table" then
-		local is_array = #val > 0 or next(val) == nil
+		local is_array = not (objects and objects[val]) and (#val > 0 or next(val) == nil)
 		if is_array then
 			local parts = {}
-			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v) end
+			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v, objects) end
 			return "[" .. table.concat(parts, ",") .. "]"
 		else
 			local parts = {}
 			for k, v in pairs(val) do
-				parts[#parts + 1] = _to_json(tostring(k)) .. ":" .. _to_json(v)
+				parts[#parts + 1] = _to_json(tostring(k), objects) .. ":" .. _to_json(v, objects)
 			end
 			return "{" .. table.concat(parts, ",") .. "}"
 		end
