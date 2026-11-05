@@ -28,6 +28,30 @@ local SPEC = Policy.validate(Json.decode(read(shared .. "/modules/control/driver
 local TOKEN = Json.decode(read(shared .. "/tests/corpus/control/driver_control.json")).token
 local FOLDER = "/run/user/1000/ergopti_plus/control"
 
+if require("tests.win_compat").is_windows() then
+	helpers.it("SKIP [linux-reload-cli-overlap] — native flock and SIGUSR1 require Linux", function()
+		helpers.assert_eq(package.config:sub(1, 1), "\\")
+	end)
+else
+helpers.it("(linux-reload-cli-overlap) a second client cannot overwrite a pending request", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_overlap.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "concurrent real CLI requests must retain the first request and refuse the second")
+end)
+
+helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory locks without blocking", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_lock_types.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
+	helpers.assert_true(status == true or status == 0, "invalid lock objects must be refused without changing them")
+end)
+end
+
 --- A session over in-memory files.
 local NOW = 1700000000
 
