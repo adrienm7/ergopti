@@ -426,9 +426,43 @@ function M.native_port()
 		end,
 		run = function(program, args, on_done)
 			sequence = sequence + 1
+			local owner = "input_source_switch:" .. sequence
+			local needs_group = program == "setxkbmap" and args[1] == "-layout"
+			local delivered = false
+			local phase = "layout"
+			local function finish(result)
+				if delivered then return end
+				delivered = true
+				on_done(result)
+			end
 			local operation = OwnedProcess.start(program, args, {
-				owner = "input_source_switch:" .. sequence, timeout_ms = timeout_ms,
-			}, function(result) on_done(result) end)
+				owner = owner, timeout_ms = timeout_ms,
+			}, function(result)
+				if phase ~= "layout" then return end
+				phase = "group"
+				if not needs_group or type(result) ~= "table" or result.ok ~= true then return finish(result) end
+				local loaded, uv = pcall(require, "luv")
+				if not loaded or type(uv.os_getpid) ~= "function" or type(uv.exepath) ~= "function" then
+					return finish({ ok = false, error = "X11 group worker unavailable" })
+				end
+				local prepared, executable, arguments = pcall(function()
+					local Paths = require("infra.paths")
+					local Runtime = require("_generated.native_runtime")
+					assert(type(Runtime.x11) == "string" and Runtime.x11:match("^[%w_+%.%-]+$"), "invalid X11 soname")
+					return uv.exepath(), {
+						Paths.driver_root() .. "/adapters/input_source_group_worker.lua",
+						string.format("%.0f", uv.os_getpid()), Runtime.x11,
+					}
+				end)
+				if not prepared then return finish({ ok = false, error = "X11 group worker could not start" }) end
+				local child = OwnedProcess.start(executable, arguments,
+					{ owner = owner .. ":group", timeout_ms = timeout_ms }, finish)
+				-- A returned owner may still owe pipe/timer retirement even if its
+				-- dispatch was refused. Only a missing owner completes here.
+				if type(child) ~= "table" then
+					finish({ ok = false, error = "X11 group worker could not start" })
+				end
+			end)
 			-- Even refused dispatch can own pipes or timers until the operation's
 			-- completion callback acknowledges their physical retirement.
 			return type(operation) == "table"

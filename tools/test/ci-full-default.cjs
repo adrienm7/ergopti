@@ -116,6 +116,12 @@ const FULL_STEPS = [
 		"${{ always() && matrix.group == 'native' }}"
 	],
 	[
+		'.github/workflows/ci-linux.yml',
+		'integration-linux',
+		'Qualify X11 input source activation',
+		"${{ !cancelled() && matrix.group == 'native' }}"
+	],
+	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Prepare genuine pinned Go toolchain',

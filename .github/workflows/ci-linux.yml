@@ -423,6 +423,13 @@ jobs:
             ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr
           if-no-files-found: error
 
+      - name: Qualify X11 input source activation
+        if: ${{ !cancelled() && matrix.group == 'native' }}
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends x11-xkb-utils
+          python3 static/ergopti_plus/linux/tests/hardware/run_x11_input_source_switch.py
+        timeout-minutes: 2
+
       # The integration group on THIS distribution's own LuaJIT, as one row per
       # distribution with an archive installation lot: the same container,
       # image, preparation and ordinary user as the Unit stage's distribution
