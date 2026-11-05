@@ -47,6 +47,24 @@ local SPACE_SHIFT = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_
 local SPACE_LAYER = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.space]\nhold_layer = "nav"\n'
 
 helpers.describe("tap-hold roll: a typing key is decided by the order of the releases", function()
+	helpers.it("retains the first origin when a second same-code source cannot be captured", function()
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = { space = { hold_modifier = "shift" } }, roll_keys = { "space" },
+			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000 })
+		local first, calls = {}, 0
+		helpers.assert_true(engine:set_roll_origin_capture(function()
+			calls = calls + 1; if calls == 1 then return first end; return nil
+		end, function() return true end))
+		local a, b = {}, {}
+		local _, _, _, initial = engine:process(SPACE, DOWN, 100, { source = "a", generation = 1, source_owner = a, source_current = true })
+		helpers.assert_nil(initial)
+		local rows, _, _, refused = engine:process(SPACE, DOWN, 110, { source = "b", generation = 1, source_owner = b, source_current = true })
+		helpers.assert_eq(rows, {})
+		helpers.assert_true(refused and refused.refused, "unowned second DOWN cannot start a journal")
+		local origins = engine:take_roll_origins()
+		helpers.assert_eq(#origins, 1); helpers.assert_true(rawequal(origins[1], first))
+	end)
+
 	helpers.it("does not capture or journal an ordinary unconfigured key", function()
 		local Engine = require("platform.remap.tap_hold_engine")
 		local engine = Engine.new({ keys = {}, roll_keys = { "space" }, tap_min_ms = 0,
