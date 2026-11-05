@@ -29,16 +29,42 @@ class WebView2 {
 		return Controller
 	}
 }
+class _PINS_Subscription {
+	__Delete() {
+		global _PINS
+		_PINS.SubscriptionsRetired += 1
+	}
+}
 class _PINS_View {
 	__New() {
 		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) {
+		global _PINS, _PiEdWeb_SessionEpoch
 		this.Subscriptions += 1
+		if _PINS.Mode == "subscription-close" {
+			Window := _PINS.Windows[1], Hwnd := Window.Hwnd
+			Epoch := _PiEdWeb_SessionEpoch
+			NativePid := 0
+			_PINS_Require(DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &NativePid, "UInt")
+				&& NativePid == ProcessExist(), "the real native close must target the exact private child window")
+			_PINS.AddEntered += 1
+			_PINS_Require(DllCall("User32\PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"), "real close must be posted to the private HWND")
+			Started := A_TickCount
+			while _PiEdWeb_SessionEpoch == Epoch && TickElapsed64(Started) < 1500
+				Sleep(10)
+			_PINS.CloseAcknowledged := _PiEdWeb_SessionEpoch != Epoch
+			_PINS.HwndAtAddReturn := !!DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+		}
+		if InStr(_PINS.Mode, "subscription-")
+			return _PINS_Subscription()
 		return {Callback: Callback}
 	}
 	NavigationCompleted(Callback) {
+		global _PINS
 		this.Subscriptions += 1
+		if InStr(_PINS.Mode, "subscription-")
+			return _PINS_Subscription()
 		return {Callback: Callback}
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
@@ -51,7 +77,12 @@ class _PINS_Controller {
 		this.CoreWebView2 := _PINS_View(), this.Closed := 0, this.Fills := 0
 	}
 	Close() {
+		global _PINS
 		this.Closed += 1
+		if InStr(_PINS.Mode, "subscription-") {
+			_PINS.HwndAtControllerClose := !!DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
+			_PINS.RetiredAtControllerClose := _PINS.SubscriptionsRetired
+		}
 	}
 	Fill() {
 		this.Fills += 1
@@ -96,8 +127,10 @@ _PINS_Main() {
 	if A_Args.Length != 5 || A_Args[1] != "personal-info"
 		ExitApp(2)
 	Mode := A_Args[2], Root := A_Args[3]
-	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close")
-	_PINS := {Windows: [], Hwnds: [], Controllers: [], Callbacks: 0, Active: false,
+	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close" || Mode == "subscription-current" || Mode == "subscription-close")
+	_PINS := {Mode: Mode, AddEntered: 0, CloseAcknowledged: false, HwndAtAddReturn: false,
+		HwndAtControllerClose: false, RetiredAtControllerClose: 0, SubscriptionsRetired: 0,
+		Windows: [], Hwnds: [], Controllers: [], Callbacks: 0, Active: false,
 		Fired: false, Failure: 0, Reopens: 0, SeenBeforeReturn: false,
 		OldHwnd: 0, NewGui: 0, NewHwnd: 0, NewAliveBefore: false}
 	_VendorDir := Root, _SharedDir := Root
@@ -110,6 +143,41 @@ _PINS_Main() {
 	Subclass := 0, Primary := 0
 	Thread("Interrupt", 0)
 	try {
+		if InStr(Mode, "subscription-") {
+			OpenFailure := 0
+			try PersonalInformationEditor()
+			catch Any as OpenError
+				OpenFailure := OpenError
+			Ready := _PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1
+				&& IsSet(_PiEdWeb_Controller) && _PiEdWeb_Controller == _PINS.Controllers[1]
+				&& _PINS.Controllers[1].CoreWebView2.Subscriptions == 2
+				&& _PINS.Controllers[1].CoreWebView2.Navigations == 1 && _PINS.Controllers[1].Fills >= 1
+				&& DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
+			if Mode == "subscription-current" && Ready {
+				DllCall("User32\SendMessageW", "Ptr", _PINS.Hwnds[1], "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+				CloseStart := A_TickCount
+				while DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int") && TickElapsed64(CloseStart) < 1500
+					Sleep(10)
+			}
+			HwndAlive := _PINS.Hwnds.Length ? !!DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int") : false
+			CloseCount := _PINS.Controllers.Length ? _PINS.Controllers[1].Closed : -1
+			FileAppend("RECEIPT personal-info-subscription mode=" . Mode . " ready=" . Ready
+				. " add_entered=" . _PINS.AddEntered . " close_ack=" . _PINS.CloseAcknowledged
+				. " hwnd_at_return=" . _PINS.HwndAtAddReturn . " hwnd_at_close=" . _PINS.HwndAtControllerClose
+				. " retired_at_close=" . _PINS.RetiredAtControllerClose . " retired=" . _PINS.SubscriptionsRetired
+				. " close_count=" . CloseCount . " hwnd_alive=" . HwndAlive . " error=" . IsObject(OpenFailure) . "`n", "*")
+			if IsObject(OpenFailure)
+				throw OpenFailure
+			_PINS_Require(_PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1 && CloseCount == 1 && !HwndAlive,
+				"the exact native owner must retire once after subscription")
+			if Mode == "subscription-current"
+				_PINS_Require(Ready && _PINS.SubscriptionsRetired == 2 && _PINS.RetiredAtControllerClose == 2 && _PINS.HwndAtControllerClose,
+					"current native close must unsubscribe both handles before controller and host retirement")
+			else
+				_PINS_Require(_PINS.AddEntered == 1 && _PINS.CloseAcknowledged && _PINS.HwndAtAddReturn
+					&& _PINS.HwndAtControllerClose && _PINS.SubscriptionsRetired == 1 && _PINS.RetiredAtControllerClose == 1,
+					"close during add must retain the native host until returned subscription is retired before controller close")
+		} else {
 		PersonalInformationEditor()
 		_PINS_Require(_PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1,
 			"The actual public constructor must complete its current control")
@@ -167,6 +235,7 @@ _PINS_Main() {
 		} else {
 			_PINS_Require(_PINS.Controllers[1].Closed == 0 && !_PiEdWeb_ResetDone)
 			FileAppend("RECEIPT personal-info-native-close mode=current windows=1 factories=1 live=1`n", "*")
+		}
 		}
 		_PINS_Require(!FSStrictExists(ScriptInformation["PersonalInfoTomlPath"]), "Opening/closing cannot persist the default identity")
 	} catch as Failure {

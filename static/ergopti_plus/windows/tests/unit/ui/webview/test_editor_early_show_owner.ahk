@@ -154,3 +154,7 @@ _PINS_ChildSource(Owners) {
 for _PINS_Mode in ["current", "destroy-reopen", "reset-close"]
 	Test("Personal information native close: " . _PINS_Mode . " retains its admitted owner (personal-info-native-close)",
 		_ESOT_Case.Bind("personal-info", _PINS_Mode))
+
+for _PINS_Mode in ["subscription-current", "subscription-close"]
+	Test("Personal information subscription: " . _PINS_Mode . " retires before its native host (personal-info-subscription-owner)",
+		_ESOT_Case.Bind("personal-info", _PINS_Mode))
