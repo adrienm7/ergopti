@@ -40,6 +40,8 @@
 
 #Requires Autohotkey v2.0+
 
+#Include ../../infra/number.ahk
+
 ; Bump whenever the cache's tables or the provenance required for reuse change.
 ; An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
@@ -394,10 +396,11 @@ KLR_CacheDiscard(md, logPath, Observed) {
 ; Unknown/truncated files and SQLite recovery companions need separate review.
 KLR_CacheReapStages(md, logPath) {
 	Loop Files KLR_CachePath(md) . ".stage.*", "F" {
-		if !RegExMatch(A_LoopFileName, "^reader\.sqlite\.stage\.([1-9]\d{0,9})\.(\d{1,10})$", &Owner)
+		if !RegExMatch(A_LoopFileName, "^reader\.sqlite\.stage\.([1-9]\d{0,9})\.(\d{1,19})$", &Owner)
 			continue
 		Hwnd := Integer(Owner[1])
-		if Hwnd > 0xFFFFFFFF || Integer(Owner[2]) > 0xFFFFFFFF
+		; The writer names stages with native 64-bit ticks; HWND remains a DWORD.
+		if Hwnd > 0xFFFFFFFF || !NumberTryParseSignedInteger(Owner[2], &StageTick)
 				|| DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
 			continue
 		try {
