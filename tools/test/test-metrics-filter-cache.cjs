@@ -4364,7 +4364,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 		const colour = () => {
 			page.context.renderActivityCalendar();
 			const html = page.elements.get('activity_calendar_container').innerHTML;
-			const match = html.match(/fill="([^"]+)"><title>6\/11\/2025 — 100 car\.<\/title>/);
+			const match = html.match(/fill="([^"]+)"><title>6\/11\/2025 — 100 [^<]+<\/title>/);
 			assert.ok(match, 'the visible day is rendered with its real count');
 			return match[1];
 		};
@@ -4617,4 +4617,104 @@ test('apps daily active-ratio chart retains small observed ratios', () => {
 		'Actif: 0'
 	);
 });
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} metrics app charts use current localized weekday and month labels`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'hour_weekday_heatmap_container',
+			'ribbon_container',
+			'activity_calendar_container',
+			'category-filter-buttons',
+			'weekday-filter-buttons',
+			'day_timeline_container',
+			'kpi-tx-autorepeat-detail'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		vm.runInContext(
+			`Date = class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-05T12:00:00'])); } };`,
+			page.context
+		);
+		page.context.window._i18n_strings['ui_typing.heatmap_day_mon'] = '<Mon-local>';
+		page.context.window._i18n_strings['ui_typing.calendar_month_10'] = '<Nov-local>';
+		page.context.window._i18n_strings['ui_apps.col_day'] = 'Day-local';
+		page.context.window._i18n_strings['ui_apps.col_chars'] = 'Chars-local';
+		page.context.window._i18n_strings['ui_apps.kpi_no_data'] = 'None-local';
+		page.context.window._i18n_strings['ui_apps.h2_autorepeat'] = 'Repeat-local';
+		publishLoadedAppsData(page, host, {
+			'2026-11-02': {
+				Editor: { app_time_ms: 60000, chars: 10, auto_repeat_count: 2, hourly: { 12: { c: 1 } } }
+			}
+		});
+		page.context.renderHourWeekdayHeatmap(page.context.getAggregatedData());
+		page.context.renderActivityCalendar();
+		page.context.renderRibbon(page.context.getAggregatedData());
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		page.context.rebuildFilterButtons();
+		page.context.renderDashboard();
+		const heatmap = page.elements.get('hour_weekday_heatmap_container').innerHTML;
+		const calendar = page.elements.get('activity_calendar_container').innerHTML;
+		assert.match(heatmap, /&lt;Mon-local&gt;/);
+		assert.doesNotMatch(heatmap, /<Mon-local>/);
+		assert.match(page.elements.get('ribbon_container').innerHTML, /&lt;Mon-local&gt;/);
+		assert.match(page.elements.get('weekday-filter-buttons').innerHTML, /&lt;Mon-local&gt;/);
+		assert.match(calendar, /&lt;Nov-local&gt;/);
+		assert.doesNotMatch(calendar, /<Nov-local>/);
+		assert.match(heatmap, /Chars-local/);
+		assert.match(calendar, /Chars-local/);
+		assert.match(page.elements.get('ribbon_container').innerHTML, /00h — 0<\/title>/);
+		assert.doesNotMatch(page.elements.get('ribbon_container').innerHTML, /None-local/);
+		assert.match(page.elements.get('day_timeline_container').innerHTML, /Day-local/);
+		assert.match(page.elements.get('kpi-tx-autorepeat-detail').textContent, /Repeat-local/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} locale updates redraw metrics without losing category selection`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'hour_weekday_heatmap_container',
+			'category-filter-buttons',
+			'weekday-filter-buttons'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-11-02': {
+				Editor: { category: 'Productivity', chars: 1, hourly: { 12: { c: 1 } } },
+				Browser: { category: 'Entertainment', chars: 1, hourly: { 12: { c: 1 } } },
+				Custom: { category: 'Personal Work', chars: 1, hourly: { 12: { c: 1 } } }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]); renderDashboard();",
+			page.context
+		);
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+		const listener = page.listeners.find((entry) => entry.name === 'i18n:applied');
+		assert.ok(listener, 'the loaded page must handle a late locale delivery');
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		page.context.window._i18n_locale = 'en';
+		page.context.window.i18n_apply({
+			'app_category.productivity': 'Productivity EN',
+			'app_category.entertainment': 'Entertainment EN',
+			'ui_typing.heatmap_day_mon': 'Monday EN'
+		});
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+		assert.match(page.elements.get('weekday-filter-buttons').innerHTML, /Monday EN/);
+		assert.match(page.elements.get('hour_weekday_heatmap_container').innerHTML, /Monday EN/);
+		vm.runInContext('currentCategoryFilter = new Set();', page.context);
+		page.context.window.i18n_apply({ 'ui_typing.heatmap_day_mon': 'Monday again' });
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), []);
+		vm.runInContext("currentCategoryFilter = new Set(['Personal Work']);", page.context);
+		page.context.window.i18n_apply({ 'ui_typing.heatmap_day_mon': 'Monday final' });
+		assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Custom']);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);

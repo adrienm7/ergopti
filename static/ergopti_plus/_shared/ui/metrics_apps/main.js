@@ -150,12 +150,12 @@ function rebuildFilterButtons() {
 	renderCats();
 
 	// ── Weekdays ──────────────────────────────────────────────────────
-	const wkLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+	const wkLabels = metricWeekdayLabels();
 	const renderWk = () => {
 		wkBox.innerHTML = wkLabels
 			.map((label, idx) => {
 				const active = !currentWeekdayFilter || currentWeekdayFilter.has(idx);
-				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${label}</button>`;
+				return `<button class="filter-btn${active ? ' active' : ''}" data-dow="${idx}" style="padding:3px 9px;font-size:11px;">${escapeHtml(label)}</button>`;
 			})
 			.join('');
 		[...wkBox.querySelectorAll('button[data-dow]')].forEach((btn) => {
@@ -713,7 +713,7 @@ function renderDashboard() {
 		setText(
 			'kpi-tx-autorepeat-detail',
 			autoRepCount > 0
-				? `${format_int(autoRepCount)} touches répétées`
+				? `${format_int(autoRepCount)} ${_t('ui_apps.h2_autorepeat')}`
 				: _t('ui_apps.kpi_no_repeat')
 		);
 
@@ -848,7 +848,7 @@ function renderDashboard() {
 		}
 
 		// #22 Dominant category per weekday — render as compact 7-day rundown
-		const DOW_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+		const DOW_LABELS = metricWeekdayLabels();
 		const wkLines = [];
 		let domToday = null;
 		const todayDow = (new Date().getDay() + 6) % 7;
@@ -1195,3 +1195,14 @@ function renderDashboard() {
 
 // =====================================================
 // =====================================================
+
+// Native locale deliveries can arrive after the page data. Preserve the
+// selected category identities while rebuilding labels and derived charts.
+document.addEventListener('i18n:applied', () => {
+	if (currentCategoryFilter) {
+		currentCategoryFilter = new Set([...currentCategoryFilter].map(translateCategory));
+	}
+	invalidateAggregationCache();
+	rebuildFilterButtons();
+	renderDashboard();
+});
