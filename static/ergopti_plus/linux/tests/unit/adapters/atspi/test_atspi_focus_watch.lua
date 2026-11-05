@@ -13,6 +13,38 @@ local Json = require("json")
 local Watch = require("adapters.atspi_focus_watch")
 local Guard = require("modules.keystats.focus_guard")
 
+helpers.describe("native focus descriptor close receipts", function()
+	for _, refused in ipairs({ 41, 42, "throw" }) do
+		helpers.it("retains ambiguous close debt for descriptor " .. refused, function()
+			local saved_ffi, saved_uv = package.loaded.ffi, package.loaded.luv
+			local calls, next_fd = {}, 40
+			local ffi = { cdef = function() end, new = function() return {} end, C = {
+				mkfifo = function() return 0 end,
+				open = function() next_fd = next_fd + 1; return next_fd end,
+				close = function(fd)
+					calls[#calls + 1] = fd
+					if refused == "throw" and fd == 41 then error("injected close exception") end
+					return fd == refused and -1 or 0
+				end,
+			} }
+			local uv = { fs_mkdtemp = function() return "/private-focus" end, fs_chmod = function() return true end,
+				fs_unlink = function() return true end, fs_rmdir = function() return true end }
+			local ok, err = xpcall(function()
+				package.loaded.ffi, package.loaded.luv = ffi, uv
+				local name, create = debug.getupvalue(Watch.new, 2)
+				assert(name == "native_transport", "test must exercise the actual native transport")
+				local transport = create()
+				helpers.assert_eq(transport.close(), false)
+				helpers.assert_eq(transport.cleanup(), true, "endpoint paths can be removed independently")
+				helpers.assert_eq(transport.close(), false, "a prior ambiguous native close remains unsettled")
+				helpers.assert_eq(calls, { 41, 42 }, "an ambiguous fd must never be closed again")
+			end, debug.traceback)
+			package.loaded.ffi, package.loaded.luv = saved_ffi, saved_uv
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 --- Requires a literal false admission result.
 local function assert_false(value, message) helpers.assert_eq(value, false, message) end
 
