@@ -36,7 +36,98 @@ local function with_browser(body)
 	assert(closed and acknowledgement, "actual Manager fixture must retire its owned document")
 end
 
+	helpers.it("(linux-model-inventory-owner) does not download a model installed after the page was drawn", function()
+		with_browser(function(f, _, seen)
+			local ready = f.handshake()
+			local available
+			for _, row in ipairs(ready.data.models) do
+				if row.backend == "ollama" and row.installed ~= true then available = row; break end
+			end
+			helpers.assert_not_nil(available)
+			seen.cache[#seen.cache + 1] = available.runtime_name
+			local result = f.send({ action = "download_model", backend = "ollama", name = available.name })
+			helpers.assert_eq(result.downloading, false)
+			helpers.assert_eq(seen.downloads, {})
+		end)
+	end)
+
 helpers.describe("model browser inventory document", function()
+	for _, unavailable in ipairs({ false, true }) do
+		helpers.it("(linux-model-inventory-owner) rechecks installation after switching backends: " .. tostring(unavailable), function()
+			with_browser(function(f, _, seen)
+				seen.backend = "api"
+				local ready = f.handshake()
+				local installed
+				for _, row in ipairs(ready.data.models) do
+					if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+				end
+				helpers.assert_not_nil(installed)
+				seen.on_backend = function() if unavailable then seen.cache = nil else seen.cache = {} end end
+				local result = f.send({ action = "select_model", backend = "ollama", name = installed.name })
+				helpers.assert_eq(result.selected, false)
+				helpers.assert_eq(seen.selected, {})
+			end)
+		end)
+	end
+
+	helpers.it("(linux-model-inventory-owner) refuses selection when the live inventory is unavailable", function()
+		with_browser(function(f, _, seen)
+			local ready = f.handshake()
+			local installed
+			for _, row in ipairs(ready.data.models) do
+				if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+			end
+			helpers.assert_not_nil(installed)
+			seen.cache = nil
+			local effects = #f.effects
+			local result = f.send({ action = "select_model", backend = "ollama", name = installed.name })
+			helpers.assert_eq(result.selected, false)
+			helpers.assert_eq(seen.selected, {})
+			helpers.assert_eq(#f.effects, effects, "unknown inventory must not repaint as empty")
+		end)
+	end)
+
+	helpers.it("(linux-model-inventory-owner) refuses deletion of an obsolete installed row", function()
+		local previous = package.loaded["ui.menu.llm_backend_rows"]
+		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+			return { rows = {}, providers = {}, tools = {} }
+		end }
+		local ok, failure = pcall(with_browser, function(f, bridge, seen)
+			local deletions = 0
+			bridge.bind({ dialogs = {}, delete_model = function() deletions = deletions + 1; return true end,
+				ollama_state = function() return true end, ollama_install_phase = function() return "idle" end,
+				install_ollama = function() return true end })
+			local ready = f.handshake()
+			local installed
+			for _, row in ipairs(ready.data.models) do
+				if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+			end
+			helpers.assert_not_nil(installed)
+			seen.cache = {}
+			local result = f.send({ action = "delete_model", backend = "ollama", name = installed.name })
+			helpers.assert_eq(result.deleted, false)
+			helpers.assert_eq(deletions, 0)
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = previous
+		assert(ok, failure)
+	end)
+
+	helpers.it("(linux-model-inventory-owner) refuses a model removed after the page was drawn", function()
+		with_browser(function(f, _, seen)
+			local ready = f.handshake()
+			local installed
+			for _, row in ipairs(ready.data.models) do
+				if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+			end
+			helpers.assert_not_nil(installed)
+			seen.cache = {}
+			local result = f.send({ action = "select_model", backend = "ollama", name = installed.name })
+			helpers.assert_eq(seen.selected, {})
+			helpers.assert_eq(result.selected, false)
+			helpers.assert_eq(f.manager.is_visible("model_browser"), true)
+		end)
+	end)
+
 	for _, mode in ipairs({ "throw", "refuse", "inline" }) do
 		helpers.it("(model-selector-listing-refusal) reports " .. mode .. " without leaking an exception", function()
 			local previous, states = package.loaded["ui.menu.llm_backend_rows"], {}
