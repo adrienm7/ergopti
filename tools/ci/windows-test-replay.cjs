@@ -45,6 +45,11 @@ function parsePlan(source) {
 	});
 }
 function selectTests(plan, selection) {
+	if (Object.hasOwn(selection, 'native_proxy_relay_owner_e2e'))
+		demand(
+			typeof selection.native_proxy_relay_owner_e2e === 'boolean',
+			'native proxy relay owner E2E selection must be Boolean'
+		);
 	if (Object.hasOwn(selection, 'native_http_client_e2e'))
 		demand(
 			typeof selection.native_http_client_e2e === 'boolean',
@@ -298,6 +303,13 @@ async function selfTest() {
 		]
 	};
 	assert.deepEqual(selectTests(plan, selection), ['Alpha (one)', 'Beta (two)']);
+	for (const selected of [true, false])
+		assert.deepEqual(selectTests(plan, { ...selection, native_proxy_relay_owner_e2e: selected }), [
+			'Alpha (one)',
+			'Beta (two)'
+		]);
+	for (const invalid of ['true', 'false', 0, 1, null, {}, []])
+		assert.throws(() => selectTests(plan, { ...selection, native_proxy_relay_owner_e2e: invalid }));
 	for (const selected of [true, false])
 		assert.deepEqual(selectTests(plan, { ...selection, native_http_client_e2e: selected }), [
 			'Alpha (one)',
