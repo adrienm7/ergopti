@@ -124,8 +124,18 @@ function M.new(active)
 		return owner.pump()
 	end
 
+	--- Retires only the binding that acquired this button; another shortcut may
+	--- own a different hold of the same global action.
+	function owner.retire_binding(button, binding)
+		local state = states[button]
+		if type(binding) ~= "string" or not state or state.binding ~= binding then return true end
+		state.wanted = false
+		if not busy then owner.pump() end
+		return states[button] == nil
+	end
+
 	--- Accepts one toggle without waiting for any native child in the callback.
-	function owner.toggle(button)
+	function owner.toggle(button, binding)
 		if (button ~= "1" and button ~= "3") or busy or retiring then return false end
 		local state = states[button]
 		if state then
@@ -136,7 +146,7 @@ function M.new(active)
 		busy = true
 		local captured = epoch
 		if not admitted() or epoch ~= captured then busy = false; return false end
-		state = { wanted = true }
+		state = { wanted = true, binding = binding }
 		states[button] = state -- The obligation precedes fallible native admission.
 		dispatch(button, state, true)
 		busy = false

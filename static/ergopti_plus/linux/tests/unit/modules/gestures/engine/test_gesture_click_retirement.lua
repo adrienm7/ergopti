@@ -82,6 +82,94 @@ local function holds(manager, state)
 	helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3" })
 end
 helpers.describe("gesture click retirement", function()
+	helpers.it("releases a toggled button when its gesture binding is removed", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			manager._test_begin_reading({ feed = function() end })
+			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad",
+				drain = function() return 0, "would_block" end, close = function() return true end }
+			helpers.assert_true(manager.enable())
+			helpers.assert_true(manager.dispatch_gesture({ fingers = 3, direction = "left" }))
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1" })
+			helpers.assert_true(manager.set_action("swipe_3_left", "none"))
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" }, "the removed binding cannot leave a held button")
+		end)
+	end)
+
+
+	helpers.it("waits for a removed binding's DOWN child before releasing", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			state.hold = true
+			manager.execute_action("left_click_toggle", "swipe_3_left")
+			local down = state.operations[1]
+			helpers.assert_true(manager.set_action("swipe_3_left", "none"))
+			helpers.assert_true(down.cancelled)
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1" }, "cancellation intent does not prove child exit")
+			down.result, down.settled = { ok = false, error = "cancelled" }, true
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" })
+			local up = state.operations[2]; up.result, up.settled = { ok = true }, true
+			state.harvest()
+		end)
+	end)
+
+	helpers.it("preserves a different binding's held button when a gesture is changed", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			manager.execute_action("left_click_toggle", "tap_key__other"); state.harvest()
+			helpers.assert_true(manager.set_action("swipe_3_left", "none")); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1" })
+			manager.execute_action("left_click_toggle", "tap_key__other"); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" })
+		end)
+	end)
+
+	helpers.it("keeps the other button held when one gesture is reassigned", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			helpers.assert_true(manager.set_action("swipe_3_right", "right_click_toggle"))
+			manager.execute_action("left_click_toggle", "swipe_3_left")
+			manager.execute_action("right_click_toggle", "swipe_3_right"); state.harvest()
+			helpers.assert_true(manager.set_action("swipe_3_left", "none")); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3", "mouseup:1" })
+			manager.execute_action("right_click_toggle", "swipe_3_right"); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3", "mouseup:1", "mouseup:3" })
+		end)
+	end)
+
+	helpers.it("keeps unchanged and refused gesture assignments from releasing a button", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle")); state.harvest()
+			local persist = manager._persist_updates
+			manager._persist_updates = function() return false end
+			helpers.assert_eq(manager.set_action("swipe_3_left", "none"), false)
+			manager._persist_updates = persist
+			state.harvest(); helpers.assert_eq(edges(state), { "mousedown:1" })
+			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" })
+		end)
+	end)
+
+	for _, route in ipairs({ "reset", "clear" }) do
+		helpers.it("retires an owned click during " .. route .. " gesture reassignment", function()
+			with_manager(function(manager, state)
+				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
+				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
+				if route == "reset" then helpers.assert_true(manager.reset_defaults())
+				else helpers.assert_true(manager.disable_all_actions()) end
+				state.harvest()
+				helpers.assert_eq(edges(state), { "mousedown:1", "mouseup:1" })
+			end)
+		end)
+	end
+
+
 	for _, transition in ipairs({ "disable", "stop", "pause" }) do
 		helpers.it("releases both buttons on " .. transition .. " without a touchpad reader", function()
 			with_manager(function(manager, state)
