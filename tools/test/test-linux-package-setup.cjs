@@ -621,6 +621,20 @@ else echo "users input uinput"; fi`
 			/systemctl --user start ergopti-hotstrings.service/,
 			/luajit|pkexec|enable/
 		],
+		...[
+			['tray-version', ['--tray', '--version'], /luajit .* --tray --version$/m],
+			['tray-unknown', ['--tray', '--unknown'], /luajit .* --tray --unknown$/m],
+			[
+				'tray-config',
+				['--tray', '--config', '/tmp/custom profile'],
+				/luajit .* --tray --config \/tmp\/custom profile$/m
+			],
+			['tray-verbose', ['--tray', '--verbose'], /luajit .* --tray --verbose$/m],
+			['tray-dry-run', ['--tray', '--dry-run'], /luajit .* --tray --dry-run$/m],
+			['tray-missing-value', ['--tray', '--config'], /luajit .* --tray --config$/m],
+			['tray-two-flags', ['--tray', '--tray'], /luajit .* --tray --tray$/m],
+			['tray-help-args', ['--tray', '--help'], /luajit .* --tray --help$/m]
+		].map(([scenario, args, expected]) => [scenario, args, 0, expected, /systemctl/]),
 		[
 			'service',
 			['--service', '--tray'],

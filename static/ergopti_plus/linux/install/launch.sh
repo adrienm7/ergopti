@@ -27,7 +27,10 @@ for arg in "$@"; do
 	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
 done
 
-if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" && command -v systemctl >/dev/null 2>&1 \
+# Only the desktop's bare tray request can be represented by the unit. Any
+# additional daemon arguments must reach the daemon itself in their original order.
+if "$DAEMON_LAUNCH" && "$SESSION_START" && ! "$SERVICE_MODE" \
+	&& [ "$#" -eq 1 ] && [ "$1" = --tray ] && command -v systemctl >/dev/null 2>&1 \
 	&& systemctl --user show-environment >/dev/null 2>&1; then
 	# The packaged unit remains the sole startup owner when systemd is present.
 	# XDG only starts the daemon directly on non-systemd desktops.
