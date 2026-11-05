@@ -66,10 +66,21 @@ helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 			helpers.assert_eq(#notices, 0)
 			enabled = true
 			for _, task in ipairs(pending) do task.done(0, "TrackpadRightClick = 1; TrackpadThreeFingerDrag = 1;", "") end
-			helpers.assert_eq(#notices, 2)
+			-- The held three-finger swipe is greyed and never fired: only the
+			-- two-finger tap, which both would handle, gets a dialog
+			helpers.assert_eq(#notices, 1)
+			helpers.assert_eq(notices[1].key, "tap_2_conflict")
 			subject.apply_all_overrides(actions, function() return enabled end)
 			for _, task in ipairs(pending) do task.done(0, "TrackpadRightClick = 1;", "") end
-			helpers.assert_eq(#notices, 2)
+			helpers.assert_eq(#notices, 1)
+		end)
+	end)
+	-- Field E2E 2026-11-05: a read that returned nothing opened five dialogs at boot
+	helpers.it("shows no boot dialog when the settings read returned nothing", function()
+		fixture(function(subject, pending, notices)
+			subject.apply_all_overrides({ tap_2 = "lookup", tap_3 = "lookup" }, function() return true end)
+			for _, task in ipairs(pending) do task.done(0, "", "") end
+			helpers.assert_eq(#notices, 0)
 		end)
 	end)
 	helpers.it("does not warn when gesture startup was refused", function()
