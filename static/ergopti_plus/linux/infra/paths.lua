@@ -110,7 +110,7 @@ local function absolute(path)
 	local cwd = M.current_directory()
 	if not cwd then return path end
 	cwd = M.normalize_native_separators(cwd):gsub("/+$", "")
-	if path == "." then return cwd end
+	if path == "." then return cwd ~= "" and cwd or "/" end
 	local relative = path:gsub("^%./", "")
 	return cwd .. "/" .. relative
 end

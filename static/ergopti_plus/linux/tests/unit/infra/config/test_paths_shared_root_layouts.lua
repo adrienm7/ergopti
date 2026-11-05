@@ -405,6 +405,17 @@ end)
 rmdir_one(FIXTURE_BASE)
 
 helpers.describe("paths: the driver root is absolute", function()
+	helpers.it("linux-path-root-cwd: anchors the current directory at filesystem root", function()
+		if package.config:sub(1, 1) == "\\" then return end
+		local Paths, uv = helpers.load_module("infra.paths"), require("luv")
+		local previous = assert(uv.cwd())
+		assert(uv.chdir("/"))
+		local ok, root, child = pcall(function() return Paths._absolute_for_test("."), Paths._absolute_for_test("./child") end)
+		assert(uv.chdir(previous))
+		helpers.assert_true(ok)
+		helpers.assert_eq(root, "/")
+		helpers.assert_eq(child, "/child")
+	end)
 
 	helpers.it("even when the modules load through a relative package.path", function()
 		-- The test runner and a checkout launch (`luajit ergopti_hotstrings.lua`)
