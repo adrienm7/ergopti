@@ -234,8 +234,8 @@ function renderSankey(aggData) {
 	const H = PAD_TOP * 2 + Math.max(leftApps.length, rightApps.length) * ROW_H;
 
 	// Y for each app on each side
-	const leftY = {};
-	const rightY = {};
+	const leftY = Object.create(null);
+	const rightY = Object.create(null);
 	leftApps.forEach((n, i) => (leftY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 	rightApps.forEach((n, i) => (rightY[n] = PAD_TOP + i * ROW_H + ROW_H / 2));
 
