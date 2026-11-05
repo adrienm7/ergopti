@@ -99,7 +99,9 @@ function tree(files) {
 	}
 	return root;
 }
-const ELF = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0, 0, 0, 0]);
+const ELF = Buffer.alloc(18);
+Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1]).copy(ELF);
+ELF.writeUInt16LE(3, 16); // ET_DYN
 const dynamics = {
 	'usr/bin/luajit':
 		' (NEEDED) Shared library: [libc.so.6]\n (NEEDED) Shared library: [libluv.so.1]',
@@ -208,6 +210,16 @@ if (gcc.status === 0 && readelf.status === 0) {
 		['libergoptifixture.so.7'],
 		'the same executable fails once its library is left out of the image'
 	);
+	// An ELF executable with the needed filename is not a loadable library.
+	source('pretend.c', 'int main(void) { return 0; }\n');
+	execFileSync('gcc', ['-no-pie', '-o', path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(work, 'pretend.c')]);
+	real = Closure.checkClosure([image], readDynamic, recipient);
+	assert.ok(real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'), 'an ET_EXEC binary cannot provide a shared library');
+	fs.unlinkSync(path.join(image, 'usr/lib/libergoptifixture.so.7'));
+	execFileSync('gcc', ['-fPIE', '-pie', '-o', path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(work, 'pretend.c')]);
+	real = Closure.checkClosure([image], readDynamic, recipient);
+	assert.ok(real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'), 'a PIE executable cannot provide a shared library');
+	fs.unlinkSync(path.join(image, 'usr/lib/libergoptifixture.so.7'));
 	const cli = spawnSync(
 		process.execPath,
 		[path.join(ROOT, 'tools/build/check-elf-needed-closure.cjs'), image],

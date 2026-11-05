@@ -94,6 +94,20 @@ function recipientLibraries(data) {
 	return { has: (name) => groupOf(name) !== null, groupOf };
 }
 
+/** ELF shared objects have type ET_DYN; executables cannot satisfy DT_NEEDED. */
+function isSharedObject(file) {
+	const descriptor = fs.openSync(file, 'r');
+	try {
+		const header = Buffer.alloc(18);
+		if (fs.readSync(descriptor, header, 0, header.length, 0) !== header.length) return false;
+		if (header[5] === 1) return header.readUInt16LE(16) === 3;
+		if (header[5] === 2) return header.readUInt16BE(16) === 3;
+		return false;
+	} finally {
+		fs.closeSync(descriptor);
+	}
+}
+
 /**
  * Checks every ELF file under the roots.
  * @param {string[]} roots Files or directories.
@@ -107,7 +121,12 @@ function checkClosure(roots, readDynamic, recipient) {
 	const provided = new Set();
 	const dynamics = new Map();
 	const elfFiles = files.filter(isElf);
-	const bundledElfPaths = new Set(elfFiles.map((file) => fs.realpathSync(file)));
+	const outputs = new Map(elfFiles.map((file) => [file, readDynamic(file)]));
+	// PIE executables also use ET_DYN, but cannot be loaded as libraries.
+	const sharedFiles = new Set(elfFiles.filter((file) =>
+		isSharedObject(file) && !/\(FLAGS_1\)[^\n]*\bPIE\b/.test(outputs.get(file))
+	));
+	const bundledElfPaths = new Set([...sharedFiles].map((file) => fs.realpathSync(file)));
 	for (const root of roots) {
 		// Symbolic links count as provided names: libfoo.so.1 is usually a link.
 		const pending = [root];
@@ -130,10 +149,12 @@ function checkClosure(roots, readDynamic, recipient) {
 	}
 	for (const file of elfFiles) {
 		checked.push(file);
-		provided.add(path.basename(file));
-		const dynamic = parseDynamic(readDynamic(file));
+		const dynamic = parseDynamic(outputs.get(file));
 		dynamics.set(file, dynamic);
-		if (dynamic.soname) provided.add(dynamic.soname);
+		if (sharedFiles.has(file)) {
+			provided.add(path.basename(file));
+			if (dynamic.soname) provided.add(dynamic.soname);
+		}
 	}
 	const violations = [];
 	for (const [file, dynamic] of dynamics)
