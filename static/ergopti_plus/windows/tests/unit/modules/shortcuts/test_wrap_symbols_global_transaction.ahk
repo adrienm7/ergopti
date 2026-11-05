@@ -977,7 +977,7 @@ _WSSA_NativeCutpoint(State) {
 	Loop Files, State.path . ".*.tmp"
 		Stages.Push(A_LoopFileFullPath)
 	AssertEqual(1, Stages.Length, "a genuine complete private stage must exist before revocation")
-	Stage := _WSIC_Document(FSReadUtf8Exact(Stages[1]))
+	Stage := _WSIC_Document(_WSHS_ReadHeldStage(Stages[1]))
 	AssertTrue(_WSIC_HasPair(Stage["custom"], "c", "d"))
 	if State.mode == "suspend"
 		Suspend(true)
@@ -1112,3 +1112,238 @@ _WSST_StageCollision(Mode, Root, Path, Source) {
 for _WSST_Mode in ["collision", "ordinary-control"]
 	Test("wrap symbols native stage ownership: " . _WSST_Mode . " (wrap-stage-ownership)",
 		_WSSA_WithOwnedSource.Bind(_WSST_StageCollision.Bind(_WSST_Mode)))
+
+; This fixture reads an explicitly held writer's immutable private stage. Its
+; read handle must share the original WRITE/DELETE access as well as READ.
+_WSHS_ReadHeldStage(Path) {
+	Handle := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+		"UInt", 7, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+	AssertTrue(Handle != 0 && Handle != -1, "acquire an actual read-only stage observation handle")
+	try {
+		Content := _FSReadUtf8ExactHandle(Handle, 0, false)
+		AssertTrue(Content is String)
+		return Content
+	} finally AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0)
+}
+
+_WSHS_StageForward(State, This, Args*) {
+	AssertEqual(11, Args.Length)
+	Args[10] := _WSHS_InspectHeldStage.Bind(State)
+	return Func.Prototype.Call.Call(This, Args*)
+}
+_WSHS_InspectHeldStage(State) {
+	State.fired += 1
+	AssertFalse(A_IsCritical, "native stage observations must precede the memory-only final span")
+	Stages := []
+	Loop Files, State.path . ".*.tmp"
+		Stages.Push(A_LoopFileFullPath)
+	AssertEqual(1, Stages.Length)
+	State.stage := Stages[1]
+	State.before := _WSHS_ReadHeldStage(State.stage)
+	State.write := FSWriteDurable(State.stage, "foreign replacement")
+	State.move := FSMove(State.stage, State.root . "\unowned-moved-stage.tmp")
+	State.delete := FSDelete(State.stage)
+	State.after := FSStrictExists(State.stage) ? _WSHS_ReadHeldStage(State.stage) : "<missing>"
+}
+_WSHS_Custody(Root, Path, Source) {
+	global _WS_Custom
+	State := {root: Root, path: Path, fired: 0, stage: "", before: "", after: "", write: false, move: false, delete: false}
+	Owner := _WS_Save
+	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
+	try {
+		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _WSHS_StageForward.Bind(State)})
+		Result := WrapSymbols_AddCustom("c", "d")
+		_TestPrint("# wrap-held-stage ack=" . Result . " fired=" . State.fired
+			. " foreign-write=" . State.write . " foreign-move=" . State.move . " foreign-delete=" . State.delete)
+		AssertEqual(1, State.fired)
+		AssertFalse(State.write, "an unrelated pathname writer cannot overwrite the retained stage")
+		AssertFalse(State.move, "an unrelated pathname mover cannot substitute the retained stage")
+		AssertFalse(State.delete, "an unrelated pathname deleter cannot retire the retained stage")
+		AssertEqual(State.before, State.after, "READ-only inspection remains compatible with the existing final cutpoint tests")
+		AssertTrue(Result, "the original held owner must still publish after all rejected competing operations")
+		AssertFalse(FSStrictExists(State.stage), "the actual successful rename consumes only the original owned stage")
+		AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+	} finally {
+		if HadCall
+			Object.Prototype.DefineProp.Call(Owner, "Call", SavedCall)
+		else if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			Object.Prototype.DeleteProp.Call(Owner, "Call")
+	}
+}
+Test("wrap native held stage: pathname substitution is refused while real publication succeeds (wrap-stage-ownership)",
+	_WSSA_WithOwnedSource.Bind(_WSHS_Custody))
+
+_WSHS_RefusalRetry(Root, Path, Source) {
+	global _WS_Custom
+	Handle := 0, ProbeOwned := false
+	try {
+		Handle := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+			"UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		AssertTrue(Handle != 0 && Handle != -1, "the fixture must acquire the target's actual no-delete-share handle")
+		Probe := Root . "\owned-sharing-control.tmp"
+		ProbeOwned := FSWriteCreateDurable(Probe, Source)
+		AssertTrue(ProbeOwned)
+		try {
+			AssertFalse(FSAtomicMoveReplace(Probe, Path, &NativeError))
+			AssertTrue(NativeError == 5 || NativeError == 32,
+				"the access/sharing refusal is qualified only by the same inverse rename after hold release")
+			AssertTrue(FSStrictExists(Probe))
+			Result := WrapSymbols_AddCustom("c", "d")
+			Stages := []
+			Loop Files, Path . ".*.tmp"
+				Stages.Push(A_LoopFileFullPath)
+			_TestPrint("# wrap-held-refusal ack=" . Result . " native-sharing=" . NativeError . " retained-stages=" . Stages.Length)
+			AssertFalse(Result)
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+			AssertFalse(_WSIC_HasPair(_WS_Custom, "c", "d"))
+			AssertEqual(0, Stages.Length, "only the failed attempt's retained owned object is discarded")
+		} finally {
+			ClosedHold := DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+			if ClosedHold
+				Handle := 0
+			AssertTrue(ClosedHold, "close the exact no-delete-share handle before the inverse witness")
+			if ProbeOwned {
+				AssertTrue(FSStrictExists(Probe), "retain the same owned probe even when a business oracle fails")
+				Released := FSAtomicMoveReplace(Probe, Path, &ReleasedError)
+				_TestPrint("# wrap-held-refusal-inverse blocked-error=" . NativeError
+					. " released-ack=" . Released . " released-error=" . ReleasedError)
+				AssertTrue(Released, "the same actual native rename must ACK after the exact hold closes")
+				ProbeOwned := false
+				AssertFalse(FSStrictExists(Probe))
+				AssertEqual(Source, FSReadUtf8Exact(Path), "the inverse uses the original complete image, preserving genuine source admission")
+			}
+		}
+		AssertTrue(WrapSymbols_AddCustom("c", "d"), "a genuine released-target retry must succeed")
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+	} finally {
+		if Handle && Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
+	}
+}
+Test("wrap native held stage: refused target retires its own stage and permits a real retry (wrap-stage-ownership)",
+	_WSSA_WithOwnedSource.Bind(_WSHS_RefusalRetry))
+
+_WSHS_AbsentCreate(Root, Path, Source) {
+	global _WS_Custom
+	AssertTrue(FSDeleteStrict(Path))
+	AssertTrue(WrapSymbols_Init(Root . "\"), "the genuine missing-source loader must establish a new absent receipt")
+	AssertFalse(FSStrictExists(Path))
+	Result := WrapSymbols_AddCustom("c", "d")
+	_TestPrint("# wrap-held-absent ack=" . Result . " created=" . FSStrictExists(Path))
+	AssertTrue(Result, "the held owner must retain the ordinary no-replace create route")
+	AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+	AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+}
+Test("wrap native held stage: a genuinely absent source can still be created (wrap-stage-ownership)",
+	_WSSA_WithOwnedSource.Bind(_WSHS_AbsentCreate))
+
+_WSHP_Flush(State, Handle, Phase) {
+	State.flushes.Push(Phase)
+	AssertFalse(A_IsCritical, "file flushing must remain outside final memory admission")
+	if Phase == "stage"
+		State.stageHandle := Handle
+	if Phase == "published" && (State.mode == "post-flush-refusal" || State.mode == "new-reload-after-refusal")
+		return false ; explicit typed adapter refusal, not a claimed native Win32 failure
+	return DllCall("Kernel32\FlushFileBuffers", "Ptr", Handle, "Int") != 0
+}
+_WSHP_Forward(State, This, Path, Content, Suffix, &Detail, StageFn,
+		BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication) {
+	global _WS_Custom, _WS_StateEpoch
+	Result := Func.Prototype.Call.Call(This, Path, Content, Suffix, &Detail,
+		StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication,
+		_WSHP_Flush.Bind(State))
+	; Query immediately, before diagnostics/reload could recycle this value.
+	Info := Buffer(52, 0)
+	State.retired := DllCall("Kernel32\GetFileInformationByHandle", "Ptr", State.stageHandle,
+		"Ptr", Info, "Int") == 0
+	State.retirementError := A_LastError
+	State.receipt := {renamed: Publication.renamed, durable: Publication.durable}
+	if State.mode == "new-reload-after-refusal" {
+		State.reloaded := WrapSymbols_Init(State.root . "\")
+		State.newOwner := _WS_Custom, State.newEpoch := _WS_StateEpoch
+	}
+	return Result
+}
+_WSHP_Notice(State, This, Message, Options) {
+	State.messages.Push(Message)
+	return true ; feedback-only observer; no persistence or policy SUT is replaced
+}
+_WSHP_RoundTrip(Mode, Root, Path, Source) {
+	global _WS_Custom, _WS_LoadFailed, _WS_StateEpoch
+	State := {mode: Mode, root: Root, flushes: [], stageHandle: 0, retired: false,
+		retirementError: 0, receipt: 0, messages: [], reloaded: false, newOwner: 0, newEpoch: -1}
+	Owner := FSWriteReplaceOwned, Notifier := NotifierSend
+	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
+	HadNotice := Object.Prototype.HasOwnProp.Call(Notifier, "Call")
+	SavedNotice := HadNotice ? Object.Prototype.GetOwnPropDesc.Call(Notifier, "Call") : false
+	try {
+		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _WSHP_Forward.Bind(State)})
+		Object.Prototype.DefineProp.Call(Notifier, "Call", {Call: _WSHP_Notice.Bind(State)})
+		Result := WrapSymbols_AddCustom("c", "d")
+	} finally {
+		if HadCall
+			Object.Prototype.DefineProp.Call(Owner, "Call", SavedCall)
+		else if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			Object.Prototype.DeleteProp.Call(Owner, "Call")
+		if HadNotice
+			Object.Prototype.DefineProp.Call(Notifier, "Call", SavedNotice)
+		else if Object.Prototype.HasOwnProp.Call(Notifier, "Call")
+			Object.Prototype.DeleteProp.Call(Notifier, "Call")
+	}
+	Physical := FSReadUtf8Exact(Path)
+	Disk := _WSIC_Document(Physical)
+	_TestPrint("# wrap-partial-publication mode=" . Mode . " result=" . Result
+		. " renamed=" . (State.receipt ? State.receipt.renamed : -1)
+		. " durable=" . (State.receipt ? State.receipt.durable : -1)
+		. " latch=" . _WS_LoadFailed . " notices=" . State.messages.Length
+		. " flushes=" . State.flushes.Length . " retired=" . State.retired
+		. " retirement-error=" . State.retirementError . " reloaded=" . State.reloaded)
+	Assert(State.receipt is Object)
+	AssertTrue(State.receipt.renamed, "the original actual held native rename must have succeeded")
+	AssertTrue(_WSIC_HasPair(Disk["custom"], "c", "d"), "the physical target really contains the new candidate")
+	AssertEqual(2, State.flushes.Length)
+	AssertEqual("stage", State.flushes[1])
+	AssertEqual("published", State.flushes[2])
+	AssertTrue(State.retired, "the real stage handle must already be closed when its adapter returns")
+	AssertEqual(6, State.retirementError, "the retirement proof must be actual ERROR_INVALID_HANDLE")
+	if Mode == "native-control" {
+		AssertTrue(Result)
+		AssertTrue(State.receipt.durable)
+		AssertFalse(_WS_LoadFailed)
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		AssertEqual(0, State.messages.Length)
+		return
+	}
+	AssertFalse(Result, "a refused post-rename flush cannot be weakened into a successful durability ACK")
+	AssertFalse(State.receipt.durable)
+	if Mode == "new-reload-after-refusal" {
+		AssertTrue(State.reloaded)
+		Assert(_WS_Custom == State.newOwner, "the older failed completion cannot replace the independently reloaded model")
+		AssertEqual(State.newEpoch, _WS_StateEpoch)
+		AssertFalse(_WS_LoadFailed, "a partial failure from the previous owner cannot poison a genuine newer reload")
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+		AssertTrue(WrapSymbols_AddCustom("e", "f"))
+		AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+		AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "e", "f"))
+		return
+	}
+	AssertTrue(_WS_LoadFailed, "the old incomplete live projection must be fenced until a genuine reload")
+	AssertFalse(_WSIC_HasPair(_WS_Custom, "c", "d"), "RAM must not falsely advertise a durably acknowledged candidate")
+	AssertEqual(1, State.messages.Length)
+	AssertFalse(State.messages[1] == t("dialog.bulk_toggle.save_failed"), "feedback must not claim the already replaced file was reverted")
+	AssertFalse(WrapSymbols_AddCustom("e", "f"), "another save cannot reconstruct over the pending physical candidate")
+	AssertEqual(Physical, FSReadUtf8Exact(Path))
+	AssertTrue(WrapSymbols_Init(Root . "\"), "a real reload reconciles the actual new physical candidate")
+	AssertFalse(_WS_LoadFailed)
+	AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
+	AssertTrue(WrapSymbols_AddCustom("e", "f"), "a genuinely reconciled model can save again")
+	AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+	AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "e", "f"))
+}
+for _WSHP_Mode in ["post-flush-refusal", "new-reload-after-refusal", "native-control"]
+	Test("wrap native partial publication: " . _WSHP_Mode . " (wrap-stage-ownership)",
+		_WSSA_WithOwnedSource.Bind(_WSHP_RoundTrip.Bind(_WSHP_Mode)))

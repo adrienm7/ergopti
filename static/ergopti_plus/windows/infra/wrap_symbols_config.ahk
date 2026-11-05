@@ -714,6 +714,42 @@ _WS_Load() {
 ; Serialize, stage and commit one detached state. The no-argument form remains
 ; for internal compatibility, but acquires the same global lease before cloning
 ; live state instead of bypassing the transaction gateway.
+; A reader may inspect the native cutpoint, but no other writer/deleter may
+; replace the stage while its original exclusive-create handle is retained.
+_WS_CreateReadableHeldStage(Folder, Name, Attributes) {
+	return _FSCreateHeldStage(Folder, Name, Attributes, 1) ; FILE_SHARE_READ only
+}
+
+_WS_BeforeHeldPublication(OwnerToken, BoundPath, StartEpoch, ExpectedSource, BeforeNativeFn) {
+	PreviousCritical := Critical("On")
+	try Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
+	finally Critical(PreviousCritical)
+	if !(Authorized is Integer) || Authorized != 1
+		return false
+	if HasMethod(BeforeNativeFn, "Call")
+		BeforeNativeFn.Call()
+	else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+		throw TypeError("The private native cutpoint is not callable")
+	; Exact source I/O precedes the pure final admission/held rename wrapper.
+	; This is not a kernel compare-and-swap of another process's source edits.
+	return _FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
+}
+
+; A visible native replacement without its durability ACK is not unchanged.
+; Fence only this still-current old projection; never poison a newer reload.
+_WS_LatchUnacknowledgedPublication(ExpectedSource, BoundPath, StartEpoch) {
+	global _WS_LoadFailed, _WS_StateEpoch, _WS_Config_Path
+	PreviousCritical := Critical("On")
+	try {
+		if _WS_StateEpoch == StartEpoch && _WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+				&& _ConfigWriteLeaseKey(_WS_Config_Path) == _ConfigWriteLeaseKey(BoundPath) {
+			_WS_LoadFailed := true
+			return true
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
 _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		ActiveCandidate := unset, OwnerToken := 0, BoundPath := unset,
 		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, BeforeNativeFn := 0, ExpectedSource := 0) {
@@ -815,76 +851,102 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	finally Critical(PreviousCritical)
 	StagePath := BoundPath . "." . A_ScriptHwnd . "-" . LocalSequence . ".tmp"
 
-	Written := false
-	WriteError := ""
-	try Written := HasMethod(WriterFn, "Call")
-		? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
-	catch as Err {
-		Written := false
-		WriteError := Err.Message
-	}
-	Written := (Written is Integer) && Written == 1
-	if !Written {
-		if (WriteError != "") {
-			try LoggerError("WrapSymbols", "Writing staging file for '{1}' failed: {2}. The previous contents are intact.", BoundPath, WriteError)
-		} else {
-			try LoggerError("WrapSymbols", "Writing staging file for '{1}' was refused. The previous contents are intact.", BoundPath)
-		}
-		_WS_CleanupStage(StagePath, DeleteFn)
-		return false
-	}
-
-	Authorized := false
-	PreviousCritical := Critical("On")
-	try {
-		Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
-		Authorized := (Authorized is Integer) && Authorized == 1
-	} finally Critical(PreviousCritical)
-
-	if !Authorized {
-		try LoggerError("WrapSymbols", "Authorization before publishing '{1}' was refused. The previous contents are intact.", BoundPath)
-		_WS_CleanupStage(StagePath, DeleteFn)
-		return false
-	}
-
-	; Keep source reads and staging outside Critical. Only the native wrapper
-	; protects the final memory admission and its immediately following rename.
-	Replaced := false
-	ReplaceError := ""
-	try {
-		; Optional observation of the final native cutpoint, internal to this
-		; helper; the public two-argument replace adapter keeps its existing ABI.
-		if HasMethod(BeforeNativeFn, "Call")
-			BeforeNativeFn.Call()
-		else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
-			throw TypeError("The private native cutpoint is not callable")
-		; Complete the exact source read outside Critical. The immediately
-		; following native wrapper rechecks only memory ownership under Critical.
-		; This is not a cross-process kernel compare-and-swap of file contents.
-		if !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
-			throw Error("The wrap-symbol source changed before native publication")
+	NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+		&& (ReplaceFn is Integer) && ReplaceFn == 0
+		&& (DeleteFn is Integer) && DeleteFn == 0
+	if NativeAdapters {
+		; Retain the exclusively created stage and its parent through the actual
+		; rename and cleanup; never reopen or retire an unowned stage pathname.
+		BeforePublish := _WS_BeforeHeldPublication.Bind(OwnerToken, BoundPath,
+			StartEpoch, ExpectedSource, BeforeNativeFn)
 		FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)
-		if HasMethod(ReplaceFn, "Call") {
-			; Preserve the existing adapter ABI, but never grant it a stale source.
-			Replaced := FinalAdmission.Call() && ReplaceFn.Call(StagePath, BoundPath)
-		} else if ExpectedSource.source["status"] == "absent"
-			Replaced := FSConfigAtomicMoveCreate(StagePath, BoundPath, FinalAdmission)
-		else
-			Replaced := FSConfigAtomicMoveReplace(StagePath, BoundPath, &NativeError, FinalAdmission)
-	}
-	catch as Err {
-		Replaced := false
-		ReplaceError := Err.Message
-	}
-	Replaced := (Replaced is Integer) && Replaced == 1
-	if !Replaced {
-		if (ReplaceError != "") {
-			try LoggerError("WrapSymbols", "Atomic replacement of '{1}' failed: {2}. The previous contents are intact.", BoundPath, ReplaceError)
-		} else {
-			try LoggerError("WrapSymbols", "Atomic replacement of '{1}' was refused. The previous contents are intact.", BoundPath)
+		StageSuffix := SubStr(StagePath, StrLen(BoundPath) + 1)
+		if !FSWriteReplaceOwned(BoundPath, Content, StageSuffix, &StageDetail,
+				_WS_CreateReadableHeldStage, BeforePublish, FinalAdmission,
+				ExpectedSource.source["status"] != "absent", &Publication) {
+			if Publication.renamed && !Publication.durable {
+				Latched := _WS_LatchUnacknowledgedPublication(ExpectedSource, BoundPath, StartEpoch)
+				PartialDetail := "the file was replaced but durable completion was not acknowledged; "
+					. (Latched ? "the old live projection was fenced pending a reload. "
+						: "this superseded completion no longer owns the current live state. ")
+				return ConfigReportPersistenceFailure("wrap-symbol publication", 0,
+					PartialDetail . StageDetail, false)
+			}
+			try LoggerError("WrapSymbols", "Owned wrap-symbol publication at '{1}' was refused: {2}.", BoundPath, StageDetail)
+			return false
 		}
-		_WS_CleanupStage(StagePath, DeleteFn)
-		return false
+	} else {
+		Written := false
+		WriteError := ""
+		try Written := HasMethod(WriterFn, "Call")
+			? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
+		catch as Err {
+			Written := false
+			WriteError := Err.Message
+		}
+		Written := (Written is Integer) && Written == 1
+		if !Written {
+			if (WriteError != "") {
+				try LoggerError("WrapSymbols", "Writing staging file for '{1}' failed: {2}. The previous contents are intact.", BoundPath, WriteError)
+			} else {
+				try LoggerError("WrapSymbols", "Writing staging file for '{1}' was refused. The previous contents are intact.", BoundPath)
+			}
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
+
+		Authorized := false
+		PreviousCritical := Critical("On")
+		try {
+			Authorized := _WS_AuthorizeCommit(OwnerToken, BoundPath, StartEpoch)
+			Authorized := (Authorized is Integer) && Authorized == 1
+		} finally Critical(PreviousCritical)
+
+		if !Authorized {
+			try LoggerError("WrapSymbols", "Authorization before publishing '{1}' was refused. The previous contents are intact.", BoundPath)
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
+
+		; Keep source reads and staging outside Critical. Only the native wrapper
+		; protects the final memory admission and its immediately following rename.
+		Replaced := false
+		ReplaceError := ""
+		try {
+			; Optional observation of the final native cutpoint, internal to this
+			; helper; the public two-argument replace adapter keeps its existing ABI.
+			if HasMethod(BeforeNativeFn, "Call")
+				BeforeNativeFn.Call()
+			else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
+				throw TypeError("The private native cutpoint is not callable")
+			; Complete the exact source read outside Critical. The immediately
+			; following native wrapper rechecks only memory ownership under Critical.
+			; This is not a cross-process kernel compare-and-swap of file contents.
+			if !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
+				throw Error("The wrap-symbol source changed before native publication")
+			FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)
+			if HasMethod(ReplaceFn, "Call") {
+				; Preserve the existing adapter ABI, but never grant it a stale source.
+				Replaced := FinalAdmission.Call() && ReplaceFn.Call(StagePath, BoundPath)
+			} else if ExpectedSource.source["status"] == "absent"
+				Replaced := FSConfigAtomicMoveCreate(StagePath, BoundPath, FinalAdmission)
+			else
+				Replaced := FSConfigAtomicMoveReplace(StagePath, BoundPath, &NativeError, FinalAdmission)
+		}
+		catch as Err {
+			Replaced := false
+			ReplaceError := Err.Message
+		}
+		Replaced := (Replaced is Integer) && Replaced == 1
+		if !Replaced {
+			if (ReplaceError != "") {
+				try LoggerError("WrapSymbols", "Atomic replacement of '{1}' failed: {2}. The previous contents are intact.", BoundPath, ReplaceError)
+			} else {
+				try LoggerError("WrapSymbols", "Atomic replacement of '{1}' was refused. The previous contents are intact.", BoundPath)
+			}
+			_WS_CleanupStage(StagePath, DeleteFn)
+			return false
+		}
 	}
 
 	PublishedSource := FSReadWithStatus(BoundPath)
