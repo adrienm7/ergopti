@@ -1,95 +1,23 @@
 {
-	"expected_count": 113,
+	"expected_count": 96,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "key chord boot settings:",
+			"contains": "wrap-symbols-global-transaction-20260813:",
+			"expected_count": 10
+		},
+		{
+			"contains": "wrap-guillemets-length",
+			"expected_count": 1
+		},
+		{
+			"contains": "wrap symbols TOML inline comments:",
 			"expected_count": 7
 		},
 		{
-			"contains": "key chord boot enabled admission:",
-			"expected_count": 5
-		},
-		{
-			"contains": "raw boot cache lone-tap admission:",
-			"expected_count": 4
-		},
-		{
-			"contains": "raw boot cache CapsWord admission:",
-			"expected_count": 6
-		},
-		{
-			"contains": "Updater actual boot interval admission:",
-			"expected_count": 5
-		},
-		{
-			"contains": "gesture actual boot marker admission:",
-			"expected_count": 3
-		},
-		{
-			"contains": "window-caption-app-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-slot-display-stale-parser",
-			"expected_count": 2
-		},
-		{
-			"contains": "layout-stage-native-refusal-retry",
-			"expected_count": 3
-		},
-		{
-			"contains": "layout-stage-native-ownership",
-			"expected_count": 8
-		},
-		{
-			"contains": "composer-stage-native-ownership",
-			"expected_count": 4
-		},
-		{
-			"contains": "wrap-native-render-focus",
-			"expected_count": 2
-		},
-		{
-			"contains": "scalar-native-nontext-receiving",
-			"expected_count": 6
-		},
-		{
-			"contains": "config-candidate-publication-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "capsword-idle-store-domain",
-			"expected_count": 2
-		},
-		{
-			"contains": "capsword auto-off: a menu change",
-			"expected_count": 1
-		},
-		{
-			"contains": "capsword auto-off: refused or invalid changes",
-			"expected_count": 1
-		},
-		{
-			"contains": "(llm-line-style)",
-			"expected_count": 11
-		},
-		{
-			"contains": "LLM parser dedup stats:",
-			"expected_count": 3
-		},
-		{
-			"contains": "meta fix-updater-load-interval:",
-			"expected_count": 2
-		},
-		{
-			"contains": "one-shot-native-spent-controls",
-			"expected_count": 4
-		},
-		{
-			"contains": "wifi-dashboard-kpi-owner",
-			"expected_count": 2
+			"contains": "wrap symbols canonical owned source:",
+			"expected_count": 12
 		},
 		{
 			"contains": "wrap source ownership:",
@@ -97,31 +25,87 @@
 		},
 		{
 			"contains": "wrap final native admission:",
-			"expected_count": 3
+			"expected_count": 5
+		},
+		{
+			"contains": "wrap-symbols-unreadable-blocks-save:",
+			"expected_count": 4
 		},
 		{
 			"contains": "agent-native-nul-input",
 			"expected_count": 4
 		},
 		{
-			"contains": "Feature-state real boot source admission:",
+			"contains": "launcher-native-target",
 			"expected_count": 6
+		},
+		{
+			"contains": "window-caption-app-owner",
+			"expected_count": 2
 		},
 		{
 			"contains": "window-caption-case-owner",
 			"expected_count": 1
 		},
 		{
+			"contains": "wifi-dashboard-kpi-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "one-shot-native-spent-controls",
+			"expected_count": 4
+		},
+		{
+			"contains": "wrap-native-render-focus",
+			"expected_count": 2
+		},
+		{
 			"contains": "changelog-show-native-close",
 			"expected_count": 2
 		},
 		{
-			"contains": "changelog-open-generation",
+			"contains": "Feature-state real boot source admission:",
 			"expected_count": 6
 		},
 		{
-			"contains": "llm-profile-preopen-navigation",
+			"contains": "Diagnostics collection skipped physical checks never pass",
 			"expected_count": 1
+		},
+		{
+			"contains": "wrap acknowledged publication:",
+			"expected_count": 2
+		},
+		{
+			"contains": "storage native enumeration receipt:",
+			"expected_count": 3
+		},
+		{
+			"contains": "collection-guided-native-write",
+			"expected_count": 1
+		},
+		{
+			"contains": "wrap-native-trigger-epoch",
+			"expected_count": 2
+		},
+		{
+			"contains": "mistral-content-chunks",
+			"expected_count": 4
+		},
+		{
+			"contains": "agent-ics-delayed",
+			"expected_count": 2
+		},
+		{
+			"contains": "keystats-native-key-char-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "gesture-transform-native-render-focus",
+			"expected_count": 2
+		},
+		{
+			"contains": "sendinstant-post-receipt-owner",
+			"expected_count": 3
 		}
 	]
 }
