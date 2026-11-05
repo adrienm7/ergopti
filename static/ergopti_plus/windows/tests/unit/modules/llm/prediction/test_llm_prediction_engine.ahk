@@ -642,6 +642,8 @@ _EngineCapturedSourceAppPrivacy() {
 		AssertFalse(_LLM_Engine_SourceAppAllowed("source.exe"), "corrupt blank policy entries cannot grant transport admission")
 		_LLM_Engine["disabled_apps"] := []
 		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(70, "source-policy", "source.exe"), "source policy cannot replace exact request ownership")
+		_LLM_Engine := 0
+		AssertFalse(_LLM_Engine_RequestSourceIsCurrent(71, "source-policy", "source.exe"), "withdrawn engine state cannot grant or throw during transport admission")
 	} finally _LLM_Engine := Saved
 }
 Test("LLM privacy: captured source app and transport policy are both enforced (llm-captured-source-app-privacy)", _EngineCapturedSourceAppPrivacy)
