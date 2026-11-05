@@ -11,10 +11,16 @@ local function with_filter(callback)
 		local c = { mode = "healthy", role = "AXTextField", subrole = nil,
 			bundle = "com.apple.Safari", ignored = false, focus_reads = 0, calls = {} }
 		local field = { attributeValue = function(_, attribute)
+			if attribute == c.unsupported_attribute then return nil, "Attribute is not supported by target" end
+			if attribute == c.failed_attribute then
+				if c.failed_exception then error("AX read failed") end
+				return nil, "Messaging failed"
+			end
 			if attribute == "AXRole" and c.role_error then return nil, "Messaging failed" end
 			if attribute == "AXRole" and c.role_throws then error("AX role unavailable") end
 			if attribute == "AXRole" then return c.role end
 			if attribute == "AXSubrole" then return c.subrole end
+			if attribute == "AXParent" then return c.parent end
 			return nil
 		end }
 		local app_element = { attributeValue = function(_, attribute)
@@ -101,6 +107,38 @@ helpers.describe("Native AX focus refusal in the AI app filter", function()
 				elseif mode == "native_error" then c.role_error = true
 				else c.role_throws = true end
 				blocked(f, c, false, true, true, 1, "an unknown browser role cannot rule out a URL bar")
+			end)
+		end)
+	end
+	for _, attribute in ipairs({ "AXSubrole", "AXIdentifier", "AXParent" }) do
+		for _, mode in ipairs({ "native", "exception" }) do
+			helpers.it("blocks browser URL classification when " .. attribute .. " refuses: " .. mode, function()
+				with_filter(function(f, c)
+					c.failed_attribute, c.failed_exception = attribute, mode == "exception"
+					blocked(f, c, false, true, true, 1, "a transport failure cannot prove the field is not a URL bar")
+				end)
+			end)
+		end
+	end
+	helpers.it("admits an ordinary field when an optional URL attribute is unsupported", function()
+		for _, attribute in ipairs({ "AXSubrole", "AXIdentifier", "AXParent" }) do
+			with_filter(function(f, c)
+				c.unsupported_attribute = attribute
+				blocked(f, c, false, true, false, 1, "unsupported differs from failed transport")
+			end)
+		end
+	end)
+	for _, stage in ipairs({ "parent_role", "parent_parent", "grandparent_role" }) do
+		helpers.it("blocks an unreadable URL ancestry: " .. stage, function()
+			with_filter(function(f, c)
+				local grandparent = { attributeValue = function() return nil, "Messaging failed" end }
+				c.parent = { attributeValue = function(_, attribute)
+					if stage == "parent_role" and attribute == "AXRole" then return nil, "Messaging failed" end
+					if attribute == "AXRole" then return "AXGroup" end
+					if stage == "parent_parent" then return nil, "Messaging failed" end
+					return grandparent
+				end }
+				blocked(f, c, false, true, true, 1)
 			end)
 		end)
 	end

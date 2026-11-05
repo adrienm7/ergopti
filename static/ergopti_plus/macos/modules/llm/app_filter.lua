@@ -102,6 +102,17 @@ local function is_secure_field_focused(front, resolve_focused)
 	return SecureFieldDetector.isElementSecure(focused)
 end
 
+--- Reads one optional AX attribute without mistaking a transport refusal for absence.
+--- Hammerspoon returns nil plus this exact error for an unsupported attribute.
+local function read_optional_attribute(element, attribute)
+	local ok, value, detail = pcall(function() return element:attributeValue(attribute) end)
+	if not ok then return nil, false end
+	if value == nil and detail ~= nil and detail ~= "Attribute is not supported by target" then
+		return nil, false
+	end
+	return value, true
+end
+
 --- Returns true when the currently focused element is a browser URL bar.
 ---
 --- Detection strategy (three layers, each more expensive than the last):
@@ -127,12 +138,14 @@ local function is_url_bar_focused(front, resolve_focused)
 	if role ~= "AXTextField" then return false end
 
 	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
-	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-	if ok_sub and subrole == AX_URL_SUBROLE then return true end
+	local subrole, ok_sub = read_optional_attribute(focused, "AXSubrole")
+	if not ok_sub then return true end
+	if subrole == AX_URL_SUBROLE then return true end
 
 	-- Layer 2 — Chrome / Brave / Opera: AXIdentifier contains a recognisable pattern
-	local ok_id, identifier = pcall(function() return focused:attributeValue("AXIdentifier") end)
-	if ok_id and type(identifier) == "string" and identifier ~= "" then
+	local identifier, ok_id = read_optional_attribute(focused, "AXIdentifier")
+	if not ok_id then return true end
+	if type(identifier) == "string" and identifier ~= "" then
 		local id_lower = identifier:lower()
 		for _, pattern in ipairs(URL_BAR_ID_PATTERNS) do
 			if id_lower:find(pattern, 1, true) then return true end
@@ -142,14 +155,18 @@ local function is_url_bar_focused(front, resolve_focused)
 	-- Layer 3 — Edge / Firefox / Arc: no usable identifier; check the parent hierarchy.
 	-- Walk up two levels: input may be directly in the toolbar (Firefox) or wrapped in
 	-- an AXGroup inside the toolbar (Chromium / Edge omnibox structure).
-	local ok_p, parent = pcall(function() return focused:attributeValue("AXParent") end)
-	if ok_p and parent then
-		local ok_pr, parent_role = pcall(function() return parent:attributeValue("AXRole") end)
-		if ok_pr and parent_role == "AXToolbar" then return true end
-		local ok_gp, grandparent = pcall(function() return parent:attributeValue("AXParent") end)
-		if ok_gp and grandparent then
-			local ok_gr, gp_role = pcall(function() return grandparent:attributeValue("AXRole") end)
-			if ok_gr and gp_role == "AXToolbar" then return true end
+	local parent, ok_p = read_optional_attribute(focused, "AXParent")
+	if not ok_p then return true end
+	if parent then
+		local parent_role, ok_pr = read_optional_attribute(parent, "AXRole")
+		if not ok_pr or type(parent_role) ~= "string" or parent_role == "" then return true end
+		if parent_role == "AXToolbar" then return true end
+		local grandparent, ok_gp = read_optional_attribute(parent, "AXParent")
+		if not ok_gp then return true end
+		if grandparent then
+			local gp_role, ok_gr = read_optional_attribute(grandparent, "AXRole")
+			if not ok_gr or type(gp_role) ~= "string" or gp_role == "" then return true end
+			if gp_role == "AXToolbar" then return true end
 		end
 	end
 

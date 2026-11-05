@@ -708,22 +708,39 @@ end
 
 -- A refused publication or undo can retain the exact writer capability. Keep
 -- it until cleanup settles before allowing another hold mutation to proceed.
-local pending_hold_cleanup = nil
+local pending_hold_cleanups = {}
 local hold_cleanup_running = false
 
 local function settle_hold_cleanup()
-	if pending_hold_cleanup == nil then return true end
+	if #pending_hold_cleanups == 0 then return true end
 	if hold_cleanup_running then return false end
 	hold_cleanup_running = true
-	local record = pending_hold_cleanup
-	local called, settled = pcall(M.undo_import, record)
-	hold_cleanup_running = false
-	if called and settled == true then
-		if pending_hold_cleanup == record then pending_hold_cleanup = nil end
-		return true
+	while #pending_hold_cleanups > 0 do
+		local record = pending_hold_cleanups[1]
+		local called, settled = pcall(M.undo_import, record)
+		if not called or settled ~= true then
+			hold_cleanup_running = false
+			Logger.error(LOG, "Navigation layer cleanup remains pending; hold change refused.")
+			return false
+		end
+		table.remove(pending_hold_cleanups, 1)
 	end
-	Logger.error(LOG, "Navigation layer cleanup remains pending; hold change refused.")
-	return false
+	hold_cleanup_running = false
+	return true
+end
+
+--- Retains the exact cleanup owner until its undo succeeds.
+function M.undo_owned(record)
+	if record ~= nil then pending_hold_cleanups[#pending_hold_cleanups + 1] = record end
+	return settle_hold_cleanup()
+end
+
+--- Imports a wizard layer while retaining failed publication cleanup.
+function M.import_owned(opts)
+	if not settle_hold_cleanup() then return nil, "navigation layer cleanup remains pending" end
+	local imported, err, failed = M.import_recommended(opts)
+	if not imported and failed then M.undo_owned(failed) end
+	return imported, err
 end
 
 --- Runs a hold setter with the layer its action enters. A hold on the
@@ -743,8 +760,7 @@ function M.commit_hold(label, action_id, commit)
 		local import, layer_err, failed = M.import_recommended()
 		if not import then
 			if failed then
-				pending_hold_cleanup = failed
-				settle_hold_cleanup()
+				M.undo_owned(failed)
 			end
 			Logger.error(LOG, "%s refused: the recommended navigation layer cannot be imported (%s).",
 				tostring(label), tostring(layer_err))
@@ -755,8 +771,7 @@ function M.commit_hold(label, action_id, commit)
 	local committed = commit()
 	if committed ~= true then
 		if layer then
-			pending_hold_cleanup = layer
-			settle_hold_cleanup()
+			M.undo_owned(layer)
 		end
 		return committed
 	end

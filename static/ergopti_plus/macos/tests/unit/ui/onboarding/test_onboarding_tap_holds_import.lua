@@ -209,6 +209,12 @@ end)
 -- now brings Ergopti's recommended layer into the configuration folder (the
 -- owner never replaces a layers.toml the user has).
 helpers.describe("the key holding the navigation layer brings the recommended layer", function()
+	helpers.it("retains cleanup when a navigation layer import fails", function()
+		with_finish({ answers = answers({ left_command = true }), layer = "cleanup" }, function(state)
+			helpers.assert_eq(#state.layer_undos, 1, "the failed import's cleanup record must reach its owner")
+			helpers.assert_eq(state.layer_undos[1].path, "failed")
+		end)
+	end)
 	helpers.it("(nav-layer-fresh-install-default) imports the layer into the configuration folder", function()
 		for _, remap in ipairs({ { running = false }, { running = true } }) do
 			with_finish({ answers = answers({ caps_lock = true, left_command = true }), remap = remap }, function(state)

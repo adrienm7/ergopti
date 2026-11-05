@@ -212,6 +212,12 @@ helpers.describe("text_utils.unescape_text", function()
 		helpers.assert_eq(tu.unescape_text("\\u00e9"), "é")
 	end)
 
+	helpers.it("decodes surrogate pairs and preserves unpaired surrogate escapes", function()
+		helpers.assert_eq(tu.unescape_text("\\uD83D\\uDE00 \\ud834\\udd1e"), "😀 𝄞")
+		helpers.assert_eq(tu.unescape_text("\\uD800 \\uDE00"), "\\uD800 \\uDE00")
+		helpers.assert_eq(tu.unescape_text("\\uD800\\uD83D\\uDE00"), "\\uD800😀")
+	end)
+
 	helpers.it("decodes backslash escapes", function()
 		helpers.assert_eq(tu.unescape_text("a\\nb"), "a\nb")
 		helpers.assert_eq(tu.unescape_text("\\\"quoted\\\""), "\"quoted\"")

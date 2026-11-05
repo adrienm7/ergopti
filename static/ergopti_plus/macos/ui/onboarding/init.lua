@@ -635,7 +635,7 @@ local function import_nav_layer(keys)
 		if not NavLayer.recommendation_enters_layer(keys, require("platform.remap.defaults").tap_hold) then
 			return nil, false
 		end
-		local imported = NavLayer.import_recommended({ config_dir = require("infra.config_paths").get_config_dir() })
+		local imported = NavLayer.import_owned({ config_dir = require("infra.config_paths").get_config_dir() })
 		return imported, imported == nil
 	end)
 	if not ok then
@@ -814,7 +814,7 @@ local function commit_owned(answers, publication)
 	import_tap_holds(tap_hold_keys, _config_path ~= previous_config_path, function(ok, detail)
 		-- Only a refusal takes the layer back: after a timeout the keys may
 		-- still land, and they must not enter an empty layer then.
-		if not ok then require("platform.remap.nav_layer").undo_import(layer) end
+		if not ok then require("platform.remap.nav_layer").undo_owned(layer) end
 		if settled then
 			Logger.warn(LOG, "The tap-hold import answered after the wizard went on without it: %s.",
 				tostring(detail))

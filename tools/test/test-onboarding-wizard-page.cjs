@@ -1480,8 +1480,8 @@ function assertSeparated(row, where) {
 	);
 	assert.equal(
 		input.maxLength,
-		hotstrings.magic_key.max_characters,
-		'the custom trigger length comes from the manifest the hosts validate against'
+		hotstrings.magic_key.max_characters * 2,
+		'the UTF-16 limit can hold every scalar the hosts accept'
 	);
 	input.value = '  ';
 	input.dispatch('input');
@@ -1500,6 +1500,45 @@ function assertSeparated(row, where) {
 		done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
 		{ path: 'hotstrings.trigger_char', value: '§' }
 	);
+})();
+
+(function supplementaryTriggerAndInvalidScalarCount() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const page = openWizard({ platform });
+		page.platform = platform;
+		goToPage(page, 'hotstrings');
+		answer(page, true);
+		const options = page.el('page-magic-options');
+		const custom = options.children[options.children.length - 1].children[0];
+		custom.checked = true;
+		custom.dispatch('change');
+		const input = page.el('page-magic-options').querySelector('magic-input');
+		assert.equal(input.maxLength, 2, `${platform}: a supplementary scalar must fit`);
+		input.value = 'ab';
+		input.dispatch('input');
+		page.click('btn-next');
+		assert.equal(
+			page.el('page-title').textContent,
+			locale('en')['menu.hotstrings.title'],
+			`${platform}: two scalar values must be rejected before leaving the page`
+		);
+		input.value = '\ud800';
+		input.dispatch('input');
+		page.click('btn-next');
+		assert.equal(
+			page.el('page-title').textContent,
+			locale('en')['menu.hotstrings.title'],
+			`${platform}: unpaired surrogate must be rejected before leaving`
+		);
+		input.value = '😀';
+		input.dispatch('input');
+		const done = finish(page);
+		assert.deepEqual(
+			done.answers.operations.find((op) => op.path === 'hotstrings.trigger_char'),
+			{ path: 'hotstrings.trigger_char', value: '😀' },
+			`${platform}: the chosen scalar is retained`
+		);
+	}
 })();
 
 (function linuxTriggerChoiceKeepsRuntimePolicyAndCustomAnswer() {
@@ -2771,3 +2810,11 @@ console.log(
 console.log(
 	'Keyboard layout controls: neutral first run, persistent values, re-run and capability reasons passed.'
 );
+
+(function scalarValidationInvalidatesCachedScript() {
+	const match = html.match(/src="script\.js\?v=(\d+)"/);
+	assert.ok(
+		match && Number(match[1]) > 10,
+		'Unicode trigger validation must invalidate the previous script'
+	);
+})();

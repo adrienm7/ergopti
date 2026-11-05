@@ -144,10 +144,11 @@ function M.with_finish(opts, scenario)
 	local RealNavLayer = require("platform.remap.nav_layer")
 	state.layer_imports, state.layer_undos = {}, {}
 	package.loaded["platform.remap.defaults"] = RealDefaults
-	package.loaded["platform.remap.nav_layer"] = setmetatable({
+	local nav_stub = setmetatable({
 		import_recommended = function(options)
 			state.layer_imports[#state.layer_imports + 1] = options.config_dir
 			if opts.layer == "fail" then return nil, "disk full" end
+			if opts.layer == "cleanup" then return nil, "disk full", { status = "imported", path = "failed" } end
 			return { status = "imported", path = options.config_dir .. "layers.toml" }
 		end,
 		undo_import = function(import)
@@ -155,6 +156,13 @@ function M.with_finish(opts, scenario)
 			return true
 		end,
 	}, { __index = RealNavLayer })
+	nav_stub.undo_owned = nav_stub.undo_import
+	nav_stub.import_owned = function(options)
+		local imported, err, failed = nav_stub.import_recommended(options)
+		if failed then nav_stub.undo_owned(failed) end
+		return imported, err
+	end
+	package.loaded["platform.remap.nav_layer"] = nav_stub
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.paths"] = { shared = opts.canonical_files and helpers.shared
 		or function() return "/virtual/shared" end }
