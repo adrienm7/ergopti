@@ -59,6 +59,7 @@ local _input_reader_ports = {}
 for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 	_input_reader_ports[name] = rawget(EvdevReader, name)
 end
+_input_reader_ports.has_native_origin_debt = rawget(EvdevReader, "has_native_origin_debt")
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local Perf = require("infra.perf_counters")
@@ -2837,6 +2838,14 @@ local function _read_source(source)
 		_event_receipts[event] = EvdevReader.capture_event(event, source.slot)
 	end
 	if status ~= "fatal" then return event end
+	-- The failed read closes its descriptor before returning. If that close was
+	-- not acknowledged the Reader cannot issue any new native input receipts,
+	-- including for other keyboards still grabbed by this session.
+	local debt = _input_reader_ports.has_native_origin_debt
+	if type(debt) == "function" and debt() == true then
+		M.emergency_stop("native source retirement was not acknowledged")
+		return nil
+	end
 	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil

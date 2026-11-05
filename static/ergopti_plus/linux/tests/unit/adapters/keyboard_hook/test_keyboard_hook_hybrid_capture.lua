@@ -437,3 +437,22 @@ helpers.describe("keyboard_hook: original fd cleanup authority", function()
 		end)
 	end
 end)
+
+helpers.describe("keyboard_hook: fatal native source retirement", function()
+	helpers.it("does not keep capture running after a source close is unacknowledged", function()
+		local options = {}
+		require("tests.support.input_owner_fixture").with_session(options, function(s)
+			local failed_fd = assert(s.descriptor("b"))
+			options.eof_path = s.paths.b
+			options.fail_reader_close = function(fd) return fd == failed_fd end
+			s.hook.pump()
+			helpers.assert_true(s.reader.has_native_origin_debt())
+			helpers.assert_eq(s.hook.isRunning(), false, "remaining keyboards must not keep a poisoned source cohort")
+			helpers.assert_eq(s.hook.isRecovering(), false, "the native descriptor debt cannot be retried safely")
+			helpers.assert_eq(s.reader.is_open("keyboard:" .. s.paths.a), false, "the surviving keyboard is returned to the desktop")
+			helpers.assert_eq(s.source_closes, 2, "each original descriptor is closed once")
+			s.hook.stop()
+			helpers.assert_eq(s.source_closes, 2, "the uncertain descriptor must not be closed again")
+		end)
+	end)
+end)
