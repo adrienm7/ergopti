@@ -8,17 +8,40 @@
 
 #Requires AutoHotkey v2.0
 class _TNLC_Ops extends _TakeNoteFakeOps {
+ static PauseAtFile := false
+ static PauseCompleted := false
  static IsSuspended() => A_IsSuspended
+ static FileExists(Path) {
+  if _TNLC_Ops.PauseAtFile {
+   _TNLC_Ops.PauseAtFile := false
+   _TNLC_RunLifecycle()
+   _TNLC_Ops.PauseCompleted := true
+  }
+  return _TakeNoteFakeOps.FileExists(Path)
+ }
 }
 Assert(Value, Message := "") {
  if !Value
   throw Error(Message)
 }
+_TNLC_RunLifecycle() {
+ global _LCPC_World, _UserProgramPaused
+ Suspend(true)
+ _LCPC_Require(A_IsSuspended, "Native Suspend must precede the actual lifecycle entry")
+ Enter := Ergopti_OnSuspendEnter()
+ _LCPC_Require(Enter == 1 && LifecycleTransitionDebtSnapshot("suspend").Length == 0
+  && _LCPC_World.Ports.Count == 16, "The genuine suspend owner and unrelated teardown ports must settle")
+ Suspend(false)
+ _LCPC_Require(!A_IsSuspended, "Native Resume must precede the actual lifecycle resume")
+ Resume := Ergopti_OnSuspendResume()
+ _LCPC_Require(Resume == 1 && LifecycleTransitionDebtSnapshot("resume").Length == 0
+  && !_UserProgramPaused, "The real resume transition must settle before old note work continues")
+}
 _TNLC_Main() {
  global _LCPC_World, _ConfigDir, _UserProgramPaused, _TakeNotePending, _TakeNoteNextId
  _LCPC_Require(A_Args.Length == 3, "A private mode, directory and shared source are required")
  Mode := A_Args[1]
- _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch", "Unknown mode")
+ _LCPC_Require(Mode == "queued" || Mode == "waiting" || Mode == "same-epoch" || Mode == "in-flight", "Unknown mode")
  _LCPC_World := {Ports: Map()}
  _ConfigDir := A_Args[2]
  TimingsLoadShared(A_Args[3])
@@ -39,21 +62,15 @@ _TNLC_Main() {
   }
   FrozenCallback := _TakeNoteFakeOps.timers.RemoveAt(1)
   _LCPC_Require(HasMethod(FrozenCallback, "Call"), "The exact scheduled callback must be retained by the test")
-  if Mode != "same-epoch" {
-   Suspend(true)
-   _LCPC_Require(A_IsSuspended, "Native Suspend must precede the actual lifecycle entry")
-   Enter := Ergopti_OnSuspendEnter()
-   _LCPC_Require(Enter == 1 && LifecycleTransitionDebtSnapshot("suspend").Length == 0
-    && _LCPC_World.Ports.Count == 16, "The genuine suspend owner and unrelated teardown ports must settle")
-   Suspend(false)
-   _LCPC_Require(!A_IsSuspended, "Native Resume must precede the actual lifecycle resume")
-   Resume := Ergopti_OnSuspendResume()
-   _LCPC_Require(Resume == 1 && LifecycleTransitionDebtSnapshot("resume").Length == 0
-    && !_UserProgramPaused, "The real resume transition must settle before the retained timer")
-  }
+  if Mode == "in-flight"
+   _TNLC_Ops.PauseAtFile := true
+  else if Mode != "same-epoch"
+   _TNLC_RunLifecycle()
   if Mode == "waiting"
    _TakeNoteFakeOps.window_exists := true
   FrozenCallback.Call()
+  if Mode == "in-flight"
+   _LCPC_Require(_TNLC_Ops.PauseCompleted, "The actual file-existence callout must contain the real suspend and resume")
   if Mode != "waiting" && _TakeNoteFakeOps.timers.Length {
    _TakeNoteFakeOps.window_exists := true
    _TakeNoteFakeOps.RunNext()
@@ -69,7 +86,7 @@ _TNLC_Main() {
    _LCPC_Require(_TakeNoteFakeOps.launch_count == 1 && _TakeNoteFakeOps.maximize_count == 1
     && _TakeNoteFakeOps.send_count == 1 && _TakeNotePending.Count == 0,
     "A request kept in its capture epoch must complete exactly once")
-  else if Mode == "queued"
+  else if Mode == "queued" || Mode == "in-flight"
    _LCPC_Require(_TakeNoteFakeOps.launch_count == 0 && !_TakeNoteFakeOps.file_exists
     && _TakeNoteFakeOps.maximize_count == 0 && _TakeNoteFakeOps.send_count == 0,
     "A queued pre-pause request may not create, launch, focus or send after resume")

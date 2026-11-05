@@ -586,3 +586,7 @@ for _OSCF_Mode in ["plain", "ctrl", "shift", "ctrl-shift"]
 
 for _OSCF_TabMode in ["tab", "tab-shift"]
 	Test("one-shot native captured Tab flags: " . _OSCF_TabMode . " (one-shot-native-tab-flags)", _OSCF_Case.Bind(_OSCF_TabMode))
+
+for _OSCF_KanaMode in ["kana-plain", "kana-released"]
+	Test("one-shot native custom flags: " . _OSCF_KanaMode . " retains the original control modifier (one-shot-native-kana-flags)",
+		_OSCF_Case.Bind(_OSCF_KanaMode))
