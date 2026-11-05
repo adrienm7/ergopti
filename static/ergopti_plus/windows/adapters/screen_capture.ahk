@@ -43,6 +43,28 @@ _GestureScreenshotGdipCheck(Status, Operation) {
 		throw Error(Operation . " failed with GDI+ status " . Status . ".")
 }
 
+; Acquires a fresh private stage without adopting a pre-existing file. The
+; read handle participates in sharing and denies deletion while GDI+ reopens
+; it for writing. Metadata-only access zero cannot retain that custody.
+_GestureScreenshotAcquireStageLease(Stage) {
+	Lease := DllCall("Kernel32\CreateFileW", "Str", Stage, "UInt", 0x80000000,
+		"UInt", 3, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+	NativeError := A_LastError
+	if Lease == -1
+		throw OSError(NativeError, -1, "Exclusive screenshot stage acquisition was refused.")
+	return Lease
+}
+
+; Returns only after native acknowledgement. The owner retains the reference
+; when this throws, so CloseHandle refusal remains exact cleanup retry debt.
+_GestureScreenshotCloseStageLease(Lease) {
+	Closed := DllCall("Kernel32\CloseHandle", "Ptr", Lease, "Int")
+	NativeError := A_LastError
+	if !Closed
+		throw OSError(NativeError, -1, "Screenshot stage lease closure was refused.")
+	return true
+}
+
 ; Runs Work between a GDI+ startup and its shutdown. GDI+ counts its startups,
 ; so this owner never disturbs the overlays which hold their own token.
 ; @param {Func} Work Called without arguments; its result is returned.

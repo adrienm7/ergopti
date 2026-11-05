@@ -55,6 +55,10 @@ _GSSC_Run(Owner, Mode) {
 		WorkerId := _GestureScreenshotCreateWorker(Owner . "_save", 1, Stage, [], Completion)
 		AssertTrue(WorkerId > 0, "the real shared registry must admit the exact completed worker")
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		; This fixture created these bytes itself rather than running Capture.
+		; Give cleanup that exact receipt; production may not adopt a pathname.
+		Job["stage_snapshot"] := OriginalSnapshot
+		Job["stage_captured"] := true
 		if Owner == "direct" {
 			_GestureDirectCaptures[1] := Map("worker_id", WorkerId, "mode", "save", "path", Destination,
 				"started_tick", A_TickCount, "timeout_ms", 60000, "callback", _GSWO_RecordTerminal)
@@ -375,3 +379,315 @@ for _GSGL_Mode in ["unleased", "zero-negative", "read"]
 	Test("screenshot stage GDI lease: " . Map("unleased", "unleased existing-file control",
 		"zero-negative", "zero-access negative control permits deletion", "read", "GENERIC_READ excludes replacement and permits encoding")[_GSGL_Mode]
 		. " (screenshot-stage-lease-compat)", _GSGL_Run.Bind(_GSGL_Mode))
+
+
+; Genuine deferred worker -> exclusive stage -> synthetic GDI+ pixels ->
+; actual direct publication -> retained-handle cleanup. No screen is read.
+_GSOC_Capture(Record) {
+	Record["capture_calls"] += 1
+	Record["capture_critical"] := !!A_IsCritical
+	Job := Record["job"]
+	Lease := Job.Get("stage_lease", 0)
+	AssertTrue(Job.Get("stage_acquired", false) && Lease != 0,
+		"the real wrapper must acquire the exact native stage before any pixels")
+	Record["lease"] := Lease
+	Record["initial"] := FSHandleSnapshot(Lease)
+	AssertTrue(Record["initial"].Get("ok", false) && Record["initial"]["size"] == 0)
+	Deleted := DllCall("Kernel32\DeleteFileW", "Str", Job["stage"], "Int")
+	DeleteError := A_LastError
+	AssertEqual(0, Deleted, "the actual capture wrapper must pin its acquired stage pathname")
+	AssertEqual(32, DeleteError)
+	if Record["mode"] == "cancel" {
+		GestureDirectCaptureFinish(1, false, "fixture cancellation after acquisition", true)
+		return
+	}
+	_GestureScreenshotWithGdiplus(_GSGL_WritePixel.Bind(Job["stage"]))
+	Record["pixel_calls"] += 1
+	Final := FSHandleSnapshot(Lease)
+	AssertTrue(Final.Get("ok", false) && Final["size"] > 8)
+	for Key in ["volume", "index_high", "index_low"]
+		AssertEqual(Record["initial"][Key], Final[Key], "GDI+ must write the originally acquired stage identity")
+	if Record["mode"] == "close-debt" {
+		AssertTrue(DllCall("Kernel32\SetHandleInformation", "Ptr", Lease, "UInt", 2, "UInt", 2, "Int") != 0,
+			"the fixture must protect the actual retained lease against CloseHandle")
+		Record["protected"] := true
+	}
+}
+
+_GSOC_Run(Mode) {
+	global DriverPid, _GestureDirectCaptures, _GSWO_Terminals
+	WasCritical := Critical("On"), WasSuspended := A_IsSuspended
+	Old := _GSWO_Install()
+	Root := A_Temp . "\ergopti_owned_stage_composition_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Primary := 0, Job := 0
+	Record := Map("mode", Mode, "capture_calls", 0, "pixel_calls", 0, "capture_critical", true,
+		"lease", 0, "protected", false)
+	try {
+		AssertEqual(0, Old["jobs"].Count, "the native composition cannot borrow a live worker or cleanup debt")
+		if A_IsSuspended
+			Suspend(false)
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Stage := Root . "\stage.png", Destination := Root . "\published.png"
+		GestureScreenshotWorkerState.spawn_fn := 0
+		GestureScreenshotWorkerState.file_exists_fn := 0
+		GestureScreenshotWorkerState.publish_file_fn := 0
+		GestureScreenshotWorkerState.cleanup_stage_fn := 0
+		GestureScreenshotWorkerState.rollback_file_fn := 0
+		WorkerId := _GestureScreenshotCreateWorker("direct_save", 1, Stage,
+			_GSOC_Capture.Bind(Record), GestureDirectCaptureWorkerDone.Bind(1))
+		AssertTrue(WorkerId > 0)
+		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		Record["job"] := Job
+		_GestureDirectCaptures[1] := Map("worker_id", WorkerId, "mode", "save", "path", Destination,
+			"started_tick", A_TickCount, "timeout_ms", 60000, "callback", _GSWO_RecordTerminal)
+		AssertTrue(_GestureScreenshotStartWorker(WorkerId))
+		Critical("Off")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while (_GSWO_Terminals.Length == 0 || (Mode != "close-debt" && GestureScreenshotWorkerState.jobs.Count))
+				&& DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 2500
+			Sleep(5)
+		Critical("On")
+		FileAppend("OBSERVATION screenshot-owned-stage mode=" . Mode . " capture_calls=" . Record["capture_calls"]
+			. " pixel_calls=" . Record["pixel_calls"] . " capture_critical=" . Record["capture_critical"]
+			. " terminals=" . _GSWO_Terminals.Length . " jobs=" . GestureScreenshotWorkerState.jobs.Count
+			. " lease=" . Job.Get("stage_lease", 0) . " stage_exists=" . FSStrictExists(Stage)
+			. " destination_exists=" . FSStrictExists(Destination) . "`n", "*")
+		AssertEqual(1, Record["capture_calls"], "the actual native wrapper must call its pixel boundary exactly once")
+		AssertFalse(Record["capture_critical"], "native stage acquisition and capture must execute in the deferred noncritical worker")
+		AssertEqual(1, _GSWO_Terminals.Length)
+		AssertEqual(Mode != "cancel", _GSWO_Terminals[1]["ok"])
+		AssertEqual(Mode == "cancel" ? 0 : 1, Record["pixel_calls"])
+		AssertEqual(Mode != "cancel", FSStrictExists(Destination), "only a successful current owner may publish the synthetic PNG")
+		if Mode == "close-debt" {
+			AssertTrue(Record["protected"] && GestureScreenshotWorkerState.jobs.Has(WorkerId),
+				"a real protected-handle close refusal must retain cleanup debt")
+			AssertEqual(Record["lease"], Job["stage_lease"], "a failed close must retain the exact native reference")
+			AssertTrue(Job.Get("cleanup_attempts", 0) >= 1 && FSStrictExists(Stage))
+			AssertTrue(DllCall("Kernel32\SetHandleInformation", "Ptr", Record["lease"], "UInt", 2, "UInt", 0, "Int") != 0)
+			Record["protected"] := false
+			Critical("Off")
+			_GestureScreenshotRetryCleanup()
+			Critical("On")
+		}
+		AssertFalse(GestureScreenshotWorkerState.jobs.Has(WorkerId), "successful close/delete must retire the exact worker")
+		AssertEqual(0, Job["stage_lease"], "the closed lease must be retired exactly once")
+		AssertFalse(FSStrictExists(Stage), "cleanup must remove only the stage this worker exclusively acquired")
+		if Mode != "cancel" {
+			Reader := FSOpenStrict(Destination, "r-wd", "UTF-8-RAW")
+			try {
+				Header := Buffer(8, 0)
+				AssertEqual(8, Reader.RawRead(Header, 8))
+				AssertEqual(0x474E5089, NumGet(Header, 0, "UInt"))
+				AssertEqual(0x0A1A0A0D, NumGet(Header, 4, "UInt"))
+			} finally Reader.Close()
+		}
+	} catch as Err {
+		Primary := Err
+	} finally {
+		Critical("On")
+		try {
+			if Record["protected"] && Job is Map && Job.Get("stage_lease", 0) {
+				AssertTrue(DllCall("Kernel32\SetHandleInformation", "Ptr", Job["stage_lease"], "UInt", 2, "UInt", 0, "Int") != 0)
+				Record["protected"] := false
+			}
+			GestureScreenshotCancelAll("owned stage fixture cleanup")
+			_GestureScreenshotRetryCleanup()
+			AssertEqual(0, GestureScreenshotWorkerState.jobs.Count, "fixture debt must retire before restoring the incoming registry")
+			if Old["jobs"].Count == 0
+				TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		_GSWO_Restore(Old)
+		try {
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		Critical(WasCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+for _GSOC_Mode in ["publish", "cancel", "close-debt"]
+	Test("screenshot owned stage composition: " . _GSOC_Mode . " (screenshot-owned-stage-composition)", _GSOC_Run.Bind(_GSOC_Mode))
+
+
+; AHK counts references. This real destruction witness proves that the exact
+; worker cycle is released even when its native timer has never been armed.
+class _GSOC_UnstartedLifetime {
+	__New(Record) {
+		this.Record := Record
+	}
+	Call(*) {
+		this.Record["calls"] += 1
+		throw Error("an unstarted native capture must never execute")
+	}
+	__Delete() {
+		this.Record["disposed"] += 1
+	}
+}
+
+_GSOC_Unstarted(Mode) {
+	global DriverPid
+	WasCritical := Critical("On")
+	Old := _GSWO_Install()
+	Root := A_Temp . "\ergopti_unstarted_stage_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Job := 0, Capture := 0, Primary := 0
+	Record := Map("calls", 0, "disposed", 0)
+	try {
+		AssertEqual(0, Old["jobs"].Count, "the unstarted lifetime fixture cannot borrow a live worker or cleanup debt")
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Stage := Root . "\stage.png"
+		GestureScreenshotWorkerState.spawn_fn := 0
+		GestureScreenshotWorkerState.cleanup_stage_fn := 0
+		Capture := _GSOC_UnstartedLifetime(Record)
+		WorkerId := _GestureScreenshotCreateWorker("direct_save", 1, Stage, Capture, 0)
+		AssertTrue(WorkerId > 0)
+		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		Capture := 0
+		AssertFalse(Job["start_attempted"])
+		AssertEqual(0, Record["disposed"], "the live native handle must retain its unstarted capture closure")
+		if Mode == "discard"
+			AssertTrue(_GestureScreenshotDiscardUnstartedWorker(WorkerId))
+		else
+			AssertTrue(GestureScreenshotCancelWorker(WorkerId, "shutdown"))
+		FileAppend("OBSERVATION screenshot-unstarted-lifetime mode=" . Mode . " capture_calls=" . Record["calls"]
+			. " disposed=" . Record["disposed"] . " jobs=" . GestureScreenshotWorkerState.jobs.Count
+			. " stage_exists=" . FSStrictExists(Stage) . "`n", "*")
+		AssertEqual(0, Record["calls"], "neither cleanup path may execute or arm the capture")
+		AssertEqual(1, Record["disposed"], "unstarted cleanup must actually destroy the capture closure without waiting for NativeRun")
+		AssertEqual(0, Job["handle"], "quiescent retirement must release its reverse task reference")
+		AssertFalse(GestureScreenshotWorkerState.jobs.Has(WorkerId))
+		AssertFalse(FSStrictExists(Stage), "discarding an unstarted task cannot acquire a stage file")
+	} catch as Err {
+		Primary := Err
+	} finally {
+		Capture := 0
+		try {
+			GestureScreenshotCancelAll("shutdown")
+			_GestureScreenshotRetryCleanup()
+			AssertEqual(0, GestureScreenshotWorkerState.jobs.Count)
+			if Old["jobs"].Count == 0
+				TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		; If the regression fails, release only this fixture's known reverse
+		; reference after recording its failed lifetime oracle.
+		if Job is Map
+			Job["handle"] := 0
+		_GSWO_Restore(Old)
+		try {
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		Critical(WasCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+for _GSOC_UnstartedMode in ["discard", "shutdown"]
+	Test("screenshot unstarted native lifetime: " . _GSOC_UnstartedMode . " (screenshot-unstarted-lifetime)",
+		_GSOC_Unstarted.Bind(_GSOC_UnstartedMode))
+
+_GSDC_UnexpectedCapture(Record) {
+	Record["calls"] += 1
+	throw Error("the native stage collision must be refused before Capture")
+}
+
+_GSDC_Run() {
+	global DriverPid, _GestureDirectCaptures, _GSWO_Terminals
+	WasCritical := Critical("On"), WasSuspended := A_IsSuspended
+	Old := _GSWO_Install()
+	Root := A_Temp . "\ergopti_default_stage_collision_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Job := 0, Primary := 0, Record := Map("calls", 0)
+	try {
+		AssertEqual(0, Old["jobs"].Count, "the collision fixture cannot borrow a live worker or cleanup debt")
+		if A_IsSuspended
+			Suspend(false)
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Stage := Root . "\stage.png", Destination := Root . "\published.png", Witness := Root . "\foreign.bin"
+		Bytes := Buffer(37, 0xA7)
+		_GSFP_Write(Stage, Bytes)
+		_GSFP_Write(Witness, Bytes)
+		Original := _GSFP_Snapshot(Stage)
+		AssertTrue(Original.Get("ok", false) && FSSameBytes(Stage, Witness))
+		GestureScreenshotWorkerState.spawn_fn := 0
+		GestureScreenshotWorkerState.file_exists_fn := 0
+		GestureScreenshotWorkerState.publish_file_fn := 0
+		GestureScreenshotWorkerState.cleanup_stage_fn := 0
+		GestureScreenshotWorkerState.rollback_file_fn := 0
+		WorkerId := _GestureScreenshotCreateWorker("direct_save", 1, Stage,
+			_GSDC_UnexpectedCapture.Bind(Record), GestureDirectCaptureWorkerDone.Bind(1))
+		AssertTrue(WorkerId > 0)
+		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		_GestureDirectCaptures[1] := Map("worker_id", WorkerId, "mode", "save", "path", Destination,
+			"started_tick", A_TickCount, "timeout_ms", 60000, "callback", _GSWO_RecordTerminal)
+		AssertTrue(_GestureScreenshotStartWorker(WorkerId), "the genuine native worker must start before rejecting its stage collision")
+		Critical("Off")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while (_GSWO_Terminals.Length == 0 || GestureScreenshotWorkerState.jobs.Count)
+				&& DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 2500
+			Sleep(5)
+		Critical("On")
+		FileAppend("OBSERVATION screenshot-default-stage-collision capture_calls=" . Record["calls"]
+			. " terminals=" . _GSWO_Terminals.Length . " jobs=" . GestureScreenshotWorkerState.jobs.Count
+			. " stage_exists=" . FSStrictExists(Stage) . " destination_exists=" . FSStrictExists(Destination) . "`n", "*")
+		AssertEqual(0, Record["calls"], "CREATE_NEW must refuse an existing native stage before invoking the capture callback")
+		AssertEqual(1, _GSWO_Terminals.Length, "the default native worker must finish through the actual direct owner exactly once")
+		AssertFalse(_GSWO_Terminals[1]["ok"], "a native stage collision cannot report a successful capture")
+		AssertFalse(GestureScreenshotWorkerState.jobs.Has(WorkerId), "a refused acquisition must retire its exact native worker")
+		AssertFalse(Job["stage_acquired"], "an existing file cannot become an acquired stage")
+		AssertEqual(0, Job["stage_lease"])
+		AssertTrue(FSStrictExists(Stage), "a refused CREATE_NEW cannot delete the foreign stage")
+		Observed := _GSFP_Snapshot(Stage)
+		for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+			AssertEqual(Original[Key], Observed[Key], "a refused native acquisition must preserve the complete foreign identity")
+		AssertTrue(FSSameBytes(Stage, Witness), "a refused native acquisition must preserve every foreign byte")
+		AssertFalse(FSStrictExists(Destination), "a refused native acquisition cannot publish a destination")
+	} catch as Err {
+		Primary := Err
+	} finally {
+		Critical("On")
+		try {
+			GestureScreenshotCancelAll("default collision fixture cleanup")
+			_GestureScreenshotRetryCleanup()
+			AssertEqual(0, GestureScreenshotWorkerState.jobs.Count, "fixture cleanup must retire before restoring the incoming registry")
+			if Old["jobs"].Count == 0
+				TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		_GSWO_Restore(Old)
+		try {
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+		if A_IsSuspended != WasSuspended
+			Suspend(WasSuspended)
+		Critical(WasCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+Test("screenshot default native stage collision preserves foreign identity before capture (screenshot-default-stage-collision)", _GSDC_Run)
