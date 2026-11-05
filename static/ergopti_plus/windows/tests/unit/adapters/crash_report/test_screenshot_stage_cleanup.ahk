@@ -691,3 +691,67 @@ _GSDC_Run() {
 }
 
 Test("screenshot default native stage collision preserves foreign identity before capture (screenshot-default-stage-collision)", _GSDC_Run)
+
+
+; Exercise the real GDI+ scaling and PNG encoder on a private generated bitmap;
+; this does not capture, inspect or modify the user's desktop or clipboard.
+_GSRZ_Encode(Stage, Width, Height, MaxEdge) {
+	global GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB, GESTURE_SCREENSHOT_PNG_ENCODER
+	Image := 0
+	_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipCreateBitmapFromScan0",
+		"Int", Width, "Int", Height, "Int", 0, "Int", GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB,
+		"Ptr", 0, "Ptr*", &Image, "Int"), "create private resize bitmap")
+	try _GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, MaxEdge)
+	finally _GestureScreenshotGdipDispose(Image)
+}
+_GSRZ_ReadBE32(Bytes, Offset) {
+	return (NumGet(Bytes, Offset, "UChar") << 24) | (NumGet(Bytes, Offset + 1, "UChar") << 16)
+		| (NumGet(Bytes, Offset + 2, "UChar") << 8) | NumGet(Bytes, Offset + 3, "UChar")
+}
+_GSRZ_RealPng(Width, Height, MaxEdge, ExpectedWidth, ExpectedHeight) {
+	global DriverPid
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "an unretired stage lease prevents another fixture")
+	Root := A_Temp . "\ergopti_resize_png_" . DriverPid . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Lease := -1
+	try {
+		Receipt := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Receipt is Integer && Receipt == 1
+		AssertTrue(Created, "the native image fixture must own its private directory")
+		Stage := Root . "\resize.png"
+		Lease := _GestureScreenshotAcquireStageLease(Stage)
+		_GestureScreenshotWithGdiplus(_GSRZ_Encode.Bind(Stage, Width, Height, MaxEdge))
+		AssertTrue(_GestureScreenshotCloseStageLease(Lease))
+		Lease := -1
+		Bytes := FSReadBytesStrict(Stage)
+		AssertTrue(Bytes.Size >= 24, "the real PNG must include its complete IHDR dimensions")
+		AssertEqual(0x474E5089, NumGet(Bytes, 0, "UInt"))
+		AssertEqual(0x0A1A0A0D, NumGet(Bytes, 4, "UInt"))
+		AssertEqual(0x52444849, NumGet(Bytes, 12, "UInt"), "dimensions must come from the real PNG IHDR")
+		ActualWidth := _GSRZ_ReadBE32(Bytes, 16), ActualHeight := _GSRZ_ReadBE32(Bytes, 20)
+		_TestPrint("# screenshot resize source=" . Width . "x" . Height . " max_edge=" . MaxEdge
+			. " png=" . ActualWidth . "x" . ActualHeight . " bytes=" . Bytes.Size)
+		AssertEqual(ExpectedWidth, ActualWidth)
+		AssertEqual(ExpectedHeight, ActualHeight)
+	} finally {
+		if Lease != -1 {
+			try {
+				_GestureScreenshotCloseStageLease(Lease)
+				Lease := -1
+			} catch as Failure {
+				RetirementDebt := {Root: Root, Lease: Lease}
+				throw Failure
+			}
+		}
+		if Created {
+			try DirDelete(Root, true)
+			catch as Failure {
+				RetirementDebt := {Root: Root, Lease: -1}
+				throw Failure
+			}
+		}
+	}
+}
+for _GSRZ_Case in [[12, 6, 4, 4, 2], [6, 12, 4, 2, 4], [12, 6, 0, 12, 6], [6, 3, 20, 6, 3]]
+	Test("screenshot: real PNG preserves bounded geometry " . _GSRZ_Case[1] . "x" . _GSRZ_Case[2]
+		. " max=" . _GSRZ_Case[3] . " (screenshot-native-resize)", _GSRZ_RealPng.Bind(_GSRZ_Case*))
