@@ -721,24 +721,23 @@ Test("paths byte admission: valid replacement scalar selects its exact profile (
 _PGOW_Case(Collision) {
 	Root := A_Temp . "\ergopti_paths_generation_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Path := Root . "\paths.toml", Created := false
-	Owner := FileOpen, HadOwn := Owner.HasOwnProp("Call"), Installed := false
+	Owner := FSWriteCreateDurable, HadOwn := Owner.HasOwnProp("Call"), Installed := false
 	if HadOwn
 		SavedCall := Owner.GetOwnPropDesc("Call")
 	State := {calls: 0, createdSentinel: 0, nativeCompleted: 0, originalBytes: 0}
 	Route := StrReplace(Root, "\", "/") . "/profile"
 	Sentinel := '# Concurrent locator owner`nConfigDirPath = "' . Route . '"`n'
-	Observe(This, Target, Flags, Encoding := unset) {
-		Mine := (Target is String) && StrCompare(Target, Path, true) == 0 && Flags == "w"
+	Observe(This, Target, Content) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
 		if Mine {
 			State.calls += 1
 			if Collision {
-				State.createdSentinel := FSWriteCreateDurable(Path, Sentinel)
+				State.createdSentinel := Func.Prototype.Call.Call(This, Path, Sentinel)
 				AssertEqual(1, State.createdSentinel, "the concurrent locator must actually be created exclusively")
 				State.originalBytes := FSReadBytesStrict(Path)
 			}
 		}
-		Result := IsSet(Encoding) ? Func.Prototype.Call.Call(This, Target, Flags, Encoding)
-			: Func.Prototype.Call.Call(This, Target, Flags)
+		Result := Func.Prototype.Call.Call(This, Target, Content)
 		if Mine
 			State.nativeCompleted += 1
 		return Result
@@ -758,8 +757,8 @@ _PGOW_Case(Collision) {
 			. " created_sentinel=" . State.createdSentinel . " native_completed=" . State.nativeCompleted
 			. " present=" . Present . " bytes=" . ActualBytes.Size
 			. " reload_route=" . Actual.Get("ConfigDirPath", "<absent>"))
-		AssertEqual(1, State.calls, "the actual bootstrap default writer must reach its native open")
-		AssertEqual(1, State.nativeCompleted, "the original FileOpen must return without an injected result")
+		AssertEqual(1, State.calls, "the actual bootstrap default writer must reach its exclusive native creator")
+		AssertEqual(1, State.nativeCompleted, "the original exclusive writer must return without an injected result")
 		AssertEqual(Collision ? 1 : 0, State.createdSentinel)
 		AssertTrue(Initial is Map)
 		AssertTrue(Present)
@@ -767,7 +766,8 @@ _PGOW_Case(Collision) {
 			AssertEqual(State.originalBytes.Size, ActualBytes.Size)
 			AssertEqual(ActualBytes.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", State.originalBytes,
 				"Ptr", ActualBytes, "UPtr", ActualBytes.Size, "UPtr"), "default generation must not truncate a concurrently published locator")
-			AssertEqual(Route, Actual.Get("ConfigDirPath", "<absent>"), "the genuine reload must still route to the published profile")
+			AssertEqual(StrReplace(Route, "/", "\"), Actual.Get("ConfigDirPath", "<absent>"), "the genuine reload must still route to the published profile")
+			AssertEqual(StrReplace(Route, "/", "\"), Initial.Get("ConfigDirPath", "<absent>"), "the first actual boot read consumes the concurrent winner too")
 		} else {
 			AssertTrue(ActualBytes.Size > 0)
 			AssertTrue(InStr(FSReadUtf8Exact(Path), "# Custom paths") > 0)
