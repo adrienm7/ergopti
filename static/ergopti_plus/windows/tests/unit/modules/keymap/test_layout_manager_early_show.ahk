@@ -98,3 +98,7 @@ for _LMSO_SubscriptionMode in ["subscription-current", "subscription-close"]
 for _LMSO_RetirementMode in ["subscription-refuse-close", "subscription-destroy-throw"]
 	Test("Layout native retirement retry: " . _LMSO_RetirementMode . " preserves exact resources (layout-subscription-retirement-retry)",
 		_LMSO_Case.Bind(_LMSO_RetirementMode))
+
+for _LMSO_NavigationMode in ["navigation-close", "navigation-reopen"]
+	Test("Layout navigation subscription: " . _LMSO_NavigationMode . " preserves carried and returned handles (layout-navigation-subscription-owner)",
+		_LMSO_Case.Bind(_LMSO_NavigationMode))
