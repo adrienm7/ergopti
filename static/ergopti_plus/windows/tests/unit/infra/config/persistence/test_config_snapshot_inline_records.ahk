@@ -696,8 +696,8 @@ _FMS_ConfigExactPersonalRowSelection() {
 Test("configuration snapshot: exact fixture row selection rejects initialized siblings and semantic-name decoys",
 	_FMS_ConfigExactPersonalRowSelection)
 
-; Scalar decoding proves the full UTF-16 identity before any native Map sees it.
-; The production subject then uses the genuine boot constructor/cache/loader.
+; The existing Unicode-scalar owner rejects NUL before native Map insertion.
+; Actual boot must retain that source fence; representable controls still load.
 _TNK_Boot(Kind) {
 	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
@@ -716,19 +716,22 @@ _TNK_Boot(Kind) {
 			: Kind == "escaped-spelling-control" ? "ergopti_base\\u0000ignored"
 			: Kind == "non-nul-control" ? "ergopti_base\u0001ignored"
 			: Kind == "known-control" ? "ergopti_base" : "ergopti_base\u0000ignored"
-		Decoded := TOML_UnescapeBasicStringContents(RawName)
+		Decoded := "", DecodeRejected := false
+		try Decoded := TOML_UnescapeBasicStringContents(RawName)
+		catch
+			DecodeRejected := true
 		Prefix := Kind == "header-nul" ? "layout" : "ergopti_base"
 		Negative := Kind == "leaf-nul" || Kind == "inline-nul" || Kind == "dotted-nul" || Kind == "header-nul"
-		if Negative || Kind == "non-nul-control" {
+		if Kind == "non-nul-control" {
 			AssertEqual(StrLen(Prefix) + 1 + StrLen("ignored"), StrLen(Decoded),
 				"the scalar owner retains the complete decoded key before native Map insertion")
-			AssertEqual(Kind == "non-nul-control" ? 1 : 0,
+			AssertEqual(1,
 				NumGet(StrPtr(Decoded), StrLen(Prefix) * 2, "UShort"), "the actual decoded UTF-16 control unit is proved")
 			AssertEqual(Ord("i"), NumGet(StrPtr(Decoded), (StrLen(Prefix) + 1) * 2, "UShort"),
 				"the suffix must really exist past the control unit")
 		}
 		_TestPrint("# toml-key-premap kind=" . Kind . " decoded-units=" . StrLen(Decoded)
-			. " expected-control=" . ((Negative || Kind == "non-nul-control") ? (Kind == "non-nul-control" ? 1 : 0) : -1))
+			. " decode-rejected=" . DecodeRejected)
 		Header := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n"
 		if Kind == "inline-nul"
 			Source := Header . 'layout = { "' . RawName . '" = ' . Value . " }`n"
@@ -742,7 +745,10 @@ _TNK_Boot(Kind) {
 		AssertFalse(RegExMatch(Source, "\x00"), "the actual native source carries legal ASCII escapes, not literal NUL bytes")
 		ConfigurationFile := Path, _DriverReady := true, _ConfigBootReadFailed := false
 		_ConfigBootRejectedOverrides := 0, _ConfigBootOutdatedEntries := Map()
-		ConfigSchemaPrepareSource(Path)
+		Prepared := false, PrepareThrew := false
+		try Prepared := ConfigSchemaPrepareSource(Path)
+		catch
+			PrepareThrew := true
 		Boot := Map("status", "threw"), BootThrew := false
 		try Boot := ConfigMigrateBoot(Path)
 		catch
@@ -768,16 +774,22 @@ _TNK_Boot(Kind) {
 			CacheKnown := CacheLayout is Map && CacheLayout.Has("ergopti_base")
 		}
 		_TestPrint("# toml-key-native kind=" . Kind . " decoded-units=" . StrLen(Decoded)
+			. " prepare-threw=" . PrepareThrew . " boot-threw=" . BootThrew
 			. " boot=" . Boot.Get("status", "<missing>") . " read-threw=" . ReadThrew
 			. " apply-threw=" . ApplyThrew . " applied=" . Applied . " default=" . Default
 			. " requested=" . Requested . " actual=" . Target["layout"]["ergopti_base"]
 			. " row-key-units=" . RowKeyUnits . " document-known=" . DocumentKnown . " cache-known=" . CacheKnown)
-		AssertFalse(BootThrew, "the genuine boot constructor must classify unsupported source identity without escaping its refusal protocol")
 		AssertEqual(Source, FSReadUtf8Exact(Path), "a boot observation must never rewrite the subject identity")
 		if Negative {
+			AssertTrue(DecodeRejected, "the existing Unicode-scalar owner rejects NUL before any native Map receives it")
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "the real native boot owner must retain write refusal for the unsupported source")
+			AssertTrue(TOML_WriteRefusal(Path) != "", "refusal must be an actual session source fence, not only a caught helper error")
+			AssertTrue(ReadThrew || ApplyThrew || Applied < 0,
+				"the genuine cache/feature boot consumers must refuse this unsupported decoded identity")
 			AssertEqual(Default, Target["layout"]["ergopti_base"],
 				"an unrepresentable quoted key must not borrow a shorter native manifest owner")
 		} else {
+			AssertFalse(DecodeRejected || PrepareThrew || BootThrew)
 			AssertEqual("current", Boot["status"], "representable quoted key controls must reach genuine current boot")
 			AssertFalse(ReadThrew || ApplyThrew, "ordinary and representable unknown keys remain supported")
 			AssertTrue(Applied >= 0)
