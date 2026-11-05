@@ -562,6 +562,7 @@ end
 
 local function schedule(context, output_context, event, live)
 	if type(context) ~= "string" or context == "" then return false end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local decisions = _debounce.input(event)
 	local arm
 	for _, decision in ipairs(decisions) do
@@ -574,6 +575,7 @@ local function schedule(context, output_context, event, live)
 		end
 	end
 	if not arm then return false end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local captured = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
@@ -1040,6 +1042,14 @@ function M.predict(context, output_context, override)
 			variant = request_index + 1,
 		}, now)[1]
 		if verdict.action == "defer" then
+			local timers_closed = _debounce.drain_retired()
+			if not request_current(false) then return end
+			if not timers_closed then
+				_predicting = false
+				meta.loading = false
+				if #candidates > 0 then publish() else clear_offer() end
+				return
+			end
 			local timer, cancel_timer, fired_early
 			cancel_timer = _scheduler.cancel
 			timer = _scheduler.after(verdict.delay_ms / 1000, function()
@@ -2814,6 +2824,7 @@ local function send_when_free(generation, chat, what, send)
 	local wait_ms = verdict.action == "defer" and verdict.delay_ms or 0
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
 	if wait_ms > 0 or busy then
+		if not _debounce.drain_retired() or _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
 		local delay_ms = math.max(wait_ms, busy and math.max(interval, _debounce.busy_recheck_ms) or 0)
 		Logger.debug(LOG, "%s waits %d ms for its backend.", what, delay_ms)
 		local timer, cancel_timer, fired_early
@@ -2992,6 +3003,7 @@ arm_agent = function(buffer, output_context)
 		_agent_timer = nil
 		_debounce.retire(previous)
 	end
+	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return end
 	local generation = _agent_generation
 	local timer, cancel_timer, fired_early
 	cancel_timer = _scheduler.cancel
