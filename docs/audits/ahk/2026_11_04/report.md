@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **144 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **145 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2159,3 +2159,15 @@ Local BOM/LF, syntax-antipattern, loop-capture, source-read and convention gates
 Tests07454ee7 run genuine public cmd commands over exclusively acquired raw witnesses, recording actual stdout bytes at the final effect/refusal port after decoding and before cleanup. Four cases distinguish NUL-bearing copy/type from legal accented/supplementary UTF-8 and malformed bytes. The production reader is unchanged. The test requires an idle command owner, exact process retirement before restoring ports or removing the witness, and retains any unacknowledged process/capture/observer debt. This is a pending hypothesis, not a measured additional finding.
 
 Testsf751aade exercise both genuine classified publication ports. A refused real admission observes the owner's actual monotone stage suffix before acquiring its exact successor under Critical. Four custody cases, two relative-basename controls and four absent-source/final-admission/source-change controls retain native filesystem operations. The classified publisher is unchanged; neither a native collision nor a correction is yet claimed. Selection9a3c644d combines these10 cases, the4 command probes,6 locale postfix/atomicity checks and7 existing port/precondition controls, for27 cases with E2E unselected. Remote execution remains pending.
+
+### Native qualification: locale custody and classified-publisher baseline
+
+Replay42129701655 at256919c5 completes27 timed cases in each order, with23PASS/4FAIL, matching names/statuses and no manifest errors or omissions. All4 locale custody and2 atomicity checks pass after254cea6f. Both classified collision cases instead return committed1, consume the independently acquired stage and change the prior target; their actual calibration executes once. The other13 filesystem controls pass, including relative basenames, absent creation and final source changes. This extends071, not the count.
+
+Sourcef22657c3 now holds an exclusively created stage through write/publication/refusal, captures relative targets once and retains the existing post-admission source recheck. A published-but-unacknowledged durability failure remains a fixed diagnostic refusal. Linux public ports independently pass4 actual collision/control cases using real Lua5.4/luv, repeated by root. macOS reserves a fresh native directory before staging; that parity evidence is source-only. Targeted Windows postfix is pending.
+
+### AHK-145: complete command capture lost at native text decoding
+
+The same run proves an independent command-output representation defect. Genuine public cmd commands retain the exact bytes410042 in their real stdout captures, but both copy/type ports receive only one UTF-16 unit with notices0. The Unicode control retains é and its supplementary scalar; malformed UTF-8 produces the existing explicit refusal. Both original NUL failures repeat reversed and retire their exact native trees.
+
+\_UserCommandRead admits valid UTF-8 containing NUL, then positive-length StrGet discards the suffix before delivery. This is separate from068's TOML projection and123/124's registry identities/envelopes. One145 covers both output sinks. Explicit recorders stand at the real effect boundary; no physical keyboard or clipboard mutation is claimed. Native source correction and postfix execution remain pending. The register now contains145 distinct findings.
