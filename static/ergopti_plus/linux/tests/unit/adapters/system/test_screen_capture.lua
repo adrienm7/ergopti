@@ -112,6 +112,27 @@ helpers.it("screen capture removes its private directory when async startup rais
 	helpers.assert_eq(remains, nil, "private capture directory leaked")
 end)
 
+helpers.it("linux-screen-refused-cleanup: retain private image until the refused child exits", function()
+	local uv = require("luv")
+	local saved, directory, listener = ShellRunner.run_async
+	ShellRunner.run_async = function(_, args)
+		directory = args[4]:match("^(.*)/screen%.png$")
+		local image = assert(io.open(args[4], "wb")); image:write("private screenshot"); image:close()
+		return nil, "pipe activation failed", { on_settled = function(fn) listener = fn; return true end }
+	end
+	local ok, err = pcall(function()
+		local handle = ScreenCapture.capture("full", EDGE, function() error("refusal must not publish") end)
+		helpers.assert_nil(handle)
+		helpers.assert_true(uv.fs_lstat(directory .. "/screen.png") ~= nil)
+		helpers.assert_true(type(listener) == "function", "native cleanup must remain observed")
+		listener()
+		helpers.assert_nil(uv.fs_lstat(directory), "private image and staging directory must be removed after exit")
+	end)
+	ShellRunner.run_async = saved
+	if directory then os.remove(directory .. "/screen.png"); os.remove(directory) end
+	assert(ok, err)
+end)
+
 -- The fake tools. Each logs its name and arguments; the behaviour is chosen
 -- per scenario.
 local BEHAVIOURS = {
