@@ -50,6 +50,19 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	helpers.it("suppresses a System 1 test when its entry is removed", function()
+		local build, state, restore = setup("api")
+		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
+		state.entries = { entry }
+		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		helpers.assert_eq(#state.tests, 1)
+		state.entries = {}
+		state.finish_test(true, "OK", 10)
+		local notices = #state.infos + #state.errors
+		restore()
+		helpers.assert_eq(notices, 0)
+	end)
+
 	helpers.it("suppresses a manual test when the active entry is replaced", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }

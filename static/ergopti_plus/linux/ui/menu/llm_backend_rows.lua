@@ -113,6 +113,14 @@ local function report_test(dialogs, name, ok, detail, elapsed_ms)
 	dialogs.error(body .. "\n" .. text, tr("menu.llm." .. kind .. "title"))
 end
 
+--- Whether the exact entry that started a test is still present.
+local function entry_retained(entries, entry)
+	for _, current in ipairs(entries.list()) do
+		if current == entry then return true end
+	end
+	return false
+end
+
 --- Tests one entry and reports the verdict when the answer arrives.
 --- @param remote table api_remote
 --- @param dialogs table
@@ -259,7 +267,8 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 	end
 	if type(on_changed) == "function" then on_changed() end
 	if chat and not published_current() then return false end
-	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id], chat and published_current or nil, page_current)
+	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id],
+		chat and published_current or function() return entry_retained(entries, entry) end, page_current)
 end
 
 --- The name of the model that answers predictions: the active API entry's
@@ -420,7 +429,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 		elseif not chat then
 			-- Never the predictions' entry: its own test and removal instead.
 			actions[1] = { id = "test", text = tr("menu.llm.api_test_entry"),
-				run = function() return run_test(remote, dialogs, entry, label, nil, page_current) end }
+				run = function() return run_test(remote, dialogs, entry, label, function() return entry_retained(entries, entry) end, page_current) end }
 			actions[2] = { id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
