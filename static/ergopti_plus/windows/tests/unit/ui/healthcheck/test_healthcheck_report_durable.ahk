@@ -147,3 +147,39 @@ _HCRD_BufferedAcceptanceIsNotPersistence() {
 	}
 }
 Test("Diagnostics attachment: native lock exposes buffered false acceptance (healthcheck-report-durable)", _HCRD_BufferedAcceptanceIsNotPersistence)
+
+_HCRD_ExclusiveRepeated() {
+	Root := _FSWL_Path()
+	try {
+		First := _HCReport_Save(Root, "diagnostic.md", "first")
+		Second := _HCReport_Save(Root, "diagnostic.md", "second")
+		AssertTrue(First != Second, "a repeated export must receive another name")
+		AssertEqual("first", FSReadUtf8Exact(First), "the first report is preserved")
+		AssertEqual("second", FSReadUtf8Exact(Second), "the second report is complete")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Diagnostics attachment: repeated native exports keep both files (healthcheck-report-exclusive)", _HCRD_ExclusiveRepeated)
+
+_HCRD_CollisionResult(State, Path, Text) {
+	State["calls"] += 1
+	return State["mode"] == "collision" ? "exists" : 0
+}
+
+_HCRD_ExclusiveRefusal(Mode) {
+	Root := _FSWL_Path(), State := Map("calls", 0, "mode", Mode), Refused := false
+	try {
+		try _HCReport_Save(Root, "diagnostic.md", "text", _HCRD_CollisionResult.Bind(State))
+		catch
+			Refused := true
+		AssertTrue(Refused)
+		AssertEqual(Mode == "collision" ? 1000 : 1, State["calls"], "only collisions advance the bounded search")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+for _HCRD_Refusal in ["collision", "error"]
+	Test("Diagnostics attachment: bounded exclusive refusal " . _HCRD_Refusal . " (healthcheck-report-exclusive)", _HCRD_ExclusiveRefusal.Bind(_HCRD_Refusal))
