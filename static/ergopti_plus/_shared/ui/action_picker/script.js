@@ -256,6 +256,7 @@ function render() {
 		}
 	}
 
+	let renderedActions = 0;
 	let curLevel = 0; // depth of the last rendered heading → indent of its actions
 	for (let i = 0; i < entries.length; i++) {
 		const e = entries[i];
@@ -275,13 +276,14 @@ function render() {
 			}
 			const row = buildActionRow(e, e.special ? 0 : curLevel);
 			list.appendChild(row);
+			renderedActions++;
 			// A greyed row is shown but never focusable, so neither the arrows nor
 			// Enter can land on an action this machine cannot run.
 			if (!e.disabled) visible.push({ id: e.id, el: row });
 		}
 	}
 
-	el('empty').hidden = visible.length > 0;
+	el('empty').hidden = renderedActions > 0;
 	if (!el('empty').hidden) el('empty').textContent = strings.noResults;
 	el('count').textContent = visible.length ? String(visible.length) : '';
 
