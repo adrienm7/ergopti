@@ -1115,6 +1115,17 @@
 			"root_cause": "ProgramProviderAbsolute in the Windows shared AHK owner requires a descendant character after the UNC server/share separator instead of admitting the complete share root itself.",
 			"silent_failure": "Run41962516263 returns false for both complete UNC roots while drive-root, UNC descendant and malformed/device controls pass. No SMB access or discovery success is inferred.",
 			"regression_test": "Nine independent real route/admission cases admit complete UNC roots and preserve all malformed/device refusals; the path policy permits an optional descendant suffix."
+		},
+		{
+			"id": "AHK-102",
+			"title": "Locale fast caches silently rename delimiter-bearing translation keys",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Cold-load a genuine flat locale JSON object with a tab or newline in its String key, admit the actual generated TSV through independent native timestamps, then warm-load the same source.",
+			"root_cause": "_I18nWriteTsvCache writes raw keys into tab/newline-delimited records; _I18nParseTSV treats those key characters as separators and still accepts the matching entry-count sentinel.",
+			"silent_failure": "Native run41969593070 at320cd51a8171a8b8ed84f74c46acb7e198768865 admits both corrupted caches with warm_ok1/warm_fast1/count1 but exact_key0. Cold JSON decoding and all three carriage/backslash/value controls pass; inverse order reproduces both failures.",
+			"regression_test": "Escape both cache fields through one codec, decode full keys, distinguish sentinel records from data and retire v2 caches. Five genuine cold/warm cases retain fail-before receipts; a sixth actual historical v2 control requires authoritative JSON regeneration. Windows owns this TSV format; the Lua drivers do not consume it. Post-fix native qualification pending."
 		}
 	]
 }
