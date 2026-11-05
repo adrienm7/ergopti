@@ -197,6 +197,28 @@ helpers.describe("model selector test ownership", function()
 end)
 
 helpers.describe("AI menu: adding and testing a Cerebras key", function()
+	helpers.it("does not overwrite a backend changed while entering an API key", function()
+		local build, state, restore = setup("ollama")
+		state.answers = { "key", "qwen" }
+		state.on_prompt = function() state.backend = "other" end
+		find(build(), "➕ Cerebras").action()
+		local backend, switches, count = state.backend, state.backend_sets or 0, #state.entries
+		restore()
+		helpers.assert_eq(backend, "other")
+		helpers.assert_eq(switches, 0)
+		helpers.assert_eq(count, 0)
+	end)
+
+	helpers.it("does not change the backend when the API key form is cancelled", function()
+		local build, state, restore = setup("ollama")
+		state.answers = {}
+		find(build(), "➕ Cerebras").action()
+		local backend, switches = state.backend, state.backend_sets or 0
+		restore()
+		helpers.assert_eq(backend, "ollama")
+		helpers.assert_eq(switches, 0)
+	end)
+
 
 	helpers.it("asks for a hidden key and the model, stores, selects and tests the entry", function()
 		local build, state, restore = setup("api")

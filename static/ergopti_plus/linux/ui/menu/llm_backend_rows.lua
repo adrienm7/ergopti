@@ -165,6 +165,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 		return ok and current == true
 	end
 	if not page_owned() then return false end
+	local starting_backend = llm.get_backend()
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
 	local fields = UrlTemplate.fields(provider.base_url)
@@ -220,6 +221,11 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 
 	local chat = remote.serves(provider.id, "chat")
 	if not page_owned() then return false end
+	if chat then
+		if llm.get_backend() ~= starting_backend then return false end
+		if starting_backend ~= "api" and llm.set_backend("api", page_owned) ~= true then return false end
+		if not page_owned() then return false end
+	end
 	local ticket, current, finish
 	if chat then
 		local begin = llm.begin_api_selection
@@ -397,11 +403,6 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 		Logger.error(LOG, "Remote API modules unavailable — the page lists no API entry.")
 		return api
 	end
-	--- Runs one API transaction under the API backend, selecting it first.
-	local function under_api(fn)
-		if llm.get_backend() ~= "api" and llm.set_backend("api") ~= true then return false end
-		return fn()
-	end
 	local active = entries.active()
 	local list = entries.list()
 	local names = entry_names(remote, list)
@@ -523,12 +524,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do
 		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current) end
-		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = function()
-			-- A chat key becomes the predictions' entry, under the API backend;
-			-- a System 1 key leaves the backend as it is.
-			if remote.serves(provider.id, "chat") then return under_api(add) end
-			return add()
-		end }
+		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = add }
 	end
 	if type(context) == "table" and type(context.is_paused) == "function"
 		and type(llm.can_configure_local_servers) == "function" then
