@@ -1,0 +1,8 @@
+verify-change: 268 changed file(s).
+verify-change: silent-failure pre-checks passed.
+
+  Gates required by this change:
+   - format  (CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files)
+       e.g. README.md, TODO.md, docs/platform-parity-audit.md
+   - js  (port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only)
+       e.g. README.md, TODO.md, docs/platform-parity-audit.md

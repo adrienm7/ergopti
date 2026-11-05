@@ -1,0 +1,8 @@
+{
+	"qualification": "Archive formatting only: original supplemental handoff envelope preserved exactly; JSON content unchanged. Existing historical receipts name the original envelope hash, resolvable by the exact original copy. No child program/source/log bytes or recorded hashes were changed. Future replays read the formatted equivalent envelope.",
+	"original_path": "validation/format-provenance/macos-domain-handoff.sha256.json.original.txt",
+	"original_sha256": "a866e492b2a1bd7884638941184ac262c10cc222072442e751ce6a8a62165c89",
+	"current_path": "macos/validation/handoff.sha256.json",
+	"current_sha256": "b7bd54fea998412a490218aa955c9f5585e436657cc465db3f8357f8bed17d75",
+	"json_equal": true
+}

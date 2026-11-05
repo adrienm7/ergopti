@@ -1,0 +1,500 @@
+{
+	"role": "macos",
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"handoff_sha256": "4622e4d33a842edfbc61de74316605ac19481ee1105b65372159ef2e21b2b95f",
+	"artifact_claims": [
+		{
+			"path": "config-probe.lua",
+			"sha256": "c8b1bf899ba9b27df70c0f8a91069b2d25d57d60f3a1891ae3ab5f7e53f97459",
+			"archived_matches": true,
+			"archived_sha256": "c8b1bf899ba9b27df70c0f8a91069b2d25d57d60f3a1891ae3ab5f7e53f97459",
+			"resolution": "current archive"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508",
+			"archived_matches": true,
+			"archived_sha256": "ea4faa4abe34e8f5ec7f744482bd91f5341128b826d8f1862e71a1aa06607508",
+			"resolution": "current archive"
+		},
+		{
+			"path": "false-green.log",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"archived_matches": true,
+			"archived_sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current archive"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "490ab6c9737c2defb0b9514b7da44a6b8115b0a1e72dd574aba8267571ced4f8",
+			"archived_matches": true,
+			"archived_sha256": "490ab6c9737c2defb0b9514b7da44a6b8115b0a1e72dd574aba8267571ced4f8",
+			"resolution": "current archive"
+		},
+		{
+			"path": "public-current.txt",
+			"sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"archived_matches": true,
+			"archived_sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"resolution": "current archive"
+		},
+		{
+			"path": "public-probe.lua",
+			"sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1",
+			"archived_matches": true,
+			"archived_sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-1.log",
+			"sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"archived_matches": true,
+			"archived_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-2.log",
+			"sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"archived_matches": true,
+			"archived_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-3.log",
+			"sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"archived_matches": true,
+			"archived_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-4.log",
+			"sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"archived_matches": true,
+			"archived_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-5.log",
+			"sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"archived_matches": true,
+			"archived_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-6.log",
+			"sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"archived_matches": true,
+			"archived_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"resolution": "current archive"
+		},
+		{
+			"path": "registered-summary.json",
+			"sha256": "8e2ed24378af9efec6c660c632244735d3e14af1d3bd0966cf22defc6f1a7a47",
+			"archived_matches": true,
+			"archived_sha256": "8e2ed24378af9efec6c660c632244735d3e14af1d3bd0966cf22defc6f1a7a47",
+			"resolution": "current archive"
+		},
+		{
+			"path": "replay.log",
+			"sha256": "7f00df00a1e6f6453b97aac3ccfc5390553314bd4770ae0b1425d95cddb71488",
+			"archived_matches": true,
+			"archived_sha256": "7f00df00a1e6f6453b97aac3ccfc5390553314bd4770ae0b1425d95cddb71488",
+			"resolution": "current archive"
+		},
+		{
+			"path": "replay.py",
+			"sha256": "61107bdc39de938753cdab7f6f319a0ecbe5c3f017c071118099b21aedd01690",
+			"archived_matches": false,
+			"archived_sha256": "d968673e5c3d3e37bec61e33dfba16c52e245691434b5861bf5b0f25a4a33640",
+			"resolution": "exact original bytes",
+			"original_bytes": "validation/original-submissions/macos/replay.py.txt"
+		},
+		{
+			"path": "report.md",
+			"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f",
+			"archived_matches": true,
+			"archived_sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f",
+			"resolution": "current archive"
+		},
+		{
+			"path": "run-module.lua",
+			"sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"archived_matches": true,
+			"archived_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"resolution": "current archive"
+		},
+		{
+			"path": "source-receipts.json",
+			"sha256": "46f002f8823b0973fec3270a0b9037abdcfe20755f809466ab59ae9f06cc4140",
+			"archived_matches": true,
+			"archived_sha256": "46f002f8823b0973fec3270a0b9037abdcfe20755f809466ab59ae9f06cc4140",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-config.log",
+			"sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+			"archived_matches": true,
+			"archived_sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-public.log",
+			"sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"archived_matches": true,
+			"archived_sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-1.log",
+			"sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"archived_matches": true,
+			"archived_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-2.log",
+			"sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"archived_matches": true,
+			"archived_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-3.log",
+			"sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"archived_matches": true,
+			"archived_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-4.log",
+			"sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"archived_matches": true,
+			"archived_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-5.log",
+			"sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"archived_matches": true,
+			"archived_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-1-registered-6.log",
+			"sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"archived_matches": true,
+			"archived_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-config.log",
+			"sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+			"archived_matches": true,
+			"archived_sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-public.log",
+			"sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"archived_matches": true,
+			"archived_sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-1.log",
+			"sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"archived_matches": true,
+			"archived_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-2.log",
+			"sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"archived_matches": true,
+			"archived_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-3.log",
+			"sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"archived_matches": true,
+			"archived_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-4.log",
+			"sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"archived_matches": true,
+			"archived_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-5.log",
+			"sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"archived_matches": true,
+			"archived_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweep-2-registered-6.log",
+			"sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"archived_matches": true,
+			"archived_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"resolution": "current archive"
+		},
+		{
+			"path": "sweeps.json",
+			"sha256": "548e32e9704d30dd2582c7c6df2a98e37e582ae3d14f88c1273d8d873f0c84ba",
+			"archived_matches": true,
+			"archived_sha256": "548e32e9704d30dd2582c7c6df2a98e37e582ae3d14f88c1273d8d873f0c84ba",
+			"resolution": "current archive"
+		}
+	],
+	"source_claims": [
+		{
+			"path": "AGENTS.md",
+			"sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": ".agents/skills/adversarial-audit/SKILL.md",
+			"sha256": "f0c4baeb48d9fcc2221ab7c074223eaefe129bfb695c68374fa0ddde8fad7640",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": ".agents/skills/hammerspoon-driver/SKILL.md",
+			"sha256": "ac670e7e9f56c8c1dfb58e5c07e1bbf7962ee364f85bbe5942f23e6c5fc0162e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": ".agents/skills/false-green-tests/SKILL.md",
+			"sha256": "8f7bc899fa67f34e382501669baa4fd8e64e88500e35d6016427fe889a6f8b0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/one_shot_shift.lua",
+			"sha256": "1b772c8608804b5962bcd038fcd621fdd095bb4803f930383b1660ffc3339aa0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/one_shot_shift.lua",
+			"sha256": "645f3a237074fc49e3294579e09cd65aa45e4840664f59ffdc0b72152c992213",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+			"sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+			"sha256": "9a5cec016f0ac91d0f57e360f97d3b40291be473c83caca33951f8cfb75f4763",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/capsword_output.lua",
+			"sha256": "eaff5c5baa507b2190cbd550aa4fc2201ff2a499130b2f21fbd16193054a6f22",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+			"sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+			"sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/layouts/keylayout.lua",
+			"sha256": "095fc49ce776a89aa395ebf3d1c7dc9fa34d542fc166fd83ac6b0263e119fc13",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+			"sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+			"sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/keymap/lifecycle/test_start_commit_transaction.lua",
+			"sha256": "62f2b90a69af35e7741d64002c4d6ff17414f98fbf48e0555c8e6bd6e145ec18",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"artifact_hashes": 35,
+		"source_claims": 20,
+		"coverage_areas": 9,
+		"findings": 2,
+		"registered_modules": 6,
+		"registered_cases": 106,
+		"public_observations": 22,
+		"final_sweeps": 2,
+		"final_processes": 16
+	},
+	"registered": [
+		{
+			"module": "tests.unit.modules.keymap.synthetic.test_one_shot_shift",
+			"passed": 7,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.adapters.synthetic_input.test_one_shot_shift",
+			"passed": 9,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.modules.keymap.lifecycle.test_start_commit_transaction",
+			"passed": 50,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.platform.remap.config.test_one_shot_timeout_is_shared",
+			"passed": 1,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.modules.gestures.actions.test_sticky_modifiers",
+			"passed": 33,
+			"failed": 0
+		},
+		{
+			"module": "tests.unit.modules.shortcuts.pause_owners.test_sticky_modifiers",
+			"passed": 6,
+			"failed": 0
+		}
+	],
+	"qualification": "Actual Lua owners over recorded ports. Setter/save port and separate public arming do not establish an ordinary UI, disk or native failure. Public Caps+Shift uses a shipped-layout projection, not Quartz receiving.",
+	"handoff_resolution": {
+		"current_sha256": "f419218b1e76ddbe4f2e06a80edd0446b6fc46dc939915d576ef74a8fe3fe170",
+		"expected_matches_original": true
+	},
+	"independent_replay": {
+		"qualification": "Independent replay against main repo with private TMPDIR per process; actual Lua owners and recorded ports, not native receiving.",
+		"processes": [
+			{
+				"name": "public",
+				"program": "public-probe.lua",
+				"program_sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1",
+				"exit_code": 0,
+				"comparison": "Parsed JSON observations match; only the qualified error path prefix is repository-dependent.",
+				"stdout_sha256": "72f72dba8944056642d57717ecf115158858f2e6d36e3a3828fd0cd637157617",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "config",
+				"program": "config-probe.lua",
+				"program_sha256": "c8b1bf899ba9b27df70c0f8a91069b2d25d57d60f3a1891ae3ab5f7e53f97459",
+				"exit_code": 0,
+				"comparison": "Parsed JSON observations match.",
+				"stdout_sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-1",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-2",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-3",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-4",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-5",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			},
+			{
+				"name": "registered-6",
+				"program": "run-module.lua",
+				"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+				"exit_code": 0,
+				"comparison": "Exact registered output matches.",
+				"stdout_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+				"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+			}
+		]
+	}
+}

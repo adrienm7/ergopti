@@ -1,0 +1,104 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"roles": [
+		{
+			"role": "windows",
+			"source_claims": 31,
+			"coverage_rows": 47,
+			"findings": 1,
+			"lexical_checks": 40,
+			"runtime_cases": 0,
+			"final_processes": 2,
+			"artifact_hashes": 15
+		},
+		{
+			"role": "macos",
+			"artifact_hashes": 35,
+			"source_claims": 20,
+			"coverage_areas": 9,
+			"findings": 2,
+			"registered_modules": 6,
+			"registered_cases": 106,
+			"public_observations": 22,
+			"final_sweeps": 2,
+			"final_processes": 16
+		},
+		{
+			"role": "linux",
+			"source_claims": 24,
+			"subject_summaries": 8,
+			"public_streams": 20,
+			"channel_cases": 5,
+			"registered_modules": 7,
+			"registered_cases_per_runtime": 405,
+			"findings": 2,
+			"final_processes": 38,
+			"artifact_hashes": 51
+		},
+		{
+			"role": "shared",
+			"artifact_hashes": 44,
+			"source_claims": 57,
+			"coverage_rows": 26,
+			"findings": 0,
+			"candidate_capabilities": 12,
+			"assertions_per_runtime": 126,
+			"final_processes": 12
+		}
+	],
+	"source_claims": 132,
+	"distinct_source_paths": 107,
+	"coverage_units": {
+		"windows_aspect_rows": 47,
+		"macos_area_summaries": 9,
+		"linux_subject_summaries": 8,
+		"shared_rows": 26,
+		"total_summary_records": 90,
+		"qualification": "These are not equivalent runtime scenario counts; do not label all90 as native cases."
+	},
+	"findings": {
+		"windows": 1,
+		"macos": 2,
+		"linux": 2,
+		"shared": 0,
+		"total_os_scoped": 5
+	},
+	"primary_artifact_hashes": {
+		"total": 145,
+		"current": 142,
+		"exact_original": 3
+	},
+	"handoff_envelopes": [
+		{
+			"role": "windows",
+			"path": "windows/handoff.json",
+			"expected_sha256": "cdbeb52bed298a456e0565f34d4749deb4b2f2513343f4c0118ab464d90e50dd",
+			"current_sha256": "cdbeb52bed298a456e0565f34d4749deb4b2f2513343f4c0118ab464d90e50dd",
+			"resolution": "current archive"
+		},
+		{
+			"role": "macos",
+			"path": "macos/handoff.sha256.json",
+			"expected_sha256": "4622e4d33a842edfbc61de74316605ac19481ee1105b65372159ef2e21b2b95f",
+			"current_sha256": "f419218b1e76ddbe4f2e06a80edd0446b6fc46dc939915d576ef74a8fe3fe170",
+			"resolution": "exact original bytes"
+		},
+		{
+			"role": "linux",
+			"path": "linux/handoff-sha256.txt",
+			"expected_sha256": "91924569588579c92be5f7beb47c6dcd7c10aac3d3744516f9f9c77f6145ccf3",
+			"current_sha256": "91924569588579c92be5f7beb47c6dcd7c10aac3d3744516f9f9c77f6145ccf3",
+			"resolution": "current archive"
+		},
+		{
+			"role": "shared",
+			"path": "shared/handoff.json",
+			"expected_sha256": "f57735305289d47b4a2bd58e0a57688f38e91218d011f76124ef93546f21ecfe",
+			"current_sha256": "f57735305289d47b4a2bd58e0a57688f38e91218d011f76124ef93546f21ecfe",
+			"resolution": "current archive"
+		}
+	],
+	"nested_hash_claims": 66,
+	"native_receiving_executed": false,
+	"qualification": "Archive custody and independent replay, not semantic completeness. MacOSM002 links separate public setter/save-port and Keymap arm executions; no disk/UI failure is inferred. Linuxchannel retirement is observed at recorded owner ports, not a keyboard stuck on a physical host."
+}

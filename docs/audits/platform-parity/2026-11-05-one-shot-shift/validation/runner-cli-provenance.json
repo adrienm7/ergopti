@@ -1,0 +1,132 @@
+{
+	"qualification": "Exact pre-edit root runners retained; current changes add optional second positional output directory and redirect only generated logs/receipts. Inputs and child programs remain anchored to validation. Existing --output source-guard option remains supported. AST equality checked after those narrow replacements; this is not raw AST identity. All existing assertions unchanged. Historical canonical receipts remain untouched and retain their original program identities.",
+	"runners": [
+		{
+			"original_path": "validation/check_source_guards.py",
+			"original_sha256": "44f6578fbae1d2832e7624ec016f416b8a2477444465b382a62699c398609506",
+			"exact_original_copy": "validation/runner-originals/check_source_guards.py.txt",
+			"current_path": "validation/check_source_guards.py",
+			"current_sha256": "685d6adb87ae034f6b0d95af09e263882d65c753d9e3d8ae851920b3b9c4e46e",
+			"ast_after_declared_cli_output_replacements_equal": true,
+			"assert_nodes_unchanged": 0
+		},
+		{
+			"original_path": "validation/check_public_channel_admission.py",
+			"original_sha256": "374eb24ce7f694062a4081a3b6a56da707274afc0c0320efbd12f98088be98a9",
+			"exact_original_copy": "validation/runner-originals/check_public_channel_admission.py.txt",
+			"current_path": "validation/check_public_channel_admission.py",
+			"current_sha256": "e1009762129e4f7e788befbf54e78d1895ed199da9950e79781691f22a236a80",
+			"ast_after_declared_cli_output_replacements_equal": true,
+			"assert_nodes_unchanged": 16
+		},
+		{
+			"original_path": "validation/check_config_domain.py",
+			"original_sha256": "adaaf294222e800e164f06ff61b01e22d7c8a78bece18587f4a2581e9f10a41e",
+			"exact_original_copy": "validation/runner-originals/check_config_domain.py.txt",
+			"current_path": "validation/check_config_domain.py",
+			"current_sha256": "b8ea0752808a1e36e8d528b4c3af5b57f23cde30c4812b24b0646d4c4f5cdcf2",
+			"ast_after_declared_cli_output_replacements_equal": true,
+			"assert_nodes_unchanged": 31
+		}
+	],
+	"external_replays": [
+		{
+			"runner_sha256": "685d6adb87ae034f6b0d95af09e263882d65c753d9e3d8ae851920b3b9c4e46e",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_source_guards.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_source_guards"
+			],
+			"output_directory": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_source_guards",
+			"receipt_sha256": "aed881648469b1d5f6225aa35cf2b171107f55db32bd511bf3690afc44682cb3",
+			"receipt": "source-guards.json",
+			"result": {
+				"positive_controls": 2,
+				"negative_controls_rejected": 5
+			},
+			"qualification": "Actual external-output execution of the current runner. Exact output copies are archived with .txt suffixes to preserve bytes; original scratch paths document the invocation. Historical canonical validation receipts/logs were not rewritten.",
+			"working_directory": "/workspace/ergopti",
+			"archived_outputs": [
+				{
+					"path": "validation/runner-cli-outputs/check_source_guards/source-guards.json.txt",
+					"sha256": "aed881648469b1d5f6225aa35cf2b171107f55db32bd511bf3690afc44682cb3"
+				}
+			],
+			"archived_receipt": "validation/runner-cli-outputs/check_source_guards/source-guards.json.txt"
+		},
+		{
+			"runner_sha256": "e1009762129e4f7e788befbf54e78d1895ed199da9950e79781691f22a236a80",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_public_channel_admission.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_public_channel_admission"
+			],
+			"output_directory": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_public_channel_admission",
+			"receipt_sha256": "dd939a42d9cdae67c10685c419593bf0dd6b938b5d15de28a7849849c1b563fe",
+			"receipt": "public-channel-admission-receipt.json",
+			"result": {
+				"fresh_runtime_processes": 2,
+				"assertions_passed": true,
+				"authenticated_sources": 28
+			},
+			"qualification": "Actual external-output execution of the current runner. Exact output copies are archived with .txt suffixes to preserve bytes; original scratch paths document the invocation. Historical canonical validation receipts/logs were not rewritten.",
+			"working_directory": "/workspace/ergopti",
+			"archived_outputs": [
+				{
+					"path": "validation/runner-cli-outputs/check_public_channel_admission/public-channel-admission-lua.txt.txt",
+					"sha256": "5a2d9f2bf4ba7984d3759b29d3c773cf09f338202f8147fd8c2336824901d68b"
+				},
+				{
+					"path": "validation/runner-cli-outputs/check_public_channel_admission/public-channel-admission-luajit.txt.txt",
+					"sha256": "83a2ae981905b62c142996bdb7525a08425e498b41b9aa16b88da0916ae8d345"
+				},
+				{
+					"path": "validation/runner-cli-outputs/check_public_channel_admission/public-channel-admission-receipt.json.txt",
+					"sha256": "dd939a42d9cdae67c10685c419593bf0dd6b938b5d15de28a7849849c1b563fe"
+				}
+			],
+			"archived_receipt": "validation/runner-cli-outputs/check_public_channel_admission/public-channel-admission-receipt.json.txt"
+		},
+		{
+			"runner_sha256": "b8ea0752808a1e36e8d528b4c3af5b57f23cde30c4812b24b0646d4c4f5cdcf2",
+			"command": [
+				"python3",
+				"docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_config_domain.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_config_domain"
+			],
+			"output_directory": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/external-runner-cli/check_config_domain",
+			"receipt_sha256": "736d252e5867b73dbfbdfd64ba3143bf900db2d32ad0e0dfa2e10747ce0489a8",
+			"receipt": "config-domain-receipt.json",
+			"result": {
+				"fresh_processes": 3,
+				"setter_rows": 14,
+				"public_arm_rows": 5,
+				"formatter_rows": 2
+			},
+			"qualification": "Actual external-output execution of the current runner. Exact output copies are archived with .txt suffixes to preserve bytes; original scratch paths document the invocation. Historical canonical validation receipts/logs were not rewritten.",
+			"working_directory": "/workspace/ergopti",
+			"archived_outputs": [
+				{
+					"path": "validation/runner-cli-outputs/check_config_domain/config-domain-boundaries-current.log.txt",
+					"sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc"
+				},
+				{
+					"path": "validation/runner-cli-outputs/check_config_domain/config-domain-receipt.json.txt",
+					"sha256": "736d252e5867b73dbfbdfd64ba3143bf900db2d32ad0e0dfa2e10747ce0489a8"
+				},
+				{
+					"path": "validation/runner-cli-outputs/check_config_domain/logger-domain-boundaries-current.log.txt",
+					"sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c"
+				},
+				{
+					"path": "validation/runner-cli-outputs/check_config_domain/public-arm-domain-boundaries-current.log.txt",
+					"sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e"
+				}
+			],
+			"archived_receipt": "validation/runner-cli-outputs/check_config_domain/config-domain-receipt.json.txt"
+		}
+	]
+}

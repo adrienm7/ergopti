@@ -1,0 +1,41 @@
+
+=== keyboard hook + tap-hold engine ===
+  ok   sends Ctrl for a held CapsLock, never the lock itself
+  ok   types a real Enter for a tapped CapsLock, which the hotstrings see
+  ok   runs the tap action of a lone Shift and nothing after Shift+A
+  ok   sends navigation chords while the layer key is held, and no Alt
+  ok   releases a held Ctrl when asked, mid-hold
+  ok   swallows the release of a key the engine took before it was switched off
+  ok   forwards the release of a key pressed before the engine came in
+  ok   times a tap by when the keys moved, not by when the daemon read them
+
+=== keyboard hook: the modifiers held with a control key ===
+  ok   names the shortcut modifier held with every control key (modified-backspace)
+  ok   names no shortcut modifier with a bare Backspace (modified-backspace)
+  ok   says Ctrl for the Backspace tapped on the layer key while LCtrl is held (modified-backspace)
+
+=== keyboard hook + tap-hold engine: the pointer during a tap ===
+  ok   keeps the tap across pointer motion and cancels it on a wheel turn (pointer-motion-tap)
+  ok   cancels the tap on a button press and on its release, as on Windows (pointer-motion-tap)
+  ok   keeps the tap when a finger lands on or leaves a touchpad (pointer-motion-tap)
+  ok   resets the typing buffer on a button press only, never on its release (pointer-motion-tap)
+  ok   still reports a touch as a click to the daemon while the tap survives it (touch-still-clicks)
+
+=== keyboard hook + tap-hold engine: a modifier the XKB options move ===
+  ok   leaves Tab native under a CapsLock the layout makes Ctrl or Super (engine-live-modifiers)
+  ok   still runs Tab's tap-hold with no modifier held (engine-live-modifiers)
+
+=== keyboard hook + tap-hold engine: a hold taken past the threshold ===
+  ok   holds Shift before a key typed past the threshold, and not before one typed sooner
+  ok   holds Shift from the pump once the threshold passes with no event read
+  ok   types a key stamped within the threshold and read after it unshifted (rctrl-one-shot-hold-past-threshold)
+  ok   reads every source again before telling the time (rctrl-one-shot-hold-past-threshold)
+  ok   keeps its clock fresh from the pointer (rctrl-one-shot-hold-past-threshold)
+  ok   never takes a coarse clock's step for time passed (rctrl-one-shot-hold-past-threshold)
+
+=== keyboard hook: physical editor source provenance ===
+  ok   (magic-editor-hook) distinguishes a real key from an engine's tap and navigation output
+
+=== keyboard hook: physical-origin generation ===
+  ok   (magic-editor-origin) fences a captured device when its current kernel origin becomes unqualified
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":26}

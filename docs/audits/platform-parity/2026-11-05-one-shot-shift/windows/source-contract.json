@@ -1,0 +1,355 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"sweep": "root",
+	"qualification": "Source structure and file identity only; no AHK execution, emulation, native hook scheduling, modifier receiving, allocation cost or editor consumption.",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+			"sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/suppressive_inputhook_ownership.ahk",
+			"sha256": "9b580bc5420ee7e64af922d8124452199d8a1c941b7a680bb5eaeed18c28f711"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+			"sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/lalt.ahk",
+			"sha256": "5481190fe880db41019ceef6f70eac69d6f88e7073997a81c3e0767379b6c6c1"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/rctrl.ahk",
+			"sha256": "fd82fb933c9d258294fc39aff9e169eeac01057ef9d2ee106a7f580d48fd98f7"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/enter.ahk",
+			"sha256": "64e9df8db5d05d0b4285b2d325f94611ca913f2d107db08b33fe6594648ee076"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/key_combinations.ahk",
+			"sha256": "cf33d2209d4fc15014a20eec6fd326718b3b11b76e0d47d9687910932f3e8e71"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/sticky_modifiers.ahk",
+			"sha256": "604ca225a666a52fcfd6d0ea80c6b9515a46a5202e7149e4a2210cfcf5948cd9"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine.ahk",
+			"sha256": "9da05a6e39e03c5208cb93fac59e4bf9e00c41f9fce620a9a1b962e69c578704"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+			"sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+			"sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/boot.ahk",
+			"sha256": "0c61b257229c7d29ebfab82e43eb5c17eebdcbad9a4b16cb5c36b24db4a7a85c"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_endkeys.ahk",
+			"sha256": "5f265868700519522d4d2c5d271a0f332316605e0eee1f07f4f2fbba66b46355"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_lalt_lshift_stuck.ahk",
+			"sha256": "22be4766c767ab1880e358ed26ea505c6a9e22b9398560b469176931f225e8df"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_oneshotshift_suspend_guard.ahk",
+			"sha256": "e702600c003eab76849846b84a6936ebe425df4720a1fffecef097984b658a6f"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/platform/remap/keys/test_rctrl_lalt_hotif_gated.ahk",
+			"sha256": "d7d5ee65f2fe7a0627222f50f55b6a8b5f0fca8703f64d0cdc0f9372c34f74f4"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/platform/remap/keys/test_timings_config.ahk",
+			"sha256": "5c5c30103a14647d8e7577cbf8522f73c5ca2931bf5814f15837b45f53799c6b"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/adapters/input/test_one_shot_rearm_admission.ahk",
+			"sha256": "90fa38dfe5a202255974229419a68b60e7158e245c9301a623fbdf16e52f2cb9"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/one_shot_rearm_admission_body.ahk",
+			"sha256": "3758a840b16286dc6b2f4699093bf8df749203e296e1bbe1b997a3f0a2133ad7"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/suppressive_capture_settlement_body.ahk",
+			"sha256": "dd9a66983df86f81f422d2c195f206203fcacf758646ed31fece760f1a00ec55"
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/fixtures/suppressive_capture_unicode_body.ahk",
+			"sha256": "3f16329105e294185b9118f978382416290825900c36f48cfe855f15012d9644"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+			"sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+			"sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+		}
+	],
+	"checks": [
+		{
+			"name": "entry refuses native suspended state before arming",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "capture is exclusive and current scalar decoder based",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "positive timeout uses shared constant, otherwise finite2s",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "shared timeout source is2000ms",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "magic key and table prepared before native capture",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "complete scalar capture, named controls exactly Backspace Enter Delete",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "refused rearm cannot change incumbent logical state",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "exact-token publication and suspend guard share Critical",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "Wait always settles exact token before dispatch",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "timeout and invalid capture do not emit",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "invalid scalar produces warning",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "named control branch replays key before text transform",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "OSW001 control replay lacks modifier attribution",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "non-atomic nonliteral replay uses ordinary SendEvent",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "runtime primitive send hook defaults disabled",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "other native tap owner explicitly preserves held modifiers with Blind",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "control completion is not an inferred Tab or Escape result",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "ordinary scalar path titlecases through native AHK Format",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "shared table contains seven explicit punctuation/space replacements",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "chosen magic key result precedes fixed punctuation lookup",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "fixed chord cancellation changes only enable bit",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "one-shot owner does not itself cancel CapsWord",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "gesture catalogue directly exposes character one-shot action",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "Windows/Linux action aliases macOS sticky Shift",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "suspended start and competing exclusivity checked inside Critical",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "start rollback retains failed native cleanup owner",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "only actual current terminal retirement permits producer output",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "decoder distinguishes timeout controls complete BMP and surrogate pair",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "named controls require exact explicit token list",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "shared EndChars excludes high halves but admits remaining BMP units",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "lifecycle stop and logical latch cleanup coexist",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "key-combination non-one-shot action cancels pending shift",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "native scalar fixture refuses held modifiers",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "named end-key regression is a source check, not modified receiving",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "existing rearm fixture distinguishes disabled incumbent",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "existing settlement fixture covers successor inserted during Stop",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "OSW001 sibling dead-key capture replays named key without modifier attribution",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "LAlt dedicated producer captures immediately then enters a bounded Shift hold",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "RCtrl dedicated producer distinguishes tap from long Shift hold",
+			"passed": true,
+			"basis": "source"
+		},
+		{
+			"name": "control decoder returns named identity without captured modifier fields",
+			"passed": true,
+			"basis": "source"
+		}
+	],
+	"reader_controls": [
+		{
+			"name": "literal-and-comment-braces",
+			"passed": true
+		},
+		{
+			"name": "missing",
+			"rejected": true
+		},
+		{
+			"name": "empty",
+			"rejected": true
+		},
+		{
+			"name": "unclosed",
+			"rejected": true
+		},
+		{
+			"name": "duplicate",
+			"rejected": true
+		}
+	]
+}

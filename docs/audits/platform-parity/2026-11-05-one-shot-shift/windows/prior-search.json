@@ -1,0 +1,22 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"command": [
+		"rg",
+		"-n",
+		"-i",
+		"named control.*modifier|control replay.*modifier|modifier.*replay|modifier.*capture|EndMods|\\{Blind\\}",
+		"TODO.md",
+		"docs/audits/platform-parity",
+		"--glob",
+		"*findings.json",
+		"--glob",
+		"report.md"
+	],
+	"exit_code": 0,
+	"matches": [
+		"docs/audits/platform-parity/2026-11-05-word-reset/windows/report.md:80:Refuted/qualified: mandatory reset for every modifier chord (shortcut-off is explicit policy); tap-hold macOS discrimination as a newly discovered bug (known explicit restriction); repeat fallback resetting the Linux boundary (prior module URL-001, not this Windows root); failed synthetic edits asserting a boundary (SendFailed correctly yields false); surrogate fragments surviving reset (separate incomplete-unit ownership exists); idle Backspace losing its old word (generation-bound recovery exists); a stale old prediction observer defeating physical-generation admission (receipt checks do reject it; WRSW-002 uses a newly captured observer); formatting G4/lag or memory-growth claims from source alone (unmeasured). A hypothetical 49-day idle tick rollover is refuted by the supported runtime's 64-bit A_TickCount domain, explicitly documented in `infra/tick_count.ahk`; the legacy modulo32 helpers apply to DWORD origins and must not be mistaken for the native clock width. Extremely large free idle numeric input could require a native AHK conversion edge check; no runtime evidence was available and no speculative finding is counted.",
+		"docs/audits/platform-parity/2026-11-04-deep/windows-input/report.md:98:Traced settings/picker persistence \u2192 inherited default eviction \u2192 enabled/action accessor \u2192 special/generic static variants \u2192 immediate modifier/layer ownership and release; ordered pairs/simultaneous chord admission, replay and pause observation; registry parser/level preparation \u2192 pre-registered hotkey ownership \u2192 emit/dead-key state; layer-file validation/table registration/dispatch/repeat; layout selection/composer publication \u2192 scoped configuration receipt/reload/rollback and shared page state; physical editor availability boundary. Challenged pause, partial registration, nested layer, stale source and asynchronous selection hypotheses in the second pass. Detailed every observed intentional/constraint/inferred difference in this surface."
+	],
+	"qualification": "Bounded text search plus reviewed prior Windows input/clipboard/word-reset/CapsWord findings. Matches discuss other modifier admission or refutations; no same named-control replay root established. Not proof of absence across all possible wording.",
+	"known_completed_todo": "macOS first-key spending bug is checked as complete and is not re-counted as this Windows modified-control replay root."
+}

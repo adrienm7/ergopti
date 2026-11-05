@@ -1,0 +1,81 @@
+{
+  "frozen_role_files_unchanged": true,
+  "formatter": "prettier --config /workspace/ergopti/.prettierrc, cwd /workspace/ergopti",
+  "files": [
+    {
+      "file": "config-domain-boundaries.log",
+      "sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc",
+      "bytes": 5965
+    },
+    {
+      "file": "config-domain-boundaries.lua",
+      "sha256": "897787d02b1301551774a2b297fa46c57e8b0570dc9915a39683dcaef2e85659",
+      "bytes": 2310
+    },
+    {
+      "file": "config-domain-report.md",
+      "sha256": "0f68f53b356ef58b1644e6259a6edb3a5a0bbb58f105684f790d09a4de9286e9",
+      "bytes": 3201
+    },
+    {
+      "file": "logger-domain-boundaries.log",
+      "sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c",
+      "bytes": 216
+    },
+    {
+      "file": "logger-domain-boundaries.lua",
+      "sha256": "6d5d232ecaee2bde095091c14a0392da051182d8cf4678987fa764aefdb5c37b",
+      "bytes": 805
+    },
+    {
+      "file": "public-arm-domain-boundaries.log",
+      "sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e",
+      "bytes": 686
+    },
+    {
+      "file": "public-arm-domain-boundaries.lua",
+      "sha256": "e0e5d0c8349a6363ab2d2bdbb125d2fb5af6857315771e7d9df877b5ee50232c",
+      "bytes": 1122
+    },
+    {
+      "file": "source-receipts.json",
+      "sha256": "dced1295c280f1c6f799a1ce7dc3b81748df2bc77de462124472c13f5ef4f1cc",
+      "bytes": 1425
+    },
+    {
+      "file": "sweep-1-config-domain-boundaries.log",
+      "sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc",
+      "bytes": 5965
+    },
+    {
+      "file": "sweep-1-logger-domain-boundaries.log",
+      "sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c",
+      "bytes": 216
+    },
+    {
+      "file": "sweep-1-public-arm-domain-boundaries.log",
+      "sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e",
+      "bytes": 686
+    },
+    {
+      "file": "sweep-2-config-domain-boundaries.log",
+      "sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc",
+      "bytes": 5965
+    },
+    {
+      "file": "sweep-2-logger-domain-boundaries.log",
+      "sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c",
+      "bytes": 216
+    },
+    {
+      "file": "sweep-2-public-arm-domain-boundaries.log",
+      "sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e",
+      "bytes": 686
+    },
+    {
+      "file": "sweeps.json",
+      "sha256": "1ec6fb0aaae7aa36a0ac7df1919315b5c4281993fec9fa74912150ada9a209a0",
+      "bytes": 437
+    }
+  ]
+}

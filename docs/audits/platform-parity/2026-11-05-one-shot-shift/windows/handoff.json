@@ -1,0 +1,90 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"qualification": "Frozen source-only Windows single-use Shift review; no AHK runtime execution. All JSON/MD artifacts were formatted with explicit /workspace/ergopti/.prettierrc before handoff hashes.",
+	"counts": {
+		"findings": 1,
+		"coverage_rows": 47,
+		"source_files": 31,
+		"lexical_checks": 40,
+		"runtime_cases": 0,
+		"final_sweeps": 2,
+		"new_roots_in_final_sweeps": 0
+	},
+	"files": [
+		{
+			"name": "report.md",
+			"bytes": 11194,
+			"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+		},
+		{
+			"name": "findings.json",
+			"bytes": 2725,
+			"sha256": "946e23677465d8d773119f7d40879bc0244fe9f5565de9777af38aece2ade3a1"
+		},
+		{
+			"name": "coverage.json",
+			"bytes": 19412,
+			"sha256": "8c7c094ea13ea16dd5bb69927f51955aa336e2dca59e1eed26f48965eb072f66"
+		},
+		{
+			"name": "source-contract.py",
+			"bytes": 15919,
+			"sha256": "4957e2156c46df9538a73fa809c9d59868fe3ca043348ca910bda0ced3ee3709"
+		},
+		{
+			"name": "source-contract.json",
+			"bytes": 10586,
+			"sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+		},
+		{
+			"name": "reader-controls.json",
+			"bytes": 372,
+			"sha256": "6df109997f257b9597376d2ea31f730c8cfeff84f98bb04b1d8fbe163a6a701e"
+		},
+		{
+			"name": "prior-search.json",
+			"bytes": 2855,
+			"sha256": "e26cbe94bb19e8495794b1511c4415cbab69b3238f9037377d22ca0b2be15eef"
+		},
+		{
+			"name": "false-greens.txt",
+			"bytes": 1027,
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a"
+		},
+		{
+			"name": "dry-A.json",
+			"bytes": 10583,
+			"sha256": "8ca369700a8e445a460dcef4d8ca48b423e4225ccf31addf387348e681225344"
+		},
+		{
+			"name": "dry-B.json",
+			"bytes": 10583,
+			"sha256": "c1125aa930cd159ce54d8fa06850aadcfd7e1ba8d07d84d0685ee78edc49f2e6"
+		},
+		{
+			"name": "dry-A.stderr.txt",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "dry-B.stderr.txt",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "dry-sweeps.json",
+			"bytes": 1394,
+			"sha256": "e92ee83e1e2278010465996331fe82f8b54d24f0a5d82323fd60800d0691d634"
+		},
+		{
+			"name": "format.txt",
+			"bytes": 730,
+			"sha256": "90f21bd525c16614ee252a17fc5827b5e5042915a5b5d415b9ac6a85cb63814b"
+		},
+		{
+			"name": "ruff.txt",
+			"bytes": 44,
+			"sha256": "ce04ce92b16073000b77c97a42c00b98b96305692d9d5ed4dcfa5a9ca9ea62d6"
+		}
+	]
+}

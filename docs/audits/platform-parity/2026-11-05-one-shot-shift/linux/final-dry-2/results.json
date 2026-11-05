@@ -1,0 +1,225 @@
+[
+	{
+		"name": "source-contract",
+		"command": [
+			"python3",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/source-contract.py",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+		],
+		"exit": 0,
+		"log": "final-dry-2/source-contract.txt",
+		"sha256": "632df408e8e8eeeb000c9f7ba640b581fa57a29e0d8713025b375213ed27d912"
+	},
+	{
+		"name": "lua-public-probe.lua",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/public-probe.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-public-probe.lua.txt",
+		"sha256": "68f881bf103e951d3ddac4329471ba6db43be3d358d081bdff3260524dcedca3"
+	},
+	{
+		"name": "lua-channel-probe.lua",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/channel-probe.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-channel-probe.lua.txt",
+		"sha256": "b56d81b7acda6bdff5f8e72e0ad3e36717fed31fc1ea33bb9dbd1f47b4a3e771"
+	},
+	{
+		"name": "lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+		"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+	},
+	{
+		"name": "lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+		"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+	},
+	{
+		"name": "lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_integration"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+		"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+	},
+	{
+		"name": "lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+		"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+	},
+	{
+		"name": "lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.modules.shortcuts.key_combinations.test_key_combinations"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+		"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+	},
+	{
+		"name": "lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_roll"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+		"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+	},
+	{
+		"name": "lua-tests.meta.corpus.test_corpus_tap_hold_decisions",
+		"command": [
+			"lua",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.meta.corpus.test_corpus_tap_hold_decisions"
+		],
+		"exit": 0,
+		"log": "final-dry-2/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+		"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+	},
+	{
+		"name": "luajit-public-probe.lua",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/public-probe.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-public-probe.lua.txt",
+		"sha256": "ae6bc66658c1ca777ec375c39e625e6c724b93a302db1d9bfab2c9b7b3560275"
+	},
+	{
+		"name": "luajit-channel-probe.lua",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/channel-probe.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-channel-probe.lua.txt",
+		"sha256": "b0e547861851f068dbbdf04b3c080dd2a693e501770fd03617650de7bd5c4593"
+	},
+	{
+		"name": "luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+		"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+	},
+	{
+		"name": "luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+		"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+	},
+	{
+		"name": "luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_integration"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+		"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+	},
+	{
+		"name": "luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+		"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+	},
+	{
+		"name": "luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.modules.shortcuts.key_combinations.test_key_combinations"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+		"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+	},
+	{
+		"name": "luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.unit.platform.remap.tap_hold.test_tap_hold_roll"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+		"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+	},
+	{
+		"name": "luajit-tests.meta.corpus.test_corpus_tap_hold_decisions",
+		"command": [
+			"luajit",
+			"/workspace/scratch/parity-one-shot-2026-11-05/linux/run-registered.lua",
+			"/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"tests.meta.corpus.test_corpus_tap_hold_decisions"
+		],
+		"exit": 0,
+		"log": "final-dry-2/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+		"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+	}
+]

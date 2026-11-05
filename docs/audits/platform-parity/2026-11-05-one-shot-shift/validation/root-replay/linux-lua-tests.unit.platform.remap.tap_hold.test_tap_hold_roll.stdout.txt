@@ -1,0 +1,13 @@
+
+=== tap-hold roll: a typing key is decided by the order of the releases ===
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Space rolled over a letter types the space, then the letter
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a letter struck and let go under Space is held
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Space held past its threshold is the hold for every key after it
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a lone tap types the space, however short
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a second key struck before either comes up is typing
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the release of the letter before does not cancel the space
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the layer on a hold follows the same order
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) Enter with a hold of its own follows the same order
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) a key that is not a typing key keeps its hold from key-down
+  ok   (tap-hold-roll-is-a-tap-2026-10-01) the typing keys are the shared list
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":10}

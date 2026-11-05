@@ -1,0 +1,10 @@
+../scratch/parity-one-shot-2026-11-05/windows/report.md 104ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/findings.json 42ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/coverage.json 24ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/source-contract.json 8ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/reader-controls.json 1ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/prior-search.json 3ms (unchanged)
+../scratch/parity-one-shot-2026-11-05/windows/dry-A.json 6ms
+../scratch/parity-one-shot-2026-11-05/windows/dry-B.json 12ms
+../scratch/parity-one-shot-2026-11-05/windows/dry-sweeps.json 2ms
+../scratch/parity-one-shot-2026-11-05/windows/dry-sweeps.json 35ms

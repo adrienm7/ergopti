@@ -1,0 +1,293 @@
+
+=== configured Linux ordered pair ownership ===
+  ok   reads canonical shared pair slots and exact action source parameters
+  ok   refuses rerouted source and foreign binding identities
+  ok   retains a refused configuration lease and retries the exact token
+  ok   fences reentrant configuration acquisition before the native callback
+  ok   lifts only the first owned hold before action and restores afterward
+  ok   does not lift another owner's reference to the same modifier
+  ok   does not restore a first press that was physically released
+  ok   lifts and restores the first owned navigation layer
+  ok   cancels a held pair tap on an unrelated physical key
+  ok   fires a tap-only pair at down and repeat with the canonical binding
+  ok   leaves a tap-only AI pair to the keys while the AI is off and takes it once on (ai-off-pair)
+  ok   refuses a cross-keyboard pair and a duplicate-code source collision
+  ok   does not admit combinations from a virtual source
+  ok   retires instead of acknowledging late focus after canonical mutation
+  ok   retires on physical generation revocation without action
+  ok   retains a refused native lift and exact retirement rows
+  ok   blocks a reentrant successor until the action frame has returned
+  ok   rejects an undecided roll as first key without advancing its timeline
+  ok   preserves the original three-value binding on native roll replay
+
+=== ordered pairs through actual native consumers ===
+  ok   dispatches the action between acknowledged lift and restore in the actual hook
+  ok   builds pairs from actual loader state without disabling them with tap-holds
+
+=== combination binding canonical program dispatch ===
+  ok   uses the actual manager parameter source guard and blocks source changes
+
+=== pair native receipt refusal boundaries ===
+  ok   never invokes action or modal after a refused real hook output port
+  ok   suppresses reentrant physical release restoration after the action retires ownership
+  ok   retires held pair output on pause during the periodic native tick
+
+=== configured pair publication lifecycle ===
+  ok   refreshes copied native slots only after exact retirement before owned publication release
+
+=== pair source and restoration refusals ===
+  ok   refuses malformed source after installation and forwards unrelated grabbed input
+  ok   keeps canonical unreadable startup neutral and baseline construction valid
+  ok   retains a refused restore without acknowledging a successor
+  ok   contains a throwing action while restoring only the same live first press
+  ok   refuses a post-read route change under the exact returned source guard
+
+=== independent pair enablement across empty configuration ===
+  ok   installs the first pair and re-installs after last deletion with tap-holds disabled
+
+=== pair external-boundary ownership ===
+  ok   rechecks the exact frame after a guard retires and replaces its owner
+  ok   rechecks exact restoration ownership after native read reentrancy
+  ok   resumes baseline letters after exact source-revocation retirement through the actual hook
+  ok   keeps baseline output acquisition owned during reentrant native retirement
+
+=== pair terminal native getter currency ===
+  ok   refuses runtime admission when the final route callback acquires a lease
+  ok   refuses action admission when the final route callback acquires a lease
+  ok   vetoes actual native pair dispatch after final route reentry
+  ok   vetoes actual native hold restoration after final route reentry
+  ok   refuses runtime admission when the final pause callback acquires a lease
+  ok   refuses action admission when the final pause callback acquires a lease
+  ok   vetoes actual native pair dispatch after final pause reentry
+  ok   vetoes actual native hold restoration after final pause reentry
+
+=== exact staged pair delivery fence ===
+  ok   requires the exact configuration owner and rejects foreign editor and release tokens
+  ok   opens delivery with a private-only ACK after staged installation
+  ok   retains both exact capabilities when staged installation refuses
+
+=== pair source receipt after final native pause callback ===
+  ok   refuses a same-byte canonical route handoff in final editor pause getter
+  ok   refuses a same-byte canonical route handoff in final configuration pause getter
+  ok   refuses a same-byte canonical route handoff in final matches pause getter
+
+=== installed input-owner OneShot prerequisite (controlled ports) ===
+  ok   arms only the acknowledged frame without reserving or writing output
+  ok   consumes exact Shift and key custody through DOWN repeat and final UP
+  ok   rejects copied scalar Writer and ordinary Recorder authority
+  ok   leaves ordinary custom Reader callbacks usable without issuing an input lease
+  ok   expires on the original input clock and does not shift the later key
+  ok   cancels cross-device consumption without admitting a pair or shifting its key
+  ok   joins actual Reader retirement after the final configuration callback
+  ok   joins actual Reader retirement after the final output callback
+  ok   joins actual Reader retirement after the final text callback
+  ok   joins actual Reader retirement after the final plan callback
+  ok   blocks reentrant publication of the same frame while its guard is running
+  ok   withdraws after acknowledged Shift DOWN and releases only its original holder
+  ok   retains debt and retires the original channel when inverse SYN is refused
+  ok   refuses the old broker after the actual Writer closes and reopens
+  ok   refuses observed reader replacement before a new DOWN
+  ok   refuses observed writer replacement before a new DOWN
+  ok   refuses observed engine replacement before a new DOWN
+  ok   refuses observed issuer replacement before a new DOWN
+  ok   refuses observed lease replacement before a new DOWN
+  ok   refuses observed configuration replacement before a new DOWN
+  ok   refuses observed tap_hold_epoch replacement before a new DOWN
+  ok   refuses observed classification replacement before a new DOWN
+  ok   refuses observed hook replacement before a new DOWN
+  ok   keeps the consumed key's original output retirement after remapper withdrawal
+  ok   an original observer refuses closed capability copies busy sessions and export rebinding
+  ok   the original observer refuses a getter that reenters then returns its old view
+
+=== original Reader source lifetime (controlled constructor) ===
+  ok   spends an unchanged title without inventing a synthetic delivery debt
+  ok   keeps scripted Reader source lifetime explicitly unavailable
+  ok   rejects copied input source leases and keeps mutation authority in the acknowledged Hook frame
+  ok   can retire its original ungrabbed descriptor without reviving input currency
+  ok   does not retry unresolved original close debt
+  ok   preserves the reopened a source even when the same numeric FD is reused
+  ok   preserves the reopened b source even when the same numeric FD is reused
+  ok   source retirement never invokes a rebound public slot closer
+
+=== original input issuer export fences (controlled ports) ===
+  ok   refuses a missing original Hook capture_input_owner before frame capture
+  ok   refuses a replaced original Hook capture_input_owner before frame capture
+  ok   refuses a missing original Hook input_owner_current before frame capture
+  ok   refuses a replaced original Hook input_owner_current before frame capture
+  ok   refuses a missing original Hook arm_one_shot before frame capture
+  ok   refuses a replaced original Hook arm_one_shot before frame capture
+  ok   refuses a missing original Hook set_remapper before frame capture
+  ok   refuses a replaced original Hook set_remapper before frame capture
+  ok   refuses a missing original Hook stop before frame capture
+  ok   refuses a replaced original Hook stop before frame capture
+  ok   refuses a missing original Hook emergency_stop before frame capture
+  ok   refuses a replaced original Hook emergency_stop before frame capture
+  ok   refuses rebound base export process after arm
+  ok   refuses rebound base export tick after arm
+  ok   refuses rebound base export activity after arm
+  ok   refuses rebound base export handles after arm
+  ok   refuses rebound base export release_all after arm
+  ok   refuses rebound base export take_custody after arm
+  ok   refuses rebound base export output_holder after arm
+  ok   refuses rebound base export combination_hold after arm
+  ok   refuses rebound base export combination_release after arm
+  ok   refuses rebound base export combination_lift after arm
+  ok   refuses rebound base export combination_restore after arm
+  ok   refuses rebound base export arm_one_shot after arm
+  ok   refuses rebound base export input_arm_state after arm
+  ok   refuses rebound base export clear_input_arm after arm
+  ok   refuses replaced instance dispatch identity
+  ok   refuses replaced base_metatable dispatch identity
+  ok   refuses replaced owner_metatable dispatch identity
+  ok   withdraws exact acknowledged Shift after process changes during SYN callback
+  ok   withdraws exact acknowledged Shift after release_all changes during SYN callback
+  ok   withdraws exact acknowledged Shift after native_release_all changes during SYN callback
+  ok   withdraws exact acknowledged Shift after hook_cleanup changes during SYN callback
+
+=== original output lifetime terminal settlement (controlled ports) ===
+  ok   settles only the old consumed retirement after exact destroy and close ACK
+  ok   does not report terminal ACK inside the pending destroy callback
+  ok   does not report terminal ACK inside the pending close callback
+  ok   retains exact retirement refusal for destroy_only without retry
+  ok   retains exact retirement refusal for close_only without retry
+  ok   retains exact retirement refusal for close_unknown without retry
+  ok   retains exact retirement refusal for close_EINTR without retry
+  ok   retains exact retirement refusal for destroy_throw without retry
+  ok   old captured terminal proof survives export replacement without borrowing it
+  ok   a destroyed successor cannot settle the still-open original issuer
+  ok   settlement uses original issuer ACK when the owner export is replaced
+
+=== original output observer constructor provenance (controlled ports) ===
+  ok   ordinary controlled output cannot mint input proof through positive_factory
+  ok   ordinary controlled output cannot mint input proof through missing_issuer
+  ok   ordinary controlled output cannot mint input proof through borrowed_factory
+  ok   ordinary controlled output cannot mint input proof through rebound_capture
+  ok   ordinary controlled output cannot mint input proof through borrowed_fresh_capture
+  ok   cannot redeem a captured terminal closure using a successor factory result
+
+=== original installed broker observer binding (controlled ports) ===
+  ok   refuses pre-frame replacement of original broker view
+  ok   refuses pre-frame replacement of original broker has_debt
+  ok   refuses pre-frame replacement of original broker output_current
+  ok   refuses pre-frame replacement of original broker output_retired
+  ok   refuses pre-frame replacement of original broker retire
+  ok   retains original terminal proof when its public method changes after consumption
+
+=== terminal proof refusal after consumed broker export retirement ===
+  ok   a public positive terminal lambda cannot settle a failed original destroy
+
+=== original Reader issuer lineage before Hook construction (controlled ports) ===
+  ok   a replaced original capture_source_owner cannot become input or cleanup authority
+  ok   a replaced original source_owner_current cannot become input or cleanup authority
+  ok   a replaced original retire_source cannot become input or cleanup authority
+  ok   a source receipt without its original observer retains only ordinary event compatibility
+  ok   the source issuer rejects copied receipts functions and a borrowed source observer
+  ok   source lineage is not revived by a successor with a recycled descriptor
+  ok   passive event receipt collection cannot mint authority and keeps genuine receipts compatible
+  ok   postframe public retirement replacement cannot steal captured original source cleanup
+
+=== actual event issuer joins original source observer (controlled ports) ===
+  ok   a rebound getter cannot issue positive_observer as original input authority
+  ok   a rebound getter cannot issue positive_current_and_observer as original input authority
+  ok   actual event origin authenticates only its exact registered source observer
+
+=== cold installed input authority bootstrap (controlled ports) ===
+  ok   the genuine Hook and Reader load before programmable backend callbacks
+  ok   cannot certify genuine_preloaded through mutable public authority ports
+  ok   cannot certify all_positive_preloaded through mutable public authority ports
+  ok   cannot certify all_positive_after_cold_load through mutable public authority ports
+
+=== consumed source withdrawal exact native inverse settlement (controlled transport) ===
+  ok   settles acknowledged Shift inverse and cancelled character after actual a FD reuse
+  ok   settles acknowledged Shift inverse and cancelled character after actual b FD reuse
+  ok   does not acknowledge a queued inverse before original native commit
+  ok   retains retirement debt after failed inverse SYN and refused original destroy
+  ok   refuses a rebound producer ACK while preserving original healthy output
+  ok   settles its old opaque holders while preserving an unrelated native Shift owner
+
+=== same-device third slot through original production consumers (controlled transport) ===
+  ok   (input-owner-clock) keeps original third-slot capture under expensive host reads
+  ok   (input-owner-clock) retains exact guard revocation before any standalone output
+  ok   (input-owner-clock) expires only when owned idle time passes the third-slot deadline
+  ok   consumes both original presses symmetrically 58
+  ok   consumes both original presses symmetrically 15
+  ok   admits equality at the positive delay without an early tick
+  ok   replays the original first hold before an expired native second
+  ok   resolves a foreign keyboard in original native output order
+  ok   withdraws a pending original press on canonical third-slot change
+  ok   cannot mint pending rights outside original dispatch or from a caller table
+  ok   preserves immediate ordered behavior for missing delay
+  ok   preserves immediate ordered behavior for missing symmetry
+  ok   preserves immediate ordered behavior for zero delay
+  ok   preserves immediate ordered behavior for mistyped symmetry
+  ok   preserves immediate ordered behavior for unissued leaf
+  ok   preserves immediate ordered behavior for disabled third slots
+  ok   retains explicit asymmetric order 15
+  ok   retains explicit asymmetric order 58
+  ok   replays a quick original release after its standalone first hold
+  ok   does not steal a matching second from a different original device
+  ok   revokes the retained third-slot source when symmetric changes
+  ok   revokes the retained third-slot source when simultaneous_threshold_ms changes
+  ok   retains pending physical lifetimes across acknowledged pause
+  ok   never matches after original evdev backlog loss
+  ok   prevents a source callback from borrowing the live capture role
+  ok   refuses a caller-normalized table even on an original installed Pair issuer
+  ok   retires a source-callback reentrant process without a stale pending owner
+  ok   does not replay a foreign key after an acknowledged first-row callback revokes source
+  ok   retains original retirement when first-row native SYN refuses
+  ok   does not retire a replacement original Reader lease after pending source reuse
+
+=== acknowledged buffered Reader cohort replacement (controlled transport) ===
+  ok   closes newly Hook-owned readers after remove and successful re-add
+
+=== generated Linux defaults received by original native combination constructors (controlled transport) ===
+  ok   receives the declared sparse100ms/asymmetric source at the inclusive boundary
+  ok   (linux-chord-caps-word) runs a simultaneous CapsWord through the catalogue executor
+  ok   does not borrow symmetric behavior from the Mac timing defaults
+  ok   declaration alone and allNone slots create no pending first-press custody
+  ok   retires pending input after replaced declared getter default_for
+  ok   retires pending input after replaced declared getter find_entry_by_path
+  ok   retires pending input after mutation of the original declared default map
+  ok   never normalizes a malformed namespace or setting into delayed authority
+  ok   never normalizes a malformed namespace or setting into delayed authority
+  ok   never normalizes a malformed namespace or setting into delayed authority
+  ok   never normalizes a malformed namespace or setting into delayed authority
+
+=== original managed saved configuration enrollment (controlled transport) ===
+  ok   rejects an invented catalogue through the real saved route and original Hook
+  ok   rejects invented physical key identifiers with an otherwise real catalogue action
+  ok   does not enroll a fresh options object requested directly from the actual installed owner
+  ok   retires pending custody after original constructor replacement modules.shortcuts.key_combinations.new
+  ok   retires pending custody after original constructor replacement platform.remap.tap_hold_engine.new
+  ok   retires pending custody after original constructor replacement platform.remap.key_combination_engine.new
+  ok   retires pending custody after original constructor replacement platform.remap.tap_hold_loader.load
+  ok   retires pending custody after original constructor replacement platform.remap.tap_hold_loader.load_document
+  ok   retires pending custody after the live generated catalogue is changed
+  ok   retires pending custody after the original source getter is replaced
+  ok   refuses a replaced Manager observer even when it returns a positive Boolean
+  ok   rechecks the exact installed generation after the canonical source callback pauses the owner
+  ok   checks the original loaded physical catalogue after external source callbacks
+  ok   refuses a future first-read Manager pretender returning positive currency
+  ok   does not reissue original loaded physical keys mutated through a public snapshot
+  ok   receives saved defaults only through the original installed Manager owner
+  ok   rejects a borrowed genuine observer placed in a future Manager alias
+
+=== relative-loader simultaneous source admission (controlled transport) ===
+  ok   (relative-loader) retains both original presses before Copy 58
+  ok   (relative-loader) retains both original presses before Copy 15
+  ok   (relative-loader) refuses foreign Manager source without pending custody
+  ok   (relative-loader) refuses unanchored Manager source without pending custody
+  ok   (relative-loader) refuses wrong-anchor Manager source without pending custody
+
+=== original Manager pair action after genuine Logger callback (controlled transport) ===
+  ok   (pair-manager-log-rejoin) preserves original action admission for source
+  ok   (pair-manager-log-rejoin) preserves original action admission for pause
+  ok   (pair-manager-log-rejoin) preserves original action admission for positive
+
+=== original Manager terminal pair identity (controlled transport) ===
+  ok   (pair-manager-identity-rejoin) rejects real restored aliases without invoking __eq
+
+=== complete combination collision claim source ===
+  ok   retains ordered claim identity and revokes on source or facade replacement
+  ok   a configuration lease and compensation never revive a prior pair claim
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":232}

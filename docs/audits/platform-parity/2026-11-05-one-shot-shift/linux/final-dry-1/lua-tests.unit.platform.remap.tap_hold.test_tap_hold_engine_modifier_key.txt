@@ -1,0 +1,56 @@
+
+=== tap-hold engine: a modifier key ===
+  ok   takes the hold at key-down and taps the action on a quick lone release
+  ok   is a chord, not a tap, when another key came in between
+  ok   is a hold past its threshold and a bounce below the minimum
+  ok   holds another modifier than itself and taps a key through the pipeline
+  ok   ignores the key's own autorepeat
+  ok   is a chord when another key comes up in between (release-is-activity)
+  ok   is a chord when another tap-hold key comes up in between (release-is-activity)
+  ok   is a chord when a layer key or a native key comes up in between (release-is-activity)
+  ok   is a chord when another key auto-repeats in between (prior-key-repeat)
+  ok   lets a click or a wheel turn make it a chord
+
+=== tap-hold engine: a tap with no hold ===
+  ok   runs its action at key-down and again with each repeat (tap-no-hold-instant)
+  ok   types its key at key-down and again with each repeat (tap-no-hold-instant)
+  ok   swallows a none tap (tap-no-hold-instant)
+  ok   arms RCtrl's one-shot Shift on a quick release and holds Shift for a long press (tap-no-hold-per-key)
+  ok   shifts only the first of three rolled letters (one-shot-roll)
+  ok   types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)
+  ok   follows each key's Windows rule for a tap with no hold (tap-no-hold-per-key)
+  ok   holds what the Windows block of a special tap holds (tap-no-hold-per-key)
+  ok   taps LCtrl only with CapsLock and LAlt up at its press (lctrl-tap-needs-caps-alt-up)
+  ok   arms LAlt's one-shot Shift at key-down and holds Shift until release (tap-no-hold-per-key)
+  ok   skips LAlt's one-shot under a held modifier or a held RCtrl, CapsLock, LShift or LCtrl (lalt-one-shot-skip)
+  ok   is still the key itself under a modifier and a layer key on the layer (tap-no-hold-instant)
+
+=== tap-hold engine: LAlt's Backspace under held keys ===
+  ok   types what Windows' BackSpaceLogic types for the keys held (lalt-backspace-logic)
+  ok   types nothing when CapsLock is down at the release of its layer hold (lalt-backspace-logic)
+  ok   decides again at each repeat when LAlt has no hold (lalt-backspace-logic)
+  ok   spends an armed one-shot Shift (lalt-backspace-logic)
+  ok   keeps up a modifier its own release just lifted (lalt-backspace-logic)
+
+=== tap-hold engine: RCtrl's Backspace under held keys ===
+  ok   types Delete under LShift, at key-down and each repeat with no hold (rctrl-backspace-logic)
+  ok   types Delete under LShift on the tap of a hold (rctrl-backspace-logic)
+  ok   types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)
+
+=== tap-hold engine: thresholds and holds ===
+  ok   counts a release exactly at the threshold or the minimum as a tap
+  ok   holds AltGr and Win, and every modifier of a combination in order
+  ok   types the key itself on a tap of a native-tap key that holds
+  ok   refuses a hold modifier that is not a canonical id instead of dropping it
+  ok   types End then Enter for the layer's new-line key
+
+=== tap-hold engine: the navigation layer ===
+  ok   turns layer keys into navigation chords while held
+  ok   releases a layer chord even when the layer key came up first
+  ok   taps its own action when used alone
+
+=== tap-hold engine: the side a modifier hold takes ===
+  ok   holds the right Ctrl itself when the right Ctrl key holds ctrl
+  ok   holds the left Ctrl when the file spelled the modifier with a left alias
+  ok   holds the right Shift itself when the right Shift key holds shift
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":41}

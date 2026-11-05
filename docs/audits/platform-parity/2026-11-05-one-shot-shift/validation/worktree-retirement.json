@@ -1,0 +1,331 @@
+{
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"authorization": "Root explicitly authorized only the four owned one-shot audit worktrees. Shared reviewer confirmed all final replays now use archived programs against /workspace/ergopti and no worktree-dependent probes remain.",
+	"retired_at_utc": "2026-11-05T19:23:59.793678+00:00",
+	"force_used": false,
+	"commands": [
+		{
+			"command": ["git", "rev-parse", "HEAD"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--ignored", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+			"exit": 0,
+			"stdout": "!! .rtk/path\n!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/6273271844944907364\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "HEAD"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/macos",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/macos",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--ignored", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/macos",
+			"exit": 0,
+			"stdout": "!! .rtk/path\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "HEAD"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--ignored", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"exit": 0,
+			"stdout": "!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/17466411991758128925\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "HEAD"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/shared",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/shared",
+			"exit": 0,
+			"stdout": "?? node_modules\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--ignored", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/shared",
+			"exit": 0,
+			"stdout": "?? node_modules\n!! .rtk/path\n!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/4390629045580904817\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"update-ref",
+				"refs/audit/parity-one-shot-2026-11-05/windows",
+				"9c565c88c9a1366a2e9b18c1b9d2868509510975",
+				"0000000000000000000000000000000000000000"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/windows"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"update-ref",
+				"refs/audit/parity-one-shot-2026-11-05/macos",
+				"9c565c88c9a1366a2e9b18c1b9d2868509510975",
+				"0000000000000000000000000000000000000000"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/macos"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"update-ref",
+				"refs/audit/parity-one-shot-2026-11-05/linux",
+				"9c565c88c9a1366a2e9b18c1b9d2868509510975",
+				"0000000000000000000000000000000000000000"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/linux"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"update-ref",
+				"refs/audit/parity-one-shot-2026-11-05/shared",
+				"9c565c88c9a1366a2e9b18c1b9d2868509510975",
+				"0000000000000000000000000000000000000000"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/shared"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"worktree",
+				"remove",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/windows"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/windows"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/macos",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"worktree",
+				"remove",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/macos"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/macos"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"worktree",
+				"remove",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/linux"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/linux"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+			"cwd": "/workspace/worktrees/parity-one-shot-2026-11-05/shared",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": [
+				"git",
+				"worktree",
+				"remove",
+				"/workspace/worktrees/parity-one-shot-2026-11-05/shared"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "rev-parse", "refs/audit/parity-one-shot-2026-11-05/shared"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "9c565c88c9a1366a2e9b18c1b9d2868509510975\n",
+			"stderr": ""
+		},
+		{
+			"command": ["git", "worktree", "list", "--porcelain"],
+			"cwd": "/workspace/ergopti",
+			"exit": 0,
+			"stdout": "worktree /workspace/ergopti\nHEAD 9c565c88c9a1366a2e9b18c1b9d2868509510975\nbranch refs/heads/dev\n\n",
+			"stderr": ""
+		}
+	],
+	"worktrees": [
+		{
+			"name": "windows",
+			"path": "/workspace/worktrees/parity-one-shot-2026-11-05/windows",
+			"head": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+			"status_before": "",
+			"ignored_and_untracked_before": "!! .rtk/path\n!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/6273271844944907364\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"recovery_ref": "refs/audit/parity-one-shot-2026-11-05/windows",
+			"removed": true,
+			"recovery_ref_head_after": "9c565c88c9a1366a2e9b18c1b9d2868509510975"
+		},
+		{
+			"name": "macos",
+			"path": "/workspace/worktrees/parity-one-shot-2026-11-05/macos",
+			"head": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+			"status_before": "",
+			"ignored_and_untracked_before": "!! .rtk/path\n",
+			"recovery_ref": "refs/audit/parity-one-shot-2026-11-05/macos",
+			"removed": true,
+			"recovery_ref_head_after": "9c565c88c9a1366a2e9b18c1b9d2868509510975"
+		},
+		{
+			"name": "linux",
+			"path": "/workspace/worktrees/parity-one-shot-2026-11-05/linux",
+			"head": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+			"status_before": "",
+			"ignored_and_untracked_before": "!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/17466411991758128925\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"recovery_ref": "refs/audit/parity-one-shot-2026-11-05/linux",
+			"removed": true,
+			"recovery_ref_head_after": "9c565c88c9a1366a2e9b18c1b9d2868509510975"
+		},
+		{
+			"name": "shared",
+			"path": "/workspace/worktrees/parity-one-shot-2026-11-05/shared",
+			"head": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+			"status_before": "?? node_modules\n",
+			"ignored_and_untracked_before": "?? node_modules\n!! .rtk/path\n!! .ruff_cache/.gitignore\n!! .ruff_cache/0.15.8/4390629045580904817\n!! .ruff_cache/CACHEDIR.TAG\n",
+			"recovery_ref": "refs/audit/parity-one-shot-2026-11-05/shared",
+			"removed": true,
+			"recovery_ref_head_after": "9c565c88c9a1366a2e9b18c1b9d2868509510975"
+		}
+	],
+	"shared_node_modules": {
+		"path": "/workspace/worktrees/parity-one-shot-2026-11-05/shared/node_modules",
+		"target": "/workspace/ergopti/node_modules",
+		"operation": "unlink symlink only; target preserved"
+	},
+	"worktrees_after": "worktree /workspace/ergopti\nHEAD 9c565c88c9a1366a2e9b18c1b9d2868509510975\nbranch refs/heads/dev\n\n"
+}

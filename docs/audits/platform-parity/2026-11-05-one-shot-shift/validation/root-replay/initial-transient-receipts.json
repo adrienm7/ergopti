@@ -1,0 +1,688 @@
+{
+	"runner_sha256": "ed734c6bcb3815551027e3ae82b006dfea3883e84229cb5ff73051383f0d73ca",
+	"frozen_role_artifacts_unchanged": true,
+	"frozen_role_artifact_count": 149,
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"repository_head": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"qualification": "Independent frozen-owner replay; recorded ports are not native receiving. Native inverse uses real libxkbcommon with explicit US keymap, without physical capture, desktop authority or receiving application. Positive infinity boundary is programmatic, not a certified UI choice.",
+	"linux_frozen_HEAD_checker": "Historical-only; not executed against descendant. Aggregate named-source checker authenticates current unchanged production bytes when present.",
+	"aggregate_source_checker_present": true,
+	"processes": [
+		{
+			"name": "macos-public",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/public-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "15f04c498881b7b5a5e33322a273f51fffd2fc83f570cc2577710376406493e1",
+			"exit_code": 0,
+			"stdout": "macos-public.stdout.txt",
+			"stderr": "macos-public.stderr.txt",
+			"stdout_sha256": "72f72dba8944056642d57717ecf115158858f2e6d36e3a3828fd0cd637157617",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "macos/sweep-1-public.log",
+			"baseline_sha256": "73bdae7df5b51b54d4659a346189256899eb916342159f10f046700dbb749f4d"
+		},
+		{
+			"name": "macos-config",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/config-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "c8b1bf899ba9b27df70c0f8a91069b2d25d57d60f3a1891ae3ab5f7e53f97459",
+			"exit_code": 0,
+			"stdout": "macos-config.stdout.txt",
+			"stderr": "macos-config.stderr.txt",
+			"stdout_sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "macos/sweep-1-config.log",
+			"baseline_sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392"
+		},
+		{
+			"name": "macos-registered-1",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.keymap.synthetic.test_one_shot_shift"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-1.stdout.txt",
+			"stderr": "macos-registered-1.stderr.txt",
+			"stdout_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-1.log",
+			"baseline_sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b"
+		},
+		{
+			"name": "macos-registered-2",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.synthetic_input.test_one_shot_shift"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-2.stdout.txt",
+			"stderr": "macos-registered-2.stderr.txt",
+			"stdout_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-2.log",
+			"baseline_sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c"
+		},
+		{
+			"name": "macos-registered-3",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.keymap.lifecycle.test_start_commit_transaction"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-3.stdout.txt",
+			"stderr": "macos-registered-3.stderr.txt",
+			"stdout_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-3.log",
+			"baseline_sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1"
+		},
+		{
+			"name": "macos-registered-4",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.config.test_one_shot_timeout_is_shared"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-4.stdout.txt",
+			"stderr": "macos-registered-4.stderr.txt",
+			"stdout_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-4.log",
+			"baseline_sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08"
+		},
+		{
+			"name": "macos-registered-5",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.gestures.actions.test_sticky_modifiers"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-5.stdout.txt",
+			"stderr": "macos-registered-5.stderr.txt",
+			"stdout_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-5.log",
+			"baseline_sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e"
+		},
+		{
+			"name": "macos-registered-6",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/run-module.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.pause_owners.test_sticky_modifiers"
+			],
+			"program_sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"exit_code": 0,
+			"stdout": "macos-registered-6.stdout.txt",
+			"stderr": "macos-registered-6.stderr.txt",
+			"stdout_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "macos/sweep-1-registered-6.log",
+			"baseline_sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4"
+		},
+		{
+			"name": "windows-source",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/windows/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "ef7ddc0dae3a3e1b58f2fa0c88a736c95bab4c49520449efad5bd9b0f52ea1e1",
+			"exit_code": 0,
+			"stdout": "windows-source.stdout.txt",
+			"stderr": "windows-source.stderr.txt",
+			"stdout_sha256": "0b12e2fccb13014a8c953569b3d012b22fea7a6fc509db8c726d8503fcbd92f5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "windows/source-contract.json",
+			"baseline_sha256": "7b94f3194040293f976da3ea7453a6716e1eda100e848af2e3f59f2d93a0fdd9"
+		},
+		{
+			"name": "linux-lua-public-probe.lua",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/public-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57",
+			"exit_code": 0,
+			"stdout": "linux-lua-public-probe.lua.stdout.txt",
+			"stderr": "linux-lua-public-probe.lua.stderr.txt",
+			"stdout_sha256": "6574473df60f1a341cffcd727421ce1c8322386765f13cc4ebecb0925c38c19a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"error": "Replay differs from frozen observation"
+		},
+		{
+			"name": "linux-lua-channel-probe.lua",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/channel-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77",
+			"exit_code": 0,
+			"stdout": "linux-lua-channel-probe.lua.stdout.txt",
+			"stderr": "linux-lua-channel-probe.lua.stderr.txt",
+			"stdout_sha256": "b10a12d2095f5b5f2244bce457a8004dcfe223463028a179f59323a578582393",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "linux/final-dry-1/lua-channel-probe.lua.txt",
+			"baseline_sha256": "5fcac2dab572d3c0019760c7c330e5dc1a68ced9e349443288171756f06406ad"
+		},
+		{
+			"name": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt",
+			"stderr": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt",
+			"stdout_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"baseline_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"name": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt",
+			"stderr": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt",
+			"stdout_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"baseline_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"name": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_integration"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt",
+			"stderr": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt",
+			"stdout_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"baseline_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"name": "linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt",
+			"stderr": "linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt",
+			"stdout_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"baseline_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"name": "linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.key_combinations.test_key_combinations"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt",
+			"stderr": "linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt",
+			"stdout_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"baseline_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"name": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_roll"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt",
+			"stderr": "linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt",
+			"stdout_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"baseline_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"name": "linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.meta.corpus.test_corpus_tap_hold_decisions"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt",
+			"stderr": "linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt",
+			"stdout_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/lua-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"baseline_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"name": "linux-luajit-public-probe.lua",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/public-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "dac95c96dcde57e91a21a67c9810808036822f3ba3437d08ec2d6574e9689d57",
+			"exit_code": 0,
+			"stdout": "linux-luajit-public-probe.lua.stdout.txt",
+			"stderr": "linux-luajit-public-probe.lua.stderr.txt",
+			"stdout_sha256": "3fb73800ae282a26304261cde1c4dd6f6f5d8744ccc5690406c5333fd87b6ea1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "linux/final-dry-1/luajit-public-probe.lua.txt",
+			"baseline_sha256": "592ddba3e8454c762f39bd524a607a4085b42fed6123db5f9435ea4dee7a51a6"
+		},
+		{
+			"name": "linux-luajit-channel-probe.lua",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/channel-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "fcc5756f4f6faf60e8dc355fa82740b7591859d450ceb3171fbcd0acdddece77",
+			"exit_code": 0,
+			"stdout": "linux-luajit-channel-probe.lua.stdout.txt",
+			"stderr": "linux-luajit-channel-probe.lua.stderr.txt",
+			"stdout_sha256": "a3fdf4a2412c66ad81da4e91e11d2abc51240eb9bd5587499d7442c4d2740c24",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "linux/final-dry-1/luajit-channel-probe.lua.txt",
+			"baseline_sha256": "5fc45e5c4cdcdad3527769a41ff1edefbf353b9a788f4ceabd55510563729943"
+		},
+		{
+			"name": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt",
+			"stdout_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.txt",
+			"baseline_sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"name": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt",
+			"stdout_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.txt",
+			"baseline_sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"name": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_integration"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt",
+			"stdout_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.txt",
+			"baseline_sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"name": "linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt",
+			"stdout_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.txt",
+			"baseline_sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"name": "linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.modules.shortcuts.key_combinations.test_key_combinations"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt",
+			"stdout_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.txt",
+			"baseline_sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"name": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.unit.platform.remap.tap_hold.test_tap_hold_roll"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt",
+			"stderr": "linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt",
+			"stdout_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.txt",
+			"baseline_sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"name": "linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/linux/run-registered.lua",
+				"/workspace/ergopti",
+				"tests.meta.corpus.test_corpus_tap_hold_decisions"
+			],
+			"program_sha256": "bc7c14227b51cf04320a223a563cd9337afbc4cd9922742e7569b5929020de79",
+			"exit_code": 0,
+			"stdout": "linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt",
+			"stderr": "linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt",
+			"stdout_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "linux/final-dry-1/luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.txt",
+			"baseline_sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"name": "shared-policy-lua54",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/shared/policy-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+			"exit_code": 0,
+			"stdout": "shared-policy-lua54.stdout.txt",
+			"stderr": "shared-policy-lua54.stderr.txt",
+			"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "shared/dry-A-policy-lua54.stdout.txt",
+			"baseline_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"name": "shared-policy-luajit",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/shared/policy-probe.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6",
+			"exit_code": 0,
+			"stdout": "shared-policy-luajit.stdout.txt",
+			"stderr": "shared-policy-luajit.stderr.txt",
+			"stdout_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "shared/dry-A-policy-luajit.stdout.txt",
+			"baseline_sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"name": "shared-catalogue-guard",
+			"command": [
+				"node",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/shared/catalogue-guard.cjs",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "f2941261793bc30d3adc76a7afd6d267e59a3387defcf1d68af64d7a22df8a08",
+			"exit_code": 0,
+			"stdout": "shared-catalogue-guard.stdout.txt",
+			"stderr": "shared-catalogue-guard.stderr.txt",
+			"stdout_sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "shared/dry-A-catalogue-guard.stdout.txt",
+			"baseline_sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e"
+		},
+		{
+			"name": "shared-declarations",
+			"command": [
+				"node",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/shared/declaration-probe.cjs",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e",
+			"exit_code": 0,
+			"stdout": "shared-declarations.stdout.txt",
+			"stderr": "shared-declarations.stderr.txt",
+			"stdout_sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "shared/dry-A-declarations.stdout.txt",
+			"baseline_sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+		},
+		{
+			"name": "shared-pinned-source",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/shared/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "5d20eb4a1d9c67914bf31eaf3e04fd4ef28e2d748e4380997c789f0e9fe9b698",
+			"exit_code": 0,
+			"stdout": "shared-pinned-source.stdout.txt",
+			"stderr": "shared-pinned-source.stderr.txt",
+			"stdout_sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Parsed JSON equal; only logger timestamp and error checkout prefix normalized",
+			"baseline": "shared/dry-A-pinned-source.stdout.txt",
+			"baseline_sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+		},
+		{
+			"name": "shared-single-source",
+			"command": [
+				"node",
+				"/workspace/ergopti/tools/test/test-tap-hold-one-shot-results-single-source.cjs"
+			],
+			"program_sha256": "232f91b45edfcfb0e9cae21ed5703076b00111b89c3f8a655483740d11dd7da9",
+			"exit_code": 0,
+			"stdout": "shared-single-source.stdout.txt",
+			"stderr": "shared-single-source.stderr.txt",
+			"stdout_sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true,
+			"comparison": "Exact text equal",
+			"baseline": "shared/dry-A-single-source.stdout.txt",
+			"baseline_sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a"
+		},
+		{
+			"name": "metadata-controls",
+			"command": [
+				"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_project.py",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "a4308fe16ba31dc12a9bb256936c8966912df6598480db49f22bdd2c588e68ac",
+			"exit_code": 0,
+			"stdout": "metadata-controls.stdout.txt",
+			"stderr": "metadata-controls.stderr.txt",
+			"stdout_sha256": "b4adb90622bb6ef54a0b44c51b25e7354d30d4f1b85d5314fa1a9ba1aa17619b",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true
+		},
+		{
+			"name": "native-inverse",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/native-inverse.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "52d2aa18924c6e838a1ea4c02dfd24f793237428616c5930098af51f40d4703f",
+			"exit_code": 0,
+			"stdout": "native-inverse.stdout.txt",
+			"stderr": "native-inverse.stderr.txt",
+			"stdout_sha256": "9c5dc4fe13ba97277dbcb99af25bb30ded429649deedfeb5800695a41736b2a4",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true
+		},
+		{
+			"name": "infinity-qualification",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/infinity-qualification.lua",
+				"/workspace/ergopti"
+			],
+			"program_sha256": "3e81d8b1409166cdb8325ad38934111c1107e075c570b075b9cabc28cc579566",
+			"exit_code": 0,
+			"stdout": "infinity-qualification.stdout.txt",
+			"stderr": "infinity-qualification.stderr.txt",
+			"stdout_sha256": "dd64dee8a99131745d49eac632168b84c44bf3b50a02c2d048b2445e2ee0597d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true
+		},
+		{
+			"name": "aggregate-source",
+			"command": [
+				"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/check_sources.py",
+				"/workspace/ergopti",
+				"--directory",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift",
+				"--output",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/root-replay/source-check.json"
+			],
+			"program_sha256": "3f6d132409869225c62775cfa47febd89eac76e2fd6a6d8defd65e91684261c3",
+			"exit_code": 0,
+			"stdout": "aggregate-source.stdout.txt",
+			"stderr": "aggregate-source.stderr.txt",
+			"stdout_sha256": "f161db4d09303b736e278af9f6a7029175795d9a71c25aef08bfa32cd5847fe6",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"private_TMPDIR": true
+		}
+	],
+	"failed": 1
+}

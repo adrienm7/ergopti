@@ -1,0 +1,26 @@
+{
+	"source": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"findings": [
+		{
+			"id": "OSM-001",
+			"severity": "medium",
+			"confidence": "high for logical transformation over declared layout translation port",
+			"title": "Caps Lock plus held Shift loses requested one-shot title",
+			"basis": "actual public callback and original adapter/state/policy; original parser and shipped layout projection",
+			"native_qualification": "No native macOS receiving proof",
+			"program": "public-probe.lua"
+		},
+		{
+			"id": "OSM-002",
+			"severity": "low",
+			"confidence": "high for original setter and original public arm separately",
+			"title": "Fractional positive API timeout publishes zero rejected by arming",
+			"basis": "actual Remap transaction with acknowledged persistence port; actual Keymap zero-value refusal separately",
+			"native_qualification": "Programmatic API only; no real disk or UI failure claim",
+			"programs": ["config-probe.lua", "public-probe.lua"]
+		}
+	],
+	"unresolved": [
+		"One-shot generated punctuation missing CapsWord output relay; native ordering/combined serializer and watcher proof absent"
+	]
+}

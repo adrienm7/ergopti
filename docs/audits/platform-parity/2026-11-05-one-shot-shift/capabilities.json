@@ -1,0 +1,748 @@
+{
+	"schema_version": 1,
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"created_at": "2026-11-05",
+	"module": "one-shot-shift",
+	"capabilities": [
+		{
+			"id": "one-shot-specials",
+			"contract": "Shared result table",
+			"windows": "Source loader selects all7 mappings",
+			"macos": "Actual resolver selects all7 mappings",
+			"linux": "Actual shared resolver and source loader select all7 mappings",
+			"classification": "raw_parity",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "magic-result",
+			"contract": "Magic has priority and yields J",
+			"windows": "Snapshot before InputHook waiting",
+			"macos": "Live magic reader on event",
+			"linux": "Live magic reader on event",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared J result explicit; setting lifetime differs. Current allowed magic symbols do not collide with ASCII table keys. Actual config changes during a pending capture are not certified.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "generic-versus-tap",
+			"contract": "An action origin is not a whole capability",
+			"windows": "Generic catalogue and tap action available",
+			"macos": "sticky_shift explicit generic equivalent and native tap source",
+			"linux": "Reserved tap one_shot_shift exists; generic catalogue names absent",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Exact catalogue/platform projection and separate reserved tap namespace; OS accessibility Sticky Keys is not assumed to reproduce Ergopti special punctuation mappings.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "default-carrier",
+			"contract": "Recommended physical trigger",
+			"windows": "right_ctrl",
+			"macos": "right_option",
+			"linux": "right_ctrl",
+			"classification": "explicit_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared defaults and explicit namespace reconciliation table document these differences; physical admission remains per-driver.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "timeout",
+			"contract": "Default and editable deadline",
+			"windows": "Shared2000ms; nonpositive constant falls back2s",
+			"macos": "Same default; positive sticky_timeout_ms user override through hs-only menu",
+			"linux": "Shared2000ms registry value",
+			"classification": "explicit_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Shared timing registry and explicit per-driver menu construction. No common permanent exclusion policy is inferred from missing controls.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "zero-timeout",
+			"contract": "User-facing zero or unlimited timeout setting",
+			"windows": "Nonpositive constant fallback2s",
+			"macos": "No unlimited UI preset established; ordinary menu rejects zero. Original state Owner.arm separately accepts positive infinity; fractional setter can publish rejected zero (OSM-002).",
+			"linux": "No same user setting; registry default positive",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "absent",
+				"macos": "absent",
+				"linux": "absent"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No supported zero/unlimited UI choice established. A separate original state-owner probe accepts math.huge: positive does not imply finite. It does not execute the setter with infinity or establish persistence support. Historical TODO wording is not current feature evidence.",
+			"finding_ids": ["OSM-002"],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				},
+				{
+					"path": "validation/infinity-qualification.lua",
+					"sha256": "3e81d8b1409166cdb8325ad38934111c1107e075c570b075b9cabc28cc579566"
+				}
+			]
+		},
+		{
+			"id": "control-spend",
+			"contract": "Editing controls spend unchanged",
+			"windows": "Named controls3; Tab/Escape scalar handling needs actual native EndKey representation",
+			"macos": "Actual shared/state controls cover5 names",
+			"linux": "Shared policy covers5; native producer classification driver-owned",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "unicode-title",
+			"contract": "Unicode title fallback",
+			"windows": "AHK Format title; non-ASCII exact native results unexecuted",
+			"macos": "Actual shared Unicode title includes expansions",
+			"linux": "Actual shared Unicode title includes expansions",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "No inference that Windows Format exactly equals shared generated Unicode tables. Scalar output may expand, e.gß→Ss andİ→I+combiningdot on actual Lua.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "retrigger",
+			"contract": "A second activation has precise ownership",
+			"windows": "Second exclusive SIHO capture refused while incumbent owns capture",
+			"macos": "Internal owner refreshes deadline and preserves old key release debt",
+			"linux": "Native input-arm lease can refuse rearm while consumed",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "State/source mechanisms only; reaching them through a held trigger or another consumer may change admission.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "native-plan",
+			"contract": "Shift choice must match actual output",
+			"windows": "Literal captured scalar/result path",
+			"macos": "Resolver predicate and adapter native flags are different layers",
+			"linux": "Resolver predicate and Hook/uinput lease are different layers",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared resolver contracts tested, not all public native modifiers/CapsWord combinations; peers own concrete driver findings.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "carrier-shape",
+			"contract": "One scalar is not an arbitrary event payload",
+			"windows": "Complete scalar capture; multi-scalar native receiving unexecuted",
+			"macos": "Actual state can title whole text; NNBSP% not scalar% special",
+			"linux": "Shared resolve takes text produced by key layout",
+			"classification": "unknown_intent",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"basis": "Actual shared Lua policy/Unicode and actual macOS state owner, or actual declaration/model guard where named. AHK relationships are source-only. No native event adapter, keyboard or receiving application is certified.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "read-failure",
+			"contract": "Catalogue failures are explicit",
+			"windows": "Loud one-time empty-map degradation until restart",
+			"macos": "Construction refuses unreadable/malformed input",
+			"linux": "Read/parse refuses manager candidate",
+			"classification": "observed_limit",
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "source",
+				"linux": "source"
+			},
+			"basis": "Source fault contracts only, no full startup/device receiving claim. Shipped valid data and baseline guard pass.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "324563d4b1bef0628b6a68da9e0873b26859e432a67b0d1cdd54f10696a44643"
+				},
+				{
+					"path": "shared/policy-probe.lua",
+					"sha256": "57edb2d11ca1e7d95f243e1d918682815408cae387918407ffcdac6a46a298e6"
+				},
+				{
+					"path": "shared/declaration-probe.cjs",
+					"sha256": "e335f0f6ee7789b252476882abfb2ebec7855e26113ff83707ca4bb0bf02b67e"
+				},
+				{
+					"path": "shared/source-contract.txt",
+					"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+				}
+			]
+		},
+		{
+			"id": "modified-controls",
+			"contract": "Preserve completing control chord identity",
+			"windows": "Named Backspace/Enter/Delete replay loses original modifier attribution; actual native admission and receiving unmeasured.",
+			"macos": "Controls spend through original callback; Cmd shortcuts retain activation. Modified control receiving is not fully certified.",
+			"linux": "Ctrl+Enter spends before shortcut lookup; Ctrl+A retains. Original ports only.",
+			"availability": {
+				"windows": "partial",
+				"macos": "unverified",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Conditional Windows source root; do not infer duplicate delivery or treat a named-control producer as native receiving.",
+			"finding_ids": ["OSW-001"],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		},
+		{
+			"id": "capslock-held-shift",
+			"contract": "First title under CapsLock and held Shift",
+			"windows": "Captured scalar/title send route; equivalent native receiving combination unexecuted.",
+			"macos": "Original callback spends title A but retains lowercase a under shipped-layout translation port.",
+			"linux": "Original public owners emit aB; inverse plan ignores live CapsLock; both Shift sides covered.",
+			"availability": {
+				"windows": "unverified",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Two OS-scoped roots share a live-state planning limitation; recording ports qualify both; no physical application proof.",
+			"finding_ids": ["OSM-001", "OSL-001"],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		},
+		{
+			"id": "first-key-repeat",
+			"contract": "Keep first-key repeats and input channel ownership",
+			"windows": "Scalar capture and retirement source checked; native repeat receiving unexecuted.",
+			"macos": "Original callback repeat/release gives AAa; fresh overlapping keys give Abc.",
+			"linux": "Ordinary physical tap first-letter repeat is refused by original broker and retires channel; no-repeat control healthy.",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Linux Reader/Hook/broker/Writer retirement is observed before teardown; no real evdev/uinput or native stuck-key claim. Additional enabled-shipped-preset control retains actual production declarations and empty valid config.toml; Lua5.4/LuaJIT reproduce the same failure without an unavailable declaration override.",
+			"finding_ids": ["OSL-002"],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				},
+				{
+					"path": "validation/public-channel-admission-receipt.json",
+					"sha256": "58721906d077e48ab7e750bb677eab590d603158c879eddbd1eaf687972e3a2a"
+				}
+			]
+		},
+		{
+			"id": "fractional-timeout-api",
+			"contract": "Accepted timeout belongs to the arming numeric domain",
+			"windows": "Fixed shared constant with finite fallback; no matching public fractional setting.",
+			"macos": "Setter publishes zero from positive fractions, or numeric NaN, through acknowledged save port; separate public arm rejects both. Infinity accepted by setter and arm; no supported unlimited UI choice established.",
+			"linux": "Shared timing value; no same end-user fractional timeout setting.",
+			"availability": {
+				"windows": "absent",
+				"macos": "partial",
+				"linux": "absent"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Same numeric validation root (OSM-002); independently executed actual setter and public arm, declared persistence/lifecycle ports; original shared formatter handles nonfinite values via protected fallback. No ordinary UI or real-disk failure is claimed.",
+			"finding_ids": ["OSM-002"],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				},
+				{
+					"path": "validation/config-domain-receipt.json",
+					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				}
+			]
+		},
+		{
+			"id": "shortcut-retention",
+			"contract": "Shortcut and nonspending controls retain activation",
+			"windows": "Tab/Escape representation and modified native receiving not measured.",
+			"macos": "Cmd shortcut retains; Backspace/Enter/Tab/Escape spend; arrows/function keys retain in original callbacks.",
+			"linux": "Ctrl+A retains; Ctrl+Enter and five editing controls spend; arrows retain.",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "unknown_intent",
+			"basis": "Control classification precedes shortcut lookup; no proven Mac/Linux Ctrl-control divergence and no claim of complete native control parity.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		},
+		{
+			"id": "lifecycle-clearing",
+			"contract": "Pause, stop and stale ownership retire activation safely",
+			"windows": "Exact-token settlement, failed-cleanup owner retention and suspend guards checked from source only.",
+			"macos": "Pause disarms/refuses, resume remains plain; complete stop/outage reset owner; disarm preserves release debt intentionally.",
+			"linux": "Ordinary original-channel pause/resume/reload/stop clear arm; reload replaces Engine; guarded stale/partial ACK cases are separate owner invariants.",
+			"availability": {
+				"windows": "unverified",
+				"macos": "present",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "raw_parity",
+			"basis": "Mechanisms differ by ownership model. Source/declared-port checks do not certify native scheduling, receiving or cost.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		},
+		{
+			"id": "capsword-output-relay",
+			"contract": "Generated output informs adjacent CapsWord owner",
+			"windows": "OneShotShift itself does not cancel CapsWord; nearby cancellation belongs to ToggleCapsLock.",
+			"macos": "Direct punctuation serializer call lacks explicit CapsWord relay; combined serializer/watcher and native ordering unresolved.",
+			"linux": "Physical CapsLock cases characterize downstream lock; actual CapsWord activation plus one-shot receiving not executed.",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "unknown_intent",
+			"basis": "Unresolved cross-owner candidate, excluded from confirmed finding count; no common automatic cancellation contract is invented.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		},
+		{
+			"id": "dedicated-trigger-semantics",
+			"contract": "Physical trigger paths retain OS-specific semantics",
+			"windows": "LAlt producer captures immediately then bounded Shift hold; RCtrl distinguishes tap and long Shift hold.",
+			"macos": "Recommended right Option plus sentinel/control route; sticky_shift calls dedicated Keymap arm, compound sticky actions use a separate owner.",
+			"linux": "RightCtrl standalone tap arms one-shot; canonical key-combination declarations reject one_shot_shift, independent of implemented physical tap route.",
+			"availability": {
+				"windows": "present",
+				"macos": "present",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "explicit_intent",
+			"basis": "Documented platform/default namespaces and distinct producer source contracts; generic-action exclusion does not remove tap-hold implementation.",
+			"finding_ids": [],
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "669b43e93c53554b63a578d74cf5c8de2db2209f23f872586d65c4e3cd88e7b3"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "d8bb4c6bb573d4a6d95e7041aba816b17c01092c43558f15bbe1e1211225561c"
+				}
+			]
+		}
+	]
+}
