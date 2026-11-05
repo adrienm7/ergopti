@@ -209,6 +209,22 @@ helpers.describe("run_command runs the user's line hidden or in a terminal (Linu
 		end)
 	end)
 
+	helpers.it("retains refused command cleanup until native settlement (user-actions)", function()
+		with_world(function(User)
+			local settled
+			local debt = { cancel = function() return false end,
+				on_settled = function(listener) settled = listener; return true end }
+			package.loaded["adapters.shell_runner"].run_async = function()
+				return nil, "pipe activation failed", debt
+			end
+			helpers.assert_eq(User.run_command({ command = "sleep 99", mode = "hidden", output = "none" }, 500), false)
+			helpers.assert_true(User.busy(), "a refused live child remains owned")
+			helpers.assert_eq(User.set_paused(true), false)
+			settled()
+			helpers.assert_true(not User.busy())
+		end)
+	end)
+
 	helpers.it("opens the session's terminal detached, the line as an argument (user-actions)", function()
 		with_world(function(User, world)
 			world.installed = { ["x-terminal-emulator"] = true, konsole = true }

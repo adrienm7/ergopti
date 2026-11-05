@@ -283,7 +283,7 @@ function M.run_command(fields, max_typed)
 		end
 	end
 	local token, finished = {}, false
-	local handle, refusal = ShellRunner.run_async(M.SHELL_BIN, M.shell_args(fields.command),
+	local handle, refusal, cleanup = ShellRunner.run_async(M.SHELL_BIN, M.shell_args(fields.command),
 		{ timeout_ms = M.COMMAND_TIMEOUT_MS, max_output_bytes = M.MAX_OUTPUT_BYTES }, function(answer)
 			finished = true
 			_handles[token] = nil
@@ -291,6 +291,12 @@ function M.run_command(fields, max_typed)
 			finish_hidden(answer, fields, max_typed, publication)
 		end)
 	if not handle then
+		-- A child may have started before its output watcher was refused. Keep
+		-- its cleanup owner visible to pause until the native exit is observed.
+		if cleanup then
+			_handles[token] = cleanup
+			pcall(cleanup.on_settled, function() _handles[token] = nil; publish_settled() end)
+		end
 		Logger.error(LOG, "The command of a run_command binding could not start: %s.", tostring(refusal))
 		M.notify("user_actions.command_failed", tostring(refusal))
 		return false
