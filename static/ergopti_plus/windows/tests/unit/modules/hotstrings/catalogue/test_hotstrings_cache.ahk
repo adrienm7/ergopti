@@ -960,3 +960,68 @@ _HSCI_EnsureWriteCallout(Mode) {
 }
 Test("hotstrings cache initial publication: real writer diagnostic edits category", _HSCI_EnsureWriteCallout.Bind("category"))
 Test("hotstrings cache initial publication: canonical memo A cannot bless actual index B", _HSCI_EnsureWriteCallout.Bind("index"))
+
+_HCOW_PublicEnsure(Collision) {
+	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
+	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources
+	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
+		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources]
+	Root := A_Temp . "\ergopti_cache_stage_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		DirCreate(Root . "\modules\hotstrings")
+		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
+		_SharedDir := Root
+		_TomlFileCache := _TomlFileCache.Clone()
+		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
+		_TomlCountCache := _TomlCountCache.Clone()
+		_HotstringBoundSources := Map()
+		for Category in HotstringsBundledCategories() {
+			Path := _HotstringsCacheTomlPath(Category)
+			SplitPath(Path, , &Parent)
+			DirCreate(Parent)
+			AssertEqual(1, FSWriteCreateDurable(Path, Category == "autocorrection"
+				? _HSCI_Source("cacheownerprobe", "Owned output") : "# genuine empty source`n"))
+		}
+		Tsv := _HotstringsCacheTsvPath(), Foreign := Tsv . ".tmp"
+		Sentinel := "Independent cache stage é😀"
+		if Collision {
+			AssertEqual(1, FSWriteCreateDurable(Foreign, Sentinel))
+			Before := FSReadBytesStrict(Foreign)
+		}
+		_HS_CACHE_ROWS := Map(), _GENERATED_HOTSTRINGS := Map(), _HS_CACHE_LOADED := false
+		HotstringsCacheEnsure()
+		Present := FSStrictExists(Foreign), CachePresent := FSStrictExists(Tsv)
+		After := Present ? FSReadBytesStrict(Foreign) : Buffer(0)
+		_TestPrint("# hotstrings-cache-stage collision=" . Collision . " foreign_present=" . Present
+			. " cache_present=" . CachePresent . " loaded=" . _HS_CACHE_LOADED
+			. " has_rows=" . _HS_CACHE_ROWS.Has("autocorrection.names") . " foreign_bytes=" . After.Size)
+		AssertTrue(_HS_CACHE_LOADED, "valid TOML remains loadable even if the best-effort cache cannot publish")
+		AssertEqual("cacheownerprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
+		AssertEqual("Owned output", _HS_CACHE_ROWS["autocorrection.names"][1][3])
+		if Collision {
+			AssertTrue(Present, "public Ensure cannot consume an independently created cache stage")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "foreign cache bytes remain exact")
+		} else {
+			AssertTrue(CachePresent, "the default native writer still produces a reusable verified cache")
+			Disk := _HotstringsCacheReadTsv(FSReadUtf8Exact(Tsv))
+			AssertTrue(_HotstringsCacheInventoryMatches(Disk))
+			AssertEqual("cacheownerprobe", Disk["autocorrection.names"][1][2])
+		}
+	} finally {
+		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
+		_GENERATED_HOTSTRINGS := Saved[4], _TomlFileCache := Saved[5]
+		_TomlFileSectionCounts := Saved[6], _TomlCountCache := Saved[7]
+		HS_BUNDLED_CATEGORIES := Saved[8], _HotstringBoundSources := Saved[9]
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _HCOW_Collision in [true, false]
+	Test("hotstrings cache stage: public Ensure collision=" . _HCOW_Collision
+		. " (hotstrings-cache-stage-ownership)", _HCOW_PublicEnsure.Bind(_HCOW_Collision))
