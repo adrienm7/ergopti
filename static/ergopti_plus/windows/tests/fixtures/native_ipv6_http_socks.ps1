@@ -85,10 +85,34 @@ public sealed class ErgoptiIpv6SocksOracle : IDisposable {
     public void Dispose(){stopped=true;listener.Stop();lock(gate){if(active!=null)active.Close();}if(!worker.Join(5000))throw new InvalidOperationException("Owned SOCKS receiver did not join");Joined=true;controlsDone.Dispose();}
 }
 '@
+# Only closed transport fields and counters from this static fixture are public.
+# Headers, endpoints, payloads and exception messages never enter this projection.
+function Write-Ipv6SocksDiagnostic($Phase,$Peer,$Metrics,$ActualRetired,$EngineRetired,$ControlsDone,$FailureReceipt) {
+    $Diagnostic=[ordered]@{schema_version=1;phase=$Phase;actual_child_quiesced=$ActualRetired
+        engine_child_quiesced=$EngineRetired;controls_done_observed=$ControlsDone;failure_receipt=$FailureReceipt}
+    if($null -ne $Metrics) {
+        $Diagnostic.actual_completed=[bool]$Metrics.completed
+        $Diagnostic.actual_status=[int]$Metrics.status
+        $Diagnostic.actual_delivered=[int64]$Metrics.delivered
+        $Diagnostic.native_failure=[string]$Metrics.failure
+        $Diagnostic.native_stage=[string]$Metrics.stage
+        $Diagnostic.native_error=[int]$Metrics.native_error
+        $Diagnostic.native_diagnostic=[string]$Metrics.diagnostic
+        $Diagnostic.proxy_used=[bool]$Metrics.proxy_used
+        $Diagnostic.proxy_answered=[bool]$Metrics.proxy_answered
+    }
+    if($null -ne $Peer) {
+        $Diagnostic.greetings=$Peer.Greetings;$Diagnostic.connect_frames=$Peer.ConnectFrames
+        $Diagnostic.requests=$Peer.Requests;$Diagnostic.early_close=$Peer.EarlyClose
+        $Diagnostic.proxy_failures=$Peer.Failures;$Diagnostic.proxy_joined=$Peer.Joined
+    }
+    [Console]::WriteLine('IPV6_HTTP_SOCKS_DIAGNOSTIC:'+($Diagnostic|ConvertTo-Json -Compress -Depth 4))
+}
 $Directory=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-ipv6-socks-'+[Guid]::NewGuid().ToString('N'))
 $DirectoryCreated=$false
 $BodyPath=Join-Path $Directory 'body.bin';$HeaderPath=Join-Path $Directory 'headers.bin'
-$Proxy=$null;$Receipt=$null
+$Proxy=$null;$Receipt=$null;$Actual=$null
+$ActualRetired=$null;$EngineRetired=$null;$ControlsDone=$null;$FailureReceipt=@{}
 try {
     New-Item -ItemType Directory -Path $Directory -ErrorAction Stop | Out-Null
     $DirectoryCreated=$true
@@ -105,7 +129,14 @@ try {
         revocation_best_effort=$false;headers=@();body=''}
     $Answer=@{child_quiesced=$true};$Engine=New-ErgoptiWinHttpAttemptEngine $InputValue $Answer
     $Actual=$Engine.InvokeRoute($Destination,$Selection.Routes[0],'GET',$false,$true)
-    if(-not $Actual.child_quiesced -or -not $Engine.ChildQuiesced() -or -not $Proxy.WaitControls()){throw 'Native attempt or exact SOCKS protocol controls did not retire.'}
+    # Observe each boundary even when another boundary failed: short-circuiting
+    # these calls would hide whether the actual request reached the SOCKS peer.
+    $ActualRetired=[bool]$Actual.child_quiesced
+    $EngineRetired=[bool]$Engine.ChildQuiesced()
+    $ControlsDone=[bool]$Proxy.WaitControls()
+    if(-not $Actual.completed -or $Actual.proxy_answered){$FailureReceipt=$Engine.GetFailureReceipt($Actual,$Destination)}
+    Write-Ipv6SocksDiagnostic 'before_assert' $Proxy $Actual $ActualRetired $EngineRetired $ControlsDone $FailureReceipt
+    if(-not $ActualRetired -or -not $EngineRetired -or -not $ControlsDone){throw 'Native attempt or exact SOCKS protocol controls did not retire.'}
     if($Proxy.Greetings -ne 2 -or $Proxy.Failures -ne 0){throw 'Both private SOCKS controls did not qualify.'}
     $Success=$Actual.completed -and $Actual.status -eq 200 -and $Actual.delivered -eq 2 -and [IO.File]::ReadAllText($BodyPath) -ceq 'OK'
     $Receipt=@{schema_version=1;oracle_status=200;oracle_body_exact=$true;route_admitted=$true
@@ -113,7 +144,11 @@ try {
         greetings=$Proxy.Greetings;connect_frames=$Proxy.ConnectFrames;requests=$Proxy.Requests
         early_close=$Proxy.EarlyClose;proxy_failures=$Proxy.Failures;native_retired=$true}
 } finally {
-    if($null -ne $Proxy){$Proxy.Dispose()}
+    Write-Ipv6SocksDiagnostic 'before_dispose' $Proxy $Actual $ActualRetired $EngineRetired $ControlsDone $FailureReceipt
+    if($null -ne $Proxy){
+        $Proxy.Dispose()
+        Write-Ipv6SocksDiagnostic 'after_join' $Proxy $Actual $ActualRetired $EngineRetired $ControlsDone $FailureReceipt
+    }
     if($DirectoryCreated) {
         foreach($Path in @($BodyPath,$HeaderPath)){if([IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}
         [IO.Directory]::Delete($Directory,$false)
