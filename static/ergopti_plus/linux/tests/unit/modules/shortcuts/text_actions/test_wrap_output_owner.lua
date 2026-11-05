@@ -37,7 +37,8 @@ local function with_wrap(options, body)
 	require("config_file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
 		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type", "logger.shim" }
+			"modules.hotstrings.injector", "adapters.keyboard_hook", "modules.shortcuts.manager", "modules.shortcuts.wrap_on_type",
+			"modules.gestures.user_actions", "logger.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
@@ -158,6 +159,16 @@ local function with_wrap(options, body)
 end
 
 helpers.describe("wrap output publication ownership", function()
+	helpers.it("does not log text inserted from a command result (wrap-output-owner)", function()
+		with_wrap({}, function(state)
+			package.loaded["modules.gestures.user_actions"] = nil
+			require("modules.gestures.user_actions").deliver_output("privatecommandoutput", "type", 100,
+				assert(state.guard.capture_text_owner()))
+			helpers.assert_true(not table.concat(state.logs, "\n"):find("privatecommandoutput", 1, true),
+				"command output must not enter trace logs")
+		end)
+	end)
+
 	helpers.it("does not log selected text while wrapping (wrap-output-owner)", function()
 		with_wrap({}, function(state)
 			helpers.assert_true(state.consumed)
@@ -311,7 +322,7 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 					.. "assert(package.loaded['adapters.storage'] == nil, 'the child store must start cold')\n"
 					.. "require('tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner')\n"
 					.. "local results = require('tests.helpers').get_results()\n"
-					.. "assert(results.passed == 36 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
+					.. "assert(results.passed == 37 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
 					.. "local storage = require('adapters.storage')\n"
 					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/ergopti_plus/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"

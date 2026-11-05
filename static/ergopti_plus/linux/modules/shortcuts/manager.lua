@@ -288,7 +288,8 @@ function M.capture_text_destination() return capture_text_destination() end
 function M.insert_text(text, publication)
 	publication = publication or capture_text_destination()
 	if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Text can be arbitrary command output or configured user content.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
