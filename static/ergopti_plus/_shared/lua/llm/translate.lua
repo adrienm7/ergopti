@@ -137,7 +137,12 @@ function M.extract(config, block)
 	if type(block) ~= "string" then return nil end
 	local at = block:upper():find(config.tag:upper(), 1, true)
 	if not at then return nil end
-	local text = block:sub(at + #config.tag):gsub("%*%*", "")
+	local text = block:sub(at + #config.tag)
+	-- Some models bold the label; remove only that label's closing marker.
+	-- Markers in the translated selection are user formatting or code.
+	if at > 2 and block:sub(at - 2, at - 1) == "**" and text:sub(1, 2) == "**" then
+		text = text:sub(3)
+	end
 	text = TextUtils.trim(text)
 	if text == "" then return nil end
 	return text
