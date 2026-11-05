@@ -78,7 +78,7 @@ local _owner_database, _owner_device, _load_day = nil, nil, nil
 local _event_admit = nil
 
 -- What the previous sample saw, for the transitions.
-local function new_last() return { at_ms = nil, ssid = nil, locked = nil, muted = nil } end
+local function new_last() return { at_ms = nil, ssid = nil, ssid_source = nil, locked = nil, muted = nil } end
 local _last = new_last()
 
 -- The transitions seen since the collector last took them, for events_system:
@@ -134,13 +134,14 @@ local function read_network()
 	if Shell.has_command("nmcli") then
 		local out = Shell.exec_line(
 			"nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | head -1")
-		if out and out ~= "" then return out end
+		if out and out ~= "" then return out, "nmcli" end
 	end
 	if Shell.has_command("iwgetid") then
 		local out = Shell.exec_line("iwgetid -r 2>/dev/null")
-		if out and out ~= "" then return out end
+		if out and out ~= "" then return out, "iwgetid" end
 	end
-	return read_wireless_interface()
+	local interface = read_wireless_interface()
+	return interface, interface and "interface" or nil
 end
 
 --- Whether the session is locked.
@@ -370,10 +371,11 @@ function M.sample()
 		_day.battery_max = _day.battery_max and math.max(_day.battery_max, battery) or battery
 	end
 
-	local ssid = read_network()
-	-- Counted only once both samples have an answer. A transition to or from
-	-- "cannot tell" is a reading about this module, not about the network.
-	if _last.ssid ~= nil and ssid ~= nil and ssid ~= _last.ssid then
+	local ssid, ssid_source = read_network()
+	-- Compare only readings from the same source: nmcli, iwgetid and the
+	-- interface fallback use different identities for the same connection.
+	-- An unreadable sample or a changed reader is not a network transition.
+	if _last.ssid ~= nil and ssid ~= nil and ssid_source == _last.ssid_source and ssid ~= _last.ssid then
 		_day.wifi_changes = _day.wifi_changes + 1
 		-- Without the network's name: it is a fingerprint, never stored.
 		transition("wifi_change")
@@ -386,7 +388,7 @@ function M.sample()
 	end
 
 	_last.at_ms, _last.clock = now_ms, clock
-	_last.ssid = ssid
+	_last.ssid, _last.ssid_source = ssid, ssid_source
 	_last.locked = locked
 	_last.muted = read_muted()
 	return _day
