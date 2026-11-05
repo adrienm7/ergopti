@@ -403,9 +403,10 @@ function M.on_message(payload, state, context)
 		if row.installed ~= true then return { selected = false } end
 		local selected = type(frame.llm_ports.set_model) == "function" and projection_current(frame)
 		if selected and type(frame.llm.get_backend) == "function" and frame.llm.get_backend() ~= "ollama" then
-			selected = frame.llm.set_backend("ollama") == true
+			selected = projection_current(frame)
+				and frame.llm.set_backend("ollama", function() return projection_current(frame) end) == true
 		end
-		selected = selected and frame.llm_ports.set_model(row.runtime_name) == true
+		selected = selected and projection_current(frame) and frame.llm_ports.set_model(row.runtime_name) == true
 		if selected then changed() end
 		local closed = selected and close_owned(context) or false
 		return { selected = selected, closed = closed, model = row.runtime_name }
