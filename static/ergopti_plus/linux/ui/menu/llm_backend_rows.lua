@@ -552,7 +552,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	end
 	if type(context) == "table" and type(context.is_paused) == "function"
 		and type(llm.can_configure_local_servers) == "function" then
-		local local_context = { paused = context.paused, is_paused = context.is_paused, page_current = page_current }
+		local local_context = setmetatable({ page_current = page_current }, { __index = context })
 		local rows, tools = require("ui.menu.local_server_rows").page_rows(llm, dialogs, changed, local_context)
 		for _, row in ipairs(rows) do api.rows[#api.rows + 1] = row end
 		for _, tool in ipairs(tools) do api.tools[#api.tools + 1] = tool end
