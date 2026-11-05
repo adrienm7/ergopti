@@ -161,8 +161,10 @@ _DayLog_State() {
 ; @param Cap {Integer} The most bytes worth reading.
 ; @returns {Map} { found: Boolean, size, text }
 _DayLog_ReadToday(Cap) {
-	; Lines still queued in memory reach the file before it is read
-	try _LoggerFlush(true)
+	; A completed flush can still retain delivery debt after a native append
+	; refusal. Diagnostics must not attach the stale file as a complete log.
+	if !LoggerFlushForRead()
+		return Map("found", false, "size", 0, "text", "", "reason", "failed")
 	Path := LoggerTodayLogPath()
 	if (Path == "" || !FileExist(Path))
 		return Map("found", false, "size", 0, "text", "")
@@ -210,8 +212,12 @@ HealthCheck_DayLogPrepare(Snapshot, Config, Context, Reader := 0) {
 	Limits := Config["day_log"]
 	DayLog := (Reader is Func) ? Reader.Call(Limits["max_bytes"]) : _DayLog_ReadToday(Limits["max_bytes"])
 	if !DayLog["found"] {
-		LoggerWarn("HealthCheckDayLog", "Today's log does not exist yet; nothing to attach.")
-		return _DayLog_Reply(Map("ok", false, "reason", "missing"))
+		Reason := DayLog.Get("reason", "missing")
+		if Reason == "missing"
+			LoggerWarn("HealthCheckDayLog", "Today's log does not exist yet; nothing to attach.")
+		else
+			LoggerWarn("HealthCheckDayLog", "Today's log delivery did not settle; no stale attachment was retained.")
+		return _DayLog_Reply(Map("ok", false, "reason", Reason))
 	}
 	Result := DayLog_Collect(DayLog["text"], DayLog["size"], Config["redaction"], Context, Limits)
 	if !Result["ok"] {
