@@ -156,12 +156,27 @@ _LLM_Bridge_TypingFieldCurrent(Source) {
 
 ; No native lookup: unknown/secure text may warm the deferred detector but is
 ; never mirrored into either LLM context. A later verdict opens future input.
-_LLM_Bridge_CachedTypingSecure(Source) {
+_LLM_Bridge_CachedTypingSecure(Source, FreshFocus := unset) {
 	Secure := true
 	if !_LLM_Bridge_TypingFieldCurrent(Source)
 		return true
+	AllowNativeNegative := true
+	if IsSet(FreshFocus) {
+		if !_LLM_Bridge_SameTypingSource(Source, FreshFocus)
+			return true
+		if FreshFocus.Has("NativeConclusive") || FreshFocus.Has("NativeSecure") {
+			Conclusive := FreshFocus.Get("NativeConclusive", "")
+			NativeSecure := FreshFocus.Get("NativeSecure", "")
+			if !(Conclusive is Integer) || (Conclusive != 0 && Conclusive != 1)
+				|| !(NativeSecure is Integer) || (NativeSecure != 0 && NativeSecure != 1)
+				return true
+			if Conclusive
+				return NativeSecure
+			AllowNativeNegative := false
+		}
+	}
 	Known := SFD_TryGetCachedVerdict(Source["control"], Source["input_focus_generation"],
-		Source.Get("input_element_id", ""), &Secure)
+		Source.Get("input_element_id", ""), &Secure, , AllowNativeNegative)
 	return !Known || Secure
 }
 
@@ -189,8 +204,8 @@ _LLM_Bridge_TypingSourceCurrent(Source, Active, Generation, Guard := unset) {
 }
 
 ; Reads privacy on a deferred prefix observer or the bounded fallback input
-; transaction. Native classification never enters FeedCharForPrefix. Unknown
-; fields fail closed, and the caller revalidates its owner after these probes.
+; transaction. Prefix input consumes its gateway native hint in RAM; UIA/app
+; reads stay deferred. Callers revalidate their owner after these probes.
 _LLM_Bridge_ReadTypingPrivacy(Source, AgentWanted, AgentApps := unset) {
 	global _LLM_Engine, _LLM_Bridge_PrivacyAppCache, SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	NeedsSecure := _LLM_Engine.Get("disable_password_fields", true) || AgentWanted
@@ -406,8 +421,20 @@ _LLM_Bridge_CaptureAdmissionSeed(Source) {
 ; into, as Map("hwnd", "control"). A global holding a function, as
 ; _AHK_SendInput is, so a test can drive a real acceptance through admission
 ; without owning the foreground window of a headless runner.
-global _LLM_Bridge_ReadLiveFocus := () => Map(
-	"hwnd", WIGetForegroundHwnd(), "control", WIGetFocusedControlToken())
+global _LLM_Bridge_ReadLiveFocus := _LLM_Bridge_ReadFocusReceipt
+
+; This is the existing native focus gateway, not the RAM prefeed policy. The
+; adapter's bounded native path never invokes UIA, settings or a cache lookup.
+_LLM_Bridge_ReadFocusReceipt() {
+	Focus := Map("hwnd", WIGetForegroundHwnd(), "control", WIGetFocusedControlToken())
+	if !(Focus["control"] is Integer) || Focus["control"] <= 0
+		return Focus
+	Conclusive := false
+	Secure := SFD_DetectNative(Focus["control"], &Conclusive)
+	Focus["NativeConclusive"] := Conclusive
+	Focus["NativeSecure"] := Conclusive ? Secure : true
+	return Focus
+}
 
 _LLM_Bridge_TextAdmissionStillCurrent(Expected) {
 	global _LLM_Bridge_ContentGeneration, _PrefixInputContextGeneration, _LLM_Engine
@@ -1339,9 +1366,14 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentBuffer
 	global _LLM_Bridge_PrefixObserver, _LLM_Engine, _LLM_Bridge_ReadLiveFocus
 	global _PrefixDeferredGeneration, _LLM_Bridge_Buffer, _LLM_Bridge_BufferAgentSafe
+	global _LLM_Bridge_ContentGeneration, _LLM_Bridge_AgentContentGeneration, SFD_FIELD_CACHE
 	if !A_IsCritical
 		throw Error("Prefix character mirroring requires a serialized input transaction.")
 	Active := _LLM_Bridge_Active
+	EntryEpoch := _PrefixDeferredGeneration
+	EntryGeneration := Active ? _LLM_Bridge_ContentGeneration : _LLM_Bridge_AgentContentGeneration
+	EntryFieldGeneration := SFD_FIELD_CACHE["focus_generation"]
+	EntryElement := SFD_FIELD_CACHE["current_element_id"]
 	if !Active {
 		Wanted := IsSet(AgentWantedFn) ? AgentWantedFn.Call()
 			: (IsSet(LLM_Agent_WatchesTyping) && LLM_Agent_WatchesTyping())
@@ -1353,12 +1385,31 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		}
 	}
 	ReadFocus := IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus
-	Source := _LLM_Bridge_BindTypingSource(ReadFocus.Call(), Active)
+	FreshFocus := ReadFocus.Call()
+	if A_IsSuspended || Active != _LLM_Bridge_Active || EntryEpoch != _PrefixDeferredGeneration
+		|| EntryGeneration != (Active ? _LLM_Bridge_ContentGeneration : _LLM_Bridge_AgentContentGeneration)
+		|| EntryFieldGeneration != SFD_FIELD_CACHE["focus_generation"]
+		|| EntryElement !== SFD_FIELD_CACHE["current_element_id"]
+		return false
+	Source := _LLM_Bridge_BindTypingSource(FreshFocus, Active)
 	if !IsObject(Source)
 		return false
-	CapturedSecure := _LLM_Bridge_CachedTypingSecure(Source)
-	_LLM_Bridge_PrepareInput(ch)
-	if Active {
+	; Buffer identity can reuse its old Map. Only this frame's fresh gateway
+	; receipt attests the native style; never rewrite an old receipt in place.
+	CapturedSecure := _LLM_Bridge_CachedTypingSecure(Source, FreshFocus)
+	NativePrivate := FreshFocus.Has("NativeConclusive") && FreshFocus.Has("NativeSecure")
+		&& FreshFocus.Get("NativeConclusive", false) is Integer
+		&& FreshFocus.Get("NativeConclusive", false) == true
+		&& FreshFocus.Get("NativeSecure", true) is Integer
+		&& FreshFocus.Get("NativeSecure", true) == true
+	RejectedNative := NativePrivate && (!Active || _LLM_Engine.Get("disable_password_fields", true))
+	if RejectedNative {
+		Generation := Active ? _LLM_Bridge_ContentGeneration : _LLM_Bridge_AgentContentGeneration
+		_LLM_Bridge_RejectPrivateTyping(Active, Source, Generation)
+	} else {
+		_LLM_Bridge_PrepareInput(ch)
+	}
+	if Active && !RejectedNative {
 		if !CapturedSecure || !_LLM_Engine.Get("disable_password_fields", true)
 			_LLM_Bridge_ApplyBufferEdit(0, ch)
 		if CapturedSecure && !_LLM_Engine.Get("disable_password_fields", true)
@@ -1367,7 +1418,7 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		LLM_Engine_CancelTimer()
 		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
 		_LLM_Engine["active_request_signature"] := ""
-	} else {
+	} else if !Active && !RejectedNative {
 		if !CapturedSecure
 			LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
