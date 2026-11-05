@@ -193,10 +193,12 @@ function openAppDrilldown(appName) {
 		recs.push(
 			`<div>${_t('ui_apps.modal_record_session')
 				.replace('{dur}', formatDuration(a.session_longest_ms))
-				.replace(
-					'{chars}',
-					a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : ''
-				)}</div>`
+				.replace('{chars}', '')}</div>`
+		);
+	}
+	if (a.session_longest_chars > 0) {
+		recs.push(
+			`<div>${_t('ui_typing.lbl_longest_chars')}: ${format_int(a.session_longest_chars)}</div>`
 		);
 	}
 	if ((a.burst_max_cpm || 0) > 0) {

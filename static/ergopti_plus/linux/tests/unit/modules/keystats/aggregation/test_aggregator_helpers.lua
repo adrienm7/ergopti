@@ -261,6 +261,15 @@ helpers.describe("aggregator_helpers", function()
       helpers.assert_eq(b.sessions[key].total_active_ms,  300000)
     end)
 
+    helpers.it("keeps duration and character records independent", function()
+      local b = AggHelper.new_batch()
+      local key = "2025-07-01\x01vim"
+      AggHelper.finalize_session(b, "2025-07-01", "vim", { char_count = 10, total_ms = 120000 })
+      AggHelper.finalize_session(b, "2025-07-01", "vim", { char_count = 200, total_ms = 60000 })
+      helpers.assert_eq(b.sessions[key].longest_ms, 120000)
+      helpers.assert_eq(b.sessions[key].longest_chars, 200)
+    end)
+
     helpers.it("collects durations up to the cap", function()
       local b = AggHelper.new_batch()
       local key = "2025-07-01\x01vim"
