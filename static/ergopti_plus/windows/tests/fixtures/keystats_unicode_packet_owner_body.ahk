@@ -89,14 +89,13 @@ _KPU_SendUnicode(Unit) {
 	_KSD_Require(DllCall("User32\SendInput", "UInt", 2, "Ptr", Inputs, "Int", Size, "UInt") == 2,
 		"The owned receiver must accept exactly one real Unicode down/up input pair.")
 }
-; AHK WantTab rewrites only named VK_TAB. A Unicode VK_PACKET takes
-; the dialog-message route instead: configure the real receiver to accept
-; native characters/all keys rather than treating Tab as dialog navigation.
+; Passive native dialog-code observation only. AHK WantTab rewrites named
+; VK_TAB, not VK_PACKET. Packet Tab is still delivered as WM_CHAR9 even though
+; this native Edit does not materialize that control character as stored text.
 _KPU_DialogCode(WParam, LParam, Message, Hwnd) {
 	global _KID
 	if _KID.Active && Hwnd == _KID.Edit.Hwnd {
 		_KID.DialogRequests += 1
-		return 0x0086 ; DLGC_WANTCHARS | DLGC_WANTALLKEYS | DLGC_WANTTAB
 	}
 }
 
@@ -152,6 +151,9 @@ _KID_Exercise() {
 		_KSD_Require(_KID.NativeDown == 1 && _KID.TargetDown == 1 && _KSD.Errors == 0,
 			"Exactly one actual native receiver keydown and one InputHook keydown must arrive without swallowed errors.")
 		ExpectedText := _KID.Mode == "packet-lf" ? "`n" : "`t"
+		; Input character preservation is independent of target-app text acceptance.
+		; Native250 proves WM_CHAR9/InputHook9 with an empty Edit for packet Tab.
+		ExpectedEditText := _KID.Mode == "packet-lf" ? "`n" : ""
 		ObservedText := StrReplace(_KID.Edit.Value, "`r`n", "`n")
 		ObservedUnits := ""
 		for Character in StrSplit(ObservedText)
@@ -162,8 +164,8 @@ _KID_Exercise() {
 			. " hook_units=" . _KID.CharUnits . "`n", "*", "UTF-8")
 		_KSD_Require(_KID.ReceiverChars == 1 && _KID.ReceiverUnits == (_KID.Mode == "packet-lf" ? "10" : "9"),
 			"One actual native WM_CHAR must reach the exact owned receiver with the sent Unicode code unit.")
-		_KSD_Require(ObservedText == ExpectedText,
-			"The exact native input must produce its independently expected receiver contents.")
+		_KSD_Require(ObservedText == ExpectedEditText,
+			"The native Edit must preserve its independently qualified LF/packet-Tab text acceptance behavior.")
 		Tokens := ""
 		for Event in Keystats.buffer_events
 			Tokens .= (Tokens == "" ? "" : ",") . (Event[1] == "`n" ? "LF" : Event[1] == "`t" ? "TABCHAR" : Event[1])
