@@ -92,7 +92,13 @@ def main():
         config["macos"]["base"], config["macos"]["segments"], app
     )
     default_log_dir = folder(logs["macos"]["base"], logs["macos"]["segments"], app)
-    log_dir = override(paths, logs["override_key"]) or default_log_dir
+    log_dir = override(paths, logs["override_key"])
+    # The driver appends the app folder to a LogsDirPath whose last folder is
+    # not it (normalize_logs_dir_override in infra/config_paths.lua); reading
+    # the override as is copied yesterday's logs (field report 2026-11-05).
+    if log_dir is not None and os.path.basename(log_dir) != app:
+        log_dir = os.path.join(log_dir, app)
+    log_dir = log_dir or default_log_dir
     declared = {entry["name"] for entry in routes["sub_files"] if "hs" in entry["platforms"]}
     unknown = sorted(set(arguments.topical) - declared)
     if unknown:
