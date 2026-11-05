@@ -1,62 +1,78 @@
 {
-	"expected_count": 54,
+	"expected_count": 67,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "model-browser-close-pause-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "model-browser-native-backend",
-			"expected_count": 2
-		},
-		{
-			"contains": "one-shot-native-spent-controls",
-			"expected_count": 5
-		},
-		{
-			"contains": "one-shot-native-control-flags",
+			"contains": "tap-hold-external-source",
 			"expected_count": 4
 		},
 		{
-			"contains": "one-shot-native-tab-flags",
+			"contains": "tap-hold-native-inheritance",
 			"expected_count": 2
 		},
 		{
-			"contains": "one-shot-native-kana-flags",
-			"expected_count": 2
-		},
-		{
-			"contains": "suppressive-capture-settlement",
-			"expected_count": 14
-		},
-		{
-			"contains": "sticky-custom-endpoint-receipt",
-			"expected_count": 5
-		},
-		{
-			"contains": "sticky-kana-native",
-			"expected_count": 5
-		},
-		{
-			"contains": "sticky-kana-capture-options",
+			"contains": "tap-hold-native-first-save",
 			"expected_count": 1
 		},
 		{
-			"contains": "one-shot-native-kana-balancing",
-			"expected_count": 4
-		},
-		{
-			"contains": "one-shot-native-failed-down",
-			"expected_count": 1
-		},
-		{
-			"contains": "takenote-native-document-owner",
+			"contains": "tap-hold-source-intent",
 			"expected_count": 2
 		},
 		{
-			"contains": "managed-bootstrap-lifetime",
+			"contains": "tap-hold-source-successor",
+			"expected_count": 2
+		},
+		{
+			"contains": "tap-hold-stage-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "tap-hold-global-transaction",
+			"expected_count": 11
+		},
+		{
+			"contains": "loader-toml-injection-readfile-hotpath",
+			"expected_count": 3
+		},
+		{
+			"contains": "tap-hold: failed persistence cannot publish partial live state",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-native-admission-order",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-typing-source-privacy",
+			"expected_count": 10
+		},
+		{
+			"contains": "prefix-scalar-framing",
+			"expected_count": 16
+		},
+		{
+			"contains": "LLM live mode: expansion observers require an unchanged verified typing target",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-instant-word-end-trigger",
+			"expected_count": 1
+		},
+		{
+			"contains": "tooltip-teardown-on-keyboard-thread",
 			"expected_count": 1
 		}
 	]
