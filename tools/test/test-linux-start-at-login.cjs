@@ -241,6 +241,11 @@ try {
 	assert.equal(run('enable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0, 'forced systemd colors do not change offline state');
 	assert.equal(run('disable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
+	const binaryCustomization = Buffer.concat([Buffer.from(ownedDesktop), Buffer.from('# personal\0data\n')]);
+	fs.writeFileSync(desktop, binaryCustomization);
+	assert.notEqual(run('enable').status, 0, 'binary custom data cannot be rewritten as text');
+	assert.deepEqual(fs.readFileSync(desktop), binaryCustomization, 'binary user bytes stay intact');
+
 	const customized =
 		ownedDesktop.replace(
 			'Hidden=true',

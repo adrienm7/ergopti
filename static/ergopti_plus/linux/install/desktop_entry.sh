@@ -35,10 +35,19 @@ ergopti_systemd_exec() {
 	printf 'ExecStart=/bin/bash "%s" --tray\n' "$escaped"
 }
 
+# Bash read discards NUL bytes, so a binary entry cannot be safely rewritten.
+ergopti_desktop_entry_textual() {
+	local file="$1" original filtered
+	original="$(sha256sum < "$file")" || return 1
+	filtered="$(LC_ALL=C tr -d '\000' < "$file" | sha256sum)" || return 1
+	[ "${original%% *}" = "${filtered%% *}" ]
+}
+
 # Ownership is determined by the command in [Desktop Entry], not by an Exec
 # belonging to a desktop action. Duplicate main groups or commands are ambiguous.
 ergopti_desktop_entry_owned() {
 	local file="$1" launcher="$2" expected line trimmed value group= main_groups=0 commands=0
+	ergopti_desktop_entry_textual "$file" || return 1
 	expected="$(ergopti_desktop_exec "$launcher")" || return 1
 	while :; do
 		line=

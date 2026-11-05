@@ -168,9 +168,16 @@ finish_startup() {
 trap finish_startup EXIT
 
 desktop_tmp="$(mktemp "$DESKTOP_FILE.XXXXXX")"
+previous_desktop_digest=
 if [ -f "$DESKTOP_FILE" ]; then
 	desktop_previous="$(mktemp "$DESKTOP_FILE.previous.XXXXXX")"
 	cp -p -- "$DESKTOP_FILE" "$desktop_previous"
+	# Recheck the snapshot that will actually be rewritten.
+	ergopti_desktop_entry_textual "$desktop_previous" || {
+		startup_record invalid-source desktop "$DESKTOP_FILE"; exit 78;
+	}
+	previous_desktop_digest="$(sha256sum < "$desktop_previous")"
+	previous_desktop_digest="${previous_desktop_digest%% *}"
 	cp -p -- "$desktop_previous" "$desktop_tmp"
 fi
 hidden=false
@@ -226,11 +233,6 @@ if "$receipt_present"; then
 	cp -p -- "$receipt_previous" "$receipt_tmp"
 	declare -A receipt_seen=()
 	receipt_count=0
-	previous_desktop_digest=
-	if [ -n "$desktop_previous" ]; then
-		previous_desktop_digest="$(sha256sum < "$desktop_previous")"
-		previous_desktop_digest="${previous_desktop_digest%% *}"
-	fi
 	update_desktop_receipt=false
 	if [ -z "$desktop_previous" ]; then update_desktop_receipt=true; fi
 	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
