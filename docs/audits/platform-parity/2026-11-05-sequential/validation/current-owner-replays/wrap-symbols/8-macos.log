@@ -1,0 +1,8 @@
+native wrapper/control diagnostic errors=0
+CONTROL original-items=1 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="(selected)" copied-empty=false
+native wrapper/control diagnostic errors=0
+WSM-002 REPRO original-items=2 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="(selected)" copied-empty=false
+native wrapper/control diagnostic errors=0
+CONTROL original-items=1 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="" copied-empty=true
+native wrapper/control diagnostic errors=0
+WSM-002 REPRO original-items=2 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="" copied-empty=true

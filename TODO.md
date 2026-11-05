@@ -71,6 +71,9 @@ the field-run step or the hand action that proves it and the commits it confirms
 
 ### Policy, documentation and verification debt
 
+- [ ] **[CI] Native Lua acquisition:** qualify the remaining macOS LuaSocket/native-client downloads after Lua.org timeouts; Linux now has an authenticated byte-identical Debian mirror, while the macOS bundle helper still uses only the primary URL. Preserve exact hashes and native receiving requirements. [Delivery evidence](docs/audits/platform-parity/2026-11-05-sequential/delivery.md).
+- [ ] **[CI] Native keyboard-source fixture:** investigate selection-deadline/cleanup-unavailable refusals seen before and during this audit; the targeted retry passes, but that does not establish a repaired cause. Keep failed receipts and exact required cohorts.
+
 - [ ] **[CODE] Personal-info documentation:** replace obsolete Windows-preview-not-wired claims in shared README; audit the metadata-only missing localization key separately from the working translated menu caption.
 - [ ] **[PARITY] Personal aliases and preparation:** document allowed alias alphabets per OS; qualify or bound Windows eager pre-generation at accepted high pattern settings without claiming a measured hang. Preserve actual dynamic-resolution alternatives on Lua.
 

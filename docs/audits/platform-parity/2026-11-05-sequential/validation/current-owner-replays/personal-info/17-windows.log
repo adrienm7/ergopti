@@ -1,0 +1,112 @@
+PROVENANCE: Node22 source contracts only; no AHK/Windows/GUI/form/Send/clipboard execution. Native owner fixture is generated but UNEXECUTED. Arithmetic is static configuration cardinality, not measured time or memory.
+sha256 45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474 static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk
+sha256 7fde3e32975575bfc60068a7f4662a16077fd3c1f7c85c3834f5d6e4a42fba26 static/ergopti_plus/windows/infra/text_utils.ahk
+sha256 57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70 static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk
+sha256 c580be723f9431ce71d6a0e318885ba54cdd2180ec420e7582b7375311097893 static/ergopti_plus/windows/infra/personal_info_preview.ahk
+sha256 aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503 static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk
+sha256 d33df4df2fef9e7009cd51698b35463c5bbb6cf9b2e0b2fffc893075b272fd5f static/ergopti_plus/windows/infra/hotstrings/hotstring_builder.ahk
+sha256 108be15b7d9f9f5c86025b699f1b2cbd1623f1f6552adf5b9811cd1593a4dcc0 static/ergopti_plus/_shared/core/config_schema/config.schema.json
+sha256 09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9 static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk
+sha256 520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161 static/ergopti_plus/windows/ErgoptiPlus.ahk
+sha256 cd4d630eda6de88dde70c4074094060b597b9284c5c9647a4494388f0e01e17c static/ergopti_plus/_shared/modules/personal_info/fields.toml
+PIW-001: supported eager multi-field registrations escape control separators after joining and admit partially empty identities, unlike per-value escaped/all-or-nothing transient resolver.
+static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk:109
+109: 		GeneratePersonalInformationHotstrings(
+110: 			PersonalInformationHotstrings,
+111: 			PersonalInformationLetters,
+112: 			Features["hotstrings"]["dynamic"][ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION][ConfigLeaf.PATTERN_MAX_LENGTH]
+113: 		)
+114: 
+115: 		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
+116: 			keys := []
+static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk:115
+115: 		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
+116: 			keys := []
+117: 			; ``hotstrings`` is a Map keyed by the alias LETTER (n, t, …); the combo
+118: 			; generator needs those keys, not the personal-data values. The 2-var Map
+119: 			; enumerator binds (key, value), so iterate `k, _` and push the KEY -- a
+120: 			; mechanical `for _, k` rewrite once seeded the values here and killed every
+121: 			; @<letter> combo (a Map is not an Array)
+122: 			for k, _ in hotstrings
+static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk:144
+141: 				loop parse, combo {
+142: 					if (hotstrings.Has(A_LoopField) and fieldsByLetter.Has(A_LoopField)) {
+143: 						if (value != "") {
+144: 							value := value . "{Tab}"
+145: 						}
+146: 
+147: 						value := value . hotstrings[A_LoopField]
+148: 						PreviewFields.Push(fieldsByLetter[A_LoopField])
+149: 						PreviewValues.Push(hotstrings[A_LoopField])
+150: 					}
+151: 				}
+152: 				if (value != "") {
+153: 					CreateHotstringCombo(combo, EscapeSpecialChars(value),
+154: 						PreviewFields, PreviewValues)
+static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk:166
+165: 		CreateHotstringCombo(combo, value, PreviewFields, PreviewValues) {
+166: 			CreateHotstring("*", "@" combo "" . ScriptInformation["MagicKey"], value, Map("OnlyText", False).Set(
+167: 				"FinalResult", True).Set("IsPrivate", True)
+168: 				.Set("Category", "personal")
+169: 				.Set("PreviewFields", PreviewFields).Set("PreviewValues", PreviewValues))
+170: 		}
+171: 
+172: 		; Every combo LONGER than pattern_max_length is resolved at fire time by
+static/ergopti_plus/windows/infra/text_utils.ahk:130
+129: 		Ch := A_LoopField
+130: 		if (Ch == "{")
+131: 			Escaped .= "{{}"
+132: 		else if (Ch == "}")
+133: 			Escaped .= "{}}"
+134: 		else
+135: 			Escaped .= Ch
+136: 	}
+static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1090
+1089: 		}
+1090: 		if (Value == "")
+1091: 				Value := ManifestDefaultFor("hotstrings." . Key)
+1092: 		return Value ? true : false
+1093: }
+1094: 
+1095: ; Apply an expansion to the buffer to mirror the screen change a hotstring
+1096: ; fire produces. The trigger suffix is stripped off the right end together
+1097: ; with the end character (when one is involved — the dispatcher BackSpaces
+1098: ; both off the screen) and the replacement is appended, followed by the
+1099: ; end character re-emitted. The buffer therefore matches « what the cursor
+1100: ; sits behind » exactly, regardless of whether the end char was a word
+1101: ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
+static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1340
+1339: 				Value := PersonalInformation[Field]
+1340: 				if (Value == "") {
+1341: 						return ""
+1342: 				}
+1343: 				PreviewValues.Push(Value)
+1344: 				if (Index > 1) {
+1345: 						Replacement .= "{Tab}"
+1346: 				}
+1347: 				Replacement .= SendEscapeLiteral(Value)
+1348: 		}
+1349: 		TriggerStr := "@" . Tag . MagicKey
+1350: 		; IsPrivate is not optional here: every field this resolver can reach comes
+1351: 		; from personal_info.toml, so the replacement is by construction the user's
+static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2681
+2678: 	if (Spec.HasOwnProp("PreviewFields") and Spec.HasOwnProp("PreviewValues")) {
+2679: 		if !IsSet(_PIPreviewMaskedText)
+2680: 			return ""
+2681: 		try return _PIPreviewMaskedText(Spec.PreviewFields, Spec.PreviewValues)
+2682: 		catch
+2683: 			return ""
+2684: 	}
+static/ergopti_plus/_shared/core/config_schema/config.schema.json:171
+170: 								"time_activation_seconds": { "type": "number", "minimum": 0 },
+171: 								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
+172: 							}
+173: 						}
+MUTATION CONTROLS: source-contract predicate detects removing whole-string escape and moving escaping to each value; this checks source-check sensitivity only, not AHK behavior.
+OBSERVED_LIMIT static 13 aliases maxLen=1: 13 generated leaves (no registration execution).
+OBSERVED_LIMIT static 13 aliases maxLen=2: 182 generated leaves (no registration execution).
+OBSERVED_LIMIT static 13 aliases maxLen=4: 30940 generated leaves (no registration execution).
+OBSERVED_LIMIT static 13 aliases maxLen=8: 883708280 generated leaves (no registration execution).
+OBSERVED_LIMIT static 13 aliases maxLen=16: 720867993281778160 generated leaves (no registration execution).
+UNEXECUTED owner fixture sha256 9c51b80e2092651358ccdd6eabd0c89aed310a7b424e4d5dfdb22b7969fd89bf owner-unexecuted.ahk
+PASS: one grouped source-confirmed owner defect; source mutation sensitivity controls; native Windows executions=0.
