@@ -54,7 +54,7 @@ _DynamicHotstringDelay() {
 SpacedPrefix(SpacedStr, RawCount) {
 	Seen := 0
 	Loop Parse, SpacedStr {
-		if A_LoopField != " "
+		if !RegExMatch(A_LoopField, "^[\s" . Chr(0xA0) . Chr(0x202F) . "]$")
 			Seen++
 		if Seen >= RawCount
 			return SubStr(SpacedStr, 1, A_Index)
@@ -169,8 +169,8 @@ _DynHS_RegisterAll() {
 		"IsPrivate", True, "Category", "dynamichotstrings")
 
 	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
-	SsnRaw  := StrReplace(Ssn,  " ", "")
-	IbanRaw := StrReplace(Iban, " ", "")
+	SsnRaw  := RegExReplace(Ssn, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
+	IbanRaw := RegExReplace(Iban, "[\s" . Chr(0xA0) . Chr(0x202F) . "]", "")
 
 	if Features["hotstrings"]["dynamic"][ConfigLeaf.PHONE_PREFIXES]["enabled"] {
 		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
@@ -212,7 +212,7 @@ _DynHS_RegisterAll() {
 			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
 			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
 			; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
-			CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynPrivateOpts)
+			CreateHotstring("*", IbanRawPrefix,  (*) => IbanRaw, _DynPrivateOpts)
 			if IbanSpacedPfx != IbanRawPrefix {
 				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynPrivateOpts)
 			}

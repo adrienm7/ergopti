@@ -78,6 +78,15 @@ end
 -- =================================================================
 
 helpers.describe("prefix expansions: what is built", function()
+	helpers.it("retains compact and spaced IBAN expansions for nonbreaking spaces", function()
+		local iban = "FR76 12 3456"
+		local mappings = for_section("ibanprefixes", { iban = iban })
+		local found = {}
+		for _, mapping in ipairs(mappings) do found[mapping.trigger] = mapping.replacement end
+		helpers.assert_eq(found["FR7612"], "FR76123456")
+		helpers.assert_eq(found["FR76 12"], iban)
+	end)
+
 
 	helpers.it("completes a phone number from its first four digits", function()
 		local mapping = by_trigger("0750")

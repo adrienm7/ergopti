@@ -1037,9 +1037,9 @@ end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
 local REPLAY_FLUSH_EVENT_COUNT = 500
--- Revision 3 rebuilds every n-gram key from the raw events in token encoding 2
--- (keystats_tokens.json); the previous cache is kept beside the live one first.
-local AGGREGATE_CACHE_REVISION = "3"
+-- Revision 4 rebuilds typing contexts and settles them at durable rollover
+-- boundaries. Revision 3 introduced n-gram token encoding 2.
+local AGGREGATE_CACHE_REVISION = "4"
 local PRE_ENCODING_REVISION = "2"
 local PRE_ENCODING_BACKUP_SUFFIX = ".pre-ngram-encoding-2.bak"
 -- Every table written by aggregator/sql.lua.  Replaying a device's canonical
@@ -1658,8 +1658,15 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 						if not walked() then error("typing aggregate flush failed") end
 					end
 					if upper ~= nil then
-						-- Discard the retired generation, then retain any cache-only outbox rows above it.
+						-- Commit this boundary even when the previous row ended exactly at a
+						-- flush limit: the closure and its resume point are one transaction.
+						assert(Aggregator.settle_contexts() == true, "cannot settle typing boundary")
 						Aggregator.reset_ngram_ctx()
+						if progress ~= nil then
+							progress.stage, progress.segment, progress.ts, progress.id = "typing", segment + 1, nil, nil
+						end
+						processed = math.max(processed, 1)
+						if not flush_if_needed(true) then error("typing boundary flush failed") end
 						previous = upper
 					end
 				end
@@ -1972,25 +1979,62 @@ local function _flush_local_data_sql_outbox(db, stage)
 end
 
 --- Commits the idempotent rollover cursor reset before its durable intent settles.
-local function _reset_rollover_cache(next_date)
+local function _reset_rollover_cache(next_date, receipt)
+	if type(receipt) ~= "table" or type(receipt.path) ~= "string"
+		or type(receipt.resolved) ~= "string" or type(receipt.dev) ~= "number"
+		or type(receipt.ino) ~= "number" or type(receipt.offset) ~= "number"
+		or type(receipt.batch) ~= "string" then return false end
+	local identity_ok, identity = pcall(json.encode,
+		{ receipt.path, receipt.resolved, receipt.dev, receipt.ino, receipt.offset, receipt.batch })
+	if not identity_ok or type(identity) ~= "string" then return false end
 	local db = SqliteWriter.get_db()
-	if not db then return false end
+	if not db or Aggregator.has_pending_batch() then return false end
+	local encoded_ok, encoded = pcall(json.encode, Aggregator.get_ngram_ctx() or {})
+	if not encoded_ok or type(encoded) ~= "string" then return false end
+	local begun, committed, replay_scheduled = false, false, false
 	local ok, err = pcall(function()
 		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin rollover reset")
+		begun = true
 		if _get_local_outbox(db) ~= "" then error("rollover reset requires an empty SQL outbox", 0) end
-		_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='today_log_offset';",
-			"cannot reset rollover offset")
-		_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(next_date) .. " WHERE key='today_log_date';",
-			"cannot reset rollover date")
-		_exec_sqlite_or_error(db, "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';",
-			"cannot reset rollover context")
+		local previous_identity
+		for row in db:nrows("SELECT value FROM meta WHERE key='rollover_settlement_receipt';") do previous_identity = row.value end
+		if _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION then
+			-- An old reset may already have committed before upgrade. In either
+			-- phase, the durable ledger must be replayed before certification.
+			assert(_write_ledger_replay_state(db, LedgerReplay.new_state()), "cannot schedule complete ledger replay")
+			replay_scheduled = true
+			_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='aggregate_cache_revision';",
+				"cannot revoke old aggregate certification")
+		elseif previous_identity ~= identity then
+			-- A cold start can recover the intent before the live walker is restored.
+			local persisted
+			for row in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json';") do persisted = row.value end
+			assert(type(persisted) == "string", "rollover context is missing")
+			local decoded, context = pcall(json.decode, persisted)
+			assert(decoded and type(context) == "table", "cannot restore rollover context")
+			Aggregator.set_ngram_ctx(context)
+			assert(Aggregator.settle_contexts() == true, "cannot settle rollover context")
+			assert(Aggregator.flush(db) == true, "cannot flush rollover context")
+			_exec_sqlite_or_error(db, Queries.render("meta.rev_bump", "native"), "cannot increment metrics revision")
+		end
+		_exec_sqlite_or_error(db, "INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',"
+			.. _sq(identity) .. ");", "cannot record rollover identity")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='today_log_offset';", "cannot reset rollover offset")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(next_date) .. " WHERE key='today_log_date';", "cannot reset rollover date")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';", "cannot reset rollover context")
 		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit rollover reset")
+		committed = true
 	end)
 	if not ok then
-		_rollback_sqlite(db, "Rollover reset")
+		if begun and not committed and not _rollback_sqlite(db, "Rollover reset") then SqliteWriter.quarantine_db(db) end
+		Aggregator.reset_batch()
+		local restored, ctx = pcall(json.decode, encoded)
+		if restored and type(ctx) == "table" then Aggregator.set_ngram_ctx(ctx) else Aggregator.reset_ngram_ctx() end
 		Logger.error(LOG, "Rollover cache reset remains pending: %s.", tostring(err))
 		return false
 	end
+	Aggregator.reset_batch()
+	if replay_scheduled then _local_ledger_replay_pending = true end
 	return true
 end
 
@@ -2231,10 +2275,16 @@ end
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
-	-- The recovery owns the shared Aggregator until it ends; today.log keeps
-	-- every event meanwhile and the next tick ingests it.
-	if _recovery ~= nil or _local_ledger_replay_pending then return false end
-	if not _resume_pending_rollover() then return false end
+	-- Settle an already-owned rollover before starting a newly required replay;
+	-- no ingest may pass the durable replay fence after its reset commits.
+	if _recovery ~= nil then return false end
+	if _pending_rollover and not _resume_pending_rollover() then return false end
+	if _local_ledger_replay_pending then
+		local db = SqliteWriter.get_db()
+		local state = db and _read_ledger_replay_state(db)
+		if db and state then _start_aggregate_recovery(db, state) end
+		return false
+	end
 
 	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
 		Logger.warn(LOG, "%s", line)
@@ -2539,8 +2589,9 @@ M.ROLLOVER_WAITS_FOR_RECOVERY = "recovering"
 --- @return string|nil reason ROLLOVER_WAITS_FOR_RECOVERY when nothing was tried.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
-	if _recovery ~= nil or _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
+	if _recovery ~= nil then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 	if _pending_rollover then return _resume_pending_rollover() end
+	if _local_ledger_replay_pending then return false, M.ROLLOVER_WAITS_FOR_RECOVERY end
 	-- Ingest waits for the recovery, so a drain could only report a stall. On a
 	-- months-old ledger on battery that lasted 33 min over midnight, with three
 	-- warnings at each tick (field report 2026-11-02); today.log loses nothing.

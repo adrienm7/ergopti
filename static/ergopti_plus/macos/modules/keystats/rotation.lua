@@ -472,7 +472,7 @@ function M.rollover(data_sql_path, read_status, reset, origin)
 	if not _close_rollover_stream() then return false end
 	local pending = _pending_rollover
 	local function checked_reset(next_date, completion)
-		if next_date ~= pending.date or reset(next_date) ~= true then return false end
+		if next_date ~= pending.date or reset(next_date, completion) ~= true then return false end
 		pending.reset_committed, pending.completion = true, completion
 		return true
 	end

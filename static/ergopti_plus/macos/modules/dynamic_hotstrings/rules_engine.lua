@@ -412,8 +412,8 @@ local function prefix_values(personal_data)
 		and personal_data.social_security_number or tostring(personal_data.social_security_number or "")
 	local iban = type(personal_data.iban) == "string"
 		and personal_data.iban or tostring(personal_data.iban or "")
-	return phone, formatted_phone, ssn:gsub("%s+", ""), ssn,
-		iban:gsub("%s+", ""), iban
+	return phone, formatted_phone, SharedEngine.strip_prefix_spacing(ssn), ssn,
+		SharedEngine.strip_prefix_spacing(iban), iban
 end
 
 --- Publishes prefix counts into the exact section descriptors owned by the menu.
@@ -547,7 +547,7 @@ local function register_prefix_entries()
 				-- is_private for the same reason as `base_opts` above: the IBAN and its
 				-- 6-char prefix trigger are both secret
 				local opts_ci = opts_for("iban", { is_case_sensitive = false })
-				add_mapping(iban_raw_pfx, iban:gsub("%s+", ""), opts_ci)
+				add_mapping(iban_raw_pfx, iban_raw, opts_ci)
 				if iban_spaced_pfx ~= iban_raw_pfx then
 					add_mapping(iban_spaced_pfx, iban, opts_ci)
 				end

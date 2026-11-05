@@ -30,9 +30,11 @@ return function()
 	local journal = temporary .. "/metrics/by_device/device/today.log"
 	local cache = temporary .. "/ergopti_metrics/device/db.sqlite"
 	local operations, timers, native_streams = {}, {}, {}
-	local errors, warnings, sqlite_live, fault_armed = {}, {}, false, false
+	local errors, warnings, sqlite_live, fault_armed = {}, {}, 0, false
 	local marker_opens, marker_refusals = 0, 0
 	local result, manager, writer, rotation, scheduler = nil, nil, nil, nil, nil
+	local extension_path = os.getenv("ERGOPTI_ROLLOVER_EXTENSION")
+	local extension = extension_path and assert(loadfile(extension_path))() or nil
 	local reset_updates = 0
 
 	local function read_file(path)
@@ -56,10 +58,10 @@ return function()
 	end
 
 	local function open_database(path)
-		assert(path == cache, "SQLite escaped the owned disposable cache")
+		assert(path == cache or path == "", "SQLite escaped the owned disposable cache")
 		local identity = request({ op = "open", path = path })
-		sqlite_live = true
-		local database = { last_error = "" }
+		sqlite_live = sqlite_live + 1
+		local database = { last_error = "", _bridge_id = identity, closed = false }
 		function database:exec(sql)
 			if sql == "UPDATE meta SET value='0' WHERE key='today_log_offset';" then reset_updates = reset_updates + 1 end
 			local response = rpc({ op = "exec", connection = identity, sql = sql })
@@ -99,10 +101,11 @@ return function()
 			return statement
 		end
 		function database:errmsg() return self.last_error end
-		function database:isopen() return sqlite_live end
+		function database:isopen() return not self.closed end
 		function database:close()
 			local status = request({ op = "close", connection = identity })
-			sqlite_live = false
+			self.closed = true
+			sqlite_live = sqlite_live - 1
 			return status
 		end
 		return database
@@ -159,7 +162,7 @@ return function()
 		for _, timer in ipairs(timers) do
 			if timer:running() then outcomes.timers_retired = false end
 		end
-		outcomes.sqlite_retired = not sqlite_live
+		outcomes.sqlite_retired = sqlite_live == 0
 		assert(outcomes.manager_stop_call_ok and outcomes.manager_stop)
 		assert(outcomes.scheduler_cancel_call_ok and outcomes.scheduler_cancel)
 		assert(outcomes.timers_retired and outcomes.sqlite_retired)
@@ -174,7 +177,15 @@ return function()
 				fs = { attributes = Lfs.attributes, dir = Lfs.dir, mkdir = Lfs.mkdir,
 					rmdir = Lfs.rmdir, symlinkAttributes = Lfs.symlinkattributes },
 				json = { encode = Json.encode, decode = Json.decode_lossless },
-				sqlite3 = { OK = 0, ERROR = 1, DONE = 101, ROW = 100, open = open_database },
+				sqlite3 = { OK = 0, ERROR = 1, DONE = 101, ROW = 100, open = open_database,
+					backup_init = function(target, target_name, source, source_name)
+						local response = rpc({ op = "backup_init", target = target._bridge_id, target_name = target_name,
+							source = source._bridge_id, source_name = source_name })
+						if not response.ok then return nil end
+						local id = response.value
+						return { step = function(_, pages) return request({ op = "backup_step", backup = id, pages = pages }) end,
+							finish = function() return request({ op = "backup_finish", backup = id }) end }
+					end },
 				execute = function(command)
 					assert(command:find("IOPlatformUUID", 1, true), "unexpected shell command in private probe")
 					return "fixture-host-identity", true, "exit", 0
@@ -217,6 +228,8 @@ return function()
 			end
 			assert(initialized, table.concat(errors, " | "))
 			assert(writer.get_db() ~= nil, "public bootstrap must open actual SQLite")
+			if extension and phase ~= "prepare" and extension.after_init then extension.after_init(manager, writer.get_db(), timers, errors) end
+			if extension and phase ~= "prepare" then extension.after_recovery(writer.get_db()) end
 			local function enqueue_new()
 				assert(manager.append_log({ type = "app_switch", timestamp = NEW .. " 00:00:01.000",
 					prev_app = "Editor", next_app = "Other", duration_ms = 11 }))
@@ -230,6 +243,7 @@ return function()
 				assert(value.new_events == 1 and value.new_duration == 11 and value.new_aggregate == 11)
 				manager.ingest_once()
 				local after = counts()
+				if extension then extension.after_recovery(writer.get_db()) end
 				assert(after.old_events == 1 and after.new_events == 1 and after.new_aggregate == 11)
 				local entries, offset, status = rotation.read_new_entries()
 				assert(#entries == 0 and status == rotation.READ_STATUS_EOF)
@@ -238,6 +252,7 @@ return function()
 			if phase == "prepare" then
 				assert(manager.append_log({ type = "app_switch", timestamp = OLD .. " 23:59:59.000",
 					prev_app = "Editor", next_app = "Other", duration_ms = 37, padding = string.rep("x", 8192) }))
+				if extension then extension.before_ingest(manager, OLD) end
 				if case == "ordinary_pending_append" then fault_ports.armed = true end
 				manager.ingest_once()
 				fault_ports.armed = false
@@ -248,12 +263,14 @@ return function()
 				local rolled = nil
 				if case ~= "ordinary_pending_append" then
 					active_day = NEW
+					if extension and extension.before_rollover then extension.before_rollover(writer.get_db()) end
 					fault_ports.armed = true
 					rolled = manager.day_rollover()
 					fault_ports.armed = false
 					assert(rolled == (case == "healthy" or case == "old_stream_close_error_after_close"), "refused rollover must not report success")
 				end
 				assert(fault_ports.faults == (case == "healthy" and 0 or 1), "exactly one configured fault")
+				if extension and extension.after_rollover then extension.after_rollover(writer.get_db()) end
 				if strategy == "runtime" or strategy == "authority_absent" or strategy == "authority_unrelated" then
 					if rolled ~= true then
 						local before = Lfs.symlinkattributes(journal) and read_file(journal) or nil

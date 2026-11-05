@@ -242,7 +242,7 @@ helpers.describe("historical rebuild ownership", function()
 			local walked = 0
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() walked = walked + 1 end })
 			helpers.assert_eq(assert(cutoffs(db, "device")), {})
 			helpers.assert_eq(rebuild(db), true, "a legacy restart must not refuse the rebuild forever")
@@ -273,7 +273,7 @@ helpers.describe("historical rebuild ownership", function()
 			local walked = 0
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() walked = walked + 1 end })
 			local ids, sql = {}, {}
 			for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
@@ -333,7 +333,7 @@ helpers.describe("historical rebuild ownership", function()
 		local walked = {}
 		value(rebuild, "Aggregator", { get_ngram_ctx = function() return { walked = #walked } end,
 			set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-			set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+			set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 			walk_typing = function(row) walked[#walked + 1] = row end })
 		return start, pending, walked
 	end
@@ -444,7 +444,7 @@ helpers.describe("historical rebuild ownership", function()
 			})
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() end })
 			-- The first derived table holds more than a batch, and still does after
 			-- three batches: one probe finds it large, three find rows left over.
@@ -539,7 +539,7 @@ helpers.describe("historical rebuild ownership", function()
 			local current = { Editor = { cur_word = "local" } }
 			local aggregate = { get_ngram_ctx = function() return current end,
 				set_ngram_ctx = function(ctx) current = ctx end, reset_ngram_ctx = function() current = {} end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() current = { foreign = true } end }
 			value(rebuild, "Aggregator", aggregate)
 			helpers.assert_eq(rebuild(db, { "foreign" }), true)
@@ -556,11 +556,11 @@ helpers.describe("historical rebuild ownership", function()
 			state.ledgers["owned/by_device/foreign/data.sql"] = batch(insert(1, "x", nil, nil, "'foreign'")) .. marker
 			value(rebuild, "Aggregator", { get_ngram_ctx = function() return { Editor = { cur_word = "y" } } end,
 				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
-				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				set_device_id = function() end, reset_batch = function() end, settle_contexts = function() return true end, flush = function() return true end,
 				walk_typing = function() end })
 			helpers.assert_eq(state.publish(db), true)
 			helpers.assert_eq(require("hs.json").decode(db.context), { Editor = { cur_word = "y" } })
-			helpers.assert_eq(db.revision, "3")
+			helpers.assert_eq(db.revision, "4")
 			helpers.assert_eq(db.statements[1], "BEGIN IMMEDIATE;")
 			helpers.assert_contains(db.statements[2], "aggregate_cache_revision','0'")
 			helpers.assert_eq(db.statements[3], "COMMIT;")
@@ -588,7 +588,7 @@ helpers.describe("historical rebuild ownership", function()
 				set_ngram_ctx = function(ctx) current = ctx end,
 				reset_ngram_ctx = function() current = {} end,
 				set_device_id = function(device) selected = device end,
-				reset_batch = function() end,
+				reset_batch = function() end, settle_contexts = function() return true end,
 				flush = function() return true end,
 				walk_typing = function()
 					current = { Editor = { cur_word = selected == "device" and "repaired-local" or "foreign" } }
@@ -649,7 +649,7 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(rebuild(db), true, "the old revision still permits a complete migration retry")
 			helpers.assert_eq(current, { Editor = { cur_word = "repaired-local" } })
 			helpers.assert_eq(state.publish(db), true)
-			helpers.assert_eq(db.revision, "3")
+			helpers.assert_eq(db.revision, "4")
 			helpers.assert_eq(json.decode(db.context), current)
 			helpers.assert_eq(db.view_revision, 3)
 
@@ -657,7 +657,7 @@ helpers.describe("historical rebuild ownership", function()
 			manager.ingest_once()
 			helpers.assert_eq(applied, 2)
 			helpers.assert_eq(state.reads, 2)
-			helpers.assert_eq(db.revision, "3", "current foreign-only refresh keeps its compatibility mark")
+			helpers.assert_eq(db.revision, "4", "current foreign-only refresh keeps its compatibility mark")
 			helpers.assert_eq(json.decode(db.context), current, "current local context keeps normal persistence")
 			helpers.assert_eq(db.view_revision, 4)
 		end)

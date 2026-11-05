@@ -58,22 +58,26 @@ local _resolver_error_reporter = nil
 -- ===============================================
 -- ===============================================
 
---- Returns the shortest prefix of a spaced string containing exactly raw_count
---- non-space characters.
---- Used to build the "with spaces" trigger that expands to the formatted value.
---- Mirrors the identical helper in AHK hotstrings.ahk section 5.2.
---- @param spaced string The full string containing decorative spaces.
---- @param raw_count number The number of non-space characters to collect.
---- @return string The prefix ending after the raw_count-th non-space character.
+--- Removes the spacing commonly found in pasted personal identifiers.
+--- @param value string
+--- @return string
+function M.strip_prefix_spacing(value)
+	return (value:gsub("%s+", ""):gsub("\194\160", ""):gsub("\226\128\175", ""))
+end
+
+--- Returns the shortest prefix containing raw_count non-space characters.
+--- Mirrors the helper in the Windows dynamic hotstrings driver.
+--- @param spaced string
+--- @param raw_count number
+--- @return string
 function M.spaced_prefix(spaced, raw_count)
 	local seen = 0
-	for i = 1, #spaced do
-		if spaced:sub(i, i) ~= " " then
-			seen = seen + 1
-		end
-		if seen >= raw_count then
-			return spaced:sub(1, i)
-		end
+	local i = 1
+	while i <= #spaced do
+		local char = spaced:match("^[%z\1-\127\194-\244][\128-\191]*", i) or spaced:sub(i, i)
+		if M.strip_prefix_spacing(char) ~= "" then seen = seen + 1 end
+		i = i + #char
+		if seen >= raw_count then return spaced:sub(1, i - 1) end
 	end
 	return spaced
 end

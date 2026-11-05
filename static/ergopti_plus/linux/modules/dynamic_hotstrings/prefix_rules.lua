@@ -146,8 +146,8 @@ function M.build(info, is_section_enabled)
 
 	-- The decorative spaces are what the user wants typed BACK, but they must not
 	-- be part of what the prefix matches against.
-	local ssn_raw  = ssn:gsub("%s+", "")
-	local iban_raw = iban:gsub("%s+", "")
+	local ssn_raw  = Engine.strip_prefix_spacing(ssn)
+	local iban_raw = Engine.strip_prefix_spacing(iban)
 
 	if enabled("phoneprefixes") then
 		if #phone >= PHONE_MIN_FOR_SHORT then

@@ -468,6 +468,22 @@ _TOAN_NavLayerComesWithItsKey() {
 		_TOAN_DeleteFolder(Folder)
 	}
 }
+
+_TOAN_RefuseUnreadableNavLayer() {
+	global _SharedDir
+	Folder := _TOAN_NewFolder()
+	Path := Folder . "\layers.toml"
+	try {
+		DirCreate(Path)
+		Preset := TapHoldRecommendedLayer(_SharedDir)
+		Result := TapHoldHoldLayerImport(Map("kind", "layer", "id", Preset["layer_id"]), Folder)
+		AssertFalse(Result, "a directory at the layer path is not a readable layer")
+		AssertTrue(DirExist(Path), "the foreign directory must remain untouched")
+	} finally {
+		_TOAN_DeleteFolder(Folder)
+	}
+}
+Test("tap-hold import: refuses an unreadable existing navigation layer", _TOAN_RefuseUnreadableNavLayer)
 Test("onboarding answers: the key holding the navigation layer brings the recommended layer (nav-layer-fresh-install-default)",
 	_TOAN_NavLayerComesWithItsKey)
 
