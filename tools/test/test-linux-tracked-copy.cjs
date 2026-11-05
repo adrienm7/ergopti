@@ -398,6 +398,16 @@ try {
 		const realLua = spawnSync(bashExecutable(), ['-c', 'command -v lua'], { encoding: 'utf8' });
 		assert.equal(realLua.status, 0, realLua.stderr);
 		fs.symlinkSync(realLua.stdout.trim(), path.join(relativeBin, 'lua'));
+		const realJit = spawnSync(bashExecutable(), ['-c', 'command -v luajit'], { encoding: 'utf8' });
+		assert.equal(realJit.status, 0, realJit.stderr);
+		fs.symlinkSync(realJit.stdout.trim(), path.join(relativeBin, 'luajit'));
+		const relativeHelp = spawnSync(bashExecutable(), ['-s', '--', helpRoot], {
+			input: 'set -euo pipefail\nLUA_BIN=luajit\nBUILD_DIR="$1"\n' + subject.slice(helpStart, helpEnd),
+			encoding: 'utf8', timeout: 15000, cwd: scratch,
+			env: { ...process.env, HOME: scratch, PATH: 'relative-bin:/usr/bin:/bin' }
+		});
+		assert.equal(relativeHelp.status, 0, `help smoke with relative PATH: ${relativeHelp.stderr || relativeHelp.stdout}`);
+
 		for (const name of ["bundle's source", 'bundle\\source', 'bundle\nsource', 'bundle;source', 'bundle?source']) {
 			const buildRoot = path.join(scratch, name);
 			const moduleFile = path.join(buildRoot, '_shared/lua/packaging_path_probe.lua');
