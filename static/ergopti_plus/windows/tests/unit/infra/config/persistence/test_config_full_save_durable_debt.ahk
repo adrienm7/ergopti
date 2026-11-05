@@ -547,10 +547,20 @@ _CFGOPT_RealOptionalBoot(Mode) {
 		Expected := Mode == "unchanged-A-control" ? 15 : 21
 		AssertEqual(Expected, AfterValue, "an optional boot canonicalizer cannot replace a newer valid file choice with its older runtime default")
 		AssertEqual("keep", TOML_ParseDocument(After)["private"]["marker"])
-		if InStr(Mode, "external-") == 1
+		if InStr(Mode, "external-") == 1 {
 			AssertEqual(Before, After, "obsolete optional canonicalization preserves the external source exactly")
-		else
+			AssertEqual(CONFIG_SAVE_OK, Result, "dispensable boot work settles without claiming a user-facing persistence failure")
+			AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation,
+				"abandoning stale optional work must never be advertised as a durable commit")
+			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().settled_generation)
+			AssertFalse(_ConfigFullSaveHasPending())
+			AssertEqual(0, State.notices, "the obsolete automatic task must not tell the user their change was reverted")
+			AssertEqual(1, State.timerCalls, "abandoned optional work does not retry a stale mirror indefinitely")
+		} else {
 			AssertEqual(CONFIG_SAVE_OK, Result, "the actual unchanged or reloaded source admits the default collector/native writer")
+			AssertEqual(_ConfigFullSaveCoordinator().requested_generation, _ConfigFullSaveCoordinator().committed_generation,
+				"the real unchanged/reloaded controls must still acknowledge their actual native write")
+		}
 	} finally {
 		Features := SavedFeatures, _IniCache := SavedCache
 		_LLM_Menu_Loaded := HadMenuLoaded ? SavedMenuLoaded : unset

@@ -1691,3 +1691,9 @@ The correction is integrated; post-fix native qualification is pending.
 ## Additional integrated corrections awaiting qualification
 
 The071 Wrap publisher now retains its exclusively created stage and folder handles through native rename and cleanup. Pre-existing stages remain untouched. A structured receipt distinguishes actual rename from complete durability, and a failed post-rename flush fences only the obsolete live projection; a newer real reload remains usable. True writes, rename, close and retry controls retain explicit partial-failure feedback. The066 request aggregator independently bounds each counter and cost and retains unknown fields until finalization. One-shot053/067 controls replay Escape as a named key and preserve captured logical modifier flags without adding one-shot Shift. All require their next targeted native receipts.
+
+## Scoped profile and optional boot follow-up for AHK-072
+
+The five profile actions now collect and write only the canonical LLM subtree. Their native writer rejects broader roots even through an injected collector, and their RAM publication rebases the LLM result over the current other roots without replacing unrelated metadata. The two original full-collector locale oracles are preserved and two additional controls cover RAM identity and refusal of a collector broader than the profile owns.
+
+Automatic optional boot full saves retain their actual admitted boot source in the existing private request ledger. If the physical source has changed, only that exact optional generation may settle without a fabricated durable commit, stale collection, notification or retry loop. A coalesced mandatory request cannot be discarded; matching source A remains bound through the existing WAL. These corrections and their targeted controls await native qualification.
