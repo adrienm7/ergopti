@@ -1,5 +1,5 @@
 {
-	"expected_count": 98,
+	"expected_count": 86,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
@@ -9,7 +9,7 @@
 		},
 		{
 			"contains": "key chord boot enabled admission:",
-			"expected_count": 3
+			"expected_count": 5
 		},
 		{
 			"contains": "raw boot cache lone-tap admission:",
@@ -40,60 +40,20 @@
 			"expected_count": 3
 		},
 		{
+			"contains": "layout-stage-native-ownership",
+			"expected_count": 8
+		},
+		{
+			"contains": "composer-stage-native-ownership",
+			"expected_count": 4
+		},
+		{
 			"contains": "wrap-native-render-focus",
 			"expected_count": 2
 		},
 		{
-			"contains": "window-title-app-attribution",
-			"expected_count": 4
-		},
-		{
-			"contains": "title-cap-count-conservation",
-			"expected_count": 4
-		},
-		{
-			"contains": "title-replay-native-failure",
-			"expected_count": 3
-		},
-		{
-			"contains": "walker-title-cap-declared-but-dead",
-			"expected_count": 5
-		},
-		{
-			"contains": "klr-readonly-image",
-			"expected_count": 4
-		},
-		{
-			"contains": "KLR cache stages: retain unknown content despite a matching name",
-			"expected_count": 1
-		},
-		{
-			"contains": "KLR cache stages: retire a dead producer and preserve live ownership",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-profile-opening-image",
-			"expected_count": 18
-		},
-		{
-			"contains": "native-profile-paste-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-profile-preopen-source",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-profile-source-representation",
-			"expected_count": 1
-		},
-		{
 			"contains": "scalar-native-nontext-receiving",
 			"expected_count": 6
-		},
-		{
-			"contains": "native-editor-cross-process",
-			"expected_count": 2
 		},
 		{
 			"contains": "config-candidate-publication-owner",
@@ -110,6 +70,26 @@
 		{
 			"contains": "capsword auto-off: refused or invalid changes",
 			"expected_count": 1
+		},
+		{
+			"contains": "(llm-line-style)",
+			"expected_count": 11
+		},
+		{
+			"contains": "LLM parser dedup stats:",
+			"expected_count": 3
+		},
+		{
+			"contains": "meta fix-updater-load-interval:",
+			"expected_count": 2
+		},
+		{
+			"contains": "one-shot-native-spent-controls",
+			"expected_count": 4
+		},
+		{
+			"contains": "wifi-dashboard-kpi-owner",
+			"expected_count": 2
 		}
 	]
 }
