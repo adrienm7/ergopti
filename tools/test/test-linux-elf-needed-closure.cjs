@@ -78,6 +78,16 @@ assert.throws(
 		}),
 	/twice/
 );
+for (const invalid of [
+	{ prefixes: [''] },
+	{ prefixes: [null] },
+	{ prefixes: 'lib' },
+	{ sonames: [''] },
+	{ sonames: [null] },
+	{ sonames: 'libx.so' }
+]) {
+	assert.throws(() => Closure.recipientLibraries({ version: 1, groups: [{ id: 'invalid', reason: 'r'.repeat(50), ...invalid }] }), /recipient library/);
+}
 passed++;
 
 // 3. The check over a tree, with injected readelf output.
