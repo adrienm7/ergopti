@@ -134,6 +134,28 @@ helpers.describe("keystats: virtual synthetic telemetry for clipboard output", f
 		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
 	end)
 
+	helpers.it("keeps only the new synthetic session after a reset", function()
+		local fixture = fixture_module.load_keystats()
+		fixture.state.is_enabled = true
+		local original_clock = fixture.hs.timer.absoluteTime
+		local now = 1000000000
+		fixture.hs.timer.absoluteTime = function() return now end
+		fixture.keystats.notify_synthetic("old", "hotstring", 0, nil, "old", false)
+		helpers.assert_eq(fixture.keystats.reset_session(), true)
+		now = 2000000000
+		fixture.keystats.notify_synthetic("new", "hotstring", 0, nil, "new", false)
+		fixture.drain()
+		fixture.hs.timer.absoluteTime = original_clock
+		local old, new = fixture.flushes[#fixture.flushes - 1], fixture.flushes[#fixture.flushes]
+		helpers.assert_eq(old.events[1][1], "o")
+		helpers.assert_eq(new.events[1][1], "n")
+		helpers.assert_eq(#old.events, 3)
+		helpers.assert_eq(#new.events, 3)
+		helpers.assert_eq(fixture.state.session_start_time, 2000)
+		helpers.assert_eq(fixture.state.session_last_active, 2000)
+		helpers.assert_eq(fixture.state.recent_typing_eff, { 2000, 2000, 2000 })
+	end)
+
 	helpers.it("immutable user-data tags own telemetry; PID remains diagnostic", function()
 		local provenance_source = read_unit("local function report_read_failure")
 		local classify = function_slice(provenance_source, "function M.classify(",
