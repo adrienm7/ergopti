@@ -193,7 +193,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 	if (Needle = "")
 		return true
 	for App in Apps {
-		if !(App is String)
+		if !(App is String) || Trim(App) == ""
 			return true
 		if (RegExReplace(StrLower(Trim(App)), "\.exe$", "") == Needle)
 			return true
@@ -203,7 +203,7 @@ _LLM_Engine_AppIsExcluded(AppId, Apps) {
 
 ; Owns the complete disabled-app privacy decision so the production caller and
 ; tests cannot disagree about invalid state, focus lookup, or name matching.
-_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
+_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0, SourceAppId := unset) {
 	global _LLM_Engine
 	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
 	if !(Apps is Array) {
@@ -224,6 +224,12 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 			return true
 		}
 		Policy.Push(App)
+	}
+	; A timer owns the origin's buffer, not the app that happens to be focused
+	; when it fires. Unknown captured identity also refuses a nonempty policy.
+	if IsSet(SourceAppId) && _LLM_Engine_AppIsExcluded(SourceAppId, Policy) {
+		try LoggerInfo("LLM", "Prediction suppressed - captured source app is excluded or unavailable.")
+		return true
 	}
 	Focused := 0
 	try Focused := HasMethod(FocusFn, "Call") ? FocusFn.Call() : WIGetFocused()
@@ -375,7 +381,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; and shown in the menu but was previously never enforced. Resolve the focused process
 	; only when the list is non-empty, so no OS call runs on the per-fire path when the user
 	; has not excluded any app (llm-app-filter-enforced).
-	if _LLM_Engine_ShouldSuppressForDisabledApps()
+	if _LLM_Engine_ShouldSuppressForDisabledApps(, RequestAcceptSource["app_name"])
 		return
 
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
@@ -637,7 +643,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; "REWRITE: …" text, which carries no erasure and would be typed as is.
 	streaming_enabled := is_rewrite ? false : LLM_EffectiveStreaming(backend,
 		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
-	request_current := _LLM_Engine_RenderIdentityIsCurrent.Bind(this_request_id, request_semantic_signature)
+	request_current := _LLM_Engine_RequestSourceIsCurrent.Bind(this_request_id, request_semantic_signature,
+		RequestAcceptSource["app_name"])
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -1165,6 +1172,25 @@ _LLM_Engine_IsCurrent(state) {
 	return (state["request_id"] == current_id
 		and _LLM_Engine_SignaturesEqual(
 			state["semantic_signature"], _LLM_Engine.Get("active_request_signature", "")))
+}
+
+; Transport admission may run under a native publication claim. This guard
+; only reads validated RAM policy: no focus probe, logging or message pumping.
+_LLM_Engine_SourceAppAllowed(SourceAppId) {
+	global _LLM_Engine
+	if !(_LLM_Engine is Map)
+		return false
+	Apps := _LLM_Engine.Get(ConfigLeaf.DISABLED_APPS, [])
+	return Apps is Array && (Apps.Length == 0 || !_LLM_Engine_AppIsExcluded(SourceAppId, Apps))
+}
+
+_LLM_Engine_RequestSourceIsCurrent(RequestId, SemanticSignature, SourceAppId) {
+	PreviousCritical := Critical("On")
+	try {
+		return !A_IsSuspended && _LLM_Engine.Get("enabled", false)
+			&& _LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature)
+			&& _LLM_Engine_SourceAppAllowed(SourceAppId)
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature) {

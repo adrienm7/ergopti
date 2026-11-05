@@ -23,12 +23,18 @@
 _LAFE_AssertDisabledAppsEnforced() {
 	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
 	Assert(Body != "", "LLM_Engine_FirePrediction(buffer) must exist")
-	Gate := "if _LLM_Engine_ShouldSuppressForDisabledApps()`n`t`treturn"
+	Gate := 'if _LLM_Engine_ShouldSuppressForDisabledApps(, RequestAcceptSource["app_name"])' . "`n`t`treturn"
 	GatePos := InStr(Body, Gate, true)
 	DispatchPreparationPos := InStr(Body, "backend_now :=", true)
 	Assert(GatePos > 0,
 		"LLM_Engine_FirePrediction must call the canonical disabled-app decision "
 		. "and return immediately when it suppresses (llm-app-filter-enforced)")
+	Policy := _DriverFuncBody("_LLM_Engine_ShouldSuppressForDisabledApps")
+	Assert(Policy != "" && InStr(Policy, "_LLM_Engine_AppIsExcluded(SourceAppId, Policy)") > 0
+		&& InStr(Policy, "WIGetFocused()") > 0,
+		"The canonical gate must preserve both captured-source and native current-focus exclusions")
+	Assert(InStr(Body, "_LLM_Engine_RequestSourceIsCurrent.Bind(") > 0,
+		"Actual asynchronous transports must retain original source-policy admission")
 	Assert(DispatchPreparationPos > 0 && GatePos < DispatchPreparationPos,
 		"the disabled-app gate must run before any backend dispatch preparation")
 }
