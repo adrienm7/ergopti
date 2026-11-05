@@ -61,6 +61,21 @@ local function scenario(day, body)
 	assert(ok, failure)
 end
 
+scenario({ month = 10, day = 25 }, function(k, _, advance)
+	k.on_app_focus("cross-midnight-trigger", Monotonic.now_ms())
+	for _, character in ipairs({ "a", "b", "c", "d" }) do
+		k.on_keydown(character, Monotonic.now_ms(), "cross-midnight-trigger")
+	end
+	advance(2000)
+	k.on_keydown("e", Monotonic.now_ms(), "cross-midnight-trigger")
+	k.record_hotstring("cross-midnight-trigger", "abcde", "x", Monotonic.now_ms(), "static", 5, false)
+	local payload = assert(k.get_dashboard_payload({ include_prefetch = false }))
+	local app = assert(payload.metrics_manifest["2026-10-26"]["cross-midnight-trigger"])
+	-- The trigger's earlier characters are on the preceding day. Its net
+	-- contribution to this day's output may therefore legitimately be negative.
+	equal({ app.chars, app.hs_chars, app.hs_input_chars }, { 1, 1, 5 })
+end)
+
 scenario({ month = 10, day = 26, hour = 0, min = 0, sec = 20 }, function(k, _, advance, _, shift)
 	k.on_app_focus("rollback-app", Monotonic.now_ms())
 	k.on_keydown("a", Monotonic.now_ms(), "rollback-app")
@@ -346,4 +361,4 @@ for _, day in ipairs({ { month = 3, day = 29, hours = 23 }, { month = 10, day = 
 		equal(rows("SELECT ms FROM agg_app_day_titles WHERE title='dst' ORDER BY date;"), { string.format("%.0f", length), "1000" })
 	end)
 end
-print("native capture calendar: scenarios=11 checks=" .. checks)
+print("native capture calendar: scenarios=12 checks=" .. checks)

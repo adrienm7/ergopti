@@ -1,10 +1,10 @@
 /**
  * tools/test/test-metrics-filter-cache.cjs
- * ==============================================================================
+ * =======================================================================for (const host of ['windows', 'macos', 'linux']) {
  * MODULE: Metrics Filter Projection Cache Regression Tests
  * DESCRIPTION:
  * Exercises the scripts loaded by the real dashboards, including native updates.
- * ==============================================================================
+ * =======================================================================for (const host of ['windows', 'macos', 'linux']) {
  */
 
 'use strict';
@@ -4183,4 +4183,19 @@ for (const host of ['windows', 'macos', 'linux']) {
 	});
 }
 
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} displays one minus for a negative net output`, () => {
+		const page = typingChartPage(host, '2026-01-01T12:30:00Z');
+		publishTypingPage(page, host, {
+			'2026-01-01': { Editor: { ...liveTypingApp(1), hs_chars: 1, hs_input_chars: 5 } }
+		});
+		const details = page.elements.get('global_details').innerHTML;
+		assert.match(details, />-3<\/strong>/);
+		assert.doesNotMatch(details, />--3<\/strong>/);
+		assert.equal(vm.runInContext('format_number_plain(-1234.5)', page.context), '-1\u00a0234,5');
+		assert.match(vm.runInContext('format_number(-1234.5)', page.context), />-1\u00a0234,5<\/span>/);
+		assert.equal(vm.runInContext('format_number_plain(-1200000)', page.context), '-1,2\u00a0M');
+		assert.equal(vm.runInContext('format_number_plain(1234.5)', page.context), '1\u00a0234,5');
+	});
+}
 console.log(`${passed} passed, 0 failed.`);
