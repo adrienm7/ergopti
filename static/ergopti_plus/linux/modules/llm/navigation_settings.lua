@@ -44,6 +44,12 @@ local collision_factory
 
 local function normalise(value)
 	if type(value) ~= "table" then return nil end
+	local length, count = #value, 0
+	for index in pairs(value) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length then return nil end
+		count = count + 1
+	end
+	if count ~= length then return nil end
 	local present = {}
 	for _, modifier in ipairs(value) do
 		if not ALLOWED[modifier] or present[modifier] then return nil end
