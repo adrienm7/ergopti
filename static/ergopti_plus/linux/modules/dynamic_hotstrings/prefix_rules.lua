@@ -141,7 +141,7 @@ function M.build(info, is_section_enabled, magic_key)
 	end
 
 	if magic_key == nil then
-		magic_key = require("infra.manifest_reader").default_for("hotstrings.trigger_char")
+		magic_key = require("infra.manifest_reader").default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 	end
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")

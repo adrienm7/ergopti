@@ -254,7 +254,7 @@ function M.new_magic(options)
 		files = options.files or require("adapters.file_system"),
 		manifest = { scope_plan = function() return { presets = {}, operations = {} } end },
 		validate_update = function(scope, row)
-			return scope == "magic" and row.section == "hotstrings" and row.key == "trigger_char"
+			return scope == "magic" and row.section == "hotstrings" and row.key == ConfigKeys.LEAF.TRIGGER_CHAR
 				and (row.delete == true or MagicKey.validate(row.value) == true)
 		end,
 		capture = function()
@@ -311,7 +311,7 @@ function M.apply_magic(value, options)
 	_owner = M.new_magic({ path = path, backup_path = path .. ".magic-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		config = options.config, preferences = options.preferences, dynamic = options.dynamic,
 		magic_key = options.magic_key, reload = options.reload, after_restore = options.after_restore })
-	local row = { section = "hotstrings", key = "trigger_char" }
+	local row = { section = "hotstrings", key = ConfigKeys.LEAF.TRIGGER_CHAR }
 	if value == options.magic_key.default() then row.delete = true else row.value = value end
 	return _owner.apply_updates({ row })
 end
