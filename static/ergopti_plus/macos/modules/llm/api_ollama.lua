@@ -1286,6 +1286,7 @@ local MAX_LOGGED_SERVER_ERROR = 300
 -- owners cannot publish an older inventory over a newer or forgotten receipt.
 local _listed_models = nil
 local _model_listing_epoch = 0
+local _menu_listing = nil
 -- Consecutive failed model-list reads of the current outage.
 local _listing_failures = 0
 -- Chat and vision share one HTTP owner; an inventory refresh has a different one.
@@ -1354,13 +1355,20 @@ end
 --- @param origin string|nil Canonical endpoint captured by the originating request.
 --- @param service_current function|nil Original request's retained daemon predicate.
 local function list_models(client, on_done, origin, service_current)
+	local callback = on_done
+	local delivered = false
+	on_done = function(...)
+		if delivered then return end
+		delivered = true
+		return callback(...)
+	end
 	local original_service = service_current or M.capture_service_owner()
 	_model_listing_epoch = _model_listing_epoch + 1
 	local epoch = _model_listing_epoch
 	local receipt = { origin = origin or M.get_base_url(), epoch = epoch,
 		service_current = original_service }
 	if not listing_current(receipt) then return on_done(nil, "model_list_unavailable") end
-	client.get(receipt.origin .. "/api/tags", {}, function(r)
+	local dispatched = client.get(receipt.origin .. "/api/tags", {}, function(r)
 		Logger.pcall(LOG, function()
 			if not listing_current(receipt) then
 				on_done(nil, "model_list_unavailable")
@@ -1415,6 +1423,53 @@ local function list_models(client, on_done, origin, service_current)
 			on_done(names, nil, receipt)
 		end)
 	end)
+	-- A superseded admission can return false without a native callback.
+	if dispatched == false and not delivered then on_done(nil, "model_list_unavailable") end
+	return receipt
+end
+
+--- Completes all waiters of one exact menu-inventory request once.
+local function finish_menu_listing(group, names, reason)
+	if group.settled then return end
+	group.settled = true
+	if _menu_listing == group then _menu_listing = nil end
+	for _, callback in ipairs(group.waiters) do
+		if names == nil then
+			ApiCommon.protected_call(callback, "inventory waiter", nil, reason)
+		elseif listing_current(group.receipt) then
+			ApiCommon.protected_call(callback, "inventory waiter", names, reason)
+		else
+			ApiCommon.protected_call(callback, "inventory waiter", nil, "model_list_unavailable")
+		end
+	end
+end
+
+--- Shares one still-current inventory request between menu owners.
+local function menu_list_models(client, on_done)
+	local group = _menu_listing
+	if group and group.receipt and listing_current(group.receipt) then
+		group.waiters[#group.waiters + 1] = on_done
+		return
+	end
+	if group then
+		finish_menu_listing(group, nil, "model_list_unavailable")
+		-- A notified owner may have started a newer request; join that owner.
+		if _menu_listing then return menu_list_models(client, on_done) end
+	end
+	group = { waiters = { on_done }, settled = false }
+	_menu_listing = group
+	local ok, receipt_or_err = pcall(function()
+		return list_models(client, function(names, reason, receipt)
+			if receipt then group.receipt = receipt end
+			finish_menu_listing(group, names, reason)
+		end)
+	end)
+	if not ok then
+		Logger.error(LOG, "Menu inventory acquisition failed.")
+		finish_menu_listing(group, nil, "model_list_unavailable")
+		return
+	end
+	if not group.settled then group.receipt = receipt_or_err end
 end
 
 --- Tells whether the local server holds a model, as its last listing said.
@@ -1430,7 +1485,7 @@ end
 --- Lists the local server's models again, for the menus.
 --- @param on_done function|nil Receives true once listed, or false and a reason.
 function M.refresh_local_models(on_done)
-	list_models(_listing_client, function(names, reason)
+	menu_list_models(_listing_client, function(names, reason)
 		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done", names ~= nil, reason) end
 	end)
 end
@@ -1443,7 +1498,7 @@ function M.verify_local_model(model, on_result)
 	if normalize_model_name(model) == nil or type(on_result) ~= "function" then
 		error("api_ollama.verify_local_model: a model name and on_result are required")
 	end
-	list_models(_listing_client, function(names, reason)
+	menu_list_models(_listing_client, function(names, reason)
 		if names == nil then return ApiCommon.protected_call(on_result, "on_result", nil, reason) end
 		ApiCommon.protected_call(on_result, "on_result", names[normalize_model_name(model)] == true)
 	end)
