@@ -53,6 +53,12 @@ for config in /etc/udev/rules.d/99-ergopti-uinput.rules /etc/modules-load.d/ergo
 		printf '[permissions] code=dangling-configuration path=%q\n' "$config" >&2
 		exit 78
 	fi
+	# Existing administrator files, including links to /dev/null used to mask
+	# rules, remain theirs. A directory or FIFO cannot serve as configuration.
+	if [ -e "$config" ] && [ ! -f "$config" ] && [ ! "$config" -ef /dev/null ]; then
+		printf '[permissions] code=invalid-configuration path=%q\n' "$config" >&2
+		exit 78
+	fi
 done
 
 missing_groups=()
