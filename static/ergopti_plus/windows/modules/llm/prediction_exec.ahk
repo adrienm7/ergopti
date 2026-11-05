@@ -1338,7 +1338,18 @@ _LLM_Engine_ParseSlots(raw, state) {
 		&displays
 	)
 	state["dedup_stats"] := dedup_ref
-	_LLM_Engine_RememberSlotDisplays(state["ctx"], displays)
+	; Parsing can yield through a refusal diagnostic. The current request may
+	; already own another context's display when that older parser returns.
+	; Revalidate and publish as one bounded memory operation, with all parser
+	; work and logging outside Critical. Pure parser/render helpers carry no
+	; request identity; any supplied identity must be complete and current.
+	PreviousCritical := Critical("On")
+	try {
+		if (state.Has("request_id") || state.Has("semantic_signature"))
+				&& !_LLM_Engine_IsCurrent(state)
+			return []
+		_LLM_Engine_RememberSlotDisplays(state["ctx"], displays)
+	} finally Critical(PreviousCritical)
 	; The first erasure recorded for a slot text wins, like the slot itself: a
 	; later duplicate is dropped by the dedup and must not replace its edit.
 	if !state.Has("rewrite_edits")
