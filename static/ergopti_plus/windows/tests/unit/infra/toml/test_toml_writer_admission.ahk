@@ -837,7 +837,15 @@ _TUNS_Case(Kind, DocumentMode := false) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		AssertEqual(1, FSWriteCreateDurable(Path, '[owned]`nvalue = "Original"`n'))
+		Source := '[owned]`nvalue = "Original"`n'
+		if DocumentMode
+			Source := _CMJFixtureCurrentSource(Source)
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		if DocumentMode {
+			; A semantic native writer needs the real current-schema boot authority.
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		}
 		Before := FSReadBytesStrict(Path)
 		Result := 0, Failure := 0
 		Writer := DocumentMode ? TOML_ConfigBatchWrite : TOML_BatchWrite
