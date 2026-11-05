@@ -222,8 +222,14 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 	local chat = remote.serves(provider.id, "chat")
 	if not page_owned() then return false end
 	if chat then
-		if llm.get_backend() ~= starting_backend then return false end
-		if starting_backend ~= "api" and llm.set_backend("api", page_owned) ~= true then return false end
+		if llm.get_backend() ~= starting_backend then
+			if page_owned() then SaveFailure.present(tr, function(message) dialogs.error(message, heading) end) end
+			return false
+		end
+		if starting_backend ~= "api" and llm.set_backend("api", page_owned) ~= true then
+			if page_owned() then SaveFailure.present(tr, function(message) dialogs.error(message, heading) end) end
+			return false
+		end
 		if not page_owned() then return false end
 	end
 	local ticket, current, finish
