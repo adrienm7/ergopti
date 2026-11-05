@@ -63,6 +63,14 @@ local function now_ms()
 	return require("infra.monotonic").now_ms()
 end
 
+--- A refused dispatch may still own a started native process. Defer the
+--- logical answer until its exact cleanup receipt has settled.
+local function after_refused_cleanup(run, cleanup, answer)
+	if not cleanup then answer(); return end
+	run.cancellers[#run.cancellers + 1] = function() cleanup.cancel() end
+	pcall(cleanup.on_settled, answer)
+end
+
 --- Starts one probe; publishes its single answer.
 --- @param run table The probe run (see M.start).
 --- @param id string Probe id.
@@ -184,11 +192,11 @@ local function proxy_pac(config, run)
 		local function ask(key, on_output)
 			-- Only GNOME stores a proxy setting there; elsewhere there is none to read.
 			if not Shell.has_command("gsettings") then on_output(nil) return end
-			local handle = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
+			local handle, _, cleanup = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
 				{ timeout_ms = config.timeout_ms }, function(result)
 					on_output(result.ok and result.stdout or nil)
 				end)
-			if not handle then on_output(nil) return end
+			if not handle then after_refused_cleanup(run, cleanup, function() on_output(nil) end); return end
 			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
 		end
 		ask("mode", function(mode)
@@ -251,7 +259,7 @@ local function system_details(config, logs_dir, run)
 			done({ state = "ok" }, sections)
 			return
 		end
-		local handle, err = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
+		local handle, err, cleanup = Shell.run_async("df", { "-Pk", logs_dir }, { timeout_ms = config.timeout_ms }, function(result)
 			if not result.ok then
 				done({ state = "error", detail = "df: " .. tostring(result.error) }, sections)
 				return
@@ -262,7 +270,9 @@ local function system_details(config, logs_dir, run)
 			done({ state = "ok" }, sections)
 		end)
 		if not handle then
-			done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			after_refused_cleanup(run, cleanup, function()
+				done({ state = "error", detail = "df: " .. tostring(err) }, sections)
+			end)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() handle.cancel() end

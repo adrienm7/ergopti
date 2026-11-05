@@ -75,6 +75,11 @@ local function with_probes(async, body, absent)
 			return not (absent or {})[binary]
 		end,
 		run_async = function(executable, args, options, callback)
+			if world.refuse and world.refuse[executable] then
+				local debt = { cancel = function() world.cancelled_children = world.cancelled_children + 1 end,
+					on_settled = function(listener) world.refuse[executable] = listener; return true end }
+				return nil, "pipe activation failed", debt
+			end
 			world.children[#world.children + 1] = { executable = executable, args = args, options = options,
 				callback = callback }
 			return { cancel = function() world.cancelled_children = world.cancelled_children + 1 end }
@@ -194,6 +199,31 @@ helpers.describe("diagnostics probes (linux)", function()
 			request.callback({ status = 200, body = '{"resources":{"core":{"limit":60,"remaining":12}}}' })
 			helpers.assert_eq(answers.github_api.result.state, "ok")
 			helpers.assert_eq(answers.github_api.sections.network.github_api, "HTTP 200, 12/60")
+		end)
+	end)
+
+	helpers.it("retains refused native probe cleanup before reporting failure (healthcheck-probe-debt)", function()
+		with_probes(true, function(Probes, world)
+			world.refuse = { df = true, gsettings = true }
+			local _, answers = start(Probes)
+			helpers.assert_nil(answers.system_details)
+			helpers.assert_nil(answers.proxy_pac)
+			world.refuse.df()
+			helpers.assert_eq(answers.system_details.result.state, "error")
+			world.refuse.gsettings()
+			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
+		end)
+	end)
+
+	helpers.it("cancels refused native probe debt without a late answer (healthcheck-probe-debt)", function()
+		with_probes(true, function(Probes, world)
+			world.refuse = { df = true, gsettings = true }
+			local run, answers = start(Probes)
+			run.cancel()
+			helpers.assert_eq(world.cancelled_children, 2)
+			world.refuse.df(); world.refuse.gsettings()
+			helpers.assert_nil(answers.system_details)
+			helpers.assert_nil(answers.proxy_pac)
 		end)
 	end)
 
