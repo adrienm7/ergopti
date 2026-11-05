@@ -41,9 +41,9 @@ local function with_wrap(options, body)
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
-			reads = 0, errors = 0, documents = { ["/field/original"] = "selected", ["/field/successor"] = "SAFE" } }
+			reads = 0, errors = 0, logs = {}, documents = { ["/field/original"] = "selected", ["/field/successor"] = "SAFE" } }
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
-		logger.set_level("trace"); logger.set_sink(function() end)
+		logger.set_level("trace"); logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function() state.errors = state.errors + 1 end)
 		package.loaded["logger.shim"] = logger
 		local injector, controller, shortcuts
@@ -158,6 +158,14 @@ local function with_wrap(options, body)
 end
 
 helpers.describe("wrap output publication ownership", function()
+	helpers.it("does not log selected text while wrapping (wrap-output-owner)", function()
+		with_wrap({}, function(state)
+			helpers.assert_true(state.consumed)
+			local logs = table.concat(state.logs, "\n")
+			helpers.assert_true(not logs:find("selected", 1, true), "selection contents must not enter trace logs")
+		end)
+	end)
+
 	helpers.it("commits a stable Unicode wrap through the actual Main and clipboard", function()
 		with_wrap({}, function(state)
 			helpers.assert_eq(state.consumed, true)
@@ -236,6 +244,8 @@ helpers.describe("wrap output publication ownership", function()
 				helpers.assert_eq(state.result.ok, false)
 				helpers.assert_eq(state.stops, 1)
 				helpers.assert_true(state.errors > 0, "restoration failures must retain the real error observer")
+				helpers.assert_true(not table.concat(state.logs, "\n"):find("selected", 1, true),
+					"the error path must not log the selection")
 				helpers.assert_eq(state.clipboard, "‘selected’", "a refused restoration cannot be reported as complete")
 			end)
 		end)
@@ -301,7 +311,7 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 					.. "assert(package.loaded['adapters.storage'] == nil, 'the child store must start cold')\n"
 					.. "require('tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner')\n"
 					.. "local results = require('tests.helpers').get_results()\n"
-					.. "assert(results.passed == 35 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
+					.. "assert(results.passed == 36 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
 					.. "local storage = require('adapters.storage')\n"
 					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/ergopti_plus/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"

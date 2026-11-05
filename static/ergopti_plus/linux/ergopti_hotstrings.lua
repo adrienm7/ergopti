@@ -2047,7 +2047,7 @@ local function main()
 				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
 			}
 			local attempted = false
-			local injected, result = pcall(injector.inject, 0, text, false, nil, publication, function()
+			local injected, result = pcall(injector.inject, 0, text, true, nil, publication, function()
 				attempted = true
 				if type(on_payload_attempt) == "function" then on_payload_attempt() end
 			end)
