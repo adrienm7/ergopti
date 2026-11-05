@@ -100,7 +100,7 @@ _WRCF_ChildSource() {
 		Code .= "#Include " . Owner . "`n"
 	}
 	for Name in ["TickElapsed", "TickElapsed64", "WrapTextIfSelected", "WrapSymbols_IsEnabled", "GetUIASelection",
-		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "WIGetForegroundHwnd",
+		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "WIGetForegroundHwnd",
 		"WIGetFocusedControlToken", "_TextSenderNativeFocus", "_SendVerdictSucceeded", "_SendInstantReport", "_SendInstant_RestoreClipboard"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The complete original wrap owner must exist: " . Name)
@@ -201,7 +201,7 @@ _WTE_ChildSource() {
 	AssertTrue(RegExMatch(Source, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age))
 	Code .= "global UIA_SELECTION_MAX_AGE_MS := " . Integer(Age[1]) . "`n"
 	for Name in ["ErgoptiLayout_Action", "WrapTextIfSelected", "WrapSymbols_IsEnabled", "GetUIASelection",
-		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "WIGetForegroundHwnd",
+		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "WIGetForegroundHwnd",
 		"WIGetFocusedControlToken", "TickElapsed", "SendInstant", "_SendInstantReport", "SendNewResult", "_SendVerdictSucceeded"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The unchanged trigger admission owner must exist: " . Name)

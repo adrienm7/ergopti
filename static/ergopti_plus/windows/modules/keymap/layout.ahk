@@ -645,9 +645,13 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				; pushed it twice and shifted every GetLastSentCharacterAt(-N)
 				; lookup by one. SendInstant, in contrast, does NOT record — so
 				; the explicit push belongs only to its success branch.
-				if !SendInstant(LeftSymbol Selection RightSymbol)
-					SendNewResult(Symbol)
-				else
+				Target := _SendInstantCaptureTarget()
+				if !SendInstant(LeftSymbol Selection RightSymbol) {
+					; A failed clipboard transport may also have changed the editor.
+					; The bare-key fallback belongs only to the original selection.
+					if _SendInstantTargetCurrent(Target)
+						SendNewResult(Symbol)
+				} else
 					; Wrapping ends at the closing text, which can differ from the
 					; pressed key and can include a no-break prefix or a surrogate pair.
 					UpdateLastSentCharacter(SubStr(RightSymbol, -_TextTailCodeUnits(RightSymbol, 1)))
