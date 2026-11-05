@@ -190,9 +190,14 @@ ST_Has(Key) {
 _ST_EnumerateKeys(&Names, EnumValuesFn := 0) {
 	Names := []
 	try {
-		Records := IsObject(EnumValuesFn)
-			? EnumValuesFn.Call(STORAGE_REG_BASE)
-			: Reg_EnumValues(STORAGE_REG_BASE)
+		if !IsObject(EnumValuesFn) {
+			if !Reg_TryEnumValueNames(STORAGE_REG_BASE, &Names) {
+				try LoggerError("storage", "The native registry value-name inventory could not be completely read.")
+				return false
+			}
+			return true
+		}
+		Records := EnumValuesFn.Call(STORAGE_REG_BASE)
 		for Rec in Records
 			Names.Push(Rec.name)
 		return true
