@@ -406,6 +406,33 @@ function M.new(options)
 		return record, nil
 	end
 
+	-- The tag can itself end in digits: reconstruct the original base from the
+	-- manifest before treating a final number as a collision suffix. Old or
+	-- nonconforming manifests retain their former deterministic ID ordering.
+	local function order_key(record, prefix)
+		if type(record.tag) ~= "string" then return record.id, "1" end
+		local stamp = record.created_at:gsub("[-:TZ]", "")
+		stamp = stamp:sub(1, 8) .. "-" .. stamp:sub(9, 14)
+		local base = prefix .. "-" .. stamp
+		local tag = record.tag:gsub(TAG_SAFE, "")
+		if tag ~= "" then base = base .. "-" .. tag end
+		if record.id == base then return base, "1" end
+		local suffix = record.id:sub(#base + 2)
+		if record.id:sub(1, #base + 1) == base .. "-"
+			and suffix:match("^[1-9]%d*$") and (#suffix > 1 or suffix >= "2") then
+			return base, suffix
+		end
+		return record.id, "1"
+	end
+
+	local function later_same_second(a, b, prefix)
+		local a_base, a_number = order_key(a, prefix)
+		local b_base, b_number = order_key(b, prefix)
+		if a_base ~= b_base then return a_base > b_base end
+		if #a_number ~= #b_number then return #a_number > #b_number end
+		return a_number > b_number
+	end
+
 	--- The newest complete backup of one kind, or nil when there is none.
 	--- @param kind string
 	--- @return table|nil record
@@ -421,7 +448,7 @@ function M.new(options)
 				local record = load(name)
 				if record and record.kind == kind
 					and (best == nil or record.created_at > best.created_at
-						or (record.created_at == best.created_at and record.id > best.id)) then
+						or (record.created_at == best.created_at and later_same_second(record, best, prefix))) then
 					best = record
 				end
 			end

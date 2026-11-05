@@ -70,6 +70,25 @@ helpers.describe("config_backup (Linux): real files", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("selects the tenth same-second backup after the ninth", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } },
+			clock = function() return { stamp = "20240101-120000", iso = "2024-01-01T12:00:00Z" } end }
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			local last
+			for index = 1, 11 do
+				write(dir .. "/cfg/config.toml", tostring(index))
+				last = assert(owner.create("pre_install", { tag = "release-9" }))
+			end
+			helpers.assert_eq(owner.latest("pre_install").id, last.id)
+		end)
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("lists files, folders, and a link to a folder as neither", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")

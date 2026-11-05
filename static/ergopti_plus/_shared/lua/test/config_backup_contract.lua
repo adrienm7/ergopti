@@ -222,6 +222,15 @@ function M.register(helpers, env)
 			helpers.assert_eq(second.id, "pre-install-20260930-101500-2")
 		end)
 
+		helpers.it("orders same-second collision suffixes numerically without confusing tag digits", function()
+			for _, tag in ipairs({ "", "release-9" }) do
+				local owner = fixture()
+				local last
+				for _ = 1, 11 do last = assert(owner.create("pre_install", { tag = tag })) end
+				helpers.assert_eq(owner.latest("pre_install").id, last.id)
+			end
+		end)
+
 		helpers.it("offers the newest complete backup of a kind", function()
 			local owner = fixture({ times = { "20260930-101500", "20260930-111500", "20260930-121500" } })
 			assert(owner.create("pre_install", { tag = "v1" }))
