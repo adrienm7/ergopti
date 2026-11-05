@@ -148,6 +148,23 @@ local function manager(options)
 		},
 		bundle_names = function() return options.bundle_names or {} end,
 	}
+	deps.inspect_file = function(path)
+		if state.files[path] == nil then return nil, "absent" end
+		return { mode = "file" }, "ok"
+	end
+	deps.read_status = function(path)
+		if state.files[path] == nil then return nil, "absent" end
+		return state.files[path], "ok"
+	end
+	deps.digest = function(text)
+		local digest
+		deps.transport.sha256(text, function(value) digest = value end)
+		return digest
+	end
+	deps.remove_exact = function(path, expected)
+		if state.files[path] ~= expected.content then return false, "source changed" end
+		return deps.delete(path)
+	end
 	return LayoutRegistry, deps, state
 end
 
@@ -182,6 +199,155 @@ local function record(state)
 end
 
 helpers.describe("layout manager (macOS): installing", function()
+	helpers.it("preserves a real edited layout during uninstall", function()
+		require("tests.support.file_system_transaction_fixture").with_fixture(function(host)
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local root = os.tmpname(); os.remove(root)
+			assert(os.execute("mkdir -p '" .. root .. "/local' '" .. root .. "/installed'"))
+			local ok, err = xpcall(function()
+				local local_dir, installed_dir = root .. "/local/", root .. "/installed/"
+				local old_record = state.files[LOCAL_DIR .. "installed.json"]
+				state.files[local_dir .. "installed.json"] = old_record
+				for _, pair in ipairs({ { LOCAL_DIR, local_dir }, { LAYOUTS_DIR, installed_dir } }) do
+					local handle = assert(io.open(pair[2] .. "ergol.keylayout", "wb"))
+					assert(handle:write(state.files[pair[1] .. "ergol.keylayout"])); assert(handle:close())
+				end
+				local edited = assert(io.open(installed_dir .. "ergol.keylayout", "wb"))
+				assert(edited:write("personal modification")); assert(edited:close())
+				deps.local_dir, deps.layouts_dir = local_dir, installed_dir
+				local adapter = host.make_adapter()
+				deps.inspect_file, deps.read_status = adapter.classify_no_follow, adapter.read_with_status
+				deps.remove_exact = adapter.remove_if_unchanged
+				local result = run(function(done) registry.uninstall("ergol", done, deps) end)
+				helpers.assert_eq(result.ok, false)
+				local live = assert(io.open(installed_dir .. "ergol.keylayout", "rb"))
+				helpers.assert_eq(live:read("*a"), "personal modification"); assert(live:close())
+				helpers.assert_eq(state.files[local_dir .. "installed.json"], old_record)
+				local restored = assert(io.open(installed_dir .. "ergol.keylayout", "wb"))
+				assert(restored:write(state.files[LAYOUTS_DIR .. "ergol.keylayout"])); assert(restored:close())
+				local retried = run(function(done) registry.uninstall("ergol", done, deps) end)
+				helpers.assert_true(retried.ok, tostring(retried.extra))
+				helpers.assert_nil(io.open(installed_dir .. "ergol.keylayout", "rb"))
+				helpers.assert_nil(io.open(local_dir .. "ergol.keylayout", "rb"))
+			end, debug.traceback)
+			os.execute("rm -rf '" .. root .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end)
+	helpers.it("refuses uninstall after either installed copy is edited", function()
+		for _, directory in ipairs({ LOCAL_DIR, LAYOUTS_DIR }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local path = directory .. "ergol.keylayout"
+			state.files[path] = "user edited layout"
+			local removed = run(function(done) registry.uninstall("ergol", done, deps) end)
+			helpers.assert_eq(removed.ok, false, "uninstall must not delete edited files")
+			helpers.assert_eq(state.files[path], "user edited layout")
+		end
+	end)
+
+	helpers.it("refuses uninstall when an installed copy is unreadable or not regular", function()
+		for _, mode in ipairs({ "unreadable", "link", "inspect_error" }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local path = LAYOUTS_DIR .. "ergol.keylayout"
+			local inspect, read = deps.inspect_file, deps.read_status
+			deps.inspect_file = function(candidate)
+				if candidate == path and mode == "link" then return { mode = "link" }, "ok" end
+				if candidate == path and mode == "inspect_error" then return nil, "error" end
+				return inspect(candidate)
+			end
+			deps.read_status = function(candidate)
+				if candidate == path and mode == "unreadable" then return nil, "error" end
+				return read(candidate)
+			end
+			local result = run(function(done) registry.uninstall("ergol", done, deps) end)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(#state.disabled, 0, "refusal happens before disabling the input source")
+			helpers.assert_not_nil(state.files[path])
+			helpers.assert_not_nil(record(state).layouts.ergol)
+		end
+	end)
+
+	helpers.it("retains removal cleanup whether or not the first unlink happened", function()
+		for _, removed in ipairs({ false, true }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local remove, allow, calls = deps.remove_exact, false, 0
+			deps.remove_exact = function(path, expected)
+				calls = calls + 1
+				if calls == 1 then
+					if removed then state.files[path] = nil end
+					return false, "release refused", { removed = removed }, function() return allow end
+				end
+				return remove(path, expected)
+			end
+			local first = run(function(done) registry.uninstall("ergol", done, deps) end)
+			helpers.assert_eq(first.ok, false)
+			helpers.assert_not_nil(record(state).layouts.ergol, "a refused native result keeps the record")
+			local blocked = run(function(done) registry.uninstall("ergol", done, deps) end)
+			helpers.assert_eq(blocked.ok, false)
+			helpers.assert_eq(calls, 1, "pending release cannot repeat unlink")
+			allow = true
+			local retried = run(function(done) registry.uninstall("ergol", done, deps) end)
+			helpers.assert_true(retried.ok, tostring(retried.extra))
+			helpers.assert_nil(record(state).layouts.ergol)
+		end
+	end)
+
+	helpers.it("refuses an installed copy changed after preflight", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local remove = deps.remove_exact
+		deps.remove_exact = function(path, expected)
+			state.files[path] = "concurrent change"
+			return remove(path, expected)
+		end
+		local result = run(function(done) registry.uninstall("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "concurrent change")
+		helpers.assert_not_nil(state.files[LOCAL_DIR .. "ergol.keylayout"])
+		helpers.assert_not_nil(record(state).layouts.ergol)
+	end)
+
+	helpers.it("preserves the record when an absent copy reappears while disabling", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local local_path = LOCAL_DIR .. "ergol.keylayout"
+		state.files[local_path] = nil
+		deps.disable_source = function(_, _, done)
+			state.files[local_path] = "foreign replacement"
+			done(true, "", nil)
+			return true
+		end
+		local result = run(function(done) registry.uninstall("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(state.files[local_path], "foreign replacement")
+		helpers.assert_not_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
+		helpers.assert_not_nil(record(state).layouts.ergol)
+	end)
+
+	helpers.it("holds the operation slot while retrying a removal release", function()
+		local registry, deps = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local remove, entered = deps.remove_exact, false
+		local nested
+		deps.remove_exact = function(path, expected)
+			deps.remove_exact = remove
+			return false, "release refused", { removed = false }, function()
+				if not entered then
+					entered = true
+					nested = run(function(done) registry.uninstall("ergol", done, deps) end)
+				end
+				return true
+			end
+		end
+		helpers.assert_eq(run(function(done) registry.uninstall("ergol", done, deps) end).ok, false)
+		helpers.assert_true(run(function(done) registry.uninstall("ergol", done, deps) end).ok)
+		helpers.assert_eq(nested.ok, false)
+		helpers.assert_eq(nested.detail, registry.FAILURE_BUSY)
+	end)
 	helpers.it("rereads a modified checkout catalogue without HTTP or stale cache (layout-catalogue-local)", function()
 		local registry, deps, state = manager({ files = shipped_files() })
 		deps.local_source = true

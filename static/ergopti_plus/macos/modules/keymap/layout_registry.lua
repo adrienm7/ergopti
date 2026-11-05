@@ -82,6 +82,20 @@ local PLATFORM = "macos"
 -- The one operation in flight ({ id, action }), nil when idle: an installation
 -- and an uninstallation of the same layout must never interleave their writes.
 local _busy = nil
+local _file_cleanup = {}
+
+local function settle_file_cleanup()
+	while #_file_cleanup > 0 do
+		local called, settled = pcall(_file_cleanup[1])
+		if not called or settled ~= true then return false end
+		table.remove(_file_cleanup, 1)
+	end
+	return true
+end
+
+local function retain_file_cleanup(retry)
+	if type(retry) == "function" then _file_cleanup[#_file_cleanup + 1] = retry end
+end
 
 -- Catalogue, shipped index, installed record and refresh, shared with Linux.
 local Store = RegistryStore.new({
@@ -192,6 +206,10 @@ local function default_deps(settings)
 		read = FileSystem.read,
 		write = FileSystem.write,
 		create = FileSystem.create_if_absent,
+		inspect_file = FileSystem.classify_no_follow,
+		read_status = FileSystem.read_with_status,
+		digest = Crypto.sha256_bytes,
+		remove_exact = FileSystem.remove_if_unchanged,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
 		prepare_parent = FileSystem.prepare_parent_for_create,
@@ -410,8 +428,44 @@ local function acquire_slot(id, action, on_done)
 		on_done(false, M.FAILURE_BUSY, "another layout operation is still running")
 		return false
 	end
-	_busy = { id = id, action = action }
+	local owner = { id = id, action = action }
+	_busy = owner
+	if not settle_file_cleanup() then
+		if _busy == owner then _busy = nil end
+		on_done(false, M.FAILURE_WRITE, "a previous layout file cleanup remains pending")
+		return false
+	end
 	return true
+end
+
+--- Capture both registered copies before a mutation. The digest proves only
+--- their bytes, not who owns the inode; the native conditional operations
+--- recheck those bytes under the cooperative writer lock.
+local function capture_registered_files(deps, entry)
+	if type(deps.inspect_file) ~= "function" or type(deps.read_status) ~= "function"
+		or type(deps.digest) ~= "function" then
+		return nil, "classified layout verification is unavailable"
+	end
+	if type(entry.sha256) ~= "string" or not entry.sha256:match("^%x+$") or #entry.sha256 ~= 64 then
+		return nil, "the installed layout has no usable checksum"
+	end
+	local copies = {}
+	for _, path in ipairs({ deps.local_dir .. entry.id .. ".keylayout", deps.layouts_dir .. entry.id .. ".keylayout" }) do
+		local attrs, status = deps.inspect_file(path)
+		if status == "absent" then
+			copies[path] = { status = "absent" }
+		elseif status == "ok" and type(attrs) == "table" and attrs.mode == "file" then
+			local content, read_status = deps.read_status(path)
+			local digest = type(content) == "string" and deps.digest(content) or nil
+			if read_status ~= "ok" or type(digest) ~= "string" or digest:lower() ~= entry.sha256:lower() then
+				return nil, "the installed layout was changed or cannot be read: " .. path
+			end
+			copies[path] = { status = "ok", content = content }
+		else
+			return nil, "the installed layout is not an inspectable regular file: " .. path
+		end
+	end
+	return copies
 end
 
 --- What an installed layout's enable came to, read from a fresh process. The
@@ -640,6 +694,17 @@ function M.uninstall(id, on_done, deps)
 		return false
 	end
 	if not acquire_slot(id, "uninstall", on_done) then return false end
+	local copies, capture_err = capture_registered_files(deps, entry)
+	if not copies then
+		_busy = nil
+		on_done(false, M.FAILURE_FOREIGN_FILE, capture_err)
+		return false
+	end
+	if type(deps.remove_exact) ~= "function" then
+		_busy = nil
+		on_done(false, M.FAILURE_WRITE, "conditional layout removal is unavailable")
+		return false
+	end
 	Logger.start(LOG, "Uninstalling the '%s' layout…", id)
 	deps.disable_source(entry.keyboard_name, entry.name, function(disabled, _output, reason)
 		if not disabled then
@@ -648,11 +713,34 @@ function M.uninstall(id, on_done, deps)
 			Logger.warn(LOG, "The '%s' layout could not be removed from the input sources: %s.", id,
 				tostring(reason))
 		end
+		for path, expected in pairs(copies) do
+			if expected.status == "absent" then
+				local _, status = deps.inspect_file(path)
+				if status ~= "absent" then
+					_busy = nil
+					on_done(false, M.FAILURE_FOREIGN_FILE, "a previously absent layout path is no longer absent: " .. path)
+					return
+				end
+			end
+		end
 		for _, path in ipairs({ deps.layouts_dir .. id .. ".keylayout", deps.local_dir .. id .. ".keylayout" }) do
-			if not deps.delete(path) then
+			local expected = copies[path]
+			local removed, remove_err, _, retry = true, nil, nil, nil
+			if expected.status == "ok" then removed, remove_err, _, retry = deps.remove_exact(path, expected) end
+			if removed ~= true then
+				retain_file_cleanup(retry)
 				_busy = nil
 				Logger.error(LOG, "The '%s' layout was not uninstalled: cannot delete %s.", id, path)
-				on_done(false, M.FAILURE_WRITE, "cannot delete " .. path)
+				on_done(false, M.FAILURE_WRITE, "removal not confirmed for " .. path .. "; the file may have been removed: "
+					.. tostring(remove_err))
+				return
+			end
+		end
+		for path in pairs(copies) do
+			local _, status = deps.inspect_file(path)
+			if status ~= "absent" then
+				_busy = nil
+				on_done(false, M.FAILURE_FOREIGN_FILE, "layout removal could not be confirmed at " .. path)
 				return
 			end
 		end
