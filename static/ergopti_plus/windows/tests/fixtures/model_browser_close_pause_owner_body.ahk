@@ -392,7 +392,7 @@ _MBPO_Run() {
 		_MBPO_ConstructorFailure()
 		return
 	}
-	if _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen" {
+	if _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen" || _MBPO.Mode == "native-hide-native-current" || _MBPO.Mode == "native-hide-native-reopen" {
 		_MBPO_ShowHide()
 		return
 	}
@@ -469,6 +469,7 @@ _MBPO_Main() {
 		|| _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api"
 		|| _MBPO.Mode == "native-backend-second-refused" || _MBPO.Mode == "native-backend-replaced" || _MBPO.Mode == "native-backend-pause-resume" || _MBPO.Mode == "native-backend-superseded" || _MBPO.Mode == "native-backend-second-schema-pause" || _MBPO.Mode == "native-backend-second-writer-replaced"
 		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen"
+		|| _MBPO.Mode == "native-hide-native-current" || _MBPO.Mode == "native-hide-native-reopen"
 		|| _MBPO.Mode == "native-show-current" || _MBPO.Mode == "native-show-close" || _MBPO.Mode == "native-hide-reopen-close"
 		|| _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed",
 		"The model browser mode must be explicit.")
@@ -785,6 +786,12 @@ _MBPO_BackendAdmission() {
 ; A genuine WM_SHOWWINDOW from the genuine Hide delegates its native window
 ; procedure first, then issues the real public Show. This is explicit native
 ; reentry, not a simulated timer gap before Hide or a fabricated Win32 failure.
+
+_MBPO_CloseEventEntered(State, Window, *) {
+	_MBPO_Require(Window == State.Window && Window.Hwnd == State.Hwnd,
+		"Only this exact genuine GUI event may qualify the native Close")
+	State.CloseEntries += 1
+}
 _MBPO_ShowHideProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch
 	State.Active += 1
@@ -818,7 +825,7 @@ _MBPO_ShowHide() {
 		_VendorDir := _DriverDir . "\vendor"
 	PreviousCritical := Critical("Off")
 	State := {Window: 0, Hwnd: 0, Proc: 0, Installed: false, Armed: false, Active: 0,
-		HideSeen: false, Reopen: _MBPO.Mode == "native-hide-reopen", EpochAtHide: -1, CallbackCritical: -1,
+		HideSeen: false, Reopen: _MBPO.Mode == "native-hide-reopen" || _MBPO.Mode == "native-hide-native-reopen", CloseEntries: 0, EpochAtHide: -1, CallbackCritical: -1,
 		SameOwner: false, VisibleDuring: false, Failed: false, Failure: 0, Debt: false}
 	_MBPO.HideState := State
 	try {
@@ -834,7 +841,17 @@ _MBPO_ShowHide() {
 			"UPtr", 0x4D425348, "UPtr", 0, "Int"), "The exact native browser must admit its visibility witness")
 		State.Installed := true, State.Armed := true
 		BeforeEpoch := _LLM_ModelBrowser_Epoch
-		_LLM_ModelBrowser_OnClose()
+		if InStr(_MBPO.Mode, "native-hide-native-") == 1 {
+			State.Window.OnEvent("Close", _MBPO_CloseEventEntered.Bind(State), -1)
+			_MBPO_Require(DllCall("PostMessageW", "Ptr", State.Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
+				"The native visibility check must post WM_CLOSE to its exact owned GUI")
+			Started := A_TickCount
+			while (!State.CloseEntries || !State.HideSeen) && TickElapsed(Started) < 1000
+				Sleep(10)
+			_MBPO_Require(State.CloseEntries == 1 && State.HideSeen,
+				"The actual registered native Close handler must reach its own Hide before visibility is judged")
+		} else
+			_LLM_ModelBrowser_OnClose()
 		_MBPO_Observe()
 		State.Armed := false
 		VisibleAfter := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
