@@ -335,11 +335,36 @@ _LLM_Menu_CaptureProfileSource() {
 		Source["content"] := Source["present"] ? FSConfigReadUtf8Exact(Source["path"]) : ""
 	} catch
 		return false
-	return _LLM_Menu_ProfileSourceBound(Source) ? Source : false
+	return _LLM_Menu_ProfileSourceBound(Source) && _LLM_Menu_ProfileSourceProfilesMatch(Source) ? Source : false
+}
+
+; A fresh physical receipt cannot authorize replacing its profile array from a
+; stale live menu. Compare the typed document through the actual profile codec,
+; so harmless TOML spelling and JSON field order do not cause false refusals.
+_LLM_Menu_ProfileSourceProfilesMatch(Source) {
+	if !_LLM_Menu_ProfileSourceBound(Source)
+		return false
+	try {
+		Document := TOML_ParseDocument(Source["content"])
+		Payload := ManifestDefaultFor(ConfigKey.LLM_USER_PROFILES)
+		if Document.Has("llm") {
+			if !(Document["llm"] is Map)
+				return false
+			if Document["llm"].Has(ConfigLeaf.USER_PROFILES)
+				Payload := Document["llm"][ConfigLeaf.USER_PROFILES]
+		}
+		PhysicalProfiles := _LLM_Menu_DeserializeUserProfiles(Payload)
+		if !(PhysicalProfiles is Array) || !Source["menu"].Has(ConfigLeaf.USER_PROFILES)
+			return false
+		Physical := _LLM_Menu_SerializeUserProfiles(PhysicalProfiles)
+		Live := _LLM_Menu_SerializeUserProfiles(Source["menu"][ConfigLeaf.USER_PROFILES])
+		return Physical is String && Live is String && Physical == Live
+	} catch
+		return false
 }
 
 _LLM_Menu_WriteProfileSource(Source, Path, Updates) {
-	if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])
+	if !_LLM_Menu_ProfileSourceBound(Source) || !_LLM_Menu_ProfileSourceProfilesMatch(Source) || !(Path == Source["path"])
 		return false
 	; The native writer retains this exact pre-dialog image through stage and
 	; replacement; a fresh schema admission must not adopt later external edits.
@@ -656,6 +681,60 @@ _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 }
 
 /**
+ * Opens the native multiline profile fallback and retains explicit cancellation.
+ * InputBox creates a single-line Edit even when its dialog is tall.
+ * @param {string} Prompt - Already translated body above the native Edit.
+ * @param {string} Title - Brandless caption passed through WindowTitle.
+ * @param {string} Options - Width, height and optional timeout, as w520 h320 T5.
+ * @param {string} Default - Exact initial prompt text, including line breaks.
+ * @returns {object} Result (OK, Cancel or Timeout) and entered Value.
+ */
+_LLM_Menu_ProfilePromptInput(Prompt, Title, Options := "", Default := "") {
+	if Trim(RegExReplace(Options, "i)(?:^|\s)(?:[wh]\d+|t(?:\d+(?:\.\d*)?|\.\d+))(?=\s|$)", "")) != ""
+		throw ValueError("The native profile prompt requires only width, height and timeout options.")
+	Width := RegExMatch(Options, "i)(?:^|\s)w(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 520
+	Height := RegExMatch(Options, "i)(?:^|\s)h(\d+)(?=\s|$)", &Match) ? Integer(Match[1]) : 320
+	Timeout := RegExMatch(Options, "i)(?:^|\s)t(\d+(?:\.\d*)?|\.\d+)(?=\s|$)", &Match) ? Number(Match[1]) : 0
+	if Width < 240 || Height < 180 || Timeout < 0 || Timeout > 2147483
+		throw ValueError("The native profile prompt dimensions or timeout are outside their supported bounds.")
+	Dialog := Gui("", WindowTitle(Title))
+	Receipt := {Result: "Cancel", Value: Default}
+	Finished := false
+	TimeoutFn := Finish.Bind("Timeout")
+	try {
+		Dialog.SetFont("s10", "Segoe UI")
+		Dialog.AddText("x12 y12 w" . (Width - 24) . " h36", Prompt)
+		Editor := Dialog.AddEdit("x12 y54 w" . (Width - 24) . " h" . (Height - 106)
+			. " Multi WantReturn VScroll Limit0", Default)
+		Dialog.AddButton("x" . (Width - 204) . " y" . (Height - 40) . " w90 Default", t("button.ok"))
+			.OnEvent("Click", Finish.Bind("OK"))
+		Dialog.AddButton("x+12 yp w90", t("button.cancel")).OnEvent("Click", Finish.Bind("Cancel"))
+		Dialog.OnEvent("Close", Finish.Bind("Cancel"))
+		Dialog.OnEvent("Escape", Finish.Bind("Cancel"))
+		Hwnd := Dialog.Hwnd
+		Dialog.Show("w" . Width . " h" . Height)
+		if !Finished {
+			if Timeout > 0
+				SetTimer(TimeoutFn, -Max(1, Round(Timeout * 1000)))
+			WinWaitClose("ahk_id " . Hwnd)
+		}
+		return Receipt
+	} finally {
+		SetTimer(TimeoutFn, 0)
+		try Dialog.Destroy()
+	}
+
+	Finish(Status, *) {
+		if Finished
+			return
+		Receipt.Value := Editor.Value
+		Receipt.Result := Status
+		Finished := true
+		Dialog.Destroy()
+	}
+}
+
+/**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
 LLM_Menu_PromptCreateProfile(Port := 0) {
@@ -676,6 +755,7 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 	InputFn := Options.Get("input", Ui_InputBox)
+	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
@@ -690,8 +770,8 @@ LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 
-	; Step 2: system prompt (multi-line via Edit control)
-	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
+	; Step 2: system prompt, including native pasted line breaks
+	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
@@ -743,6 +823,7 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 		return ConfigReportPersistenceFailure("the custom LLM profile edit", Options.Get("notify", 0),
 			"the opening configuration source is unavailable")
 	InputFn := Options.Get("input", Ui_InputBox)
+	PromptInputFn := Options.Get("prompt_input", Options.Has("input") ? InputFn : _LLM_Menu_ProfilePromptInput)
 	pid := profile.Has("id") ? profile["id"] : ""
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
@@ -755,7 +836,7 @@ LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
-	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
+	ib_prompt := PromptInputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
 		profile.Has("system_single") ? profile["system_single"] : "")
 	if (ib_prompt.Result != "OK")
 		return
