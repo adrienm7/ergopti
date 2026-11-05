@@ -4996,4 +4996,47 @@ test('apps muted duration is not presented as a focus-time percentage', () => {
 	context.renderDashboard();
 	assert.equal(elements['kpi-sys-mute-detail'].textContent, '');
 });
+for (const host of ['linux', 'macos', 'windows']) {
+	test(`${host} SFB doubling tooltip reports actual bigram count`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-25T12:00:00Z');
+		const container = page.context.document.createElement('div');
+		page.elements.set('sfb_heatmap_container', container);
+		const manifest = { '2026-10-25': { Editor: { chars: 4 } } };
+		publishTypingPage(page, host, manifest);
+		deliverTypingManifest(page, host, manifest, {
+			range: {
+				historical: {},
+				today: {
+					Editor: {
+						bg: { aa: { c: 2 }, aq: { c: 1 } },
+						c: { a: { c: 3 }, q: { c: 1 } },
+						kc: { 0: { c: 3 }, 12: { c: 1 } },
+						sc_kb: { 30: { c: 3 }, 16: { c: 1 } }
+					}
+				}
+			}
+		});
+		page.context.render_sfb_kpi();
+		assert.equal(
+			vm.runInContext(
+				'_sfb_heatmap_full.sfb_pairs_by_kc["0"].reduce((sum, pair) => sum + pair.count, 0)',
+				page.context
+			),
+			3
+		);
+		assert.match(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b><\/td><td[^>]*>67%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td><td[^>]*><b>1<\/b><\/td><td[^>]*>33%<\/td>/);
+		assert.match(container.innerHTML, />aa<\/td>.*?66\.67%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?33\.33%<\/td>/);
+		assert.match(container.innerHTML, />aa<\/td>.*?66\.7%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?33\.3%<\/td>/);
+		page.context.toggle_sfb_same_key();
+		assert.match(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b>/);
+		page.context.toggle_sfb_heatmap_same_key();
+		assert.doesNotMatch(container.innerHTML, />aa<\/td><td[^>]*><b>2<\/b>/);
+		assert.match(container.innerHTML, />aq<\/td><td[^>]*><b>1<\/b><\/td><td[^>]*>100%<\/td>/);
+		assert.match(container.innerHTML, />aq<\/td>.*?100\.00%<\/td>/);
+	});
+}
 console.log(`${passed} passed, 0 failed.`);

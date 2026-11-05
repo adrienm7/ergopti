@@ -1294,11 +1294,11 @@ function render_sfb_kpi() {
 		// build BOTH the full map and the same-key-only delta so the
 		// heatmap-only toggle can switch view without re-running this loop.
 		sfb_by_kc[kc_a] = (sfb_by_kc[kc_a] || 0) + count;
-		sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
+		if (!is_same_key) sfb_by_kc[kc_b] = (sfb_by_kc[kc_b] || 0) + count;
 		if (!sfb_pairs_by_kc[kc_a]) sfb_pairs_by_kc[kc_a] = [];
 		if (!sfb_pairs_by_kc[kc_b]) sfb_pairs_by_kc[kc_b] = [];
 		sfb_pairs_by_kc[kc_a].push({ partner_kc: kc_b, pair_label: k, count });
-		sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
+		if (!is_same_key) sfb_pairs_by_kc[kc_b].push({ partner_kc: kc_a, pair_label: k, count });
 		if (is_same_key) {
 			// Heatmap delta — subtracted at render time when the heatmap
 			// toggle is "doublons exclus".
@@ -1415,13 +1415,12 @@ function _render_sfb_heatmap_with_toggle() {
 		render_sfb_heatmap(full.sfb_by_kc, full.sfb_pairs_by_kc, app_state.data.kc || {});
 		return;
 	}
-	// Subtract same-key deltas from the full map (each side of the pair was
-	// the same key so we credit twice — count is doubled in sfb_by_kc).
+	// Subtract each same-key pair once from the full per-key totals.
 	const adjusted = {};
 	const same = (_sfb_heatmap_same_only && _sfb_heatmap_same_only.sfb_by_kc) || {};
 	Object.entries(full.sfb_by_kc).forEach(([kc_str, n]) => {
 		const dup = same[kc_str] || 0;
-		const v = n - dup * 2;
+		const v = n - dup;
 		if (v > 0) adjusted[kc_str] = v;
 	});
 	// Filter pair lists too — drop any entry where partner_kc === kc itself
