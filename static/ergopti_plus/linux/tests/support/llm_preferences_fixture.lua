@@ -56,6 +56,10 @@ function M.new(options)
 		revision = revision + 1
 		return true
 	end
+	function port.set_with_notice(path, value, _on_notice) return port.set(path, value) end
+	function port.set_many_with_notice(values, expected_source, admission, _on_notice)
+		return port.set_many(values, expected_source, admission)
+	end
 	return port
 end
 

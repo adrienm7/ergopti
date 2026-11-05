@@ -247,7 +247,7 @@ function M.on_message(payload, _state)
 		end
 
 		request.saving = true
-		local ok, accepted = pcall(request.on_save, value)
+		local ok, accepted = pcall(request.on_save, value, function() return current(request) end)
 		request.saving = false
 		if not current(request) then return { saved = false, closed = false, stale = true } end
 		if not ok or accepted == false then

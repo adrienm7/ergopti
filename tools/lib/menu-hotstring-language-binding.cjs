@@ -1796,7 +1796,7 @@ const PERSONAL_DEFAULT_CHOICES = {
 		refusal:
 			'if type(choice) ~= "table" then\n\t\t\t\t\t\tpersonal_choices_admitted = false\n\t\t\t\t\t\treturn {}\n\t\t\t\t\tend',
 		// config-key-literal-ok: quotes the driver source this gate pins
-		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\tEditor.set_pref("default_section", name)\n\t\t\t\t\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return name end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
+		call: 'local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {\n\t\t\t\t\t\t["personal_default_section"] = function()\n\t\t\t\t\t\t\treturn save_editor_pref("default_section", name)\n\t\t\t\t\t\tend,\n\t\t\t\t\t}, {\n\t\t\t\t\t\tpersonal_default_section_label = function() return name end,\n\t\t\t\t\t\tpersonal_default_section_selected = function() return selected end,\n\t\t\t\t\t})',
 		frame:
 			// config-key-literal-ok: quotes the driver source this gate pins
 			'local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {\n\t\t\t\t\t["personal_default_none"] = none_action,\n\t\t\t\t}, {\n\t\t\t\t\t["personal_default_unset"] = function() return current == nil or current == "" end,\n\t\t\t\t\t["personal_default_boundary"] = function() return false end,\n\t\t\t\t}, { ["personal_default_choices"] = function() return choices end })',
@@ -2031,6 +2031,17 @@ function personalDefaultChoicePublication(source, platform, manifest) {
 							extension
 						);
 		}
+		if (
+			platform === 'linux' &&
+			(bindings(body, extension, 'save_editor_pref').length !== 0 ||
+				!route(body, extension, [
+					[
+						'local function save_editor_pref(key, value)\n\t\t\t\t\tlocal saved = Editor.set_pref(key, value)\n\t\t\t\tif saved ~= true then\n\t\t\t\t\tLogger.error(LOG, "Hotstring editor preference could not be saved.")\n\t\t\t\t\tshow_error(i18n_safe("dialog.personal_info.save_failed_title"), i18n_safe("common.error_title"))\n\t\t\t\t\treturn false\n\t\t\t\tend\n\t\t\t\tif type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end\n\t\t\t\treturn true\n\t\t\tend',
+						1
+					]
+				]))
+		)
+			return false;
 		const statements = [
 			...(proof.enclosure ? [[proof.enclosure, proof.enclosureDepth]] : []),
 			[proof.prefix, proof.frameDepth],

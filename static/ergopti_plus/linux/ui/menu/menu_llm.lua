@@ -44,11 +44,13 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	local Prefs = require("infra.llm_preferences")
 	local Paths = require("infra.config_paths")
 	local set, get_many, generation = owner.set, Prefs.get_many, Prefs.generation
+	local classified, retained = owner.set_with_reason, owner.set_with_source_notice
 	local revision_current, publish, config = Prefs.is_current_revision, Prefs.set_many, Paths.config
 	if type(set) ~= "function" or type(get_many) ~= "function" or type(generation) ~= "function"
 		or type(revision_current) ~= "function" or type(publish) ~= "function" or type(config) ~= "function" then return nil end
 	local function ports_current()
-		return package.loaded[module_name] == owner and owner.set == set
+		return package.loaded[module_name] == owner and owner.set == set and owner.set_with_reason == classified
+			and owner.set_with_source_notice == retained
 			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
 			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
 			and Prefs.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
@@ -63,21 +65,36 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 		local read, selected = pcall(config, "config.toml")
 		return read and selected == root and ports_current() and revision_current(revision) == true and ports_current()
 	end
-	local function refused()
+	local function refused(page_current, invalid)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
+		if page_current and page_current() ~= true then return false end
 		local okay, notifier = pcall(require, "adapters.notifier")
-		if okay and type(notifier.send) == "function" then
-			pcall(SaveFailure.present, i18n_safe, function(message) notifier.send(message, { level = "error" }) end)
+		if okay and type(notifier.send) == "function" and (not page_current or page_current() == true) then
+			local message = i18n_safe(invalid and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
+			if not page_current or page_current() == true then pcall(notifier.send, message, { level = "error" }) end
 		end
 		return false
 	end
 	if not current() then refused(); return nil end
-	return values[path], function(value)
-		if not current() then return refused() end
+	return values[path], function(value, page_current)
+		if page_current and page_current() ~= true then return false end
+		if not current() then return refused(page_current) end
 		local checked, actual = pcall(generation)
-		if not checked or actual ~= revision or not current() then return refused() end
-		local saved, accepted = pcall(set, name, value, source, current)
-		if not saved or accepted ~= true then return refused() end
+		if not checked or actual ~= revision or not current() then return refused(page_current) end
+		local noticed = false
+		local receipt = { admit = page_current, acknowledge = function() noticed = true end }
+		local saved, accepted, reason = pcall(classified or retained or set, name, value, source, current, receipt)
+		if not saved then
+			Logger.error(LOG, "Numeric setting callback raised (error type: %s).", type(accepted))
+			return false
+		end
+		if accepted ~= true then
+			if noticed then return false end
+			local reread, _, observed = pcall(get_many, { path })
+			if not reread or type(observed) ~= "table" or observed.status ~= source.status
+				or observed.content ~= source.content then return false end
+			return refused(page_current, reason == "invalid")
+		end
 		if type(refresh) == "function" then refresh() end
 		return true
 	end
@@ -91,9 +108,12 @@ end
 --- @param classified boolean|nil Whether the owner exposes a closed refusal reason.
 --- @return boolean committed
 local function commit_preset(owner, name, value, refresh, classified)
-	local setter = classified and owner.set_with_reason or owner.set
+	local setter = classified and owner.set_with_reason or owner.set_with_notice
 	if type(setter) ~= "function" then return false end
-	local accepted, reason = setter(name, value)
+	local noticed = false
+	local accepted, reason
+	if classified then accepted, reason = setter(name, value, nil, nil, function() noticed = true end)
+	else accepted, noticed = setter(name, value) end
 	if accepted ~= true then
 		if classified and reason == "invalid" then
 			local okay, notifier = pcall(require, "adapters.notifier")
@@ -104,10 +124,10 @@ local function commit_preset(owner, name, value, refresh, classified)
 		end
 		if classified and reason ~= "persistence" then return false end
 		Logger.error(LOG, "Preset setting '%s' could not be saved.", name)
+		if noticed == true then return false end
 		local okay, notifier = pcall(require, "adapters.notifier")
 		if okay and type(notifier.send) == "function" then
-			pcall(SaveFailure.present, function() return i18n_safe("dialog.personal_info.save_failed_title") end,
-				function(message) notifier.send(message, { level = "error" }) end)
+			pcall(notifier.send, i18n_safe("dialog.personal_info.save_failed_title"), { level = "error" })
 		end
 		return false
 	end
@@ -203,7 +223,7 @@ local function _build_llm(ctx)
 						value = value,
 						min = bounds.min,
 						max = bounds.max,
-						on_save = function(number) return save(math.floor(number)) end,
+						on_save = function(number, page_current) return save(math.floor(number), page_current) end,
 					}, ctx.webview)
 				end,
 			})

@@ -113,6 +113,75 @@ local function find(rows, title)
 end
 
 helpers.describe("complete personal hotstring shared frames (Linux)", function()
+	helpers.it("a previous TOML case-twin notice cannot suppress a JSON save error", function()
+		with_personal_frame(function(f)
+			local rows = f.build()
+			local parent = assert(find(rows, f.corpus.default_parent_labels.linux.en))
+			local prior = package.loaded["toml_codec.writer"]
+			package.loaded["toml_codec.writer"] = nil
+			local writer = require("toml_codec.writer")
+			local path = os.tmpname()
+			local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
+			local reports = 0
+			writer.set_case_twin_reporter(function() reports = reports + 1 end)
+			assert(writer.prepare_batch(path, { { section = "section", key = "key", value = 3 } }) == false)
+			local rename, execute, notices = os.rename, os.execute, 0
+			os.rename = function(from, to) if to:match("/storage%.json$") then return false, "inert refusal" end; return rename(from, to) end
+			os.execute = function(command) if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end; return execute(command) end
+			local called, result = pcall(parent.menu[1].fn)
+			os.rename, os.execute = rename, execute
+			os.remove(path)
+			package.loaded["toml_codec.writer"] = prior
+			helpers.assert_true(called)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(reports, 1)
+			helpers.assert_eq(notices, 1)
+		end)
+	end)
+	helpers.it("does not report rollback when an editor preference raises after commit", function()
+		with_personal_frame(function(f)
+			local rows, before = f.build(), f.read_source()
+			local parent = assert(find(rows, f.corpus.default_parent_labels.linux.en))
+			local save, execute, notices = f.bridge.set_pref, os.execute, 0
+			f.bridge.set_pref = function(...) assert(save(...) == true); error("inert post-save exception") end
+			os.execute = function(command)
+				if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end
+				return execute(command)
+			end
+			local ok = pcall(parent.menu[1].fn)
+			f.bridge.set_pref, os.execute = save, execute
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(notices, 0)
+			helpers.assert_true(f.read_source() ~= before)
+		end)
+	end)
+	helpers.it("reports refused editor preferences without redrawing a successful change", function()
+		with_personal_frame(function(f)
+			local rows, before = f.build(), f.read_source()
+			local parent = assert(find(rows, f.corpus.default_parent_labels.linux.en))
+			local controls = { parent.menu[1], parent.menu[2], assert(find(rows, f.get("menu.hotstrings.close_on_add"))) }
+			local rename, execute, notices = os.rename, os.execute, 0
+			os.rename = function(from, to)
+				if to:match("/storage%.json$") then return false, "inert refusal" end
+				return rename(from, to)
+			end
+			os.execute = function(command)
+				if command:find("dialog_host.lua", 1, true) then
+					assert(command:find(f.get("dialog.personal_info.save_failed_title"), 1, true))
+					notices = notices + 1; return 0
+				end
+				return execute(command)
+			end
+			local ok, err = pcall(function()
+				for _, control in ipairs(controls) do helpers.assert_eq(control.fn(), false) end
+			end)
+			os.rename, os.execute = rename, execute
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(f.read_source(), before)
+			helpers.assert_eq(f.changes(), 0)
+			helpers.assert_eq(notices, 3)
+		end)
+	end)
 	helpers.it("retains the literal native section order and persistent current default", function()
 		with_personal_frame(function(f)
 			local before = f.read_source()
