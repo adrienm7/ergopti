@@ -231,17 +231,21 @@ end
 --- @param text string
 --- @return boolean
 local function valid_ipv6(text)
-	if not text:find("^[%x:]+$") or not text:find("%x") then return false end
+	if not text:find("^[%x:]+$") then return false end
 	local colons = count(text, ":")
 	local compressed = count(text, "::")
-	if colons < 2 or colons > 7 or compressed > 1 or text:find(":::", 1, true) then return false end
+	if colons < 2 or compressed > 1 or text:find(":::", 1, true) then return false end
 	if compressed == 0 and colons ~= 7 then return false end
 	if (starts_with(text, ":") and not starts_with(text, "::"))
 		or (ends_with(text, ":") and not ends_with(text, "::")) then return false end
+	local groups = 0
 	for group in text:gmatch("[^:]+") do
 		if #group > 4 then return false end
+		groups = groups + 1
 	end
-	return true
+	-- A double colon replaces at least one of eight groups, including all
+	-- eight in ::. At either edge seven written groups need eight colons.
+	return compressed == 1 and groups < 8 or compressed == 0 and groups == 8
 end
 
 --- Whether one dot-separated label can be part of a host name.
