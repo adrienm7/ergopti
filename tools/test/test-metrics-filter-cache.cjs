@@ -4830,4 +4830,29 @@ test('apps recovery ranking admits qualifying zero-delay corrections', () => {
 	assert.equal(elements['kpi-tx-recovery-app'].textContent, 'Editor');
 	assert.equal(elements['kpi-tx-recovery-app-detail'].textContent, '0 ms en moyenne');
 });
+test('apps burst histogram labels the open-ended class above 500', () => {
+	const fixture = appsFixture();
+	const context = fixture.context;
+	vm.runInContext(read('metrics_apps/charts.js'), context);
+	context.document.getElementById = (id) =>
+		id === 'burst_histogram_chart' ? { getContext: () => 'bursts' } : null;
+	let chart;
+	context.Chart = class {
+		constructor(_owner, config) {
+			chart = config;
+		}
+		destroy() {}
+	};
+	context.window.bootstrapMetricsAppsData(
+		{
+			'2026-10-25': { Editor: { burst_length_buckets: { 500: 2, '500+': 1 } } }
+		},
+		{},
+		{}
+	);
+	fixture.set("currentPeriod = 'all';");
+	context.renderBurstHistogram(fixture.get());
+	assert.deepEqual(Array.from(chart.data.labels), ['≤ 500', '> 500']);
+	assert.deepEqual(Array.from(chart.data.datasets[0].data), [2, 1]);
+});
 console.log(`${passed} passed, 0 failed.`);
