@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "الحد الأقصى من الكلمات لكل اقتراح: %s",
 	"menu.llm.max_words_prompt": "الحد الأقصى لعدد الكلمات في الاقتراح (0 = غير محدود):",
 	"menu.llm.min_words_label": "الحد الأدنى من الكلمات لكل اقتراح: %s",
+	"menu.llm.word_limits_incompatible": "لا يمكن أن يتجاوز الحد الأدنى الحد الأقصى لعدد الكلمات.",
 	"menu.llm.min_words_prompt": "الحد الأدنى لعدد الكلمات في كل اقتراح:",
 	"menu.llm.mlx_model_hint": "معرّف HuggingFace لنموذج MLX، مثال: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "منفذ خادم %s: %s",

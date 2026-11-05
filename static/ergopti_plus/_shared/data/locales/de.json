@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Max. Wörter pro Vorschlag: %s",
 	"menu.llm.max_words_prompt": "Maximale Anzahl Wörter pro Vorschlag (0 = unbegrenzt):",
 	"menu.llm.min_words_label": "Min. Wörter pro Vorschlag: %s",
+	"menu.llm.word_limits_incompatible": "Das Minimum darf die maximale Wortzahl nicht überschreiten.",
 	"menu.llm.min_words_prompt": "Minimale Anzahl Wörter pro Vorschlag:",
 	"menu.llm.mlx_model_hint": "HuggingFace-Kennung für das MLX-Modell, z. B.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s-Server-Port: %s",

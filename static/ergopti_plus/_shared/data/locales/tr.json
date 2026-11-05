@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Öneri başına maks. kelime: %s",
 	"menu.llm.max_words_prompt": "Öneri başına maksimum kelime sayısı (0 = sınırsız):",
 	"menu.llm.min_words_label": "Öneri başına min. kelime: %s",
+	"menu.llm.word_limits_incompatible": "En az değer, en fazla kelime sayısını aşamaz.",
 	"menu.llm.min_words_prompt": "Öneri başına minimum kelime sayısı:",
 	"menu.llm.mlx_model_hint": "MLX modeli için HuggingFace tanımlayıcısı, ör.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s sunucu bağlantı noktası: %s",

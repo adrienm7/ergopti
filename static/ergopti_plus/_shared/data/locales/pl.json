@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Maks. słów na sugestię: %s",
 	"menu.llm.max_words_prompt": "Maksymalna liczba słów na sugestię (0 = bez limitu):",
 	"menu.llm.min_words_label": "Min. słów na sugestię: %s",
+	"menu.llm.word_limits_incompatible": "Minimum nie może przekraczać maksymalnej liczby słów.",
 	"menu.llm.min_words_prompt": "Minimalna liczba słów na sugestię:",
 	"menu.llm.mlx_model_hint": "Identyfikator HuggingFace dla modelu MLX, np.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "Port serwera %s: %s",

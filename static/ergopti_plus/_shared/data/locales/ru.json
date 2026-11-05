@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Максимум слов в предложении: %s",
 	"menu.llm.max_words_prompt": "Максимальное количество слов в предложении (0 = без ограничений):",
 	"menu.llm.min_words_label": "Минимум слов в предложении: %s",
+	"menu.llm.word_limits_incompatible": "Минимум не может превышать максимальное число слов.",
 	"menu.llm.min_words_prompt": "Минимальное количество слов в предложении:",
 	"menu.llm.mlx_model_hint": "Идентификатор HuggingFace для модели MLX, напр.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "Порт сервера %s: %s",

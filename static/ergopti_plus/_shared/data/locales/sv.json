@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Högsta ord per förslag: %s",
 	"menu.llm.max_words_prompt": "Maximalt antal ord per förslag (0 = obegränsat):",
 	"menu.llm.min_words_label": "Minsta ord per förslag: %s",
+	"menu.llm.word_limits_incompatible": "Minimum får inte överstiga det maximala antalet ord.",
 	"menu.llm.min_words_prompt": "Minsta antal ord per förslag:",
 	"menu.llm.mlx_model_hint": "HuggingFace-identifierare för MLX-modellen, t.ex.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "%s-serverport: %s",

@@ -1888,6 +1888,7 @@
 	"menu.llm.max_words_label": "Mots max par suggestion : %s",
 	"menu.llm.max_words_prompt": "Nombre maximum de mots par suggestion (0 = illimité) :",
 	"menu.llm.min_words_label": "Mots min par suggestion : %s",
+	"menu.llm.word_limits_incompatible": "Le minimum ne peut pas dépasser le nombre maximal de mots.",
 	"menu.llm.min_words_prompt": "Nombre minimum de mots à générer par suggestion :",
 	"menu.llm.mlx_model_hint": "Identifiant HuggingFace du modèle MLX, par exemple : mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.model_backend": "Backend : %s",

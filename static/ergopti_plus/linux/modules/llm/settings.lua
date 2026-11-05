@@ -151,42 +151,42 @@ end
 --- @param expected_source table|nil Exact source retained by a deferred editor.
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean Whether it was accepted.
-function M.set(name, value, expected_source, admission)
+local function set_with_reason(name, value, expected_source, admission)
 	local default = shipped()[name]
 	if default == nil then
 		Logger.error(LOG, "set(): '%s' has no shipped default — refusing to store it.", tostring(name))
-		return false
+		return false, "invalid"
 	end
 	if not in_bounds(name, value) then
 		local bounds = BOUNDS[name]
 		local expectation = bounds and string.format("%s..%s", bounds.min, bounds.max) or "a boolean"
 		Logger.error(LOG, "set(): %s = %s is invalid (expected %s) — refused.",
 			name, tostring(value), expectation)
-		return false
+		return false, "invalid"
 	end
 	if name == LEAF.MIN_WORDS then
 		local maximum = M.get(LEAF.MAX_WORDS)
 		if maximum and maximum > 0 and value > maximum then
 			Logger.error(LOG, "set(): min_words cannot exceed max_words — refused.")
-			return false
+			return false, "invalid"
 		end
 	elseif name == LEAF.MAX_WORDS then
 		local minimum = M.get(LEAF.MIN_WORDS)
 		if value > 0 and minimum and value < minimum then
 			Logger.error(LOG, "set(): max_words cannot be lower than min_words — refused.")
-			return false
+			return false, "invalid"
 		end
 	end
 
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage — '%s' was not changed.", name)
-		return false
+		return false, "persistence"
 	end
 	local persisted
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or type(admission) ~= "function"
-			or type(Storage.set_many) ~= "function" then return false end
+			or type(Storage.set_many) ~= "function" then return false, "invalid" end
 		persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, expected_source, admission)
 	elseif value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
@@ -197,11 +197,33 @@ function M.set(name, value, expected_source, admission)
 	end
 	if not persisted then
 		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", name)
-		return false
+		return false, "persistence"
 	end
 	_values[name] = value
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
+end
+
+--- Sets one value with a closed refusal reason for user-facing callers.
+--- @param name string Generation setting name.
+--- @param value number|boolean Candidate value.
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Original configuration admission.
+--- @return boolean accepted
+--- @return string|nil reason "invalid" or "persistence" on refusal.
+function M.set_with_reason(name, value, expected_source, admission)
+	return set_with_reason(name, value, expected_source, admission)
+end
+
+--- Sets one value, retaining the original single-result contract.
+--- @param name string Generation setting name.
+--- @param value number|boolean Candidate value.
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Original configuration admission.
+--- @return boolean accepted
+function M.set(name, value, expected_source, admission)
+	local accepted = set_with_reason(name, value, expected_source, admission)
+	return accepted
 end
 
 --- The values a menu offers for one setting, lowest first.

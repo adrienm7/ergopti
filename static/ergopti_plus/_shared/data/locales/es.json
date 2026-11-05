@@ -1893,6 +1893,7 @@
 	"menu.llm.max_words_label": "Máx. palabras por sugerencia: %s",
 	"menu.llm.max_words_prompt": "Número máximo de palabras por sugerencia (0 = ilimitado):",
 	"menu.llm.min_words_label": "Mín. palabras por sugerencia: %s",
+	"menu.llm.word_limits_incompatible": "El mínimo no puede superar el número máximo de palabras.",
 	"menu.llm.min_words_prompt": "Número mínimo de palabras por sugerencia:",
 	"menu.llm.mlx_model_hint": "Identificador HuggingFace del modelo MLX, p. ej.: mlx-community/Qwen2.5-3B-Instruct-4bit",
 	"menu.llm.server_port_label": "Puerto del servidor %s: %s",
