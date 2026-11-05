@@ -53,7 +53,9 @@ for (const [method, key] of [
 		100,
 		`${method}: scientific notation must preserve its actual numeric value`
 	);
-	for (const invalid of ['', '2.5', '9007199254740992']) {
+	for (const invalid of method === 'bindDelay'
+		? ['', '2.5', '9007199254740992']
+		: ['2.5', '9007199254740992']) {
 		f.input.value = invalid;
 		f.input.change();
 		assert.equal(
@@ -63,4 +65,21 @@ for (const [method, key] of [
 		);
 	}
 }
-console.log('hotstring numeric settings preserve entered values');
+for (const section of [null, { name: 'snippets', priority: 3, priority_default: 5 }]) {
+	const f = field();
+	context.bindPriority(f, category, section);
+	f.input.value = '';
+	f.input.validity = { badInput: true };
+	f.input.change();
+	assert.equal(messages.length, 0, 'an unfinished numeric edit must not erase the override');
+	f.input.validity = { badInput: false };
+	f.input.change();
+	const clear = messages.pop();
+	assert.equal(clear?.action, 'clear_priority', 'clearing priority must request inheritance');
+	assert.equal(
+		clear?.section,
+		section?.name || '',
+		'the correct category or section must be cleared'
+	);
+}
+console.log('hotstring numeric settings preserve entered values and clear priority');

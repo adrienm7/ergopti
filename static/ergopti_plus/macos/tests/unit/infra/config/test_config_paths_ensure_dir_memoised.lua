@@ -162,7 +162,7 @@ helpers.describe("config_paths falls back to the shell when hs.fs.mkdir is absen
 		local created = false
 		local config_paths = helpers.load_with_stubs("infra.config_paths", {
 			-- No mkdir field: emulates a host where the filesystem API is unavailable.
-			fs      = { attributes = function() return created and {} or nil end,
+			fs      = { attributes = function() return created and { mode = "directory" } or nil end,
 			            dir        = function() return function() return nil end end },
 			execute = function()
 				counters.shell = counters.shell + 1
@@ -190,6 +190,27 @@ end)
 -- =====================================================
 
 helpers.describe("config_paths retries a directory it could not create", function()
+	helpers.it("rechecks a previously ensured directory after it disappears", function()
+		local exists, attempts = true, 0
+		local config_paths = helpers.load_with_stubs("infra.config_paths", {
+			fs = {
+				attributes = function() return exists and { mode = "directory" } or nil end,
+				mkdir = function() attempts = attempts + 1; return nil, "permission denied" end,
+			},
+			execute = function() return "", false end,
+		})
+		helpers.assert_true(config_paths.ensure_dir("/removed/"))
+		exists = false
+		helpers.assert_eq(config_paths.ensure_dir("/removed/"), false, "a removed path cannot remain ensured")
+		helpers.assert_true(attempts > 0, "the missing directory must be retried")
+	end)
+	helpers.it("does not accept a regular file as an ensured directory", function()
+		local config_paths = helpers.load_with_stubs("infra.config_paths", {
+			fs = { attributes = function() return { mode = "file" } end, mkdir = function() return nil end },
+			execute = function() return "", false end,
+		})
+		helpers.assert_eq(config_paths.ensure_dir("/file/"), false)
+	end)
 	helpers.it("does not memoise a path whose creation was refused", function()
 		-- hs.fs.mkdir follows LuaFileSystem semantics: it RETURNS nil plus an error
 		-- and never raises, so reading the pcall STATUS reported success for a create
