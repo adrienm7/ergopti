@@ -2532,7 +2532,8 @@ function LayerPointer.sync()
 		local grabbed = false
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
-			local mask = not LayerPointer.slots[slot] and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
+			local mask = not LayerPointer.slots[slot] and not _sync_dropped[slot]
+				and EvdevReader.is_open(slot) and EvdevReader.event_capabilities(slot) or nil
 			if mask and LayerPointer.forwardable(mask) then
 				if LayerPointer.has_type(mask, 4) then
 					local misc = EvdevReader.event_capabilities(slot, 4)
@@ -2629,6 +2630,14 @@ local function _dispatch_pointer(ev, slot)
 		M.emergency_stop("grabbed pointer queue desynchronised")
 		return
 	end
+	if slot ~= nil then
+		if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_DROPPED then
+			_sync_dropped[slot] = true
+		elseif _sync_dropped[slot] then
+			if ev.type == EVDEV_TYPE_SYN and ev.code == SYN_REPORT then _sync_dropped[slot] = nil
+			else return end
+		end
+	end
 	local pointer_key = ev.type == EVDEV_TYPE_KEY and (InputEvent.is_pointer_button(ev.code)
 		or ev.code >= 0x140 and ev.code <= 0x14f) -- BTN_DIGI contacts and tools
 	if ev.type == EVDEV_TYPE_KEY and ev.code >= 1 and not pointer_key then
@@ -2696,6 +2705,7 @@ local function _read_source(source)
 	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
+	if not source.keyboard then _sync_dropped[source.slot] = nil end
 	if not source.keyboard and _on_pointer_event then
 		_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, source.slot)
 		if not _running or _capture_session ~= session then return nil end
@@ -3156,6 +3166,7 @@ local function _close_paths(paths, slot_for, tx, cancelled)
 		else EvdevReader.close(slot) end
 		if cancelled and cancelled() then return false end
 		_pending_events[slot] = nil
+		if slot_for == pointer_slot then _sync_dropped[slot] = nil end
 		if pointer_open and _on_pointer_event then
 			_call_callback("pointer event callback", _on_pointer_event, "reset", nil, nil, slot)
 		end
