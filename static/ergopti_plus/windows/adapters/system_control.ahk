@@ -406,6 +406,14 @@ class SystemControl {
 	; @returns {String} "removed", "absent" or "failed".
 	DeleteZoneIdentifier(Path) {
 		global SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND
+		; Inspect the selected entry itself before touching its stream. A selected
+		; file symlink is an incomplete operation, not an absent target stream.
+		; This remains a cooperative pathname check, not an identity lease.
+		Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
+		if Attributes == 0xFFFFFFFF
+			return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
+		if Attributes & 0x400 ; FILE_ATTRIBUTE_REPARSE_POINT
+			return "failed"
 		if DllCall("DeleteFileW", "Str", Path . ":Zone.Identifier", "Int")
 			return "removed"
 		return (A_LastError = SYSTEM_CONTROL_ERROR_FILE_NOT_FOUND) ? "absent" : "failed"
@@ -461,6 +469,14 @@ class SystemControl {
 		Exhausted := false
 		while Pending.Length && !Exhausted {
 			Current := Pending.Pop(), Data := Buffer(592, 0)
+			; FindFirstFileW inspects children, so it cannot reject a selected root
+			; that is itself a junction. Recheck each queued directory before entry;
+			; descendants may also have changed since their enumeration receipt.
+			Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Current, "UInt")
+			if Attributes == 0xFFFFFFFF || !(Attributes & 0x10) || (Attributes & 0x400) {
+				Failed += 1
+				continue
+			}
 			Search := DllCall("Kernel32\FindFirstFileW", "Str", RTrim(Current, "\/") . "\*", "Ptr", Data, "Ptr")
 			if Search == -1 {
 				; No matches is a valid empty directory; all other failures are incomplete.
