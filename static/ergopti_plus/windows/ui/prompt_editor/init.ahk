@@ -139,8 +139,10 @@ _PromptEdWeb_TryOpen(Existing, OpeningSource := 0) {
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
 	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
 
-	_PromptEdWeb_RetryRetiredHosts()
 	ExpectedContext := { Serial: _PromptEdWeb_EpochSerial, Epoch: _PromptEdWeb_ContextEpoch }
+	_PromptEdWeb_RetryRetiredHosts()
+	if ExpectedContext.Serial != _PromptEdWeb_EpochSerial || ExpectedContext.Epoch != _PromptEdWeb_ContextEpoch
+		return true
 	if !_PromptEdWeb_Available()
 		return false
 	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()

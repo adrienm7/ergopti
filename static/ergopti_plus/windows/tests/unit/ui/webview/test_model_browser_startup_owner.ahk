@@ -130,3 +130,7 @@ for _MBSTO_SdkMode in ["subscription-throw-current", "subscription-throw-retired
 
 Test("Model browser SDK refusal: real Close during unwind keeps fallback canceled (model-subscription-sdk-reset-close-owner)",
 	_MBSTO_Case.Bind("subscription-throw-unwind-close"))
+
+for _MBSTO_RetryMode in ["retry-current", "retry-reentry"]
+	Test("Model browser initial retirement: " . _MBSTO_RetryMode . " preserves native cancellation (model-browser-native-initial-retirement-reentry)",
+		_MBSTO_Case.Bind(_MBSTO_RetryMode))

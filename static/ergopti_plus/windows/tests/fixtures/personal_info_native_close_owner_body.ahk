@@ -20,7 +20,7 @@ Gui_Create(Options := "", Title := "") {
 	global _PINS
 	Window := Gui(Options, Title)
 	_PINS.Windows.Push(Window), _PINS.Hwnds.Push(Window.Hwnd)
-	_PINS_Require(_PINS.Windows.Length <= 2, "Only one actual successor may be constructed")
+	_PINS_Require(_PINS.Windows.Length <= (InStr(_PINS.Mode, "retry-") == 1 ? 3 : 2), "Only one actual successor may be constructed")
 	return Window
 }
 class WebView2 {
@@ -89,10 +89,27 @@ class _PINS_View {
 }
 class _PINS_Controller {
 	__New() {
-		this.CoreWebView2 := _PINS_View(), this.Closed := 0, this.Fills := 0
+		this.CoreWebView2 := _PINS_View(), this.Closed := 0, this.Fills := 0, this.Attempts := 0
 	}
 	Close() {
 		global _PINS
+		this.Attempts += 1
+		if InStr(_PINS.Mode, "retry-") == 1 && this == _PINS.Controllers[1] {
+			if _PINS.RetryRefuse {
+				_PINS.RetryRefuse := false
+				_PINS.RetryRefusals += 1
+				throw Error("Controlled SDK Close refusal before effect")
+			}
+			if _PINS.RetryReenter {
+				_PINS.RetryReenter := false
+				PersonalInformationEditor()
+				_PINS_Require(_PINS.Windows.Length == 2 && _PINS.Controllers.Length == 2,
+					"The retirement callout must really open a second public native editor")
+				_PINS.RetrySuccessor := true
+				_PINS_RetryNativeClose(2, true)
+				_PINS.RetrySuccessorClosed := _PINS.Controllers[2].Closed == 1
+			}
+		}
 		this.Closed += 1
 		if _PINS.Mode == "subscription-error-reopen" && !_PINS.CloseReopen && this == _PINS.Controllers[1] {
 			_PINS.CloseReopen := true
@@ -138,6 +155,58 @@ _PINS_Destroy(Hwnd, Message, WParam, LParam, Id, RefData) {
 		return 0
 	} finally _PINS.Callbacks -= 1
 }
+
+_PINS_RetryNativeClose(Index, RequireDestroyed) {
+	global _PINS, _PiEdWeb_SessionEpoch
+	Hwnd := _PINS.Hwnds[Index], Epoch := _PiEdWeb_SessionEpoch, NativePid := 0
+	_PINS_Require(DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &NativePid, "UInt")
+		&& NativePid == ProcessExist() && DllCall("User32\IsWindowVisible", "Ptr", Hwnd, "Int"),
+		"Native Close must target the exact visible private editor")
+	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+	Started := A_TickCount
+	while (_PiEdWeb_SessionEpoch == Epoch || (RequireDestroyed && DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")))
+		&& TickElapsed64(Started) < 1500
+		Sleep(10)
+	_PINS_Require(_PiEdWeb_SessionEpoch != Epoch && (!RequireDestroyed || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")),
+		"The genuine native handler must revoke its epoch and complete any requested exact destruction")
+}
+_PINS_RetryExercise() {
+	global _PINS, _PiEdWeb_RetiredHosts, _PiEdWeb_Gui, _PiEdWeb_ResetDone
+	_PINS_Require(_PiEdWeb_RetiredHosts.Length == 0, "No retirement record may be fabricated before the public open")
+	PersonalInformationEditor()
+	_PINS_Require(_PINS.Windows.Length == 1 && _PINS.Controllers.Length == 1
+		&& _PINS.Controllers[1].Attempts == 0, "The real public editor must acquire its current native/controller pair")
+	_PINS.RetryRefuse := true
+	_PINS_RetryNativeClose(1, false)
+	DebtCreated := _PINS.RetryRefusals == 1 && _PINS.Controllers[1].Attempts == 1
+		&& _PINS.Controllers[1].Closed == 0 && _PiEdWeb_RetiredHosts.Length == 1
+		&& !IsObject(_PiEdWeb_Gui) && DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int")
+	FileAppend("RECEIPT personal-initial-retry mode=" . _PINS.Mode . " debt_created=" . DebtCreated . "`n", "*")
+	_PINS_Require(DebtCreated, "One real Close refusal before effect must produce the original pending host")
+	_PINS.RetryReenter := _PINS.Mode == "retry-reentry"
+	PersonalInformationEditor()
+	FileAppend("RECEIPT personal-initial-retry result mode=" . _PINS.Mode
+		. " windows=" . _PINS.Windows.Length . " controllers=" . _PINS.Controllers.Length
+		. " old_attempts=" . _PINS.Controllers[1].Attempts . " old_closed=" . _PINS.Controllers[1].Closed
+		. " successor_opened=" . _PINS.RetrySuccessor . " successor_closed=" . _PINS.RetrySuccessorClosed
+		. " gui=" . IsObject(_PiEdWeb_Gui) . " pending=" . _PiEdWeb_RetiredHosts.Length . "`n", "*")
+	_PINS_Require(_PINS.Controllers[1].Attempts == 2 && _PINS.Controllers[1].Closed == 1
+		&& !DllCall("User32\IsWindow", "Ptr", _PINS.Hwnds[1], "Int") && _PiEdWeb_RetiredHosts.Length == 0,
+		"Retry must retire the exact formerly refused browser and its native host")
+	if _PINS.Mode == "retry-current" {
+		_PINS_Require(_PINS.Windows.Length == 2 && _PINS.Controllers.Length == 2
+			&& _PiEdWeb_Gui == _PINS.Windows[2] && !_PiEdWeb_ResetDone,
+			"A current request must still open after successful retirement without an intervening public intent")
+		_PINS_RetryNativeClose(2, true)
+	} else {
+		_PINS_Require(_PINS.RetrySuccessor && _PINS.RetrySuccessorClosed,
+			"The nested public successor must really open and complete native Close before the outer opening resumes")
+		_PINS_Require(_PINS.Windows.Length == 2 && _PINS.Controllers.Length == 2
+			&& !IsObject(_PiEdWeb_Gui) && _PiEdWeb_ResetDone,
+			"The older request must not reopen an editor after the intervening native cancellation")
+	}
+}
+
 _PINS_Main() {
 	global _PINS, _VendorDir, _SharedDir, ScriptInformation
 	global PersonalInformation, PersonalInformationLetters, HSE_RuntimeDecisionGeneration
@@ -146,12 +215,13 @@ _PINS_Main() {
 	if A_Args.Length != 5 || A_Args[1] != "personal-info"
 		ExitApp(2)
 	Mode := A_Args[2], Root := A_Args[3]
-	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close" || Mode == "subscription-current" || Mode == "subscription-close" || Mode == "subscription-reset-close" || Mode == "subscription-error-current" || Mode == "subscription-error-reopen" || Mode == "subscription-reset-retain")
+	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close" || Mode == "subscription-current" || Mode == "subscription-close" || Mode == "subscription-reset-close" || Mode == "subscription-error-current" || Mode == "subscription-error-reopen" || Mode == "subscription-reset-retain" || Mode == "retry-current" || Mode == "retry-reentry")
 	_PINS := {Mode: Mode, AddEntered: 0, CloseAcknowledged: false, HwndAtAddReturn: false,
 		HwndAtControllerClose: false, RetiredAtControllerClose: 0, SubscriptionsRetired: 0, ResetRetained: false, ResetCloseDetached: false, Errors: 0, CloseReopen: false,
 		Windows: [], Hwnds: [], Controllers: [], Callbacks: 0, Active: false,
 		Fired: false, Failure: 0, Reopens: 0, SeenBeforeReturn: false,
-		OldHwnd: 0, NewGui: 0, NewHwnd: 0, NewAliveBefore: false}
+		OldHwnd: 0, NewGui: 0, NewHwnd: 0, NewAliveBefore: false,
+		RetryRefuse: false, RetryRefusals: 0, RetryReenter: false, RetrySuccessor: false, RetrySuccessorClosed: false}
 	_VendorDir := Root, _SharedDir := Root
 	ScriptInformation := Map("PersonalInfoTomlPath", Root . "\personal_info.toml")
 	PersonalInformation := Map("first_name", "Private default")
@@ -162,7 +232,9 @@ _PINS_Main() {
 	Subclass := 0, Primary := 0
 	Thread("Interrupt", 0)
 	try {
-		if Mode == "subscription-reset-retain" {
+		if InStr(Mode, "retry-") == 1 {
+			_PINS_RetryExercise()
+		} else if Mode == "subscription-reset-retain" {
 			OpenFailure := 0
 			try PersonalInformationEditor()
 			catch Any as OpenError

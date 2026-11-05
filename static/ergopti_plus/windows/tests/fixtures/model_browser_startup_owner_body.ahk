@@ -13,7 +13,8 @@
 global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false, NativeAliveAtSubscriptionReturn: false, NativeAliveAtControllerClose: false, SdkFailure: Error("Controlled model SDK add-event refusal"),
 	SdkCalls: 0, SdkPublicLogs: 0, SdkRetiredLogs: 0, SdkCaught: 0, SdkAliveAtThrow: false,
 	ResetHookInstalled: false, ResetHadCall: false, ResetCallDescriptor: 0,
-	UnwindStarted: false, UnwindCloseAcknowledged: false, ForwardedResetRefused: false}
+	UnwindStarted: false, UnwindCloseAcknowledged: false, ForwardedResetRefused: false, Controllers: [], RetryRefuse: false, RetryRefusals: 0, RetryReenter: false,
+	RetrySuccessor: false, RetrySuccessorClosed: false}
 global _VendorDir := A_Args[2]
 global _SharedDir := A_Args[3]
 global _I18nLocale := "fr"
@@ -53,7 +54,7 @@ _MBSW_Withdraw(Boundary) {
 ; The real browser reads this one delay from the registry; nothing else may ask.
 TimingsGet(Section, Key) {
 	global _MBSW
-	if Section != "ui" || (Key != "webview_page_safety_flush_ms" && !(InStr(_MBSW.Mode, "subscription-throw-") == 1 && Key == "model_browser_filter_debounce_ms"))
+	if Section != "ui" || (Key != "webview_page_safety_flush_ms" && !((InStr(_MBSW.Mode, "subscription-throw-") == 1 || InStr(_MBSW.Mode, "retry-") == 1) && Key == "model_browser_filter_debounce_ms"))
 		throw Error("The startup child binds only the page safety flush.")
 	if !RegExMatch(FileRead(A_Args[3] . "\modules\timings\constants.toml", "UTF-8"), "m)^\s*" . Key . "\s*=\s*(\d+)", &Value)
 		throw Error("The shared registry must declare the page safety flush.")
@@ -64,7 +65,7 @@ Gui_Create(Options := "", Title := "") {
 	global _MBSW
 	local Window := Gui(Options, Title)
 	_MBSW.Windows.Push(Window)
-	if _MBSW.Windows.Length > (_MBSW.Mode == "subscription-throw-cleanup-reopen" ? 3 : (_MBSW.Mode == "reopen" || _MBSW.Mode == "teardown-reopen" || InStr(_MBSW.Mode, "subscription-throw-") == 1 ? 2 : 1))
+	if _MBSW.Windows.Length > (InStr(_MBSW.Mode, "retry-") == 1 ? 3 : _MBSW.Mode == "subscription-throw-cleanup-reopen" ? 3 : (_MBSW.Mode == "reopen" || _MBSW.Mode == "teardown-reopen" || InStr(_MBSW.Mode, "subscription-throw-") == 1 ? 2 : 1))
 		throw Error("A retired browser opening must not create an unrequested native fallback")
 	if _MBSW.Windows.Length == 1
 		_MBSW.Hwnd := Window.Hwnd
@@ -113,7 +114,9 @@ class WebView2 {
 }
 class _MBSW_PassiveController {
 	__New() {
-		this.View := _MBSW_PassiveView()
+		global _MBSW
+		this.View := _MBSW_PassiveView(), this.Attempts := 0, this.Closed := 0
+		_MBSW.Controllers.Push(this)
 	}
 	CoreWebView2 {
 		get {
@@ -128,6 +131,24 @@ class _MBSW_PassiveController {
 	}
 	Close() {
 		global _MBSW
+		this.Attempts += 1
+		if InStr(_MBSW.Mode, "retry-") == 1 && this == _MBSW.Controllers[1] {
+			if _MBSW.RetryRefuse {
+				_MBSW.RetryRefuse := false
+				_MBSW.RetryRefusals += 1
+				throw Error("Controlled SDK Close refusal before effect")
+			}
+			if _MBSW.RetryReenter {
+				_MBSW.RetryReenter := false
+				LLM_ModelBrowser_Show()
+				if _MBSW.Windows.Length != 2 || _MBSW.Controllers.Length != 2
+					throw Error("Unqualified: retirement must really open public native browser B")
+				_MBSW.RetrySuccessor := true
+				_MBSW_RetryNativeClose(2, true)
+				_MBSW.RetrySuccessorClosed := _MBSW.Controllers[2].Closed == 1
+			}
+		}
+		this.Closed += 1
 		_MBSW.Closed += 1
 		if InStr(_MBSW.Mode, "subscription-owner-") == 1
 				|| (InStr(_MBSW.Mode, "subscription-throw-") == 1 && _MBSW.Closed == 1)
@@ -261,12 +282,70 @@ _MBSW_ResetDuringSdkUnwind(This, Params*) {
 	return Result
 }
 
+
+_MBSW_RetryNativeClose(Index, RequireDestroyed) {
+	global _MBSW, _LLM_MBW_SessionEpoch
+	Window := _MBSW.Windows[Index], Hwnd := Window.Hwnd, Epoch := _LLM_MBW_SessionEpoch, NativePid := 0
+	if !DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &NativePid, "UInt")
+		|| NativePid != ProcessExist() || !DllCall("User32\IsWindowVisible", "Ptr", Hwnd, "Int")
+		throw Error("Unqualified: native Close must address the exact visible private model browser")
+	DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+	Started := A_TickCount
+	while (_LLM_MBW_SessionEpoch == Epoch || (RequireDestroyed && DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")))
+		&& A_TickCount - Started < 1500
+		Sleep(10)
+	if _LLM_MBW_SessionEpoch == Epoch || (RequireDestroyed && DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"))
+		throw Error("Unqualified: genuine native Close must revoke its epoch and complete requested destruction")
+}
+_MBSW_RetryExercise() {
+	global _MBSW, _LLM_MBW_RetiredHosts, _LLM_MBW_Gui, _LLM_MBW_ResetDone, _LLM_ModelBrowser_Gui
+	if _LLM_MBW_RetiredHosts.Length != 0
+		throw Error("Unqualified: retirement debt must not be fabricated")
+	LLM_ModelBrowser_Show()
+	if _MBSW.Created != 1 || _MBSW.Windows.Length != 1 || _MBSW.Controllers[1].Attempts != 0
+		throw Error("Unqualified: first public model browser must acquire its real native/controller pair")
+	_MBSW.RetryRefuse := true
+	_MBSW_RetryNativeClose(1, false)
+	DebtCreated := _MBSW.RetryRefusals == 1 && _MBSW.Controllers[1].Attempts == 1
+		&& _MBSW.Controllers[1].Closed == 0 && _LLM_MBW_RetiredHosts.Length == 1
+		&& !IsSet(_LLM_MBW_Gui) && DllCall("User32\IsWindow", "Ptr", _MBSW.Hwnd, "Int")
+	FileAppend("RECEIPT model-initial-retry mode=" . _MBSW.Mode . " debt_created=" . DebtCreated . "`n", "*")
+	if !DebtCreated
+		throw Error("Unqualified: one native Close refusal before effect must create the real pending host")
+	_MBSW.RetryReenter := _MBSW.Mode == "retry-reentry"
+	Result := LLM_ModelBrowser_Show()
+	FileAppend("RECEIPT model-initial-retry result mode=" . _MBSW.Mode
+		. " windows=" . _MBSW.Windows.Length . " controllers=" . _MBSW.Controllers.Length
+		. " old_attempts=" . _MBSW.Controllers[1].Attempts . " old_closed=" . _MBSW.Controllers[1].Closed
+		. " successor_opened=" . _MBSW.RetrySuccessor . " successor_closed=" . _MBSW.RetrySuccessorClosed
+		. " gui=" . IsSet(_LLM_MBW_Gui) . " native_fallback=" . IsSet(_LLM_ModelBrowser_Gui)
+		. " pending=" . _LLM_MBW_RetiredHosts.Length . "`n", "*")
+	if _MBSW.Controllers[1].Attempts != 2 || _MBSW.Controllers[1].Closed != 1
+		|| DllCall("User32\IsWindow", "Ptr", _MBSW.Hwnd, "Int") || _LLM_MBW_RetiredHosts.Length != 0
+		throw Error("Unqualified: retry must acknowledge the exact original browser and retire its native host")
+	if _MBSW.Mode == "retry-current" {
+		if _MBSW.Windows.Length != 2 || _MBSW.Controllers.Length != 2 || !IsSet(_LLM_MBW_Gui)
+			|| _LLM_MBW_Gui != _MBSW.Windows[2] || _LLM_MBW_ResetDone || Result != _MBSW.Windows[2]
+			throw Error("Current public request must still open after retirement without a newer intent")
+		_MBSW_RetryNativeClose(2, true)
+	} else {
+		if !_MBSW.RetrySuccessor || !_MBSW.RetrySuccessorClosed
+			throw Error("Unqualified: the real nested public browser must open and natively close before the outer request resumes")
+		if _MBSW.Windows.Length != 2 || _MBSW.Controllers.Length != 2 || IsSet(_LLM_MBW_Gui)
+			|| IsSet(_LLM_ModelBrowser_Gui) || !_LLM_MBW_ResetDone || Result != 0
+			throw Error("The older request must not reopen web or native browser after intervening native cancellation")
+	}
+	return Result
+}
+
 OnMessage(0x18, _MBSW_ShowMessage)
 OnMessage(0x10, _MBSW_CloseMessage)
 try {
 	if _MBSW.Mode == "subscription-throw-unwind-close"
 		_MBSW_InstallUnwindClose()
-	if _MBSW.Mode == "subscription-throw-direct" {
+	if InStr(_MBSW.Mode, "retry-") == 1
+		PublicResult := _MBSW_RetryExercise()
+	else if _MBSW.Mode == "subscription-throw-direct" {
 		PublicResult := 0
 		try PublicResult := _LLM_ModelBrowser_ShowWeb()
 		catch Any as SdkFailure
@@ -283,7 +362,9 @@ try {
 	FileAppend("receipt mode=" . _MBSW.Mode . " native_close=" . _MBSW.NativeClose . " close_events=" . _MBSW.CloseEvents . " constructors=" . _MBSW.Created . " exists=" . Exists . " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBSW.Hwnd, "Int") . " epoch=" . _LLM_MBW_SessionEpoch . "`n", "*", "UTF-8")
 	if (_MBSW.Mode == "close" || _MBSW.Mode == "reopen") && !_MBSW.EarlyClose
 		throw Error("Unqualified: the native Show close must precede every browser callout/public return")
-	if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
+	if InStr(_MBSW.Mode, "retry-") == 1 {
+		; Dedicated checks already captured retirement and cancellation.
+	} else if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
 		_MBSW_CheckSdkFailure(PublicResult)
 	} else if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
 		CurrentReady := true
@@ -346,7 +427,9 @@ try {
 			_LLM_MBW_Reset.DeleteProp("Call")
 		_MBSW.ResetHookInstalled := false
 	}
-	if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
+	if InStr(_MBSW.Mode, "retry-") == 1 && IsSet(_LLM_MBW_Gui)
+		try _LLM_MBW_OnClose(_LLM_MBW_Gui)
+	if InStr(_MBSW.Mode, "subscription-throw-") == 1 || InStr(_MBSW.Mode, "retry-") == 1 {
 		if IsSet(_LLM_MBW_Gui)
 			try _LLM_MBW_OnClose(_LLM_MBW_Gui)
 		if IsSet(_LLM_ModelBrowser_Gui) {
