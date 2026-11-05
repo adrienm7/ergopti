@@ -5,7 +5,7 @@
 ; This is injected input, not a physical-key witness.
 if A_Args.Length != 2 || A_Args[1] != "--allow-owned-native-kana-sticky"
 	throw Error("Explicit native modifier injection opt-in is required.")
-if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held" || A_Args[2] == "kana-released")
+if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held" || A_Args[2] == "kana-released" || A_Args[2] == "kana-up-before-key")
 	throw Error("The exact 64-bit INPUT40 probe and known case are required.")
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2, TEXT_SENDER_SEND_LEVEL := 0
 ; A valid production policy keeps shortcut words open. Its actual complete-scalar
@@ -104,10 +104,18 @@ _SKN_Inject() {
 			: [[0x75, 0x40, 0], [0x75, 0x40, 2]]
 		if _SKN.Mode == "kana-released"
 			Rows := [[0xDF, 0x38, 1], [0x75, 0x40, 0], [0x75, 0x40, 2], [0xDF, 0x38, 3]]
+		if _SKN.Mode == "kana-up-before-key"
+			Rows := [[0xDF, 0x38, 1], [0xDF, 0x38, 3], [0x75, 0x40, 0], [0x75, 0x40, 2]]
 		Packets := _SKN_Packets(Rows)
 		_SKN.Injected := DllCall("SendInput", "UInt", Rows.Length, "Ptr", Packets, "Int", 40, "UInt")
-		_SKN.OemOwed := _SKN.Mode != "plain" && _SKN.Injected >= 1 && (_SKN.Mode != "kana-released" || _SKN.Injected < 4)
-		_SKN.F6Owed := _SKN.Mode != "plain" ? _SKN.Injected == 2 : _SKN.Injected == 1
+		for Index, Row in Rows {
+			if Index > _SKN.Injected
+				break
+			if Row[1] == 0xDF
+				_SKN.OemOwed := !(Row[3] & 2)
+			else if Row[1] == 0x75
+				_SKN.F6Owed := !(Row[3] & 2)
+		}
 		_SKN_Require(_SKN.Injected == Rows.Length, "The complete exact native INPUT40 vector must be admitted.")
 	} catch as Err {
 		_SKN.Failure := Err
@@ -170,14 +178,20 @@ _SKN_Main() {
 			. " f6_ctrl=" . (F6.Length ? F6[1].Ctrl : -1) . " f6_oem=" . (F6.Length ? F6[1].Oem : -1)
 			. " released_before_replay=" . _SKN.ReleasedAtReplay
 			. " payload=" . (_SKN.Payloads.Length ? _SKN.Payloads[1] : "") . "`n", "*")
-		if _SKN.Mode == "kana-released"
+		if _SKN.Mode == "kana-released" || _SKN.Mode == "kana-up-before-key"
 			_SKN_Require(_SKN.ReleasedAtReplay, "The actual OEM8 logical and asynchronous states must be released before the genuine replay port is called.")
 		_SKN_Require(Accepted && _SKN.Errors.Length == 0 && _SKN.Payloads.Length == 1,
 			"The real sticky capture and real TextPressKey must emit one native replay without errors.")
 		_SKN_Require(F6.Length == 1 && F6[1].Ctrl && OriginalF6 == 0,
 			"Kana AltGr must remain an intervening modifier so the following F6, not OEM8, consumes the requested sticky Ctrl.")
-		_SKN_Require(OriginalOem == (_SKN.Mode != "plain") && F6[1].Oem == (_SKN.Mode != "plain"),
+		_SKN_Require(OriginalOem == (_SKN.Mode != "plain")
+			&& F6[1].Oem == (_SKN.Mode == "kana-held" || _SKN.Mode == "kana-released"),
 			"The receiver must retain the original native Kana modifier through the actual modified F6.")
+		if _SKN.Mode == "kana-held"
+			_SKN_Require(!!(DllCall("GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000),
+				"Replay must never release the user's original custom-modifier hold")
+		_SKN_Require(_SKN.Hook.OnKeyDown == "" && _SKN.Hook.OnKeyUp == "" && _SKN.Hook.OnEnd == "",
+			"The exact completed capture must release all private callback references")
 		_SKN_Require(_SKN.TransactionCritical && _SKN.Finishes.Length == 1 && !_SKN.Finishes[1]
 			&& HSE_Buffer == "seed" && _PrefixBuffer == "seed" && SIHO_Count() == 0,
 			"The genuine synthetic transaction and exact suppressive owner must compose and settle unchanged.")
@@ -205,7 +219,8 @@ _SKN_Main() {
 				_SKN_Require(!GetKeyState("vkDF"), "The acknowledged OEM8 Up must settle logically before retirement.")
 				_SKN.OemOwed := false
 			}
-			if _SKN.Mode == "kana-released" && _SKN.Injected == 4 {
+			if (_SKN.Mode == "kana-released" && _SKN.Injected == 4)
+				|| (_SKN.Mode == "kana-up-before-key" && _SKN.Injected >= 2) {
 				Started := A_TickCount
 				while GetKeyState("vkDF") && A_TickCount - Started < 1000
 					Sleep(5)

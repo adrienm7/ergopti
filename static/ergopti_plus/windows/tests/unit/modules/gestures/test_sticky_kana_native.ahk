@@ -62,3 +62,6 @@ for _SKN_Mode in ["plain", "kana-held"]
 
 Test("sticky native Kana release: captured original flags survive native modifier release before replay (sticky-kana-native-released)",
 	_SKN_Case.Bind("kana-released"))
+
+Test("sticky native Kana endpoint: a custom modifier released before F6 does not leak into replay (sticky-kana-native-up-before)",
+	_SKN_Case.Bind("kana-up-before-key"))
