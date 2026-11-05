@@ -135,6 +135,7 @@ helpers.describe("aggregator_helpers", function()
 
     helpers.it("returns '500+' for values beyond last bucket", function()
       helpers.assert_eq(AggHelper.burst_length_bucket(500), "500")
+      helpers.assert_eq(AggHelper.burst_length_bucket(501), "500+")
       helpers.assert_eq(AggHelper.burst_length_bucket(999), "500+")
       helpers.assert_eq(AggHelper.burst_length_bucket(99999), "500+")
     end)
