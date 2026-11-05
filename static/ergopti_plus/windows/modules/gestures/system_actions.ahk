@@ -691,7 +691,18 @@ GestureSysNewTextFileHere(Sys := 0) {
 			return false
 		}
 		Document := Here.Window.Document
-		Item := Document.Folder.ParseName(Name)
+		Folder := Document.Folder
+		; Explorer may navigate while the native file creation or logging pumps.
+		; A same-named item in its replacement folder is not the file we created.
+		if StrCompare(Folder.Self.Path, Here.Folder, false) != 0 {
+			LoggerInfo("gestures", "The created text file remains in its original folder; Explorer navigated before rename preparation.")
+			return
+		}
+		Item := Folder.ParseName(Name)
+		if !IsObject(Item) || StrCompare(Item.Path, Path, false) != 0 {
+			LoggerWarn("gestures", "The created text file could not be identified exactly for Explorer rename preparation.")
+			return
+		}
 		if A_IsSuspended {
 			LoggerInfo("gestures", "new_text_file_here was cancelled before selecting its created file: the script is suspended.")
 			return false
