@@ -1124,7 +1124,7 @@ function M.predict(context, output_context, override)
 			if err then
 				_predicting = false
 				meta.loading = false
-				if err ~= "cancelled" then Logger.warn(LOG, "Prediction failed: %s", err) end
+				if err ~= "cancelled" then Logger.warn(LOG, "Prediction failed: %s", require("modules.llm.error_log").describe(err)) end
 				if #candidates > 0 then publish() else clear_offer() end
 				return
 			end
@@ -1465,7 +1465,7 @@ local function finish_tone(generation, plan, focus, receipt, full_text, err)
 		return
 	end
 	if err then
-		if err ~= "cancelled" then Logger.warn(LOG, "Tone rewrite failed: %s", tostring(err)) end
+		if err ~= "cancelled" then Logger.warn(LOG, "Tone rewrite failed: %s", require("modules.llm.error_log").describe(err)) end
 		return
 	end
 	local text = Tone.extract(Parser.strip_thinking(full_text or ""))
@@ -1861,7 +1861,7 @@ local function request_screen_answers(spec, screen)
 					offer_missing_model(err, true)
 					return
 				end
-				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, tostring(err))
+				Logger.warn(LOG, "Screen answer '%s' failed: %s", answer.id, require("modules.llm.error_log").describe(err))
 			else
 				local text = Vision.extract(Parser.strip_thinking(full_text or ""), config.answer_tag)
 				if text then
@@ -1897,7 +1897,7 @@ local function finish_screen_read(flow, spec, text, err)
 	_vision_flow = nil
 	flow.reading = false
 	if err then
-		Logger.warn(LOG, "Vision request failed: %s", tostring(err))
+		Logger.warn(LOG, "Vision request failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		if not _is_paused() and _enabled and offer_missing_model(err, true) then return end
 		show_notice(VISION_READ_FAILED_KEY, "read_failed")
@@ -2140,7 +2140,7 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		return
 	end
 	if err then
-		Logger.warn(LOG, "Translation failed: %s", tostring(err))
+		Logger.warn(LOG, "Translation failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		show_notice(TRANSLATE_FAILED_KEY, "failed")
 		return
@@ -2570,7 +2570,7 @@ local function finish_agent(epoch, meta, config, tools, full_text, err)
 		return
 	end
 	if err then
-		Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+		Logger.warn(LOG, "Agent request failed: %s", require("modules.llm.error_log").describe(err))
 		clear_offer()
 		if offer_missing_model(err, false) then return end
 		return fail(AGENT_KEYS.failed, "failed")
@@ -2882,7 +2882,7 @@ local function auto_system2(generation, sentence, opts)
 			_agent_triage = nil
 			if err then
 				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
-				Logger.warn(LOG, "Agent request failed: %s", tostring(err))
+				Logger.warn(LOG, "Agent request failed: %s", require("modules.llm.error_log").describe(err))
 				return
 			end
 			if agent_blocked() then
@@ -2959,7 +2959,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 			_agent_triage = nil
 			if err then
 				if not _is_paused() then LocalModelOffer.handle(err, { automatic = true }) end
-				Logger.warn(LOG, "Agent triage failed: %s", tostring(err))
+				Logger.warn(LOG, "Agent triage failed: %s", require("modules.llm.error_log").describe(err))
 				return
 			end
 			if not triage then

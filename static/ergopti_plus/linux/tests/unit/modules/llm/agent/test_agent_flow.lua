@@ -165,6 +165,27 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 		end)
 	end)
 
+	helpers.it("does not log private text echoed by a failing provider", function()
+		local previous = package.loaded["logger.shim"]
+		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local lines = {}
+		logger.set_level("trace")
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		package.loaded["logger.shim"] = logger
+		local ok, err = pcall(function()
+			Scenario.run({ selection = SELECTION }, function(world)
+				world.handlers.llm_agent_selection("tap_3")
+				world.wait_for(1)
+				world.refuse(1, 400, "private_server_echo_628")
+			end)
+			local log = table.concat(lines, "\n")
+			helpers.assert_nil(log:find("private_server_echo_628", 1, true))
+			helpers.assert_true(log:find("HTTP 400", 1, true) ~= nil, "the status remains diagnosable")
+		end)
+		package.loaded["logger.shim"] = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("does not log arbitrary model-provided action type or field text", function()
 		local previous = package.loaded["logger.shim"]
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
