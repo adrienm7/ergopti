@@ -71,6 +71,7 @@ class _LMSO_Core {
 		if !HasProp(_LMSO, "SettingsMode") || !InStr(_LMSO.SettingsMode, "subscription-")
 			return {Callback: Callback}
 		Controller := _LayMgrWeb_Controller
+		_LMSO.PrimaryController := Controller
 		_LMSO_SubscriptionBoundary()
 		return _LMSO_Subscription(Callback, Controller)
 	}
@@ -95,7 +96,7 @@ class _LMSO_Subscription {
 _LMSO_SubscriptionBoundary() {
 	global _LMSO, _LayMgrWeb_SessionEpoch
 	_LMSO.SubscriptionCalls += 1
-	if _LMSO.SettingsMode != "subscription-close"
+	if _LMSO.SettingsMode == "subscription-current" || _LMSO.ClosePosted
 		return
 	_LMSO_Require(_LMSO.SubscriptionCalls == 1 && !_LMSO.ClosePosted,
 		"The one subscription effect may post exactly one native Close")
@@ -121,6 +122,13 @@ class _LMSO_Controller {
 		this.CoreWebView2 := _LMSO_Core(), this.Closed := 0, this.Fills := 0
 	}
 	Close() {
+		global _LMSO
+		this.CloseAttempts := this.HasOwnProp("CloseAttempts") ? this.CloseAttempts + 1 : 1
+		if HasProp(_LMSO, "SettingsMode") && _LMSO.SettingsMode == "subscription-refuse-close"
+				&& HasProp(_LMSO, "PrimaryController") && _LMSO.PrimaryController == this && !_LMSO.AllowRetry {
+			_LMSO.RefusedCloses += 1
+			throw Error("Explicit passive controller Close refusal before its effect")
+		}
 		this.Closed += 1
 	}
 	Fill() {
@@ -259,6 +267,63 @@ _LMSO_OpenGeneration(Mode) {
 }
 
 
+
+_LMSO_DestroyAfterNative(Window, Args*) {
+	global _LMSO
+	Target := IsObject(_LMSO.Window) && Window == _LMSO.Window
+	if Target
+		_LMSO.DestroyAttempts += 1
+	_LMSO.DestroyReal.Call(Window, Args*)
+	if Target && !_LMSO.DestroyThrew {
+		_LMSO.DestroyGoneBeforeThrow := !DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+		_LMSO.DestroyThrew := true
+		throw Error("Explicit port exception after genuine native Gui.Destroy completed")
+	}
+	if Target
+		_LMSO.DestroyRetryReturned := true
+}
+_LMSO_PendingOriginal() {
+	global _LMSO, _LayMgrWeb_RetiredHosts
+	Count := 0
+	for Host in _LayMgrWeb_RetiredHosts
+		if Host.gui == _LMSO.Window
+			Count += 1
+	return Count
+}
+_LMSO_RetirementCheck(Environment, Mode, Started, OpeningFailure) {
+	global _LMSO, _LayMgrWeb_Gui, _LayMgrWeb_Controller
+	_LMSO_Require(_LMSO.SubscriptionCalls == 1 && _LMSO.ClosePosted && _LMSO.CloseObserved
+		&& _LMSO.Unsubscribed == 1 && _LMSO.UnsubscribedAfterClose == 0,
+		"The real native Close must be acknowledged and its returned handle retired before the failure port")
+	_LMSO_Require(!IsObject(OpeningFailure) && !Started && !_LayMgrWeb_Gui,
+		"The withdrawn opening must return cancellation without republishing its host")
+	_LMSO_Equal(1, Environment.Controllers.Length)
+	OldController := Environment.Controllers[1]
+	if Mode == "subscription-refuse-close" {
+		_LMSO_Require(_LMSO.RefusedCloses == 1 && OldController.Closed == 0
+			&& DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int"),
+			"A refused passive Close must keep the exact native HWND and controller available for retry")
+	} else {
+		_LMSO_Require(_LMSO.DestroyThrew && _LMSO.DestroyGoneBeforeThrow && OldController.Closed == 1,
+			"The injected exception must follow genuine native destruction and the one acknowledged controller Close")
+	}
+	_LMSO_Equal(1, _LMSO_PendingOriginal(), "Only the exact unsettled host must remain pending")
+	_LMSO.AllowRetry := true
+	_LMSO_Require(LayoutManager_Open(), "The public opening must retry retirement then admit a real successor")
+	FileAppend("OBSERVATION layout-retirement mode=" . Mode . " close_attempts=" . OldController.CloseAttempts
+		. " controller_closed=" . OldController.Closed . " destroy_attempts=" . _LMSO.DestroyAttempts
+		. " native_gone_before_throw=" . _LMSO.DestroyGoneBeforeThrow . " retry_destroy_returned=" . _LMSO.DestroyRetryReturned
+		. " pending_original=" . _LMSO_PendingOriginal() . " controllers=" . Environment.Controllers.Length . "`n", "*")
+	_LMSO_Equal(0, _LMSO_PendingOriginal(), "The exact old host must settle; an already destroyed native GUI cannot retain eternal debt")
+	_LMSO_Equal(1, OldController.Closed, "A retry after acknowledged Close cannot close the old controller twice")
+	_LMSO_Equal(Mode == "subscription-refuse-close" ? 2 : 1, OldController.CloseAttempts)
+	if Mode == "subscription-destroy-throw"
+		_LMSO_Require(_LMSO.DestroyRetryReturned, "The genuine native Destroy retry must return, rather than inferring idempotence")
+	_LMSO_Require(Environment.Controllers.Length == 2 && _LayMgrWeb_Controller == Environment.Controllers[2]
+		&& _LayMgrWeb_Gui != _LMSO.Window && DllCall("IsWindow", "Ptr", _LayMgrWeb_Gui.Hwnd, "Int")
+		&& Environment.Controllers[2].Closed == 0, "The current successor must retain its independent live owner")
+}
+
 ; The browser property is an existing COM-effect port; only its delivery of a
 ; genuine WM_CLOSE is controlled. No actual WebView2 RPC pump is claimed here.
 _LMSO_SettingsGeneration(Mode) {
@@ -269,15 +334,24 @@ _LMSO_SettingsGeneration(Mode) {
 	PreviousEnv := _WebView_SharedEnv, PreviousRetired := _WebView_SharedEnvRetired
 	PreviousCritical := Critical("Off"), Environment := _LMSO_Environment()
 	_LMSO := {SettingsMode: Mode, SettingsCalls: 0, Window: 0, Hwnd: 0, ClosePosted: false, CloseObserved: false,
-		SubscriptionCalls: 0, Unsubscribed: 0, UnsubscribedAfterClose: 0, AliveAtSubscriptionReturn: false}
+		SubscriptionCalls: 0, Unsubscribed: 0, UnsubscribedAfterClose: 0, AliveAtSubscriptionReturn: false,
+		AllowRetry: false, RefusedCloses: 0, DestroyAttempts: 0, DestroyThrew: false, DestroyGoneBeforeThrow: false, DestroyRetryReturned: false}
 	Started := false, OpeningFailure := 0
+	DestroyDescriptor := Gui.Prototype.GetOwnPropDesc("Destroy")
+	_LMSO.DestroyReal := DestroyDescriptor.Call
 	try {
+		if Mode == "subscription-destroy-throw"
+			Gui.Prototype.DefineProp("Destroy", {Call: _LMSO_DestroyAfterNative})
 		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
 		_LMSO_Require(_LayMgrWeb_Available(), "The genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		try Started := LayoutManager_Open()
 		catch Any as Failure
 			OpeningFailure := Failure
+		if Mode == "subscription-refuse-close" || Mode == "subscription-destroy-throw" {
+			_LMSO_RetirementCheck(Environment, Mode, Started, OpeningFailure)
+			return
+		}
 		FileAppend("OBSERVATION layout-settings mode=" . Mode . " settings_calls=" . _LMSO.SettingsCalls
 			. " close_posted=" . _LMSO.ClosePosted . " close_observed=" . _LMSO.CloseObserved
 			. " controllers=" . Environment.Controllers.Length . " started=" . Started
@@ -330,7 +404,10 @@ _LMSO_SettingsGeneration(Mode) {
 			_LMSO_Equal(0, Environment.Controllers[1].Closed)
 		}
 	} finally {
+		Gui.Prototype.DefineProp("Destroy", DestroyDescriptor)
+		_LMSO.AllowRetry := true
 		_LayMgrWeb_Close()
+		_LayMgrWeb_RetryRetiredHosts()
 		if InStr(Mode, "subscription-") && IsSet(_LayMgrWeb_MsgSub)
 			_LayMgrWeb_MsgSub := unset
 		for Controller in Environment.Controllers
@@ -354,6 +431,7 @@ try {
 	LoggerInit()
 	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close" || A_Args[1] == "settings-reopen"
 		|| A_Args[1] == "subscription-current" || A_Args[1] == "subscription-close"
+		|| A_Args[1] == "subscription-refuse-close" || A_Args[1] == "subscription-destroy-throw"
 		_LMSO_SettingsGeneration(A_Args[1])
 	else
 		_LMSO_OpenGeneration(A_Args[1])

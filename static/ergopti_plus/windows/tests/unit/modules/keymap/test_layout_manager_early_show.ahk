@@ -94,3 +94,7 @@ Test("Layout native settings continuation: settings-reopen preserves the exact s
 for _LMSO_SubscriptionMode in ["subscription-current", "subscription-close"]
 	Test("Layout native subscription continuation: " . _LMSO_SubscriptionMode . " retires its exact handle (layout-subscription-close-owner)",
 		_LMSO_Case.Bind(_LMSO_SubscriptionMode))
+
+for _LMSO_RetirementMode in ["subscription-refuse-close", "subscription-destroy-throw"]
+	Test("Layout native retirement retry: " . _LMSO_RetirementMode . " preserves exact resources (layout-subscription-retirement-retry)",
+		_LMSO_Case.Bind(_LMSO_RetirementMode))
