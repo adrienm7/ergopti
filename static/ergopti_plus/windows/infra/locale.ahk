@@ -198,11 +198,8 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 		; is an atomic NTFS rename, so the cache is always either the old one or the
 		; new one, never a prefix of the new one (locale-tsv-non-atomic-write).
 		; Mirrors _HotstringsCacheWriteTsv, which was fixed first.
-		TmpPath := TsvPath . ".tmp"
-		if FileExist(TmpPath)
-			FileDelete(TmpPath)
-		FileAppend(Content, TmpPath, "UTF-8-RAW")
-		FileMove(TmpPath, TsvPath, 1)
+		if !FSWriteReplaceOwned(TsvPath, Content, ".tmp", &Detail)
+			throw Error("The locale cache could not be published: " . Detail)
 	} catch as err {
 		try LoggerWarn("i18n", "Could not write fast-cache '{1}' ({2}); JSON path stays active.", TsvPath, err.Message)
 	}
