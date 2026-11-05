@@ -12,6 +12,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
+local unpack_values = table.unpack or unpack
 local EvdevCodes = require("infra.evdev_codes")
 local InputEvent = require("infra.input_event")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
@@ -86,7 +87,7 @@ local function recorded(script)
 		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_pointer_mock.sqlite" })
 		require("tests.support.metrics_consent_fixture").enable(keystats)
 		keystats.reset_session()
-		script(keystats)
+		script(keystats, fake_writer)
 		keystats.flush()
 		for _, entry in ipairs(fake_writer.typing) do rows[#rows + 1] = entry.row end
 		keystats.flush()
@@ -98,6 +99,111 @@ local function recorded(script)
 end
 
 helpers.describe("pointer metrics: the recorder writes them with the typing row", function()
+	helpers.it("retains diagonal distance fractions across committed flushes", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			for _ = 1, 3 do
+				move(keystats.record_pointer, 1, 1)
+				keystats.flush()
+			end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)), "flush boundaries must not discard each fraction")
+	end)
+
+	helpers.it("keeps fractional distance separate for each application", function()
+		local rows = recorded(function(keystats)
+			for _ = 1, 2 do
+				for _, app in ipairs({ "first", "second" }) do
+					keystats.on_app_focus(app, 1000)
+					move(keystats.record_pointer, 1, 1)
+					helpers.assert_true(keystats.flush())
+				end
+			end
+		end)
+		local totals = {}
+		for _, row in ipairs(rows) do totals[row.app] = (totals[row.app] or 0) + row.mouse_distance_px end
+		helpers.assert_eq(totals.first, 2)
+		helpers.assert_eq(totals.second, 2)
+	end)
+
+	helpers.it("does not carry fractional distance into another database", function()
+		local rows = recorded(function(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+			helpers.assert_true(keystats.init({ sqlite_path = "/tmp/ergopti_other_pointer_mock.sqlite" }))
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			keystats.on_app_focus("owned-app", 1000)
+			for _ = 1, 2 do move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush()) end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, 3, "the second database starts without the first's remainder")
+	end)
+
+	helpers.it("does not publish fractional distance on refused flush admission", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			move(keystats.record_pointer, 1, 1)
+			writer.start_flush = function() return nil end
+			helpers.assert_eq(keystats.flush(), false)
+			writer.start_flush = original
+			helpers.assert_true(keystats.flush())
+			for _ = 1, 2 do move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush()) end
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
+	helpers.it("publishes the distance fraction only after a failed transaction retries", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			writer.start_flush = function(...)
+				writer.start_flush = original
+				local args = { ... }
+				local operation = { result = { committed = false } }
+				function operation:pump() return true end
+				function operation:is_read_safe() return true end
+				function operation:phase() return "done" end
+				function operation:is_retryable() return self.result.committed == false end
+				function operation:retry() self.result = original(unpack_values(args)).result; return true end
+				return operation
+			end
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_eq(keystats.flush(), false)
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_true(keystats.flush(), "the original snapshot commits on retry")
+			helpers.assert_true(keystats.flush(), "newer motion follows the original snapshot")
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
+	helpers.it("keeps reentrant motion behind the committed distance fraction", function()
+		local rows = recorded(function(keystats, writer)
+			keystats.on_app_focus("owned-app", 1000)
+			local original = writer.start_flush
+			writer.start_flush = function(...)
+				writer.start_flush = original
+				move(keystats.record_pointer, 1, 1)
+				return original(...)
+			end
+			move(keystats.record_pointer, 1, 1)
+			helpers.assert_true(keystats.flush())
+			helpers.assert_true(keystats.flush())
+			move(keystats.record_pointer, 1, 1); helpers.assert_true(keystats.flush())
+		end)
+		local total = 0
+		for _, row in ipairs(rows) do total = total + row.mouse_distance_px end
+		helpers.assert_eq(total, math.floor(3 * math.sqrt(2)))
+	end)
+
 	helpers.it("forgets partial pointer frames across a collection pause", function()
 		local rows = recorded(function(keystats)
 			keystats.on_app_focus("owned-app", 1000)
