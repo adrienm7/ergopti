@@ -175,6 +175,10 @@ _HNRC_Run() {
 		"The actual public fallback must publish visible native A and real widgets")
 	_HNRC_Require(_HCW_PendingNumericWrites.Length == 0 && !_HCW_NumericDrainActive && !_HSLR_Active,
 		"No numeric candidate or live rebuild may predate this component")
+	if InStr(_HNRC.Mode, "numeric-") == 1 {
+		_HNRC_NumericRun()
+		return
+	}
 	Found := 0
 	for Control in _HNRC.A {
 		if Control.Type == "Button" && Control.Text == t("hs_config.btn_reset_all") {
@@ -252,6 +256,138 @@ _HNRC_Run() {
 	}
 }
 
+
+; Passive subscribers bracket the already-registered production Change handler.
+; No function Call property or production callback is replaced/invoked manually.
+_HNRC_NumericBefore(Control, *) {
+	global _HNRC
+	if Control.Hwnd == _HNRC.NumericHwnd && Control.Text == _HNRC.NumericText
+		_HNRC.NumericBefore += 1
+}
+_HNRC_NumericAfter(Control, *) {
+	global _HNRC
+	if Control.Hwnd == _HNRC.NumericHwnd && Control.Text == _HNRC.NumericText
+		_HNRC.NumericAfter += 1
+}
+_HNRC_NumericInput() {
+	global _HNRC, _HCW_PendingNumericWrites, _HCW_NumericDrainActive, _HCW_NUMERIC_DEBOUNCE_MS
+	try {
+		_HNRC.NumericInputs += 1
+		NativePid := 0
+		_HNRC_Require(_HNRC.NumericInputs == 1
+			&& DllCall("User32\GetWindowThreadProcessId", "Ptr", _HNRC.NumericHwnd, "UInt*", &NativePid, "UInt")
+			&& NativePid == ProcessExist() && WinGetClass("ahk_id " . _HNRC.NumericHwnd) == "Edit",
+			"Only the exact child-owned native Edit may receive this one WM_CHAR edit")
+		_HNRC.NumericEdit.Focus()
+		_HNRC_Require(DllCall("User32\GetFocus", "Ptr") == _HNRC.NumericHwnd,
+			"The actual numeric Edit must own native focus before editing")
+		DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0xB1, "Ptr", 0, "Ptr", -1, "Ptr")
+		if _HNRC.NumericEmpty
+			DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0x102, "UPtr", 0x08, "Ptr", 1, "Ptr")
+		else {
+			for Character in StrSplit(_HNRC.NumericText)
+				DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0x102, "UPtr", Ord(Character), "Ptr", 1, "Ptr")
+		}
+		_HNRC.RawNumericText := _HNRC.NumericEdit.Text
+		Started := A_TickCount
+		; Wait through a real debounce interval even if empty text queued nothing.
+		; An OnError capture cannot hide a subsequently persisted false zero.
+		while TickElapsed(Started) < 5000 {
+			if TickElapsed(Started) >= _HCW_NUMERIC_DEBOUNCE_MS + 150
+				&& _HNRC.NumericBefore > 0 && _HCW_PendingNumericWrites.Length == 0 && !_HCW_NumericDrainActive
+				break
+			Sleep(10)
+		}
+		_HNRC.NumericDrained := TickElapsed(Started) >= _HCW_NUMERIC_DEBOUNCE_MS + 150
+			&& _HCW_PendingNumericWrites.Length == 0 && !_HCW_NumericDrainActive
+	} catch Any as Failure {
+		_HNRC_Fail(Failure)
+	} finally _HNRC.NumericDone := true
+}
+_HNRC_NumericWorker() {
+	global _HNRC, _HSLR_Active, HSE_RebuildInProgress
+	_HNRC_Require(_HSLR_Active && HSE_RebuildInProgress,
+		"The genuine coordinator must own this explicitly refused external registry/tray work")
+	_HNRC.WorkerCalls += 1
+	if _HNRC.WorkerCalls == 1 {
+		SetTimer(_HNRC_NumericInput, -1)
+		Started := A_TickCount
+		while !_HNRC.NumericDone && TickElapsed(Started) < 7000
+			Sleep(10)
+		_HNRC_Require(_HNRC.NumericDone, "The actual native edit and debounce observation must settle before this worker returns")
+	}
+	return false
+}
+_HNRC_NumericRun() {
+	global _HNRC, _HCWWidgets, _HSLR_Active, HSE_RebuildInProgress
+	global _HCW_PendingNumericWrites, _HCW_NumericDrainActive
+	Entry := _HCW_SelectedEntry(), Section := _HCW_SelectedSection(Entry)
+	_HNRC_Require(!Entry.IsPersonal && !Entry.IsExtension && !Entry.IsVirtual && Entry.Key != "",
+		"The real initial selection must use the common override writer, not a virtual/config or personal backend")
+	; Both initial values are nonzero through the real source-admitted writer.
+	_HNRC_Require(HotstringsSetOverride(Entry.Key, Section, "delay", 0.321)
+		&& HotstringsSetOverride(Entry.Key, Section, "priority", 47),
+		"The private selected record must acquire genuine positive durable values before native editing")
+	_HCW_LoadCurrent()
+	_HNRC_Require(_HCW_PendingNumericWrites.Length == 0 && !_HCW_NumericDrainActive,
+		"Refreshing actual controls must leave no pre-existing numeric candidate")
+	_HNRC.NumericEmpty := _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority"
+	_HNRC.NumericField := _HNRC.Mode == "numeric-empty-priority" ? "priority" : "delay"
+	_HNRC.NumericEdit := _HNRC.NumericField == "priority" ? _HCWWidgets.PriorityEdit : _HCWWidgets.DelayEdit
+	_HNRC.NumericHwnd := _HNRC.NumericEdit.Hwnd
+	_HNRC.NumericText := _HNRC.NumericEmpty ? "" : (_HNRC.Mode == "numeric-current" ? "3" : "18446744073709551619")
+	_HNRC_Require(_HNRC.NumericEdit.Text != ""
+		&& (DllCall("User32\GetWindowLongW", "Ptr", _HNRC.NumericHwnd, "Int", -16, "Int") & 0x2000),
+		"The actual nonempty native Edit must expose the shipped ES_NUMBER style")
+	Before := FSReadBytesStrict(_HNRC.OverridePath), BeforeHash := CryptoSha256Bytes(Before)
+	BeforeResolved := HotstringsResolve(Entry.Key, Section)
+	_HNRC_Require(Abs(BeforeResolved.Delay - 0.321) < 0.000000001 && BeforeResolved.Priority == 47,
+		"The initial live projection must match both genuine seeded durable values")
+	_HNRC.NumericEdit.OnEvent("Change", _HNRC_NumericBefore, -1)
+	_HNRC.NumericEdit.OnEvent("Change", _HNRC_NumericAfter)
+	try Result := RebuildHotstringsLive(_HNRC_NumericWorker)
+	finally {
+		_HNRC.NumericEdit.OnEvent("Change", _HNRC_NumericBefore, 0)
+		_HNRC.NumericEdit.OnEvent("Change", _HNRC_NumericAfter, 0)
+	}
+	FinalHash := CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath))
+	FinalDocument := TOML_ParseDocument(FSReadUtf8Exact(_HNRC.OverridePath))
+	FinalResolved := HotstringsResolve(Entry.Key, Section)
+	Node := FinalDocument.Get(Entry.Key, Map())
+	if Section != ""
+		Node := Node.Get(Section, Map())
+	Offset := Node.Get("delay_offset", "absent")
+	WrappedDurable := Offset is Number && Abs((HotstringsBaseDelay() + Offset) - 0.003) < 0.000000001
+	FileAppend("OBSERVATION hcw-native-numeric mode=" . _HNRC.Mode . " field=" . _HNRC.NumericField
+		. " backend=common key=" . JsonStringLiteral(Entry.Key) . " section=" . JsonStringLiteral(Section)
+		. " class=" . WinGetClass("ahk_id " . _HNRC.NumericHwnd)
+		. " input_calls=" . _HNRC.NumericInputs . " before_change=" . _HNRC.NumericBefore . " after_change=" . _HNRC.NumericAfter
+		. " raw_text=" . JsonStringLiteral(_HNRC.RawNumericText) . " drained=" . _HNRC.NumericDrained
+		. " errors=" . _HNRC.Errors.Length . " async_failure=" . IsObject(_HNRC.Failure)
+		. " before_delay=" . BeforeResolved.Delay . " final_delay=" . FinalResolved.Delay
+		. " before_priority=" . BeforeResolved.Priority . " final_priority=" . FinalResolved.Priority
+		. " wrapped_durable=" . WrappedDurable . " unlimited=" . Node.Get("delay_unlimited", false)
+		. " bytes_changed=" . (BeforeHash != FinalHash) . "`n", "*", "UTF-8-RAW")
+	_HNRC_Require(_HNRC.NumericInputs == 1 && _HNRC.NumericBefore > 0 && _HNRC.NumericDrained
+		&& _HNRC.RawNumericText == _HNRC.NumericText && Result is Integer && Result == false
+		&& !_HSLR_Active && !HSE_RebuildInProgress,
+		"The real native Edit, registered Change event, debounce interval and actual coordinator must all be observed")
+	if IsObject(_HNRC.Failure)
+		throw _HNRC.Failure
+	_HNRC_Require(_HNRC.NumericAfter > 0, "The production Change handler must return to its passive following subscriber")
+	if _HNRC.Mode == "numeric-current"
+		_HNRC_Require(_HNRC.Errors.Length == 0 && WrappedDurable && Abs(FinalResolved.Delay - 0.003) < 0.000000001
+			&& FinalResolved.Priority == 47 && BeforeHash != FinalHash,
+			"Ordinary 3ms input must still reach the real durable override writer without changing another field")
+	else if _HNRC.NumericEmpty
+		_HNRC_Require(_HNRC.Errors.Length == 0 && BeforeHash == FinalHash
+			&& FinalResolved.Delay == BeforeResolved.Delay && FinalResolved.Priority == BeforeResolved.Priority,
+			"Transient empty editing must neither throw nor publish an implicit zero or alter the durable/live record")
+	else
+		_HNRC_Require(!WrappedDurable && Abs(FinalResolved.Delay - 0.003) >= 0.000000001,
+			"The original wide decimal text must never wrap 2^64+3 into a durable/live 3ms delay")
+}
+
 _HNRC_Main() {
 	global _HNRC
 	_HNRC := {Mode: A_Args[1], A: 0, AHwnd: 0, B: 0, BHwnd: 0, BWidgets: 0, Button: 0,
@@ -259,8 +395,10 @@ _HNRC_Main() {
 		ActorArmed: false, ActorDone: false, AClosed: false, BeforeB: false, Errors: [], Failure: 0,
 		DestroyProc: 0, DestroyInstalled: false, DestroyActive: 0, DestroySeen: false, ReopenCalls: 0, ReopenFailure: 0,
 		DestroyDescriptor: 0, DestroyPortInstalled: false, DestroyCalls: 0, NativeDestroyReturns: 0,
-		FaultInjected: false, FaultWarnings: 0, Fault: Error("Controlled native reset Destroy observer refusal"), LastThrown: 0}
-	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode()), "The private mode and root must be explicit")
+		FaultInjected: false, FaultWarnings: 0, Fault: Error("Controlled native reset Destroy observer refusal"), LastThrown: 0,
+		NumericEdit: 0, NumericHwnd: 0, NumericText: "", RawNumericText: "", NumericBefore: 0, NumericAfter: 0,
+		NumericInputs: 0, NumericDone: false, NumericDrained: false, NumericEmpty: false, NumericField: ""}
+	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode() || _HNRC.Mode == "numeric-current" || _HNRC.Mode == "numeric-overflow" || _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority"), "The private mode and root must be explicit")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_HNRC_OnError)
 	LoggerSetTestSink(_HNRC_Log)
@@ -292,7 +430,7 @@ _HNRC_Main() {
 			_HNRC.DestroyProc := 0
 		} else if !IsObject(Cleanup)
 			Cleanup := Error("The exact native destruction callback must quiesce before callback memory is released")
-		for Callback in [_HNRC_Click, _HNRC_Actor] {
+		for Callback in [_HNRC_Click, _HNRC_Actor, _HNRC_NumericInput] {
 			try SetTimer(Callback, 0)
 			catch Any as Failure {
 				if !IsObject(Cleanup)
