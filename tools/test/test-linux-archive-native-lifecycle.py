@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "static/ergopti_plus/linux/native/archive_output"
 
 with tempfile.TemporaryDirectory(prefix="ergopti-native-lifecycle-") as temporary:
-    parent = Path(temporary)
+    parent = Path(temporary).resolve(strict=True)
     library = parent / "archive.so"
     subprocess.run(
         [
