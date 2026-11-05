@@ -73,10 +73,27 @@ class _PRSO_View {
 
 class _PRSO_Controller {
 	__New() {
-		this.CoreWebView2 := _PRSO_View(), this.Closed := 0, this.Fills := 0
+		this.CoreWebView2 := _PRSO_View(), this.Closed := 0, this.Fills := 0, this.Attempts := 0
 	}
 	Close() {
 		global _PRSO
+		this.Attempts += 1
+		if InStr(_PRSO.Mode, "retry-") == 1 && _PRSO.Controllers[1] == this {
+			if _PRSO.RetryRefuse {
+				_PRSO.RetryRefuse := false
+				_PRSO.RetryRefusals += 1
+				throw Error("Controlled browser Close refusal before its effect")
+			}
+			if _PRSO.RetryReenter {
+				_PRSO.RetryReenter := false
+				_PRSO_Open(_PRSO.Profiles[2])
+				_PRSO_Require(_PRSO.Windows.Length == 2 && _PRSO.Controllers.Length == 2,
+					"Retirement must actually open a second public native editor before its cancellation.")
+				_PRSO.RetrySuccessor := true
+				_PRSO_NativeClose(_PRSO.Hwnds[2])
+				_PRSO.RetrySuccessorClosed := _PRSO.Controllers[2].Closed == 1
+			}
+		}
 		if InStr(_PRSO.Mode, "subscription-") == 1 {
 			_PRSO.SubscriptionCloseCalls += 1
 			_PRSO.SubscriptionsAtClose := _PRSO.ActiveSubscriptions
@@ -120,7 +137,7 @@ _PRSO_Create(Hwnd) {
 		"The public edit must capture its real boot-admitted private file, not a fabricated READY receipt.")
 	Controller := _PRSO_Controller()
 	_PRSO.Controllers.Push(Controller)
-	if _PRSO.Controllers.Length > 1 || _PRSO.Mode == "current" || InStr(_PRSO.Mode, "subscription-") == 1
+	if _PRSO.Controllers.Length > 1 || _PRSO.Mode == "current" || InStr(_PRSO.Mode, "subscription-") == 1 || InStr(_PRSO.Mode, "retry-") == 1
 		return Controller
 	_PRSO.Pending := Promise.withResolvers()
 	; An independent observer prevents the vendor task's unobserved-report path.
@@ -258,7 +275,8 @@ _PRSO_Main() {
 		ActiveSubscriptions: 0, CreatedSubscriptions: 0, ReleasedSubscriptions: 0, SubscriptionCalls: 0,
 		SubscriptionCloseCalls: 0, NativeAliveAtReturn: false, NativeAliveAtClose: false, SubscriptionsAtClose: -1,
 		SubscriptionInFlight: false, ReleasedInFlight: false, NativeCloseObserved: false,
-		SdkFailure: Error("Controlled prompt SDK add-event refusal"), SdkCaught: 0 }
+		SdkFailure: Error("Controlled prompt SDK add-event refusal"), SdkCaught: 0, RetryRefuse: false, RetryRefusals: 0, RetryReenter: false,
+		RetrySuccessor: false, RetrySuccessorClosed: false }
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_PRSO_OnError)
 	LoggerSetTestSink(_PRSO_Log)
@@ -287,14 +305,19 @@ _PRSO_Main() {
 			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
 			"The actual native writer must align the complete private LLM source before opening.")
 		_PRSO.Source := FSConfigReadUtf8Exact(ConfigurationFile)
-		if InStr(_PRSO.Mode, "subscription-throw-") == 1 {
+		if InStr(_PRSO.Mode, "retry-") == 1 {
+			_PRSO_CheckInitialRetirement()
+			Observed := true
+		} else if InStr(_PRSO.Mode, "subscription-throw-") == 1 {
 			try _PRSO_Open(_PRSO.Profiles[1])
 			catch Any as SdkFailure
 				_PRSO.SdkCaught := SdkFailure
 		} else
 			_PRSO_Open(_PRSO.Profiles[1])
-		_PRSO_Observe(), Observed := true
-		_PRSO_Check()
+		if InStr(_PRSO.Mode, "retry-") != 1 {
+			_PRSO_Observe(), Observed := true
+			_PRSO_Check()
+		}
 	} catch as Failure {
 		Primary := IsObject(_PRSO.Failure) ? _PRSO.Failure : Failure
 	} finally {
@@ -441,6 +464,58 @@ _PRSO_CheckSdkFailure() {
 		&& !DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int")
 		&& FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
 		"Failed startup cleanup must finish without changing the real profile source")
+}
+
+
+; The queue starts empty. Its first record is produced by the genuine native
+; Close handler after the passive SDK controller refuses Close before effect.
+_PRSO_CheckInitialRetirement() {
+	global _PRSO, _PromptEdWeb_RetiredHosts, _PromptEdWeb_Gui, _PromptEdWeb_ContextEpoch
+	global _PromptEdWeb_ResetDone, ConfigurationFile
+	_PRSO_Require(_PromptEdWeb_RetiredHosts.Length == 0, "The native child must start without fabricated retirement debt.")
+	_PRSO_Open(_PRSO.Profiles[1])
+	_PRSO_Require(_PRSO.Windows.Length == 1 && _PRSO.Controllers.Length == 1
+		&& _PRSO.Controllers[1].Attempts == 0,
+		"The first public editor must initialize with its actual native host and browser subscription owner.")
+	_PRSO.RetryRefuse := true
+	FirstHwnd := _PRSO.Hwnds[1]
+	DllCall("User32\SendMessageW", "Ptr", FirstHwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+	Started := A_TickCount
+	while _PromptEdWeb_ContextEpoch != 0 && TickElapsed(Started) < 1000
+		Sleep(10)
+	DebtCreated := _PRSO.RetryRefusals == 1 && _PRSO.Controllers[1].Attempts == 1
+		&& _PRSO.Controllers[1].Closed == 0 && _PromptEdWeb_RetiredHosts.Length == 1
+		&& _PromptEdWeb_ContextEpoch == 0 && !IsObject(_PromptEdWeb_Gui)
+		&& DllCall("User32\IsWindow", "Ptr", FirstHwnd, "Int")
+	FileAppend("RECEIPT prompt-initial-retry mode=" . _PRSO.Mode . " debt_created=" . DebtCreated
+		. " close_attempts=" . _PRSO.Controllers[1].Attempts . " refusals=" . _PRSO.RetryRefusals . "`n", "*", "UTF-8")
+	_PRSO_Require(DebtCreated, "A real native Close and genuine retirement path must produce the one refused original host.")
+	_PRSO.RetryReenter := _PRSO.Mode == "retry-reentry"
+	_PRSO_Open(_PRSO.Profiles[1])
+	FileAppend("RECEIPT prompt-initial-retry result mode=" . _PRSO.Mode
+		. " public_calls=" . _PRSO.PublicCalls . " windows=" . _PRSO.Windows.Length
+		. " controllers=" . _PRSO.Controllers.Length . " old_closed=" . _PRSO.Controllers[1].Closed
+		. " old_attempts=" . _PRSO.Controllers[1].Attempts . " successor_opened=" . _PRSO.RetrySuccessor
+		. " successor_closed=" . _PRSO.RetrySuccessorClosed . " gui=" . IsObject(_PromptEdWeb_Gui)
+		. " epoch=" . _PromptEdWeb_ContextEpoch . " pending=" . _PromptEdWeb_RetiredHosts.Length . "`n", "*", "UTF-8")
+	_PRSO_Require(_PRSO.Controllers[1].Attempts == 2 && _PRSO.Controllers[1].Closed == 1
+		&& !DllCall("User32\IsWindow", "Ptr", FirstHwnd, "Int") && _PromptEdWeb_RetiredHosts.Length == 0,
+		"Retry must acknowledge and retire the exact previously refused browser host.")
+	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.FallbackInputs == 0
+		&& FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
+		"Neither retirement nor editor admission may rewrite profiles or use fallback input.")
+	if _PRSO.Mode == "retry-current" {
+		_PRSO_Require(_PRSO.Windows.Length == 2 && _PRSO.Controllers.Length == 2
+			&& _PromptEdWeb_Gui == _PRSO.Windows[2] && _PromptEdWeb_ContextEpoch > 0,
+			"With no intervening public intent, successful retirement must still allow the requested editor.")
+		_PRSO_NativeClose(_PRSO.Hwnds[2])
+	} else {
+		_PRSO_Require(_PRSO.RetrySuccessor && _PRSO.RetrySuccessorClosed,
+			"The retirement callout must actually open and natively close its public successor before the outer call returns.")
+		_PRSO_Require(_PRSO.Windows.Length == 2 && _PRSO.Controllers.Length == 2
+			&& !IsObject(_PromptEdWeb_Gui) && _PromptEdWeb_ContextEpoch == 0 && _PromptEdWeb_ResetDone,
+			"An opening admitted before retirement must not revive an editor after the intervening native cancellation.")
+	}
 }
 
 _PRSO_Main()

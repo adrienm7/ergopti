@@ -170,3 +170,7 @@ for _PRST_SubscriptionMode in ["subscription-current", "subscription-close"]
 for _PRST_SdkMode in ["subscription-throw-current", "subscription-throw-retired"]
 	Test("Prompt editor SDK refusal: " . _PRST_SdkMode . " preserves its original disposition (prompt-subscription-sdk-failure-owner)",
 		_PRST_Case.Bind(_PRST_SdkMode))
+
+for _PRST_RetryMode in ["retry-current", "retry-reentry"]
+	Test("Prompt initial retirement: " . _PRST_RetryMode . " preserves intervening native cancellation (prompt-native-initial-retirement-reentry)",
+		_PRST_Case.Bind(_PRST_RetryMode))
