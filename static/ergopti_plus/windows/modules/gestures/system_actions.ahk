@@ -309,15 +309,16 @@ GestureSysOpenApp(BindingId := "", Sys := 0) {
 		return
 	}
 	try {
-		; A chooser returns one unquoted file path. Passing it raw to Run lets
-		; CreateProcess execute an existing prefix before the first space. Keep
-		; shell targets and command lines unchanged when they are not exact files.
-		IsFile := Sys.IsExistingFile(Value)
+		; A stored file or folder is one shell target. Passing it raw to Run
+		; can execute an earlier executable prefix before the first space.
+		IsPath := Sys.IsExistingFile(Value)
+		if !IsPath && !RegExMatch(Value, '[*?"<>|]')
+			IsPath := Sys.IsDirectory(Value)
 		if A_IsSuspended || !TapHoldOwnerCurrent(Owner) {
 			LoggerInfo("gestures", "open_app was cancelled after inspecting its target: paused or original owner retired.")
 			return false
 		}
-		Target := IsFile ? '"' . Value . '"' : Value
+		Target := IsPath ? '"' . Value . '"' : Value
 		Sys.Launch(Target)
 		LoggerInfo("gestures", "Opened the application '{1}'.", Value)
 	} catch as Err {
