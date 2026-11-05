@@ -461,13 +461,17 @@ local function build_install_transaction(target_dir, bundles_dir, bundle_name)
 		"trap 'exit 1' 1 2 15;",
 		'for prior in "$target"/Ergopti_v*.bundle; do',
 			'[ -e "$prior" ] || [ -L "$prior" ] || continue;',
+			'prior_name=${prior##*/}; prior_version=${prior_name#Ergopti_v}; prior_version=${prior_version%.bundle};',
+			'case "$prior_version" in ""|*[!0-9.]*) continue ;; esac;',
 			'"$launcher" --release-rename move "$prior" "$backup/${prior##*/}" || exit 1;',
 		'done;',
 		'"$launcher" --release-rename move "$stage" "$target/$name" || exit 1;',
 		'committed=1;',
-		'rm -rf "$backup" || true;',
 		'trap - 0 1 2 15;',
-		'rm -rf "$work" || true;',
+		'if ! rm -rf "$work"; then',
+			'echo "Keyboard layout installation cleanup failed; retained at $work.";',
+			'echo "Keyboard layout installation cleanup failed; retained at $work." >&2;',
+		'fi;',
 		'exit 0;',
 	}, " ")
 end
@@ -578,6 +582,9 @@ local function install_user_unlocked(bundles_dir, bundle_name)
 	local committed, detail, reason = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
 	if committed then
+		if type(detail) == "string" and detail:find("Keyboard layout installation cleanup failed; retained at ", 1, true) then
+			Logger.warn(LOG, "%s", (detail:gsub("%s+$", "")))
+		end
 		local clear, check_reason = warn_other_scope(SYSTEM_LAYOUTS_DIR)
 		if not clear then
 			Logger.warn(LOG, "User bundle was installed, but input-source changes are deferred.")

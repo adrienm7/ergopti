@@ -596,7 +596,9 @@ function M.sync_foreign_data_sql(on_applied)
 			local djattrs   = fs.attributes(djpath)
 			local sql_attrs = fs.attributes(data_sql)
 			if djattrs and sql_attrs then
-				-- Ensure a devices row exists so imported_data_sql_size has a home
+				-- A stored watermark belongs to a previously identified source; it
+				-- cannot authenticate the directory's current device.json.
+				local identified = false
 				local fh = io.open(djpath, "r")
 				if fh then
 					local raw = fh:read("*a"); fh:close()
@@ -604,6 +606,7 @@ function M.sync_foreign_data_sql(on_applied)
 					if ok and type(obj) == "table"
 						and type(obj.device_id) == "string"
 						and obj.device_id == entry then
+						identified = true
 						local stmt = db:prepare(
 							"INSERT OR IGNORE INTO devices "
 							.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
@@ -618,16 +621,16 @@ function M.sync_foreign_data_sql(on_applied)
 					end
 				end
 
-				-- Look up the watermark for this device.  A malformed/missing
-				-- device.json leaves no devices row; applying its ledger anyway would
-				-- rebuild it every tick because the watermark UPDATE affects zero rows.
+				-- Only the currently identified source may use an existing row.
 				local watermark, digest, has_device_row = 0, nil, false
-				for r in db:nrows(string.format(
-					"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
-					Literal.escape(entry))) do
-					has_device_row = true
-					watermark = tonumber(r.imported_data_sql_size)
-					digest = r.imported_data_sql_sha256
+				if identified then
+					for r in db:nrows(string.format(
+						"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
+						Literal.escape(entry))) do
+						has_device_row = true
+						watermark = tonumber(r.imported_data_sql_size)
+						digest = r.imported_data_sql_sha256
+					end
 				end
 
 				local sz = sql_attrs.size or 0

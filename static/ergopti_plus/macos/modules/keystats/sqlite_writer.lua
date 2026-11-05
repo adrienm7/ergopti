@@ -527,6 +527,17 @@ local function _json_text(v)
 	return encoded
 end
 
+--- Typing events are replay source data: replacing a failed encoding with an
+--- empty object would permanently discard the keystrokes from reconstruction.
+local function _typing_events_json(value)
+	if value == nil then return "{}" end
+	local ok, encoded = pcall(json.encode, value)
+	if not ok or type(encoded) ~= "string" or encoded == "" then
+		error("typing event JSON encoding failed", 0)
+	end
+	return encoded
+end
+
 --- Allocate the next event id (per-device autoincrement).
 local function _alloc_event_id()
 	local id = _next_event_id
@@ -557,7 +568,7 @@ function _builders.typing(e, id)
 	-- literally typed, so they are the only ones encrypted. The aggregates the
 	-- dashboard computes over stay in clear, which is what keeps reads fast.
 	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
-	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _json_text(e.events))
+	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _typing_events_json(e.events))
 	if enc_text == nil or enc_json == nil then
 		-- Encryption is on but could not run. Storing the plaintext would defeat
 		-- the setting the user turned on, so this row is not written at all.

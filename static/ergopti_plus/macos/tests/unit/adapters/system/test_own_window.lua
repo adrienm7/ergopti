@@ -95,6 +95,15 @@ helpers.describe("own window lookup never scans every window (webview-window-no-
 		end)
 	end)
 
+	helpers.it("finds the target after an unrelated window has no readable id", function()
+		local target = window_double(31, "target")
+		with_native({ own = { window_double(nil, "unavailable"), target } }, function(_, counts)
+			helpers.assert_true(rawequal(OwnWindow.for_webview(webview_double(31)), target))
+			helpers.assert_eq(counts.own_reads, 1)
+			helpers.assert_eq(counts.scans, 0)
+		end)
+	end)
+
 	helpers.it("reads a window without a window device as not available yet", function()
 		with_native({ own = { window_double(0, "x") } }, function(_, counts)
 			helpers.assert_eq(OwnWindow.for_webview(webview_double(0)), nil)

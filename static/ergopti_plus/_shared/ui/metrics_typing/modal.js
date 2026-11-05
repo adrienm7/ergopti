@@ -161,6 +161,19 @@ function toggle_app_selection(checkbox) {
  * Re-renders the scrollable app list inside the modal, filtered by the
  * search input and decorated with icons or colored badge fallbacks.
  */
+const appInitialSegmenter =
+	typeof Intl.Segmenter === 'function'
+		? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+		: null;
+
+function appInitial(name) {
+	const normalized = name.normalize('NFC');
+	const first = appInitialSegmenter
+		? appInitialSegmenter.segment(normalized)[Symbol.iterator]().next().value?.segment
+		: Array.from(normalized)[0];
+	return (first || '').toUpperCase();
+}
+
 function render_app_list() {
 	const query = (document.getElementById('app_search')?.value ?? '').toLowerCase().normalize('NFC');
 	const container = document.getElementById('app_list');
@@ -176,7 +189,7 @@ function render_app_list() {
 			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="${escape_html(app)}" />`
-			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${app.charAt(0).toUpperCase()}</div>`;
+			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${escape_html(appInitial(app))}</div>`;
 
 		html +=
 			`<label class="app-item">` +
