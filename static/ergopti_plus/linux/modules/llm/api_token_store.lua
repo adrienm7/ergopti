@@ -43,8 +43,16 @@ local KEY_ATTRIBUTE = "api_key"
 
 -- The backend a test installed, or nil for secret-tool.
 local _backend = nil
--- Revisions stored by this process: two in the same second still differ.
-local _sequence = 0
+-- Random revisions also survive process restarts inside the same second.
+local REVISION_BYTES = 16
+
+local function revision()
+	local loaded, uv = pcall(require, "luv")
+	if not loaded or type(uv) ~= "table" or type(uv.random) ~= "function" then return nil end
+	local called, bytes = pcall(uv.random, REVISION_BYTES)
+	if not called or type(bytes) ~= "string" or #bytes ~= REVISION_BYTES then return nil end
+	return (bytes:gsub(".", function(byte) return string.format("%02x", byte:byte()) end))
+end
 
 
 
@@ -232,8 +240,9 @@ function M.store(entry_id, token)
 		Logger.error(LOG, "API key of '%s' not stored: %s.", entry_id, unavailable)
 		return nil, unavailable
 	end
-	_sequence = _sequence + 1
-	local name = entry_id .. "#" .. os.time() .. "-" .. _sequence
+	local suffix = revision()
+	if not suffix then return nil, "secure random revision unavailable" end
+	local name = entry_id .. "#" .. suffix
 	local called, ok, reason = pcall(with_keyboard, function() return backend().store(name, token) end)
 	if not called then ok, reason = false, tostring(ok) end
 	if ok ~= true then
