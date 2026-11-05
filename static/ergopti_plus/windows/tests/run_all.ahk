@@ -987,6 +987,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/shortcuts/test_text_case_vectors.ahk
 #Include unit/modules/shortcuts/test_wrap_selection_action.ahk
 #Include unit/modules/gestures/test_system_actions.ahk
+#Include unit/modules/gestures/test_unblock_selected_root_reparse.ahk
 #Include unit/modules/gestures/test_system_actions_confirmed_targets.ahk
 #Include unit/modules/gestures/test_system_actions_query_pause.ahk
 #Include unit/modules/gestures/test_system_actions_process_lease.ahk
