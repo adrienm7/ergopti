@@ -773,7 +773,7 @@ function renderDashboard() {
 					datasets: [
 						{
 							label: 'CPM',
-							data: cats.map((c) => +c.cpm.toFixed(0)),
+							data: cats.map((c) => c.cpm),
 							backgroundColor: cats.map((c) => getCategoryColor(c.cat, 0)),
 							borderRadius: 4
 						}
@@ -782,7 +782,10 @@ function renderDashboard() {
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
-					plugins: { legend: { display: false } },
+					plugins: {
+						legend: { display: false },
+						tooltip: { callbacks: { label: formatCpmTooltip } }
+					},
 					scales: {
 						x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-ccc') } },
 						y: {

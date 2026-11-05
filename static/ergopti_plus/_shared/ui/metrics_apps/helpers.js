@@ -336,7 +336,19 @@ function formatDuration(ms) {
 
 function formatDurationDecimal(ms) {
 	if (!ms) return 0;
-	return Number((ms / 3600000).toFixed(2));
+	return ms / 3600000;
+}
+
+/**
+ * Keeps the previous whole-CPM tooltip while retaining precision in the plot.
+ * @param {ChartTooltipItem} context - The active Chart.js tooltip item.
+ * @returns {string} The default label with the rounded CPM value.
+ */
+function formatCpmTooltip(context) {
+	return Chart.defaults.plugins.tooltip.callbacks.label({
+		...context,
+		formattedValue: Math.round(context.parsed.y).toLocaleString(context.chart?.options?.locale)
+	});
 }
 
 function formatDisplayDate(dateStr) {
