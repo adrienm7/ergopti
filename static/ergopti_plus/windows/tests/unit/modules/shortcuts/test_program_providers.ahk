@@ -744,3 +744,29 @@ for Sensitive in [true, false]
 	Test("program providers: " . (Sensitive ? "case-sensitive directory" : "ordinary distinct names")
 		. " actual inventory and execution (program-provider-case-sensitive)",
 		_RPPCS_WithFixture.Bind(_RPPCS_Case.Bind(Sensitive)))
+
+; Exact duplicate inventory names are not two physical case-sensitive entries.
+_RPPCS_ExactDuplicateRefusal() {
+	State := _RPP_ControlledOwner(), Owner := State["owner"]
+	OriginalList := Owner.Ports["list"]
+	Packet := Owner.Discover()
+	Assert(Packet is Map, "SETUP: the real provider policy admits the unchanged controlled native receipts")
+	AssertEqual(1, Packet["choices"].Length, "SETUP: the independently owned original script is discoverable")
+	OldKey := Packet["choices"][1]["key"]
+	try {
+		Owner.Ports["list"] := (*) => Map("names", ["été 日本.py", "été 日本.py"], "truncated", false)
+		DuplicatePacket := Owner.Discover()
+		_TestPrint("# provider-case-exact-duplicate result=" . (DuplicatePacket is Map)
+			. " current=" . IsObject(Owner.Current))
+		AssertFalse(DuplicatePacket, "an exact repeated name remains a refused inventory, not two public choices")
+		AssertFalse(IsObject(Owner.Current), "duplicate refusal cannot leave an admitted candidate packet")
+		AssertFalse(Owner.Resolve(OldKey, []), "the preceding generation cannot survive a refused duplicate discovery")
+	} finally Owner.Ports["list"] := OriginalList
+	Fresh := Owner.Discover()
+	Assert(Fresh is Map, "restored original inventory can admit its own fresh generation")
+	AssertEqual(1, Fresh["choices"].Length, "ordinary one-name inventory behavior is unchanged")
+	Assert(Owner.Resolve(Fresh["choices"][1]["key"], []) is String,
+		"the fresh exact physical receipt still resolves through the canonical program decoder")
+	AssertTrue(Owner.Invalidate(), "the isolated controlled inventory owner retires explicitly")
+}
+Test("program providers: exact duplicate names still refuse (program-provider-exact-duplicate)", _RPPCS_ExactDuplicateRefusal)
