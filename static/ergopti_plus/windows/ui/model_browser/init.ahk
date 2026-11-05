@@ -75,18 +75,24 @@ global LLM_MB_COL_STATUS    := 7
  */
 LLM_ModelBrowser_Show() {
 	global _LLM_ModelBrowser_Gui, _LLM_Menu
+	global _LLM_MBW_SessionEpoch, _LLM_MBW_ResetDone, _LLM_MBW_Gui
 	_LLM_ModelBrowser_RetryFailedNativeWindows()
 	; Prefer the shared web table (sortable/filterable, identical to the macOS
 	; browser) when WebView2 is available and there is enough free RAM to boot it;
 	; fall back to the native ListView below when WebView2 is unavailable, the
 	; webview fails to spin up, or free RAM is too low for the Chromium cold start.
 	if (_LLM_MBW_WebView2Available() && !WebView_ShouldUseNativeFallback()) {
-		web := ""
-		try web := _LLM_ModelBrowser_ShowWeb()
+		web := "", FallbackEpoch := 0
+		try web := _LLM_ModelBrowser_ShowWeb(&FallbackEpoch)
 		catch as Err
 			try LoggerError("LLM.browser", "WebView2 model browser failed: {1} — falling back to ListView.", Err.Message)
 		if IsObject(web)
 			return web
+		; Error reporting and failed-startup cleanup can both admit B. This
+		; old attempt cannot open a native fallback over its newer web session.
+		if FallbackEpoch && (_LLM_MBW_SessionEpoch != FallbackEpoch
+				|| !_LLM_MBW_ResetDone || IsSet(_LLM_MBW_Gui))
+			return 0
 	}
 	if IsSet(_LLM_ModelBrowser_Gui) {
 		Window := _LLM_ModelBrowser_Gui
@@ -697,11 +703,12 @@ global LLM_MBW_HOST_ACCESS_ALLOW := 1
  * fallback (e.g. WebView2 create failed).
  * @returns {Gui|string}
  */
-_LLM_ModelBrowser_ShowWeb() {
+_LLM_ModelBrowser_ShowWeb(&FallbackEpoch := unset) {
 	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub
 	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
 	global _VendorDir, _SharedDir, _I18nLocale
 
+	FallbackEpoch := 0
 	_LLM_MBW_RetryRetiredHosts()
 	if IsSet(_LLM_MBW_Gui) {
 		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
@@ -821,6 +828,10 @@ _LLM_ModelBrowser_ShowWeb() {
 					try Controller.Close()
 				try g.Destroy()
 			}
+			; Only this frame's exact detach ACK admits fallback. A Close
+			; consumed before Reset must remain terminal even at epoch + 1.
+			; The public catch rechecks this old token after its own logger.
+			FallbackEpoch := ResetForFallback ? SessionEpoch + 1 : -1
 		}
 	}
 	; A retired constructor is handled. Only a still-owned factory failure
@@ -852,11 +863,11 @@ _LLM_MBW_Subscribe(Host, Handler) {
 			return false
 		Host.in_flight := true
 	} finally Critical(PreviousCritical)
-	Subscription := 0, Failed := false, FailureType := ""
+	Subscription := 0, Failed := false, FailureType := "", FailureValue := 0
 	try {
 		Subscription := Host.view.WebMessageReceived(Handler)
 	} catch Any as Failure {
-		Failed := true, FailureType := Type(Failure)
+		Failed := true, FailureType := Type(Failure), FailureValue := Failure
 	} finally {
 		PreviousCritical := Critical("On")
 		try {
@@ -867,6 +878,11 @@ _LLM_MBW_Subscribe(Host, Handler) {
 				&& _LLM_MBW_StartupCurrent(Host.epoch, Host.gui)
 		} finally Critical(PreviousCritical)
 	}
+	; Preserve the original caller's current-startup error policy (including
+	; the public model browser's native fallback). A retired constructor must
+	; consume its late failure instead of reopening a canceled or newer UI.
+	if Failed && Current && !Host.retired
+		throw FailureValue
 	if Host.retired
 		_LLM_MBW_RetryRetiredHosts()
 	if Failed

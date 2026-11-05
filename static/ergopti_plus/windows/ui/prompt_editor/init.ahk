@@ -331,12 +331,12 @@ _PromptEdWeb_Subscribe(Host, Kind, Handler) {
 			return false
 		Host.in_flight := true
 	} finally Critical(PreviousCritical)
-	Subscription := 0, Failed := false, FailureType := ""
+	Subscription := 0, Failed := false, FailureType := "", FailureValue := 0
 	try {
 		Subscription := Kind == "message" ? Host.view.WebMessageReceived(Handler)
 			: Host.view.NavigationCompleted(Handler)
 	} catch Any as Failure {
-		Failed := true, FailureType := Type(Failure)
+		Failed := true, FailureType := Type(Failure), FailureValue := Failure
 	} finally {
 		PreviousCritical := Critical("On")
 		try {
@@ -347,6 +347,11 @@ _PromptEdWeb_Subscribe(Host, Kind, Handler) {
 				&& _PromptEdWeb_StartupCurrent(Host.gui)
 		} finally Critical(PreviousCritical)
 	}
+	; Preserve the original caller's current-startup error policy (including
+	; the public model browser's native fallback). A retired constructor must
+	; consume its late failure instead of reopening a canceled or newer UI.
+	if Failed && Current && !Host.retired
+		throw FailureValue
 	if Host.retired
 		_PromptEdWeb_RetryRetiredHosts()
 	if Failed
