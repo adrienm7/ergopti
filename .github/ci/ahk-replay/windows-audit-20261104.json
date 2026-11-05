@@ -1,31 +1,19 @@
 {
-	"expected_count": 72,
+	"expected_count": 250,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "backspace-repeat-native-epoch",
-			"expected_count": 6
+			"contains": "i18n-source-shape",
+			"expected_count": 8
 		},
 		{
-			"contains": "gesture-title-native-transform-target",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-profile-nonllm-source",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal info source projection:",
-			"expected_count": 7
-		},
-		{
-			"contains": "wrap-stage-ownership",
-			"expected_count": 2
+			"contains": "program-provider-unc-root",
+			"expected_count": 9
 		},
 		{
 			"contains": "request-usage-aggregate-domain",
-			"expected_count": 3
+			"expected_count": 5
 		},
 		{
 			"contains": "WPM compensation ownership:",
@@ -48,36 +36,220 @@
 			"expected_count": 3
 		},
 		{
-			"contains": "walker-composite-checkpoint",
+			"contains": "wrap-symbols-global-transaction-20260813:",
+			"expected_count": 10
+		},
+		{
+			"contains": "wrap-guillemets-length",
 			"expected_count": 1
 		},
 		{
-			"contains": "manifest-payload-contract",
-			"expected_count": 1
-		},
-		{
-			"contains": "metrics-system-manifest",
-			"expected_count": 3
-		},
-		{
-			"contains": "i18n-source-shape",
+			"contains": "wrap symbols TOML inline comments:",
 			"expected_count": 7
 		},
 		{
-			"contains": "keystats network: A/disconnected/A emits disconnect and reconnect",
+			"contains": "wrap symbols canonical owned source:",
+			"expected_count": 12
+		},
+		{
+			"contains": "wrap source ownership:",
+			"expected_count": 4
+		},
+		{
+			"contains": "wrap final native admission:",
+			"expected_count": 5
+		},
+		{
+			"contains": "wrap-symbols-unreadable-blocks-save:",
+			"expected_count": 4
+		},
+		{
+			"contains": "wrap acknowledged publication:",
+			"expected_count": 2
+		},
+		{
+			"contains": "wrap-stage-ownership",
+			"expected_count": 8
+		},
+		{
+			"contains": "collection-guided-native-write",
+			"expected_count": 2
+		},
+		{
+			"contains": "one-shot-native-spent-controls",
+			"expected_count": 5
+		},
+		{
+			"contains": "one-shot-native-control-flags",
+			"expected_count": 4
+		},
+		{
+			"contains": "backspace-repeat-native-epoch",
+			"expected_count": 6
+		},
+		{
+			"contains": "suppressive-capture-settlement",
+			"expected_count": 14
+		},
+		{
+			"contains": "one-shot-rearm-admission",
+			"expected_count": 10
+		},
+		{
+			"contains": "scalar-native-nontext-receiving",
+			"expected_count": 6
+		},
+		{
+			"contains": "prompt-startup-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "prompt-navigation-custody",
+			"expected_count": 4
+		},
+		{
+			"contains": "AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
 			"expected_count": 1
 		},
 		{
-			"contains": "keystats network: A/unknown/A preserves state without false transitions",
+			"contains": "final-context-duration-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "keystats-native-unicode-packet",
+			"expected_count": 2
+		},
+		{
+			"contains": "changelog-show-native-close",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-profile-opening-image",
+			"expected_count": 18
+		},
+		{
+			"contains": "native-profile-paste-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-profile-preopen-source",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-profile-source-representation",
 			"expected_count": 1
 		},
 		{
-			"contains": "program-provider-unc-root",
-			"expected_count": 9
+			"contains": "llm-profile-preopen-navigation",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-profile-memory-source",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-profile-projection-canonical",
+			"expected_count": 7
+		},
+		{
+			"contains": "llm-profile-projection-unknown-api",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-profile-nonllm-source",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-profile-nonllm-scope",
+			"expected_count": 2
+		},
+		{
+			"contains": "mouse-distance-flush-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "unblock-native-junction",
+			"expected_count": 1
+		},
+		{
+			"contains": "unblock-native-acl",
+			"expected_count": 1
 		},
 		{
 			"contains": "sendinstant-native-snapshot-copy",
 			"expected_count": 3
+		},
+		{
+			"contains": "gesture-title-native-transform-target",
+			"expected_count": 2
+		},
+		{
+			"contains": "optional boot full-save source ownership:",
+			"expected_count": 4
+		},
+		{
+			"contains": "personal info source projection:",
+			"expected_count": 7
+		},
+		{
+			"contains": "personal-info-source-witness",
+			"expected_count": 5
+		},
+		{
+			"contains": "personal-info-reader-publication",
+			"expected_count": 3
+		},
+		{
+			"contains": "personal-info-canonical-grammar",
+			"expected_count": 5
+		},
+		{
+			"contains": "rctrl-modified-native-epoch",
+			"expected_count": 3
+		},
+		{
+			"contains": "lalt-modified-native-epoch",
+			"expected_count": 3
+		},
+		{
+			"contains": "one-shot-native-tab-flags",
+			"expected_count": 2
+		},
+		{
+			"contains": "config-full-save-debt-matching",
+			"expected_count": 1
+		},
+		{
+			"contains": "config-full-save-debt-conflict",
+			"expected_count": 1
+		},
+		{
+			"contains": "config-full-save-debt-generation",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: regenerates .tsv on a miss and round-trips",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: backslash + newline round-trip through the .tsv",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: .tsv stores the raw",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: stale .tsv",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: a fresh .tsv is served",
+			"expected_count": 1
+		},
+		{
+			"contains": "i18n cache: fresh partial .tsv rebuilds",
+			"expected_count": 1
 		}
 	]
 }
