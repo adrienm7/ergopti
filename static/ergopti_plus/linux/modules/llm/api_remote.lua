@@ -1412,8 +1412,9 @@ local function list_models_now(entry, finish)
 				finish({ state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" })
 				return
 			end
-			local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
-			local ids = decoded_ok and ApiModelListing.model_ids(format, decoded) or nil
+			local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
+			local list = type(decoded) == "table" and decoded[format == "gemini" and "models" or "data"] or nil
+			local ids = decoded_ok and not Json.is_null(list) and ApiModelListing.model_ids(format, decoded) or nil
 			if type(ids) ~= "table" then
 				Logger.warn(LOG, "Remote model listing could not be read (provider=%s).", provider_id)
 				finish({ state = "failed", reason = "unreadable" })
