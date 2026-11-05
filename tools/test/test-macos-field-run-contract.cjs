@@ -521,6 +521,31 @@ function reportFolder(paths) {
 			);
 		});
 
+		await check('a managed Mac installs the dev prerelease with one administrator password', () => {
+			const installer = fs.readFileSync(
+				path.join(ROOT, 'tools/dev/install-macos-dev-prerelease.sh'),
+				'utf8'
+			);
+			assert.doesNotMatch(
+				installer,
+				/\[ -w \/Applications \] \|\| fail/,
+				'an unwritable /Applications must not refuse'
+			);
+			const ask = installer.indexOf('sudo -v || fail');
+			assert(ask > 0, 'the installer must ask for the administrator password');
+			assert(
+				ask < installer.indexOf('Quitting the running'),
+				'the password is asked before anything is quit'
+			);
+			for (const verb of ['rm -rf', 'ditto', 'mv']) {
+				assert.match(
+					installer,
+					new RegExp(`^\\t\\$as_admin ${verb} `, 'm'),
+					`${verb} must run as the admin when needed`
+				);
+			}
+		});
+
 		await check('the collector runs the shell checklist steps from their own file', () => {
 			assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/macos-field-shell-checks\.sh"$/m);
 			assert.match(
