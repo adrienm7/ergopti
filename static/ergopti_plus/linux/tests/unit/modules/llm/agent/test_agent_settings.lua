@@ -73,6 +73,18 @@ helpers.it("refuses malformed action schemas before accepting agent output", fun
 	end
 end)
 
+helpers.it("refuses missing and invalid agent source labels", function()
+	local Json = require("json")
+	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+	for _, case in ipairs({ { "selection" }, { "selection", false }, { "typing", "" }, { "command", 5 } }) do
+		local config = assert(Json.decode(source)); config.source_kinds[case[1]] = case[2]
+		local parsed, reason = require("modules.llm.agent_settings").parse_config(Json.encode(config))
+		helpers.assert_nil(parsed, "unusable source label must not be admitted")
+		helpers.assert_true(type(reason) == "string")
+	end
+end)
+
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
 	local Paths = require("infra.paths")
