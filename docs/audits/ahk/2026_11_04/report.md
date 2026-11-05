@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **141 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **142 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2107,3 +2107,11 @@ Sourcesb577434c,33455472 and6692abce correct the admitted siblings. Actual Linux
 Sources4c538f7a and873c8215 apply the existing Windows usage007 and complete-provider-text091 policies to actual Lua consumers. Root usage/parser/error modules pass227 cases with genuine helpers/native clocks and normal macOS test stubs. Pure shared replay passes93 assertions in both orders. Stale first-part and leading-null partial-output expectations are explicitly reconciled while preserving all error/syntax matrix rows and reasoning/other-candidate controls. The separate usage fixture cache restoration passes its3 actual cases and module-leak check. These are targeted data-parser checks, not native graphical/network or full OS suites.
 
 Sourcebf99d591 fixes shared-Lua hexadecimal layout aliases and validates Unicode entities before conversion; the shared contract passes7/7 in both orders and each driver test module passes7 cases. Nine Windows layout tests are baseline probes, with their production source unchanged. Six confirmed-action and four menu-stage hypotheses likewise remain tests-first, without source fixes or native claims. The next122-case Windows selection combines these probes with proportional postfix controls. Helper875a8b51 now emits bounded per-case failure manifests so missing artifact ZIP access does not hide reverse names. The distinct finding count remains141.
+
+### AHK-142: XML scalar validation before the native Chr ABI
+
+Replay42116306020 atdc32bfaf completes122 isolated cases and a reverse122/122 timed manifest with matching names/statuses, no errors and no omitted cases. The four XML entity cases fail in both orders. Five valid UTF-16 edge/control values, including NUL, pass before the first invalid reference4294967361 (hex100000041) is unexpectedly admitted. Separate64-bit entity traces record actual unintended A output through the real keystroke model. The32-bit case records acceptance, not its exact output; surrogate checks after its first failed assertion are not independent baseline observations.
+
+This is one distinct root cause beyond076:4294967361 fits Int64, but the pinned AHK Chr implementation narrows through ParamIndexToInt before its Unicode check. Checked Int64 parsing cannot correct that second representation boundary. The required remedy validates0..10FFFF and excludes surrogates before Chr, while preserving existing control placeholders. The five layout integer-attribute aliases remain076. Earlier provisional grouping of all nine layout probes is superseded by this native evidence and independent ABI analysis; the register now contains142 distinct findings.
+
+The same run qualifies original29 postfix and all47 LLM cases in both orders. Query controls pass25/26 and the ordinary emptytrash control passes. The remaining query failure is an incomplete double returning only Name where the unchanged production navigation guard requires Item.Path; its fixture must supply the actual private folder/name path. Confirmed-action3 and menu-stage2 failures are separately reproduced hypotheses awaiting their source fixes. No native archive ZIP download is claimed.
