@@ -23,6 +23,7 @@ local SELF_STAT = "4242 (luajit) S 1 4242 4242 0 -1 4194560 812 0 0 0 3 1 0 0 20
 -- and every decision the restarter makes is tested on text it is handed. On
 -- Linux a missing setsid or /proc is a failure.
 local ON_WINDOWS = WinCompat.is_windows()
+local BOOT_ID = "01234567-89ab-cdef-0123-456789abcdef"
 
 helpers.describe("updater restart: starting the installed version", function()
 
@@ -39,16 +40,127 @@ helpers.describe("updater restart: starting the installed version", function()
 	helpers.it("(quit-wins-over-reload) cancels a relay by its marker with no XDG_RUNTIME_DIR", function()
 		local ran = {}
 		local run = function(cmd) ran[#ran + 1] = cmd; return true end
-		local path = Restarter.cancel_path(4242)
-		helpers.assert_eq(path, require("adapters.storage").path() .. ".relay-cancel-4242")
-		helpers.assert_eq(Restarter.cancel("relay", { run = run, pid = 4242 }), true)
+		local path = Restarter.cancel_path(4242, "1337", BOOT_ID)
+		helpers.assert_eq(path, require("adapters.storage").path() .. ".relay-cancel-4242-1337-" .. BOOT_ID)
+		helpers.assert_eq(Restarter.cancel("relay", { run = run, pid = 4242, start_tick = "1337", boot_id = BOOT_ID }), true)
 		helpers.assert_eq(ran, { "touch '" .. path .. "'" })
-		local refused, detail = Restarter.cancel("relay", { run = function() return false end, pid = 4242 })
+		local refused, detail = Restarter.cancel("relay", { run = function() return false end, pid = 4242, start_tick = "1337", boot_id = BOOT_ID })
 		helpers.assert_eq(refused, false)
 		helpers.assert_contains(detail, "marker")
 		local none, why = Restarter.cancel("nothing", {})
 		helpers.assert_eq(none, false)
 		helpers.assert_contains(why, "no restart")
+	end)
+
+	helpers.it("(relay-cancel-identity) keeps stale markers distinct across process and boot reuse", function()
+		local original = Restarter.cancel_path(4242, "1337", BOOT_ID)
+		local different_process = Restarter.cancel_path(4242, "1338", BOOT_ID)
+		local different_boot = Restarter.cancel_path(4242, "1337", "11234567-89ab-cdef-0123-456789abcdef")
+		helpers.assert_true(original ~= different_process and original ~= different_boot)
+		helpers.assert_nil(Restarter.cancel_path(4242, "1337", "not-a-boot-id"))
+		helpers.assert_nil(Restarter.cancel_path(4242, "1/escape", BOOT_ID))
+	end)
+
+	helpers.it("(relay-cancel-identity) a stale cancellation does not suppress the new launcher", function()
+		if ON_WINDOWS then return end
+		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
+		local original = Storage.path
+		local ok, detail = xpcall(function()
+			Storage.path = function() return directory .. "/storage.json" end
+			local pid = assert(Restarter.own_pid())
+			local stale = assert(Restarter.cancel_path(pid, "0", BOOT_ID))
+			local legacy = Storage.path() .. ".relay-cancel-" .. tostring(pid)
+			local current = assert(Restarter.cancel_path(pid, "0", "11234567-89ab-cdef-0123-456789abcdef"))
+			local file = assert(io.open(stale, "w")); assert(file:close())
+			file = assert(io.open(legacy, "w")); assert(file:close())
+			local launcher, launched = directory .. "/launcher", directory .. "/launched"
+			file = assert(io.open(launcher, "w")); file:write("#!/bin/sh\necho yes > " .. Shell.quote(launched) .. "\n"); file:close()
+			assert(Shell.run("chmod 700 " .. Shell.quote(launcher)))
+			assert(Shell.run(Restarter.relay_command(pid, launcher, {}, current, "0")))
+			local present = false
+			for _ = 1, 30 do
+				local probe = io.open(launched, "r")
+				if probe then probe:close(); present = true; break end
+				os.execute("sleep 0.05")
+			end
+			helpers.assert_true(present, "the new relay must ignore another boot's stale marker")
+			local remaining = io.open(stale, "r")
+			helpers.assert_true(remaining ~= nil, "the new relay cannot consume the old marker")
+			if remaining then remaining:close() end
+			remaining = io.open(legacy, "r")
+			helpers.assert_true(remaining ~= nil, "the legacy marker also stays untouched")
+			if remaining then remaining:close() end
+		end, debug.traceback)
+		Storage.path = original
+		os.execute("rm -rf " .. Shell.quote(directory))
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("(relay-cancel-identity) refuses to arm a relay with an invalid boot identity", function()
+		local calls = 0
+		local how = Restarter.restart({ wrapper = "/x", cgroup = TERMINAL_CGROUP, pid = 4242,
+			start_tick = "1337", boot_id = "invalid", run = function() calls = calls + 1; return true end })
+		helpers.assert_nil(how)
+		helpers.assert_eq(calls, 0, "an unqualified marker cannot safely cancel the relay")
+	end)
+
+	helpers.it("(relay-cancel-identity) cancellation uses the dispatched identity despite later read failure", function()
+		local old = Restarter.process_start_time
+		local commands = {}
+		local function run(command) commands[#commands + 1] = command; return true end
+		local how = Restarter.restart({ wrapper = "/x", args = {}, cgroup = TERMINAL_CGROUP,
+			pid = 4243, start_tick = "1337", boot_id = BOOT_ID, run = run })
+		helpers.assert_eq(how, "relay")
+		Restarter.process_start_time = function() return nil end
+		local ok, detail = pcall(function()
+			helpers.assert_true(Restarter.cancel("relay", { pid = 4243, run = run }))
+			helpers.assert_contains(commands[2], ".relay-cancel-4243-1337-" .. BOOT_ID)
+			local refused = Restarter.cancel("relay", { pid = 4244, run = run })
+			helpers.assert_eq(refused, false, "a different PID cannot borrow a fresh identity")
+			helpers.assert_eq(#commands, 2)
+		end)
+		Restarter.process_start_time = old
+		if not ok then error(detail, 0) end
+	end)
+
+	helpers.it("(relay-cancel-identity) quits the actual relay without rereading unavailable proc identity", function()
+		if ON_WINDOWS then return end
+		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
+		local old_path, old_open = Storage.path, io.open
+		local child
+		local ok, detail = xpcall(function()
+			Storage.path = function() return directory .. "/storage.json" end
+			local launcher, launched = directory .. "/launcher", directory .. "/launched"
+			local file = assert(io.open(launcher, "w")); file:write("#!/bin/sh\necho yes > " .. Shell.quote(launched) .. "\n"); file:close()
+			assert(Shell.run("chmod 700 " .. Shell.quote(launcher)))
+			local pipe = assert(io.popen("sleep 1 & echo $!")); child = assert(tonumber(pipe:read("*l"))); pipe:close()
+			local tick, boot = assert(Restarter.process_start_time(child)), assert(Restarter.boot_id())
+			local marker = assert(Restarter.cancel_path(child, tick, boot))
+			helpers.assert_eq(Restarter.restart({ wrapper = launcher, cgroup = TERMINAL_CGROUP,
+				pid = child, start_tick = tick, boot_id = boot, run = Shell.run }), "relay")
+			io.open = function(path, ...)
+				if path == "/proc/self/stat" or path == "/proc/" .. child .. "/stat"
+					or path == "/proc/sys/kernel/random/boot_id" then return nil, "controlled refusal" end
+				return old_open(path, ...)
+			end
+			helpers.assert_true(Restarter.cancel("relay", { run = Shell.run }), "Quit must use the dispatch identity")
+			io.open = old_open
+			local exists = io.open(marker, "r"); helpers.assert_true(exists ~= nil); if exists then exists:close() end
+			local consumed = false
+			for _ = 1, 40 do
+				local probe = io.open(marker, "r")
+				if not probe then consumed = true; break end
+				probe:close(); os.execute("sleep 0.05")
+			end
+			helpers.assert_true(consumed, "the actual relay must consume the exact marker")
+			helpers.assert_nil(io.open(launched, "r"), "Quit must win")
+		end, debug.traceback)
+		io.open, Storage.path = old_open, old_path
+		if child then os.execute("kill " .. child .. " 2>/dev/null") end
+		os.execute("rm -rf " .. Shell.quote(directory))
+		if not ok then error(detail, 0) end
 	end)
 
 	helpers.it("(quit-wins-over-reload) a relay command checks the cancellation marker after the wait", function()
@@ -122,7 +234,7 @@ helpers.describe("updater restart: starting the installed version", function()
 	helpers.it("otherwise relaunches the installed launcher once this process has exited", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray", "--verbose" },
-			cgroup = TERMINAL_CGROUP, pid = 4242, start_tick = "1337", run = function(cmd) ran[#ran + 1] = cmd; return true end })
+			cgroup = TERMINAL_CGROUP, pid = 4242, start_tick = "1337", boot_id = BOOT_ID, run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(how, "relay", "the caller must now exit")
 		helpers.assert_true(ran[1]:find("^setsid sh %-c ") ~= nil, "detached from the dying daemon")
 		helpers.assert_true(ran[1]:find("kill -0 4242", 1, true) ~= nil,
