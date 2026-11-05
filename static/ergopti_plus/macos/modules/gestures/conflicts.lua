@@ -185,7 +185,9 @@ local MACOS_GESTURE_GROUPS = {
 }
 
 local SLOT_TO_GROUP = {}
+local KEY_TO_GROUP = {}
 for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
+	KEY_TO_GROUP[grp.key] = grp
 	for _, slot in ipairs(grp.slots) do
 		SLOT_TO_GROUP[slot] = grp
 	end
@@ -424,8 +426,15 @@ function M.apply_all_overrides(active_actions, is_enabled)
 	return M.refresh(function()
 		if boot_notified or not is_enabled or is_enabled() ~= true then return end
 		boot_notified = true
+		-- Nothing read: nothing to claim. A slot macOS holds is greyed in the
+		-- menu and never fired, so "both will react" would be false for it;
+		-- once the read ran, the boot showed five such dialogs (2026-11-05).
+		if next(cached_preferences) == nil then return end
 		for _, warning in ipairs(M.active_conflicts(active_actions)) do
-			require("ui.gesture_conflict_notice").show(warning)
+			local group = KEY_TO_GROUP[warning.key]
+			if not (group and group.blocks == true) then
+				require("ui.gesture_conflict_notice").show(warning)
+			end
 		end
 	end)
 end
