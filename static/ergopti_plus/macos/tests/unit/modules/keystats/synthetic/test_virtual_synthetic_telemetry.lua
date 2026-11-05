@@ -122,6 +122,18 @@ helpers.describe("keystats: virtual synthetic telemetry for clipboard output", f
 			"the keystats guard must fail if a sibling aggregation route precedes tag rejection")
 	end)
 
+	helpers.it("does not restore an earlier synthetic session after reset", function()
+		local fixture = fixture_module.load_keystats()
+		fixture.state.is_enabled = true
+		fixture.keystats.notify_synthetic("xy", "hotstring", 0, "case", "xy", false)
+		helpers.assert_eq(fixture.keystats.reset_session(), true)
+		fixture.drain()
+		helpers.assert_eq(#fixture.flushes[#fixture.flushes].events, 2, "accepted history must still drain")
+		helpers.assert_eq(fixture.state.session_start_time, 0)
+		helpers.assert_eq(fixture.state.session_last_active, 0)
+		helpers.assert_eq(#fixture.state.recent_typing_eff, 0)
+	end)
+
 	helpers.it("immutable user-data tags own telemetry; PID remains diagnostic", function()
 		local provenance_source = read_unit("local function report_read_failure")
 		local classify = function_slice(provenance_source, "function M.classify(",
