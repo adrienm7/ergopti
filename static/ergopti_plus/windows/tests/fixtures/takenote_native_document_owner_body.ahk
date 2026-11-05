@@ -63,8 +63,8 @@ _TNDO_HoldProcess(Pid, FromRun := false) {
 _TNDO_ReadDocument(Hwnd) {
 	; Classic Edit and the packaged RichEdit backend expose their actual text.
 	for Control in WinGetControlsHwnd("ahk_id " . Hwnd) {
-		Class := WinGetClass("ahk_id " . Control)
-		if !RegExMatch(Class, "i)^(?:Edit|RichEdit.*)$")
+		ControlClass := WinGetClass("ahk_id " . Control)
+		if !RegExMatch(ControlClass, "i)^(?:Edit|RichEdit.*)$")
 			continue
 		try return ControlGetText(Control)
 	}
