@@ -27,6 +27,15 @@ local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"
 local CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
 
 helpers.describe("AI agent: missing local model admission", function()
+	helpers.it("accepts optional JSON null fields without accepting invalid null actions", function()
+		Scenario.run({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_agent_selection("tap_3"))
+			world.wait_for(1)
+			world.respond(1, 'ACTIONS: [{"type":"calendar","title":"Meeting","start":"2026-10-01T14:00","location":null,"attendees":null},'
+				.. '{"type":"reminder","title":null},{"type":"calendar","title":"Invalid","start":"2026-10-01T14:00","attendees":[null]}]')
+			helpers.assert_eq(world.offered(), { Scenario.text("llm.agent.label.calendar", { "Meeting", "2026-10-01 14:00" }) })
+		end)
+	end)
 	helpers.it("asks tags before local System 2 and offers the exact model without sending selection text", function()
 		Scenario.run({ local_backend = true, selection = SELECTION,
 			stored = { ["llm.agent_system2"] = "local" }, download_choice = true }, function(world)

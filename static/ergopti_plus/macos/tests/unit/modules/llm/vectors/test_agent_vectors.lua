@@ -170,6 +170,16 @@ end)
 -- ============================================
 
 helpers.describe("agent actions stay inside the closed schema", function()
+	helpers.it("treats decoded optional null as absent and rejects null required values", function()
+		local config = read_json("modules/llm/agent.json")
+		local actions, rejected = Agent.parse_actions(config,
+			'ACTIONS: [{"type":"calendar","title":"Meeting","start":"2026-10-01T14:00","location":null},{"type":"reminder","title":null}]',
+			json.decode_lossless, { tools = {}, is_null = json.is_null })
+		helpers.assert_eq(#actions, 1)
+		helpers.assert_eq(actions[1].title, "Meeting")
+		helpers.assert_nil(actions[1].location)
+		helpers.assert_eq(#rejected, 1)
+	end)
 	helpers.it("encodes reserved characters in calendar attendee addresses", function()
 		local config = read_json("modules/llm/agent.json")
 		local action = assert(Agent.validate_action(config, {
