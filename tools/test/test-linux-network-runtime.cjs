@@ -46,6 +46,27 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check('native luv build stage is representable in Lua paths', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-stage-'));
+		const helper = shellFunction(outputs[`${DRIVER}/install.sh`], '_native_luv_stage_create');
+		try {
+			for (const suffix of ['ordinary', 'with;separator', 'with?substitution', 'relative']) {
+				const temporary = suffix === 'relative' ? 'relative' : path.join(scratch, suffix);
+				if (suffix !== 'relative') fs.mkdirSync(temporary);
+				const result = spawnSync(bashExecutable(), ['-c', `${helper}\n_native_luv_stage_create`], {
+					encoding: 'utf8', env: { ...process.env, TMPDIR: temporary }
+				});
+				assert.equal(result.status, 0, result.stderr);
+				const stage = result.stdout.trim();
+				try {
+					assert.ok(path.isAbsolute(stage));
+					assert.doesNotMatch(stage, /[;?]/);
+					assert.equal(path.dirname(stage), suffix === 'ordinary' ? temporary : '/tmp');
+				} finally { fs.rmSync(stage, { recursive: true, force: true }); }
+			}
+		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+	});
 	check(
 		'native module parents refuse source and installation symlink aliases without writes',
 		() => {
@@ -171,7 +192,7 @@ function portable() {
 			const prepare = shellFunction(installer, '_prepare_source_network_runtime');
 			assert.ok(
 				prepare.indexOf('_native_output_bin_parents || return 1') <
-					prepare.indexOf('NATIVE_LUV_STAGE="$(mktemp -d)"')
+					prepare.indexOf('NATIVE_LUV_STAGE="$(_native_luv_stage_create)"')
 			);
 			assert.match(prepare, /_network_runtime_available; then return 0; fi/);
 			assert.match(
