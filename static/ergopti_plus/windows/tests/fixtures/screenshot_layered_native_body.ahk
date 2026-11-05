@@ -72,8 +72,8 @@ _SCLP_Main() {
 	FileAppend("PASS screenshot-layered-native " . A_Args[1] . "`n", "*")
 }
 try _SCLP_Main()
-catch Any as Failure {
-	FileAppend("FAIL screenshot-layered-native " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n", "*")
+catch Any as _SCLP_ChildFailure {
+	FileAppend("FAIL screenshot-layered-native " . _SCLP_ChildFailure.Message . " [" . _SCLP_ChildFailure.File . ":" . _SCLP_ChildFailure.Line . "]`n", "*")
 	ExitApp(1)
 }
 ExitApp(0)
