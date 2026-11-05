@@ -87,13 +87,18 @@ M.KEYS = {
 --- types, stores its canonical form and says what downloads now do. A value
 --- the parser refuses is never stored. Logs name the mode only, never a relay.
 --- @param setting table Interpreter from M.new.
---- @param ports table { get = fn(key) -> any, set = fn(key, value) -> boolean,
+--- @param ports table { get = fn(key) -> any, boolean|nil (false on refused read), set = fn(key, value) -> boolean,
 ---   prompt = fn(title, text, initial) -> string|nil (nil on cancel),
 ---   error = fn(title, text), info = fn(title, text), t = fn(key) -> string,
 ---   log = fn(level, message, ...) }.
 --- @return boolean saved
 function M.edit(setting, ports)
-	local stored = ports.get(setting.storage_key)
+	local stored, readable = ports.get(setting.storage_key)
+	if readable == false then
+		ports.log("error", "Proxy override not saved: the settings store refused the read.")
+		ports.error(ports.t(M.KEYS.title), ports.t(M.KEYS.not_saved))
+		return false
+	end
 	local initial = type(stored) == "string" and stored or setting.default
 	local typed = ports.prompt(ports.t(M.KEYS.title), ports.t(M.KEYS.prompt), initial)
 	if typed == nil then return false end

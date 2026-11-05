@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy voor downloads",
 	"proxy_override.prompt": "Laat leeg om de netwerkinstellingen van het systeem te volgen (inclusief een bedrijfs-PAC). Typ direct om zonder proxy te downloaden, of het adres van één proxy, bijvoorbeeld http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Dit is geen proxyadres. Laat het veld leeg, typ direct of geef een adres zoals http://proxy.example.com:3128 (http, https, socks5 of socks5h, met poort).",
-	"proxy_override.not_saved": "De instelling kon niet worden opgeslagen. Er is niets veranderd.",
+	"proxy_override.not_saved": "Het opslaan van de instelling kon niet worden bevestigd.",
 	"proxy_override.saved_automatic": "Downloads volgen weer de netwerkinstellingen van het systeem.",
 	"proxy_override.saved_direct": "Downloads maken nu verbinding zonder proxy.",
 	"proxy_override.saved_relay": "Downloads gaan nu via deze proxy.",

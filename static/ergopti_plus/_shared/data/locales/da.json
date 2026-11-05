@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy til downloads",
 	"proxy_override.prompt": "Lad feltet være tomt for at følge systemets netværksindstillinger (også en virksomheds-PAC). Skriv direct for at downloade uden proxy, eller adressen på én proxy, for eksempel http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Dette er ikke en proxyadresse. Lad feltet være tomt, skriv direct eller angiv en adresse som http://proxy.example.com:3128 (http, https, socks5 eller socks5h, med port).",
-	"proxy_override.not_saved": "Indstillingen kunne ikke gemmes. Intet er ændret.",
+	"proxy_override.not_saved": "Det kunne ikke bekræftes, at indstillingen blev gemt.",
 	"proxy_override.saved_automatic": "Downloads følger igen systemets netværksindstillinger.",
 	"proxy_override.saved_direct": "Downloads forbinder nu uden proxy.",
 	"proxy_override.saved_relay": "Downloads går nu gennem denne proxy.",

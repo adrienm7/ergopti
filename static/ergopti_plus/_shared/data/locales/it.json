@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy dei download",
 	"proxy_override.prompt": "Lascia vuoto per seguire le impostazioni di rete del sistema (PAC aziendale compreso). Scrivi direct per scaricare senza alcun proxy, oppure l'indirizzo di un proxy, ad esempio http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Non è un indirizzo di proxy. Lascia il campo vuoto, scrivi direct oppure un indirizzo come http://proxy.example.com:3128 (http, https, socks5 o socks5h, con la porta).",
-	"proxy_override.not_saved": "Impossibile salvare l'impostazione. Non è cambiato nulla.",
+	"proxy_override.not_saved": "Non è stato possibile confermare il salvataggio dell’impostazione.",
 	"proxy_override.saved_automatic": "I download seguono di nuovo le impostazioni di rete del sistema.",
 	"proxy_override.saved_direct": "I download ora si collegano senza alcun proxy.",
 	"proxy_override.saved_relay": "I download ora passano da questo proxy.",

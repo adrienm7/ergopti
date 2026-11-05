@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "下载代理",
 	"proxy_override.prompt": "留空则遵循系统网络设置（包括公司的 PAC）。输入 direct 表示不经任何代理直接下载，或输入一个代理地址，例如 http://proxy.example.com:3128。",
 	"proxy_override.invalid": "这不是代理地址。请留空、输入 direct，或输入类似 http://proxy.example.com:3128 的地址（http、https、socks5 或 socks5h，并带端口）。",
-	"proxy_override.not_saved": "无法保存该设置。未做任何更改。",
+	"proxy_override.not_saved": "无法确认设置已保存。",
 	"proxy_override.saved_automatic": "下载重新遵循系统网络设置。",
 	"proxy_override.saved_direct": "下载现在不经任何代理直接连接。",
 	"proxy_override.saved_relay": "下载现在经过此代理。",

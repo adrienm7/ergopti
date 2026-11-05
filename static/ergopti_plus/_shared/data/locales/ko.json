@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "다운로드용 프록시",
 	"proxy_override.prompt": "비워 두면 시스템 네트워크 설정(회사 PAC 포함)을 따릅니다. 프록시 없이 다운로드하려면 direct를 입력하고, 특정 프록시를 쓰려면 그 주소(예: http://proxy.example.com:3128)를 입력하세요.",
 	"proxy_override.invalid": "프록시 주소가 아닙니다. 칸을 비워 두거나, direct를 입력하거나, http://proxy.example.com:3128 같은 주소(http, https, socks5 또는 socks5h와 포트)를 입력하세요.",
-	"proxy_override.not_saved": "설정을 저장하지 못했습니다. 아무것도 바뀌지 않았습니다.",
+	"proxy_override.not_saved": "설정이 저장되었는지 확인할 수 없습니다.",
 	"proxy_override.saved_automatic": "다운로드가 다시 시스템 네트워크 설정을 따릅니다.",
 	"proxy_override.saved_direct": "이제 다운로드가 프록시 없이 연결됩니다.",
 	"proxy_override.saved_relay": "이제 다운로드가 이 프록시를 거칩니다.",

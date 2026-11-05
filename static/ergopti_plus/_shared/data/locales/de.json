@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy für Downloads",
 	"proxy_override.prompt": "Leer lassen, um den Netzwerkeinstellungen des Systems zu folgen (einschließlich einer Firmen-PAC). Geben Sie direct ein, um ohne Proxy herunterzuladen, oder die Adresse eines Proxys, zum Beispiel http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Das ist keine Proxy-Adresse. Lassen Sie das Feld leer, geben Sie direct ein oder eine Adresse wie http://proxy.example.com:3128 (http, https, socks5 oder socks5h, mit Port).",
-	"proxy_override.not_saved": "Die Einstellung konnte nicht gespeichert werden. Nichts wurde geändert.",
+	"proxy_override.not_saved": "Das Speichern der Einstellung konnte nicht bestätigt werden.",
 	"proxy_override.saved_automatic": "Downloads folgen wieder den Netzwerkeinstellungen des Systems.",
 	"proxy_override.saved_direct": "Downloads verbinden sich jetzt ohne Proxy.",
 	"proxy_override.saved_relay": "Downloads laufen jetzt über diesen Proxy.",

@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy for nedlastinger",
 	"proxy_override.prompt": "La feltet stå tomt for å følge systemets nettverksinnstillinger (også en bedrifts-PAC). Skriv direct for å laste ned uten proxy, eller adressen til én proxy, for eksempel http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Dette er ikke en proxyadresse. La feltet stå tomt, skriv direct eller oppgi en adresse som http://proxy.example.com:3128 (http, https, socks5 eller socks5h, med port).",
-	"proxy_override.not_saved": "Innstillingen kunne ikke lagres. Ingenting er endret.",
+	"proxy_override.not_saved": "Det kunne ikke bekreftes at innstillingen ble lagret.",
 	"proxy_override.saved_automatic": "Nedlastinger følger igjen systemets nettverksinnstillinger.",
 	"proxy_override.saved_direct": "Nedlastinger kobler nå til uten proxy.",
 	"proxy_override.saved_relay": "Nedlastinger går nå gjennom denne proxyen.",

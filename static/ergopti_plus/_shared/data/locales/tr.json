@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "İndirmeler için proxy",
 	"proxy_override.prompt": "Sistemin ağ ayarlarını (bir şirket PAC dosyası dahil) izlemek için boş bırakın. Proxy olmadan indirmek için direct yazın veya bir proxy adresi girin, örneğin http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Bu bir proxy adresi değil. Alanı boş bırakın, direct yazın veya http://proxy.example.com:3128 gibi bir adres girin (http, https, socks5 veya socks5h, bağlantı noktasıyla).",
-	"proxy_override.not_saved": "Ayar kaydedilemedi. Hiçbir şey değişmedi.",
+	"proxy_override.not_saved": "Ayarın kaydedildiği doğrulanamadı.",
 	"proxy_override.saved_automatic": "İndirmeler yeniden sistemin ağ ayarlarını izliyor.",
 	"proxy_override.saved_direct": "İndirmeler artık proxy olmadan bağlanıyor.",
 	"proxy_override.saved_relay": "İndirmeler artık bu proxy üzerinden geçiyor.",

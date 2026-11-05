@@ -1404,7 +1404,7 @@
 	"proxy_override.title": "Proxy för nedladdningar",
 	"proxy_override.prompt": "Lämna tomt för att följa systemets nätverksinställningar (även en företags-PAC). Skriv direct för att ladda ned utan proxy, eller adressen till en proxy, till exempel http://proxy.example.com:3128.",
 	"proxy_override.invalid": "Det här är ingen proxyadress. Lämna fältet tomt, skriv direct eller ange en adress som http://proxy.example.com:3128 (http, https, socks5 eller socks5h, med port).",
-	"proxy_override.not_saved": "Inställningen kunde inte sparas. Inget har ändrats.",
+	"proxy_override.not_saved": "Det gick inte att bekräfta att inställningen sparades.",
 	"proxy_override.saved_automatic": "Nedladdningar följer åter systemets nätverksinställningar.",
 	"proxy_override.saved_direct": "Nedladdningar ansluter nu utan proxy.",
 	"proxy_override.saved_relay": "Nedladdningar går nu via den här proxyn.",
