@@ -95,6 +95,116 @@ local function test(name, body)
 end
 
 helpers.describe("Ollama inventory endpoint receipts", function()
+	test("settles a model verification when a menu refresh overlaps it", function(world)
+		local verified, verify_count, refreshed = nil, 0, nil
+		world.api.verify_local_model(MODEL, function(value)
+			verify_count, verified = verify_count + 1, value
+		end)
+		world.api.refresh_local_models(function(value) refreshed = value end)
+		helpers.assert_true(#world.gets >= 1)
+		for index = 1, #world.gets do world.listed(index, {}) end
+		helpers.assert_eq(verify_count, 1, "the model chooser must receive one terminal result")
+		helpers.assert_eq(verified, false, "a missing model must remain eligible for its offer")
+		helpers.assert_eq(refreshed, true)
+	end)
+
+	test("settles a refused inventory admission even without a native callback", function(world)
+		local original = world.listing.get
+		world.listing.get = function() return false end
+		local count, result, reason = 0, true, nil
+		world.api.verify_local_model(MODEL, function(value, why)
+			count, result, reason = count + 1, value, why
+		end)
+		world.listing.get = original
+		helpers.assert_eq(count, 1)
+		helpers.assert_nil(result)
+		helpers.assert_eq(reason, "model_list_unavailable")
+	end)
+
+	test("keeps a successor inventory after synchronous timer refusal", function(world)
+		local original_new = hs.timer.new
+		local first_count, successor_count, successor, refreshed = 0, 0, nil, nil
+		hs.timer.new = function() return nil end
+		local ok, err = xpcall(function()
+			world.api.verify_local_model(MODEL, function(value)
+				first_count = first_count + 1
+				helpers.assert_nil(value)
+				hs.timer.new = original_new
+				world.api.verify_local_model(MODEL, function(result)
+					successor_count, successor = successor_count + 1, result
+				end)
+			end)
+		end, debug.traceback)
+		hs.timer.new = original_new
+		if not ok then error(err, 0) end
+		world.api.refresh_local_models(function(value) refreshed = value end)
+		helpers.assert_eq(first_count, 1)
+		helpers.assert_eq(#world.gets, 1, "the refresh joins the successor, not the refused request")
+		world.listed(1, {})
+		helpers.assert_eq(successor_count, 1)
+		helpers.assert_eq(successor, false)
+		helpers.assert_eq(refreshed, true)
+	end)
+
+	test("does not log acquisition exception details", function(world)
+		local logger = require("infra.logger")
+		local original_url = world.api.get_base_url
+		local messages, reason = {}, nil
+		logger.error = function(_, format, ...)
+			messages[#messages + 1] = string.format(format, ...)
+		end
+		world.api.get_base_url = function() error("private-endpoint-secret") end
+		world.api.verify_local_model(MODEL, function(_, why) reason = why end)
+		world.api.get_base_url = original_url
+		helpers.assert_eq(reason, "model_list_unavailable")
+		helpers.assert_true(#messages > 0)
+		helpers.assert_nil(table.concat(messages, " "):find("private-endpoint-secret", 1, true))
+	end)
+
+	test("continues notifying inventory waiters when one callback raises", function(world)
+		local refreshed = nil
+		world.api.verify_local_model(MODEL, function() error("controlled waiter failure") end)
+		world.api.refresh_local_models(function(value) refreshed = value end)
+		helpers.assert_eq(#world.gets, 1)
+		world.listed(1, {})
+		helpers.assert_eq(refreshed, true)
+	end)
+
+	test("retires the old waiter when a new endpoint starts a refresh", function(world)
+		local calls, old, reason, refreshed = 0, true, nil, nil
+		world.api.verify_local_model(MODEL, function(value, why)
+			calls, old, reason = calls + 1, value, why
+		end)
+		world.port(11471)
+		world.api.refresh_local_models(function(value) refreshed = value end)
+		helpers.assert_eq(calls, 1)
+		helpers.assert_nil(old)
+		helpers.assert_eq(reason, "model_list_unavailable")
+		helpers.assert_eq(#world.gets, 2)
+		world.listed(1, {})
+		world.listed(2, { MODEL })
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(refreshed, true)
+		helpers.assert_eq(world.api.local_model_installed(MODEL), true)
+	end)
+
+	test("revokes remaining inventory waiters when the first invalidates its receipt", function(world)
+		local results = {}
+		world.api.verify_local_model(MODEL, function(value)
+			results[#results + 1] = { value = value }
+			world.api.forget_local_models()
+		end)
+		world.api.refresh_local_models(function(value, reason)
+			results[#results + 1] = { value = value, reason = reason }
+		end)
+		helpers.assert_eq(#world.gets, 1)
+		world.listed(1, {})
+		helpers.assert_eq(#results, 2)
+		helpers.assert_eq(results[1].value, false)
+		helpers.assert_eq(results[2].value, false)
+		helpers.assert_eq(results[2].reason, "model_list_unavailable")
+	end)
+
 	for _, kind in ipairs({ "chat", "vision" }) do
 		test("admits the unchanged " .. kind .. " endpoint and reuses only its acknowledged cache", function(world)
 			world.request(kind)
