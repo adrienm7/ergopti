@@ -343,7 +343,7 @@ function M.rescan(admit, on_done)
 				detail = "no discovery descriptor in local_servers.json" }
 		end
 	end
-	local ok, err = pcall(Ports.scan, entries, function(results)
+	local ok = pcall(Ports.scan, entries, function(results)
 		for id, result in pairs(undescribed) do results[id] = result end
 		port_scans = results
 		local waiters = scan_waiters or {}
@@ -351,8 +351,8 @@ function M.rescan(admit, on_done)
 		local function done(changed)
 			for _, waiter in ipairs(waiters) do
 				if waiter.on_done then
-					local called, raised = pcall(waiter.on_done, changed)
-					if not called then Logger.error(LOG, "Local server rescan callback raised: %s", tostring(raised)) end
+					local called = pcall(waiter.on_done, changed)
+					if not called then Logger.error(LOG, "Local server rescan callback raised an error.") end
 				end
 			end
 		end
@@ -365,7 +365,7 @@ function M.rescan(admit, on_done)
 	end)
 	if not ok then
 		scan_waiters = nil
-		Logger.error(LOG, "The local server port scan could not start: %s", tostring(err))
+		Logger.error(LOG, "The local server port scan could not start.")
 		return false
 	end
 	return true
