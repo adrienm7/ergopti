@@ -162,6 +162,37 @@ local function write_and_close(fh, content, path, operation)
 	return true
 end
 
+--- Creates a new file exclusively and confirms its full contents.
+--- @param path string Native destination.
+--- @param content string Bytes to publish.
+--- @return boolean written
+--- @return string|number|nil reason Native open refusal (including EEXIST).
+function M.write_new(path, content)
+	if not valid_native_path(path) or type(content) ~= "string" then return false, "invalid" end
+	-- A different writer can change the same inode after our exclusive create.
+	-- Leave partial output on failure: inode identity cannot authorize unlinking
+	-- another writer's subsequent bytes.
+	local stream, detail, code, _, current, same_owned, release_pin = require("infra.regular_file_writer").open(path, "wx", true)
+	if not stream then return false, code or detail end
+	if type(release_pin) ~= "function" then pcall(stream.close, stream); return false, "descriptor ownership unavailable" end
+	local wrote, accepted = pcall(stream.write, stream, content)
+	local closed, acknowledged = pcall(stream.close, stream)
+	if not wrote or not accepted or not closed or acknowledged ~= true then
+		local released, pin_closed = pcall(release_pin)
+		if not released or pin_closed ~= true then return false, "descriptor close unconfirmed" end
+		return false, "write refused"
+	end
+	local owned, original = pcall(same_owned)
+	local checked, same = pcall(current, content)
+	local rechecked, still_original = pcall(same_owned)
+	local released, pin_closed = pcall(release_pin)
+	if not released or pin_closed ~= true then return false, "descriptor close unconfirmed" end
+	if not owned or original ~= true or not checked or same ~= true or not rechecked or still_original ~= true then
+		return false, "file changed"
+	end
+	return true
+end
+
 --- Writes content to a file, overwriting any existing content.
 --- Admits a pinned regular destination before truncation; FIFOs cannot block.
 --- @param path    string Absolute path to the file.
