@@ -1037,8 +1037,8 @@ function _render_activity_calendar() {
 		return `rgb(${r}, ${g}, ${b})`;
 	};
 
-	const fr_date = (d) =>
-		d.toLocaleDateString('fr-FR', {
+	const localized_date = (d) =>
+		d.toLocaleDateString(window._i18n_locale || 'fr', {
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
@@ -1059,7 +1059,7 @@ function _render_activity_calendar() {
 		const date_str = formatMetricsDateKey(cursor.getTime());
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
-		const tip = `${fr_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
+		const tip = `${localized_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month

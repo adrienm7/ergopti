@@ -2917,10 +2917,10 @@ function render_records_kpi() {
 		prev = ordinal;
 	});
 
-	const fr_short = (date_str) => {
+	const localized_short_date = (date_str) => {
 		if (!date_str) return '—';
 		const d = new Date(parseDateKey(date_str));
-		return d.toLocaleDateString('fr-FR', {
+		return d.toLocaleDateString(window._i18n_locale || 'fr', {
 			day: 'numeric',
 			month: 'short',
 			year: '2-digit',
@@ -2944,15 +2944,20 @@ function render_records_kpi() {
 	);
 	set(
 		'records_session',
-		max_session_ms > 0 ? `${_fmt_duration_ms(max_session_ms)} (${fr_short(max_session_date)})` : '—'
+		max_session_ms > 0
+			? `${_fmt_duration_ms(max_session_ms)} (${localized_short_date(max_session_date)})`
+			: '—'
 	);
 	set(
 		'records_best_day',
 		best_day_chars > 0
-			? `${format_number(best_day_chars)} ${escape_html(_t('ui_typing.col_chars'))} (${fr_short(best_day)})`
+			? `${format_number(best_day_chars)} ${escape_html(_t('ui_typing.col_chars'))} (${localized_short_date(best_day)})`
 			: '—'
 	);
-	set('records_streak', streak_max > 0 ? `${streak_max} jour${streak_max > 1 ? 's' : ''}` : '—');
+	set(
+		'records_streak',
+		streak_max > 0 ? `${escape_html(_t('ui_apps.label_days'))} ${streak_max}` : '—'
+	);
 
 	const has_data = max_burst > 0 || max_session_ms > 0 || best_day_chars > 0;
 	const loading = document.getElementById('records_loading');

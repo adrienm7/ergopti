@@ -315,6 +315,7 @@ document.addEventListener('i18n:applied', () => {
 	render_rhythm_kpi();
 	render_sessions_kpi();
 	render_records_kpi();
+	_render_activity_calendar();
 	render_apps_kpi();
 });
 
