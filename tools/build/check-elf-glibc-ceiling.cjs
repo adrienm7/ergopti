@@ -162,7 +162,7 @@ function regularFiles(roots, includeSymlinks = false) {
  * @returns {string|null} The interpreter path, or null for a file without one.
  */
 function parseInterpreter(output) {
-	const match = output.match(/Requesting program interpreter: ([^\]\s]+)/);
+	const match = output.match(/^\s*\[Requesting program interpreter: (.*)\]\s*$/m);
 	return match ? match[1] : null;
 }
 
