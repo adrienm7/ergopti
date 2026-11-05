@@ -15,9 +15,19 @@ local TapCopy = require("platform.remap.tap_copy")
 --- @param options table|nil { reason = string, copies = { [n] = true }, copy_on_send = boolean }
 local function world(options)
 	options = options or {}
-	local w = { counter = 1000, sends = 0, warnings = 0, logs = {}, timers = {}, now = 0 }
+	local w = { counter = 1000, sends = 0, warnings = 0, logs = {}, timers = {}, now = 0, destination = "field-a" }
 	w.owner = TapCopy.new({
 		verify_ms = 300,
+		capture_destination = function()
+			if w.on_capture then w.on_capture() end
+			local captured = w.destination
+			if captured == nil then return nil end
+			return { current = function()
+				if w.on_check then w.on_check() end
+				if w.current_error then error("focus check failed") end
+				return captured == w.destination
+			end }
+		end,
 		read_counter = function()
 			if options.reason then return nil, options.reason end
 			return w.counter
@@ -49,7 +59,7 @@ local function world(options)
 	function w.tap()
 		w.owner:run("tap_hold__left_shift", function()
 			if options.copy_on_send then w.counter = w.counter + 1 end
-		end)
+		end, function() return w.source_current ~= false end)
 	end
 	return w
 end
@@ -72,6 +82,112 @@ helpers.describe("Linux tap-hold copy (tap-copy-verified)", function()
 		w.advance(300)
 		helpers.assert_eq(w.warnings, 0)
 		helpers.assert_eq(w.logs[1].level, "warn")
+	end)
+
+	helpers.it("does not retry Ctrl+C after the focused field changes", function()
+		local w = world()
+		w.tap()
+		w.destination = "field-b"
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0, "a newer selection must not be copied")
+	end)
+
+	helpers.it("does not retry when the original destination is unknown", function()
+		local w = world()
+		w.destination = nil
+		w.tap()
+		w.destination = "field-b"
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0)
+	end)
+
+	helpers.it("still sends the first copy when destination capture raises", function()
+		local w = world()
+		local initial = 0
+		w.on_capture = function() error("focus unavailable") end
+		w.owner:run("tap_hold", function() initial = initial + 1 end, function() return true end)
+		helpers.assert_eq(initial, 1)
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0)
+	end)
+
+	helpers.it("does not retry after the original remap is replaced", function()
+		local w = world()
+		w.tap()
+		w.source_current = false
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0)
+	end)
+
+	helpers.it("does not retry if the focus proof raises", function()
+		local w = world()
+		w.tap()
+		w.current_error = true
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0)
+	end)
+
+	helpers.it("does not use an owner replaced during the focus check", function()
+		local w = world()
+		w.tap()
+		w.on_check = function() w.on_check = nil; w.owner:stop() end
+		w.advance(300)
+		helpers.assert_eq(w.sends, 0)
+	end)
+
+	helpers.it("retires an old retry before capturing a new destination", function()
+		local w = world()
+		w.tap()
+		local old_callback = w.timers[1].callback
+		w.destination = "field-b"
+		w.on_capture = function() w.on_capture = nil; old_callback() end
+		w.tap()
+		helpers.assert_eq(w.sends, 0, "the older retry cannot borrow the newer destination")
+	end)
+
+	helpers.it("cannot reuse a replaced operation with the same destination and source", function()
+		local callbacks, retries, owner, replace, warnings = {}, 0, nil, false, 0
+		local source = function() return true end
+		local destination = { current = function()
+			if replace then
+				replace = false
+				owner:stop()
+				owner:run("new", function() end, source)
+			end
+			return true
+		end }
+		owner = TapCopy.new({ verify_ms = 300, read_counter = function() return 5 end,
+			capture_destination = function() return destination end,
+			send_copy = function() retries = retries + 1; return true end,
+			after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+			cancel = function() end, log = function() end, warn_user = function() warnings = warnings + 1 end })
+		owner:run("old", function() end, source)
+		replace = true
+		callbacks[1]()
+		helpers.assert_eq(retries, 0, "old operation cannot borrow the new one's identical proof")
+		helpers.assert_eq(warnings, 0, "a superseded retry cannot warn for the new operation")
+		callbacks[2]()
+		helpers.assert_eq(retries, 1, "the new operation retains its own retry")
+	end)
+
+	helpers.it("does not warn for a retired sender that raises after replacement", function()
+		local callbacks, warnings, owner, sends = {}, 0, nil, 0
+		local source = function() return true end
+		local destination = { current = function() return true end }
+		owner = TapCopy.new({ verify_ms = 300, read_counter = function() return 5 end,
+			capture_destination = function() return destination end,
+			send_copy = function()
+				sends = sends + 1
+				if sends == 1 then owner:stop(); owner:run("new", function() end, source); error("retired") end
+				return true
+			end,
+			after = function(_, fn) callbacks[#callbacks + 1] = fn; return {} end,
+			cancel = function() end, log = function() end, warn_user = function() warnings = warnings + 1 end })
+		owner:run("old", function() end, source)
+		callbacks[1]()
+		helpers.assert_eq(warnings, 0)
+		callbacks[2]()
+		helpers.assert_eq(sends, 2)
 	end)
 
 	helpers.it("a Ctrl+C that never landed warns the user (tap-copy-verified)", function()

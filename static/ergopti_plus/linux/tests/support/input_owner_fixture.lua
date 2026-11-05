@@ -308,7 +308,7 @@ function M.with_manager_session(options, body)
 			Layout._set_table_for_test({ a = { keycode = 30, level = 1, mods = {} }, A = { keycode = 30, level = 2, mods = { "shift" } } })
 			manager = options.cached_manager or h.load_module("platform.remap.tap_hold_manager")
 			s.actions = {}
-			assert(manager.init({ keyboard_hook = s.hook,
+			assert(manager.init({ keyboard_hook = s.hook, capture_copy_owner = options.capture_copy_owner,
 				execute_action = function(action, binding)
 					s.actions[#s.actions + 1] = { action, binding }
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end

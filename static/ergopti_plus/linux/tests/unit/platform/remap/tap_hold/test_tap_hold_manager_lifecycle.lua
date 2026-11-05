@@ -90,6 +90,49 @@ os.remove(user_path)
 		os.remove(user_path)
 	end)
 
+	helpers.it("keeps a delayed copy retry out of a newly focused field", function()
+		local names = { "adapters.clipboard", "adapters.timer_scheduler", "adapters.notifier" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local callback, field = nil, "first"
+		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_, fn) callback = fn; return { armed = true } end,
+			cancel = function() return true end,
+		}
+		package.loaded["adapters.notifier"] = { send = function() return true end }
+		local Manager, path
+		local ok, err = xpcall(function()
+			local hook, actions
+			Manager, hook, actions, path = manager(nil, { capture_copy_owner = function()
+				local selected = field
+				return { current = function() return selected == field end }
+			end })
+			local code = require("platform.remap.tap_hold_engine").KEY_CODES.left_shift
+			hook.engine:process(code, 1, 0)
+			local _, action, binding = hook.engine:process(code, 0, 100)
+			helpers.assert_eq(action, "copy")
+			hook.on_tap(action, binding)
+			helpers.assert_eq(#actions, 1, "the first copy is still sent after key-up")
+			helpers.assert_true(type(callback) == "function")
+			callback()
+			helpers.assert_eq(#actions, 2, "the unchanged field and remap permit the retry")
+			hook.on_tap("copy")
+			helpers.assert_eq(#actions, 3)
+			field = "second"
+			callback()
+			helpers.assert_eq(#actions, 3, "the retry cannot copy the second field")
+			hook.on_tap("copy")
+			helpers.assert_eq(#actions, 4)
+			helpers.assert_true(Manager.set_enabled(false))
+			callback()
+			helpers.assert_eq(#actions, 4, "a retired remap cannot send its delayed retry")
+		end, debug.traceback)
+		if Manager then Manager._reset_for_test() end
+		if path then os.remove(path) end
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("transports the actual monitor tap binding through release and queued rollover", function()
 		local Manager, hook, actions, user_path = manager()
 		local Engine = require("platform.remap.tap_hold_engine")
@@ -690,6 +733,42 @@ helpers.describe("native OneShot Manager route", function()
 	local function consume(s)
 		s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 220)
 	end
+	helpers.it("permits a copy retry after a configured pair key is released", function()
+		local names = { "adapters.clipboard", "adapters.timer_scheduler", "adapters.notifier" }
+		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local timer
+		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_, callback) timer = callback; return { armed = true } end,
+			cancel = function() return true end,
+		}
+		package.loaded["adapters.notifier"] = { send = function() return true end }
+		local ok, err = xpcall(function()
+			Fixture.with_manager_session({ before_manager = function(s)
+				s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'
+			end, capture_copy_owner = function() return { current = function() return true end } end }, function(s)
+				s.pair()
+				helpers.assert_eq(#s.actions, 1)
+				helpers.assert_eq(s.actions[1][1], "copy")
+				helpers.assert_true(type(timer) == "function")
+				timer()
+				helpers.assert_eq(#s.actions, 2, "the unchanged pair still owns the retry after release")
+			end)
+			timer = nil
+			Fixture.with_manager_session({ before_manager = function(s)
+				s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'
+			end, capture_copy_owner = function() return { current = function() return true end } end }, function(s)
+				s.pair()
+				helpers.assert_eq(#s.actions, 1)
+				s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "none"\n'
+				timer()
+				helpers.assert_eq(#s.actions, 1, "changed pair configuration cannot own the retry")
+			end)
+		end, debug.traceback)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("loads the saved action and arms through the actual Manager callback", function()
 		Fixture.with_manager_session({}, function(s)
 			helpers.assert_eq(s.owner.get_action("caps_lock_then_tab"), "one_shot_shift")

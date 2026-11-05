@@ -1056,6 +1056,11 @@ local function main()
 	privacy_owners.tap_hold_called, privacy_owners.tap_hold_initialized = pcall(function() return TapHold.init({
 		keyboard_hook = keyboard_hook,
 		dry_run = opts.dry_run,
+		capture_copy_owner = function()
+			local guard = privacy_owners.context
+			if not guard or type(guard.capture_text_owner) ~= "function" then return nil end
+			return guard.capture_text_owner()
+		end,
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
 			action_catalogue.execute_action(action, binding)
