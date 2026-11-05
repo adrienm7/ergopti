@@ -1122,8 +1122,11 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 	install -d "${LIB_DIR}/linux/native_modules"
 	_native_output_bin_parents || exit 1
 	NATIVE_LUV_PUBLICATION="$(mktemp "${LIB_DIR}/linux/native_modules/.luv.XXXXXX")"
-	install -m 755 "$NATIVE_LUV_STAGE/luv.so" "$NATIVE_LUV_PUBLICATION"
-	mv -T -- "$NATIVE_LUV_PUBLICATION" "${LIB_DIR}/linux/native_modules/luv.so"
+	if ! install -m 755 "$NATIVE_LUV_STAGE/luv.so" "$NATIVE_LUV_PUBLICATION" \
+		|| ! mv -T -- "$NATIVE_LUV_PUBLICATION" "${LIB_DIR}/linux/native_modules/luv.so"; then
+		rm -f -- "$NATIVE_LUV_PUBLICATION"
+		exit 1
+	fi
 fi
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"

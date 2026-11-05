@@ -65,6 +65,34 @@ function portable() {
 			assert.equal(fs.readFileSync(path.join(destination, 'lib/..hidden-runtime'), 'utf8'), 'runtime bytes\n');
 		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 	});
+	check('failed native luv publication retires its private temporary file', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-publication-'));
+		try {
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const start = installer.indexOf('\tNATIVE_LUV_PUBLICATION="$(mktemp');
+			const end = installer.indexOf('\nfi\ncp -r', start);
+			assert.ok(start >= 0 && end > start, 'actual publication block');
+			const block = installer.slice(start, end);
+			const stage = path.join(scratch, 'stage');
+			const library = path.join(scratch, 'lib');
+			const modules = path.join(library, 'linux/native_modules');
+			fs.mkdirSync(stage);
+			fs.mkdirSync(modules, { recursive: true });
+			fs.writeFileSync(path.join(stage, 'luv.so'), 'new bytes');
+			fs.writeFileSync(path.join(modules, 'luv.so'), 'existing bytes');
+			for (const failure of ['install', 'mv']) {
+				const script = `set -euo pipefail\n${failure}() { return 71; }\n${block}`;
+				const result = spawnSync(bashExecutable(), ['-c', script], {
+					encoding: 'utf8', timeout: 10000,
+					env: { ...process.env, LIB_DIR: library, NATIVE_LUV_STAGE: stage }
+				});
+				assert.notEqual(result.status, 0, `${failure} must fail publication`);
+				assert.deepEqual(fs.readdirSync(modules), ['luv.so']);
+				assert.equal(fs.readFileSync(path.join(modules, 'luv.so'), 'utf8'), 'existing bytes');
+			}
+		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+	});
 	check('native luv build stage is representable in Lua paths', () => {
 		if (process.platform !== 'linux') return;
 		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-stage-'));
