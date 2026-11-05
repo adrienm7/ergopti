@@ -7,7 +7,7 @@
 
 #Requires AutoHotkey v2.0
 
-_KLRCE_PublishedCache(Scenario := 0) {
+_KLRCE_PublishedCache(Scenario := 0, InputEvents := unset) {
 	global KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
 	global KL_ENC_MachineIdOverride, KL_ENC_MachineIdOverrideActive
 	Saved := [Keystats.device_id, Keystats._device_id_lit, KL_ENC_Enabled,
@@ -23,7 +23,7 @@ _KLRCE_PublishedCache(Scenario := 0) {
 		Entry := Map("type", "typing", "timestamp", "2026-01-01 10:00:00.000",
 			"app", "fixture.exe", "title", "Cache cipher fixture", "layout", "fr",
 			"pause_before_ms", 0, "text", "ab", "events",
-			[["a", 25, Map("kc", 65, "sk", 30)], ["b", 30, Map("kc", 66, "sk", 48)]])
+			IsSet(InputEvents) ? InputEvents : [["a", 25, Map("kc", 65, "sk", 30)], ["b", 30, Map("kc", 66, "sk", 48)]])
 		Sql := KL_BuildInsertTyping(Entry, 1)
 		AssertContains(Sql, "ergopti-enc-v1:", "the fixture must use the real encrypted writer")
 		_KLRDC_WriteLedger(_KLRDC_Header() . "BEGIN;" . Sql . "COMMIT;`n")
@@ -250,3 +250,56 @@ _KLRCE_UnsafeStoredImage(Db, Entry, Worker) {
 for Worker in [false, true]
 	Test("KLR cache: unsafe stored image worker=" . Worker . " is upgraded (klr-cache-payload-upgrade)",
 		_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeStoredImage.Bind(, , Worker))))
+
+
+_KLRTP_CheckEncryptedNumeric(Mode, Delay, Db, Entry) {
+	Stored := 0, Resident := 0
+	try {
+		Row := SQLite_Query(Db, "SELECT chars,pauses,think_time_ms,think_pause_ms FROM klr_reader_typing_counts;")[1]
+		AssertEqual(2, Row["chars"])
+		AssertEqual(1, Row["pauses"])
+		AssertEqual(Delay, Row["think_time_ms"])
+		AssertEqual(KLWConst.THINK_PAUSE_MS, Row["think_pause_ms"])
+		Path := KLR_CachePath(_KLRDC_Root())
+		Stored := SQLite_Open(Path, Mode == "legacy-cache" ? SQLiteConst.OPEN_RW : SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		if Mode == "legacy-cache" {
+			AssertTrue(KLR_CACHE_FORMAT_VERSION != "20", "The old row-level pause projection must no longer be admitted")
+			AssertTrue(SQLite_Exec(Stored, "UPDATE klr_cache_meta SET value='20' WHERE key='format_version';"
+				. "UPDATE agg_app_day SET pauses=0,think_time_ms=0;"))
+			SQLite_Close(Stored), Stored := 0
+			AssertTrue(_KLR_CacheStageIsOwned(Path), "The old format20 remains an owned image eligible for safe retirement")
+			KLR_ResetCache()
+			Rebuilt := _KLRDC_BuildAsWorker()
+			AssertEqual(1, SQLite_Query(Rebuilt, "SELECT pauses FROM agg_app_day;")[1]["pauses"])
+			AssertEqual(Delay, SQLite_Query(Rebuilt, "SELECT think_time_ms FROM agg_app_day;")[1]["think_time_ms"], "A rejected old image must rebuild from its actual encrypted ledger")
+		} else {
+			Resident := SQLite_CloneMemory(Stored)
+			AssertTrue(Resident != 0)
+			SQLite_Close(Stored), Stored := 0
+			AssertEqual(0, SQLite_Query(Resident, "SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_payload';")[1]["n"], "The real resident main-only clone has no decrypted TEMP payload")
+			AssertTrue(SQLite_Exec(Resident, "UPDATE events_typing SET events_json='ergopti-enc-v1:invalid';"))
+			AssertTrue(KLR_RebuildAggregates(Resident), "The resident SQL rollup must use persisted numbers even when the TEMP payload table does not exist")
+			AssertEqual(Delay, SQLite_Query(Resident, "SELECT think_time_ms FROM agg_app_day;")[1]["think_time_ms"])
+			AssertTrue(KLR_PrepareTypingProjection(Resident, 0, false), "Valid persisted numeric history must not be decrypted again by a resident counts-only refresh")
+			AssertEqual(0, SQLite_Query(Resident, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"])
+			AssertTrue(KLR_RebuildAggregates(Resident))
+			Cell := KLR_ReadManifest(Resident, "2026-01-01", "2026-01-01")["2026-01-01"]["fixture.exe"]
+			AssertEqual(1, Cell["pauses"])
+			AssertEqual(Delay, Cell["think_time"])
+			AssertEqual(2, SQLite_Query(Resident, "PRAGMA temp_store;")[1]["temp_store"])
+		}
+	} finally {
+		SQLite_Close(Resident)
+		SQLite_Close(Stored)
+	}
+}
+
+_KLRTP_EncryptedCase(Mode) {
+	Delay := KLWConst.THINK_PAUSE_MS + 1
+	_KLRCE_PublishedCache(_KLRTP_CheckEncryptedNumeric.Bind(Mode, Delay),
+		[["a",0,Map("kc",65,"sk",30)], ["b",Delay,Map("kc",66,"sk",48)]])
+}
+for _KLRTP_Mode in ["resident-counts", "legacy-cache"]
+	Test("KLR thinking pauses: encrypted " . _KLRTP_Mode . " preserves numeric history without persisted clear payload (klr-thinking-pause-encrypted)",
+		_KLRDC_CheckTeardown.Bind(_KLRTP_EncryptedCase.Bind(_KLRTP_Mode)))
