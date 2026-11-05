@@ -136,7 +136,7 @@ function M.new(opts)
 				end
 			end
 
-			if keyboard_hook.isRunning() then
+			if keyboard_hook.isRunning() or (type(keyboard_hook.isRecovering) == "function" and keyboard_hook.isRecovering()) then
 				if type(emergency_reason) == "string" and emergency_reason ~= "" then
 					keyboard_hook.emergency_stop(emergency_reason)
 				else
