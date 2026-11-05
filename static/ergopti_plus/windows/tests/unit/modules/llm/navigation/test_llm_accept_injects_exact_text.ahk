@@ -420,3 +420,96 @@ _LAIET_OptionsKeepExactDeletedText() {
 }
 Test("LLM accept: native options preserve the exact deleted tail (notepad-pending)",
 	_LAIET_OptionsKeepExactDeletedText)
+
+; Real JSON/provider/parser/accept chain. The SendInput port is an emission
+; observer from _LAIET_Run; these cases do not claim native editor reception.
+_LPNUL_Accept(Mode) {
+	global LAIET_TYPED, LAIET_PREDICTION
+	Expected := "grand empereur français"
+	HasNul := Mode != "plain"
+	WireText := HasNul ? 'grand empereur\u0000 français' : Expected
+	if Mode == "chunks"
+		Wire := '{"choices":[{"message":{"content":[{"type":"text","text":"grand empereur\u0000"},{"type":"text","text":" français"}]}}]}'
+	else
+		Wire := '{"choices":[{"message":{"content":"' . WireText . '"}}]}'
+	; Decode independently using the production parser; inspect code units via
+	; Ptr only, never WStr, so this diagnostic cannot shorten a NUL string.
+	Root := JsonParse(Wire)
+	Decoded := Mode == "chunks" ? Root["choices"][1]["message"]["content"][1]["text"]
+		: Root["choices"][1]["message"]["content"]
+	if HasNul {
+		AssertEqual(0, NumGet(StrPtr(Decoded), StrLen("grand empereur") * 2, "UShort"))
+		AssertTrue(StrLen(Decoded) > StrLen("grand empereur"), "JSON must preserve the escaped NUL before the subject runs")
+	}
+	Classified := _LLMRemoteClassifyResponse("openai", Wire)
+	if !Classified["ok"] {
+		AssertTrue(HasNul, "The ordinary canonical completion control must remain usable")
+		FileAppend("# provider-nul mode=" . Mode . " refused_by_provider=1`n", "*")
+		return
+	}
+	Raw := Classified["text"]
+	NulAt := RegExMatch(Raw, "\x00")
+	RawUnits := StrLen(Raw)
+	Slots := LLM_Parser_ParseResponse(Raw, LAIET_TYPED, LAIET_TYPED, 1, 15, false, 1)
+	AssertTrue(Slots.Length <= 1)
+	OldPrediction := LAIET_PREDICTION
+	try {
+		if Slots.Length
+			LAIET_PREDICTION := Slots[1]
+		_LAIET_Run(CheckOutput)
+	} finally LAIET_PREDICTION := OldPrediction
+	CheckOutput(Sent, Record) {
+		global _LLM_Bridge_Buffer, LAIET_TYPED
+		Accepted := false
+		if Slots.Length {
+			SendLevel(2)
+			Accepted := _LLM_Accept_ClaimAndDispatch(LLM_Tooltip_GetAcceptSnapshot())
+		}
+		FileAppend("# provider-nul mode=" . Mode . " raw_units=" . RawUnits
+			. " nul_at=" . NulAt . " slots=" . Slots.Length
+			. " accepted=" . Accepted . " sends=" . Sent.Length
+			. " slot_units=" . (Slots.Length ? StrLen(Slots[1]) : 0) . "`n", "*")
+		if HasNul && NulAt {
+			AssertEqual(StrLen(Expected) + 1, RawUnits,
+				"The extracted source must preserve the complete suffix after its NUL")
+			AssertEqual(StrLen("grand empereur") + 1, NulAt)
+		} else
+			AssertEqual(Expected, Raw, "Any provider-side sanitation must retain the complete non-NUL text")
+		if !Slots.Length {
+			AssertTrue(HasNul, "The ordinary completion control must remain usable")
+			AssertEqual(0, Sent.Length)
+			AssertEqual(LAIET_TYPED, _LLM_Bridge_Buffer)
+			return
+		}
+		AssertTrue(Accepted)
+		AssertEqual(1, Sent.Length)
+		; Existing cleaner policy may remove NUL or reject the whole answer.
+		; Accepting only the prefix before NUL loses valid suffix text.
+		AssertEqual("{Text}" . Expected, Sent[1].Keys,
+			"An accepted sanitized completion must retain all non-NUL suffix text")
+		AssertEqual(LAIET_TYPED . Expected, _LLM_Bridge_Buffer)
+	}
+}
+for _LPNUL_Mode in ["plain", "string", "chunks"]
+	Test("LLM provider output: " . _LPNUL_Mode . " preserves complete accepted text (provider-nul-accept)",
+		_LPNUL_Accept.Bind(_LPNUL_Mode))
+
+_LPNUL_RawTextSendRefuses() {
+	_LAIET_Run(CheckOutput)
+	CheckOutput(Sent, Record) {
+		Raw := JsonParse('"grand empereur\u0000 français"')
+		AssertTrue(RegExMatch(Raw, "\x00") > 0)
+		global _AHK_SendText
+		OldSendText := _AHK_SendText, Direct := [], Results := []
+		try {
+			_AHK_SendText := (Text) => Direct.Push(Text)
+			TextSend(Raw, Map("mode", "direct"), (Ok, Detail := "") => Results.Push(Ok))
+			AssertEqual(1, Results.Length)
+			AssertFalse(Results[1], "Raw embedded NUL must be rejected before any transport")
+			AssertEqual(0, Sent.Length)
+			AssertEqual(0, Direct.Length)
+		} finally _AHK_SendText := OldSendText
+	}
+}
+Test("TextSender: original provider NUL is refused without partial emission (provider-nul-accept)",
+	_LPNUL_RawTextSendRefuses)
