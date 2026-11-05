@@ -15,8 +15,8 @@
 ---
 --- HOW IT READS, AND WHY EACH WAY:
 --- Battery through /sys/class/power_supply, which is a kernel file and needs no
---- daemon. Lock state and suspend through logind, which is the only thing on a
---- systemd desktop that knows both. Network through the first of nmcli, iwgetid
+--- daemon. Lock state comes from logind; suspension is the difference between
+--- the boot and monotonic clocks. Network uses the first of nmcli, iwgetid
 --- or /proc/net/wireless that answers — three because distributions disagree
 --- about which is installed, and a metric that works on one distribution is a
 --- metric nobody can compare. Audio mute through the first sound stack that
@@ -53,9 +53,8 @@ local LOG = "modules.keystats.system_metrics"
 -- learn the same answer.
 local SAMPLE_INTERVAL_MS = 30000
 
--- A gap between two samples longer than this means the machine was not running
--- in between — it suspended, or the daemon was stopped. Three sample intervals,
--- so a busy machine that merely ran late is never mistaken for one that slept.
+-- Ignore short apparent suspensions within three sample intervals. When the
+-- suspend-aware clock is unavailable, retain the older elapsed-gap heuristic.
 local SLEEP_GAP_MS = SAMPLE_INTERVAL_MS * 3
 
 -- A sampler must never switch time domains within one captured history.
@@ -329,6 +328,7 @@ end
 function M.sample()
 	local clock = Calendar.capture(true)
 	local boot_ms = clock.boot_ms
+	clock.active_mono_ms = clock.mono_ms
 	if not _sample_clock_source then
 		_sample_clock_source = type(boot_ms) == "number" and "boot" or "monotonic"
 		if _sample_clock_source == "monotonic" then
@@ -343,6 +343,12 @@ function M.sample()
 		clock.mono_ms = boot_ms
 	end
 	local now_ms, date = clock.mono_ms, clock.date
+	if _last.at_ms and (now_ms < _last.at_ms
+		or (_sample_clock_source == "boot" and _last.clock
+			and clock.active_mono_ms < _last.clock.active_mono_ms)) then
+		Logger.error(LOG, "System sampling clock moved backwards; sample deferred.")
+		return nil
+	end
 	if _day and _day.date == date and _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
 	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
 	local capture_events = _event_admit()
@@ -350,7 +356,13 @@ function M.sample()
 	local current = retained_day(date)
 	if not current then return nil end
 	local elapsed = _last.at_ms and math.max(0, now_ms - _last.at_ms) or 0
-	local asleep = elapsed > SLEEP_GAP_MS
+	local suspended = elapsed
+	if _sample_clock_source == "boot" and _last.clock then
+		local active = math.max(0, clock.active_mono_ms - _last.clock.active_mono_ms)
+		suspended = math.max(0, elapsed - math.min(elapsed, active))
+	end
+	local asleep = suspended > SLEEP_GAP_MS
+	local sleep_total = asleep and suspended or 0
 	local segments = {}
 	local at, span_date = _last.at_ms, _last.clock and _last.clock.date
 	if at and _last.clock then
@@ -363,22 +375,28 @@ function M.sample()
 	-- Admit every source first: a refused historical load cannot leave half an
 	-- interval credited and then counted again on the next periodic retry.
 	for _, segment in ipairs(segments) do if not retained_day(segment.date) then return nil end end
+	-- Two clock deltas prove the interval totals but not when suspension began.
+	-- Across local day cuts, apportion those totals by segment duration; the
+	-- cumulative rounding conserves every measured millisecond.
+	local credited, sleep_credited = 0, 0
 	for _, segment in ipairs(segments) do
 		local day = _days[segment.date]
-		if asleep then
-			day.sleep_ms = day.sleep_ms + segment.elapsed
-		else
-			local field = _last.locked == true and "locked_ms" or "awake_ms"
-			day[field] = day[field] + segment.elapsed
-			if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + segment.elapsed end
-		end
+		credited = credited + segment.elapsed
+		local cumulative_sleep = elapsed > 0 and math.floor(sleep_total * credited / elapsed + 0.5) or 0
+		local segment_sleep = cumulative_sleep - sleep_credited
+		sleep_credited = cumulative_sleep
+		local active = segment.elapsed - segment_sleep
+		day.sleep_ms = day.sleep_ms + segment_sleep
+		local field = _last.locked == true and "locked_ms" or "awake_ms"
+		day[field] = day[field] + active
+		if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + active end
 	end
 	_day = current
 	local function transition(action, metadata)
 		if not capture_events then return end
 		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
 	end
-	if asleep then transition("wake", { asleep_ms = elapsed }) end
+	if asleep then transition("wake", { asleep_ms = sleep_total }) end
 
 	local battery = read_battery()
 	if battery then
