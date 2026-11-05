@@ -1586,12 +1586,14 @@ local function models_response_is_valid(format, response)
 	if type(response.body) ~= "string" or response.body == "" then
 		return false, "response body is empty"
 	end
-	local decode_ok, decoded, decode_error = pcall(JsonCodec.decode, response.body)
+	-- Native decoding collapses empty arrays and objects, so it cannot prove
+	-- that a successful response actually contains the provider's array.
+	local decode_ok, decoded, decode_error = pcall(Json.decode_lossless, response.body)
 	if not decode_ok or decode_error ~= nil or type(decoded) ~= "table" then
 		return false, "response body is not valid JSON"
 	end
 	local catalogue_key = format == "gemini" and "models" or "data"
-	if type(decoded[catalogue_key]) ~= "table" then
+	if not Json.is_array(decoded[catalogue_key]) then
 		return false, "models catalogue is missing"
 	end
 	return true, "ok"
