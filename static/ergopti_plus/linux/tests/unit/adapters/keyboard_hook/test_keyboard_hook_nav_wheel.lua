@@ -140,7 +140,7 @@ local function drive(pointer_kind, keyboard_events, pointer_events, on_relative,
 			end,
 			onClick = not omit_click and function(code) if on_click then on_click(kh, code) end end or nil,
 			onPointerEvent = observer and function(kind, code, value, slot)
-				return observer(kind, code, value, slot, kh, start_options)
+				return observer(kind, code, value, slot, kh, start_options, grabs)
 			end or nil,
 		}
 		kh.start(start_options)
@@ -176,6 +176,29 @@ end
 local HOLD = { { LEFT_ALT, 1, 1000 }, { LEFT_ALT, 0, 9000 } }
 
 helpers.describe("keyboard hook: the navigation layer's wheel (layer-wheel-linux)", function()
+	helpers.it("ignores stale pointer reports until the sync boundary (pointer-dropped-stale)", function()
+		local clicks, reports = 0, {}
+		local _, _, _, running = drive("mouse", {}, {
+			{ EV_SYN, 3, 0, 1000 }, { EV_KEY, BTN_LEFT, 1, 2000 },
+			{ EV_SYN, 0, 0, 3000 }, { EV_KEY, BTN_LEFT, 1, 4000 },
+		}, nil, function(kind) reports[#reports + 1] = kind end, nil, nil,
+			function() clicks = clicks + 1 end)
+		helpers.assert_true(running)
+		helpers.assert_eq(clicks, 1, "only the press after SYN_REPORT is trustworthy")
+		helpers.assert_eq(reports, { "dropped", "frame", "press", "reset" })
+	end)
+
+	helpers.it("waits for the pointer sync boundary before grabbing the wheel (pointer-dropped-stale)", function()
+		local during_frame
+		local _, grabs, _, running, source = drive("mouse", { { LEFT_ALT, 1, 2000 } }, {
+			{ EV_SYN, 3, 0, 1000 }, { EV_KEY, BTN_LEFT, 1, 3000 }, { EV_SYN, 0, 0, 4000 },
+		}, nil, function(kind, _, _, slot, _, _, all_grabs)
+			if kind == "frame" then during_frame = all_grabs[slot:sub(#"pointer:" + 1)].on end
+		end)
+		helpers.assert_true(running)
+		helpers.assert_eq(during_frame, 0, "stale events cannot cross a grab boundary")
+		helpers.assert_eq(grabs.on, 1, "the synchronized pointer can be grabbed afterward")
+	end)
 	helpers.it("preserves a successor started during emergency pointer cleanup (emergency-pointer-successor)", function()
 		local restarted = false
 		local _, _, _, running, _, pointer_open = drive("mouse", {}, { { EV_KEY, BTN_LEFT, 1, 3000 } }, nil,
