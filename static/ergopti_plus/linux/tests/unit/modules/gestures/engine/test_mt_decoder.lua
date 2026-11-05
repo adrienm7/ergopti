@@ -483,6 +483,20 @@ helpers.describe("mt decoder: lost queue recovery", function()
 		})
 	end
 
+	helpers.it("does not reuse cached slot coordinates after queue loss", function()
+		local decoder = Decoder.new()
+		helpers.assert_true(feed_all(decoder, gesture_events(1, 0, 0)) ~= nil)
+		dropped(decoder); report(decoder)
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 800 },
+			{ EV_KEY, BTN_TOOL[1], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "lost reports invalidate the cached axis values")
+	end)
+
 	helpers.it("mt-drop-recovery: ignores a stale count and lift in the discarded packet", function()
 		local decoder = Decoder.new()
 		partial_start(decoder); report(decoder); dropped(decoder)
