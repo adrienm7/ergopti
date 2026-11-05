@@ -68,7 +68,7 @@ class _SIC_CaptureHook {
 		this.Starts := 0, this.Stops := 0
 	}
 	KeyOpt(Keys, Options) {
-		Expected := A_Args[1] == "one-shot" ? "{BackSpace}{Enter}{Delete}{Escape}"
+		Expected := A_Args[1] == "one-shot" ? "{BackSpace}{Enter}{Delete}{Escape}{Tab}"
 			: "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 		_SIC_Require(Keys == Expected && Options == (A_Args[1] == "one-shot" ? "ES" : "S"),
 			"The passive port must represent the actual owner's exact ending-control suppression options.")

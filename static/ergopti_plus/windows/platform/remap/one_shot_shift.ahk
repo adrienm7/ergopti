@@ -32,7 +32,7 @@ OneShotShift() {
 		_TapHoldOneShotTable()
 		if !TapHoldOwnerCurrent(GestureOwner) || A_IsSuspended
 				return
-		NamedKeys := "{BackSpace}{Enter}{Delete}{Escape}"
+		NamedKeys := "{BackSpace}{Enter}{Delete}{Escape}{Tab}"
 		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
 		ihvText.KeyOpt(NamedKeys, "ES") ; Own only ending controls; other nontext keys remain native.
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
