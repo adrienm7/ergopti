@@ -135,7 +135,7 @@ local function github_api(config, run)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(GITHUB_OWNER) end
-		HttpClient.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
+		local started = HttpClient.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
 			{ timeout_ms = config.timeout_ms, owner = GITHUB_OWNER, https_only = true }, function(result)
 				if tonumber(result.status) ~= 200 then
 					done(http_failure(result))
@@ -149,6 +149,7 @@ local function github_api(config, run)
 				end
 				done({ state = "ok" }, { network = { github_api = value } })
 			end)
+		if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 	end
 end
 
@@ -169,7 +170,7 @@ local function proxy_pac(config, run)
 		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
 		local function fetch(url)
 			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
-			HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
+			local started = HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
 				{ timeout_ms = config.timeout_ms, owner = PAC_OWNER }, function(result)
 					local state, text = PacCheck.judge(result.status, result.body, result.error)
 					if state == "ok" then
@@ -178,6 +179,7 @@ local function proxy_pac(config, run)
 						done({ state = "error", detail = text })
 					end
 				end)
+			if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 		end
 		local function ask(key, on_output)
 			-- Only GNOME stores a proxy setting there; elsewhere there is none to read.
@@ -217,7 +219,7 @@ local function ai_health(config, state, run)
 			return
 		end
 		run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(AI_OWNER) end
-		HttpClient.get(llm.get_base_url() .. config.paths[AI_BACKEND], {},
+		local started = HttpClient.get(llm.get_base_url() .. config.paths[AI_BACKEND], {},
 			{ timeout_ms = config.timeout_ms, owner = AI_OWNER }, function(result)
 				local status = tonumber(result.status) or 0
 				if status < 200 or status >= 300 then
@@ -228,6 +230,7 @@ local function ai_health(config, state, run)
 				local version = type(data) == "table" and type(data.version) == "string" and data.version or nil
 				done({ state = "ok" }, { ai = { ai_health = version and (AI_BACKEND .. " " .. version) or ("HTTP " .. status) } })
 			end)
+		if started ~= true then done({ state = "error", detail = "HTTP request refused" }) end
 	end
 end
 
