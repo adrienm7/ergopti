@@ -25,6 +25,7 @@ local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local AgentSettings = require("modules.llm.agent_settings")
+local AppIdentity = require("llm.app_identity")
 local COMMAND = require("config_keys").COMMAND
 
 local LOG = "ui.menu.agent_rows"
@@ -152,8 +153,9 @@ local function running_apps(excluded)
 	local list, seen = {}, {}
 	for _, info in ipairs(WindowInfo.getAll()) do
 		local app = type(info) == "table" and info.appId or nil
-		if type(app) == "string" and app ~= "" and not seen[app] and not excluded[app] then
-			seen[app] = true
+		local key = AppIdentity.normalize(app)
+		if key and not seen[key] and not excluded[key] then
+			seen[key] = true
 			list[#list + 1] = app
 		end
 	end
@@ -171,14 +173,19 @@ local function disabled_app_rows(llm, dialogs, changed)
 	local ManifestMenu = require("infra.manifest_menu")
 	local apps = AgentSettings.get_disabled_apps()
 	local excluded = {}
-	for _, app in ipairs(apps) do excluded[app] = true end
+	for _, app in ipairs(apps) do
+		local key = AppIdentity.normalize(app)
+		if key then excluded[key] = true end
+	end
 	local function store(list)
 		if AgentSettings.set_disabled_apps(list) then changed() end
 	end
 	-- Read again at click time: the list may have changed since the menu was built.
 	local function add(app)
 		local list = AgentSettings.get_disabled_apps()
-		for _, existing in ipairs(list) do if existing == app then return end end
+		local key = AppIdentity.normalize(app)
+		if not key then return end
+		for _, existing in ipairs(list) do if AppIdentity.normalize(existing) == key then return end end
 		list[#list + 1] = app
 		store(list)
 	end
@@ -210,7 +217,8 @@ local function disabled_app_rows(llm, dialogs, changed)
 	}, {
 		agent_disabled_apps_present = function() return #apps > 0 end,
 		agent_disabled_app_current_present = function()
-			return type(last) == "string" and last ~= "" and not excluded[last]
+			local key = AppIdentity.normalize(last)
+			return key ~= nil and not excluded[key]
 		end,
 		agent_disabled_app_current_caption = function() return last end,
 	}, {

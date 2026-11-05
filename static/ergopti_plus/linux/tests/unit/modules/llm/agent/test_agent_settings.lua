@@ -1036,6 +1036,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 		{ apps = {}, last = "editor", count = 2, boundary = false, current = true },
 		{ apps = { "editor" }, last = false, count = 3, boundary = true, current = false },
 		{ apps = { "editor" }, last = "editor", count = 3, boundary = true, current = false },
+		{ apps = { "Firefox" }, last = "firefox", count = 3, boundary = true, current = false },
 		{ apps = { "editor" }, last = "terminal", count = 4, boundary = true, current = true },
 		{ apps = { "z", "a" }, last = false, count = 4, boundary = true, current = false },
 	}) do
