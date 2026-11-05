@@ -109,11 +109,13 @@ _PISW_Run(Mode, Path) {
 	}
 }
 
-_PISW_Utf16Run(Path) {
+_PISW_Utf16Run(Path, Literal := false) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	global HSE_RuntimeDecisionGeneration
 	Generation := HSE_RuntimeDecisionGeneration
 	Source := _PISW_Image("Zoë", "Native BOM")
+	if Literal
+		Source := StrReplace(Source, 'first_name = "Zoë"', "first_name = " . Chr(39) . "Zoë" . Chr(39), true)
 	try {
 		File := FSOpenStrict(Path, "w", "UTF-16")
 		AssertTrue(IsObject(File), "the native UTF-16 fixture writer must open")
@@ -163,8 +165,8 @@ _PISW_Case(Mode) {
 		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
 		_ReadPersonalInfoTomlCache := false
 		ScriptInformation["PersonalInfoTomlPath"] := Path
-		if Mode == "utf16"
-			_PISW_Utf16Run(Path)
+		if Mode == "utf16" || Mode == "utf16-literal"
+			_PISW_Utf16Run(Path, Mode == "utf16-literal")
 		else
 			_PISW_Run(Mode, Path)
 	} finally {
@@ -213,12 +215,19 @@ _PISYN_PublicRoundTrip(Mode) {
 		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
 		_ReadPersonalInfoTomlCache := false
 		ScriptInformation["PersonalInfoTomlPath"] := Path
-		First := Mode == "unsupported-info-type" ? 42 : Mode == "quoted-hash-control" ? "Ada#Place" : "Ada"
-		RawFirst := Mode == "unsupported-info-type" ? "42" : Mode == "literal-info" ? "'Ada'" : Mode == "multiline-info" ? '"""Ada"""' : TOML_RenderString(First)
+		First := Mode == "unsupported-info-type" ? 42 : Mode == "bare-date-type" ? "1979-05-27"
+			: Mode == "multiline-literal-control" ? "Ada'#Place" : Mode == "quoted-hash-control" ? "Ada#Place" : "Ada"
+		RawFirst := Mode == "unsupported-info-type" ? "42" : Mode == "bare-date-type" ? "1979-05-27"
+			: Mode == "multiline-literal-control" ? Chr(39) . Chr(39) . Chr(39) . First . Chr(39) . Chr(39) . Chr(39)
+			: Mode == "literal-info" ? "'Ada'" : Mode == "multiline-info" ? '"""Ada"""' : TOML_RenderString(First)
 		InfoHeader := Mode == "header-comment" ? "[info] # valid annotation" : "[info]"
 		RawLetter := Mode == "literal-letter" ? "'first_name'" : TOML_RenderString("first_name")
 		Source := InfoHeader . "`nfirst_name = " . RawFirst . '`nlast_name = "Initial"`n'
 			. "[letters]`np = " . RawLetter . '`nn = "last_name"`n'
+		if Mode == "inline-control"
+			Source := 'info = { first_name = "Ada", last_name = "Initial" }`nletters = { p = "first_name", n = "last_name" }`n'
+		else if Mode == "dotted-control"
+			Source := 'info.first_name = "Ada"`ninfo.last_name = "Initial"`nletters.p = "first_name"`nletters.n = "last_name"`n'
 		AssertTrue(FSWriteCreateDurable(Path, Source))
 		Independent := TOML_ParseDocument(FSReadUtf8Exact(Path))
 		AssertEqual(First, Independent["info"]["first_name"], "the actual canonical decoder accepts this genuine TOML source")
@@ -234,7 +243,7 @@ _PISYN_PublicRoundTrip(Mode) {
 			. " read_first=" . _PISYN_Display(ReadFirst) . " read_alias=" . _PISYN_Display(ReadLetter)
 			. " disk_first=" . _PISYN_Display(Disk["info"].Get("first_name", "_missing_"))
 			. " disk_alias=" . _PISYN_Display(Disk.Get("letters", Map()).Get("p", "_missing_")))
-		if Mode == "unsupported-info-type" {
+		if Mode == "unsupported-info-type" || Mode == "bare-date-type" {
 			AssertFalse(Result, "a non-String owned field must refuse the public save; preserving its number is not a valid admission")
 			AssertEqual(Source, After, "a refused unsupported owned type must preserve every original source byte")
 			return
@@ -271,3 +280,9 @@ _PISYN_PublicRoundTrip(Mode) {
 }
 for _PISYN_Mode in ["literal-info", "multiline-info", "header-comment", "literal-letter", "unsupported-info-type", "basic-control", "quoted-hash-control"]
 	Test("personal info source projection: " . _PISYN_Mode, _PISYN_PublicRoundTrip.Bind(_PISYN_Mode))
+
+Test("personal info source: actual UTF-16 BOM literal identity still saves and reloads (personal-info-canonical-grammar)",
+	_PISW_Case.Bind("utf16-literal"))
+for _PICAL_Mode in ["inline-control", "dotted-control", "multiline-literal-control", "bare-date-type"]
+	Test("personal info canonical grammar: " . _PICAL_Mode . " (personal-info-canonical-grammar)",
+		_PISYN_PublicRoundTrip.Bind(_PICAL_Mode))
