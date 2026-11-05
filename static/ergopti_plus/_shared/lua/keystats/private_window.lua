@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local UnicodeCase = require("unicode_case")
 
 
 
@@ -43,6 +44,13 @@ M.KEYWORDS = {
 	"Incognito",
 	"InPrivate",
 	"Anonymous",
+	-- Firefox's browser-main-private-window-title in its shipped translations.
+	-- https://github.com/mozilla-l10n/firefox-l10n/tree/master
+	"Navigation privée", "Privater Modus", "Navegación privada", "Navigazione anonima",
+	"navegação privativa", "privénavigatie", "tryb prywatny", "Приватный просмотр",
+	"Приватний перегляд", "Gizli Gezinti", "プライベートブラウジング", "사생활 보호 모드",
+	"隐私浏览", "التصفح الخاص", "Anonymní prohlížení", "Privat browsing",
+	"Privat surfning", "Privat nettlesing", "גלישה פרטית",
 }
 
 
@@ -55,22 +63,44 @@ M.KEYWORDS = {
 -- ===========================
 -- ===========================
 
+-- Cache only the public built-in markers, by index and exact source value. This
+-- respects runtime changes to M.KEYWORDS without retaining window titles or
+-- caller-supplied keywords after a check.
+local lowered_keywords, keywords_owner, keyword_count = {}, nil, 0
+local function lower(value)
+	if not value:find("[\128-\255]") then return value:lower() end
+	return UnicodeCase.lower(value)
+end
+
 --- Reports whether a window title marks a private/incognito browser window.
 --- @param title string|nil          Focused window title.
 --- @param extra_keywords table|nil  Additional markers (e.g. a localised term).
 --- @return boolean
 function M.matches(title, extra_keywords)
 	if type(title) ~= "string" or title == "" then return false end
-	local haystack = title:lower()
+	if keywords_owner ~= M.KEYWORDS then
+		lowered_keywords, keywords_owner, keyword_count = {}, M.KEYWORDS, 0
+	end
+	local current_count = #M.KEYWORDS
+	for index = current_count + 1, keyword_count do lowered_keywords[index] = nil end
+	keyword_count = current_count
+	local ascii_title = not title:find("[\128-\255]")
+	local haystack = ascii_title and title:lower() or lower(title)
 
-	for _, keyword in ipairs(M.KEYWORDS) do
-		if haystack:find(keyword:lower(), 1, true) then return true end
+	for index, keyword in ipairs(M.KEYWORDS) do
+		local cached = lowered_keywords[index]
+		if not cached or cached.source ~= keyword then
+			cached = { source = keyword, value = lower(keyword) }
+			cached.ascii = not cached.value:find("[\128-\255]")
+			lowered_keywords[index] = cached
+		end
+		if (not ascii_title or cached.ascii) and haystack:find(cached.value, 1, true) then return true end
 	end
 
 	if type(extra_keywords) == "table" then
 		for _, keyword in ipairs(extra_keywords) do
 			if type(keyword) == "string" and keyword ~= ""
-				and haystack:find(keyword:lower(), 1, true) then
+				and haystack:find(lower(keyword), 1, true) then
 				return true
 			end
 		end

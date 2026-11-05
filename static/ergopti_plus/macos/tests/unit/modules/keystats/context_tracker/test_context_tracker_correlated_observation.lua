@@ -235,6 +235,14 @@ helpers.describe("explicit dormant correlated context", function()
 		end)
 	end)
 
+	helpers.it("protects localized Firefox private titles after native identity qualification", function()
+		with_fixture(function(tracker, _, c)
+			c.bind(); c.activate(); c.title = "Mozilla Firefox — NAVIGATION PRIVÉE"; tracker.update_private_status()
+			helpers.assert_eq(last(c.records).correlated, true)
+			helpers.assert_eq(last(c.records).private, true); helpers.assert_eq(last(c.records).allowed, false)
+		end)
+	end)
+
 	helpers.it("keeps user-disabled private filtering under the existing policy predicate", function()
 		with_fixture(function(tracker, state, c)
 			c.bind(); c.activate(); state.private_filter_enabled = false
