@@ -348,13 +348,14 @@ end
 --- Reports whether the automatic mode ignores an application.
 --- @param app string|nil
 --- @return boolean
+local indexed_owner, disabled_index = setmetatable({}, { __mode = "v" }), nil
 function M.is_app_disabled(app)
-	local key = AppIdentity.normalize(app)
-	if not key then return false end
-	for _, disabled in ipairs(M.get_disabled_apps()) do
-		if AppIdentity.normalize(disabled) == key then return true end
+	local apps = read(DISABLED_APPS_PATH)
+	if type(apps) ~= "table" then report_invalid(DISABLED_APPS_PATH); return false end
+	if apps ~= indexed_owner[1] then
+		indexed_owner[1], disabled_index = apps, AppIdentity.exclusion_index(apps)
 	end
-	return false
+	return AppIdentity.exclusion_contains(disabled_index, app, apps)
 end
 
 --- Captures the cached settings without reading or publishing preferences.

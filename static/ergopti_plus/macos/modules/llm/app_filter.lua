@@ -28,6 +28,28 @@ local SecureFieldDetector = require("adapters.secure_field_detector")
 
 local LOG = "llm.app_filter"
 
+-- At most one active exclusion list and 200 of its names are retained. Each
+-- entry is checked against its current source on every lookup, so an edited
+-- descriptor never keeps a stale comparison key.
+local indexed_owner, indexed_names = setmetatable({}, { __mode = "v" }), {}
+local MAX_INDEXED_NAMES = 200
+
+local function unicode_name(name)
+	if require("compat.utf8").len(name) == nil then return nil end
+	return require("unicode_case").lower(name)
+end
+
+local function indexed_name(apps, index, name)
+	if apps ~= indexed_owner[1] then indexed_owner[1], indexed_names = apps, {} end
+	if index > MAX_INDEXED_NAMES then return unicode_name(name) end
+	local previous = indexed_names[index]
+	if not previous or previous.source ~= name then
+		previous = { source = name, key = unicode_name(name) or false }
+		indexed_names[index] = previous
+	end
+	return previous.key or nil
+end
+
 
 --- =============================================
 --- =============================================
@@ -241,8 +263,9 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	local bid  = front:bundleID() or ""
 	local path = front:path() or ""
 	local name = (front:name() or ""):lower()
+	local comparison_name, checked_name
 
-	for _, app in ipairs(excluded_apps) do
+	for index, app in ipairs(excluded_apps) do
 		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
 		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
 		local configured_name = type(app.name) == "string" and app.name:lower() or ""
@@ -254,6 +277,16 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 			and (configured_name == name
 			or name:find(configured_name, 1, true)
 			or configured_name:find(name, 1, true)))
+		if not same_name and not has_path and not has_bid and configured_name ~= "" and name ~= ""
+			and (name:find("[\128-\255]") or configured_name:find("[\128-\255]")) then
+			if not checked_name then comparison_name, checked_name = unicode_name(name), true end
+			if comparison_name then
+				local candidate = indexed_name(excluded_apps, index, configured_name)
+				same_name = candidate ~= nil and (candidate == comparison_name
+					or comparison_name:find(candidate, 1, true)
+					or candidate:find(comparison_name, 1, true))
+			end
+		end
 		local path_match = has_path and (app.appPath == path)
 		local bid_match  = (not has_path and has_bid and app.bundleID == bid)
 
