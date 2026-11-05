@@ -1347,3 +1347,67 @@ _WSHP_RoundTrip(Mode, Root, Path, Source) {
 for _WSHP_Mode in ["post-flush-refusal", "new-reload-after-refusal", "native-control"]
 	Test("wrap native partial publication: " . _WSHP_Mode . " (wrap-stage-ownership)",
 		_WSSA_WithOwnedSource.Bind(_WSHP_RoundTrip.Bind(_WSHP_Mode)))
+
+_WSSA_Case(Kind) {
+	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed, _WS_StateEpoch
+	global _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS, _WS_BUILTIN_GROUPS
+	Saved := {path: _WS_Config_Path, disabled: _WS_Disabled, custom: _WS_Custom,
+		failed: _WS_LoadFailed, epoch: _WS_StateEpoch, active: _WS_ACTIVE_PAIRS,
+		builtins: _WS_BUILTIN_PAIRS, groups: _WS_BUILTIN_GROUPS}
+	Root := A_Temp . "\ergopti_wrap_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\wrap_symbols.toml", Created := false
+	try {
+		AssertFalse(A_IsSuspended)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		Source := '[[disabled]]`nchar = "("`n[[custom]]`nleft = "a"`nright = "b"`n'
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		AssertTrue(WrapSymbols_Init(Root . "\"))
+		AssertFalse(_WS_LoadFailed)
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "a", "b"))
+		Before := FSReadBytesStrict(Path)
+		OpeningCustom := _WS_Custom, OpeningDisabled := _WS_Disabled, OpeningActive := _WS_ACTIVE_PAIRS
+		OpeningEpoch := _WS_StateEpoch
+		Left := Kind == "left-nul" ? Chr(0) : Chr(1)
+		Right := Kind == "right-nul" ? Chr(0) : ")"
+		AssertEqual(1, StrLen(Left)), AssertEqual(1, StrLen(Right))
+		Result := WrapSymbols_AddCustom(Left, Right)
+		After := FSReadBytesStrict(Path)
+		SameProjection := _WS_Custom == OpeningCustom && _WS_Disabled == OpeningDisabled
+			&& _WS_ACTIVE_PAIRS == OpeningActive && _WS_StateEpoch == OpeningEpoch
+		Parsed := false
+		try {
+			Disk := _WSIC_Document(FSReadUtf8Exact(Path))
+			Parsed := true
+		}
+		Reloaded := WrapSymbols_Init(Root . "\")
+		_TestPrint("# wrap-scalar kind=" . Kind . " result=" . Result . " parsed=" . Parsed
+			. " same-projection=" . SameProjection . " reloaded=" . Reloaded . " latched=" . _WS_LoadFailed
+			. " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Kind != "control" {
+			AssertFalse(Result, "public wrap mutations must refuse a scalar their canonical reader cannot represent")
+			AssertTrue(SameProjection, "a refused scalar must not publish a replacement live owner")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "the original complete durable source must remain exact")
+		} else {
+			AssertTrue(Result, "a non-NUL escaped control remains a representable one-unit symbol")
+			AssertTrue(Parsed)
+			AssertTrue(_WSIC_HasPair(Disk["custom"], Left, Right))
+			AssertTrue(_WSIC_HasPair(_WS_Custom, Left, Right))
+		}
+		AssertTrue(Reloaded)
+		AssertFalse(_WS_LoadFailed, "the actual acknowledged/refused native file must remain reloadable")
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "a", "b"))
+		AssertTrue(_WS_Disabled.Has("("))
+	} finally {
+		_WS_Config_Path := Saved.path, _WS_Disabled := Saved.disabled, _WS_Custom := Saved.custom
+		_WS_LoadFailed := Saved.failed, _WS_StateEpoch := Saved.epoch, _WS_ACTIVE_PAIRS := Saved.active
+		_WS_BUILTIN_PAIRS := Saved.builtins, _WS_BUILTIN_GROUPS := Saved.groups
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _WSSA_Kind in ["left-nul", "right-nul", "control"]
+	Test("wrap symbols public scalar admission: " . _WSSA_Kind . " (wrap-scalar-admission)", _WSSA_Case.Bind(_WSSA_Kind))

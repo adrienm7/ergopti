@@ -1324,3 +1324,141 @@ _OAP_ResumeAfterPathProbe() {
 	}
 }
 Test("system actions: pause and resume during open_app probe retires launch (open-app-probe-resume)", _OAP_ResumeAfterPathProbe)
+
+; Run's first stage is CreateProcessW. The quoted branch below exercises that
+; real stage in suspended mode and deliberately does not open shared Explorer.
+; The unquoted danger branch delegates to the actual SystemControl.Launch.
+global _OAF_RetirementDebt := 0
+class _OAF_Control extends _OAP_NativeControl {
+	__New(Prefix) {
+		super.__New()
+		this.Prefix := Prefix, this.Quoted := false, this.QuotedError := 0, this.Suspended := 0
+	}
+	Launch(Target, WorkingDir := "", Options := "") {
+		if SubStr(Target, 1, 1) != '"'
+			return super.Launch(Target, WorkingDir, Options)
+		this.Quoted := true
+		TextBuffer := Buffer(StrPut(Target, "UTF-16") * 2, 0)
+		StrPut(Target, TextBuffer, "UTF-16")
+		Startup := Buffer(A_PtrSize == 8 ? 104 : 68, 0)
+		NumPut("UInt", Startup.Size, Startup, 0)
+		Info := Buffer(A_PtrSize == 8 ? 24 : 16, 0)
+		Created := DllCall("Kernel32\CreateProcessW", "Ptr", 0, "Ptr", TextBuffer, "Ptr", 0, "Ptr", 0,
+			"Int", false, "UInt", 4, "Ptr", 0, "Ptr", 0, "Ptr", Startup, "Ptr", Info, "Int")
+		this.QuotedError := A_LastError
+		if Created {
+			this.Suspended := { Process: NumGet(Info, 0, "Ptr"), Thread: NumGet(Info, A_PtrSize, "Ptr"),
+				Prefix: this.Prefix, Stopped: false }
+			throw Error("Quoted directory unexpectedly created a suspended process.")
+		}
+		if this.QuotedError == 0
+			throw Error("Quoted directory refusal had no native error.")
+		return 0
+	}
+}
+_OAF_RetireSuspended(Control) {
+	if !IsObject(Control.Suspended)
+		return true
+	Owned := Control.Suspended
+	if !Owned.Stopped {
+		Image := Buffer(65536, 0), ImageLength := 32768
+		if !DllCall("Kernel32\QueryFullProcessImageNameW", "Ptr", Owned.Process, "UInt", 0,
+			"Ptr", Image, "UInt*", &ImageLength, "Int")
+			return false
+		if StrLower(StrGet(Image, ImageLength, "UTF-16")) != StrLower(Owned.Prefix)
+			return false
+		Status := DllCall("Kernel32\WaitForSingleObject", "Ptr", Owned.Process, "UInt", 0, "UInt")
+		if Status != 0 {
+			if Status != 258 || !DllCall("Kernel32\TerminateProcess", "Ptr", Owned.Process, "UInt", 1, "Int")
+				return false
+			if DllCall("Kernel32\WaitForSingleObject", "Ptr", Owned.Process, "UInt", 10000, "UInt") != 0
+				return false
+		}
+		Owned.Stopped := true
+	}
+	if Owned.Thread {
+		if !DllCall("Kernel32\CloseHandle", "Ptr", Owned.Thread, "Int")
+			return false
+		Owned.Thread := 0
+	}
+	if Owned.Process {
+		if !DllCall("Kernel32\CloseHandle", "Ptr", Owned.Process, "Int")
+			return false
+		Owned.Process := 0
+	}
+	Control.Suspended := 0
+	return true
+}
+; Explicit retry retains all exact handles and the root until each acknowledgement.
+_OAF_RetireDebt() {
+	global _OAF_RetirementDebt
+	if !IsObject(_OAF_RetirementDebt)
+		return true
+	Debt := _OAF_RetirementDebt
+	try {
+		if !_OAF_RetireSuspended(Debt.Control)
+			return false
+		_OAP_Join(Debt.Control, Debt.EventHandle)
+		if Debt.EventHandle {
+			if !DllCall("Kernel32\CloseHandle", "Ptr", Debt.EventHandle, "Int")
+				return false
+			Debt.EventHandle := 0
+		}
+		DirDelete(Debt.Root, true)
+		_OAF_RetirementDebt := 0
+		return true
+	} catch {
+		return false
+	}
+}
+_OAF_FolderPathDoesNotLaunchPrefix() {
+	global _OAF_RetirementDebt, _OAP_RetirementDebt
+	if IsObject(_OAF_RetirementDebt) || IsObject(_OAP_RetirementDebt)
+		throw Error("A prior witness retirement debt blocks this probe.")
+	Root := A_Temp . "\ergopti-openfolder-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	if RegExMatch(Root, "[\s]")
+		throw Error("This native fixture requires a temporary path without whitespace.")
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	Prefix := Root . "\witness.exe", Control := _OAF_Control(Prefix), EventHandle := 0
+	try {
+		Name := "Local\ErgoptiOpenFolderWitness-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+		EventHandle := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
+		EventError := A_LastError
+		if !EventHandle || EventError == 183
+			throw Error("Exclusive witness event was not acquired.")
+		Compiler := A_WinDir . "\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+		AssertTrue(FileExist(Compiler) != "", "the native C# compiler is available")
+		Folder := Root . "\witness.exe folder", Source := Root . "\witness.cs", Receipt := Root . "\receipt.txt"
+		DirCreate(Folder)
+		Code := 'using System; using System.IO; using System.Diagnostics; using System.Threading; '
+			. 'class Witness { static int Main() { try { var p = Process.GetCurrentProcess(); '
+			. 'File.WriteAllText(@"' . Receipt . '.pending", p.Id.ToString() + "|" + '
+			. 'p.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() + "|" + p.MainModule.FileName); '
+			. 'File.Move(@"' . Receipt . '.pending", @"' . Receipt . '"); '
+			. 'using (var e = EventWaitHandle.OpenExisting(@"' . Name
+			. '")) { return e.WaitOne(30000) ? 0 : 3; } } catch { return 4; } } }'
+		FileAppend(Code, Source, "UTF-8")
+		CompileCode := RunWait('"' . Compiler . '" /nologo /target:exe /out:"' . Prefix . '" "' . Source . '"', , "Hide")
+		AssertEqual(0, CompileCode, "native inert witness compiled successfully")
+		AssertTrue(Control.Native.IsDirectory(Folder), "the selected path is a real directory")
+		Control.Launch('"' . Folder . '"')
+		AssertTrue(Control.Quoted && Control.QuotedError != 0, "the native quoted CreateProcess stage refuses the folder")
+		Control.Quoted := false, Control.QuotedError := 0
+		_OAP_RunAction(Control, Folder)
+		Observed := ""
+		if Control.ProcessHandle {
+			Observed := _OAP_AwaitReceipt(Receipt, Control, Prefix, Prefix)
+			_OAP_Join(Control, EventHandle)
+		}
+		_TestAppendProgress("# open_app folder quoted=" . Control.Quoted . " observed=" . Observed)
+		AssertTrue(Control.Quoted, "an existing folder is passed as one quoted shell target")
+		AssertEqual("", Observed, "its executable prefix did not run")
+	} finally {
+		_OAF_RetirementDebt := { Control: Control, Root: Root, EventHandle: EventHandle }
+		if !_OAF_RetireDebt()
+			throw Error("Owned folder witness retirement remains outstanding.")
+	}
+}
+Test("system actions: existing folder path does not launch an executable prefix (open-app-native-folder)", _OAF_FolderPathDoesNotLaunchPrefix)
