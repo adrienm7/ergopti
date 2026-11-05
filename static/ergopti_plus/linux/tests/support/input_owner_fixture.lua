@@ -138,7 +138,10 @@ function M.with_session(options, body)
 	}
 	package.loaded["adapters.xkb_capture"] = options.capture or capture
 	package.loaded["modules.hotstrings.device_finder"] = {
-		find_devices = function() return { paths.a, paths.b }, {} end,
+		find_devices = function()
+			local found = {}; for _, id in ipairs(options.source_ids or { "a", "b" }) do found[#found + 1] = paths[id] end
+			return found, {}
+		end,
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
 		is_interceptable_key_device = function() return true end,

@@ -955,6 +955,344 @@ helpers.describe("native OneShot Manager route", function()
 		end)
 	end)
 
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("keeps a shared navigation key down when " .. first .. " releases first", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000)
+				s.edge("a", 36, 1, 2010); s.edge("b", 36, 1, 2020)
+				s.edge(first, 36, 0, 2030); s.edge(last, 36, 2, 2040)
+				s.edge("a", 57, 0, 2045); s.edge(last, 36, 0, 2050)
+				helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 105, 2 }, { 105, 0 }, { 29, 0 } },
+					"the first release cannot lift the surviving source's navigation chord")
+			end)
+		end)
+	end
+
+	helpers.it("does not let another keyboard release a navigation chord it never acquired", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 36, 1, 2010)
+			s.edge("b", 36, 0, 2020); s.edge("a", 36, 2, 2030); s.edge("a", 36, 0, 2040)
+			s.edge("a", 57, 0, 2050)
+			helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 105, 2 }, { 105, 0 }, { 29, 0 } })
+		end)
+	end)
+
+	for _, lost in ipairs({ "a", "b" }) do
+		helpers.it("retires shared navigation output after loss of keyboard " .. lost, function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			local options = { tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }
+			Fixture.with_manager_session(options, function(s)
+				s.edge("a", 57, 1, 1000); s.pump_at(2000)
+				s.edge("a", 36, 1, 2010); s.edge("b", 36, 1, 2020)
+				options.eof_path = s.paths[lost]; s.hook.pump()
+				helpers.assert_true(s.hook.isRunning())
+				helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 105, 0 }, { 29, 0 } },
+					"source loss retires the whole original remapper cohort")
+				helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+			end)
+		end)
+	end
+
+	helpers.it("stops the shared navigation chord when its repeated output is not acknowledged", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		local refused = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true,
+			fail_sync = function(_, code, value)
+				if not refused and code == 105 and value == 2 then refused = true; return true end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000)
+			s.edge("a", 36, 1, 2010); s.edge("b", 36, 1, 2020); s.edge("a", 36, 0, 2030)
+			s.edge("b", 36, 2, 2040)
+			helpers.assert_true(refused)
+			helpers.assert_eq(s.hook.isRunning(), false, "uncertain repeat cannot retain a live capture")
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 36, "no source key is replayed") end
+		end)
+	end)
+
+	helpers.it("counts an intermediate shared navigation release as activity for another tap-hold", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000)
+			s.edge("a", 36, 1, 2010); s.edge("b", 36, 1, 2020); s.edge("a", 57, 0, 2030)
+			s.edge("a", 58, 1, 2040); s.edge("a", 36, 0, 2050); s.edge("a", 58, 0, 2060)
+			s.edge("b", 36, 0, 2070)
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 28, "the other key's release cancels the Caps tap") end
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+		end)
+	end)
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("keeps each instant action source when " .. first .. " releases first", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" } }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 1, 1, 1000); s.edge("b", 1, 1, 1010)
+				s.edge(first, 1, 0, 1020); s.edge(last, 1, 2, 1030); s.edge(last, 1, 0, 1040)
+				helpers.assert_eq(#s.actions, 3, "both physical presses and the surviving repeat must run")
+			end)
+		end)
+	end
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("keeps simultaneous instant pair-candidate actions when " .. first .. " releases first", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.caps_lock]\ntap_action = "paste"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" } }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 58, 1, 1000); s.edge("b", 58, 1, 1010)
+				s.edge(first, 58, 0, 1020); s.edge(last, 58, 2, 1030); s.edge(last, 58, 0, 1040)
+				helpers.assert_eq(#s.actions, 3, "a combination candidate must keep each source's action and repeat")
+			end)
+		end)
+	end
+
+	helpers.it("keeps an instant key and another source's later navigation mapping independent", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.caps_lock]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 58, 1, 1000)
+			s.edge("a", 57, 1, 1010); s.pump_at(2000)
+			helpers.assert_true(s.engine.layer_depth > 0, "the layer must be active")
+			s.edge("b", 58, 1, 2010); s.edge("a", 58, 0, 2020)
+			s.edge("b", 58, 2, 2030); s.edge("b", 58, 0, 2040); s.edge("a", 57, 0, 2050)
+			helpers.assert_eq(#s.actions, 1)
+			helpers.assert_eq(s.rows, { { 14, 1 }, { 14, 2 }, { 14, 0 } },
+				"releasing the instant source cannot lift the other source's layer chord")
+		end)
+	end)
+
+	for _, lost in ipairs({ "a", "b" }) do
+		helpers.it("does not revive an instant press after keyboard " .. lost .. " is lost", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+			local options = { tap_hold_text = text, action_names = { "paste", "one_shot_shift" } }
+			Fixture.with_manager_session(options, function(s)
+				local survivor = lost == "a" and "b" or "a"
+				s.edge("a", 1, 1, 1000); s.edge("b", 1, 1, 1010)
+				helpers.assert_eq(#s.actions, 2)
+				options.eof_path = s.paths[lost]; s.hook.pump()
+				s.edge(survivor, 1, 2, 1030); s.edge(survivor, 1, 0, 1040)
+				helpers.assert_eq(#s.actions, 2, "old holds do not survive source retirement")
+			end)
+		end)
+	end
+
+	helpers.it("keeps both roll owners when the key is also a combination candidate", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.tab]\nhold_modifier = "shift"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" } }, function(s)
+			helpers.assert_true(s.owner.has_bindings(), "the combination owner must be active")
+			s.edge("a", 15, 1, 1000); s.edge("b", 15, 1, 1010)
+			s.edge("a", 15, 0, 1020); s.edge("b", 30, 1, 1030); s.edge("b", 30, 0, 1040); s.edge("b", 15, 0, 1050)
+			helpers.assert_eq(s.rows, { { 42, 1 }, { 30, 1 }, { 30, 0 }, { 42, 0 } })
+		end)
+	end)
+
+	helpers.it("retires delegated pair-candidate roll after its second source disappears", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.tab]\nhold_modifier = "shift"\n'
+		local removed = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" },
+			after_sync = function(s, code, value)
+				if not removed and code == 42 and value == 1 then
+					removed = true; s.reader.close("keyboard:" .. s.paths.b)
+				end
+			end }, function(s)
+			s.edge("a", 15, 1, 1000); s.edge("b", 15, 1, 1010)
+			helpers.assert_true(removed)
+			helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+			for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 15, "retired Tab cannot replay") end
+		end)
+	end)
+
+	helpers.it("keeps an instant key independent of another source's native pass-through under a layer", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 1, 1, 1000); s.edge("a", 57, 1, 1010); s.pump_at(2000)
+			s.edge("b", 1, 1, 2010); s.edge("a", 1, 0, 2020)
+			s.edge("b", 1, 2, 2030); s.edge("b", 1, 0, 2040); s.edge("a", 57, 0, 2050)
+			helpers.assert_eq(#s.actions, 1)
+			helpers.assert_eq(s.rows, { { 1, 1 }, { 1, 2 }, { 1, 0 } })
+		end)
+	end)
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("keeps native layer-key repeats when " .. first .. " releases first", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000)
+				s.edge("b", 1, 1, 2010); s.edge("a", 1, 1, 2020)
+				s.edge(first, 1, 0, 2030); s.edge("a", 57, 0, 2035)
+				s.edge(last, 1, 2, 2040); s.edge(last, 1, 0, 2050)
+				helpers.assert_eq(s.rows, { { 1, 1 }, { 1, 2 }, { 1, 0 } })
+				helpers.assert_eq(#s.actions, 0)
+			end)
+		end)
+	end
+
+	for _, lost in ipairs({ "a", "b" }) do
+		helpers.it("keeps the surviving native key balanced after source " .. lost .. " disappears", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+				.. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+			local options = { tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }
+			Fixture.with_manager_session(options, function(s)
+				local survivor = lost == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000)
+				s.edge("a", 1, 1, 2010); s.edge("b", 1, 1, 2020)
+				options.eof_path = s.paths[lost]; s.hook.pump()
+				helpers.assert_true(s.hook.isRunning())
+				s.edge(survivor, 1, 0, 2040)
+				helpers.assert_eq(s.rows, { { 1, 1 }, { 1, 0 } })
+				helpers.assert_eq(#s.actions, 0)
+			end)
+		end)
+	end
+
+	helpers.it("keeps both native Tab sources while the combination owner is active", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.tab]\ntap_action = "paste"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }, function(s)
+			helpers.assert_true(s.owner.has_bindings())
+			s.edge("a", 57, 1, 1000); s.pump_at(2000)
+			s.edge("a", 15, 1, 2010); s.edge("b", 15, 1, 2020)
+			s.edge("a", 15, 0, 2030); s.edge("b", 15, 2, 2040); s.edge("b", 15, 0, 2050); s.edge("a", 57, 0, 2060)
+			helpers.assert_eq(s.rows, { { 15, 1 }, { 15, 2 }, { 15, 0 } })
+			helpers.assert_eq(#s.actions, 0)
+		end)
+	end)
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("uses native input for a new source after the layer ends (" .. first .. " releases first)", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000)
+				s.edge("a", 36, 1, 2010); s.edge("a", 57, 0, 2020); s.edge("b", 36, 1, 2030)
+				s.edge(first, 36, 0, 2040)
+				if last == "b" then s.edge("b", 36, 2, 2045) end
+				s.edge(last, 36, 0, 2050)
+				if first == "a" then
+					helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 36, 1 }, { 105, 0 }, { 29, 0 }, { 36, 2 }, { 36, 0 } })
+				else
+					helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 36, 1 }, { 36, 0 }, { 105, 0 }, { 29, 0 } })
+				end
+			end)
+		end)
+	end
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("uses each source's original action when the layer ends before the second DOWN (" .. first .. " first)", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+				.. '[tap_hold.keys.caps_lock]\ntap_action = "paste"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "paste", "one_shot_shift" }, nav_fixture = true }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 58, 1, 2010)
+				s.edge("a", 57, 0, 2020); s.edge("b", 58, 1, 2030)
+				s.edge(first, 58, 0, 2040); s.edge(last, 58, 0, 2050)
+				helpers.assert_eq(s.rows, { { 14, 1 }, { 14, 0 } })
+				helpers.assert_eq(#s.actions, 1, "B uses its instant action instead of A's old layer")
+			end)
+		end)
+	end
+
+	helpers.it("keeps a late tap-hold separate from the first source's old layer chord", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			.. '[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\n'
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 58, 1, 2010)
+			s.edge("a", 57, 0, 2020); s.edge("b", 58, 1, 2030)
+			s.edge("a", 58, 0, 2040); s.edge("b", 58, 0, 2050)
+			helpers.assert_eq(s.rows, { { 14, 1 }, { 29, 1 }, { 14, 0 }, { 29, 0 } })
+		end)
+	end)
+
+	helpers.it("retires the old layer owner when a late native source has an unknown output receipt", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		local refused = false
+		Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" }, nav_fixture = true,
+			fail_sync = function(_, code, value)
+				if not refused and code == 36 and value == 1 then refused = true; return true end
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 36, 1, 2010)
+			s.edge("a", 57, 0, 2020); s.edge("b", 36, 1, 2030)
+			helpers.assert_true(refused)
+			helpers.assert_eq(s.hook.isRunning(), false, "unknown output must stop the original capture")
+			helpers.assert_eq(#s.actions, 0)
+		end)
+	end)
+
+	helpers.it("retains two late native sources independently of an old layer chord", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		Fixture.with_manager_session({ source_ids = { "a", "b", "c" }, tap_hold_text = text,
+			action_names = { "one_shot_shift" }, nav_fixture = true }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 36, 1, 2010); s.edge("a", 57, 0, 2020)
+			s.edge("b", 36, 1, 2030); s.edge("c", 36, 1, 2040); s.edge("b", 36, 0, 2050)
+			s.edge("c", 36, 2, 2060); s.edge("c", 36, 0, 2070); s.edge("a", 36, 0, 2080)
+			helpers.assert_eq(s.rows, { { 29, 1 }, { 105, 1 }, { 36, 1 }, { 36, 2 }, { 36, 0 }, { 105, 0 }, { 29, 0 } })
+		end)
+	end)
+
+	for _, first in ipairs({ "a", "b" }) do
+		helpers.it("balances a late native source sharing its code with the old layer output (" .. first .. " first)", function()
+			local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+				.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+			Fixture.with_manager_session({ tap_hold_text = text, action_names = { "one_shot_shift" },
+				before_manager = function(s)
+					local dir = assert(s.tap_path:match("^(.*)/[^/]+$"))
+					local file = assert(io.open(dir .. "/layers.toml", "wb"))
+					file:write('[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "keystroke:KeyJ"\n'); file:close()
+				end }, function(s)
+				local last = first == "a" and "b" or "a"
+				s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 36, 1, 2010); s.edge("a", 57, 0, 2020)
+				helpers.assert_true(s.engine.layer_keys[36] ~= nil, "the first J must own a layer chord")
+			s.edge("b", 36, 1, 2030); s.edge("b", 36, 2, 2035); s.edge(first, 36, 0, 2040); s.edge(last, 36, 0, 2050)
+				helpers.assert_eq(s.rows, { { 36, 1 }, { 36, 2 }, { 36, 0 } }, "shared wire key must stay balanced")
+				helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+			end)
+		end)
+	end
+
+	helpers.it("keeps queued same-code roll replays bound to their own late native sources", function()
+		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
+			.. '[tap_hold.keys.space]\nhold_layer = "nav"\n'
+		Fixture.with_manager_session({ source_ids = { "a", "b", "c" }, tap_hold_text = text,
+			action_names = { "one_shot_shift" }, before_manager = function(s)
+				local dir = assert(s.tap_path:match("^(.*)/[^/]+$"))
+				local file = assert(io.open(dir .. "/layers.toml", "wb"))
+				file:write('[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "keystroke:KeyJ"\n'); file:close()
+			end }, function(s)
+			s.edge("a", 57, 1, 1000); s.pump_at(2000); s.edge("a", 36, 1, 2010); s.edge("a", 57, 0, 2020)
+			helpers.assert_true(s.engine.layer_keys[36] ~= nil)
+			s.edge("b", 57, 1, 2030); helpers.assert_eq(s.engine.undecided, 57)
+			s.edge("c", 36, 1, 2040); s.edge("b", 36, 1, 2050)
+			s.edge("b", 57, 0, 2060); s.edge("c", 36, 0, 2070); s.edge("b", 36, 2, 2080); s.edge("b", 36, 0, 2090); s.edge("a", 36, 0, 2100)
+			helpers.assert_eq(s.rows, { { 36, 1 }, { 57, 1 }, { 57, 0 }, { 36, 2 }, { 36, 0 } })
+		end)
+	end)
+
 	helpers.it("delivers rolled actions from their separate physical keyboards", function()
 		local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.space]\nhold_modifier = "shift"\n'
@@ -1403,3 +1741,206 @@ helpers.describe("OneShot construction-original text source", function()
 	end
 end)
 
+
+-- Cross-source choices use the layer and configuration at each physical DOWN.
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('independent multi-source review', function()
+  for _, first in ipairs({'a','b'}) do
+    helpers.it('uses current instant config after native under layer: '..first, function()
+      local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n' .. '[tap_hold.keys.space]\nhold_layer = "nav"\n' .. '[tap_hold.keys.escape]\ntap_action = "paste"\n'
+      Fixture.with_manager_session({tap_hold_text=text, action_names={'paste','one_shot_shift'},nav_fixture=true},function(s)
+        local last=first=='a' and 'b' or 'a'
+        s.edge('a',57,1,1000); s.pump_at(2000)
+        s.edge('a',1,1,2010); s.edge('a',57,0,2020)
+        s.edge('b',1,1,2030)
+        helpers.assert_eq(#s.actions,1,'B presses after layer ended and must execute paste')
+        s.edge(first,1,0,2040); s.edge(last,1,0,2050)
+        helpers.assert_eq(s.rows,{{1,1},{1,0}})
+      end)
+    end)
+  end
+end)
+helpers.describe('independent reverse order review', function()
+  for _, first in ipairs({'a', 'b'}) do
+  helpers.it('selects layer for new source while another holds configured Ctrl: '..first,function()
+    local text='[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\nhold_layer = "nav"\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\n'
+    Fixture.with_manager_session({tap_hold_text=text,action_names={'one_shot_shift'},nav_fixture=true},function(s)
+      s.edge('a',58,1,1000); s.pump_at(2000)
+      s.edge('b',56,1,2010); s.pump_at(3000); helpers.assert_true(s.engine.layer_depth > 0, 'B LAlt has active navigation')
+      s.edge('b',58,1,3010)
+      if first == 'a' then s.edge('a',58,0,3020); s.edge('b',58,0,3030)
+      else s.edge('b',58,0,3020); s.edge('a',58,0,3030) end
+      s.edge('b',56,0,3040)
+      local expected = first == 'a' and {{29,1},{14,1},{29,0},{14,0}} or {{29,1},{14,1},{14,0},{29,0}}
+      helpers.assert_eq(s.rows, expected, 'each release follows its own source')
+    end)
+  end)
+  end
+end)
+
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('native choice while another source holds a tap-hold', function()
+  for _, first in ipairs({'a', 'b'}) do
+  helpers.it('passes the unmapped key through the active layer: '..first, function()
+    local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+    Fixture.with_manager_session({tap_hold_text=text, action_names={'paste','one_shot_shift'}, nav_fixture=true}, function(s)
+      s.edge('a',1,1,1000); s.pump_at(2000)
+      s.edge('b',56,1,2010); s.pump_at(3000)
+      s.edge('b',1,1,3010)
+      if first == 'a' then s.edge('a',1,0,3020); s.edge('b',1,0,3030)
+      else s.edge('b',1,0,3020); s.edge('a',1,0,3030) end
+      s.edge('b',56,0,3040)
+      local expected = first == 'a' and {{29,1},{1,1},{29,0},{1,0}} or {{29,1},{1,1},{1,0},{29,0}}
+      helpers.assert_eq(s.rows, expected)
+    end)
+  end)
+  end
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('source-specific swallowed navigation key', function()
+  helpers.it('does not repeat or tap a second left alt under the active layer', function()
+    local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\ntap_action = "backspace"\nhold_layer = "nav"\n'
+    Fixture.with_manager_session({tap_hold_text=text, action_names={'one_shot_shift'}, nav_fixture=true}, function(s)
+      s.edge('a',56,1,1000); s.pump_at(2000)
+      s.edge('b',56,1,2010); s.edge('b',56,2,2020); s.edge('b',56,0,2030)
+      s.edge('a',56,0,2040)
+      helpers.assert_eq(s.rows, {})
+      helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+    end)
+  end)
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('source-specific native to hold', function()
+  for _, first in ipairs({'a', 'b'}) do
+    helpers.it('preserves the later hold and earlier native key: '..first, function()
+      local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.space]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+      Fixture.with_manager_session({tap_hold_text=text,action_names={'paste','one_shot_shift'},nav_fixture=true},function(s)
+        s.edge('a',57,1,1000); s.pump_at(2000)
+        s.edge('a',1,1,2010); s.edge('a',57,0,2020)
+        s.edge('b',1,1,2030)
+        if first == 'a' then s.edge('a',1,0,2040); s.edge('b',1,0,2050)
+        else s.edge('b',1,0,2040); s.edge('a',1,0,2050) end
+        local expected = first == 'a' and {{1,1},{29,1},{1,0},{29,0}} or {{1,1},{29,1},{29,0},{1,0}}
+        helpers.assert_eq(s.rows, expected)
+        helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+      end)
+    end)
+  end
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('source choice output refusal', function()
+  helpers.it('retires capture when the later native DOWN cannot be acknowledged', function()
+    local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+    local refused = false
+    Fixture.with_manager_session({tap_hold_text=text,action_names={'paste','one_shot_shift'},nav_fixture=true,
+      fail_sync=function(_,code,value) if code == 1 and value == 1 and not refused then refused=true; return true end end}, function(s)
+      s.edge('a',1,1,1000); s.pump_at(2000); s.edge('b',56,1,2010); s.pump_at(3000)
+      s.edge('b',1,1,3010)
+      helpers.assert_true(refused)
+      helpers.assert_eq(s.hook.isRunning(), false)
+      helpers.assert_eq(#s.actions, 0)
+    end)
+  end)
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('source choice on source loss', function()
+  helpers.it('keeps the surviving hold until its own release after native source loss', function()
+    local text = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.space]\nhold_layer = "nav"\n[tap_hold.keys.escape]\ntap_action = "paste"\nhold_modifier = "ctrl"\n'
+    local options = {tap_hold_text=text,action_names={'paste','one_shot_shift'},nav_fixture=true}
+    Fixture.with_manager_session(options, function(s)
+      s.edge('a',57,1,1000); s.pump_at(2000); s.edge('a',1,1,2010); s.edge('a',57,0,2020)
+      s.edge('b',1,1,2030)
+      options.eof_path=s.paths.a; s.hook.pump(); options.eof_path=nil
+      helpers.assert_eq(s.writer.output_view(s.output).down, {29})
+      s.edge('b',1,0,2040)
+      helpers.assert_eq(s.writer.output_view(s.output).down, {})
+      helpers.assert_eq(#s.actions, 0)
+    end)
+  end)
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('plain combination candidate ownership', function()
+  for _, code in ipairs({58,15}) do
+  for _, first in ipairs({'a','b'}) do
+    helpers.it('keeps the surviving native candidate and its repeat: '..code..' / '..first, function()
+      Fixture.with_manager_session({tap_hold_text='[tap_hold]\nenabled = true\ninherit_defaults = false\n',action_names={'copy','one_shot_shift'}}, function(s)
+        helpers.assert_true(s.owner.has_bindings())
+        helpers.assert_eq(s.engine.by_code[code], nil)
+        s.edge('a',code,1,1000); s.pump_at(2000)
+        helpers.assert_eq(s.rows, {{code,1}})
+        s.edge('b',code,1,2010); s.edge(first,code,0,2020)
+        helpers.assert_eq(s.rows, {{code,1}})
+        local last = first == 'a' and 'b' or 'a'
+        s.edge(last,code,2,2030); s.edge(last,code,0,2040)
+        helpers.assert_eq(s.rows, {{code,1},{code,2},{code,0}})
+        helpers.assert_eq(#s.actions,0)
+        helpers.assert_eq(next(s.writer.output_view(s.output).down),nil)
+      end)
+    end)
+  end
+  end
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('plain candidate repress with a peer still held', function()
+  helpers.it('keeps each native reference and does not borrow the other keyboard', function()
+    Fixture.with_manager_session({tap_hold_text='[tap_hold]\nenabled = true\ninherit_defaults = false\n',action_names={'copy','one_shot_shift'}}, function(s)
+      s.edge('a',58,1,1000); s.pump_at(2000)
+      s.edge('b',58,1,2010); s.edge('a',58,0,2020)
+      s.edge('a',58,1,2030); helpers.assert_true(s.hook.isRunning(), 'after re-press')
+      s.edge('a',15,1,2040); helpers.assert_true(s.hook.isRunning(), 'after Tab down')
+      s.edge('a',15,0,2050); s.edge('a',58,0,2060); s.edge('b',58,0,2070)
+      helpers.assert_eq(s.arm_deadline(), nil)
+      helpers.assert_eq(s.rows, {{58,1},{15,1},{15,0},{58,0}})
+      helpers.assert_eq(next(s.writer.output_view(s.output).down), nil)
+    end)
+  end)
+end)
+end
+
+do
+local helpers = require('tests.helpers')
+local Fixture = require('tests.support.input_owner_fixture')
+helpers.describe('repressed chord with a surviving peer', function()
+  helpers.it('does not trigger a chord until the native peer releases', function()
+    Fixture.with_manager_session({public_chords=true,tap_hold_text='[tap_hold]\nenabled = true\ninherit_defaults = false\n',action_names={'copy','one_shot_shift'},before_manager=function(s)
+      s.bytes='[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "none"\n[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+    end}, function(s)
+      s.edge('a',58,1,1000); s.pump_at(2000); s.edge('b',58,1,2010); s.edge('a',58,0,2020)
+      s.edge('a',58,1,2030); s.edge('a',15,1,2040); s.edge('a',15,0,2050); s.edge('a',58,0,2060)
+      s.edge('b',58,2,2070); s.edge('b',58,0,2080)
+      helpers.assert_eq(#s.actions,0)
+      helpers.assert_eq(next(s.writer.output_view(s.output).down),nil)
+    end)
+  end)
+end)
+end

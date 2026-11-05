@@ -393,6 +393,10 @@ end
 --- kernel, and the first release must not lift it under the others.
 local output_holders = setmetatable({}, { __mode = "k" })
 local source_holds = setmetatable({}, { __mode = "k" })
+local layer_sources = setmetatable({}, { __mode = "k" })
+local instant_sources = setmetatable({}, { __mode = "k" })
+local native_sources = setmetatable({}, { __mode = "k" })
+local pass_observations = setmetatable({}, { __mode = "k" })
 local source_physical = setmetatable({}, { __mode = "k" })
 
 --- Retains producer custody separately from the stable public event shape.
@@ -487,6 +491,8 @@ end
 --- again, and is lifted by whichever of the two lets go last.
 --- @return table|nil nil to pass the event unchanged, {} to swallow it
 local function pass(self, code, value)
+	local observation = pass_observations[self]
+	if observation and observation.code == code and observation.value == value then observation.forwarded = true end
 	if value == REPEAT then return nil end
 	if MODIFIER_KEYS[code] then self.modifiers_down[code] = value == DOWN or nil end
 	self.passed_down[code] = value == DOWN or nil
@@ -858,11 +864,11 @@ local function replay(self, out, code, value, now_ms, origin)
 		receipt = { source = receipt.source, generation = receipt.generation, source_owner = receipt.source_owner,
 			source_current = true, physical_down = self.physical_down }
 	end
-	local previous, previous_journaling = roll_replay_origins[self], roll_journaling[self]
-	roll_replay_origins[self] = origin
+	local previous, previous_journaling, previous_pass = roll_replay_origins[self], roll_journaling[self], pass_observations[self]
+	roll_replay_origins[self], pass_observations[self] = origin, nil
 	if roll_origin_ports[self] then roll_journaling[self] = true end
 	local ok, events, tap, binding, journal = pcall(self.process, self, code, value, now_ms, receipt)
-	roll_replay_origins[self], roll_journaling[self] = previous, previous_journaling
+	roll_replay_origins[self], roll_journaling[self], pass_observations[self] = previous, previous_journaling, previous_pass
 	if not ok then error(events, 0) end
 	local rows = {}
 	if events == nil then
@@ -994,7 +1000,7 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-local function process(self, code, value, now_ms, scoped, receipt)
+local function process(self, code, value, now_ms, scoped, receipt, skip_layer, skip_native)
 	local config = self.by_code[code]
 	local out = {}
 	if not scoped and value == DOWN then
@@ -1019,7 +1025,7 @@ local function process(self, code, value, now_ms, scoped, receipt)
 
 	-- A key pressed on the layer keeps its chord until it is released, even if
 	-- the layer key comes up first.
-	local on_layer = self.layer_keys[code]
+	local on_layer = not skip_layer and self.layer_keys[code]
 	if on_layer then
 		if value == REPEAT then
 			if #on_layer.keys > 0 then
@@ -1034,7 +1040,7 @@ local function process(self, code, value, now_ms, scoped, receipt)
 
 	-- Tab, Enter and their kind pressed while a modifier was down are the key
 	-- itself (Ctrl+Tab, Shift+Tab), as on Windows, until released.
-	if self.native_keys[code] then
+	if not skip_native and self.native_keys[code] then
 		if value == UP then self.native_keys[code] = nil end
 		return pass(self, code, value)
 	end
@@ -1224,6 +1230,74 @@ function M:process(code, value, now_ms, receipt)
 			self.physical_down[code] = next(down) ~= nil and true or nil
 		end
 	end
+	-- Instant actions keep their own press and repeat lifetime per source.
+	local instant_groups = instant_sources[self]
+	local instant_group = scoped and instant_groups and instant_groups[code] or nil
+	local instant_owner = instant_group and instant_group[source] or nil
+	if instant_owner then
+		if instant_owner.generation ~= generation or not rawequal(instant_owner.native_owner, native_owner) then return {} end
+		if value == DOWN then return {} end
+		if value == UP then
+			cancel_taps(self, code)
+			instant_group[source] = nil
+			if next(instant_group) == nil then instant_groups[code] = nil; self.instant_down[code] = nil end
+			return {}
+		end
+		if value == REPEAT then
+			cancel_taps(self, code)
+			if instant_owner.swallowed then return {} end
+			return fire_instant(self, {}, self.by_code[code], now_ms)
+		end
+	end
+	local layer_groups = layer_sources[self]
+	local layer_group = scoped and layer_groups and layer_groups[code] or nil
+	local existing_holds = scoped and source_holds[self] and source_holds[self][code] or nil
+	local layer_owner = layer_group and layer_group[source] or nil
+	local hold_owner = existing_holds and existing_holds[source] or nil
+	local bypass_layer = hold_owner ~= nil
+
+	-- Native pass-through selected under a layer/modifier is likewise owned
+	-- per keyboard: one release cannot retire the surviving key's repeats.
+	local native_groups = native_sources[self]
+	local native_group = scoped and native_groups and native_groups[code] or nil
+	local bypass_native = native_group ~= nil and native_group[source] == nil
+	if native_group then
+		local own = native_group[source]
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if own then
+			if value == DOWN then return {} end
+			if value == UP then
+				cancel_taps(self, code)
+				native_group[source] = nil
+				local remaining = next(native_group) ~= nil
+				if not remaining then native_groups[code] = nil; self.native_keys[code] = nil end
+				local rows = pass(self, code, value)
+				if remaining then
+					self.passed_down[code] = true
+					if MODIFIER_KEYS[code] then self.modifiers_down[code] = true end
+				end
+				return rows
+			end
+			if value == REPEAT then cancel_taps(self, code); return pass(self, code, value) end
+		elseif value ~= DOWN and not layer_owner and not hold_owner then return {} end
+	end
+	-- A mapped chord is shared only by sources that pressed while its layer
+	-- was active. A later source follows its own current configuration.
+	if layer_group and not bypass_layer then
+		local own = layer_owner
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if value == DOWN then
+			if own then return {} end
+			if self.layer_depth <= 0 then bypass_layer = true
+			else layer_group[source] = { generation = generation, native_owner = native_owner }; return {} end
+		elseif not own then return {}
+		elseif value == UP then
+			layer_group[source] = nil
+			if next(layer_group) ~= nil then cancel_taps(self, code); return {} end
+			layer_groups[code] = nil
+			return process(self, code, value, now_ms, scoped, receipt)
+		end
+	end
 	local groups = source_holds[self]
 	if scoped and not groups then groups = {}; source_holds[self] = groups end
 	local group = groups and groups[code]
@@ -1232,6 +1306,32 @@ function M:process(code, value, now_ms, receipt)
 		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
 		if value == DOWN then
 			if own then return {} end
+			-- A new physical source selects the active layer before sharing an
+			-- older source's held tap-hold state.
+			local layer_spec = self.layer_depth > 0 and self.nav_layer[code]
+			if layer_spec and not layer_group then
+				cancel_taps(self, nil)
+				local rows = press_layer_key(self, code, layer_spec)
+				layer_groups = layer_groups or {}; layer_sources[self] = layer_groups
+				layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
+				return rows
+			end
+			local config = self.by_code[code]
+			if self.layer_depth > 0 and not layer_spec and config and config.swallowed_on_layer then
+				cancel_taps(self, nil)
+				instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
+				instant_group = instant_group or {}; instant_groups[code] = instant_group
+				instant_group[source] = { generation = generation, native_owner = native_owner, swallowed = true }
+				return {}
+			end
+			if self.layer_depth > 0 and not layer_spec and config and not config.swallowed_on_layer then
+				cancel_taps(self, nil)
+				self.native_keys[code] = true
+				native_groups = native_groups or {}; native_sources[self] = native_groups
+				native_group = native_group or {}; native_groups[code] = native_group
+				native_group[source] = { generation = generation, native_owner = native_owner }
+				return pass(self, code, value)
+			end
 			local original = self.held[code]
 			if not original then return {} end
 			if original.undecided then
@@ -1275,7 +1375,7 @@ function M:process(code, value, now_ms, receipt)
 		elseif not own then return {}
 		elseif value == UP then
 			self.held[code], group[source] = own.state, nil
-			local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
+			local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt, bypass_layer, bypass_native)
 			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding, journal end
 			local _, remaining = next(group)
 			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
@@ -1283,7 +1383,39 @@ function M:process(code, value, now_ms, receipt)
 			return out, tap, binding, journal
 		end
 	end
-	local out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
+	-- Another source holding an instant key must not hide this new DOWN from
+	-- normal layer and modifier precedence. Restore its aggregate flag afterward.
+	local separate_instant = scoped and value == DOWN and instant_group ~= nil and instant_owner == nil
+	if separate_instant then self.instant_down[code] = nil end
+	local out, tap, binding, journal
+	local observation
+	if bypass_layer or bypass_native or (scoped and value == DOWN) then
+		local previous = pass_observations[self]
+		observation = { code = code, value = value, forwarded = false }
+		pass_observations[self] = observation
+		local ok
+		ok, out, tap, binding, journal = pcall(process, self, code, value, now_ms, scoped, receipt, bypass_layer, bypass_native)
+		pass_observations[self] = previous
+		if not ok then error(out, 0) end
+	else
+		out, tap, binding, journal = process(self, code, value, now_ms, scoped, receipt)
+	end
+	local acquired_instant = scoped and value == DOWN and self.instant_down[code] == true
+	if acquired_instant then
+		instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
+		instant_group = instant_group or {}; instant_groups[code] = instant_group
+		instant_group[source] = { generation = generation, native_owner = native_owner }
+	end
+	if separate_instant and not acquired_instant then self.instant_down[code] = true end
+	if scoped and value == DOWN and ((not bypass_native and self.native_keys[code]) or (observation and observation.forwarded)) then
+		native_groups = native_groups or {}; native_sources[self] = native_groups
+		native_group = native_group or {}; native_groups[code] = native_group
+		native_group[source] = { generation = generation, native_owner = native_owner }
+	end
+	if scoped and value == DOWN and self.layer_keys[code] and not layer_group and not bypass_layer then
+		layer_groups = layer_sources[self] or {}; layer_sources[self] = layer_groups
+		layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
+	end
 	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
 		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
 	end
@@ -1382,6 +1514,9 @@ end
 --- Releases everything this engine holds down and forgets its state.
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
+	native_sources[self] = nil
+	instant_sources[self] = nil
+	layer_sources[self] = nil
 	source_holds[self] = nil
 	source_physical[self] = nil
 	local out = {}
