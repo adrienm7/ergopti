@@ -149,8 +149,8 @@ those paths are provenance, not dependencies of the portable decisive programs.
 Three worker-hashed JSON receipts changed presentation under repository Prettier.
 Their exact original bytes are retained as `.txt` copies, with original/current
 digests and verified JSON-value equality in
-[format-provenance.json](validation/format-provenance.json). Worker receipts are
-not rewritten; canonical evidence hashes describe the current formatted archive.
+[format-provenance.json](validation/format-provenance.json). Historical claim values remain unchanged; canonical evidence hashes describe
+the current formatted archive.
 
 ## Delivery validation qualification
 
