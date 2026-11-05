@@ -162,7 +162,10 @@ end
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
 	_info_generation = _info_generation + 1
-	UserCode.invalidate("dynamic initialization")
+	if UserCode.invalidate("dynamic initialization") ~= true then
+		Logger.error(LOG, "Dynamic initialization refused while programmable cancellation remains pending.")
+		return false
+	end
 	local options = type(opts) == "table" and opts or {}
 
 	-- Resolve trigger character (default "★").
