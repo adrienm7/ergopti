@@ -1,0 +1,7 @@
+ProxyAutoConfigEnable: 1
+ProxyAutoConfigURLString: set
+HTTP_PROXY: unset
+HTTPS_PROXY: unset
+NO_PROXY: set
+http_proxy: unset
+https_proxy: unset
