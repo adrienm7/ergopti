@@ -32,6 +32,7 @@ local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local FileSystem = require("adapters.file_system")
 local Json = require("json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 local NativePath = require("native_path")
@@ -2223,6 +2224,17 @@ function M.install(ctx)
 			and session.script_path or derived_script_path
 		local pid       = tonumber(session.pid)
 		local session_file = "/tmp/hs_mlx_active_download.json"
+		-- The decoded startup argument has no deletion authority by itself.
+		-- Capture the observed regular file and its exact bytes before attaching.
+		local entry, entry_status = FileSystem.classify_no_follow(session_file)
+		local source, source_status = FileSystem.read_with_status(session_file)
+		local recorded = type(source) == "string" and JsonCodec.decode(source) or nil
+		local source_matches = entry_status == "ok" and type(entry) == "table" and entry.mode == "file"
+			and source_status == "ok" and type(recorded) == "table"
+			and recorded.model == session.model and recorded.log_path == session.log_path
+			and recorded.exit_path == session.exit_path and recorded.script_path == session.script_path
+			and recorded.repo == session.repo and tonumber(recorded.pid) == tonumber(session.pid)
+		local captured_source = source_matches and source or nil
 
 		if download_owner ~= nil then
 			Logger.warn(LOG, "Cannot reattach '%s': another MLX download owner is active.",
@@ -2277,9 +2289,30 @@ function M.install(ctx)
 
 		owner.remove_session = function()
 			if owner.session_published ~= true then return true end
-			local ok, removed = Logger.callback(LOG,
-				"MLX reattached session removal", os.remove, session_file)
-			if ok ~= true or removed == false or removed == nil then return false end
+			if owner.session_cleanup then
+				local cleanup = owner.session_cleanup
+				if cleanup.retry() ~= true then return false end
+				owner.session_cleanup = nil
+				if cleanup.removed then
+					owner.session_published = false
+					return true
+				end
+			end
+			if captured_source == nil then return false end
+			local current, status = FileSystem.read_with_status(session_file)
+			if status == "absent" or (status == "ok" and current ~= captured_source) then
+				owner.session_published = false
+				return true
+			end
+			if status ~= "ok" then return false end
+			local removed, _, receipt, retry_cleanup = FileSystem.remove_if_unchanged(
+				session_file, { status = "ok", content = captured_source })
+			if removed ~= true then
+				if type(receipt) == "table" and type(retry_cleanup) == "function" then
+					owner.session_cleanup = { retry = retry_cleanup, removed = receipt.removed == true }
+				end
+				return false
+			end
 			owner.session_published = false
 			return true
 		end
