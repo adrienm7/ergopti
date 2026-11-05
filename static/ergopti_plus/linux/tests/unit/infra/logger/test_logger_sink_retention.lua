@@ -10,14 +10,14 @@
 --- The purge forked `find <dir> -maxdepth 1 -type f -name '<prefix>*.log'
 --- -mtime +N -delete` once per prefix: two forks at every daemon start (measured
 --- with `ergopti_hotstrings.lua --help`, before any boot stage) and two more on
---- the logging path itself at each midnight rollover. The in-process sweep must
---- delete exactly what find deleted and nothing else: only regular files directly
---- in the folder, never a link or a folder, named by either glob, older than
+--- the logging path itself at each midnight rollover. The in-process sweep
+--- restricts that historical selection to generated daily and topical names:
+--- regular files directly in the folder, never a link or folder, older than
 --- N + 1 whole days.
 ---
 --- FEATURES & RATIONALE:
---- 1. Differential: the expected deletions are what GNU find selects with the
----    same expressions over the same folder, before the sink runs.
+--- 1. Differential: expected generated files are selected by GNU find before
+---    the sink runs, then restricted to the names the application owns.
 --- 2. No fork: a rollover purge spawns nothing, and an install forks only its
 ---    folder creation.
 --- 3. Never fatal: a folder the kernel refuses to list is reported on stderr and
@@ -88,16 +88,21 @@ local function names(dir)
 	return list
 end
 
---- The files GNU find deletes with the sink's former command lines.
+--- Generated files GNU find selects with the sink's former command lines.
 --- @param dir string
 --- @param days number
 --- @return table set
 local function find_selection(dir, days)
 	local selected = {}
+	local topical = {}; for _, sub in ipairs(require("_generated.logger_sub_files")) do topical[sub.name] = true end
 	for _, prefix in ipairs({ "ErgoptiPlus_", "ErgoptiPlus_errors_" }) do
 		local pipe = assert(io.popen(string.format("find %s -maxdepth 1 -type f -name %s -mtime +%d -print0",
 			Shell.quote(dir), Shell.quote(prefix .. "*.log"), days)))
-		for path in pipe:read("*a"):gmatch("([^%z]+)%z") do selected[path:sub(#dir + 2)] = true end
+		for path in pipe:read("*a"):gmatch("([^%z]+)%z") do
+			local name = path:sub(#dir + 2)
+			if topical[name] or name:match("^ErgoptiPlus_%d%d%d%d%-%d%d%-%d%d%.log$")
+				or name:match("^ErgoptiPlus_errors_%d%d%d%d%-%d%d%-%d%d%.log$") then selected[name] = true end
+		end
 		pipe:close()
 	end
 	return selected
@@ -126,8 +131,27 @@ end
 -- ==========================================
 -- ==========================================
 
-helpers.describe("log retention purge deletes what find deleted", function()
-	helpers.it("removes only the aged regular files named by either glob, at install, without find", function()
+helpers.describe("log retention purge deletes aged generated files", function()
+	helpers.it("keeps foreign prefix-matching files during real installation", function()
+		if ON_WINDOWS then return end
+		local days = require("infra.timings").count("logger", "retention_days")
+		local dir = fixture(days)
+		local foreign = dir .. "/ErgoptiPlus_notes.log"
+		local file = assert(io.open(foreign, "wb")); assert(file:write("user notes")); assert(file:close())
+		aged(foreign, (days + 2) * DAY)
+		local Sink, logger = helpers.load_module("infra.logger_sink"), fake_logger()
+		local ok, err = pcall(function()
+			helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }))
+			local kept = assert(io.open(foreign, "rb")); helpers.assert_eq(kept:read("*a"), "user notes"); assert(kept:close())
+			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_2026-01-01.log", "rb"))
+			helpers.assert_nil(io.open(dir .. "/ErgoptiPlus_hotstrings.log", "rb"))
+		end)
+		Sink.uninstall(logger)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("removes only aged regular generated files at install without find", function()
 		if ON_WINDOWS then print("  SKIP native POSIX purge: Windows has no GNU find or symbolic links here"); return end
 		local days = require("infra.timings").count("logger", "retention_days")
 		local dir = fixture(days)
@@ -136,8 +160,9 @@ helpers.describe("log retention purge deletes what find deleted", function()
 		local ok, err = pcall(function()
 			local before = names(dir)
 			local expected_deleted = find_selection(dir, days)
-			helpers.assert_true(expected_deleted["ErgoptiPlus_ancient.log"] and expected_deleted["ErgoptiPlus_line\nbreak.log"]
-				and not expected_deleted["ErgoptiPlus_link.log"], "the fixture straddles find's selection")
+			helpers.assert_true(expected_deleted["ErgoptiPlus_2026-01-01.log"] and expected_deleted["ErgoptiPlus_hotstrings.log"]
+				and not expected_deleted["ErgoptiPlus_line\nbreak.log"] and not expected_deleted["ErgoptiPlus_link.log"],
+				"the fixture distinguishes generated names from foreign files and links")
 			local commands = forks_during(function()
 				helpers.assert_eq(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }), true)
 			end)

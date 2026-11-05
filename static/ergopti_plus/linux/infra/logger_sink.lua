@@ -328,12 +328,19 @@ local function open_handles(date)
 	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
 end
 
---- Whether a basename matches the shell glob `<prefix>*<extension>`.
+--- Whether a basename is a generated daily log for this prefix.
 --- @param name string Basename.
 --- @param prefix string Literal prefix (no glob character).
 --- @return boolean
 local function rolled_name(name, prefix)
-	return #name >= #prefix + #LOG_EXT and name:sub(1, #prefix) == prefix and name:sub(-#LOG_EXT) == LOG_EXT
+	if name:sub(1, #prefix) ~= prefix or name:sub(-#LOG_EXT) ~= LOG_EXT then return false end
+	local date = name:sub(#prefix + 1, #name - #LOG_EXT)
+	return date:match("^%d%d%d%d%-%d%d%-%d%d$") ~= nil
+end
+
+local function topical_name(name)
+	for _, sub in ipairs(SUB_FILES) do if sub.name == name then return true end end
+	return false
 end
 
 --- Reports a purge refusal on stderr: the sink cannot log through itself.
@@ -363,10 +370,8 @@ end
 --- daemon may have been off for a month, and a purge that only understands
 --- "yesterday" leaves everything older untouched.
 ---
---- The sweep runs in this process. It is exactly what the two forked
---- `find <dir> -maxdepth 1 -type f -name '<prefix>*<ext>' -mtime +N -delete`
---- did, at every start and every rollover: a regular file directly in the
---- folder (never a link, never a folder), named by either glob, last modified
+--- The sweep runs in this process: a regular file directly in the folder
+--- (never a link, never a folder), with a daily name or declared topical name, last modified
 --- more than N + 1 whole days before the current second (-mtime +N drops the
 --- fraction of the age).
 --- A refusal the purge used to discard is now reported, and never fatal.
@@ -389,7 +394,7 @@ local function purge_old()
 	local cutoff = os.time() - (math.floor(days) + 1) * DAY_SECONDS
 	for _, entry in ipairs(entries) do
 		local name = entry.name
-		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)) then
+		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX) or topical_name(name)) then
 			local path = NativeDirectory.join(_dir, name)
 			local inspected, stat, stat_message, stat_code = pcall(NativeDirectory.stat, path)
 			if not inspected then
