@@ -269,7 +269,7 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		}
 		; A caption belongs to its application. Equal text in a new process
 		; still closes the old title interval and starts a fresh native origin.
-		if (NewTitle != outgoing_title || AppChanged) {
+		if (NewTitle !== outgoing_title || AppChanged) {
 				if (outgoing_title != "" and outgoing_app != "") {
 		duration := TickElapsed(KLHook.title_entered_at, Now)
 						; Flush before logging so the typing buffer is attributed to
