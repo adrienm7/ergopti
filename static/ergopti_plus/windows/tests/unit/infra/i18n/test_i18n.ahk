@@ -752,3 +752,64 @@ for _I18nShape_Mode in ["root-boolean", "root-array", "nested-value", "numeric-v
 
 Test("i18n public lookup: historical numeric cache cannot bypass source validation (i18n-source-shape)",
 	_I18nShape_Case.Bind("legacy-numeric-cache"))
+
+
+; The physical cache is an alternate representation of the same JSON object.
+; A delimiter in a legal String key must not silently rename a translation.
+_I18nKeyCacheRoundTrip(Mode) {
+	Root := A_Temp . "\ergopti_i18n_key_cache_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Owned := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Owned := (Creation is Integer) && Creation == 1
+		AssertTrue(Owned, "the case exclusively owns its native fixture directory")
+		Path := Root . "\fixture.json", Tsv := Root . "\fixture.tsv"
+		Key := "fixture.key", Value := "translation"
+		switch Mode {
+			case "tab-key":
+				Json := '{"before\tafter":"translation"}'
+				Key := "before`tafter"
+			case "newline-key":
+				Json := '{"before\nafter":"translation"}'
+				Key := "before`nafter"
+			case "carriage-key":
+				Json := '{"before\rafter":"translation"}'
+				Key := "before`rafter"
+			case "backslash-key-control":
+				Json := '{"before\\nafter":"translation"}'
+				Key := "before\nafter"
+			case "value-control":
+				Json := '{"fixture.key":"before\tline\nnext\r\\n"}'
+				Value := "before`tline`nnext`r\n"
+			default:
+				throw ValueError("Unknown locale cache key mode")
+		}
+		FileAppend(Json, Path, "UTF-8-RAW")
+		AssertEqual(Json, FSReadUtf8Exact(Path), "the genuine loader receives exactly the authored JSON")
+		Source := JsonParse(Json)
+		AssertEqual(1, Source.Count)
+		AssertTrue(Source.Has(Key), "the canonical parser admits the full key before the cache exists")
+		AssertEqual(Value, Source[Key])
+		Cold := _I18nLoadLocaleMap(Path, "★")
+		AssertTrue(Cold.Ok)
+		AssertFalse(Cold.Fast)
+		AssertTrue(Cold.Cache.Has(Key))
+		AssertEqual(Value, Cold.Cache[Key])
+		AssertTrue(FSExists(Tsv), "the actual cold-load writer must publish its cache")
+		FileSetTime("20000101000000", Path, "M")
+		FileSetTime("20000101000002", Tsv, "M")
+		AssertTrue(_I18nTsvIsFresh(Tsv, Path), "the real filesystem timestamps must admit the generated cache")
+		Warm := _I18nLoadLocaleMap(Path, "★")
+		_TestPrint("# i18n-key-cache mode=" . Mode . " warm_ok=" . Warm.Ok . " warm_fast=" . Warm.Fast
+			. " expected_key_units=" . StrLen(Key) . " exact_key=" . Warm.Cache.Has(Key) . " count=" . Warm.Cache.Count)
+		AssertTrue(Warm.Ok)
+		AssertEqual(1, Warm.Cache.Count)
+		AssertTrue(Warm.Cache.Has(Key), "a generated fast cache must preserve the complete canonical translation key")
+		AssertEqual(Value, Warm.Cache[Key], "the same translation must survive a real cold-to-warm native reload")
+	} finally {
+		if Owned
+			DirDelete(Root, true)
+	}
+}
+for _I18nKeyCache_Mode in ["tab-key", "newline-key", "carriage-key", "backslash-key-control", "value-control"]
+	Test("i18n cache key fidelity: " . _I18nKeyCache_Mode . " (i18n-cache-key-fidelity)", _I18nKeyCacheRoundTrip.Bind(_I18nKeyCache_Mode))
