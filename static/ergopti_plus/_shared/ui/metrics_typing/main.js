@@ -311,9 +311,11 @@ document.addEventListener('i18n:applied', render_media_keys);
 // The remaining record labels are rendered from accepted data rather than
 // data-i18n attributes. Refresh them after a late native locale delivery.
 document.addEventListener('i18n:applied', () => {
+	render_sfb_kpi();
 	render_lexical_kpi();
 	render_rhythm_kpi();
 	render_sessions_kpi();
+	render_charmix_kpi();
 	render_records_kpi();
 	_render_activity_calendar();
 	render_apps_kpi();

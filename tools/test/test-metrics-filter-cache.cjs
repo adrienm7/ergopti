@@ -5091,5 +5091,85 @@ for (const host of ['windows', 'macos', 'linux']) {
 		assert.doesNotMatch(html, /<letters-label>/);
 	});
 }
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of [
+		{ locale: 'ja', finger: '小指左', hand: '左' },
+		{ locale: 'ja', finger: '小指左', hand: '—', counterpart: '薬指右' },
+		{ locale: 'fr', finger: 'Auriculaire G', hand: 'G' },
+		{ locale: 'no', finger: 'Lillefinger H', hand: 'H' },
+		{ locale: 'he', finger: 'זרת L', hand: '—' }
+	])
+		test(`${host} SFB keeps full ${vector.locale} finger labels and only known hands`, () => {
+			const page = loadMetricsTypingPage(host);
+			if (vector.locale === 'ja') {
+				page.context.CustomEvent = class {
+					constructor(type) {
+						this.type = type;
+					}
+				};
+				page.context.document.dispatchEvent = (event) => {
+					for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+				};
+				assert.doesNotThrow(() => page.context.window.i18n_apply({}));
+			}
+
+			publishTypingPage(page, host, { '2026-10-01': { Editor: { chars: 2 } } });
+			page.context.window._i18n_strings = JSON.parse(
+				fs.readFileSync(path.join(root, `../data/locales/${vector.locale}.json`), 'utf8')
+			);
+			if (vector.counterpart)
+				page.context.window._i18n_strings['ui_typing.finger.l_pinky'] = vector.counterpart;
+			page.context.window.keycode_layout = { 12: 'a', 0: 'q' };
+			page.elements.get('date_start').value = '2026-10-01';
+			page.elements.get('date_end').value = '2026-10-01';
+			const raw = { bg: { aq: { c: 1 } }, sc_kb: { 16: { c: 1 } }, kc: { 12: { c: 1 } } };
+			const history = host === 'macos' ? raw : page.context.window.translate_win_today(raw);
+			assert.equal(page.context.receive_range_data({ historical: history, today: {} }), true);
+			const rows = JSON.parse(vm.runInContext('JSON.stringify(_sfb_data)', page.context));
+			assert.equal(rows.length, 1);
+			assert.equal(rows[0].finger, vector.finger);
+			assert.equal(rows[0].hand, vector.hand);
+			if (vector.locale === 'fr') {
+				page.context.CustomEvent = class {
+					constructor(type) {
+						this.type = type;
+					}
+				};
+				page.context.document.dispatchEvent = (event) => {
+					for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+				};
+				const japanese = JSON.parse(
+					fs.readFileSync(path.join(root, '../data/locales/ja.json'), 'utf8')
+				);
+				page.context.window.i18n_apply(japanese);
+				const updated = JSON.parse(vm.runInContext('JSON.stringify(_sfb_data)', page.context));
+				assert.equal(updated[0].finger, '小指左');
+				assert.equal(updated[0].hand, '左');
+			}
+		});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} late locale delivery redraws character composition`, () => {
+		const page = loadMetricsTypingPage(host);
+		page.context.CustomEvent = class {
+			constructor(type) {
+				this.type = type;
+			}
+		};
+		page.context.document.dispatchEvent = (event) => {
+			for (const entry of page.listeners) if (entry.name === event.type) entry.callback(event);
+		};
+		assert.doesNotThrow(() => page.context.window.i18n_apply({}));
+		publishTypingPage(page, host, {
+			'2026-10-01': { Editor: { chars: 100, char_letter: 99, char_digit: 1 } }
+		});
+		page.elements.get('date_start').value = '2026-10-01';
+		page.elements.get('date_end').value = '2026-10-01';
+		page.context.render_charmix_kpi();
+		page.context.window.i18n_apply({ 'ui_typing.charmix_letters': 'Letters-local' });
+		assert.match(page.elements.get('charmix_bar_container').innerHTML, /Letters-local/);
+	});
+}
 
 console.log(`${passed} passed, 0 failed.`);
