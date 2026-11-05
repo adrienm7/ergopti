@@ -109,6 +109,120 @@ try {
 			assert.match(result.stdout, /--no-service/);
 		}
 	}
+	// A missing prefix value must not consume a later flag and create its name
+	// as a directory (or silently re-enable the service/dependency setup).
+	{
+		const cwd = path.join(sandbox, 'missing-prefix-option');
+		fs.mkdirSync(cwd);
+		for (const name of ['install.sh', 'uninstall.sh']) {
+			const installer = path.join(ROOT, 'static/ergopti_plus/linux', name);
+			for (const flag of [
+				'',
+				'--no-service',
+				'--no-deps',
+				'--setup-perms',
+				'--prefix',
+				'--help',
+				'-h',
+				'--unknown',
+				'--yes',
+				'--check'
+			]) {
+				const result = spawnSync(bashExecutable(), [bashPath(installer), '--prefix', flag], {
+					cwd,
+					encoding: 'utf8',
+					timeout: 10000,
+					env: {
+						...process.env,
+						HOME: bashPath(sandbox),
+						XDG_CONFIG_HOME: bashPath(path.join(sandbox, 'missing-config')),
+						LC_ALL: 'C'
+					}
+				});
+				assert.equal(result.status, 64, `missing prefix before ${flag}: ${result.stderr}`);
+				assert.match(result.stderr, /Missing --prefix value/);
+				assert.deepEqual(fs.readdirSync(cwd), [], 'argument refusal must not create a prefix');
+				assert.equal(fs.existsSync(path.join(sandbox, 'missing-config')), false);
+			}
+		}
+	}
+	// Paths whose basename starts with '-' remain expressible with ./ or an
+	// absolute path. Stop the installer at the existing UID admission boundary.
+	{
+		const cwd = path.join(sandbox, 'dash-prefix-paths');
+		const bin = path.join(cwd, 'bin');
+		fs.mkdirSync(bin, { recursive: true });
+		fs.writeFileSync(path.join(bin, 'id'), '#!/bin/bash\necho 999\n', { mode: 0o755 });
+		for (const name of ['install.sh', 'uninstall.sh']) {
+			for (const prefix of ['./--name', path.join(cwd, '--name')]) {
+				const mode = name === 'install.sh' ? '--no-deps' : '--check';
+				const result = spawnSync(
+					bashExecutable(),
+					[bashPath(path.join(ROOT, 'static/ergopti_plus/linux', name)), '--prefix', prefix, mode],
+					{
+						cwd,
+						encoding: 'utf8',
+						timeout: 10000,
+						env: {
+							...process.env,
+							PATH: `${bin}:/usr/bin:/bin`,
+							HOME: bashPath(sandbox),
+							LC_ALL: 'C'
+						}
+					}
+				);
+				assert.notEqual(result.status, 64, result.stderr);
+				assert.equal(fs.existsSync(path.join(cwd, '--name')), false);
+			}
+		}
+	}
+	// Explicit invalid owner tokens must not be treated as “no owner”, which
+	// would bypass waiting for the daemon; GUI arguments are all required.
+	{
+		const script = path.join(ROOT, 'static/ergopti_plus/linux/uninstall.sh');
+		const cases = [
+			['--wait-owner'],
+			['--wait-owner', ''],
+			['--wait-owner', '--yes'],
+			['--wait-owner', 'abc'],
+			['--gui'],
+			['--gui', 'Title', 'Error'],
+			['--gui', '', 'Error', 'Missing'],
+			['--gui', 'Title', '', 'Missing'],
+			['--gui', 'Title', 'Error', ''],
+			['--gui', '--yes', 'Error', 'Missing'],
+			['--gui', 'Title', '--check', 'Missing'],
+			['--gui', 'Title', 'Error', '--prefix'],
+			['--unknown']
+		];
+		for (const args of cases) {
+			const result = spawnSync(bashExecutable(), [bashPath(script), ...args], {
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, HOME: bashPath(sandbox), LC_ALL: 'C' }
+			});
+			assert.equal(
+				result.status,
+				64,
+				`invalid uninstall args ${JSON.stringify(args)}: ${result.stderr}`
+			);
+		}
+		const setup = spawnSync(
+			bashExecutable(),
+			[
+				bashPath(path.join(ROOT, 'static/ergopti_plus/linux/install.sh')),
+				'--setup-perms',
+				'--prefix',
+				''
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: { ...process.env, HOME: bashPath(sandbox), LC_ALL: 'C' }
+			}
+		);
+		assert.equal(setup.status, 64, 'empty prefix cannot fall through to permission setup');
+	}
 	// A root shell need not have sudo installed: execute the detected package
 	// manager directly, while retaining its actual failure as a failure.
 	{

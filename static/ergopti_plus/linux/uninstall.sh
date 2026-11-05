@@ -37,13 +37,18 @@ while [ "$#" -gt 0 ]; do
 		--yes) CONFIRMED=true; shift ;;
 		--check) CHECK_ONLY=true; shift ;;
 		--wait-owner)
-			[ "$#" -ge 2 ] || exit 64
+			[ "$#" -ge 2 ] && [[ "$2" =~ ^[0-9]+:[0-9]+$ ]] || exit 64
 			WAIT_OWNER="$2"; shift 2 ;;
 		--gui)
 			[ "$#" -ge 4 ] || exit 64
+			for gui_value in "$2" "$3" "$4"; do
+				case "$gui_value" in ''|--yes|--check|--wait-owner|--gui|--prefix) exit 64 ;; esac
+			done
 			GUI_TITLE="$2"; GUI_ERROR="$3"; GUI_MISSING="$4"; shift 4 ;;
 		--prefix)
 			[ "$#" -ge 2 ] || { ergopti_msg uninstall.missing_prefix_value >&2; exit 64; }
+			# Use ./-name or an absolute path for a prefix beginning with '-'.
+			case "$2" in ''|-*) ergopti_msg uninstall.missing_prefix_value >&2; exit 64 ;; esac
 			PREFIX="$2"; shift 2 ;;
 		*) ergopti_msg uninstall.unsupported_argument "$1" >&2; exit 64 ;;
 	esac
