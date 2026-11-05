@@ -45,6 +45,19 @@ helpers.describe("action picker bounds retained native controllers", function()
 		end)
 	end)
 
+	helpers.it("delivers ready and navigation initialization to the same page", function()
+		with_picker(function(_, h)
+			helpers.assert_true(h.open())
+			local view, controller = h.views[1], h.controllers[1]
+			local before = #view.evaluations
+			h.post(controller, view, { action = "ready" })
+			view.options.on_navigation("didFinishNavigation")
+			helpers.assert_eq(#view.evaluations, before + 2, "both native lifecycle callbacks reach the page")
+			helpers.assert_true(view.evaluations[before + 1]:find("init(", 1, true) ~= nil)
+			helpers.assert_true(view.evaluations[before + 2]:find("init(", 1, true) ~= nil)
+		end)
+	end)
+
 	helpers.it("rejects an old native page after the controller is rebound to B", function()
 		with_picker(function(picker, h)
 			helpers.assert_true(h.open())

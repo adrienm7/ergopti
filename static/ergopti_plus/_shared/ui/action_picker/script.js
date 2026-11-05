@@ -76,6 +76,8 @@ let activeIndex = 0;
 
 let currentId = 'none';
 let strings = { noResults: 'No matching action' };
+// Ready and navigation completion can both push the same document payload.
+let initialized = false;
 
 function el(id) {
 	return document.getElementById(id);
@@ -86,6 +88,7 @@ function el(id) {
 // ============================================================
 
 function init(data) {
+	if (initialized) return;
 	data = data || {};
 	strings.noResults = data.noResults || 'No matching action';
 
@@ -163,6 +166,7 @@ function init(data) {
 	collapsed.clear();
 	render();
 	updateEditCurrent(data.editCurrentLabel || '');
+	initialized = true;
 	focusSearch();
 }
 
