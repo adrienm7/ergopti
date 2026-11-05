@@ -261,6 +261,20 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(#calls, 3, "the index is not written after a refused source list")
 	end)
 
+	helpers.it("runs a queued resume after the old GNOME index write fails", function()
+		local answers = gnome_answers()
+		answers["gsettings set org.gnome.desktop.input-sources current 0"] = false
+		local port, calls, flush = fake_port(Switch.GNOME, answers, true)
+		local switcher, results, settled = Switch.new(port), {}, false
+		switcher.select("xkb:fr", function(ok) results[#results + 1] = { "pause", ok } end)
+		switcher.select("xkb:fr+ergopti", function(ok) results[#results + 1] = { "resume", ok } end)
+		switcher.when_settled(function() settled = true end)
+		flush()
+		helpers.assert_eq(results, { { "pause", false }, { "resume", true } })
+		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 1")
+		helpers.assert_true(settled)
+	end)
+
 	helpers.it("replaces a queued switch so a quick pause then resume ends on the resume layout", function()
 		local answers = gnome_answers()
 		local port, calls, flush = fake_port(Switch.GNOME, answers, true)
