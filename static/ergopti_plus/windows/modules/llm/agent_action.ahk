@@ -964,7 +964,14 @@ _LLM_Agent_OnPause(Generation, Buffer, TypingGuard := unset, TypingProbe := unse
 	Revision := _LLM_Agent_System1Revision
 	Current := IsSet(TypingGuard) ? _LLM_Agent_TypingTriageCurrent.Bind(Generation, Revision, TypingGuard)
 		: _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
-	_LLM_Agent_Auto["timer"] := 0
+	; A retained scheduler callback may arrive after a new pause was armed.
+	; Retire only this generation's capability before consulting its policy.
+	PauseCritical := Critical("On")
+	try {
+		if Generation != _LLM_Agent_Generation
+			return false
+		_LLM_Agent_Auto["timer"] := 0
+	} finally Critical(PauseCritical)
 	if !Current.Call()
 		return false
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended || !LLM_Menu_AiEnabled()
