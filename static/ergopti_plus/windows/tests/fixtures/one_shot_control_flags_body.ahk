@@ -6,7 +6,7 @@
 ; never just the generated payload. No physical keyboard claim is made.
 if A_Args.Length != 3 || A_Args[1] != "--allow-explicit-owned-one-shot-control-flags"
 	throw Error("Explicit owned native one-shot control opt-in is required.")
-if !(A_Args[2] == "plain" || A_Args[2] == "ctrl")
+if !(A_Args[2] == "plain" || A_Args[2] == "ctrl" || A_Args[2] == "shift" || A_Args[2] == "ctrl-shift")
 	throw Error("Unknown spent-control case.")
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0, _TH_SyntheticEpoch := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605)), OneShotShiftEnabled := false
@@ -14,7 +14,7 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2, _SendHook := 0, TEXT_SENDER_SEND_LEVEL :
 global _EMIT_SUPPRESSING_HOOKS := [], _AHK_SendInput := SendInput
 global _OSPC := {Mode: A_Args[2], Window: 0, A: 0, B: 0, Hook: 0, ReadyAt: 0, Attempts: 0,
 	ControlSent: 0, FollowingSent: 0, PendingAfterControl: -1, NativeKeys: [], FocusSteps: [], Escapes: 0,
-	Backspaces: [], CtrlAttempted: false, Outputs: [], Rings: [], Logs: [], Failure: 0, Armed: false}
+	Backspaces: [], CtrlAttempted: false, ShiftAttempted: false, Outputs: [], Rings: [], Logs: [], Failure: 0, Armed: false}
 _OSPC_Require(Condition, Message) {
 	if !Condition
 		throw Error(Message)
@@ -96,12 +96,20 @@ _OSPC_Control() {
 			"The first native control must reach the exact admitted one-shot hook within its bounded readiness window.")
 		_OSPC.Armed := true
 		SendLevel(0)
-		if _OSPC.Mode == "ctrl" {
+		if InStr(_OSPC.Mode, "ctrl") {
 			_OSPC.CtrlAttempted := true
 			SendEvent("{LCtrl down}")
 		}
+		if InStr(_OSPC.Mode, "shift") {
+			_OSPC.ShiftAttempted := true
+			SendEvent("{LShift down}")
+		}
 		try SendEvent("{Backspace}")
 		finally {
+			if _OSPC.ShiftAttempted {
+				SendEvent("{LShift up}")
+				_OSPC.ShiftAttempted := false
+			}
 			if _OSPC.CtrlAttempted {
 				SendEvent("{LCtrl up}")
 				_OSPC.CtrlAttempted := false
@@ -148,16 +156,25 @@ _OSPC_Main() {
 			. " receiver_ctrl=" . (_OSPC.Backspaces.Length ? _OSPC.Backspaces[1].Ctrl : -1)
 			. " receiver_shift=" . (_OSPC.Backspaces.Length ? _OSPC.Backspaces[1].Shift : -1)
 			. " ctrl_released=" . !(DllCall("User32\GetAsyncKeyState", "Int", 0x11, "Short") & 0x8000)
+			. " shift_released=" . !(DllCall("User32\GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000)
 			. " capture_owners=" . SIHO_Count() . " logs=" . _OSPC.Logs.Length . "`n", "*")
 		_OSPC_Require(_OSPC.ControlSent == 1 && _OSPC.Outputs.Length == 1 && SIHO_Count() == 0,
 			"The genuine one-shot must consume and replay its one ending control exactly once.")
-		_OSPC_Require(_OSPC.Mode == "ctrl" ? InStr(Captured, "^") > 0 : Captured == "",
+		ExpectedCtrl := InStr(_OSPC.Mode, "ctrl") > 0
+		ExpectedShift := InStr(_OSPC.Mode, "shift") > 0
+		_OSPC_Require((InStr(Captured, "^") > 0) == ExpectedCtrl
+			&& (InStr(Captured, "+") > 0) == ExpectedShift && !InStr(Captured, "!") && !InStr(Captured, "#"),
 			"The true native capture must witness exactly the intended original modifier flags.")
-		_OSPC_Require(_OSPC.Backspaces.Length == 1 && !_OSPC.Backspaces[1].Shift
-			&& _OSPC.Backspaces[1].Ctrl == (_OSPC.Mode == "ctrl"),
+		_OSPC_Require(_OSPC.Backspaces.Length == 1 && _OSPC.Backspaces[1].Shift == ExpectedShift
+			&& _OSPC.Backspaces[1].Ctrl == ExpectedCtrl,
 			"A spent-unshifted control must preserve its captured Ctrl flag at the actual receiving native keydown.")
 	} finally {
 		SetTimer(_OSPC_Control, 0)
+		if _OSPC.ShiftAttempted {
+			_OSPC_Target()
+			SendEvent("{LShift up}")
+			_OSPC.ShiftAttempted := false
+		}
 		if _OSPC.CtrlAttempted {
 			_OSPC_Target()
 			SendEvent("{LCtrl up}")
