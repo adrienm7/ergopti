@@ -317,7 +317,7 @@ function M.on_message(payload, state, context)
 		local fn = frame.runs[key]
 		if type(fn) ~= "function" or not projection_current(frame) then return false end
 		local ok, result = pcall(fn)
-		if not ok then Logger.error(LOG, "Model selector action failed: %s", tostring(result)) end
+		if not ok then Logger.error(LOG, "Model selector action %s raised an error.", payload.action) end
 		return ok and result ~= false
 	end
 	local function changed()

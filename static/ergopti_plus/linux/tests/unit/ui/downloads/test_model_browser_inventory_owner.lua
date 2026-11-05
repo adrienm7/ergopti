@@ -37,6 +37,33 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	helpers.it("(model-selector-private-error) keeps action exceptions out of the log", function()
+		local previous = package.loaded["ui.menu.llm_backend_rows"]
+		package.loaded["ui.menu.llm_backend_rows"] = { api_page = function()
+			return { rows = {}, tools = {}, providers = { { id = "test", label = "Test",
+				run = function() error("synthetic-private-token") end } } }
+		end }
+		local ok, failure = pcall(with_browser, function(f, bridge)
+			bridge.bind({ dialogs = {}, delete_model = function() return false end,
+				ollama_state = function() return true end, ollama_install_phase = function() return "idle" end,
+				install_ollama = function() return true end })
+			f.handshake()
+			local logger, messages = require("logger.shim"), {}
+			local previous_error = logger.error
+			logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+			local called, result = pcall(f.send, { action = "add_provider", backend = "api", provider = "test" })
+			logger.error = previous_error
+			assert(called, result)
+			helpers.assert_eq(result.accepted, false)
+			helpers.assert_true(#messages > 0)
+			for _, message in ipairs(messages) do
+				helpers.assert_true(not message:find("synthetic-private-token", 1, true))
+			end
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = previous
+		assert(ok, failure)
+	end)
+
 	helpers.it("(linux-model-selection-owner) does not select after page revocation during backend switch", function()
 		with_browser(function(f, bridge, seen)
 			seen.backend = "api"
