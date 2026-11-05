@@ -144,7 +144,6 @@ local UNKNOWN_CONTEXT_MARKERS = {
 	"reset = function()",
 	"if remaining >= 1 then",
 	"invalidated = true",
-	"local result = injector.inject(0, text, false, nil, publication)",
 	"onDesync = function()",
 }
 
@@ -190,6 +189,35 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			count = count + 1
 		end
 		helpers.assert_eq(count, #UNKNOWN_CONTEXT_MARKERS)
+	end)
+
+	helpers.it("wrap output resets unknown context only when delivery was attempted and ownership survives", function()
+		local source = daemon_source()
+		local first = assert(source:find("local function retained(check)", 1, true))
+		local last = assert(source:find("if not injected then error(result, 0) end", first, true))
+		local body = source:sub(first, last - 1)
+		local compile = loadstring or load
+		local run = assert(compile("return function(owner, destination, injector, engine)\n"
+			.. "local current, cached = owner.current, owner.cached\n"
+			.. "local text, on_payload_attempt, _undoable = 'x', nil, true\n"
+			.. body .. "\nend", "@wrap-output-reset"))()
+		local function check(attempted, success, owned, expected)
+			local owner = { current = function() return owned end, cached = function() return owned end }
+			local destination = { current = function() return owned end, cached = function() return owned end }
+			local resets = {}
+			local engine = { reset = function(_, boundary) resets[#resets + 1] = boundary == false and "unknown" or "other" end }
+			local injector = { inject = function(_, _, _, _, _, on_attempt)
+				if attempted then on_attempt() end
+				return { ok = success }
+			end }
+			run(owner, destination, injector, engine)
+			helpers.assert_eq(#resets, expected and 1 or 0)
+			if expected then helpers.assert_eq(resets[1], "unknown") end
+		end
+		check(true, false, true, true) -- failed after payload attempt still invalidates
+		check(false, true, true, true) -- committed output invalidates too
+		check(false, false, true, false) -- failure before output preserves context
+		check(true, false, false, false) -- successor focus owns its own buffer
 	end)
 
 	helpers.it("every daemon reset names whether a word starts", function()
