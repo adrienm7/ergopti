@@ -177,6 +177,13 @@ end)
 
 describe("Diagnostic snapshot: Linux collector", function()
 	local Collector = require("infra.diagnostic_snapshot")
+	it("linux-os-release-duplicates: uses the last assignment", function()
+		local facts = Collector.system_facts({ read = function(path)
+			if path == "/etc/os-release" then return 'NAME="Old"\nNAME="Current"\nVERSION_ID=1\nVERSION_ID=2\n' end
+		end })
+		assert_eq(facts.os_name, "Current")
+		assert_eq(facts.os_version_id, "2")
+	end)
 	it("linux-os-release-quotes: decodes supported single and double quoted values", function()
 		local facts = Collector.system_facts({ read = function(path)
 			if path == "/etc/os-release" then
