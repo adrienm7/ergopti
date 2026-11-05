@@ -30,6 +30,7 @@ M.EXIT_ACCEPTED = 0
 M.EXIT_CANCELLED = 1
 M.EXIT_USAGE = 2
 M.EXIT_UNAVAILABLE = 69
+M.EXIT_IO_ERROR = 74
 
 --- The dialog kinds, one of which every command line names exactly once.
 M.KINDS = { question = true, info = true, warning = true, error = true, entry = true, list = true,
@@ -518,8 +519,12 @@ function M.main(argv, io_out, io_err, binder)
 		status, answer = run_file(lib, request)
 	end
 	if answer ~= nil then
-		out:write(answer, "\n")
-		out:flush()
+		local called, written = pcall(out.write, out, answer, "\n")
+		local flushed, accepted = pcall(out.flush, out)
+		if not called or not written or not flushed or not accepted then
+			pcall(err.write, err, "ergopti dialog: could not publish the answer\n")
+			return M.EXIT_IO_ERROR
+		end
 	end
 	return status
 end
