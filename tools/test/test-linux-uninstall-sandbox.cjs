@@ -523,7 +523,7 @@ try {
 				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
 			)
 	);
-	for (const name of ['dirname', 'grep', 'cat', 'rm', 'sleep']) {
+	for (const name of ['dirname', 'grep', 'cat', 'rm', 'sleep', 'sha256sum']) {
 		fs.symlinkSync(
 			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
 			path.join(bare, name)
@@ -1036,7 +1036,7 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	const nativeStartup = path.join(home, '.config/autostart/ergopti.desktop');
 	fs.mkdirSync(path.dirname(nativeStartup), { recursive: true });
 	const ownedStartup =
-		'[Desktop Entry]\nExec=/bin/bash "/usr/bin/ergopti" --session-start --tray\n';
+		'[Desktop Entry]\nType=Application\nName=Ergopti\nExec=/bin/bash "/usr/bin/ergopti" --session-start --tray\nTerminal=false\nHidden=false\nX-Ergopti-Startup=true\n';
 	fs.writeFileSync(nativeStartup, ownedStartup);
 	nativeQueryStatus = '23';
 	assert.notEqual(
@@ -1074,6 +1074,10 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 		!fs.existsSync(nativeStartup),
 		'confirmed package removal retires its own user startup entry'
 	);
+	const customizedNativeStartup = `${ownedStartup}# personal startup setting\n[Desktop Action Example]\nExec=/other/application\n`;
+	fs.writeFileSync(nativeStartup, customizedNativeStartup);
+	assert.equal(packagedRun('--yes').status, 0);
+	assert.equal(fs.readFileSync(nativeStartup, 'utf8'), customizedNativeStartup, 'package removal preserves a customized owned entry');
 	fs.writeFileSync(nativeStartup, '[Desktop Entry]\nExec=/other/application\n');
 	assert.equal(packagedRun('--yes').status, 0);
 	assert.equal(

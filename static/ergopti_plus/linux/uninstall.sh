@@ -315,11 +315,18 @@ if [ -n "$WAIT_OWNER" ]; then
 fi
 
 remove_native_startup() {
-	local entry="${CONFIG_ROOT}/autostart/ergopti.desktop"
-	if [ -f "$entry" ] && [ ! -L "$entry" ] \
-		&& grep -Fxq "$(ergopti_desktop_exec /usr/bin/ergopti)" "$entry"; then
-		rm -- "$entry"
-	fi
+	local entry="${CONFIG_ROOT}/autostart/ergopti.desktop" command actual expected hidden
+	[ -f "$entry" ] && [ ! -L "$entry" ] || return 0
+	command="$(ergopti_desktop_exec /usr/bin/ergopti)" || return 1
+	actual="$(sha256sum < "$entry")" || return 1
+	for hidden in true false; do
+		expected="$(printf '[Desktop Entry]\nType=Application\nName=Ergopti\n%s\nTerminal=false\nHidden=%s\nX-Ergopti-Startup=true\n' "$command" "$hidden" | sha256sum)" || return 1
+		if [ "${actual%% *}" = "${expected%% *}" ]; then
+			rm -- "$entry"
+			return
+		fi
+	done
+	return 0
 }
 
 if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
