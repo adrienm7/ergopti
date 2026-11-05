@@ -552,17 +552,23 @@ for _KCSBOOT_Mode in ["quoted-symmetry", "number-symmetry", "quoted-delay", "boo
 
 ; Uses the real-file admission fixture from test_tap_hold_lone_tap.ahk.
 _KCSENABLED_Run(Mode, _World, _Ports) {
-	Raw := Mode == "number-zero" ? "0" : Mode == "false-control" ? "false" : "true"
+	Raw := Mode == "number-zero" ? "-0" : Mode == "legacy-zero-control" ? "0"
+		: Mode == "legacy-one-control" ? "1 # retained old writer intent" : Mode == "false-control" ? "false" : "true"
 	Source := "[mod_combos]`nenabled = " . Raw . "`n"
 		. '[mod_combos.config.caps_lock_then_tab]`ncombo = "copy"`n'
 	_RBC_WithActualBootCache(Source, _KCSENABLED_Read.Bind(Mode))
 }
 _KCSENABLED_Read(Mode, Cache) {
 	global _KeyCombinationChordPolicy
-	Expected := Mode != "false-control"
+	Expected := Mode != "false-control" && Mode != "legacy-zero-control"
 	Snapshot := ConfigTomlBootSnapshot(Cache)
-	ConfigTomlBootSnapshotValue(Snapshot, "mod_combos", "enabled", &Admitted)
-	AssertEqual(Expected, Admitted)
+	AssertFalse(ManifestFindEntryByPath("mod_combos.enabled") is Map, "the private enabled switch has no feature-manifest default")
+	Authored := Snapshot.Document["mod_combos"]["enabled"]
+	if Mode == "number-zero"
+		AssertTrue(Authored is Integer && Authored == 0, "signed zero keeps its native integer shape but is not an old writer bare0 spelling")
+	else if InStr(Mode, "legacy-") == 1
+		AssertTrue(Authored is Integer && Authored == Expected, "the exact bare0/1 old writer spellings preserve legacy intent")	else
+		AssertTrue(Authored is TOML_Bool, "valid controls retain their actual authored Boolean type")
 	KeyCombinationChordsReadConfig(Cache)
 	AssertEqual(Expected, IsObject(_KeyCombinationChordPolicy), "an outdated numeric zero must not disable the admitted default chord policy")
 	if Expected {
@@ -571,6 +577,6 @@ _KCSENABLED_Read(Mode, Cache) {
 		AssertEqual("copy", Chosen["action"])
 	}
 }
-for _KCSENABLED_Mode in ["number-zero", "false-control", "true-control"]
+for _KCSENABLED_Mode in ["number-zero", "false-control", "true-control", "legacy-zero-control", "legacy-one-control"]
 	Test("key chord boot enabled admission: " . _KCSENABLED_Mode,
 		_KCCE_With.Bind(Map(), false, _KCSENABLED_Run.Bind(_KCSENABLED_Mode)))

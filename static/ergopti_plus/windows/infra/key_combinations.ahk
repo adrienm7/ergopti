@@ -1112,6 +1112,24 @@ KeyCombinationChordCurrentSettings() {
 ; Reads the third slots with the other two: an action is admitted as on Linux, and
 ; the delay and symmetry fall to the manifest's declared values when absent.
 ; @param Cache {Map} The parsed config.
+
+; This private compatibility switch is not a feature-manifest leaf. Its owner
+; defaults to on, with native booleans and the old writer's exact bare0/1
+; spellings admitted; other source types retain that default.
+_KeyCombinationChordBootEnabled(Snapshot) {
+	for Row in Snapshot.Rows {
+		if Row.Section != ConfigLeaf.MOD_COMBOS || Row.Key != "enabled"
+			continue
+		if Row.Typed is TOML_Bool
+			return !!Row.Typed.Value
+		Raw := Trim(TOML_StripInlineComment(Row.Raw), " `t")
+		if Row.Typed is Integer && (Raw == "0" || Raw == "1")
+			return Row.Typed == 1
+		return true
+	}
+	return true
+}
+
 KeyCombinationChordsReadConfig(Cache) {
 	global KeyCombinationChords, KeyCombinationChordConfig, _KeyCombinationChordPolicy, _KeyCombinationChordFirsts
 	global KEY_COMBINATION_NONE, GESTURE_ACTIONS, KEY_COMBINATION_CHORD_REFUSED_ACTIONS
@@ -1123,7 +1141,7 @@ KeyCombinationChordsReadConfig(Cache) {
 	if IsObject(Snapshot) {
 		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, ConfigLeaf.SIMULTANEOUS_THRESHOLD_MS, &Delay)
 		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "symmetric", &Symmetric)
-		ConfigTomlBootSnapshotValue(Snapshot, ConfigLeaf.MOD_COMBOS, "enabled", &Enabled)
+		Enabled := _KeyCombinationChordBootEnabled(Snapshot)
 	}
 	try KeyCombinationChordConfig := KeyCombinationChordSettings(
 		IsNumber(Delay) ? Delay + 0 : Delay, Symmetric ? 1 : 0)
