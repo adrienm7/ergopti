@@ -260,6 +260,41 @@ helpers.describe("Linux local server discovery ownership", function()
 			helpers.assert_true(changes>=1)
 		end)
 	end)
+	helpers.it("a closed model page receives no invalid local address error", function()
+		isolated(function()
+			local live, errors = true, 0
+			local llm = { get_backend = function() return "ollama" end,
+				can_configure_local_servers = function() return true end, is_enabled = function() return true end }
+			local dialogs = { prompt = function() live = false; return "not a URL" end,
+				error = function() errors = errors + 1 end }
+			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
+				{ is_paused = function() return false end, page_current = function() return live end })
+			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			helpers.assert_true(address ~= nil)
+			helpers.assert_eq(address.items[1].action(), false)
+			helpers.assert_eq(errors, 0)
+		end)
+	end)
+
+	helpers.it("a closed model page refuses a local server address entered by its old dialog", function()
+		isolated(function(servers, entries, calls)
+			local live, setters = true, 0
+			local llm = { get_backend = function() return "ollama" end,
+				can_configure_local_servers = function() return true end, is_enabled = function() return true end,
+				set_backend = function() setters = setters + 1; return true end }
+			local dialogs = { prompt = function() live = false; return "http://localhost:9876/v1" end,
+				error = function() end }
+			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
+				{ is_paused = function() return false end, page_current = function() return live end })
+			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			helpers.assert_true(address ~= nil)
+			helpers.assert_eq(address.items[1].action(), false)
+			helpers.assert_eq(servers.target("omlx").base_url, "http://127.0.0.1:8000/v1")
+			helpers.assert_nil(entries.active())
+			helpers.assert_eq(setters, 0)
+		end)
+	end)
+
 	helpers.it("a scope acquired during a blocking address prompt refuses publication and any backend setter", function()
 		isolated(function(servers,entries,calls)
 			local allowed,setters=true,0

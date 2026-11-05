@@ -72,6 +72,22 @@ local function by_name(api)
 end
 
 helpers.describe("model selector API listing on Linux", function()
+	helpers.it("(model-selector-local-owner) passes the page owner to local server rows", function()
+		with_rows({}, function(Rows, calls, dialogs)
+			local owner = function() return true end
+			local captured
+			package.loaded["ui.menu.local_server_rows"] = { page_rows = function(_, _, _, context)
+				captured = context
+				return {}, {}
+			end }
+			local llm = engine(calls)
+			llm.can_configure_local_servers = function() return true end
+			Rows.api_page(llm, dialogs, nil, { is_paused = function() return false end }, nil, owner)
+			helpers.assert_true(captured ~= nil)
+			helpers.assert_eq(captured.page_current, owner)
+		end)
+	end)
+
 	helpers.it("reports a refused backend when selecting a listed API model", function()
 		with_rows({}, function(Rows, calls, dialogs)
 			local llm = engine(calls)
