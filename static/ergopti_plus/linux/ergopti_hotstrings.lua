@@ -717,6 +717,7 @@ end
 local perform_reload, reload_in_flight, abandon_reload = require("infra.reload_restart").new({ gestures = gestures,
 	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end,
 	cancel = function() return require("infra.daemon_restart").cancel() end })
+privacy_owners.reload_in_flight = reload_in_flight
 
 
 --- Emits facts prepared before capture only after actual driver readiness.
@@ -2478,7 +2479,7 @@ local function main()
 			-- spawned — never this process — so Reload logged success and
 			-- reloaded nothing.
 			on_reload     = function() return perform_reload("the tray menu") end,
-			reload_in_flight = reload_in_flight,
+			reload_in_flight = privacy_owners.reload_in_flight,
 			-- Opens one category's TOML in the user's editor. The category submenu
 			-- offers it because a pack is a file people edit, and finding it by
 			-- hand means knowing whether it came from the bundle or the user's own
