@@ -907,6 +907,14 @@ class _MBPC_Finalizer {
 		this.State.Disposed += 1
 	}
 }
+; Native HWND custody includes hidden, not-yet-shown construction windows.
+; WinGetPID's title search otherwise excludes them by default.
+_MBPO_NativeWindowPid(Hwnd) {
+	Pid := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid, "UInt")
+	return ThreadId ? Pid : 0
+}
+
 _MBPC_Create(This, Params*) {
 	global _MBPO
 	Window := Func.Prototype.Call.Call(This, Params*)
@@ -914,7 +922,7 @@ _MBPC_Create(This, Params*) {
 	if State.Armed {
 		State.Created += 1
 		State.Hwnd := Window.Hwnd, State.GuiPtr := ObjPtr(Window)
-		State.Pid := WinGetPID("ahk_id " . State.Hwnd)
+		State.Pid := _MBPO_NativeWindowPid(State.Hwnd)
 		Window.CtorWitness := _MBPC_Finalizer(State)
 	}
 	return Window
@@ -972,7 +980,7 @@ _MBPO_ConstructorFailure() {
 		if !IsObject(Cleanup) && DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
 			Cleanup := GuiFromHwnd(State.Hwnd)
 		if IsObject(Cleanup) {
-			_MBPO_Require(ObjPtr(Cleanup) == State.GuiPtr && WinGetPID("ahk_id " . State.Hwnd) == ProcessExist(),
+			_MBPO_Require(ObjPtr(Cleanup) == State.GuiPtr && _MBPO_NativeWindowPid(State.Hwnd) == ProcessExist(),
 				"Only the exact originally observed live Gui may be adopted for failure-path cleanup")
 			if IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Cleanup
 				_LLM_ModelBrowser_Gui := unset
@@ -1005,7 +1013,7 @@ _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
 		if !State.Armed || Hwnd != State.Hwnd || Message != 0x18
 			return Result
-		_MBPO_Require(WinGetPID("ahk_id " . Hwnd) == ProcessExist(), "Only the exact owned native visibility callback may drive another action")
+		_MBPO_Require(_MBPO_NativeWindowPid(Hwnd) == ProcessExist(), "Only the exact owned native visibility callback may drive another action")
 		if State.Mode == "native-hide-reopen-close" && !WParam && !State.Reopened {
 			State.Reopened := true
 			State.ShowReturned := LLM_ModelBrowser_Show()
@@ -1045,7 +1053,7 @@ _MBPO_VisibilityReentry() {
 		State.Window := _MBPO.Window, State.Hwnd := _MBPO.Hwnd
 		if State.Mode == "native-hide-reopen-close"
 			State.Window.Show("NA")
-		_MBPO_Require(WinGetPID("ahk_id " . State.Hwnd) == ProcessExist()
+		_MBPO_Require(_MBPO_NativeWindowPid(State.Hwnd) == ProcessExist()
 			&& !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int") == (State.Mode == "native-hide-reopen-close"),
 			"The real starting visibility must match the tested production action")
 		State.Proc := CallbackCreate(_MBPO_VisibilityProc.Bind(State), , 6)
