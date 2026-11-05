@@ -166,7 +166,9 @@ local function archive_listings_canonical(names, verbose)
 	for _, entry in ipairs(split_lines(names)) do
 		if entry:sub(1, 1) == "/"
 			or entry:find("\\", 1, true)
-			or entry:find("..", 1, true)
+			-- Only a complete parent component escapes a root; names such as
+			-- notes..toml are ordinary files produced by tar as well.
+			or ("/" .. entry .. "/"):find("/../", 1, true)
 			or entry:match("^%./") then
 			return false, "archive contains an unsafe path: " .. entry
 		end
