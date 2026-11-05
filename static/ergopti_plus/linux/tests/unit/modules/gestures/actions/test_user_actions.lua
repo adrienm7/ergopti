@@ -330,3 +330,34 @@ helpers.describe("ShellRunner.run_async takes a caller's output bound (Linux)", 
 		helpers.assert_eq(refusal, "max_output_bytes must be a positive integer")
 	end)
 end)
+
+helpers.describe("private user-action notification fallback", function()
+	for _, mode in ipairs({ "unavailable", "refused" }) do
+		helpers.it("does not log command stderr when notifier is " .. mode, function()
+			local names = { "logger.shim", "infra.i18n", "adapters.shell_runner", "adapters.notifier",
+				"adapters.application_notifier", "modules.gestures.user_actions" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local logs = {}
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
+			package.loaded["infra.i18n"] = { get = function() return "Command failed: {1}: {2}" end }
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return mode ~= "unavailable" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function() return false end,
+			}
+			package.loaded["adapters.notifier"] = nil
+			package.loaded["adapters.application_notifier"] = nil
+			package.loaded["modules.gestures.user_actions"] = nil
+			local ok, err = xpcall(function()
+				local user = require("modules.gestures.user_actions")
+				user.notify("user_actions.command_failed_detail", 6, "secretmarker")
+				helpers.assert_true(not table.concat(logs, "\n"):find("secretmarker", 1, true),
+					"the command's stderr must not be copied into logs")
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
