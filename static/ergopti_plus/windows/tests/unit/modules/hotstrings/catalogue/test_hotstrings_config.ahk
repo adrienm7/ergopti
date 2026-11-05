@@ -1967,3 +1967,57 @@ _HSBR_PublicNamespace(ExtensionControl) {
 for _HSBR_Control in [false, true]
 	Test("hotstring override reserved namespace: extension_control=" . _HSBR_Control
 		. " (override-reserved-root-roundtrip)", _HSBR_PublicNamespace.Bind(_HSBR_Control))
+
+
+_HSQS_LegacyFiniteIntention(Kind) {
+ global Features, _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
+ global _HotstringsLegacyDelimiters, _HotstringsCommonOverrideAdmitted, LastSentCharacterKeyTime
+ Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+  groups: HotstringGroupConfig, legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted(),
+  times: LastSentCharacterKeyTime}
+ Root := A_Temp . "\ergopti_delay_zero_sentinel_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+ Created := FSCreateDirectoryExclusiveStrict(Root)
+ AssertEqual(1, Created)
+ Path := Root . "\overrides.toml"
+ Raw := Kind == "positive-sub-ms" ? "0.0004" : (Kind == "one-ms" ? "0.001" : "0")
+ Original := Kind == "positive-sub-ms" ? 0.0004 : (Kind == "one-ms" ? 0.001 : 0)
+ try {
+  AssertFalse(A_IsSuspended)
+  Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+  Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+  HotstringGroupConfig := HotstringGroupConfig.Clone()
+  _HotstringsOverridesPath := Path, _HotstringsOverrides := Map()
+  Source := "[magickey]`ndelay = " . Raw . "`n[magickey.text_expansion_symbols]`ndelay = " . Raw . "`n"
+  AssertEqual(1, FSWriteCreateDurable(Path, Source))
+  HotstringsConfigInit(Path)
+  AssertEqual(Original, _HotstringsOverrides["magickey"].LegacyDelay, "The actual typed TOML reader must admit the complete original finite intention")
+  AssertEqual(Original, _HotstringsOverrides["magickey"].Sections["text_expansion_symbols"].LegacyDelay)
+  AssertTrue(TickTryDurationMsFromSeconds(Original, &QuantizedMs), "The existing native duration policy admits this source")
+  LastSentCharacterKeyTime := Map("a", 1000)
+  ExpectedExpired := IsTimeActivationExpired("a", Original, 1002)
+  AssertEqual(Original > 0, ExpectedExpired, "The original positive delay is a finite same-tick gate; explicit zero is unlimited")
+  AssertTrue(HotstringsSetOverride("magickey", "", "color", "#123456"), "An unrelated real public metadata save must be acknowledged")
+  Disk := TOML_ParseDocument(FSReadUtf8Exact(Path))
+  AssertEqual("#123456", Disk["magickey"]["color"])
+  AssertTrue(HotstringsConfigReload(), "The actual acknowledged image must reload through the genuine override owner")
+  for Section in ["", "text_expansion_symbols"] {
+   Resolved := HotstringsResolve("magickey", Section)
+   ActualExpired := IsTimeActivationExpired("a", Resolved.Delay, 1002)
+   _TestPrint("# delay-zero-sentinel kind=" . Kind . " original=" . Raw . " quantized_ms=" . QuantizedMs
+    . " section=" . Section . " resolved=" . Resolved.Delay . " expected_expired=" . ExpectedExpired . " actual_expired=" . ActualExpired)
+   AssertEqual(Original == 0, Resolved.Delay == 0, "Millisecond quantization cannot turn an acknowledged finite source into the unlimited sentinel")
+   AssertEqual(ExpectedExpired, ActualExpired, "An unrelated save cannot remove the original finite activation gate")
+  }
+ } finally {
+  Features := Saved.features, _HotstringsOverrides := Saved.overrides
+  _HotstringsOverridesPath := Saved.path, HotstringGroupConfig := Saved.groups
+  _HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+  LastSentCharacterKeyTime := Saved.times
+  HotstringsResolveBumpGen()
+  _TOML_InvalidateParseCache(Path)
+  if Created
+   DirDelete(Root, true)
+ }
+}
+for _HSQS_Kind in ["positive-sub-ms", "one-ms", "explicit-zero"]
+ Test("Hotstring delay quantization preserves its zero sentinel: " . _HSQS_Kind . " (hotstring-delay-zero-sentinel-domain)", _HSQS_LegacyFiniteIntention.Bind(_HSQS_Kind))
