@@ -75,6 +75,7 @@ _TNNU_Case(Mode) {
 		RawAlias := FileExist(Counted) != ""
 		AdapterAlias := _TakeNoteNative.FileExists(Counted)
 		AssertTrue(RawAlias, "The real native file primitive must see the independently owned folder prefix.")
+		AssertFalse(AdapterAlias, "The note adapter must not authenticate an invalid counted path from its existing prefix.")
 		Ops := _TNNU_Ops()
 		Owned := Map(), Claimed := false
 		PreviousCritical := Critical("On")

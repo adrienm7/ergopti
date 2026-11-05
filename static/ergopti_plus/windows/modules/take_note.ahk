@@ -35,6 +35,17 @@ _TakeNoteTitleMatchesFile(Title, FileName) {
 ; Injectable OS boundary. Tests replace this class with a deterministic clock
 ; and manually-driven timer queue, so they never launch or focus a real window.
 class _TakeNoteNative {
+	; Win32 paths are NUL-terminated; inspect the original counted units before
+	; a query or effect could silently select the shorter prefix.
+	static _HasNativeNul(Path) {
+		if !(Path is String)
+			return false
+		loop StrLen(Path)
+			if NumGet(StrPtr(Path), (A_Index - 1) * 2, "UShort") == 0
+				return true
+		return false
+	}
+
 	static NowTick() {
 		return A_TickCount
 	}
@@ -44,15 +55,19 @@ class _TakeNoteNative {
 	}
 
 	static FileExists(Path) {
-		return FileExist(Path) != ""
+		return !_TakeNoteNative._HasNativeNul(Path) && FileExist(Path) != ""
 	}
 
 	static CreateEmptyFile(Path) {
+		if _TakeNoteNative._HasNativeNul(Path)
+			throw ValueError("note path cannot contain a NUL code unit")
 		FileAppend("", Path)
 		return true
 	}
 
 	static Launch(Path) {
+		if _TakeNoteNative._HasNativeNul(Path)
+			throw ValueError("note path cannot contain a NUL code unit")
 		Run('notepad.exe "' . Path . '"')
 		return true
 	}
@@ -162,6 +177,8 @@ TakeNoteRequest(DatedNotes, DestinationFolder, AppendNewlineOnLaunch := true, Op
 	try {
 		if !(DestinationFolder is String) or Trim(DestinationFolder) = ""
 			throw ValueError("note destination folder must be a non-empty string")
+		if _TakeNoteNative._HasNativeNul(DestinationFolder)
+			throw ValueError("note destination folder cannot contain a NUL code unit")
 		FileName := DatedNotes
 			? "Notes_" . FormatTime(, "dd_MM_yyyy") . ".txt"
 			: "Notes.txt"
