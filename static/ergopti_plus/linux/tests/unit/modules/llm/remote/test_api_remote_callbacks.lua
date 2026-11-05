@@ -114,6 +114,14 @@ local function check_delivery(delivered, chunks, text, reason)
 end
 
 helpers.describe("api_remote_callbacks: safe reporting and callback ownership", function()
+	helpers.it("withholds private response text raised by a terminal callback", function()
+		isolated(function(remote, calls, logs)
+			assert(start(remote, "openai", nil, function(text) error(text, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = replies.openai })
+			helpers.assert_eq(#logs, 1)
+			check_log(logs[1], "details withheld")
+		end)
+	end)
 	local cases = { "healthy", "chunk-string", "chunk-object", "terminal-string",
 		"terminal-object", "terminal-throwing-object", "reentry-object", "reentry-throwing-object" }
 	for _, format in ipairs({ "openai", "anthropic", "gemini" }) do
@@ -166,7 +174,7 @@ helpers.describe("api_remote_callbacks: safe reporting and callback ownership", 
 						helpers.assert_eq(successors, 1)
 					end
 					helpers.assert_eq(remote.is_active(), false)
-					if case == "terminal-string" then helpers.assert_eq(#logs, 1); check_log(logs[1], "owned terminal failure")
+					if case == "terminal-string" then helpers.assert_eq(#logs, 1); check_log(logs[1], "details withheld")
 					elseif case:find("object", 1, true) and case ~= "chunk-object" then
 						helpers.assert_eq(#logs, 1); check_log(logs[1], "error object (table)")
 					else helpers.assert_eq(#logs, 0) end
@@ -211,8 +219,8 @@ helpers.describe("api_remote_callbacks: safe reporting and callback ownership", 
 			end)
 		end
 	end
-	for _, case in ipairs({ { name = "empty string", value = "", expected = "" },
-		{ name = "number", value = 42, expected = "42" }, { name = "false", value = false, expected = "false" },
+	for _, case in ipairs({ { name = "empty string", value = "", expected = "details withheld" },
+		{ name = "number", value = 42, expected = "details withheld" }, { name = "false", value = false, expected = "false" },
 		{ name = "function", value = function() error("must not be called") end, expected = "error object (function)" },
 		{ name = "thread", value = coroutine.create(function() error("must not resume") end), expected = "error object (thread)" } }) do
 		helpers.it("api_remote_callbacks: safely describes " .. case.name .. " terminal failure", function()

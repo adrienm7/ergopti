@@ -164,6 +164,18 @@ local function check_outcome_delivery(delivered, outcome)
 end
 
 helpers.describe("api_remote_callback_siblings: protected public wrappers", function()
+	helpers.it("withholds listing callback failures containing private output", function()
+		isolated(function(remote, calls, logs)
+			local secret = "private model listing token"
+			local entry = { provider = "openai_compat", model = "fixture-model", token = "owned-fixture-token",
+				base_url = "https://example.invalid/v1" }
+			helpers.assert_true(remote.list_models(entry, function() error(secret, 0) end))
+			calls[1].callback({ ok = true, status = 200, body = '{"data":[{"id":"model"}]}' })
+			helpers.assert_eq(#logs, 1)
+			helpers.assert_eq(logs[1].message, "Remote model listing callback raised — %s")
+			helpers.assert_eq(logs[1].detail, "details withheld")
+		end)
+	end)
 	for _, spec in ipairs(SPECS) do
 		for _, case in ipairs({ "healthy", "string", "object", "throwing-object", "reentry-object", "reentry-throwing-object" }) do
 			helpers.it("api_remote_callback_siblings: " .. spec.owner .. " " .. spec.provider .. " " .. case, function()
@@ -213,7 +225,7 @@ helpers.describe("api_remote_callback_siblings: protected public wrappers", func
 					if case == "healthy" then helpers.assert_eq(#logs, 0)
 					else
 						helpers.assert_eq(#logs, 1)
-						check_log(logs[1], case == "string" and "owned ordinary wrapper failure" or "error object (table)")
+						check_log(logs[1], case == "string" and "details withheld" or "error object (table)")
 					end
 					local retries = 0
 					assert(start(remote, spec, function(a, b, c)
