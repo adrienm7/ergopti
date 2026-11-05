@@ -1015,3 +1015,54 @@ _TZF_OffsetUnavailable() {
 	AssertEqual("", Context["timezone"], "an unavailable offset is not fabricated")
 }
 Test("agent context: unavailable timezone offset is not fabricated (agent-timezone-offset-refusal)", _TZF_OffsetUnavailable)
+
+
+; Retained callbacks must not erase the cancellation capability of a newer
+; pause. These units use the real agent and the existing scheduler port.
+_LAPO_Sequence(Mode, Fx, Lines, Sent) {
+	global _LLM_Agent_Auto
+	Fx.App := "Slack"
+	Gate := {Allowed: true}
+	AssertTrue(LLM_Agent_OnTyping(LAG_TYPED, () => Gate.Allowed))
+	Older := _LLM_Agent_Auto["timer"]
+	AssertTrue(HasMethod(Older, "Call"))
+	if Mode == "current" {
+		AssertTrue(Older.Call())
+		AssertEqual(0, _LLM_Agent_Auto["timer"])
+		AssertEqual(1, Fx.Remote.Length, "the admitted pause must dispatch its genuine System 1 request")
+		return
+	}
+	if Mode == "withdrawn" {
+		Gate.Allowed := false
+		AssertFalse(Older.Call())
+		AssertEqual(0, _LLM_Agent_Auto["timer"], "a withdrawn current pause still retires its own capability")
+		AssertEqual(0, Fx.Remote.Length)
+		return
+	}
+	AssertTrue(LLM_Agent_OnTyping(LAG_TYPED . " later"))
+	Newer := _LLM_Agent_Auto["timer"]
+	AssertTrue(HasMethod(Newer, "Call") && Newer != Older)
+	Before := Fx.Scheduled.Length
+	Result := Older.Call()
+	OwnerPreserved := _LLM_Agent_Auto["timer"] == Newer
+	; Subsequent actual invalidation must retain the exact timer cancellation
+	; operation, rather than merely changing a logical generation.
+	LLM_Agent_InvalidateTyping()
+	CancelledNewer := false
+	for Index, Entry in Fx.Scheduled {
+		if Index > Before && Entry["fn"] == Newer && Entry["period"] == 0
+			CancelledNewer := true
+	}
+	_TestPrint("# agent-pause-owner result=" . Result . " newer_owner=" . OwnerPreserved
+		. " cancelled_newer=" . CancelledNewer . " requests=" . Fx.Remote.Length)
+	AssertFalse(Result)
+	AssertTrue(OwnerPreserved, "a retired pause cannot erase the exact successor timer owner")
+	AssertTrue(CancelledNewer, "the current pause must remain cancellable after a stale callback")
+	AssertEqual(0, Fx.Remote.Length)
+}
+_LAPO_Case(Mode) {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras"), _LTN_Screen(""), _LAPO_Sequence.Bind(Mode))
+}
+for _LAPO_Mode in ["stale", "current", "withdrawn"]
+	Test("LLM agent pause ownership: " . _LAPO_Mode . " retains its exact cancellation capability (agent-pause-timer-owner)",
+		_LAPO_Case.Bind(_LAPO_Mode))
