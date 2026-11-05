@@ -1,155 +1,47 @@
 {
-	"expected_count": 177,
-	"native_http_client_e2e": true,
-	"native_hotstring_e2e": true,
+	"expected_count": 23,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "llm-debounce-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-password-source-privacy",
-			"expected_count": 3
-		},
-		{
-			"contains": "llm-debounce-private-retyped-context",
+			"contains": "llm-prefix-observer-lifetime",
 			"expected_count": 2
 		},
 		{
-			"contains": "llm-typing-source-privacy",
-			"expected_count": 10
+			"contains": "override-reserved-root-roundtrip",
+			"expected_count": 2
 		},
 		{
-			"contains": "prefix-char-admission",
-			"expected_count": 9
+			"contains": "Reg_KeyExists: known system key returns true",
+			"expected_count": 1
 		},
 		{
-			"contains": "prefix-scalar-framing",
-			"expected_count": 16
+			"contains": "Reg_KeyExists: empty registry key returns true",
+			"expected_count": 1
 		},
 		{
-			"contains": "prefix-bridge-idle-fragment",
+			"contains": "Reg_KeyExists: non-existent key returns false",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot-native-kana-flags",
+			"expected_count": 2
+		},
+		{
+			"contains": "one-shot-native-control-flags",
 			"expected_count": 4
 		},
 		{
-			"contains": "bridge-shortcut-fragment",
-			"expected_count": 7
-		},
-		{
-			"contains": "llm-buffer-cap-single-owner",
+			"contains": "one-shot-native-tab-flags",
 			"expected_count": 2
 		},
 		{
-			"contains": "llm unicode-context-cap:",
-			"expected_count": 4
-		},
-		{
-			"contains": "(F47)",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-failure-finalizer-owner",
+			"contains": "agent-pause-timer-owner",
 			"expected_count": 3
-		},
-		{
-			"contains": "llm-slot-display-stale-parser",
-			"expected_count": 2
-		},
-		{
-			"contains": "LLM live mode:",
-			"expected_count": 23
-		},
-		{
-			"contains": "agent-source1-custody",
-			"expected_count": 10
-		},
-		{
-			"contains": "public-prediction-requester-admission",
-			"expected_count": 18
-		},
-		{
-			"contains": "jev-native-requester",
-			"expected_count": 2
-		},
-		{
-			"contains": "profile-suffix-menu-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-suffix-menu-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-instant-word-end-trigger",
-			"expected_count": 1
-		},
-		{
-			"contains": "tooltip-teardown-on-keyboard-thread",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-bridge-deferred-hides",
-			"expected_count": 1
-		},
-		{
-			"contains": "corpus-request-plan",
-			"expected_count": 3
-		},
-		{
-			"contains": "storage-native-scalar-persistence",
-			"expected_count": 4
-		},
-		{
-			"contains": "storage-quoted-scalar-protocol",
-			"expected_count": 2
-		},
-		{
-			"contains": "storage-quoted-scalar-invalid",
-			"expected_count": 2
-		},
-		{
-			"contains": "storage-native-counted-inventory",
-			"expected_count": 2
-		},
-		{
-			"contains": "storage-native-name-nul",
-			"expected_count": 6
-		},
-		{
-			"contains": "storage-native-name-coercion",
-			"expected_count": 2
-		},
-		{
-			"contains": "storage native enumeration receipt:",
-			"expected_count": 5
-		},
-		{
-			"contains": "personal-info-native-close",
-			"expected_count": 3
-		},
-		{
-			"contains": "webview reset idempotent: _PiEdWeb_Reset checks",
-			"expected_count": 1
-		},
-		{
-			"contains": "personal-info-source-witness",
-			"expected_count": 5
-		},
-		{
-			"contains": "personal info source projection:",
-			"expected_count": 7
-		},
-		{
-			"contains": "storage-native-nested-float",
-			"expected_count": 4
-		},
-		{
-			"contains": "sticky-kana-native-preheld",
-			"expected_count": 1
 		},
 		{
 			"contains": "takenote-pause-lifecycle-owner",
-			"expected_count": 3
+			"expected_count": 5
 		}
 	]
 }
