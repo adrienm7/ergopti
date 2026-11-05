@@ -127,7 +127,8 @@ _TapKeysCategoryEnabled() {
 }
 
 ; The #HotIf predicate of one tap key: assigned to a known action that is armed
-; (an AI action is not while the AI is off), and the Shortcuts category on.
+; (an AI action is not while the AI is off), the Shortcuts category on, and
+; no Kana AltGr held: its ordinary virtual key is not an AHK modifier.
 ; Evaluated by the keyboard hook on every press, so it
 ; only reads memory.
 ; @param {String} Id A tap key id.
@@ -137,7 +138,8 @@ TapKeyShouldFire(Id) {
 	if !IsSet(TapKeyAssignments) || !IsSet(GESTURE_ACTIONS)
 		return false
 	Action := TapKeyAssignments.Get(Id, "none")
-	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action) && _TapKeysCategoryEnabled()
+	return Action != "none" && GESTURE_ACTIONS.Has(Action) && !AiActionBlocked(Action)
+		&& _TapKeysCategoryEnabled() && !TapHoldKanaAltGrHeld()
 }
 
 ; Runs a tap key's action, then holds the hotkey thread until the key is up so
