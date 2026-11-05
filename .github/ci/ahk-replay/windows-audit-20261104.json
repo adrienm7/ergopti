@@ -1,80 +1,44 @@
 {
-	"expected_count": 41,
+	"expected_count": 24,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
-	"native_proxy_relay_owner_e2e": true,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
 	"filters": [
-		{
-			"contains": "synthetic-lifted-down-refusal",
-			"expected_count": 3
-		},
-		{
-			"contains": "synthetic-lifted-down-custody",
-			"expected_count": 3
-		},
-		{
-			"contains": "raced-repress-release-debt",
-			"expected_count": 2
-		},
-		{
-			"contains": "synthetic-user-held-2026-09-25",
-			"expected_count": 5
-		},
-		{
-			"contains": "taphold-synthetic-refcount",
-			"expected_count": 4
-		},
-		{
-			"contains": "tap-holds AHK-03: synthetic ownership uses short transactional Critical spans",
-			"expected_count": 1
-		},
-		{
-			"contains": "tap-holds AHK-03: every synthetic Down caller consumes the ownership verdict",
-			"expected_count": 1
-		},
-		{
-			"contains": "tap-holds AHK-03: synthetic key-Up is not injected while the driver is suspended",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed-bootstrap-graph-lifetime",
-			"expected_count": 4
-		},
-		{
-			"contains": "managed-bootstrap-lifetime",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed-bootstrap-timer-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed-bootstrap-observer-retirement",
-			"expected_count": 2
-		},
-		{
-			"contains": "managed bootstrap: cancellation keeps private cleanup debt",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed bootstrap: READY keeps source withdrawal retirement",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed bootstrap: exact committed enable hands off READY source",
-			"expected_count": 1
-		},
-		{
-			"contains": "layout-navigation-subscription-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "model-browser-native-backend",
-			"expected_count": 2
-		},
 		{
 			"contains": "model-browser-close-pause-owner",
 			"expected_count": 6
+		},
+		{
+			"contains": "(model-browser-native-backend)",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-native-backend-admission",
+			"expected_count": 3
+		},
+		{
+			"contains": "model-browser-native-backend-superseded",
+			"expected_count": 1
+		},
+		{
+			"contains": "model-browser-native-backend-second-admission",
+			"expected_count": 1
+		},
+		{
+			"contains": "sensor-power-unknown",
+			"expected_count": 4
+		},
+		{
+			"contains": "sensor-collection-pause",
+			"expected_count": 2
+		},
+		{
+			"contains": "managed-bootstrap-constructor-failure-lifetime",
+			"expected_count": 2
+		},
+		{
+			"contains": "open-app-original-nul",
+			"expected_count": 3
 		}
 	]
 }
