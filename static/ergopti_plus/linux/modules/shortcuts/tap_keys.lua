@@ -232,9 +232,24 @@ function M.set_action(id, action_id)
 		return false
 	end
 	local path = require("infra.config_paths").config("config.toml")
+	local assignments, generation = _assignments, _dispatch_generation
+	local bytes, status = TomlWriter.read_classified(path)
+	if status ~= "ok" and status ~= "absent" then return false end
+	local ok, expected = pcall(function()
+		return M.configuration_candidate(TomlCodec.decode(bytes or "")).assignments
+	end)
+	if not ok or type(expected) ~= "table" or _assignments ~= assignments
+		or _dispatch_generation ~= generation or _configuration_owner ~= nil then return false end
+	for key, value in pairs(assignments) do
+		if expected[key] ~= value then
+			Logger.warn(LOG, "Tap key configuration changed externally; reload shortcuts before editing.")
+			return false
+		end
+	end
+	for key, value in pairs(expected) do if assignments[key] ~= value then return false end end
 	local committed, detail = TomlWriter.batch_write(path, {
 		{ section = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS, key = id, value = action_id },
-	})
+	}, nil, { status = status, content = bytes })
 	if committed ~= true then
 		Logger.error(LOG, "set_action(): could not persist tap key '%s': %s.", id, tostring(detail))
 		return false

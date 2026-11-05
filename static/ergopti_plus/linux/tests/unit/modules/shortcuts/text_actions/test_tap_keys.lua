@@ -88,6 +88,43 @@ local function fresh(stored)
 end
 
 helpers.describe("Linux number-row tap keys (tap-keys)", function()
+	helpers.it("tap-config-owner: refuses a stale sibling binding without modifying the file", function()
+		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
+		local ok, err = pcall(function()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			Sandbox.write_bytes(log.path, '[shortcuts.tap_keys]\nnumber_row_left = "send_shortcut"\n')
+			local external = Sandbox.read_bytes(log.path)
+			helpers.assert_eq(TapKeys.set_action("number_row_right_2", "send_text"), false)
+			helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			TapKeys._reset()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "send_shortcut")
+			helpers.assert_true(TapKeys.set_action("number_row_right_2", "send_text"))
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("tap-config-owner: refuses a file change between admission and write", function()
+		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
+		local Writer, original = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+		local external = '[shortcuts.tap_keys]\nnumber_row_left = "send_shortcut"\n'
+		local ok, err = pcall(function()
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			Writer.batch_write = function(...)
+				Sandbox.write_bytes(log.path, external)
+				return original(...)
+			end
+			helpers.assert_eq(TapKeys.set_action("number_row_right_2", "send_text"), false)
+			helpers.assert_eq(Sandbox.read_bytes(log.path), external)
+			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
+			helpers.assert_eq(TapKeys.get_action("number_row_right_2"), "none")
+		end)
+		Writer.batch_write = original
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("tap-config-owner: absent overrides stay native despite legacy storage", function()
 		local TapKeys, log = fresh()
 		local ok, err = pcall(function()
