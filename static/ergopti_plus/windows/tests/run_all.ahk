@@ -1368,6 +1368,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/network/test_network_pac_source_contract.ahk
 #Include unit/platform/network/test_managed_routes_native.ahk
 #Include unit/platform/network/test_native_static_scheme_proxy.ahk
+#Include unit/platform/network/test_native_ipv6_http_socks.ahk
 #Include unit/platform/network/test_managed_remote_transport.ahk
 #Include unit/platform/network/test_managed_remote_cleanup_diagnostics.ahk
 #Include unit/platform/network/test_managed_remote_fixture_scope.ahk
