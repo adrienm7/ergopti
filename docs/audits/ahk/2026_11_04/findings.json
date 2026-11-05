@@ -1522,6 +1522,17 @@
 			"root_cause": "ProgramProviderSession validates inventory names in a case-insensitive Seen Map, rejecting two independently executable entries that NTFS admits in a case-sensitive directory.",
 			"silent_failure": "The entire valid inventory disappears rather than exposing the two separately owned script choices. Kernel capability and execution prerequisites are established before the business assertion.",
 			"regression_test": "Commit067cbec1 deduplicates exact names and leaves native identity, bounds and Resolve ownership intact. A new explicit-port control keeps exact duplicate inventory entries refused and revokes the old generation. Shared Lua already uses exact-key deduplication, so macOS/Linux require no source edit for parity. Original native probes remain unchanged; postfix qualification is pending. Replay42085043186 qualifies both actual native program inventory/execution cases and the exact duplicate refusal control in both orders. Native capability, distinct physical identities and separate genuine executions remain prerequisites. This validates067cbec1 for that scope."
+		},
+		{
+			"id": "AHK-139",
+			"title": "Native HTTP transport strips the IPv6 server-name brackets required by WinHTTP",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Replay42095131679 at7e574d11 uses a private owned IPv4 HTTP proxy with an independent raw WinHTTP IPv6 oracle. Bracketed server spelling returns200 with the exact body and wire1; unbracketed spelling fails12005 at connect with wire0. The genuine Ergopti transport also fails12005 at connect with wire_actual0. DNS returns200; the deliberately unreachable proxy returns12029. Native handles close and the peer joins. Both execution orders repeat.",
+			"root_cause": "WinHttpTransport uses destination.IdnHost and additionally strips brackets before WinHttpConnect. For IPv6 the resulting unbracketed native server name is rejected before any proxy connection, while the bracketed Uri.Host representation is accepted.",
+			"silent_failure": "An admitted HTTP API with an IPv6 origin cannot use a working proxy through the Windows native transport. The fixture needs no external origin or local IPv6 interface; this does not qualify direct external IPv6 connectivity or the later SOCKS authority parser.",
+			"regression_test": "Retain independent bracketed/unbracketed/DNS/refusing-proxy controls and the genuine transport assertion. Correct only the native IPv6 server-name presentation, preserve IDN handling for other hosts and compare equivalent IPv6 wire addresses rather than one compressed textual spelling. Source correction and native postfix qualification are pending. macOS and Linux use their native HTTP/curl owners rather than this WinHttpConnect wrapper."
 		}
 	]
 }
