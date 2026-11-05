@@ -33,14 +33,16 @@ class _LMSO_Core {
 	Settings {
 		get {
 			global _LMSO, _LayMgrWeb_Gui, _LayMgrWeb_SessionEpoch
+			global _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
 			if HasProp(_LMSO, "SettingsMode") {
 				_LMSO.SettingsCalls += 1
 				Window := _LayMgrWeb_Gui
-				_LMSO.Window := Window, _LMSO.Hwnd := Window.Hwnd
-				_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
-					&& WinGetPID("ahk_id " . _LMSO.Hwnd) == ProcessExist(),
+				if _LMSO.SettingsCalls == 1
+					_LMSO.Window := Window, _LMSO.Hwnd := Window.Hwnd
+				_LMSO_Require(DllCall("IsWindow", "Ptr", Window.Hwnd, "Int")
+					&& WinGetPID("ahk_id " . Window.Hwnd) == ProcessExist(),
 					"The browser settings port must still name the exact owned native window")
-				if _LMSO.SettingsMode == "settings-close" {
+				if (_LMSO.SettingsMode == "settings-close" || _LMSO.SettingsMode == "settings-reopen") && !_LMSO.ClosePosted {
 					_LMSO_Require(!_LMSO.ClosePosted, "The COM boundary may post exactly one native Close")
 					_LMSO.ClosePosted := true
 					Before := _LayMgrWeb_SessionEpoch
@@ -51,6 +53,14 @@ class _LMSO_Core {
 						Sleep(1)
 					_LMSO.CloseObserved := _LayMgrWeb_SessionEpoch != Before
 						&& !DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+					if _LMSO.SettingsMode == "settings-reopen" {
+						_LMSO_Require(_LMSO.CloseObserved, "The original GUI must retire before public reopening")
+						_LMSO_Require(LayoutManager_Open(), "The public constructor must admit the real successor")
+						_LMSO.SuccessorGui := _LayMgrWeb_Gui, _LMSO.SuccessorController := _LayMgrWeb_Controller
+						_LMSO.SuccessorView := _LayMgrWeb_WebView, _LMSO.SuccessorEpoch := _LayMgrWeb_SessionEpoch
+						_LMSO.SuccessorMsg := _LayMgrWeb_MsgSub, _LMSO.SuccessorNav := _LayMgrWeb_NavSub
+					}
+
 				}
 			}
 			return this.SettingsValue
@@ -209,7 +219,8 @@ _LMSO_OpenGeneration(Mode) {
 ; genuine WM_CLOSE is controlled. No actual WebView2 RPC pump is claimed here.
 _LMSO_SettingsGeneration(Mode) {
 	global _LMSO, _WebView_SharedEnv, _WebView_SharedEnvRetired
-	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
 	_LMSO_Refuse(!!_LayMgrWeb_Gui, "A settings opening starts without a foreign native host")
 	PreviousEnv := _WebView_SharedEnv, PreviousRetired := _WebView_SharedEnvRetired
 	PreviousCritical := Critical("Off"), Environment := _LMSO_Environment()
@@ -226,9 +237,23 @@ _LMSO_SettingsGeneration(Mode) {
 			. " close_posted=" . _LMSO.ClosePosted . " close_observed=" . _LMSO.CloseObserved
 			. " controllers=" . Environment.Controllers.Length . " started=" . Started
 			. " caught=" . (IsObject(OpeningFailure) ? Type(OpeningFailure) : "none") . "`n", "*")
-		_LMSO_Equal(1, _LMSO.SettingsCalls, "The real host must reach its actual settings property exactly once")
-		_LMSO_Equal(1, Environment.Controllers.Length, "The settings cutpoint requires genuine SDK controller creation")
-		if Mode == "settings-close" {
+		ExpectedControllers := Mode == "settings-reopen" ? 2 : 1
+		_LMSO_Equal(ExpectedControllers, _LMSO.SettingsCalls, "Every real host must reach its actual settings property exactly once")
+		_LMSO_Equal(ExpectedControllers, Environment.Controllers.Length, "The settings cutpoint requires genuine SDK controller creation")
+		if Mode == "settings-reopen" {
+			_LMSO_Require(_LMSO.ClosePosted && _LMSO.CloseObserved && HasProp(_LMSO, "SuccessorGui"),
+				"The original native Close and genuine successor must finish before the old continuation resumes")
+			_LMSO_Equal(1, Environment.Controllers[1].Closed)
+			_LMSO_Refuse(IsObject(OpeningFailure) || !!Started, "The retired opening may neither throw nor claim its successor")
+			_LMSO_Require(_LayMgrWeb_Gui == _LMSO.SuccessorGui && _LayMgrWeb_Controller == _LMSO.SuccessorController
+				&& _LayMgrWeb_WebView == _LMSO.SuccessorView && _LayMgrWeb_SessionEpoch == _LMSO.SuccessorEpoch,
+				"The returning old frame must preserve the exact successor GUI/controller/view/epoch")
+			_LMSO_Require(_LayMgrWeb_MsgSub == _LMSO.SuccessorMsg && _LayMgrWeb_NavSub == _LMSO.SuccessorNav,
+				"The old settings frame cannot replace its successor's real subscription handles")
+			_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.SuccessorGui.Hwnd, "Int")
+				&& _LMSO.SuccessorController.Closed == 0 && _LMSO.SuccessorController.Fills == 1,
+				"Only the successor may fill its live controller exactly once")
+		} else if Mode == "settings-close" {
 			_LMSO_Require(_LMSO.ClosePosted && _LMSO.CloseObserved,
 				"A genuine native Close must retire its exact GUI and epoch before judging the older opening")
 			_LMSO_Equal(1, Environment.Controllers[1].Closed, "The exact admitted controller must close once")
@@ -249,6 +274,8 @@ _LMSO_SettingsGeneration(Mode) {
 				Controller.Close()
 		if IsObject(_LMSO.Window)
 			try _LMSO.Window.Destroy()
+		if HasProp(_LMSO, "SuccessorGui")
+			try _LMSO.SuccessorGui.Destroy()
 		_WebView_SharedEnv := PreviousEnv, _WebView_SharedEnvRetired := PreviousRetired
 		Critical(PreviousCritical)
 	}
@@ -261,7 +288,7 @@ try {
 	_LMSO_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
 		"The isolated UI role must remain genuinely outside primary configuration admission.")
 	LoggerInit()
-	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close"
+	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close" || A_Args[1] == "settings-reopen"
 		_LMSO_SettingsGeneration(A_Args[1])
 	else
 		_LMSO_OpenGeneration(A_Args[1])

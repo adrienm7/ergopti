@@ -87,3 +87,6 @@ for _LMSO_Mode in ["current", "close", "reopen"]
 for _LMSO_SettingsMode in ["settings-current", "settings-close"]
 	Test("Layout native settings continuation: " . _LMSO_SettingsMode . " respects actual Close (layout-settings-close-owner)",
 		_LMSO_Case.Bind(_LMSO_SettingsMode))
+
+Test("Layout native settings continuation: settings-reopen preserves the exact successor (layout-settings-successor-owner)",
+	_LMSO_Case.Bind("settings-reopen"))

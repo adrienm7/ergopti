@@ -577,23 +577,52 @@ LayoutManager_Open(*) {
 			_LayMgrWeb_Close()
 		return false
 	}
-	; SDK creation pumps messages while awaiting COM. The exact opening window
-	; may have closed or been replaced before the controller becomes available.
-	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != g {
+	; SDK creation pumps messages while awaiting COM. Claim only the exact GUI
+	; before giving its native Close callback custody of this controller.
+	PreviousCritical := Critical("On")
+	try {
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g)
+		if Admitted
+			_LayMgrWeb_Controller := CreatedController
+	} finally Critical(PreviousCritical)
+	if !Admitted {
 		CreatedController.Close()
 		LoggerInfo("LayoutManager", "Layout manager opening cancelled after its window was closed or replaced.")
 		return false
 	}
-	_LayMgrWeb_Controller := CreatedController
-	_LayMgrWeb_WebView := CreatedController.CoreWebView2
+	Controller := CreatedController
+	View := Controller.CoreWebView2
+	; A Close during the property getter already retired the published controller.
+	; The abandoned frame must neither close it twice nor publish over a successor.
+	PreviousCritical := Critical("On")
 	try {
-		s := _LayMgrWeb_WebView.Settings
+		Admitted := _LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller)
+		if Admitted
+			_LayMgrWeb_WebView := View
+	} finally Critical(PreviousCritical)
+	if !Admitted
+		return false
+	try {
+		s := View.Settings
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDevToolsEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreDefaultContextMenusEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsStatusBarEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.AreBrowserAcceleratorKeysEnabled := false
+		if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+			return false
 		s.IsSwipeNavigationEnabled := false
 	}
+	; Optional settings may throw as before; cancellation is still terminal.
+	if !_LayMgrWeb_StartupCurrent(SessionEpoch, g, Controller, View)
+		return false
 	; Subscription handles live in globals so they are not collected, which
 	; would silently drop the JS->AHK channel.
 	_LayMgrWeb_MsgSub := _LayMgrWeb_WebView.WebMessageReceived(_LayMgrWeb_OnWebMessage.Bind(SessionEpoch))
@@ -603,6 +632,19 @@ LayoutManager_Open(*) {
 	_LayMgrWeb_Controller.Fill()
 	LoggerSuccess("LayoutManager", "Layout manager opened.")
 	return true
+}
+
+
+; RAM-only admission for a partially configured native host. Browser calls stay
+; outside Critical, and a returned old frame never adopts current globals.
+_LayMgrWeb_StartupCurrent(SessionEpoch, Window, Controller := 0, View := 0) {
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_Gui, _LayMgrWeb_ResetDone
+	global _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	if SessionEpoch != _LayMgrWeb_SessionEpoch || _LayMgrWeb_Gui != Window || _LayMgrWeb_ResetDone
+		return false
+	if IsObject(Controller) && (!IsSet(_LayMgrWeb_Controller) || _LayMgrWeb_Controller != Controller)
+		return false
+	return !IsObject(View) || (IsSet(_LayMgrWeb_WebView) && _LayMgrWeb_WebView == View)
 }
 
 _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
