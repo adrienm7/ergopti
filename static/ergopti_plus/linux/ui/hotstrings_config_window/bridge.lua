@@ -510,15 +510,39 @@ function M.on_message(payload, state, context)
 		-- who wants their timing back has no way to ask for it here.
 		local config = state and state.config
 		if type(config) == "table" and type(config.get_categories) == "function"
-			and type(config.get_neutral_color) == "function" then
+			and type(config.get_neutral_color) == "function" and type(config.set_override) == "function" then
 			-- No `or "#……"` here. The colour comes from the shared defaults, which
 			-- the config module loads fail-fast; substituting a literal would repaint
 			-- the user's categories a shade nothing else in the product uses.
+			local manager = require("ui.webview_manager")
+			local setter = config.set_override
+			local function owned()
+				return state.config == config and config.set_override == setter
+					and (context == nil or window_current(context, manager))
+			end
+			local function paint(id, section, value)
+				if not owned() then return false end
+				local called, accepted = pcall(set_override, state, id, section, "color", value, context)
+				return called and accepted == true and owned()
+			end
+			local function refused()
+				Logger.error(LOG, "All-grey stopped because a colour could not be saved; earlier changes may remain.")
+				if owned() then
+					push_state(state, context)
+					if owned() and type(state.notify_error) == "function" then
+						pcall(state.notify_error, "healthcheck.status.failed")
+					end
+				end
+				return { grey = false }
+			end
 			local neutral = config.get_neutral_color()
-			for id, category in pairs(config.get_categories()) do
-				set_override(state, id, nil, "color", neutral, context)
+			if not owned() or not require("hotstrings.personal_metadata").valid("color", neutral) then return refused() end
+			local categories = config.get_categories()
+			if not owned() or type(categories) ~= "table" then return refused() end
+			for id, category in pairs(categories) do
+				if not paint(id, nil, neutral) then return refused() end
 				for _, section in ipairs(type(category) == "table" and category.sections_order or {}) do
-					set_override(state, id, section, "color", nil, context)
+					if not paint(id, section, nil) then return refused() end
 				end
 			end
 		else

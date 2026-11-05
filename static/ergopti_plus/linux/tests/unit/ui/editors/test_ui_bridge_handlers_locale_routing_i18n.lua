@@ -194,6 +194,7 @@ helpers.describe("ui.bridge_handlers", function()
       end
       s2.config.set_override = function(cat, sec, field, value)
         seen[#seen + 1] = { cat = cat, sec = sec, value = value }
+				return true
       end
       handler.on_message({ action = "set_all_grey" }, s2)
 
@@ -208,6 +209,39 @@ helpers.describe("ui.bridge_handlers", function()
       -- the user as a button that half-worked.
       helpers.assert_eq(sections_cleared, 2, "and every per-section colour override must be wiped")
     end)
+		helpers.it("(hotstrings-grey-refusal) stops and reports a refused colour write", function()
+			local s2, notices, calls = build_mock_state(), {}, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function() calls = calls + 1; return false end
+			s2.notify_error = function(key) notices[#notices + 1] = key end
+			handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(notices, { "healthcheck.status.failed" })
+		end)
+		helpers.it("(hotstrings-grey-refusal) reports a later failure after a partial repaint", function()
+			local s2, notices, calls = build_mock_state(), {}, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute", "grave" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function() calls = calls + 1; return calls == 1 end
+			s2.notify_error = function(key) notices[#notices + 1] = key end
+			local result = handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq(result, { grey = false })
+			helpers.assert_eq(calls, 2)
+			helpers.assert_eq(notices, { "healthcheck.status.failed" })
+		end)
+		helpers.it("(hotstrings-grey-refusal) never writes a replacement configuration", function()
+			local s2, calls, foreign = build_mock_state(), 0, 0
+			s2.config.get_categories = function() return { accents = { sections_order = { "acute" } } } end
+			s2.config.get_neutral_color = function() return "#6e6e73" end
+			s2.config.set_override = function()
+				calls = calls + 1
+				s2.config = { set_override = function() foreign = foreign + 1 end }
+				return true
+			end
+			handler.on_message({ action = "set_all_grey" }, s2)
+			helpers.assert_eq({ calls, foreign }, { 1, 0 })
+		end)
     helpers.it("'set_all_grey' changes nothing when the neutral colour cannot be read", function()
       local seen = {}
       local s2 = build_mock_state()
