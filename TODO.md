@@ -273,6 +273,8 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
   - `field_owned_pause` is rolled back by Ollama: a serve task that exited 78 leaves its start cleanup unsettled, `pause_warmup` returns false (`modules/llm/api_ollama.lua:571-592, 714-735`), and the global pause gives up. A dead, unpublished daemon must not block the pause.
   - The managed Ollama daemon itself exited 78 ("operation"): the next report names the primary and cleanup failures (`managed_ollama_serve.py` now prints both).
   - `key_accounting` fails `window_unfocused` intermittently: the first key asks `hs.window.focusedWindow()` once, 0.6 s after the scratch window shows, and a 523 ms main-thread hold made it miss (`adapters/field_probe_ports.lua:711-714, 799`). Wait for the window's own focus report, and give the two refusal sites distinct tokens.
+  - `diagnostics` fails `phase_a_budget` at 5.2 ms against 5 ms: phase A's permissions section calls `hs.accessibilityState` and `screenRecordingState` live (`ui/healthcheck/helpers.lua:436-461`), which breaks the schema's rule that phase A reads memory only. Cache both from the boot and screen-capture reads, or make them a probe; keep the 5 ms budget.
+  - The managed Ollama daemon still fails at the native guardian (`platform/suspended_image_owner.py`, `V1 REFUSED <errno>`); the next report names the errno (`cleanup_guardian_refused`) and the installed app's strict signature (`app_signature` step).
   - The Mac's LogsDirPath still ends in the old `ergopti_plus` folder, so logs land in `…/ergopti_plus/Ergopti/`; the migration only rewrites old default folders.
 
 ### Linux
