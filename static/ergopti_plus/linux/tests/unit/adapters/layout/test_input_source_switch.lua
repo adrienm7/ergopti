@@ -119,6 +119,35 @@ helpers.describe("input source switch: plans", function()
 end)
 
 helpers.describe("input source switch: switcher", function()
+	helpers.it("linux-layout-start-debt: native refused start waits for settlement callback", function()
+		local previous = package.loaded["adapters.owned_process"]
+		local pending
+		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+			pending = callback
+			return { started = false, error = "native allocation refused" }
+		end }
+		local port = Switch.native_port()
+		package.loaded["adapters.owned_process"] = previous
+		local delivered = false
+		local accepted = port.run("setxkbmap", { "-query" }, function() delivered = true end)
+		helpers.assert_eq(accepted, true, "the returned owner still has physical retirement to acknowledge")
+		helpers.assert_eq(delivered, false)
+		pending({ ok = false, error = "native allocation refused" })
+		helpers.assert_eq(delivered, true)
+	end)
+	helpers.it("linux-layout-refresh-settlement: waits for an outstanding listing", function()
+		local pending, settled, changed = nil, false, nil
+		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+			run = function(_, _, callback) pending = callback; return true end })
+		switcher.refresh(function(value) changed = value end)
+		helpers.assert_eq(switcher.is_settled(), false)
+		switcher.when_settled(function() settled = true end)
+		helpers.assert_eq(settled, false)
+		pending({ ok = true, stdout = "layout: us\n" })
+		helpers.assert_eq(changed, true)
+		helpers.assert_eq(settled, true)
+		helpers.assert_eq(switcher.is_settled(), true)
+	end)
 	helpers.it("linux-layout-refresh-order: an older completion cannot replace newer choices", function()
 		local pending, completed = {}, {}
 		local switcher = Switch.new({ backend = function() return Switch.X11 end,
