@@ -127,6 +127,7 @@ function Session:report(fields)
 	fields.driver_pid = self.pid
 	local ok, err = pcall(function() self:publish("result", Policy.result_text(self.spec, fields)) end)
 	if not ok then Logger.error(LOG, "The reload result could not be written: %s.", tostring(err)) end
+	return ok
 end
 
 --- Completes a pending request naming this process, then publishes the session.
@@ -222,8 +223,8 @@ function Session:handle()
 	end
 	Logger.info(LOG, "Reload request %s admitted; the reload owner decides.", id)
 	-- Written before the restart: it may end this process before it returns.
-	self:report({ request_id = id, state = "requested",
-		deadline = self.ports.now() + self.spec.pending_ttl_seconds })
+	if not self:report({ request_id = id, state = "requested",
+		deadline = self.ports.now() + self.spec.pending_ttl_seconds }) then return false end
 	local ran, reloaded, why = pcall(self.reload, "the local reload control")
 	if ran and reloaded == true then
 		Logger.info(LOG, "Reload request %s requested; the successor claims it once ready.", id)
