@@ -305,3 +305,13 @@ for _MBPT_Mode in ["current", "during-close", "paused-entry", "native-refused", 
 for _MBBK_Mode in ["native-backend-current", "native-backend-api"]
 	Test("Native model browser activation: " . _MBBK_Mode . " activates the selected Ollama catalogue model (model-browser-native-backend)",
 		_MBPT_Case.Bind(_MBBK_Mode))
+
+for _MBBK_AdmissionMode in ["native-backend-second-refused", "native-backend-replaced", "native-backend-pause-resume"]
+	Test("Native model backend admission: " . _MBBK_AdmissionMode . " preserves acknowledged and current ownership (model-browser-native-backend-admission)",
+		_MBPT_Case.Bind(_MBBK_AdmissionMode))
+
+Test("Native model backend admission: a newer public model setter supersedes the pending row (model-browser-native-backend-superseded)",
+	_MBPT_Case.Bind("native-backend-superseded"))
+
+Test("Native model backend admission: pause/resume at the second schema entry cannot adopt new authority (model-browser-native-backend-second-admission)",
+	_MBPT_Case.Bind("native-backend-second-schema-pause"))

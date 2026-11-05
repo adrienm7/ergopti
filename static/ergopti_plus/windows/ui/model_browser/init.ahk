@@ -24,6 +24,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+#Include %A_LineFile%\..\..\..\infra\lifecycle_transition.ahk
 
 #Requires AutoHotkey v2.0
 
@@ -31,6 +32,8 @@
 ; Module-level Gui handle so a second call brings the existing window to
 ; the front instead of stacking duplicates.
 global _LLM_ModelBrowser_Gui := unset
+; Closing a reused native host revokes any selection still applying.
+global _LLM_ModelBrowser_Epoch := 0
 
 ; Column index of "params" in the ListView — kept as a constant so the
 ; sort-on-header handler can resolve it without a magic number. Indices
@@ -316,27 +319,58 @@ _LLM_ModelBrowser_GetInstalledTags() {
  * exactly like a click in the flat menu. Closes the browser on success.
  */
 _LLM_ModelBrowser_PickRow(LV, RowNumber) {
-	global _LLM_ModelBrowser_Gui
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
 	if A_IsSuspended
 		return false
 	Window := LV.Gui
+	PreviousCritical := Critical("On")
+	try {
+		Owner := {window: Window, epoch: _LLM_ModelBrowser_Epoch, lifecycle: _LifecycleLatestTransition}
+		if !_LLM_ModelBrowser_NativeCurrent(Owner)
+			return false
+	} finally Critical(PreviousCritical)
 	if (!RowNumber or RowNumber < 1)
 		return
 	name := LV.GetText(RowNumber, 1)
 	if (name == "")
 		return
 	Applied := LLM_Menu_SetModel(name)
-	if (Applied is Integer) && Applied == 1 && IsSet(_LLM_ModelBrowser_Gui)
-			&& _LLM_ModelBrowser_Gui == Window
-		_LLM_ModelBrowser_OnClose()
-	return Applied
+	if !(Applied is Integer) || Applied != 1 || !_LLM_ModelBrowser_NativeCurrent(Owner)
+		return false
+	; This is the only model-selector entry left in the native tray. Like its
+	; Web counterpart, selecting an Ollama row also activates that backend.
+	if _LLM_Menu.Get("backend", "") != "ollama" {
+		Applied := LLM_Menu_SetBackend("ollama")
+		if !(Applied is Integer) || Applied != 1
+			return false
+	}
+	if !_LLM_ModelBrowser_NativeCurrent(Owner)
+		return false
+	return _LLM_ModelBrowser_OnClose(Owner)
 }
 
-_LLM_ModelBrowser_OnClose(*) {
-	global _LLM_ModelBrowser_Gui
-	if IsSet(_LLM_ModelBrowser_Gui) {
-		try _LLM_ModelBrowser_Gui.Hide()
-	}
+; Independent of the model lifecycle epoch, which this selection itself bumps.
+_LLM_ModelBrowser_NativeCurrent(Owner) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition
+	return !A_IsSuspended && IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Owner.window
+		&& _LLM_ModelBrowser_Epoch == Owner.epoch && _LifecycleLatestTransition == Owner.lifecycle
+		&& (!(Owner.lifecycle is Object) || Owner.lifecycle.finished)
+}
+
+_LLM_ModelBrowser_OnClose(Params*) {
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch
+	PreviousCritical := Critical("On")
+	try {
+		if Params.Length && IsObject(Params[1]) && Params[1].HasOwnProp("lifecycle")
+				&& !_LLM_ModelBrowser_NativeCurrent(Params[1])
+			return false
+		if !IsSet(_LLM_ModelBrowser_Gui)
+			return false
+		Window := _LLM_ModelBrowser_Gui
+		_LLM_ModelBrowser_Epoch += 1
+	} finally Critical(PreviousCritical)
+	try Window.Hide()
+	return true
 }
 
 
