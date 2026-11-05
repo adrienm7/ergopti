@@ -271,6 +271,51 @@ helpers.describe("app category file: the keystats edit path", function()
 		end)
 	end)
 
+	helpers.it("category edit refuses inexact native source identities", function()
+		with_keystats({}, function(keystats, _, path)
+			write(path, '{"Other":{"type":"Work","score":2}}')
+			local uv = require("luv")
+			for _, invalid in ipairs({ -1, 0.5, 2 ^ 53, 0 / 0, math.huge }) do
+				for _, field in ipairs({ "dev", "ino" }) do
+					local fake = setmetatable({ fs_stat = function(target)
+						local stat = uv.fs_stat(target)
+						if target == path and stat then stat[field] = invalid end
+						return stat
+					end }, { __index = uv })
+					package.loaded.luv = fake
+					local ok, receipt = pcall(keystats.capture_app_category_edit)
+					package.loaded.luv = uv
+					helpers.assert_true(ok)
+					helpers.assert_nil(receipt)
+				end
+			end
+			helpers.assert_not_nil(keystats.capture_app_category_edit(), "real native identity is accepted")
+		end)
+	end)
+
+	helpers.it("category edit distinguishes adjacent large exact native identities", function()
+		with_keystats({}, function(keystats, _, path)
+			local original = '{"Other":{"type":"Work","score":2}}'; write(path, original)
+			local uv, device = require("luv"), 2 ^ 53 - 2
+			local fake = setmetatable({ fs_stat = function(target)
+				local stat = uv.fs_stat(target)
+				if target == path and stat then stat.dev = device end
+				return stat
+			end }, { __index = uv })
+			package.loaded.luv = fake
+			local ok, receipt, saved = pcall(function()
+				local captured = assert(keystats.capture_app_category_edit())
+				device = 2 ^ 53 - 1
+				return captured, keystats.set_app_category("Firefox", "Work", 1, captured)
+			end)
+			package.loaded.luv = uv
+			helpers.assert_true(ok)
+			helpers.assert_not_nil(receipt)
+			helpers.assert_eq(saved, false)
+			helpers.assert_eq(read(path), original)
+		end)
+	end)
+
 	helpers.it("category edit receipt rejects a replaced file with identical bytes", function()
 		with_keystats({}, function(keystats, _, path)
 			local original = '{"Other":{"type":"Work","score":2}}'
