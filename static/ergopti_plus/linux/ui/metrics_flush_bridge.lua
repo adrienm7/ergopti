@@ -3,7 +3,6 @@
 --- Owns dashboard requests across SQLite settlement and native page replacement.
 local M = {}
 local Logger = require("logger.shim")
-local ErrorDescription = require("error_description")
 local LOG = "bridge.metrics_flush"
 local API = { "get_flush_status", "is_flush_pending", "has_flush_debt", "when_flush_settled" }
 
@@ -119,7 +118,8 @@ function M.new(app, push, commit)
 			if not request.valid() then return nil end
 			local ok, result, cache = pcall(executor, request)
 			if not ok then
-				Logger.error(LOG, "Dashboard request failed: %s", tostring(result))
+				-- Callback errors may carry application names or other private metrics.
+				Logger.error(LOG, "Dashboard request failed (error type: %s).", type(result))
 				return nil
 			end
 			if type(result) ~= "table" or not request.valid() then return nil end
@@ -169,7 +169,7 @@ function M.new(app, push, commit)
 			if not admitted then
 				delivered = true
 				if not called then
-					Logger.error(LOG, "Dashboard reset request raised: %s.", ErrorDescription.describe(accepted))
+					Logger.error(LOG, "Dashboard reset request raised (error type: %s).", type(accepted))
 				end
 				if not request.valid() then return nil end
 				return build_reply(false)

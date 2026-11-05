@@ -77,6 +77,44 @@ local function fixture(app)
 end
 
 H.describe("metrics flush bridge", function()
+	H.it("(metrics-callback-error) a failing error formatter cannot escape the dashboard bridge", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.get_dashboard_payload = function()
+			error(setmetatable({}, { __tostring = function() error("formatter failed") end }))
+		end
+		local ok, result = pcall(F.B.on_message, "ready", F.state, F.context)
+		H.assert_true(ok)
+		H.assert_eq(result, nil)
+	end)
+	H.it("(metrics-callback-error) callback details do not disclose private metrics in logs", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.get_dashboard_payload = function() error("private-application-name") end
+		local logger = require("logger.shim")
+		local original, messages = logger.error, {}
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, result = pcall(F.B.on_message, "ready", F.state, F.context)
+		logger.error = original
+		H.assert_true(ok)
+		H.assert_eq(result, nil)
+		H.assert_eq(#messages, 1)
+		H.assert_eq(messages[1]:find("private-application-name", 1, true), nil)
+	end)
+	H.it("(metrics-callback-error) reset refusal does not log private collector errors", function()
+		local F = fixture("metrics_apps")
+		F.read_safe()
+		F.K.request_session_reset = function() error("private-reset-application") end
+		local logger = require("logger.shim")
+		local original, messages = logger.error, {}
+		logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+		local ok, result = pcall(F.B.on_message, { action = "reset" }, F.state, F.context)
+		logger.error = original
+		H.assert_true(ok)
+		H.assert_eq(result.reset, false)
+		H.assert_eq(#messages, 1)
+		H.assert_eq(messages[1]:find("private-reset-application", 1, true), nil)
+	end)
 	H.it("(metrics-pause-privacy) a dashboard resume cannot clear secure-field suppression", function()
 		local F = fixture("metrics_apps")
 		F.read_safe()
