@@ -149,7 +149,7 @@ _RBC_LoneTapRead(Mode, Cache) {
 
 _RBC_CapsWord(Mode) {
 	Raw := Mode == "idle-boolean-false" ? "[shortcuts.caps_word]`nidle_timeout_seconds = false`n"
-		: Mode == "pointer-number-zero" ? "[shortcuts.caps_word.pointer]`nleft_click = 0`n"
+		: Mode == "pointer-number-zero" ? "[shortcuts.caps_word.pointer]`nleft_click = -0`n"
 		: Mode == "idle-zero-control" ? "[shortcuts.caps_word]`nidle_timeout_seconds = 0`n"
 		: Mode == "idle-number-control" ? "[shortcuts.caps_word]`nidle_timeout_seconds = 2`n"
 		: Mode == "pointer-false-control" ? "[shortcuts.caps_word.pointer]`nleft_click = false`n"

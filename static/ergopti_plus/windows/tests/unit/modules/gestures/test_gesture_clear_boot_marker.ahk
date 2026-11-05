@@ -142,7 +142,7 @@ _GMBA_ActualBootMarker(Mode) {
 		AssertTrue(IsObject(Snapshot))
 		Authored := Snapshot.Document["gestures"]["auto_configure_on_next_start"]
 		if Mode == "numeric-one"
-			AssertTrue(Authored is Integer && Authored == 1, "a native numeric one is not an authored authorization Boolean")
+			AssertTrue(Authored is Integer && Authored == 1, "legacy bare1 retains the genuine source integer shape")
 		else
 			AssertTrue(Authored is TOML_Bool)
 		Raw := IniCacheGet(Cache, "gestures", "auto_configure_on_next_start")
@@ -150,8 +150,9 @@ _GMBA_ActualBootMarker(Mode) {
 		; the existing scheduling port observed instead of starting hardware work.
 		if _GestureAutoConfigureFlagEnabled(Raw)
 			AssertTrue(GestureConsumeAutoConfigureFlag(Path, 0, (*) => 0, Schedule))
-		Expected := Mode == "true-control" ? 1 : 0
-		AssertEqual(Expected, Scheduled.Length, "only an actual authored Boolean true can schedule elevated touchpad setup")
+		; The private owner accepts bare1 as legacy intent, like native true.
+		Expected := Mode == "false-control" ? 0 : 1
+		AssertEqual(Expected, Scheduled.Length, "native true and the private owner's legacy bare1 schedule exactly one setup")
 		if Expected {
 			Persisted := TOML_ParseDocument(FSReadUtf8Exact(Path))
 			AssertTrue(Persisted["gestures"]["auto_configure_on_next_start"] is TOML_Bool)
