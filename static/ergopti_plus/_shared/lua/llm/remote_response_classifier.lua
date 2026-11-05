@@ -84,7 +84,7 @@ function M.usage(format, root)
 			out.total_tokens      = nonnegative_number(usage.total_tokens)
 		end
 	end
-	if out.total_tokens == 0 and out.prompt_tokens > 0 then
+	if out.total_tokens == 0 then
 		out.total_tokens = out.prompt_tokens + out.completion_tokens
 	end
 	return out

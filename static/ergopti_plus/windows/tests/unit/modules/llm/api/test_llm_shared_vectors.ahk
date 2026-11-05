@@ -90,7 +90,7 @@ _LSV_PriceAdmission() {
 
 _LSV_Register() {
 	Temperature := _LSV_TemperatureCorpus(), Usage := _LSV_UsageCorpus()
-	if Temperature["vectors"].Length != 15 || Usage["usage_vectors"].Length != 8 || Usage["cost_vectors"].Length != 5
+	if Temperature["vectors"].Length != 15 || Usage["usage_vectors"].Length != 12 || Usage["cost_vectors"].Length != 5
 		throw Error("The independent LLM figures corpus requires explicit review.")
 	for Vector in Temperature["vectors"]
 		Test("llm shared vectors: temperature " . Vector["id"], _LSV_Temperature.Bind(Vector, Temperature["policy"]))
