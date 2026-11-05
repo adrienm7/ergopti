@@ -1,0 +1,767 @@
+2026-11-05 10:10:34:601 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 10:10:34:830 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 10:10:35:235 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 10:10:35:235 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 10:10:35:235 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 10:10:35:235 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 10:10:35:287 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 10:10:35:292 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 10:10:35:292 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 10:10:35:292 [INFO] [karabiner] init phase 'load_available_actions': 56.6 ms.
+2026-11-05 10:10:35:293 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 10:10:35:324 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 10:10:35:324 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 10:10:35:325 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 10:10:35:326 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 10:10:35:326 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 10:10:35:326 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 10:10:35:326 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 10:10:35:329 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 10:10:35:329 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 10:10:35:329 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 10:10:35:329 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 10:10:35:329 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 10:10:35:335 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 10:10:35:342 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 10:10:35:345 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 10:10:35:345 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 10:10:35:726 [SUCCESS] [karabiner] Removed 28 ErgoptiPlus rule(s) from karabiner.json; personal rules are byte-identical.
+2026-11-05 10:10:35:726 [INFO] [karabiner] Removed 28 rule(s) an earlier build merged into '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 10:10:35:726 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 10:10:35:726 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 10:10:35:726 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 10:10:35:785 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 10:10:35:324 and 2026-11-05 10:10:35:325 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 10:10:35:785 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 10:10:35:293 and 2026-11-05 10:10:35:329 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 10:10:36:159 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 10:10:37:374 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 10:10:55:983 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 10:10:55:984 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 10:10:56:014 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-05 10:10:56:014 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-05 10:10:56:014 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-05 10:10:56:014 [DONE] [karabiner] Input source watcher stopped.
+2026-11-05 10:10:56:014 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-05 10:10:56:729 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 10:10:56:879 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 10:10:57:149 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 10:10:57:149 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 10:10:57:149 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 10:10:57:149 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 10:10:57:198 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 10:10:57:202 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 10:10:57:202 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 10:10:57:202 [INFO] [karabiner] init phase 'load_available_actions': 52.5 ms.
+2026-11-05 10:10:57:203 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 10:10:57:229 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 10:10:57:229 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 10:10:57:229 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 10:10:57:230 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 10:10:57:230 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 10:10:57:230 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 10:10:57:230 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 10:10:57:232 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 10:10:57:232 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 10:10:57:232 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 10:10:57:232 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 10:10:57:232 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 10:10:57:233 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 10:10:57:245 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 10:10:57:251 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 10:10:57:252 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 10:10:57:252 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 10:10:57:252 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 10:10:57:252 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 10:10:57:252 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 10:10:57:253 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 10:10:57:290 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 10:10:57:229 and 2026-11-05 10:10:57:229 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 10:10:57:290 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 10:10:57:203 and 2026-11-05 10:10:57:232 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 10:10:57:603 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 10:11:03:251 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:01:03:045 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable: caller
+stack traceback:
+	[C]: in function 'xpcall'
+	...ources/static/ergopti_plus/macos/platform/remap/init.lua:7457: in function 'platform.remap.teardown_local'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1059: in function <...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1056>
+	[C]: in function 'xpcall'
+	...static/ergopti_plus/macos/infra/teardown_transaction.lua:80: in function 'infra.teardown_transaction.run'
+	...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:1071: in function <...pp/Contents/Resources/static/ergopti_plus/macos/init.lua:868>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...tic/ergopti_plus/macos/infra/termination_coordinator.lua:381: in upvalue 'run_teardown_attempt'
+	...tic/ergopti_plus/macos/infra/termination_coordinator.lua:452: in upvalue 'teardown_once'
+	...	(skipping 8 levels)
+	...s/static/ergopti_plus/macos/adapters/timer_scheduler.lua:137: in upvalue 'settle_handle'
+	...s/static/ergopti_plus/macos/adapters/timer_scheduler.lua:364: in function 'adapters.timer_scheduler.cancel'
+	[C]: in function 'pcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:975: in upvalue 'stop_periodic_handle'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:996: in upvalue 'stop_idle_waiter'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1035: in upvalue 'settle_idle_waiter'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1046: in function <...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:1045>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:288: in upvalue 'run_logged'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:357: in upvalue 'drain_deferred_lifecycle'
+	...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:379: in function <...s/static/ergopti_plus/macos/adapters/synthetic_input.lua:378>
+2026-11-05 11:17:06:072 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:17:06:190 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:17:06:572 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 11:17:06:572 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 11:17:06:572 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 11:17:06:572 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 11:17:06:624 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 11:17:06:629 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:17:06:629 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 11:17:06:629 [INFO] [karabiner] init phase 'load_available_actions': 56.7 ms.
+2026-11-05 11:17:06:630 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 11:17:06:660 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 11:17:06:660 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 11:17:06:660 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 11:17:06:662 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 11:17:06:662 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 11:17:06:662 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 11:17:06:662 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 11:17:06:665 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 11:17:06:665 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 11:17:06:665 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 11:17:06:665 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 11:17:06:665 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 11:17:06:670 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 11:17:06:680 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 11:17:06:686 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 11:17:06:686 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 11:17:06:687 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 11:17:06:687 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 11:17:06:687 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 11:17:06:687 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 11:17:06:687 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 11:17:06:724 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 11:17:06:660 and 2026-11-05 11:17:06:660 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 11:17:06:724 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 11:17:06:630 and 2026-11-05 11:17:06:665 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 11:17:07:042 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:17:08:718 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:17:18:151 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 11:17:18:151 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 11:17:18:165 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-05 11:17:18:165 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-05 11:17:18:165 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-05 11:17:18:165 [DONE] [karabiner] Input source watcher stopped.
+2026-11-05 11:17:18:165 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-05 11:17:18:795 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:17:18:911 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:17:19:179 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 11:17:19:179 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 11:17:19:179 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 11:17:19:179 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 11:17:19:211 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 11:17:19:215 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:17:19:215 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 11:17:19:215 [INFO] [karabiner] init phase 'load_available_actions': 36.2 ms.
+2026-11-05 11:17:19:216 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 11:17:19:242 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 11:17:19:242 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 11:17:19:242 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 11:17:19:243 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 11:17:19:243 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 11:17:19:243 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 11:17:19:243 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 11:17:19:245 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 11:17:19:245 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 11:17:19:245 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 11:17:19:245 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 11:17:19:245 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 11:17:19:246 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 11:17:19:254 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 11:17:19:259 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 11:17:19:259 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 11:17:19:260 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 11:17:19:260 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 11:17:19:260 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 11:17:19:260 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 11:17:19:260 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 11:17:19:290 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 11:17:19:242 and 2026-11-05 11:17:19:242 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 11:17:19:290 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 11:17:19:216 and 2026-11-05 11:17:19:245 (last: init phase 'start_input_source_watcher': 0.0 ms.).
+2026-11-05 11:17:19:520 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:17:41:293 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:18:11:627 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 11:20:45:154 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'French'.
+2026-11-05 11:20:45:408 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 11:20:45:920 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:20:45:920 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 11:20:45:927 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:20:45:930 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:20:45:934 [INFO] [karabiner] Shortcuts rebound for layout 'French'.
+2026-11-05 11:20:47:218 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:20:47:220 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:20:47:225 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 11:20:47:713 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 11:20:48:241 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:20:48:244 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:20:49:890 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:20:49:892 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:20:49:896 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 11:20:50:414 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:20:50:416 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:28:12:094 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 26 more times between 2026-11-05 11:18:22:776 and 2026-11-05 11:20:49:071 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 11:30:45:593 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 3 more times between 2026-11-05 11:20:46:781 and 2026-11-05 11:20:49:107 (last: Layout notification detected change: 'French' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 11:30:46:093 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 2 more times between 2026-11-05 11:20:48:230 and 2026-11-05 11:20:50:409 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 11:30:46:093 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 2 more times between 2026-11-05 11:20:48:230 and 2026-11-05 11:20:50:409 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 11:30:46:093 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 2 more times between 2026-11-05 11:20:48:250 and 2026-11-05 11:20:50:420 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 11:32:33:268 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:32:33:414 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:32:33:713 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 11:32:33:713 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 11:32:33:713 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 11:32:33:713 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 11:32:33:753 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 11:32:33:758 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:32:33:758 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 11:32:33:758 [INFO] [karabiner] init phase 'load_available_actions': 44.5 ms.
+2026-11-05 11:32:33:760 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 11:32:33:787 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 11:32:33:787 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 11:32:33:788 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 11:32:33:788 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 11:32:33:788 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 11:32:33:788 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 11:32:33:789 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 11:32:33:790 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 11:32:33:790 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 11:32:33:790 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 11:32:33:790 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 11:32:33:791 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 11:32:33:793 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 11:32:33:802 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 11:32:33:807 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 11:32:33:807 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 11:32:33:808 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 11:32:33:808 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 11:32:33:808 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 11:32:33:808 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 11:32:33:808 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 11:32:33:842 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 11:32:33:787 and 2026-11-05 11:32:33:788 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 11:32:33:843 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 11:32:33:760 and 2026-11-05 11:32:33:791 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 11:32:34:147 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:33:03:851 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:33:08:441 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 11:33:08:441 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 11:33:08:449 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-05 11:33:08:449 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-05 11:33:08:449 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-05 11:33:08:449 [DONE] [karabiner] Input source watcher stopped.
+2026-11-05 11:33:08:449 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-05 11:33:08:998 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:33:09:137 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:33:09:378 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 11:33:09:378 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 11:33:09:378 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 11:33:09:378 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 11:33:09:412 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 11:33:09:416 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:33:09:416 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 11:33:09:416 [INFO] [karabiner] init phase 'load_available_actions': 37.9 ms.
+2026-11-05 11:33:09:417 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 11:33:09:443 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 11:33:09:443 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 11:33:09:443 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 11:33:09:444 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 11:33:09:444 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 11:33:09:444 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 11:33:09:444 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 11:33:09:446 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 11:33:09:446 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 11:33:09:446 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 11:33:09:446 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 11:33:09:446 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 11:33:09:447 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 11:33:09:454 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 11:33:09:459 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 11:33:09:459 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 11:33:09:460 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 11:33:09:460 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 11:33:09:460 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 11:33:09:460 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 11:33:09:460 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 11:33:09:494 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 11:33:09:443 and 2026-11-05 11:33:09:443 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 11:33:09:494 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 11:33:09:417 and 2026-11-05 11:33:09:446 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 11:33:09:720 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:33:39:478 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:34:07:465 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 11:34:07:483 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'Ergopti Field Rows 15'.
+2026-11-05 11:34:07:797 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 15'…
+2026-11-05 11:34:08:378 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:34:08:378 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 11:34:08:389 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:34:08:392 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:34:08:396 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti Field Rows 15'.
+2026-11-05 11:34:09:053 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 16'…
+2026-11-05 11:34:09:591 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:34:09:593 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:34:09:678 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 11:34:10:194 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:34:10:199 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:36:50:362 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 2 more times between 2026-11-05 11:34:08:728 and 2026-11-05 11:34:09:400 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 11:36:52:032 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 2 more times between 2026-11-05 11:34:08:772 and 2026-11-05 11:34:09:428 (last: Layout notification detected change: 'Ergopti Field Rows 16' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 11:36:53:073 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 2 more times between 2026-11-05 11:34:09:585 and 2026-11-05 11:34:10:184 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 11:36:53:073 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 2 more times between 2026-11-05 11:34:09:585 and 2026-11-05 11:34:10:184 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 11:37:31:163 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 2 more times between 2026-11-05 11:34:09:597 and 2026-11-05 11:34:10:206 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 11:37:44:021 [INFO] [karabiner] Owned Karabiner runtime activation: idle.
+2026-11-05 11:37:44:021 [INFO] [karabiner] Karabiner pause already satisfied by fail-closed lease phase 'idle'.
+2026-11-05 11:37:44:028 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:37:44:033 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:37:44:038 [START] [karabiner] Resuming ErgoptiPlus Karabiner remapping…
+2026-11-05 11:37:44:038 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:37:44:038 [WARNING] [karabiner] Karabiner lease could not be provisioned on resume (owned-runtime-not-admitted); resuming without a live lease.
+2026-11-05 11:37:44:038 [SUCCESS] [karabiner] ErgoptiPlus Karabiner remapping resumed after paused preparation.
+2026-11-05 11:38:29:155 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 11:38:29:157 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 11:38:41:815 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:38:42:011 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:38:42:312 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 11:38:42:312 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 11:38:42:312 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 11:38:42:312 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 11:38:42:350 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 11:38:42:354 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:38:42:354 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 11:38:42:354 [INFO] [karabiner] init phase 'load_available_actions': 41.6 ms.
+2026-11-05 11:38:42:355 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 11:38:42:381 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 11:38:42:381 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 11:38:42:381 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 11:38:42:382 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 11:38:42:382 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 11:38:42:382 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 11:38:42:382 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 11:38:42:384 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 11:38:42:384 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 11:38:42:384 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 11:38:42:384 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 11:38:42:384 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 11:38:42:386 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 11:38:42:396 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 11:38:42:401 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 11:38:42:401 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 11:38:42:402 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 11:38:42:402 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 11:38:42:402 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 11:38:42:402 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 11:38:42:402 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 11:38:42:436 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 11:38:42:381 and 2026-11-05 11:38:42:381 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 11:38:42:436 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 11:38:42:355 and 2026-11-05 11:38:42:384 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 11:38:43:048 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 11:39:12:439 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:39:38:317 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 11:42:10:247 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'French'.
+2026-11-05 11:42:10:922 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 11:42:11:208 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 11:42:11:715 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 11:42:11:715 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 11:42:11:725 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:42:11:728 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:42:11:734 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.
+2026-11-05 11:42:12:887 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 11:42:13:416 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:42:13:420 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:42:14:174 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 11:42:14:575 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:42:14:624 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:42:14:688 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 11:42:14:690 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 11:49:38:585 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 26 more times between 2026-11-05 11:39:49:326 and 2026-11-05 11:42:13:858 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 11:52:10:527 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 3 more times between 2026-11-05 11:42:10:956 and 2026-11-05 11:42:13:876 (last: Layout notification detected change: 'French' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 11:52:12:099 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 2 more times between 2026-11-05 11:42:13:405 and 2026-11-05 11:42:14:679 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 11:52:12:099 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 2 more times between 2026-11-05 11:42:13:405 and 2026-11-05 11:42:14:679 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 11:52:12:099 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 2 more times between 2026-11-05 11:42:13:427 and 2026-11-05 11:42:14:695 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 13:53:36:468 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 13:53:36:468 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 13:53:36:468 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-05 13:53:37:185 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 13:53:37:185 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 13:53:37:193 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 13:53:37:196 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 13:53:37:200 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 13:53:37:201 [INFO] [karabiner.lease] Remap guardian registration answered 'ready' (developer_adhoc_legacy_only).
+2026-11-05 13:53:37:201 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (unexpected-worker-loss).
+2026-11-05 13:53:38:292 [INFO] [karabiner] Karabiner deploy decision: deferred-for-typing (input 0 ms ago; recovery attempt 1 waits up to 5.0 s for 750 ms of quiet).
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 1 failed: owned-runtime-not-admitted.
+2026-11-05 13:53:39:271 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (owned-runtime-not-admitted).
+2026-11-05 13:53:45:582 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 13:53:45:584 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 13:53:45:671 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (layout-settled).
+2026-11-05 13:54:02:473 [INFO] [karabiner] Karabiner deploy decision: deploying during input after the 5.0 s typing deferral bound (recovery attempt 2).
+2026-11-05 13:54:02:473 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 2 failed: owned-runtime-not-admitted.
+2026-11-05 13:54:02:473 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 3/3 in 30.0 s (owned-runtime-not-admitted).
+2026-11-05 13:54:39:307 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 3 failed: owned-runtime-not-admitted.
+2026-11-05 13:54:39:307 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (owned-runtime-not-admitted).
+2026-11-05 14:03:36:485 [INFO] [karabiner.lease] ↑ "No live Karabiner lease generation to renew." repeated 1 more time between 2026-11-05 13:53:45:060 and 2026-11-05 13:53:45:060.
+2026-11-05 14:03:36:485 [INFO] [karabiner] ↑ "Wake found no live Karabiner lease; re-acquiring it." repeated 1 more time between 2026-11-05 13:53:45:060 and 2026-11-05 13:53:45:060.
+2026-11-05 14:03:37:486 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 13:53:45:574 and 2026-11-05 13:53:45:574 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 14:03:37:486 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 13:53:45:574 and 2026-11-05 13:53:45:574 (last: Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 14:03:37:486 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 13:53:45:589 and 2026-11-05 13:53:45:589 (last: Shortcuts rebound for layout 'current'.).
+2026-11-05 14:03:38:486 [INFO] [karabiner] ↑ "Karabiner deploy decision: deferred-for-typing (input %.0f ms ago; recovery attempt %d waits up to %.1f s for %.0f ms of quiet)." repeated 2 more times between 2026-11-05 13:53:55:757 and 2026-11-05 13:54:32:554 (last: Karabiner deploy decision: deferred-for-typing (input 0 ms ago; recovery attempt 3 waits up to 5.0 s for 750 ms of quiet).).
+2026-11-05 14:03:39:486 [WARNING] [karabiner] ↑ "Regenerate skipped — the owned Karabiner runtime is not admitted." repeated 2 more times between 2026-11-05 13:54:02:473 and 2026-11-05 13:54:39:307.
+2026-11-05 14:04:02:486 [INFO] [karabiner] ↑ "Karabiner deploy decision: deploying during input after the %.1f s typing deferral bound (recovery attempt %d)." repeated 1 more time between 2026-11-05 13:54:39:307 and 2026-11-05 13:54:39:307 (last: Karabiner deploy decision: deploying during input after the 5.0 s typing deferral bound (recovery attempt 3).).
+2026-11-05 14:11:32:423 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 14:11:32:423 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 14:11:32:940 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 14:11:32:940 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 14:11:32:949 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 14:11:32:951 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 14:11:32:955 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 14:11:33:037 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 14:23:44:851 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 14:23:44:851 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 14:23:45:374 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 14:23:45:374 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 14:23:45:381 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 14:23:45:384 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 14:23:45:390 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 14:23:45:473 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 14:35:05:255 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 14:35:05:255 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 14:35:05:798 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 14:35:05:798 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 14:35:05:807 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 14:35:05:809 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 14:35:05:816 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 14:35:05:895 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 15:12:32:769 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 15:12:32:769 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 15:12:34:977 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 15:12:34:977 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 15:12:34:988 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 15:12:34:990 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 15:12:34:996 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 15:12:35:068 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 15:12:40:234 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 15:12:40:236 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 15:22:33:068 [INFO] [karabiner.lease] ↑ "No live Karabiner lease generation to renew." repeated 1 more time between 2026-11-05 15:12:39:160 and 2026-11-05 15:12:39:160.
+2026-11-05 15:22:33:068 [INFO] [karabiner] ↑ "Wake found no live Karabiner lease; re-acquiring it." repeated 1 more time between 2026-11-05 15:12:39:160 and 2026-11-05 15:12:39:160.
+2026-11-05 15:22:35:068 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 15:12:40:228 and 2026-11-05 15:12:40:228 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 15:22:35:068 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 15:12:40:228 and 2026-11-05 15:12:40:228 (last: Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 15:22:35:068 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 15:12:40:240 and 2026-11-05 15:12:40:240 (last: Shortcuts rebound for layout 'current'.).
+2026-11-05 15:22:35:068 [ERROR] [karabiner] ↑ "Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled)." repeated 1 more time between 2026-11-05 15:12:40:327 and 2026-11-05 15:12:40:327.
+2026-11-05 16:48:36:885 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 16:51:10:273 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'French'.
+2026-11-05 16:51:10:622 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 16:51:11:134 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 16:51:11:134 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 16:51:11:143 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 16:51:11:146 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 16:51:11:151 [INFO] [karabiner] Shortcuts rebound for layout 'French'.
+2026-11-05 16:51:11:506 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled).
+2026-11-05 16:51:12:008 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 16:51:12:165 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 16:51:12:168 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 16:51:12:521 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 16:51:12:568 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 16:54:00:606 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 1 more time between 2026-11-05 16:51:11:714 and 2026-11-05 16:51:11:714 (last: Layout notification detected change: 'French' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 16:58:37:134 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 25 more times between 2026-11-05 16:48:47:758 and 2026-11-05 16:51:12:008 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 17:01:05:205 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 16:51:12:514 and 2026-11-05 16:51:12:514 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 17:01:11:136 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 16:51:12:514 and 2026-11-05 16:51:12:514 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 17:01:11:636 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 16:51:12:572 and 2026-11-05 16:51:12:572 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 17:01:11:636 [ERROR] [karabiner] ↑ "Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (layout-settled)." repeated 1 more time between 2026-11-05 16:51:12:632 and 2026-11-05 16:51:12:632.
+2026-11-05 17:47:51:694 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:47:51:870 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:47:52:274 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 17:47:52:274 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 17:47:52:274 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 17:47:52:274 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 17:47:52:311 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 17:47:52:316 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:47:52:316 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 17:47:52:316 [INFO] [karabiner] init phase 'load_available_actions': 42.5 ms.
+2026-11-05 17:47:52:317 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 17:47:52:348 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 17:47:52:348 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 17:47:52:348 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 17:47:52:350 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 17:47:52:350 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 17:47:52:350 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 17:47:52:350 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 17:47:52:352 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 17:47:52:352 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 17:47:52:352 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 17:47:52:352 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 17:47:52:352 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 17:47:52:358 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 17:47:52:370 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 17:47:52:378 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 17:47:52:378 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 17:47:52:380 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 17:47:52:380 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 17:47:52:380 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 17:47:52:380 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 17:47:52:380 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 17:47:52:447 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 17:47:52:348 and 2026-11-05 17:47:52:348 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 17:47:52:447 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 17:47:52:317 and 2026-11-05 17:47:52:352 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 17:47:52:759 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 17:48:22:400 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 17:48:27:251 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 17:48:27:252 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 17:48:27:256 [START] [karabiner] Stopping Karabiner bridge…
+2026-11-05 17:48:27:256 [DEBUG] [karabiner] Trackpad CapsWord resources stopped with the Ergopti lease.
+2026-11-05 17:48:27:257 [TRACE] [karabiner] Stopping input source watcher…
+2026-11-05 17:48:27:257 [DONE] [karabiner] Input source watcher stopped.
+2026-11-05 17:48:27:257 [SUCCESS] [karabiner] Karabiner bridge stopped.
+2026-11-05 17:48:27:925 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:48:28:045 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:48:28:390 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 17:48:28:390 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 17:48:28:390 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 17:48:28:390 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 17:48:28:429 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 17:48:28:435 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:48:28:435 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 17:48:28:435 [INFO] [karabiner] init phase 'load_available_actions': 44.6 ms.
+2026-11-05 17:48:28:436 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 17:48:28:471 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 17:48:28:472 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 17:48:28:472 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 17:48:28:473 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 17:48:28:473 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 17:48:28:473 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 17:48:28:473 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 17:48:28:476 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 17:48:28:476 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 17:48:28:476 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 17:48:28:476 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 17:48:28:476 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 17:48:28:477 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 17:48:28:487 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 17:48:28:494 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 17:48:28:494 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 17:48:28:496 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 17:48:28:496 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 17:48:28:496 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 17:48:28:496 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 17:48:28:496 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 17:48:28:539 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 17:48:28:472 and 2026-11-05 17:48:28:472 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 17:48:28:539 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 17:48:28:436 and 2026-11-05 17:48:28:476 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 17:48:28:860 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 17:48:58:492 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 17:49:28:556 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 17:49:28:579 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'Ergopti Field Rows 17'.
+2026-11-05 17:49:28:930 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 17'…
+2026-11-05 17:49:29:510 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:49:29:510 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 17:49:29:523 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:49:29:529 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:49:29:534 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti Field Rows 17'.
+2026-11-05 17:49:30:211 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti Field Rows 18'…
+2026-11-05 17:49:30:551 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 17:49:31:113 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:49:31:115 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:49:54:412 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 2 more times between 2026-11-05 17:49:29:874 and 2026-11-05 17:49:30:276 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 17:49:54:452 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 2 more times between 2026-11-05 17:49:29:894 and 2026-11-05 17:49:30:300 (last: Layout notification detected change: 'Ergopti Field Rows 18' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 17:49:54:453 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 17:49:31:106 and 2026-11-05 17:49:31:106 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 17:49:54:453 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 17:49:31:106 and 2026-11-05 17:49:31:106 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 17:49:54:476 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 17:49:31:121 and 2026-11-05 17:49:31:121 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 17:53:25:263 [INFO] [karabiner] Owned Karabiner runtime activation: idle.
+2026-11-05 17:53:25:263 [INFO] [karabiner] Karabiner pause already satisfied by fail-closed lease phase 'idle'.
+2026-11-05 17:53:25:272 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:53:25:279 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:53:25:287 [START] [karabiner] Resuming ErgoptiPlus Karabiner remapping…
+2026-11-05 17:53:25:287 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 17:53:25:287 [WARNING] [karabiner] Karabiner lease could not be provisioned on resume (owned-runtime-not-admitted); resuming without a live lease.
+2026-11-05 17:53:25:287 [SUCCESS] [karabiner] ErgoptiPlus Karabiner remapping resumed after paused preparation.
+2026-11-05 17:54:10:237 [INFO] [karabiner] ↑ "Owned Karabiner runtime activation: %s." repeated 1 more time between 2026-11-05 17:53:25:287 and 2026-11-05 17:53:25:287 (last: Owned Karabiner runtime activation: start.).
+2026-11-05 17:54:10:377 [START] [karabiner] Revoking the exact Ergopti Karabiner lease…
+2026-11-05 17:54:10:378 [SUCCESS] [karabiner] Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.
+2026-11-05 17:54:23:091 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:54:23:216 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:54:23:500 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 17:54:23:500 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 17:54:23:500 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 17:54:23:500 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 17:54:23:541 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 17:54:23:547 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:54:23:547 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 17:54:23:547 [INFO] [karabiner] init phase 'load_available_actions': 47.1 ms.
+2026-11-05 17:54:23:548 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 17:54:23:581 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 17:54:23:581 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 17:54:23:581 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 17:54:23:582 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 17:54:23:582 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 17:54:23:582 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 17:54:23:582 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 17:54:23:585 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 17:54:23:585 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 17:54:23:585 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 17:54:23:585 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 17:54:23:585 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 17:54:23:587 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 17:54:23:597 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 17:54:23:605 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 17:54:23:605 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 17:54:23:606 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 17:54:23:606 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 17:54:23:606 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 17:54:23:606 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 17:54:23:606 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 17:54:23:649 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 17:54:23:581 and 2026-11-05 17:54:23:581 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 17:54:23:649 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 17:54:23:548 and 2026-11-05 17:54:23:585 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 17:54:24:177 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 17:54:25:603 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 17:55:18:798 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 17:56:51:601 [INFO] [karabiner] Layout poll detected change: 'Ergopti_v2_2_2_plus' → 'EPProbe94886pa'.
+2026-11-05 17:56:51:852 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe94886pa'…
+2026-11-05 17:56:52:317 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 17:56:52:920 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:56:52:920 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 17:56:52:930 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:56:52:933 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:56:52:940 [INFO] [karabiner] Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.
+2026-11-05 17:57:54:149 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 17:57:54:660 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 17:57:54:661 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 17:57:54:668 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:57:54:671 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:57:54:676 [INFO] [karabiner] Shortcuts rebound for layout 'French'.
+2026-11-05 17:57:55:924 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:57:55:926 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 17:57:56:185 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 17:57:56:702 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 17:57:56:704 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 18:05:43:958 [DEBUG] [karabiner] ↑ "Input source notification received — debouncing (%.0fms)…" repeated 25 more times between 2026-11-05 17:55:19:230 and 2026-11-05 17:57:57:273 (last: Input source notification received — debouncing (250ms)…).
+2026-11-05 18:21:29:144 [INFO] [karabiner] ↑ "Layout %s detected change: '%s' → '%s'." repeated 3 more times between 2026-11-05 17:56:52:064 and 2026-11-05 17:57:55:934 (last: Layout poll detected change: 'French' → 'Ergopti_v2_2_2_plus'.).
+2026-11-05 18:21:29:144 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 17:57:56:695 and 2026-11-05 17:57:56:695 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 18:21:29:144 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 17:57:56:695 and 2026-11-05 17:57:56:695 (last: Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 18:21:29:144 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 17:57:56:709 and 2026-11-05 17:57:56:709 (last: Shortcuts rebound for layout 'Ergopti_v2_2_2_plus'.).
+2026-11-05 20:04:30:228 [INFO] [karabiner.lease] No live Karabiner lease generation to renew.
+2026-11-05 20:04:30:228 [INFO] [karabiner] Wake found no live Karabiner lease; re-acquiring it.
+2026-11-05 20:04:30:228 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-11-05 20:04:31:123 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 20:04:31:123 [INFO] [karabiner] Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 20:04:31:142 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:04:31:158 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:04:31:173 [INFO] [karabiner] Shortcuts rebound for layout 'current'.
+2026-11-05 20:04:33:646 [INFO] [karabiner.lease] Remap guardian registration answered 'unavailable' (developer_adhoc_legacy_only).
+2026-11-05 20:04:33:646 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert; ~/Library/Logs/Ergopti/launcher.log names the registration cause.
+2026-11-05 20:04:33:654 [INFO] [karabiner] Remap guardian unavailable — user notified.
+2026-11-05 20:04:33:654 [WARNING] [karabiner] Karabiner lease recovery remains fail-closed after guardian status 'unavailable' (unexpected-worker-loss).
+2026-11-05 20:04:33:654 [DEBUG] [karabiner] Karabiner lease recovery is waiting for guardian readiness (next check in 3.0 s; unavailable).
+2026-11-05 20:04:36:739 [INFO] [karabiner] Remap guardian became ready; resuming bounded lease recovery.
+2026-11-05 20:04:36:739 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 1/3 in 1.0 s (guardian-ready).
+2026-11-05 20:04:37:830 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 20:04:37:830 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 1 failed: owned-runtime-not-admitted.
+2026-11-05 20:04:37:830 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (owned-runtime-not-admitted).
+2026-11-05 20:04:41:732 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:04:41:735 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:04:41:812 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 2/3 in 10.0 s (layout-settled).
+2026-11-05 20:04:51:893 [INFO] [karabiner] Karabiner deploy decision: deferred-for-typing (input 0 ms ago; recovery attempt 2 waits up to 5.0 s for 750 ms of quiet).
+2026-11-05 20:04:58:526 [INFO] [karabiner] Karabiner deploy decision: deploying during input after the 5.0 s typing deferral bound (recovery attempt 2).
+2026-11-05 20:04:58:526 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 2 failed: owned-runtime-not-admitted.
+2026-11-05 20:04:58:526 [WARNING] [karabiner] Karabiner lease failed after exact fencing; fresh-generation recovery attempt 3/3 in 30.0 s (owned-runtime-not-admitted).
+2026-11-05 20:05:35:149 [WARNING] [karabiner] Karabiner lease auto-recovery attempt 3 failed: owned-runtime-not-admitted.
+2026-11-05 20:05:35:149 [ERROR] [karabiner] Karabiner lease auto-recovery exhausted after 3 attempt(s); rules remain fail-closed (owned-runtime-not-admitted).
+2026-11-05 20:05:54:317 [INFO] [karabiner.lease] ↑ "No live Karabiner lease generation to renew." repeated 1 more time between 2026-11-05 20:04:41:205 and 2026-11-05 20:04:41:205.
+2026-11-05 20:06:03:952 [INFO] [karabiner] ↑ "Wake found no live Karabiner lease; re-acquiring it." repeated 1 more time between 2026-11-05 20:04:41:205 and 2026-11-05 20:04:41:205.
+2026-11-05 20:06:04:140 [DEBUG] [karabiner] ↑ "Resolved %d logical-char action(s) to key codes." repeated 1 more time between 2026-11-05 20:04:41:721 and 2026-11-05 20:04:41:721 (last: Resolved 548 logical-char action(s) to key codes.).
+2026-11-05 20:06:04:424 [INFO] [karabiner] ↑ "%s refresh: re-resolved %s action(s); exact lease inactive, no redeploy." repeated 1 more time between 2026-11-05 20:04:41:722 and 2026-11-05 20:04:41:722 (last: Wake refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.).
+2026-11-05 20:06:25:304 [INFO] [karabiner] ↑ "Shortcuts rebound for layout '%s'." repeated 1 more time between 2026-11-05 20:04:41:742 and 2026-11-05 20:04:41:742 (last: Shortcuts rebound for layout 'current'.).
+2026-11-05 20:07:26:792 [INFO] [karabiner] ↑ "Karabiner deploy decision: deferred-for-typing (input %.0f ms ago; recovery attempt %d waits up to %.1f s for %.0f ms of quiet)." repeated 1 more time between 2026-11-05 20:05:28:601 and 2026-11-05 20:05:28:601 (last: Karabiner deploy decision: deferred-for-typing (input 0 ms ago; recovery attempt 3 waits up to 5.0 s for 750 ms of quiet).).
+2026-11-05 20:07:26:800 [INFO] [karabiner] ↑ "Karabiner deploy decision: deploying during input after the %.1f s typing deferral bound (recovery attempt %d)." repeated 1 more time between 2026-11-05 20:05:35:149 and 2026-11-05 20:05:35:149 (last: Karabiner deploy decision: deploying during input after the 5.0 s typing deferral bound (recovery attempt 3).).
+2026-11-05 20:07:26:808 [WARNING] [karabiner] ↑ "Regenerate skipped — the owned Karabiner runtime is not admitted." repeated 2 more times between 2026-11-05 20:04:58:526 and 2026-11-05 20:05:35:149.
+2026-11-05 20:12:40:656 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:12:40:765 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:12:41:201 [DEBUG] [karabiner] Script chords' source registered.
+2026-11-05 20:12:41:201 [DEBUG] [karabiner] Virtual keyboard choice's source registered.
+2026-11-05 20:12:41:201 [START] [karabiner] Initializing Karabiner bridge…
+2026-11-05 20:12:41:201 [INFO] [karabiner] KE config path resolved: '~/perso/config/macOS/.config/karabiner/karabiner.json'.
+2026-11-05 20:12:41:250 [DEBUG] [karabiner] Localised 55 of 74 action label(s) from the shared registry.
+2026-11-05 20:12:41:255 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 20:12:41:255 [INFO] [karabiner] Loaded 674 action(s) from actions.json.
+2026-11-05 20:12:41:255 [INFO] [karabiner] init phase 'load_available_actions': 54.7 ms.
+2026-11-05 20:12:41:256 [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+2026-11-05 20:12:41:292 [INFO] [karabiner] Loaded 182 modifier combo(s).
+2026-11-05 20:12:41:293 [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+2026-11-05 20:12:41:293 [DEBUG] [karabiner] Non-canonical combos computed: 91.
+2026-11-05 20:12:41:295 [INFO] [karabiner] User config loaded (Ergopti uses Karabiner: true).
+2026-11-05 20:12:41:295 [INFO] [karabiner] Ergopti's own Karabiner runtime is selected.
+2026-11-05 20:12:41:295 [INFO] [karabiner] Owned KE config path resolved: '~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json'.
+2026-11-05 20:12:41:295 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-11-05 20:12:41:298 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-11-05 20:12:41:298 [INFO] [karabiner] Integration enabled — deploy will be triggered from init.lua boot completion.
+2026-11-05 20:12:41:298 [TRACE] [karabiner] Registering input source watcher…
+2026-11-05 20:12:41:298 [DEBUG] [karabiner] Initial layout: 'Ergopti+ v2.2.2'.
+2026-11-05 20:12:41:298 [DONE] [karabiner] Input source watcher registered (poll every 2s after input, every 30s without).
+2026-11-05 20:12:41:303 [START] [karabiner] Binding the owned Karabiner runtime…
+2026-11-05 20:12:41:312 [SUCCESS] [karabiner] Owned Karabiner runtime bound.
+2026-11-05 20:12:41:319 [INFO] [karabiner] Owned Karabiner runtime activation: start.
+2026-11-05 20:12:41:319 [START] [karabiner] Removing ErgoptiPlus rules from karabiner.json…
+2026-11-05 20:12:41:320 [SUCCESS] [karabiner] karabiner.json holds no ErgoptiPlus rule — nothing to remove.
+2026-11-05 20:12:41:320 [DEBUG] [karabiner] No earlier ErgoptiPlus rule in '~/perso/config/macOS/.config/karabiner/karabiner.json' (unchanged).
+2026-11-05 20:12:41:321 [SUCCESS] [karabiner] Karabiner bridge initialized (674 action(s), 3 combo(s) active).
+2026-11-05 20:12:41:321 [DEBUG] [karabiner] Login Items approval presenter registered.
+2026-11-05 20:12:41:321 [DEBUG] [karabiner] Legacy-rule cleanup presenter registered.
+2026-11-05 20:12:41:379 [DEBUG] [karabiner] ↑ "Non-canonical combo: '%s' (reverse of '%s')." repeated 90 more times between 2026-11-05 20:12:41:293 and 2026-11-05 20:12:41:293 (last: Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').).
+2026-11-05 20:12:41:379 [INFO] [karabiner] ↑ "init phase '%s': %.1f ms." repeated 5 more times between 2026-11-05 20:12:41:256 and 2026-11-05 20:12:41:298 (last: init phase 'start_input_source_watcher': 0.1 ms.).
+2026-11-05 20:12:41:688 [WARNING] [karabiner] Regenerate skipped — the owned Karabiner runtime is not admitted.
+2026-11-05 20:13:11:333 [DEBUG] [karabiner] Layout baseline adopted from HIToolbox: 'Ergopti_v2_2_2_plus'.
+2026-11-05 20:13:32:662 [DEBUG] [karabiner] Input source notification received — debouncing (250ms)…
+2026-11-05 20:13:32:685 [INFO] [karabiner] Layout notification detected change: 'Ergopti_v2_2_2_plus' → 'EPProbe74126a'.
+2026-11-05 20:13:32:935 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe74126a'…
+2026-11-05 20:13:33:523 [DEBUG] [karabiner] Resolved 548 logical-char action(s) to key codes.
+2026-11-05 20:13:33:523 [INFO] [karabiner] Layout-change refresh: re-resolved 548 action(s); exact lease inactive, no redeploy.
+2026-11-05 20:13:33:534 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:13:33:537 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:13:33:541 [INFO] [karabiner] Shortcuts rebound for layout 'EPProbe74126a'.
+2026-11-05 20:13:41:577 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:13:42:111 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:13:42:115 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:13:44:053 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe74126pa'…
+2026-11-05 20:13:44:636 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:13:44:641 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:13:49:573 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:13:50:106 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:13:50:108 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:05:745 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe74126pb'…
+2026-11-05 20:14:06:339 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:06:342 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:25:603 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:14:26:132 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:26:135 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:27:609 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe74126pc'…
+2026-11-05 20:14:28:201 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:28:204 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:41:262 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:14:41:871 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:41:874 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:54:113 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe78502a'…
+2026-11-05 20:14:55:191 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:55:194 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:14:55:576 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:14:56:107 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:14:56:112 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:15:05:185 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe78502pa'…
+2026-11-05 20:15:05:776 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:15:05:779 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:15:19:572 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:15:20:108 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:15:20:112 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:15:27:163 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe78502pb'…
+2026-11-05 20:15:27:810 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:15:27:817 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:15:48:887 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:15:49:497 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:15:49:499 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:16:00:091 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'EPProbe78502pd'…
+2026-11-05 20:16:00:615 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:16:00:621 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:16:05:734 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 20:16:06:244 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:16:06:247 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:16:06:252 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:16:06:769 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:16:06:775 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:16:07:623 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 20:16:07:891 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'Ergopti_v2_2_2_plus'…
+2026-11-05 20:16:08:420 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:16:08:429 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.
+2026-11-05 20:16:09:896 [START] [karabiner] Layout change detected — scheduling settled refresh for layout 'French'…
+2026-11-05 20:16:10:487 [START] [karabiner.nav_layer] Loading the navigation layer from '<config>/'…
+2026-11-05 20:16:10:492 [SUCCESS] [karabiner.nav_layer] Navigation layer loaded: 51 key(s) bound.

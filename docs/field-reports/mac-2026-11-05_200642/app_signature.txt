@@ -1,0 +1,3 @@
+/Applications/ErgoptiPlus.app: a sealed resource is missing or invalid
+codesign exit=1
+pycache_folders=3
