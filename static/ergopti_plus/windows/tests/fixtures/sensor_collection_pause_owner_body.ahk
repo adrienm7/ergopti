@@ -18,11 +18,25 @@ _KCSP_Require(Condition, Message) {
 		throw Error(Message)
 }
 
+_KCSP_PowerSample(Mode, Pwr) {
+	global _KCSP_PowerReceipt
+	_KCSP_PowerReceipt.Calls += 1
+	_KCSP_PowerReceipt.BufferSize := Pwr.Size
+	Ac := Mode == "power-ac" ? 1 : Mode == "power-dc" ? 0 : 255
+	Battery := Mode == "power-battery-unknown" ? 255 : 73
+	NumPut("UChar", Ac, "UChar", 0, "UChar", Battery, Pwr, 0)
+	_KCSP_PowerReceipt.Ac := NumGet(Pwr, 0, "UChar")
+	_KCSP_PowerReceipt.Battery := NumGet(Pwr, 2, "UChar")
+	return 1
+}
+
 _KCSP_Main() {
+	global _KCSP_PowerReceipt
 	try {
 		_KCSP_Require(A_Args.Length == 2, "The private child arguments must be exact.")
 		Mode := A_Args[1]
-		_KCSP_Require(Mode == "collection" || Mode == "driver", "The pause mode must be declared.")
+		_KCSP_Require(Mode == "collection" || Mode == "driver" || Mode == "power-unknown"
+			|| Mode == "power-ac" || Mode == "power-dc" || Mode == "power-battery-unknown", "The test mode must be declared.")
 		MetricsFocusCache.event_mode := false
 		MetricsFocusCache.state := {valid: true, hwnd: 0, process_name: "sensor-fixture.exe",
 			title: "Native sensor fixture", class: "Fixture", last_at: A_TickCount,
@@ -33,6 +47,37 @@ _KCSP_Main() {
 		MetricsFilters.system_auth := false
 		Keystats.initialized := true
 		Keystats._shutting_down := false
+		if InStr(Mode, "power-") == 1 {
+			_KCSP_PowerReceipt := {Calls: 0, BufferSize: 0, Ac: -1, Battery: -1}
+			KL_Sensors_Tick(_KCSP_PowerSample.Bind(Mode))
+			ExpectedAc := Mode == "power-ac" ? 1 : Mode == "power-dc" ? 0 : 255
+			ExpectedBattery := Mode == "power-battery-unknown" ? 255 : 73
+			FileAppend("RECEIPT sensor-power calls=" . _KCSP_PowerReceipt.Calls
+				. " raw_ac=" . _KCSP_PowerReceipt.Ac . " raw_battery=" . _KCSP_PowerReceipt.Battery
+				. " buffer_size=" . _KCSP_PowerReceipt.BufferSize . "`n", "*", "UTF-8")
+			_KCSP_Require(_KCSP_PowerReceipt.Calls == 1 && _KCSP_PowerReceipt.BufferSize == 12
+				&& _KCSP_PowerReceipt.Ac == ExpectedAc && _KCSP_PowerReceipt.Battery == ExpectedBattery,
+				"The exact injected SYSTEM_POWER_STATUS must be consumed once before the publication oracle")
+			_KCSP_Require(Keystats._pending_entries.Length == 1, "The real sampler must publish exactly one row")
+			Row := Keystats._pending_entries[1]
+			HasAc := Row.Has("on_ac"), HasBattery := Row.Has("battery_pct")
+			FileAppend("OBSERVATION sensor-power mode=" . Mode . " has_ac=" . HasAc
+				. " ac=" . (HasAc ? Row["on_ac"] : "absent") . " has_battery=" . HasBattery
+				. " battery=" . (HasBattery ? Row["battery_pct"] : "absent") . "`n", "*", "UTF-8")
+			_KCSP_Require(Row["type"] == "system_event" && Row["action"] == "system_load"
+				&& Row["ram_total_mb"] > 0, "The real publication retains its other native observations")
+			if Mode == "power-battery-unknown"
+				_KCSP_Require(!HasBattery && !HasAc, "An unknown battery keeps the established omission policy")
+			else {
+				_KCSP_Require(HasBattery && Row["battery_pct"] == 73, "The known battery percentage remains visible")
+				if Mode == "power-unknown"
+					_KCSP_Require(!HasAc, "Unknown AC status cannot be published as off-line")
+				else
+					_KCSP_Require(HasAc && Row["on_ac"] == (Mode == "power-ac"), "Known AC status must remain exact")
+			}
+			FileAppend("PASS sensor-owner " . Mode . "`n", "*", "UTF-8")
+			ExitApp(0)
+		}
 		KL_Sensors_Tick()
 		_KCSP_Require(Keystats._pending_entries.Length == 1, "The genuine unpaused sampler must publish exactly once.")
 		First := Keystats._pending_entries[1]
