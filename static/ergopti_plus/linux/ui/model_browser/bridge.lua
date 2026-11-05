@@ -403,21 +403,40 @@ function M.on_message(payload, state, context)
 	if backend ~= "ollama" then return { selected = false } end
 	if payload.action ~= "open_url" and not ollama_ready() then return { selected = false } end
 
+	local function installed_now()
+		local ok, models = pcall(frame.llm_ports.get_cached_models)
+		if not ok or type(models) ~= "table" or not projection_current(frame) then return nil end
+		local target = normalise_name(row.runtime_name)
+		for _, model in ipairs(models) do
+			if type(model) ~= "string" then return nil end
+			if normalise_name(model) == target then return projection_current(frame) and true or nil end
+		end
+		if not projection_current(frame) then return nil end
+		return false
+	end
 	if payload.action == "select_model" then
-		-- Only an installed model can be made active; a missing one offers its download.
-		if row.installed ~= true then return { selected = false } end
+		-- Only a still-installed model can be made active.
+		local live_installed = installed_now()
+		if row.installed ~= true or live_installed ~= true then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { selected = false }
+		end
 		local selected = type(frame.llm_ports.set_model) == "function" and projection_current(frame)
 		if selected and type(frame.llm.get_backend) == "function" and frame.llm.get_backend() ~= "ollama" then
 			selected = projection_current(frame)
 				and frame.llm.set_backend("ollama", function() return projection_current(frame) end) == true
 		end
-		selected = selected and projection_current(frame) and frame.llm_ports.set_model(row.runtime_name) == true
+		selected = selected and installed_now() == true and frame.llm_ports.set_model(row.runtime_name) == true
 		if selected then changed() end
 		local closed = selected and close_owned(context) or false
 		return { selected = selected, closed = closed, model = row.runtime_name }
 	end
 	if payload.action == "download_model" then
-		if row.installed == true then return { downloading = false } end
+		local live_installed = installed_now()
+		if row.installed == true or live_installed ~= false then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { downloading = false }
+		end
 		local downloading = type(frame.llm_ports.download_model) == "function" and projection_current(frame)
 			and frame.llm_ports.download_model(row.runtime_name, row.name, function(succeeded)
 				if succeeded then changed() end
@@ -425,8 +444,12 @@ function M.on_message(payload, state, context)
 		return { selected = false, downloading = downloading, model = row.runtime_name }
 	end
 	if payload.action == "delete_model" or payload.action == "remove_custom_model" then
-		if row.installed ~= true or not _bound or type(_bound.delete_model) ~= "function" then return { deleted = false } end
-		return { deleted = _bound.delete_model(row.runtime_name, function() return projection_current(frame) end) == true }
+		local live_installed = installed_now()
+		if row.installed ~= true or not _bound or type(_bound.delete_model) ~= "function" or live_installed ~= true then
+			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
+			return { deleted = false }
+		end
+		return { deleted = _bound.delete_model(row.runtime_name, function() return installed_now() == true end) == true }
 	end
 
 	if payload.action == "open_url" and type(payload.url) == "string" then
