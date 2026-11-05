@@ -247,6 +247,7 @@ function M.check_idle()
 				duration_ms = _state.session_last_active - _state.session_start_time,
 			})
 			Logger.debug(LOG, "Typing session ended after %.0f ms of inactivity.", idle_ms)
+			_state.session_generation = (_state.session_generation or 0) + 1
 			_state.session_last_active = 0
 			_state.session_start_time  = 0
 			_state.is_micro_idle       = false
