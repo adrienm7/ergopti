@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **127 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **128 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1921,3 +1921,15 @@ Replay42035395037 atc160aceb passes11/13 in each order. The admitted native sett
 Replay42034174395 opens genuine private A/Notes.txt, then requests B/Notes.txt. The active native document still contains A's authenticated canary, launches remain1 and the public job finishes without an error. Both orders reproduce; same-folder reuse passes. Cleanup authenticates and retires the exact owned processes/windows before releasing private files.
 
 Basename matching cannot establish full document identity. A replacement which merely launches B and then searches that same basename could still accept A before B appears. The correction remains under investigation; current evidence does not justify a new document identity claim based on title, HWND or process alone.
+
+### Native qualification: replays42 and40
+
+Replay42037461104 at8ad112fd passes38/42 in each order. It qualifies paste/copy-title8, native Settings/Show/successor6, typing entry-lifecycle4 and the selected owned TapHold stage/transaction/loader/persistence controls. Its subscription Close proves an old add_Event continuation outlives native controller retirement (109). Source3dfc52f5 retains that host until unsubscribe can precede Close and Destroy; postfix qualification is pending. Model backend current reaches the desired selected model/backend but fails its Errors0 prerequisite, which remains enforced. A separate diagnostic now exports those retained errors; the API backend still remains API after model selection, without counting another family before the current control is explained.
+
+Replay42039178724 at67757700 passes35/40 in each order. Production parsing and90 native hotstring E2E pass. It qualifies the uncertain-Down correction4e83ef8a and the minimal bootstrap timer retirementa2a2c25a. Its remaining failures are4 actual resource-option retention graphs (125) and1 controlled scalar restoration release (037). Those are confirmed extensions under correction, not five new distinct findings.
+
+### AHK-128: A native password-style transition reuses an ordinary verdict
+
+Replay42037461104 establishes a genuine normal Edit/cache/focus-hook receipt, then enables native ES_PASSWORD without changing HWND or element identity. Native inspection reports secure1 and conclusive1, but the actual adapter returns secure0 at47ms inside the unmodified1000ms TTL; diagnostics0. Both orders repeat. The normal and naturally expired controls pass.
+
+Source92e4c1c7 refreshes bounded native classification before cache reuse and keeps inconclusive fallback conservative. Two added controls preserve exact UIA-negative reuse and reject stale native-negative reuse. Postfix qualification is pending. This detector proof is separate from any keyboard/HTTP leak claim; a native prefix retention/publication composition is newly integrated for testing. No IO is added to the RAM-only prefix reader by that getter-only change.
