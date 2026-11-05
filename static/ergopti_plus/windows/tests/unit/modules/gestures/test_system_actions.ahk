@@ -687,3 +687,86 @@ _SysActions_OpenApp() {
 Test("system actions: open_app launches the application stored for its binding", _SysActions_OpenApp)
 
 #Include test_microphone_endpoint_owner.ahk
+
+; File creation uses the real native adapter. Explorer documents are explicit
+; port doubles so a navigation during that external call is deterministic.
+class _SNFO_Folder {
+	__New(Path) {
+		this.Self := {Path: Path}
+	}
+	ParseName(Name) {
+		Path := this.Self.Path . "\" . Name
+		return FileExist(Path) ? {Path: Path} : 0
+	}
+}
+
+class _SNFO_Document {
+	__New(Path, Selected) {
+		this.Folder := _SNFO_Folder(Path)
+		this.Selected := Selected
+	}
+	SelectItem(Item, Flags) {
+		this.Selected.Push({Path: Item.Path, Flags: Flags})
+	}
+}
+
+class _SNFO_System extends _SysActionsFake {
+	CreateNewFile(Path) {
+		Status := SystemControl().CreateNewFile(Path)
+		this.CreatedPath := Path
+		if this.Navigate
+			this.Explorer.Document := this.NextDocument
+		return Status
+	}
+}
+
+_SNFO_Run(Navigate) {
+	Root := A_Temp . "\ergopti_new_file_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, PreviousSuspended := A_IsSuspended
+	try {
+		if A_IsSuspended
+			Suspend(false)
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Original := Root . "\original", Changed := Root . "\navigated"
+		DirCreate(Original)
+		DirCreate(Changed)
+		Base := t("system_actions.new_text_file_name") . ".txt"
+		Foreign := Changed . "\" . Base
+		AssertTrue(FSWriteCreateDurable(Foreign, "unrelated file in the newly navigated folder"))
+		Selected := []
+		InitialDocument := _SNFO_Document(Original, Selected)
+		NextDocument := _SNFO_Document(Changed, Selected)
+		Explorer := {HWND: 0x42, Document: InitialDocument}
+		Sys := _SNFO_System()
+		Sys.Active := {Hwnd: 0x42, Pid: 7, Class: "CabinetWClass"}
+		Sys.Shell := {Windows: (this) => [Explorer]}
+		Sys.Navigate := Navigate
+		Sys.Explorer := Explorer
+		Sys.NextDocument := NextDocument
+		Sys.CreatedPath := ""
+		GestureSysNewTextFileHere(Sys)
+		AssertEqual(Original . "\" . Base, Sys.CreatedPath)
+		AssertTrue(FileExist(Sys.CreatedPath) != "", "the actual native adapter must create the requested original-folder file")
+		AssertEqual("", FileRead(Sys.CreatedPath, "UTF-8"))
+		AssertEqual("unrelated file in the newly navigated folder", FileRead(Foreign, "UTF-8"))
+		_TestPrint("# new-file-document-owner navigation=" . Navigate . " selections=" . Selected.Length
+			. " selected_created_file=" . (Selected.Length ? StrCompare(Selected[1].Path, Sys.CreatedPath, true) == 0 : false))
+		if Navigate
+			AssertEqual(0, Selected.Length, "navigation cannot start renaming a same-named unrelated file in the replacement folder")
+		else {
+			AssertEqual(1, Selected.Length, "an unchanged original document must still prepare the created file's rename")
+			AssertEqual(Sys.CreatedPath, Selected[1].Path)
+			AssertEqual(GESTURE_SYS_SVSI_RENAME, Selected[1].Flags)
+		}
+	} finally {
+		if Created
+			DirDelete(Root, true)
+		if A_IsSuspended != PreviousSuspended
+			Suspend(PreviousSuspended)
+	}
+}
+
+for _SNFO_Navigation in [false, true]
+	Test("new text file rename owns its original Explorer folder: navigation=" . _SNFO_Navigation . " (new-file-document-owner)",
+		_SNFO_Run.Bind(_SNFO_Navigation))

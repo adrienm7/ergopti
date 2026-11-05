@@ -817,7 +817,7 @@
 			"reproduction": "Native run41930158432 at5d857ae: the +SC010 variant is selected, Shift is released before dispatch, and callback/receiver both observeShift0. Plain and still-held modifier controls pass; inverse repeats the failure.",
 			"root_cause": "_LayoutRowPassthrough replays only the scan code with Blind and discards the selected modifier identity. Current key state no longer describes the original event after deferred dispatch.",
 			"silent_failure": "A captured modified key can reach the application as an unmodified key and invoke a different action.",
-			"regression_test": "Three genuine native handler/receiver probes establish the defect. Additional thread-state diagnostics are integrated. No production correction is integrated yet: wildcard modifier combinations and external receiver semantics still require a sound solution. This confirmed finding is not counted as fixed."
+			"regression_test": "Native run41939048652 at46019fb confirms the same released-Shift failure across distinct process/input queues; plain and held controls pass individually and reversed, and all callback queue/logical/async Shift flags are0. The integrated correction keeps the same240/five-prefix identities and exact I2/I3 levels but uses tilde to admit the original event without synthetic replay. Chosen plain magic remains protected after marker normalization. Local/external probes retain exact modifier/key-count oracles and now require original event provenance, one real I1 keydown/host character and exact Edit text. Priority and emulated-output controls remain strict. Post-fix native qualification pending."
 		}
 	]
 }

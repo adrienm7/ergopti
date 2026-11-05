@@ -425,3 +425,110 @@ _CWAO_RingReportsOutput() {
 Test("capsword auto-off: the ring of sent characters reports to CapsWord", _CWAO_RingReportsOutput)
 
 #Include test_capsword_auto_off_ownership.ahk
+
+; Append to tests/unit/modules/shortcuts/test_capsword_auto_off.ahk.
+_CWAOD_End(State, Reason, Kind) {
+    global CapsWordEnabled
+    State["ends"] += 1
+    State["reason"] := Reason
+    CapsWordEnabled := false
+}
+_CWAOD_Case(Name, Seconds) {
+    global CapsWordEnabled, _TimingsCache
+    AssertFalse(CapsWordAutoOff.Armed is Map, "do not borrow an active CapsWord")
+    AssertEqual(0, CapsWordAutoOff.Subscriptions.Length)
+    Saved := {Enabled: CapsWordEnabled, Configured: CapsWordAutoOff.Configured,
+        Values: CapsWordAutoOff.Values, Critical: A_IsCritical, Suspended: A_IsSuspended}
+    State := Map("ends", 0, "reason", "")
+    Receipt := Map("case", Name, "input_type", Type(Seconds), "input_seconds", String(Seconds))
+    Primary := 0, CleanupIssues := []
+    try {
+        Critical("Off"), Suspend(false)
+        if !IsSet(_TimingsCache) || !(_TimingsCache is Map)
+            TimingsLoadShared()
+        Pointer := Map()
+        for Kind in CapsWordAutoOffPointerKinds()
+            Pointer[Kind] := 0
+        Cache := Map("shortcuts.caps_word", Map("idle_timeout_seconds", Seconds, "terminators", []),
+            "shortcuts.caps_word.pointer", Pointer)
+        Accepted := CapsWordAutoOffValidateIdleTimeout(Seconds, &Reason)
+        Receipt["validator_accepted"] := Accepted
+        Receipt["validator_reason"] := Reason
+        Values := CapsWordAutoOffReadValues(Cache)
+        Receipt["read_seconds"] := String(Values["idle_timeout_seconds"])
+        ReadError := 0, ArmError := 0
+        try CapsWordAutoOffReadConfig(Cache)
+        catch Any as Failure
+            ReadError := Failure
+        Receipt["read_error"] := IsObject(ReadError) ? Type(ReadError) : ""
+        if !IsObject(ReadError) {
+            Policy := CapsWordAutoOffCurrentPolicy()
+            Idle := CapsWordAutoOffIdleDelayMs(Policy)
+            Receipt["idle_ms"] := String(Idle)
+            Receipt["idle_positive_finite"] := Idle > 0 && Idle - Idle == 0
+            Receipt["expires_after_one_ms"] := CapsWordAutoOffIdleExpired(Policy, 1000, 1001)
+            CapsWordEnabled := true
+            try CapsWordAutoOffArm(_CWAOD_End.Bind(State))
+            catch Any as Failure
+                ArmError := Failure
+            Receipt["arm_error"] := IsObject(ArmError) ? Type(ArmError) : ""
+            Receipt["armed"] := CapsWordAutoOff.Armed is Map
+            Receipt["idle_running"] := CapsWordAutoOff.IdleRunning
+            Receipt["subscriptions"] := CapsWordAutoOff.Subscriptions.Length
+            if Name == "ordinary" && !IsObject(ArmError) {
+                Started := A_TickCount
+                while State["ends"] == 0 && TickElapsed(Started) < 1000
+                    Sleep(1)
+            }
+            Receipt["ends"] := State["ends"]
+        }
+        _TestPrint("# CAPSWORD_IDLE_DOMAIN " . KL_JsonEncode(Receipt))
+        AssertFalse(IsObject(ReadError), "a value admitted or explicitly defaulted by the public reader must compile")
+        if Accepted {
+            AssertEqual(Seconds, Values["idle_timeout_seconds"], "an accepted value must reach the real policy unchanged")
+            AssertTrue(Receipt["idle_positive_finite"], "a positive accepted configuration must not overflow into disabled/negative/nonfinite policy")
+            AssertFalse(Receipt["expires_after_one_ms"], "a positive accepted duration above one millisecond cannot immediately expire")
+        } else {
+            AssertEqual("invalid_idle_timeout", Reason, "unsupported values must be refused at validation with the stable reason")
+            DefaultSeconds := ManifestDefaultFor(ConfigKey.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS)
+            AssertEqual(DefaultSeconds, Values["idle_timeout_seconds"], "the existing reader explicitly defaults a refused duration")
+            DefaultPolicy := CapsWordAutoOffCompileConfig(Map())
+            AssertEqual(CapsWordAutoOffIdleDelayMs(DefaultPolicy), Idle, "refusal must retain the genuine manifest default policy, including a disabled default")
+        }
+        AssertFalse(IsObject(ArmError), "a published policy must be armable through the genuine native timer boundary")
+        AssertTrue(Receipt["armed"], "the activation must own its real compiled policy")
+        AssertEqual(Idle > 0, Receipt["idle_running"], "idle ownership must match the admitted policy; zero explicitly disables the timer")
+        if Name == "ordinary"
+            AssertEqual(1, State["ends"], "the ordinary control must actually deliver the native timer once")
+        else
+            AssertEqual(0, State["ends"], "a huge delay cannot turn into an immediate end")
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            CapsWordEnabled := false
+            CapsWordAutoOffDisarm()
+            AssertFalse(CapsWordAutoOff.Armed is Map)
+            AssertEqual(0, CapsWordAutoOff.Subscriptions.Length)
+            AssertFalse(CapsWordAutoOff.IdleRunning)
+            AssertFalse(CapsWordAutoOff.MotionRunning)
+        } catch Any as Failure {
+            CleanupIssues.Push(Map("error", Type(Failure), "message", SubStr(Failure.Message, 1, 200)))
+            if !IsObject(Primary)
+                Primary := Failure
+        }
+        CapsWordAutoOff.Configured := Saved.Configured
+        CapsWordAutoOff.Values := Saved.Values
+        CapsWordEnabled := Saved.Enabled
+        Suspend(Saved.Suspended), Critical(Saved.Critical)
+        if CleanupIssues.Length
+            _TestPrint("# CAPSWORD_IDLE_DOMAIN_CLEANUP " . KL_JsonEncode(CleanupIssues))
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+Test("CapsWord idle domain: ordinary config reaches its native timer (capsword-idle-domain)", _CWAOD_Case.Bind("ordinary", 0.05))
+Test("CapsWord idle domain: finite integer seconds cannot wrap into disabled policy (capsword-idle-domain)",
+    _CWAOD_Case.Bind("integer_overflow", 1 << 62))
+Test("CapsWord idle domain: finite float seconds cannot overflow its compiled delay (capsword-idle-domain)",
+    _CWAOD_Case.Bind("float_overflow", 1e308))
