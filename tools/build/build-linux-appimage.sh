@@ -54,6 +54,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! "$SKIP_APPIMAGE" && ! command -v appimagetool >/dev/null 2>&1; then
+  echo "[ERR] appimagetool is required to build an AppImage; use --skip-appimage for staging only." >&2
+  exit 69
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IFS= read -r -d '' PROJECT_ROOT < <(cd -- "$SCRIPT_DIR/../.." && printf '%s\0' "$PWD")
 # A caller that runs several builds at once gives each its own output directory.
@@ -273,15 +278,6 @@ if [ "$SKIP_APPIMAGE" = true ]; then
   echo "AppDir: $APPDIR"
   echo "Files: $(find "$APPDIR" -type f | wc -l)"
   echo "To package: ARCH=$ARCH appimagetool $APPDIR $APPIMAGE_FILE"
-  exit 0
-fi
-
-if ! command -v appimagetool &>/dev/null; then
-  echo ""
-  echo "=== AppDir complete (appimagetool not available) ==="
-  echo "AppDir: $APPDIR"
-  echo "Files: $(find "$APPDIR" -type f | wc -l)"
-  echo "Run on Linux to package: ARCH=$ARCH appimagetool $APPDIR $APPIMAGE_FILE"
   exit 0
 fi
 
