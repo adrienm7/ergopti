@@ -135,7 +135,7 @@ end
 local function read_network()
 	if Shell.has_command("nmcli") then
 		local out = Shell.exec_line(
-			"nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | head -1")
+			"LC_ALL=C nmcli --colors no -t -f active,ssid dev wifi 2>/dev/null | grep '^yes:' | head -1")
 		if out and out ~= "" then return out, "nmcli" end
 	end
 	if Shell.has_command("iwgetid") then
