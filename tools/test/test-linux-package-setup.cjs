@@ -522,6 +522,20 @@ fi`
 		/^user1001 .*disable/m,
 		'package removal preserves a user-owned service override'
 	);
+	// NSS may return an inconsistent identity; do not act as another account.
+	for (const entry of [
+		'other:x:1001:1001::/home/other:/bin/bash',
+		'user1000:x:1000:1000::/home/user1000:/bin/bash\nother:x:1001:1001::/home/other:/bin/bash'
+	]) {
+		stub('getent', `printf '%s\\n' ${shellQuote(entry)}`);
+		fs.writeFileSync(callLog, '');
+		const mismatch = spawnSync(bashExecutable(), [bashPath(stopScript)], {
+			encoding: 'utf8', timeout: 15000,
+			env: { HOME: bashPath(sandbox), TEST_STUBS: bashPath(stubs), CALL_LOG: bashPath(callLog) }
+		});
+		assert.notEqual(mismatch.status, 0, 'inconsistent NSS identity must fail');
+		assert.equal(fs.readFileSync(callLog, 'utf8'), '', 'no session is touched');
+	}
 	// The Fedora job is a nonlogin container: HOME is supplied, while USER and
 	// LOGNAME need the real account query before privacy admission in --help.
 	const pipeline = require('./ci-pipeline.cjs');
