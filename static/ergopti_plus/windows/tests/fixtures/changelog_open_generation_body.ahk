@@ -58,7 +58,7 @@ class _CWOC_Environment {
 		this.Controllers.Push(Ctrl)
 		if this.Calls > 1
 			return Promise.resolve(Ctrl)
-		if this.Mode == "cold-success"
+		if this.Mode == "cold-success" || InStr(this.Mode, "show-") == 1
 			return Promise.resolve(Ctrl)
 		Pending := Promise((Resolve, Reject) => SetTimer(this.Act.Bind(this, Resolve, Reject, Ctrl), -1))
 		; The effect port observes its terminal outcome; await still receives the
@@ -87,6 +87,32 @@ class _CWOC_Environment {
 			Resolve.Call(Ctrl)
 	}
 }
+; Observe the production Gui.Show callout, then deliver the real native Close.
+; Epoch advance proves the installed production Close event actually ran while
+; Show was still on its stack; absence of that receipt is setup failure only.
+_CWOC_ShowCloseProbe(State, WParam, LParam, Msg, Hwnd) {
+	global _CLW_Gui, _CLW_WindowEpoch
+	if State.Fired || !WParam
+		return
+	try {
+		if WinGetPID("ahk_id " . Hwnd) != ProcessExist() || WinGetTitle("ahk_id " . Hwnd) != State.Caption
+			return
+		State.Fired := true
+		State.Hwnd := Hwnd
+		State.OwnerAbsent := !IsSet(_CLW_Gui)
+		if !State.Close
+			return
+		Before := _CLW_WindowEpoch
+		DllCall("User32\SendMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Ptr")
+		Started := A_TickCount
+		while _CLW_WindowEpoch == Before && TickElapsed(Started) < 500
+			Sleep(1)
+		State.CloseEntered := _CLW_WindowEpoch != Before
+	} catch Any as Failure {
+		State.Failure := Failure
+	}
+}
+
 _CWOC_OpenGeneration(Mode) {
 	global _WebView_SharedEnv, _WebView_SharedEnvRetired, _CLW_Gui, _CLW_Controller
 	global _CLW_WebView, _CLW_ResetDone, _CLW_WindowEpoch
@@ -96,6 +122,11 @@ _CWOC_OpenGeneration(Mode) {
 	Environment := _CWOC_Environment(Mode)
 	global _CWOC_CurrentEnvironment := Environment
 	_CWOC_Require(!_Updater_OpenChangelogWindow.HasOwnProp("Call") && !_CLW_FetchAndInject.HasOwnProp("Call"), "effect guards begin from the real functions")
+	ShowState := {Fired: false, Close: Mode == "show-close", Caption: WindowTitle(t("changelog_window.window_title")),
+		Hwnd: 0, OwnerAbsent: false, CloseEntered: false, Failure: 0}
+	ShowHook := _CWOC_ShowCloseProbe.Bind(ShowState)
+	if InStr(Mode, "show-") == 1
+		OnMessage(0x18, ShowHook)
 	_Updater_OpenChangelogWindow.DefineProp("Call", {Call: _CWOC_NativeFallback})
 	_CLW_FetchAndInject.DefineProp("Call", {Call: _CWOC_RejectFetch})
 	try {
@@ -103,7 +134,26 @@ _CWOC_OpenGeneration(Mode) {
 		_CWOC_Require(_CLW_WebView2Available(), "the genuine vendored SDK loader must be present")
 		Thread("Interrupt", 0)
 		_CWOC_PublicOpen()
-		if Mode == "cold-success" {
+		if InStr(Mode, "show-") == 1 {
+			if ShowState.Failure is Error
+				throw ShowState.Failure
+			_CWOC_Require(ShowState.Fired && ShowState.Hwnd != 0, "the exact public Gui.Show must deliver a native visibility notification")
+			NativeAlive := DllCall("User32\IsWindow", "Ptr", ShowState.Hwnd, "Int") != 0
+			FileAppend("DIAG changelog-show-close mode=" . Mode . " observed=" . ShowState.Fired
+				. " owner_absent=" . ShowState.OwnerAbsent . " close_entered=" . ShowState.CloseEntered
+				. " native_alive=" . NativeAlive . " gui_global=" . IsSet(_CLW_Gui)
+				. " controller_global=" . IsSet(_CLW_Controller) . " factory_calls=" . Environment.Calls . "`n", "*")
+			if ShowState.Close {
+				_CWOC_Require(ShowState.CloseEntered, "the genuine WM_CLOSE event must run before the Gui.Show callout returns")
+				_CWOC_Refuse(NativeAlive, "a native close during initial Show must retire that exact native window")
+				_CWOC_Refuse(IsSet(_CLW_Gui), "the cancelled opening cannot republish a GUI after its close event")
+				_CWOC_Refuse(IsSet(_CLW_Controller), "the cancelled initial window cannot publish a controller")
+			} else {
+				_CWOC_Require(NativeAlive && IsSet(_CLW_Gui) && IsSet(_CLW_Controller), "observing native Show alone must retain the actual successful opening")
+				_CWOC_Equal(ShowState.Hwnd, _CLW_Gui.Hwnd)
+				_CWOC_Equal(Environment.Controllers[1], _CLW_Controller)
+			}
+		} else if Mode == "cold-success" {
 			_CWOC_Require(_CLW_Gui is Gui)
 			_CWOC_Equal(Environment.Controllers[1], _CLW_Controller)
 			_CWOC_Equal(0, Environment.Controllers[1].Closed)
@@ -126,6 +176,8 @@ _CWOC_OpenGeneration(Mode) {
 		_CWOC_Equal(Mode == "cold-refusal" ? 1 : 0, Environment.Fallbacks, "only a current initial refusal may open the native fallback")
 		_CWOC_Equal(0, Environment.Fetches, "the constructor component must not fetch releases")
 	} finally {
+		if InStr(Mode, "show-") == 1
+			OnMessage(0x18, ShowHook, 0)
 		Changelog_Close()
 		for Controller in Environment.Controllers
 			if !Controller.Closed
