@@ -248,22 +248,30 @@ local function revoke_event(code, source)
 			if value == 1 then native_presses[stamp] = true
 			elseif value == 0 then native_presses[stamp] = nil end
 		elseif value == 1 then
-			if presses[code] and presses[code] ~= source then
-				blocked[source .. "\0" .. code] = true
+			-- A blocked physical peer still owns its original DOWN even if
+			-- the first source has since released.  Do not start another
+			-- combination until all such source-specific paths retire.
+			if next(blocked) and not presses[code] then
+				blocked[source .. "\0" .. code] = { delegated = true }
 				base_ports.activity(base)
 				if policy then policy.activity() end
-				if base.held[code] and not base.held[code].undecided then
-					return base_ports.process(base, code, value, at_ms, receipt)
-				end
+				return base_ports.process(base, code, value, at_ms, receipt)
+			end
+			if presses[code] and presses[code] ~= source then
+				local delegated = base.held[code] ~= nil or base.instant_down[code] ~= nil
+					or base.layer_keys[code] ~= nil or base.native_keys[code] ~= nil or base.passed_down[code] ~= nil
+				blocked[source .. "\0" .. code] = { delegated = delegated }
+				base_ports.activity(base)
+				if policy then policy.activity() end
+				if delegated then return base_ports.process(base, code, value, at_ms, receipt) end
 				return {}
 			end
 			presses[code] = source
 		elseif blocked[source .. "\0" .. code] then
-			if value == 0 then
-				blocked[source .. "\0" .. code] = nil
-				if base.held[code] then return base_ports.process(base, code, value, at_ms, receipt) end
-			end
+			local owner = blocked[source .. "\0" .. code]
+			if value == 0 then blocked[source .. "\0" .. code] = nil end
 			if policy then policy.activity() end
+			if owner.delegated then return base_ports.process(base, code, value, at_ms, receipt) end
 			return {}
 		elseif value == 0 and presses[code] and presses[code] ~= source then
 			return {}
@@ -491,7 +499,7 @@ local function revoke_event(code, source)
 	end
 	local function candidate(code)
 		if not ids[code] or not runtime_chords or not options.chord_settings or next(presses) or next(native_presses) or next(chords)
-			or not source_settings_current()
+			or next(blocked) or not source_settings_current()
 			or base_ports.combination_first_available(base,code) ~= true then return false end
 		for _, second in ipairs(options.keys) do if choose(ids[code],second,0) then return true end end
 		return false
