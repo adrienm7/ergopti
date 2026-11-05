@@ -301,6 +301,7 @@ GestureSysCenterMouse(Sys := 0) {
 ; Opens the application stored for a binding: a program, a Start-menu
 ; shortcut, a packaged app (shell:AppsFolder\...) or any target the shell runs.
 GestureSysOpenApp(BindingId := "", Sys := 0) {
+	Owner := TapHoldNewOwner()
 	Sys := _GestureSys(Sys)
 	Value := GestureGetActionParameter(BindingId, "open_app")
 	if !GestureAppParameterIsValid(Value) {
@@ -308,7 +309,16 @@ GestureSysOpenApp(BindingId := "", Sys := 0) {
 		return
 	}
 	try {
-		Sys.Launch(Value)
+		; A chooser returns one unquoted file path. Passing it raw to Run lets
+		; CreateProcess execute an existing prefix before the first space. Keep
+		; shell targets and command lines unchanged when they are not exact files.
+		IsFile := Sys.IsExistingFile(Value)
+		if A_IsSuspended || !TapHoldOwnerCurrent(Owner) {
+			LoggerInfo("gestures", "open_app was cancelled after inspecting its target: paused or original owner retired.")
+			return false
+		}
+		Target := IsFile ? '"' . Value . '"' : Value
+		Sys.Launch(Target)
 		LoggerInfo("gestures", "Opened the application '{1}'.", Value)
 	} catch as Err {
 		LoggerError("gestures", "The application '{1}' could not be opened: {2}", Value, Err.Message)

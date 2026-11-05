@@ -1214,6 +1214,28 @@
 			"root_cause": "KL_Hook_Stop invalidates capture and releases its privacy tracker, then flushes existing buffers without closing the active app/title clocks; those clocks emit rows only on a later context transition.",
 			"silent_failure": "Runs41967942121 and41971226185 observe terminal rows0/elapsed46-47/errors0 and cold SQL time0. After correcting the independent JSON dependency, the native switch control emits2 rows and SQL app_time47 in run41971226185; inverse repeats.",
 			"regression_test": "Close each accepted app/title origin with independent append acknowledgements, preserve privacy refusals and transition ownership under native Stop reentrancy, and never resurrect a retired context. Four additional accepted-row/native-stop cutpoint controls are integrated but unqualified. Implementation and postfix qualification are pending."
+		},
+		{
+			"id": "AHK-111",
+			"title": "A selected existing application path can launch its executable prefix",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Choose an actual executable at a path containing spaces while another executable exists at the path prefix before the first space; dispatch the stored value through real GestureSysOpenApp and SystemControl.Launch.",
+			"root_cause": "The chooser stores an unquoted file path, but open_app forwards it as a raw Run command line; Windows CreateProcess with no explicit application name may select its earlier executable prefix.",
+			"silent_failure": "Native run41974178449 at26b1ecd81954794d09806e746265724e60332bc1 launches the private witness.exe instead of witness.exe folder/target.exe. The quoted target control succeeds; both processes are authenticated by retained handle, PID, creation FILETIME and image and joined before cleanup. Inverse repeats. No privilege elevation or external application execution is claimed.",
+			"regression_test": "Quote an entire value recognized as an existing file, preserve legacy shell URI/argument strings and the generic Launch method, and retain the original lifecycle owner across the file probe. The existing native receiver plus real shortcut, exact-file/command and actual suspend/resume guards cover the fix. Missing or unobservable path strings remain indistinguishable from legacy commands without additional stored provenance; this correction does not claim to solve that separate domain. Native postfix qualification pending."
+		},
+		{
+			"id": "AHK-112",
+			"title": "Malformed locator bytes silently select a different configuration profile",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Store an actual invalid UTF-8 byte in paths.toml ConfigDirPath and create a distinct private profile whose legal name contains the replacement scalar; run the genuine locator reader and boot directory selector.",
+			"root_cause": "ReadPathsToml uses lossy FileRead UTF-8 decoding before routing, so a malformed byte can become U+FFFD and name a different existing directory. Read-only source handling does not authenticate the selected profile.",
+			"silent_failure": "Native run41974178449 at26b1ecd81954794d09806e746265724e60332bc1 independently rejects the original bytes with FSReadUtf8Exact, proves native replacement decoding, then reports refused0/selected-target1/actual-profile redirected. The valid Unicode control selects its intended profile, and inverse repeats.",
+			"regression_test": "Read one raw Buffer and decode it strictly before parsing/routing, reusing the already-qualified068 algorithm through a pure early-boot source codec. Preserve the existing personal helper ABI. Four actual profiles cover malformed UTF-8, valid Unicode and UTF-8/UTF-16LE BOM protocols, with unchanged source bytes. Native postfix qualification pending."
 		}
 	]
 }
