@@ -1,43 +1,15 @@
 {
-	"expected_count": 60,
+	"expected_count": 165,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": false,
+	"native_hotstring_e2e": true,
 	"filters": [
 		{
-			"contains": "send-key-native-scalar",
-			"expected_count": 3
+			"contains": "HotstringsConfig:",
+			"expected_count": 55
 		},
 		{
-			"contains": "send-input-actions",
-			"expected_count": 4
-		},
-		{
-			"contains": "crash-native-path-receipt",
-			"expected_count": 3
-		},
-		{
-			"contains": "crash-json-control-native",
-			"expected_count": 1
-		},
-		{
-			"contains": "usage-integer-price",
-			"expected_count": 1
-		},
-		{
-			"contains": "_LLMRemoteExtractUsage:",
-			"expected_count": 5
-		},
-		{
-			"contains": "usage-finite-cost",
-			"expected_count": 2
-		},
-		{
-			"contains": "anthropic-temperature-domain",
-			"expected_count": 3
-		},
-		{
-			"contains": "token-wait-request-budget",
-			"expected_count": 4
+			"contains": "hotstring-override-global-transaction-20260813",
+			"expected_count": 10
 		},
 		{
 			"contains": "HotstringsConfig external source ownership:",
@@ -48,32 +20,100 @@
 			"expected_count": 2
 		},
 		{
-			"contains": "layout-row-native-flags",
-			"expected_count": 3
+			"contains": "HotstringsConfig exact source UTF-8:",
+			"expected_count": 5
 		},
 		{
-			"contains": "personal-native-constructor-owner",
+			"contains": "screenshot-stage-admission",
 			"expected_count": 2
 		},
 		{
-			"contains": "screenshot-stage-lease-compat",
+			"contains": "screenshot-stage-cleanup-debt",
+			"expected_count": 10
+		},
+		{
+			"contains": "screenshot-worker-ownership",
+			"expected_count": 11
+		},
+		{
+			"contains": "layout-row-native-flags",
 			"expected_count": 3
-		},
-		{
-			"contains": "HotstringsConfig exact source UTF-8: empty-control",
-			"expected_count": 1
-		},
-		{
-			"contains": "AHK-020 app picker:",
-			"expected_count": 7
 		},
 		{
 			"contains": "app-picker-native-refusal-owner",
 			"expected_count": 4
 		},
 		{
-			"contains": "agent-app-picker-tail",
-			"expected_count": 6
+			"contains": "HotstringsConfig native source gate:",
+			"expected_count": 2
+		},
+		{
+			"contains": "HotstringsConfig direct source authority:",
+			"expected_count": 2
+		},
+		{
+			"contains": "HotstringsConfig legacy default durable ACK:",
+			"expected_count": 5
+		},
+		{
+			"contains": "screenshot-owned-stage-composition",
+			"expected_count": 3
+		},
+		{
+			"contains": "screenshot-unstarted-lifetime",
+			"expected_count": 2
+		},
+		{
+			"contains": "screenshot-default-stage-collision",
+			"expected_count": 1
+		},
+		{
+			"contains": "token-wait-request-budget",
+			"expected_count": 8
+		},
+		{
+			"contains": "usage-finite-cost",
+			"expected_count": 3
+		},
+		{
+			"contains": "anthropic-temperature-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "app-picker-public-durable",
+			"expected_count": 5
+		},
+		{
+			"contains": "app-picker-exact-attempt",
+			"expected_count": 2
+		},
+		{
+			"contains": "idle-delay-decimal-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "ui-decimal-sibling-domain",
+			"expected_count": 1
+		},
+		{
+			"contains": "log-openers-buffered-owner",
+			"expected_count": 9
+		},
+		{
+			"contains": "token-margin-integer-domain",
+			"expected_count": 1
+		},
+		{
+			"contains": "remote-trim-scope",
+			"expected_count": 2
+		},
+		{
+			"contains": "worker-unicode-sibling070",
+			"expected_count": 2
+		},
+		{
+			"contains": "native-profile-paste-owner",
+			"expected_count": 3
 		}
 	]
 }

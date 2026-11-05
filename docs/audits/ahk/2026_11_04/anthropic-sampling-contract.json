@@ -1,0 +1,26 @@
+{
+	"observed_at": "2026-11-05",
+	"kind": "versioned official SDK contract, no upstream request",
+	"sources": [
+		{
+			"url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/v0.70.0/src/anthropic/types/message_create_params.py",
+			"sha256": "e5f6771998e16fecaf3a50d9495716897b679bbef1d32a7f8a533b208040010f",
+			"excerpt": "temperature: float; Defaults to 1.0. Ranges from 0.0 to 1.0."
+		},
+		{
+			"url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/v0.70.0/src/anthropic/types/model_param.py",
+			"sha256": "b1fda26d33723b679f3af4e045ea2c1d6ad2ce9c74d99990115686b4756588b9",
+			"excerpt": "        \"claude-haiku-4-5\",\n        \"claude-haiku-4-5-20251001\","
+		},
+		{
+			"url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/v0.84.0/src/anthropic/types/message_create_params.py",
+			"sha256": "b45e14c10a2bde4d92b4e63101c5380c0ae7960f940f8d1469dda2fd558ca66d",
+			"excerpt": "temperature: float; Defaults to 1.0. Ranges from 0.0 to 1.0."
+		},
+		{
+			"url": "https://raw.githubusercontent.com/anthropics/anthropic-sdk-python/v0.84.0/src/anthropic/types/model_param.py",
+			"sha256": "d4e125a04c1bd831ee6d13306eec8ded80cfc13a8425833c02356ce8df3376e1",
+			"excerpt": "        \"claude-haiku-4-5\",\n        \"claude-haiku-4-5-20251001\","
+		}
+	]
+}

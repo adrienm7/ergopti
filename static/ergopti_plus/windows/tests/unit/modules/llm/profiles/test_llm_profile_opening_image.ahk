@@ -28,9 +28,78 @@ _PFI_External(State) {
 	AssertTrue(ConfigFullStateCanPersist(), "The actual READY schema admits this external current document.")
 }
 
+
+_PFI_NativeInputTick(Step) {
+	if Step.Submitted || Step.Busy
+		return
+	Step.Busy := true
+	try {
+		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . A_Pid) {
+			if WinGetTitle("ahk_id " . Hwnd) != Step.Title
+				continue
+			Step.Hwnd := Hwnd
+			EditHwnd := ControlGetHwnd("Edit1", "ahk_id " . Hwnd)
+			Step.Multiline := !!(DllCall("User32\GetWindowLongW", "Ptr", EditHwnd, "Int", -16, "UInt") & 4)
+			if Step.Cancel {
+				PostMessage(0x111, 2, 0, , "ahk_id " . Hwnd)
+			} else {
+				if Step.Label
+					ControlSetText("Edited A", "Edit1", "ahk_id " . Hwnd)
+				else {
+					; Select all, then exercise the actual native paste behavior of
+					; the production dialog's Edit control, not SetWindowText.
+					SendMessage(0xB1, 0, -1, "Edit1", "ahk_id " . Hwnd)
+					SendMessage(0x302, 0, 0, "Edit1", "ahk_id " . Hwnd)
+				}
+				Step.Observed := ControlGetText("Edit1", "ahk_id " . Hwnd)
+				PostMessage(0x111, 1, 0, , "ahk_id " . Hwnd)
+			}
+			Step.Submitted := true
+			return
+		}
+	} catch as Failure {
+		Step.Failure := Failure
+		if Step.Hwnd
+			DllCall("User32\PostMessageW", "Ptr", Step.Hwnd, "UInt", 0x111, "Ptr", 2, "Ptr", 0, "Int")
+		Step.Submitted := true
+	} finally Step.Busy := false
+}
+
+_PFI_NativeInput(State, Prompt, Title, Options, Default) {
+	AssertFalse(A_IsCritical, "The public profile wizard must admit native modal automation outside Critical")
+	Step := {Title: WindowTitle(Title), Hwnd: 0, Label: State.Inputs == 1,
+		Cancel: State.Mode == "edit-native-cancel" && State.Inputs == 2,
+		Submitted: false, Busy: false, Failure: 0, Multiline: false, Observed: "", Returned: ""}
+	SavedClipboard := ClipboardAll()
+	Tick := _PFI_NativeInputTick.Bind(Step)
+	try {
+		if !Step.Label && !Step.Cancel {
+			A_Clipboard := State.Mode == "edit-native-single" ? "native single-line prompt"
+				: "first prompt line`r`nsecond prompt line"
+			AssertTrue(ClipWait(1), "The native paste must own actual Unicode clipboard text")
+		}
+		SetTimer(Tick, 10)
+		; T5 bounds automation failure without changing the dialog's text or
+		; control styles. Both dimensions come unchanged from production.
+		Box := Ui_InputBox(Prompt, Title, Options . " T5", Default)
+		if Step.Failure is Error
+			throw Step.Failure
+		AssertTrue(Step.Submitted && Step.Hwnd != 0, "The real production InputBox must receive native automation")
+		AssertEqual(Step.Cancel ? "Cancel" : "OK", Box.Result)
+		Step.Returned := Box.Value
+		State.NativeCaptures.Push(Step)
+		return Box
+	} finally {
+		SetTimer(Tick, 0)
+		A_Clipboard := SavedClipboard
+	}
+}
+
 _PFI_Input(State, Prompt, Title, Options, Default := "") {
 	State.Inputs += 1
 	AssertTrue(Prompt != "" && Title != "", "The native fallback must reach actual localized input boundaries.")
+	if InStr(State.Mode, "edit-native-") == 1
+		return _PFI_NativeInput(State, Prompt, Title, Options, Default)
 	if InStr(State.Mode, "external") && State.Inputs == 1 && State.ExternalImage == ""
 		_PFI_External(State)
 	if InStr(State.Mode, "cancel")
@@ -88,7 +157,7 @@ _PFI_Run(Mode) {
 	SavedVendor := _VendorDir
 	SavedReset := _PromptEdWeb_ResetDone
 	State := { Mode: Mode, World: 0, Inputs: 0, Confirms: 0, Collects: 0,
-		Notices: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "" }
+		Notices: [], InitialProfiles: 0, InitialImage: "", ExternalImage: "", NativeCaptures: [] }
 	try {
 		Suspend(false)
 		World := _LSP_World()
@@ -141,6 +210,7 @@ _PFI_Run(Mode) {
 			Result := LLM_Menu_OnUserProfileClick(Profiles[1], Port)
 		Accepted := Mode == "edit-current" || Mode == "create-current" || Mode == "delete-current"
 			|| Mode == "web-current" || Mode == "use-current"
+			|| Mode == "edit-native-paste" || Mode == "edit-native-single"
 		Cancelled := InStr(Mode, "cancel") > 0
 		AssertEqual(Accepted, World.ApplyCalls, "Only an owned accepted image may publish the real profile action.")
 		HandledChooser := InStr(Mode, "chooser-edit") || InStr(Mode, "use")
@@ -168,9 +238,23 @@ _PFI_Run(Mode) {
 				AssertEqual("edited-a", Saved[1]["system_single"])
 				AssertEqual("Edited A", Saved[1]["label"])
 			}
+			if Mode == "edit-native-paste" || Mode == "edit-native-single" {
+				ExpectedPrompt := Mode == "edit-native-single" ? "native single-line prompt"
+					: "first prompt line`nsecond prompt line"
+				AssertEqual(2, State.NativeCaptures.Length)
+				Input := State.NativeCaptures[2]
+				SavedPrompt := StrReplace(Saved[1]["system_single"], "`r`n", "`n")
+				_TestPrint("# native-profile-paste mode=" . Mode . " multiline_style=" . Input.Multiline
+					. " paste_control_lines=" . StrSplit(StrReplace(Input.Observed, "`r`n", "`n"), "`n").Length
+					. " returned_lines=" . StrSplit(StrReplace(Input.Returned, "`r`n", "`n"), "`n").Length
+					. " durable_lines=" . StrSplit(SavedPrompt, "`n").Length)
+				AssertEqual(ExpectedPrompt, SavedPrompt, "A real native paste must retain every prompt line through actual durable serialization")
+				AssertEqual(ExpectedPrompt, StrReplace(_LLM_Menu["user_profiles"][1]["system_single"], "`r`n", "`n"))
+				AssertEqual("Edited A", Saved[1]["label"])
+			}
 		}
 		if SubStr(Mode, 1, 5) == "edit-" || SubStr(Mode, 1, 7) == "create-"
-			AssertEqual(Cancelled ? 1 : 2, State.Inputs, "Both actual fallback inputs must be exercised except ordinary cancellation.")
+			AssertEqual(Cancelled && Mode != "edit-native-cancel" ? 1 : 2, State.Inputs, "Both actual fallback inputs must be exercised except ordinary label cancellation.")
 		if InStr(Mode, "delete")
 			AssertEqual(2, State.Confirms, "Removal must exercise both real confirmation callbacks.")
 		if InStr(Mode, "chooser-edit") {
@@ -228,3 +312,7 @@ _PFI_ColdProfilePolicy() {
 }
 Test("LLM profile policy: cold recommendation is composed before menu startup (llm-profile-policy-composition)",
 	_PFI_ColdProfilePolicy)
+
+for _PFI_NativeMode in ["edit-native-paste", "edit-native-single", "edit-native-cancel"]
+	Test("LLM native profile prompt: " . _PFI_NativeMode . " retains pasted lines (native-profile-paste-owner)",
+		_PFI_Run.Bind(_PFI_NativeMode))

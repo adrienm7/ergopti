@@ -314,3 +314,26 @@ Test("hotstring word reset: setters persist and publish", (*) => _HICR_WithFixtu
 Test("hotstring word reset: the free-entry prompt", (*) => _HICR_WithFixture(_HICR_PromptRefusesAndAccepts))
 Test("hotstring word reset: the choice row's free entry", _HICR_ChoiceRowFreeEntry)
 Test("hotstring word reset: the loader and the watcher wiring", _HICR_LoaderRejectsNegative)
+
+; The UI promises the engine's finite nonnegative seconds domain, not Int64.
+; Decimal input must be validated before AutoHotkey's wrapping integer cast.
+_HICR_WideDecimalPrompt(Raw, Expected) {
+	if Expected is Float
+		AssertTrue(HSE_ValidIdleResetSeconds(Expected), "The independent engine contract admits this finite delay")
+	Actual := ParseHotstringsIdleResetSeconds(Raw)
+	AssertEqual(Expected, Actual, "The actual menu parser must preserve the finite decimal magnitude, never wrap it to disabled/zero")
+	if Expected is Float
+		AssertTrue(Actual is Float, "A finite value outside Int64 must retain floating-point representation")
+}
+Test("hotstring idle reset: wide decimal integer cannot wrap to disabled (idle-delay-decimal-domain)",
+	_HICR_WideDecimalPrompt.Bind("18446744073709551616", 18446744073709551616.0))
+Test("hotstring idle reset: integral float cannot cross Int64 cast (idle-delay-decimal-domain)",
+	_HICR_WideDecimalPrompt.Bind("100000000000000000000.0", 1.0e20))
+_HICR_OverflowingDecimalPrompt() {
+	Raw := ""
+	loop 400
+		Raw .= "9"
+	_HICR_WideDecimalPrompt(Raw . ".0", "")
+}
+Test("hotstring idle reset: overflowing decimal float refuses before Round (idle-delay-decimal-domain)",
+	_HICR_OverflowingDecimalPrompt)

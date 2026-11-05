@@ -278,7 +278,7 @@
 			"reproduction": "Open the native model browser, hold a genuine configuration write lease, select model B and click Pick.",
 			"root_cause": "static/ergopti_plus/windows/ui/model_browser/init.ahk:_LLM_ModelBrowser_PickRow ignores the transactional Boolean returned by LLM_Menu_SetModel and always hides the browser. The Web sibling closes only after an acknowledged success.",
 			"silent_failure": "The unchanged model A remains selected but its native browser disappears, presenting the refused operation as finished.",
-			"regression_test": "Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry. AppPicker sibling: run41924556519 proves actual lease and sharing refusals destroy the current native picker and lose checkbox selections; both fail after genuine durable refusal. This variant is retained under this durability/presentation family without increasing the finding count. Corrective outcome ownership is being prepared. AppPicker source correction is now integrated after independent review: an explicit per-attempt durable outcome is recorded by the genuine writer before apply/log effects; confirmed noncommit rearms only the current receipt, and committed/unknown outcomes close. Four native refusal/apply/cancellation cases and existing callback ownership controls are selected next. Qualification pending."
+			"regression_test": "Use the genuine native browser construction, actual Pick button, full boot/configuration/menu owners and a real write lease. Require visible UI and unchanged file/RAM after refusal; release the lease and require a durable B selection and hidden UI after retry. AppPicker sibling: run41924556519 proves actual lease and sharing refusals destroy the current native picker and lose checkbox selections; both fail after genuine durable refusal. This variant is retained under this durability/presentation family without increasing the finding count. Corrective outcome ownership is being prepared. AppPicker source correction is now integrated after independent review: an explicit per-attempt durable outcome is recorded by the genuine writer before apply/log effects; confirmed noncommit rearms only the current receipt, and committed/unknown outcomes close. Four native refusal/apply/cancellation cases and existing callback ownership controls are selected next. Qualification pending. Native run41930158432 at5d857ae passes the selected existing regressions individually and reversed with complete production compilation. Exact open-attempt reservation now also prevents a cloned receipt from reopening an already claimed attempt. Five public durable-save cases and two exact-attempt cases await native qualification."
 		},
 		{
 			"id": "AHK-026",
@@ -520,7 +520,7 @@
 			"reproduction": "Native run41909512571 ata6373a4 passes the timely token answer. A genuine answer timer begins while the request owner is current and its clock live, then crosses the unchanged96ms deadline under Critical before delivering the actual token answer. Readiness returns true instead of false, individually and reversed.",
 			"root_cause": "_LLMRemote_ReadyOnAccess checks auxiliary identity but omits the stored absolute whole-request deadline. For a nonlisting request it publishes true immediately after successful token preparation even if the due deadline timer has not yet run.",
 			"silent_failure": "Save-time credential validation can report success after its total request budget expired, depending on native callback delivery order. The shared usable token may correctly remain cached while the expired individual validation must fail.",
-			"regression_test": "Two token-ready-deadline cases run public readiness and the genuine token engine through the existing passive exchange HTTP port, with actual AHK timer delivery. The late reply crosses the original real budget; neither origin nor duration is moved. Timely control, current-owner checks, exact one-result receipt and preserved token cache distinguish authority from credential lifetime. The narrow fix checks the original deadline in ReadyOnAccess. Native fail-before measured; post-fix measured. macOS/Linux token readiness continues through a request rather than this Windows-only nonlisting shortcut. Native post-fix: both real timer deadline cases passed individually and reversed in run41910772341 atf7e7b2f."
+			"regression_test": "Two token-ready-deadline cases run public readiness and the genuine token engine through the existing passive exchange HTTP port, with actual AHK timer delivery. The late reply crosses the original real budget; neither origin nor duration is moved. Timely control, current-owner checks, exact one-result receipt and preserved token cache distinguish authority from credential lifetime. The narrow fix checks the original deadline in ReadyOnAccess. Native fail-before measured; post-fix measured. macOS/Linux token readiness continues through a request rather than this Windows-only nonlisting shortcut. Native post-fix: both real timer deadline cases passed individually and reversed in run41910772341 atf7e7b2f. Native run41930158432 reproduces two own-request budget overruns while shared token exchange is pending; immediate403 controls pass. Integrated per-reservation watchdogs retire only their own request, preserve shared exchange and cancelled silence, and clean up invalid timer arms. Eight targeted cases await post-fix qualification."
 		},
 		{
 			"id": "AHK-048",
@@ -696,7 +696,7 @@
 			"reproduction": "Native run41924556519 case34 proves parent_create=1, newer_seen=1, native_priority_alive=1, global_priority_matches=0 and priority_error=Error. The no-reentry control passes; reverse replay agrees.",
 			"root_cause": "OpenPersonalEditor assigns _PersonalEditorPrioCtrl during construction before its final session-epoch check. A successor created through native control notifications owns a live priority edit, but the older constructor overwrites the global and then destroys that obsolete control.",
 			"silent_failure": "The current visible editor retains a dangling priority-control reference and cannot reliably save its entry.",
-			"regression_test": "Two personal-native-constructor-owner cases observe real WM_PARENTNOTIFY creation, exact HWND ownership and a subsequent genuine save. The priority control remains private until atomically published with the admitted GUI/source at the final epoch check. Post-fix pending. Run41926489533 observes the correct live successor priority identity in isolation, then times out before the next receipt; the reverse case passes. Final qualification remains incomplete. Diagnostic phase markers are added without changing the scenario or assertions. The constructor epoch increment/local capture now form a short RAM-only Critical claim."
+			"regression_test": "Two personal-native-constructor-owner cases observe real WM_PARENTNOTIFY creation, exact HWND ownership and a subsequent genuine save. The priority control remains private until atomically published with the admitted GUI/source at the final epoch check. Post-fix pending. Run41926489533 observes the correct live successor priority identity in isolation, then times out before the next receipt; the reverse case passes. Final qualification remains incomplete. Diagnostic phase markers are added without changing the scenario or assertions. The constructor epoch increment/local capture now form a short RAM-only Critical claim. Native run41930158432 at5d857ae passes the selected existing regressions individually and reversed with complete production compilation."
 		},
 		{
 			"id": "AHK-064",
@@ -729,7 +729,7 @@
 			"reproduction": "Native run41924556519 at9a8ebad: the real classifier and managed Poll both accept a finite1e30 usage count as MININT, publish a negative inferred total and negative estimated cost. Individually valid MAXINT prompt plus1 completion also wraps the inferred total to MININT. Both normal controls pass, and actual callbacks and exact handle/registry retirement still complete in all modes.",
 			"root_cause": "_LLMRemoteExtractUsageRoot treats every nonnegative finite Number as safely castable to signed64 Integer and adds two valid counters without a representation check. JSON validity alone does not establish the native consumer domain.",
 			"silent_failure": "A successful response can publish negative usage totals and estimated costs even though its provider supplied nonnegative values.",
-			"regression_test": "Six genuine classifier/managed-completion probes plus an eight-row boundary test preserve valid response text, exact callback count and retirement. The fix admits only representable counts and infers a total only when subtraction proves the addition safe; otherwise total remains unknown0. No product token cap is introduced. Native post-fix pending. Run41926489533 passes all7 counter/boundary cases and5 existing format/cost controls individually and reversed. An additional admitted integer-price case demonstrates multiplication wrap before float division; casting counts before multiplication is integrated as this same numeric-domain family, with post-fix qualification pending. Finite-cost overflow probes are added without a new count."
+			"regression_test": "Six genuine classifier/managed-completion probes plus an eight-row boundary test preserve valid response text, exact callback count and retirement. The fix admits only representable counts and infers a total only when subtraction proves the addition safe; otherwise total remains unknown0. No product token cap is introduced. Native post-fix pending. Run41926489533 passes all7 counter/boundary cases and5 existing format/cost controls individually and reversed. An additional admitted integer-price case demonstrates multiplication wrap before float division; casting counts before multiplication is integrated as this same numeric-domain family, with post-fix qualification pending. Finite-cost overflow probes are added without a new count. Native run41930158432 passes integer-price correction but reproduces two finite-input cost overflow failures. Cost now scales counts before price multiplication and rejects nonfinite final estimates. Three finite-cost tests include a tiny positive-price control; qualification pending."
 		},
 		{
 			"id": "AHK-067",
@@ -762,7 +762,7 @@
 			"reproduction": "Native run41926489533 at69c71ef: actual SendInputParse/Emit and TextPressKey accept the shared corpus emoji, execute the real Critical synthetic transaction and default prefix finalizer, but the receiving owned Edit obtains0 UTF-16 units instead of2. ASCII and BMP controls pass; reverse repeats the astral failure.",
 			"root_cause": "_SendInputAhkKey forwards a literal surrogate pair to TextPressKey, which braces it as an AutoHotkey key name. A braced unknown two-unit name is ignored; supplementary Unicode requires the explicit U+codepoint syntax.",
 			"silent_failure": "The action reports accepted input and commits its synthetic context while the requested character never reaches the application.",
-			"regression_test": "Three owned native receiver cases test ASCII, BMP and astral output through the actual transaction. The adapter now converts only well-formed supplementary pairs to U+codepoint; named/BMP/braces remain unchanged. Four extra action assertions cover U+10000, U+1F44B, U+10FFFF and a modified supplementary key. Native post-fix pending."
+			"regression_test": "Three owned native receiver cases test ASCII, BMP and astral output through the actual transaction. The adapter now converts only well-formed supplementary pairs to U+codepoint; named/BMP/braces remain unchanged. Four extra action assertions cover U+10000, U+1F44B, U+10FFFF and a modified supplementary key. Native post-fix pending. Native run41930158432 at5d857ae passes the selected existing regressions individually and reversed with complete production compilation."
 		},
 		{
 			"id": "AHK-070",
@@ -773,7 +773,7 @@
 			"reproduction": "Native run41926489533 at69c71ef: after correcting the independent8.3 input alias fixture, ASCII passes exact_path1 with a physical artifact. Primary and fallback workers both create the Unicode artifact but their returned path does not exist; expected UTF-16 unit233 is decoded as8218 under CP0. Same reverse failures. Initial run41924556519 had an additional fixture alias mismatch and did not alone establish the codec defect.",
 			"root_cause": "PowerShell5.1 Write-Output encodes its console receipt using an OEM code page, while the parent native runner reads the staged bytes as ANSI CP0 without a byte-order mark. Native Unicode paths therefore cross incompatible codecs.",
 			"silent_failure": "A report can be written successfully while its acknowledged filename is unusable, preventing the driver from locating or opening that report.",
-			"regression_test": "Three genuine worker/mapping/file controls independently locate and inspect the physical report before comparing the raw acknowledged path. Both writers now emit explicit UTF-8 bytes with BOM on stdout; FileRead autodetects the encoding without changing ShellRunner or OK:path semantics. Native post-fix pending."
+			"regression_test": "Three genuine worker/mapping/file controls independently locate and inspect the physical report before comparing the raw acknowledged path. Both writers now emit explicit UTF-8 bytes with BOM on stdout; FileRead autodetects the encoding without changing ShellRunner or OK:path semantics. Native post-fix pending. Native run41930158432 at5d857ae passes the selected existing regressions individually and reversed with complete production compilation."
 		},
 		{
 			"id": "AHK-071",
@@ -784,7 +784,40 @@
 			"reproduction": "Native run41927538467 at09e8ea2: the public GestureCaptureRegion owner and genuine deferred worker receive a pixel-I/O refusal before any write. A pre-existing file acquired independently by CREATE_NEW at the deterministic stage path disappears; terminal count1 and jobs0 prove cleanup completed. The no-stage control passes. No screen pixels or clipboard content are captured.",
 			"root_cause": "The stage path is derived from process ID and epoch without acquiring file ownership. WorkerDone calls _GestureScreenshotCaptureStage even after pre-write failure; that routine creates its cleanup authority by observing whatever file is now present at the path.",
 			"silent_failure": "A failed capture may delete an unowned existing temporary file, including an artifact left by an earlier process with a recycled ID.",
-			"regression_test": "Two public-owner/native filesystem cases prove pre-write failure must preserve the exact independently created stage identity and bytes. A synthetic one-pixel GDI compatibility probe separately refutes the proposed zero-access metadata lease: DeleteFile succeeds, so that proposal cannot be used as a fix. Qualification of a real read lease is pending. No production ownership correction is integrated yet; this finding is confirmed but is not counted as fixed."
+			"regression_test": "Native run41930158432 proves that a GENERIC_READ lease with read/write sharing permits actual GDI encoding while retaining stage identity and preventing deletion. The integrated fix acquires CREATE_NEW before capture, retains the native handle and snapshot through publication/cleanup, refuses unowned stages, preserves close-failure debt and releases unstarted job cycles. Existing cleanup fixtures now carry actual ownership receipts. Three real one-pixel composition tests and two unstarted lifetime witnesses are added; post-fix Windows qualification pending."
+		},
+		{
+			"id": "AHK-072",
+			"title": "Override saves overwrite a source changed after the loaded snapshot",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41930158432 at5d857ae: four external-source changes and one staging-time change are silently overwritten by public override saves; three unchanged-source controls pass. The inverse repeats the same five failures.",
+			"root_cause": "The full-state override writer serializes its cached Map without proving that the current exact source bytes still belong to that same loaded Map. A path or cloned Map alone is not source authority.",
+			"silent_failure": "An acknowledged setting edit erases edits made by another writer after loading, including changes during save preparation.",
+			"regression_test": "Integrated receipts bind exact UTF-8 source state, canonical path and actual Map identity. Save admission checks the captured receipt again after staging; successful readback publishes a new receipt with RAM. Eight original native probes, two final-gate cases and two direct-owner cases cover refusal and controls. Existing actual-writer fixtures are adapted; post-fix qualification pending."
+		},
+		{
+			"id": "AHK-073",
+			"title": "Anthropic requests transmit temperatures outside the provider domain",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41930158432 at5d857ae: actual Anthropic request building emits1.02 and2.0 from accepted settings; the0.9 control passes. Official versioned Anthropic SDK documents temperature0.0..1.0 for the configured model family. No upstream HTTP request was made.",
+			"root_cause": "The generic0..2 option range reaches the Anthropic-specific serializer unchanged although this provider accepts only0..1.",
+			"silent_failure": "A supported UI configuration constructs a request outside the provider temperature contract.",
+			"regression_test": "The Anthropic builder now clamps to its documented0..1 domain, leaving other providers unchanged. Three actual request-building cases await post-fix qualification. Versioned SDK URLs, content hashes and normative excerpts are retained in anthropic-sampling-contract.json."
+		},
+		{
+			"id": "AHK-074",
+			"title": "Deferred layout-row replay loses a captured Shift modifier",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1"],
+			"reproduction": "Native run41930158432 at5d857ae: the +SC010 variant is selected, Shift is released before dispatch, and callback/receiver both observeShift0. Plain and still-held modifier controls pass; inverse repeats the failure.",
+			"root_cause": "_LayoutRowPassthrough replays only the scan code with Blind and discards the selected modifier identity. Current key state no longer describes the original event after deferred dispatch.",
+			"silent_failure": "A captured modified key can reach the application as an unmodified key and invoke a different action.",
+			"regression_test": "Three genuine native handler/receiver probes establish the defect. Additional thread-state diagnostics are integrated. No production correction is integrated yet: wildcard modifier combinations and external receiver semantics still require a sound solution. This confirmed finding is not counted as fixed."
 		}
 	]
 }
