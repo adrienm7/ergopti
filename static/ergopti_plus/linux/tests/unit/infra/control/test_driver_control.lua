@@ -60,6 +60,18 @@ local function request(files, token, id)
 end
 
 helpers.describe("Linux local driver control", function()
+	helpers.it("linux-control-session-read: retains unreadable session ownership until retry", function()
+		local session, files = world(function() return true end)
+		session:start()
+		local path = FOLDER .. "/session.json"
+		local original = files[path]
+		session.ports.read_status = function() return nil, "error", "controlled EIO" end
+		helpers.assert_eq(session:stop(), false, "an unreadable session is not proven absent")
+		helpers.assert_eq(files[path], original)
+		session.ports.read_status = function(target) return files[target], "ok" end
+		helpers.assert_eq(session:stop(), true)
+		helpers.assert_nil(files[path])
+	end)
 	for _, mode in ipairs({ "write", "rename" }) do
 		helpers.it("linux-control-reload-receipt: refuses restart when requested record cannot " .. mode, function()
 			local session, files, calls = world(function() return true end)
