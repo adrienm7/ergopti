@@ -1,0 +1,22 @@
+{
+ "continuations": 0,
+ "counters": {},
+ "error_keys": [],
+ "errors": [],
+ "field_checks": {
+  "counts": {},
+  "items": []
+ },
+ "lifecycle": {},
+ "lines": 0,
+ "logs": [],
+ "performance": [],
+ "previous": "mac-2026-11-05_101318",
+ "records": 0,
+ "schema": 1,
+ "span": {
+  "first": null,
+  "last": null
+ },
+ "top_fixes": []
+}

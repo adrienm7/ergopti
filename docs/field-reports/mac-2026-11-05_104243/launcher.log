@@ -1,0 +1,89 @@
+[2026-11-05 10:10:16.220] launcher startup started — version 0.0.0-dev.162+3354
+[2026-11-05 10:10:16.222] launcher stage: sole-launcher lock held at /Users/b519hs/Library/Application Support/Ergopti/launcher.lock
+[2026-11-05 10:10:16.228] launcher stage: Sparkle updater wired (+75 ms)
+[2026-11-05 10:10:16.229] launcher stage: MJConfigFile seeded to /Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/init.lua
+[2026-11-05 10:10:16.230] launcher stage: embedded Hammerspoon and bundled init.lua found at /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+[2026-11-05 10:10:16.230] launcher stage: remap guardian registration left to the driver's Karabiner switch
+[2026-11-05 10:10:16.230] launcher stage: native logger worker bound on loopback port 64268
+[2026-11-05 10:10:16.231] launcher stage: child environment exports ERGOPTI_CONFIG_DIR, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_FIELD_REPORT_RERUN, ERGOPTI_FIELD_RUN_ROOT, ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_LAUNCHER_LOG_FILE, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_PATHS_FILE, ERGOPTI_REMAP_GUARDIAN_STATUS
+[2026-11-05 10:10:16.232] launcher stage: launch requested for /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app
+[2026-11-05 10:10:16.431] embedded Hammerspoon launched at /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app (pid 32879, +277 ms)
+[2026-11-05 10:10:16.432] launcher startup complete: exit monitoring attached to pid 32879 (+278 ms)
+[2026-11-05 10:10:16] embedded Hammerspoon boot INFO: Native scripting server: pid=32879; getter=boolean; allowed=false; bridge=callable; handler_registration=unobserved; handler_entry=unobserved.
+[2026-11-05 10:10:16] embedded Hammerspoon boot INFO: Boot timing started.
+[2026-11-05 10:10:16] embedded Hammerspoon boot INFO: Launcher environment keys present: ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_CONFIG_DIR, ERGOPTI_PATHS_FILE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_REMAP_GUARDIAN_STATUS, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_LAUNCHER_LOG_FILE; missing: none.
+[2026-11-05 10:10:16] embedded Hammerspoon boot START: Boot stage started: Core module requires.
+[2026-11-05 10:10:16] embedded Hammerspoon boot SUCCESS: Boot stage completed: Core module requires in 3.7 ms (+4.5 ms, total 4.5 ms, cpu 2.7 ms).
+[2026-11-05 10:10:16] embedded Hammerspoon boot START: Boot stage started: Path: config dir + paths.toml (config_paths.init).
+[2026-11-05 10:10:17] embedded Hammerspoon boot INFO: Config dir resolved: <config>/ (directory).
+[2026-11-05 10:10:17] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 352.1 ms (+352.5 ms, total 357.1 ms, cpu 214.7 ms).
+[2026-11-05 10:10:17] embedded Hammerspoon boot START: Boot stage started: Path: log file open (retention purge deferred).
+[2026-11-05 10:10:17] embedded Hammerspoon boot INFO: Log folder chosen: ~/perso/ergopti/ergopti_plus/Ergopti/ (directory; usable: true).
+[2026-11-05 10:10:17] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: log file open (retention purge deferred) in 4.1 ms (+5.1 ms, total 362.2 ms, cpu 1.2 ms).
+[2026-11-05 10:10:17] embedded Hammerspoon boot START: Boot stage started: Path: native asynchronous logger transport committed.
+[2026-11-05 10:10:17.185] embedded Hammerspoon bootstrap logger configured (+1031 ms)
+[2026-11-05 10:10:56] embedded Hammerspoon boot INFO: Native scripting server: pid=32879; getter=boolean; allowed=false; bridge=callable; handler_registration=unobserved; handler_entry=unobserved.
+[2026-11-05 10:10:56] embedded Hammerspoon boot INFO: Boot timing started.
+[2026-11-05 10:10:56] embedded Hammerspoon boot INFO: Launcher environment keys present: ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_CONFIG_DIR, ERGOPTI_PATHS_FILE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_REMAP_GUARDIAN_STATUS, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_LAUNCHER_LOG_FILE; missing: none.
+[2026-11-05 10:10:56] embedded Hammerspoon boot START: Boot stage started: Core module requires.
+[2026-11-05 10:10:56] embedded Hammerspoon boot SUCCESS: Boot stage completed: Core module requires in 5.1 ms (+8.9 ms, total 8.9 ms, cpu 3.5 ms).
+[2026-11-05 10:10:56] embedded Hammerspoon boot START: Boot stage started: Path: config dir + paths.toml (config_paths.init).
+[2026-11-05 10:10:56] embedded Hammerspoon boot INFO: Config dir resolved: <config>/ (directory).
+[2026-11-05 10:10:56] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 261.8 ms (+262.5 ms, total 271.4 ms, cpu 172.4 ms).
+[2026-11-05 10:10:56] embedded Hammerspoon boot START: Boot stage started: Path: log file open (retention purge deferred).
+[2026-11-05 10:10:56] embedded Hammerspoon boot INFO: Log folder chosen: ~/perso/ergopti/ergopti_plus/Ergopti/ (directory; usable: true).
+[2026-11-05 10:10:56] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: log file open (retention purge deferred) in 2.0 ms (+2.6 ms, total 274.0 ms, cpu 1.0 ms).
+[2026-11-05 10:10:56] embedded Hammerspoon boot START: Boot stage started: Path: native asynchronous logger transport committed.
+[2026-11-05 10:11:05.375] embedded Hammerspoon terminated with exit code 0 (bootstrap logger configured: true, +49221 ms)
+[2026-11-05 10:11:05.402] FATAL: Embedded Hammerspoon stopped at boot stage 'accessibility': Accessibility permission was not granted within 600 s
+[2026-11-05 10:11:07.291] applicationWillTerminate; stopping embedded Hammerspoon
+[2026-11-05 10:42:50.123] launcher startup started — version 0.0.0-dev.162+3354
+[2026-11-05 10:42:50.125] launcher stage: sole-launcher lock held at /Users/b519hs/Library/Application Support/Ergopti/launcher.lock
+[2026-11-05 10:42:50.130] launcher stage: Sparkle updater wired (+84 ms)
+[2026-11-05 10:42:50.138] launcher stage: MJConfigFile seeded to /Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/init.lua
+[2026-11-05 10:42:50.139] launcher stage: embedded Hammerspoon and bundled init.lua found at /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+[2026-11-05 10:42:50.139] launcher stage: remap guardian registration left to the driver's Karabiner switch
+[2026-11-05 10:42:50.147] launcher stage: native logger worker bound on loopback port 55444
+[2026-11-05 10:42:50.153] launcher stage: child environment exports ERGOPTI_CONFIG_DIR, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_FIELD_REPORT_RERUN, ERGOPTI_FIELD_RUN_ROOT, ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_LAUNCHER_LOG_FILE, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_PATHS_FILE, ERGOPTI_REMAP_GUARDIAN_STATUS
+[2026-11-05 10:42:50.154] launcher stage: launch requested for /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app
+[2026-11-05 10:42:50.317] embedded Hammerspoon launched at /Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app (pid 45655, +271 ms)
+[2026-11-05 10:42:50.329] launcher startup complete: exit monitoring attached to pid 45655 (+283 ms)
+[2026-11-05 10:42:50] embedded Hammerspoon boot INFO: Native scripting server: pid=45655; getter=boolean; allowed=false; bridge=callable; handler_registration=unobserved; handler_entry=unobserved.
+[2026-11-05 10:42:50] embedded Hammerspoon boot INFO: Boot timing started.
+[2026-11-05 10:42:50] embedded Hammerspoon boot INFO: Launcher environment keys present: ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_CONFIG_DIR, ERGOPTI_PATHS_FILE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_REMAP_GUARDIAN_STATUS, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_LAUNCHER_LOG_FILE; missing: none.
+[2026-11-05 10:42:50] embedded Hammerspoon boot START: Boot stage started: Core module requires.
+[2026-11-05 10:42:50] embedded Hammerspoon boot SUCCESS: Boot stage completed: Core module requires in 3.4 ms (+4.5 ms, total 4.5 ms, cpu 2.5 ms).
+[2026-11-05 10:42:50] embedded Hammerspoon boot START: Boot stage started: Path: config dir + paths.toml (config_paths.init).
+[2026-11-05 10:42:50] embedded Hammerspoon boot INFO: Config dir resolved: <config>/ (directory).
+[2026-11-05 10:42:50] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 245.6 ms (+245.9 ms, total 250.4 ms, cpu 200.0 ms).
+[2026-11-05 10:42:50] embedded Hammerspoon boot START: Boot stage started: Path: log file open (retention purge deferred).
+[2026-11-05 10:42:50] embedded Hammerspoon boot INFO: Log folder chosen: ~/perso/ergopti/ergopti_plus/Ergopti/ (directory; usable: true).
+[2026-11-05 10:42:50] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: log file open (retention purge deferred) in 10.4 ms (+11.4 ms, total 261.8 ms, cpu 1.1 ms).
+[2026-11-05 10:42:50] embedded Hammerspoon boot START: Boot stage started: Path: native asynchronous logger transport committed.
+[2026-11-05 10:42:50.961] embedded Hammerspoon bootstrap logger configured (+916 ms)
+[2026-11-05 10:44:52] embedded Hammerspoon boot INFO: Native scripting server: pid=45655; getter=boolean; allowed=false; bridge=callable; handler_registration=unobserved; handler_entry=unobserved.
+[2026-11-05 10:44:52] embedded Hammerspoon boot INFO: Boot timing started.
+[2026-11-05 10:44:52] embedded Hammerspoon boot INFO: Launcher environment keys present: ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_CONFIG_DIR, ERGOPTI_PATHS_FILE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_REMAP_GUARDIAN_STATUS, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_LAUNCHER_LOG_FILE; missing: none.
+[2026-11-05 10:44:52] embedded Hammerspoon boot START: Boot stage started: Core module requires.
+[2026-11-05 10:44:52] embedded Hammerspoon boot SUCCESS: Boot stage completed: Core module requires in 4.6 ms (+6.0 ms, total 6.0 ms, cpu 3.0 ms).
+[2026-11-05 10:44:52] embedded Hammerspoon boot START: Boot stage started: Path: config dir + paths.toml (config_paths.init).
+[2026-11-05 10:44:53] embedded Hammerspoon boot INFO: Config dir resolved: <config>/ (directory).
+[2026-11-05 10:44:53] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 213.3 ms (+213.8 ms, total 219.9 ms, cpu 167.1 ms).
+[2026-11-05 10:44:53] embedded Hammerspoon boot START: Boot stage started: Path: log file open (retention purge deferred).
+[2026-11-05 10:44:53] embedded Hammerspoon boot INFO: Log folder chosen: ~/perso/ergopti/ergopti_plus/Ergopti/ (directory; usable: true).
+[2026-11-05 10:44:53] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: log file open (retention purge deferred) in 2.5 ms (+3.2 ms, total 223.1 ms, cpu 1.1 ms).
+[2026-11-05 10:44:53] embedded Hammerspoon boot START: Boot stage started: Path: native asynchronous logger transport committed.
+[2026-11-05 10:45:08] embedded Hammerspoon boot INFO: Native scripting server: pid=45655; getter=boolean; allowed=false; bridge=callable; handler_registration=unobserved; handler_entry=unobserved.
+[2026-11-05 10:45:08] embedded Hammerspoon boot INFO: Boot timing started.
+[2026-11-05 10:45:08] embedded Hammerspoon boot INFO: Launcher environment keys present: ERGOPTI_KEYBOARD_GEOMETRY_V1, ERGOPTI_LAUNCHER_PID, ERGOPTI_LAUNCHER_BUNDLE_ID, ERGOPTI_LOG_PORT, ERGOPTI_LOG_TOKEN, ERGOPTI_LAUNCHER_VERSION, ERGOPTI_CONFIG_DIR, ERGOPTI_PATHS_FILE, ERGOPTI_LAUNCHER_EXECUTABLE, ERGOPTI_REMAP_GUARDIAN_STATUS, ERGOPTI_LAUNCHER_DEVICE, ERGOPTI_LAUNCHER_INODE, ERGOPTI_FATAL_REPORT_FILE, ERGOPTI_LAUNCHER_LOG_FILE; missing: none.
+[2026-11-05 10:45:08] embedded Hammerspoon boot START: Boot stage started: Core module requires.
+[2026-11-05 10:45:08] embedded Hammerspoon boot SUCCESS: Boot stage completed: Core module requires in 4.1 ms (+5.3 ms, total 5.3 ms, cpu 2.6 ms).
+[2026-11-05 10:45:08] embedded Hammerspoon boot START: Boot stage started: Path: config dir + paths.toml (config_paths.init).
+[2026-11-05 10:45:08] embedded Hammerspoon boot INFO: Config dir resolved: <config>/ (directory).
+[2026-11-05 10:45:08] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: config dir + paths.toml (config_paths.init) in 215.2 ms (+215.8 ms, total 221.1 ms, cpu 157.2 ms).
+[2026-11-05 10:45:08] embedded Hammerspoon boot START: Boot stage started: Path: log file open (retention purge deferred).
+[2026-11-05 10:45:08] embedded Hammerspoon boot INFO: Log folder chosen: ~/perso/ergopti/ergopti_plus/Ergopti/ (directory; usable: true).
+[2026-11-05 10:45:08] embedded Hammerspoon boot SUCCESS: Boot stage completed: Path: log file open (retention purge deferred) in 1.5 ms (+2.4 ms, total 223.5 ms, cpu 0.8 ms).
+[2026-11-05 10:45:08] embedded Hammerspoon boot START: Boot stage started: Path: native asynchronous logger transport committed.
+[2026-11-05 10:45:30.607] embedded Hammerspoon terminated with exit code 0 (bootstrap logger configured: true, +160562 ms)
+[2026-11-05 10:45:30.629] applicationWillTerminate; stopping embedded Hammerspoon

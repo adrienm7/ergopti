@@ -1,0 +1,7 @@
+[dev-prerelease] Newest signed dev prerelease: v0.0.0-dev.162.
+[dev-prerelease] /Applications/ErgoptiPlus.app is already v0.0.0-dev.162.
+[dev-prerelease] Opened /Applications/ErgoptiPlus.app with this clone as its field-run root.
+[field-report] Two steps may need you: type your password if macOS asks for it (Ergopti installs its own Karabiner
+[field-report] runtime), and if System Settings opens Login Items & Extensions, switch on the Karabiner driver there.
+[field-report] Nothing else needs a click; the run waits for both.
+[field-report] Waiting for the developer app to publish its readiness...

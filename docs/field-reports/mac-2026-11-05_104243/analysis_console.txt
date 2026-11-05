@@ -1,0 +1,2 @@
+[field-report] Check verdicts summary: ✅ 0 pass, ❌ 0 fail, ⏭️ 0 skip, ⌨️ 0 needs_typing, ⚠️ 0 other.
+[field-report] Log analysis: 0 error group(s), 0 warning group(s), 0 measure(s) over budget; see analysis.md.
