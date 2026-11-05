@@ -2593,10 +2593,13 @@ function render_lexical_kpi() {
 		const el = document.getElementById(id);
 		if (el) el.innerHTML = html;
 	};
-	set('lexical_val', `${richness.toFixed(1)}<span class="stat-unit">% richesse</span>`);
+	set(
+		'lexical_val',
+		`${richness.toFixed(1)}<span class="stat-unit">${escape_html(_t('ui_typing.unit_richness'))}</span>`
+	);
 	set('lexical_unique', format_number(unique_words));
 	set('lexical_total', format_number(total_words));
-	set('lexical_avg_len', `${avg_len.toFixed(2)} car.`);
+	set('lexical_avg_len', `${avg_len.toFixed(2)} ${escape_html(_t('ui_typing.col_chars'))}`);
 	set('lexical_top', top_word ? `${escape_html(top_word)} (${format_number(top_count)})` : '—');
 
 	const loading = document.getElementById('lexical_loading');
@@ -2624,7 +2627,7 @@ function render_lexical_kpi() {
 		const label = l === 15 ? '15+' : String(l);
 		bars_html.push(
 			`<tr>` +
-				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} car.</td>` +
+				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:42px;">${label} ${escape_html(_t('ui_typing.col_chars'))}</td>` +
 				`<td style="padding:2px 6px;">` +
 				`<div style="height:10px;background:rgba(255,255,255,0.05);border-radius:5px;overflow:hidden;">` +
 				`<div style="height:100%;width:${pct}%;background:rgb(251, 191, 36);"></div>` +
@@ -2726,7 +2729,10 @@ function render_rhythm_kpi() {
 		'rhythm_val',
 		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">${_t('ui_typing.unit_cpm_burst')}</span>`
 	);
-	set('rhythm_max_chars', max_chars > 0 ? `${format_number(max_chars)} car.` : '—');
+	set(
+		'rhythm_max_chars',
+		max_chars > 0 ? `${format_number(max_chars)} ${escape_html(_t('ui_typing.col_chars'))}` : '—'
+	);
 	set('rhythm_count', format_number(total_bursts));
 	set('rhythm_mean_delay', mean_delay > 0 ? `${mean_delay.toFixed(0)} ms` : '—');
 	set('rhythm_cv', inter_count > 0 ? cv.toFixed(2) : '—');
@@ -2754,7 +2760,7 @@ function render_rhythm_kpi() {
 		.map((k) => {
 			const n = length_buckets[k] || 0;
 			const pct = max_bucket > 0 ? (n / max_bucket) * 100 : 0;
-			const label = k === '500+' ? '500+ car.' : `≤ ${k} car.`;
+			const label = `${k === '500+' ? '500+' : `≤ ${k}`} ${escape_html(_t('ui_typing.col_chars'))}`;
 			return (
 				`<tr>` +
 				`<td style="text-align:right;font-variant-numeric:tabular-nums;color:${ThemeTokens.color('grey-aaa')};width:78px;">${label}</td>` +
@@ -2818,7 +2824,12 @@ function render_sessions_kpi() {
 	);
 	set('sessions_total_time', count > 0 ? _fmt_duration_ms(total_active_ms) : '—');
 	set('sessions_longest_time', longest_ms > 0 ? _fmt_duration_ms(longest_ms) : '—');
-	set('sessions_longest_chars', longest_chars > 0 ? `${format_number(longest_chars)} car.` : '—');
+	set(
+		'sessions_longest_chars',
+		longest_chars > 0
+			? `${format_number(longest_chars)} ${escape_html(_t('ui_typing.col_chars'))}`
+			: '—'
+	);
 	set('sessions_avg_time', avg_ms > 0 ? _fmt_duration_ms(avg_ms) : '—');
 
 	const loading = document.getElementById('sessions_loading');
@@ -2928,7 +2939,9 @@ function render_records_kpi() {
 	);
 	set(
 		'records_burst_chars',
-		max_burst > 0 ? `${format_number(max_burst)} car. (${escape_html(max_burst_app)})` : '—'
+		max_burst > 0
+			? `${format_number(max_burst)} ${escape_html(_t('ui_typing.col_chars'))} (${escape_html(max_burst_app)})`
+			: '—'
 	);
 	set(
 		'records_session',
@@ -2936,7 +2949,9 @@ function render_records_kpi() {
 	);
 	set(
 		'records_best_day',
-		best_day_chars > 0 ? `${format_number(best_day_chars)} car. (${fr_short(best_day)})` : '—'
+		best_day_chars > 0
+			? `${format_number(best_day_chars)} ${escape_html(_t('ui_typing.col_chars'))} (${fr_short(best_day)})`
+			: '—'
 	);
 	set('records_streak', streak_max > 0 ? `${streak_max} jour${streak_max > 1 ? 's' : ''}` : '—');
 
@@ -3157,7 +3172,9 @@ function render_apps_kpi() {
 	const top_vol = _apps_data.slice().sort((a, b) => b.chars - a.chars)[0];
 	set(
 		'apps_top_volume',
-		top_vol ? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} car.)` : '—'
+		top_vol
+			? `${escape_html(top_vol.name)} (${format_number(top_vol.chars)} ${escape_html(_t('ui_typing.col_chars'))})`
+			: '—'
 	);
 
 	// Build symmetric app-pair affinity: both directions of switching count.
