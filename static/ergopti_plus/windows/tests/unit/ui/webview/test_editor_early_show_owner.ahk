@@ -151,6 +151,6 @@ _PINS_ChildSource(Owners) {
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. Includes . "#Include " . Fixture . "`n"
 }
-for _PINS_Mode in ["current", "destroy-reopen"]
+for _PINS_Mode in ["current", "destroy-reopen", "reset-close"]
 	Test("Personal information native close: " . _PINS_Mode . " retains its admitted owner (personal-info-native-close)",
 		_ESOT_Case.Bind("personal-info", _PINS_Mode))

@@ -92,10 +92,11 @@ _PINS_Main() {
 	global _PINS, _VendorDir, _SharedDir, ScriptInformation
 	global PersonalInformation, PersonalInformationLetters, HSE_RuntimeDecisionGeneration
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_ResetDone
+	global _PiEdWeb_EditorSource, _PiEdWeb_SessionEpoch
 	if A_Args.Length != 5 || A_Args[1] != "personal-info"
 		ExitApp(2)
 	Mode := A_Args[2], Root := A_Args[3]
-	_PINS_Require(Mode == "current" || Mode == "destroy-reopen")
+	_PINS_Require(Mode == "current" || Mode == "destroy-reopen" || Mode == "reset-close")
 	_PINS := {Windows: [], Hwnds: [], Controllers: [], Callbacks: 0, Active: false,
 		Fired: false, Failure: 0, Reopens: 0, SeenBeforeReturn: false,
 		OldHwnd: 0, NewGui: 0, NewHwnd: 0, NewAliveBefore: false}
@@ -145,6 +146,24 @@ _PINS_Main() {
 				"Returning old Close must preserve the real successor's live global owner")
 			_PINS_Require(_PINS.Controllers.Length == 2 && _PiEdWeb_Controller == _PINS.Controllers[2]
 				&& _PINS.Controllers[2].Closed == 0)
+		} else if Mode == "reset-close" {
+			Source := _PiEdWeb_EditorSource
+			_PiEdWeb_Reset()
+			ResetEpoch := _PiEdWeb_SessionEpoch
+			_PINS_Require(_PiEdWeb_Gui == Old && DllCall("User32\IsWindow", "Ptr", _PINS.OldHwnd, "Int")
+				&& _PiEdWeb_ResetDone && _PINS.Controllers[1].Closed == 1 && !Source["active"],
+				"A genuine plumbing-only Reset must retain its exact native host after one controller retirement")
+			; Before-reload/manual cleanup must still close the retained exact host.
+			_PiEdWeb_OnClose(Old)
+			_PINS_Require(!DllCall("User32\IsWindow", "Ptr", _PINS.OldHwnd, "Int") && !IsObject(_PiEdWeb_Gui),
+				"Exact manual Close after ResetDone must destroy its real retained window")
+			_PINS_Require(_PINS.Controllers[1].Closed == 1 && _PiEdWeb_SessionEpoch == ResetEpoch,
+				"Closing only a retained host must not repeat COM close or advance the already-retired source")
+			_PiEdWeb_OnClose(Old)
+			_PINS_Require(_PINS.Controllers[1].Closed == 1 && _PiEdWeb_SessionEpoch == ResetEpoch && !IsObject(_PiEdWeb_Gui),
+				"A duplicate exact Close must remain inert after native destruction")
+			FileAppend("RECEIPT personal-info-native-close mode=reset-close retained_before=1 native_after=0 controller_closes="
+				. _PINS.Controllers[1].Closed . " epoch_preserved=" . (_PiEdWeb_SessionEpoch == ResetEpoch) . "`n", "*")
 		} else {
 			_PINS_Require(_PINS.Controllers[1].Closed == 0 && !_PiEdWeb_ResetDone)
 			FileAppend("RECEIPT personal-info-native-close mode=current windows=1 factories=1 live=1`n", "*")
