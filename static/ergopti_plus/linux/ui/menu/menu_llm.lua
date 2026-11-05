@@ -83,6 +83,26 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	end
 end
 
+--- Commits a preset only when its persistent owner acknowledges the write.
+--- @param owner table Settings owner.
+--- @param name string Setting name.
+--- @param value any Selected value.
+--- @param refresh function|nil Menu refresh callback.
+--- @return boolean committed
+local function commit_preset(owner, name, value, refresh)
+	local called, accepted = pcall(owner.set, name, value)
+	if not called or accepted ~= true then
+		Logger.error(LOG, "Preset setting '%s' could not be saved.", name)
+		local okay, notifier = pcall(require, "adapters.notifier")
+		if okay and type(notifier.send) == "function" then
+			pcall(SaveFailure.present, i18n_safe, function(message) notifier.send(message, { level = "error" }) end)
+		end
+		return false
+	end
+	if type(refresh) == "function" then refresh() end
+	return true
+end
+
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local NativeParent = require("ui.menu.ai_parent")
@@ -131,8 +151,7 @@ local function _build_llm(ctx)
 			local delay_choices = {}
 			local function choose(value)
 				return function()
-					TriggerSettings.set(name, value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return commit_preset(TriggerSettings, name, value, ctx.on_menu_changed)
 				end
 			end
 			for _, value in ipairs(TriggerSettings.presets(name)) do
@@ -840,8 +859,7 @@ local function _build_llm(ctx)
 				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
-					ProfileSettings.set(require("config_keys").LEAF.NUM_PREDICTIONS, value)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return commit_preset(ProfileSettings, require("config_keys").LEAF.NUM_PREDICTIONS, value, ctx.on_menu_changed)
 				end,
 			}
 		end
@@ -879,8 +897,7 @@ local function _build_llm(ctx)
 					label = tostring(value),
 					checked = current == value,
 					action = function()
-						Settings.set(setting.name, value)
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return commit_preset(Settings, setting.name, value, ctx.on_menu_changed)
 					end,
 				}
 			end
