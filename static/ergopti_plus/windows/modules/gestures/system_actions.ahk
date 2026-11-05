@@ -482,11 +482,12 @@ GestureSysEmptyTrash(Sys := 0) {
 
 ; Ejects every removable drive through its Eject verb, as Explorer does.
 GestureSysEjectAllDisks(Sys := 0) {
-	global GESTURE_SYS_CSIDL_DRIVES
+	global GESTURE_SYS_CSIDL_DRIVES, _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	Letters := Sys.RemovableDrives()
-	if A_IsSuspended {
-		LoggerInfo("gestures", "eject_all_disks was cancelled after its drive query: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "eject_all_disks was cancelled after its drive query: suspended or original lifecycle transition retired.")
 		return false
 	}
 	if (Letters = "") {
@@ -498,13 +499,13 @@ GestureSysEjectAllDisks(Sys := 0) {
 	Ejected := 0
 	for Letter in StrSplit(Letters) {
 		try {
-			if A_IsSuspended {
-				LoggerInfo("gestures", "eject_all_disks was cancelled before its next drive: the script is suspended.")
+			if A_IsSuspended || Transition != _LifecycleLatestTransition {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its next drive: suspended or original lifecycle transition retired.")
 				return false
 			}
 			DriveItem := Computer.ParseName(Letter . ":\")
-			if A_IsSuspended {
-				LoggerInfo("gestures", "eject_all_disks was cancelled before its drive ejection: the script is suspended.")
+			if A_IsSuspended || Transition != _LifecycleLatestTransition {
+				LoggerInfo("gestures", "eject_all_disks was cancelled before its drive ejection: suspended or original lifecycle transition retired.")
 				return false
 			}
 			DriveItem.InvokeVerb("Eject")
