@@ -27,7 +27,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			var code: SecStaticCode?, path: CFURL?
 			guard SecCodeCopyStaticCode(guest, [], &code) == errSecSuccess, let code,
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
-				let values = fields[kSecCodeInfoCdHashes as String] as? [Data], values.count == 2, Set(values) == hashes,
+				let values = OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields), Set(values) == hashes,
 				SecCodeCopyPath(code, [], &path) == errSecSuccess, let path else { return false }
 			let actual = (path as URL).standardizedFileURL
 			return (actual == stage || actual == stage.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer")) && issuer.current()
@@ -96,8 +96,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
 				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
 				SecCertificateCopyData(certificate) as Data == publisher?.leaf,
-				let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], hashes.count == 2, Set(hashes).count == 2,
-				hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { markRefused(); return }
+				let hashes = OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields) else { markRefused(); return }
 			let bytes = try Data(contentsOf: helper.appendingPathComponent("Contents/MacOS/ErgoptiPlus-Runtime-Installer"))
 			guard OwnedRuntimeInstallOwner.systemClosedExecutableForInstaller(bytes) else { markRefused(); return }; try source.verify()
 			guard queryPurpose(helper: helper, hashes: Set(hashes)), sourceCurrent(), let leaf = publisher?.leaf else { markRefused(); return }
@@ -143,7 +142,7 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 				OwnedRuntimePublisherSignature.currentLeaf(guest, role: .installer) == publisher?.leaf,
 				SecCodeCopyStaticCode(guest, [], &code) == errSecSuccess, let code,
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
-				let actual = fields[kSecCodeInfoCdHashes as String] as? [Data], actual.count == 2, Set(actual) == hashes,
+				let actual = OwnedRuntimeInstallMainOperation.codeDirectoryHashes(fields), Set(actual) == hashes,
 				SecCodeCopyPath(code, [], &path) == errSecSuccess, let path else { return false }
 			let named = (path as URL).standardizedFileURL
 			return (named == helper || named.path == executable) && inputsCurrent()
