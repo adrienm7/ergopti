@@ -198,6 +198,12 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_nil(payload:find("first\rsecond", 1, true), "the iCalendar field cannot contain a bare CR")
 	end)
 
+	helpers.it("normalizes a lone carriage return in a mailto body", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = assert(Agent.validate_action(config, { type = "mail", body = "first\rsecond" }, { tools = {} }))
+		helpers.assert_eq(Agent.mailto(action), "mailto:?body=first%0D%0Asecond")
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }

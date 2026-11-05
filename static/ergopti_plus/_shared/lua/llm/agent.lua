@@ -473,7 +473,7 @@ end
 --- @param text string
 --- @return string
 local function mailto_encode(text)
-	return TextUtils.percent_encode((text:gsub("\r?\n", "\r\n")))
+	return TextUtils.percent_encode((text:gsub("\r\n", "\n"):gsub("[\r\n]", "\r\n")))
 end
 
 --- Builds the mailto: link of a mail action. The "@" of an address stays
