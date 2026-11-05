@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **139 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **140 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -2049,3 +2049,11 @@ The native IPv6 host correction139 passes with HTTP200/exact body/wire_actual1/r
 The remaining IPv6 HTTP-over-SOCKS case now completes with HTTP502 and exact native retirement. Its first independent SOCKS control succeeds; the genuine hop closes its second greeting before a CONNECT frame. Investigation must distinguish the authority parser from any other pre-frame refusal before recording or fixing another defect.
 
 PiEd source73d2dcd0 and ActionPicker source756c6018 now retain hosts during subscription admission, preserve their prior SDK failure policies and retain the native GUI after plumbing-only Reset until exact Close. Their additional current-error/retained-host/cleanup-reopen tests await native execution. Unicode135 V2 is deliberately not integrated: revoking its assembly authority can still lose an unpublished high unit and make a later Backspace erase the earlier public prefix. Three independent native traces now cover RAM-only revocations and consecutive high units before choosing a correction representation.
+
+### AHK-140: Default IPv6 port in the SOCKS relay authority
+
+Replay28 now establishes a second distinct IPv6 defect after139 is corrected. The independent SOCKS oracle sends a complete IPv6 CONNECT frame and receives its HTTP response; the genuine route sends the second greeting but closes before its frame and returns502. Native retirement and peer joining succeed, with no peer failure. Source inspection locates the missing default port: the absolute-form HTTP branch mistakes an IPv6 colon for an explicit port, so SplitAuthority tries to parse an address suffix ending in a bracket as the port.
+
+Source8baef993 constructs a bracketed IPv6 authority with the separate URI port field. The original default80 business oracle remains, and a new18080 control verifies the exact binary destination address and port. Native postfix execution, domain/IPv4/CONNECT controls and selected HTTP/native-owner checks are pending. No IPv6 zones or external connectivity are claimed. The register now contains140 distinct findings.
+
+Paths sourcecbc01527 retains the exact host across subscription admission, preserves the original SDK Error object and fences factory fallback with its own Reset acknowledgement. Plumbing-only Reset retains its native GUI until later Close. The original two native subscription cases and compatibility/startup controls await postfix execution. A separate pre-effect native Destroy refusal probe remains an unclassified hypothesis until it produces its actual receipt.
