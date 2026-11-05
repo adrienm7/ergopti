@@ -224,6 +224,44 @@ helpers.describe("model selector test ownership", function()
 end)
 
 helpers.describe("AI menu: adding and testing a Cerebras key", function()
+	helpers.it("acknowledges a saved entry if the menu refresh raises", function()
+		local build, state, restore = setup("api")
+		state.answers = { "test-key", "qwen" }
+		state.on_changed = function() error("synthetic refresh failure") end
+		local ok, result = pcall(find(build(), "➕ Cerebras").action)
+		local count = #state.entries
+		restore()
+		helpers.assert_eq(count, 1)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, true)
+	end)
+
+	helpers.it("acknowledges a saved entry if its optional test raises", function()
+		local build, state, restore = setup("api")
+		state.answers = { "test-key", "qwen" }
+		package.loaded["modules.llm.api_remote"].test = function() error("synthetic test failure") end
+		local ok, result = pcall(find(build(), "➕ Cerebras").action)
+		local count = #state.entries
+		restore()
+		helpers.assert_eq(count, 1)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(result, true)
+	end)
+
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("acknowledges a saved " .. kind .. " entry when its test request is refused", function()
+			local build, state, restore = setup("api")
+			state.answers = { "test-key", kind == "chat" and "qwen" or "jev-latest" }
+			package.loaded["modules.llm.api_remote"].test = function() return false end
+			local result = find(build(), kind == "chat" and "➕ Cerebras" or "➕ TypeSafe").action()
+			local count, changed = #state.entries, state.changed
+			restore()
+			helpers.assert_eq(count, 1)
+			helpers.assert_eq(changed, 1)
+			helpers.assert_eq(result, true)
+		end)
+	end
+
 	helpers.it("does not overwrite a backend changed while entering an API key", function()
 		local build, state, restore = setup("ollama")
 		state.answers = { "key", "qwen" }
