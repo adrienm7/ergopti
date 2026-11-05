@@ -1,5 +1,5 @@
 {
-	"expected_count": 4,
+	"expected_count": 27,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -7,6 +7,34 @@
 		{
 			"contains": "locale-cache-stage-custody",
 			"expected_count": 4
+		},
+		{
+			"contains": "locale-tsv-non-atomic-write",
+			"expected_count": 2
+		},
+		{
+			"contains": "user-command-counted-output",
+			"expected_count": 4
+		},
+		{
+			"contains": "classified-publisher-stage-custody",
+			"expected_count": 4
+		},
+		{
+			"contains": "classified-publisher-relative",
+			"expected_count": 2
+		},
+		{
+			"contains": "classified-publisher-controls",
+			"expected_count": 4
+		},
+		{
+			"contains": "(file-system-ports)",
+			"expected_count": 6
+		},
+		{
+			"contains": "fs-admission-source-change",
+			"expected_count": 1
 		}
 	]
 }
