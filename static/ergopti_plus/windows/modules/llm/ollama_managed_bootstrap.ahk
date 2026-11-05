@@ -310,7 +310,7 @@ class OllamaManagedBootstrap {
 		this.RuntimeRetired := false
 		this.RuntimeRetiring := false
 		this.Target := 0
-		this.Timer := ObjBindMethod(this, "_Tick")
+		this.Timer := 0
 		this.Sources := Map()
 		if Port is Map {
 			this.Plan := Port["plan"].Clone()
@@ -321,6 +321,7 @@ class OllamaManagedBootstrap {
 				this.MenuIntent := Port["menu_intent"].Call().Clone()
 				this.AuxGeneration := Port["aux_generation"].Call()
 			}
+			this.Timer := ObjBindMethod(this, "_Tick")
 			return
 		}
 		if !RegExMatch(this.Endpoint, "^http://(?:localhost|127\.0\.0\.1):([0-9]+)$", &Match)
@@ -387,7 +388,8 @@ class OllamaManagedBootstrap {
 			"download_helper", Directory . "\ollama_download_archive.ps1",
 			"powershell", A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
 			"capture_bytes", 65536, "spawn", OllamaInstallFiles_Spawn,
-			"on_physical", ObjBindMethod(this, "_Physical"), "on_error", ObjBindMethod(this, "_Error")))
+			"on_physical", OllamaManagedBootstrap._UnstartedObserver,
+			"on_error", OllamaManagedBootstrap._UnstartedObserver))
 		RuntimeProxy := Map("VendorDirectory", Vendor, "VendorSha256", CryptoSha256(RuntimeInventory),
 			"ProxyPolicyPath", Policy, "ProxyPolicySha256", this.Sources[Policy],
 			"UpdaterDefaultsPath", Updater, "UpdaterDefaultsSha256", this.Sources[Updater],
@@ -409,7 +411,33 @@ class OllamaManagedBootstrap {
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
 			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"proxy", RuntimeProxy,
-			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
+			"on_retired", OllamaManagedBootstrap._UnstartedObserver,
+			"on_error", OllamaManagedBootstrap._UnstartedObserver))
+		this._PublishConstructionObservers()
+	}
+
+	; Before constructor success there is no native task or physical receipt.
+	; An unreachable callback keeps new ports acyclic through fallible capture.
+	static _UnstartedObserver(*) {
+		throw Error("Managed constructor observers cannot run before source capture completes.")
+	}
+
+	_PublishConstructionObservers() {
+		; Prepare every fallible binding before any instance points back to this
+		; flow. Failure releases these local references with the constructor frame.
+		Physical := ObjBindMethod(this, "_Physical")
+		ErrorObserver := ObjBindMethod(this, "_Error")
+		Retired := ObjBindMethod(this, "_RuntimeRetired")
+		Polling := ObjBindMethod(this, "_Tick")
+		PreviousCritical := Critical("On")
+		try {
+			; Existing slots of the freshly constructed native ports, RAM only.
+			this.Files.Options["on_physical"] := Physical
+			this.Files.Options["on_error"] := ErrorObserver
+			this.Runtime.Options["on_retired"] := Retired
+			this.Runtime.Options["on_error"] := ErrorObserver
+			this.Timer := Polling
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Starts a read-only inspection; no missing runtime is installed implicitly. */
