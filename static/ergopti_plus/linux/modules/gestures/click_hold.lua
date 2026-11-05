@@ -146,6 +146,19 @@ function M.new(active)
 		end
 	end
 
+	--- Captures the exact current holds for retirement after durable publication.
+	--- @return function retire Successor holds remain owned by their own bindings.
+	function owner.capture_retirement()
+		local captured = { ["1"] = states["1"], ["3"] = states["3"] }
+		return function()
+			for _, button in ipairs({ "1", "3" }) do
+				local state = captured[button]
+				if state and states[button] == state then state.wanted = false end
+			end
+			if not busy then owner.pump() end
+		end
+	end
+
 	--- Accepts one toggle without waiting for any native child in the callback.
 	function owner.toggle(button, binding)
 		if (button ~= "1" and button ~= "3") or busy or retiring then return false end

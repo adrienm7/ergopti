@@ -198,6 +198,7 @@ local _now_sec = Monotonic.now_sec
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _parameter_configuration_owner = nil
+local _gesture_click_fence = nil
 local _click_holds = require("modules.gestures.click_hold").new(function() return not _is_paused() end)
 
 -- =========================================
@@ -622,11 +623,11 @@ local BUILTIN_HANDLERS = {
 			table.concat(SETTINGS_APPLICATIONS, ", "))
 	end,
 	["left_click_toggle"] = function(binding)
-		if _parameter_configuration_owner and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		if (_parameter_configuration_owner or _gesture_click_fence) and M.DEFAULT_GESTURES[binding] ~= nil then return false end
 		return _click_holds.toggle("1", binding)
 	end,
 	["right_click_toggle"] = function(binding)
-		if _parameter_configuration_owner and M.DEFAULT_GESTURES[binding] ~= nil then return false end
+		if (_parameter_configuration_owner or _gesture_click_fence) and M.DEFAULT_GESTURES[binding] ~= nil then return false end
 		return _click_holds.toggle("3", binding)
 	end,
 	["open_chatgpt"] = function()
@@ -1152,10 +1153,11 @@ end
 --- Keeps captured preferences exclusively owned until compensation completes.
 --- @return boolean admitted
 local function admit_mutation(owner)
+	if _gesture_click_fence ~= nil and _gesture_click_fence ~= owner then return false end
 	local bindings = package.loaded["infra.program_binding_transaction"]
 	if type(bindings) == "table" and bindings.pending() and not bindings.owns(owner) then return false end
 	if _parameter_configuration_owner ~= nil then return false end
-	if _scope_owner and _scope_owner.pending() then
+	if _scope_owner and _scope_owner ~= owner and _scope_owner.pending() then
 		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
 		return false
 	end
@@ -1223,11 +1225,14 @@ function M.disable()
 	return true
 end
 
+local preserve_scope_clicks = {}
+local stop_reading_preserving_clicks
+
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
 --- @return boolean True when the requested state was committed.
 function M.set_enabled(enabled)
-	if not admit_mutation() then return false end
+	if _gesture_click_fence ~= nil or not admit_mutation() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
 		return false
@@ -1237,26 +1242,67 @@ function M.set_enabled(enabled)
 	if not snapshot then return false end
 	local candidate = M.capture_scope_state()
 	candidate.enabled, candidate.reading = enabled, enabled
-	local applied = M.apply_scope_state(candidate)
-	if applied == true and M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = enabled } }) then
-		return true
-	end
-	-- The native boundary can fail after releasing ownership. Keep the exact
-	-- inverse admitted until it succeeds; a later setter must not supersede it.
-	local debt = snapshot
-	local owner = {}
+	-- Install the recovery owner before reader, process or persistence callbacks.
+	local debt, uncertain, source, candidate_bytes = snapshot, false, nil, nil
+	local owner, retire_clicks = {}, nil
 	function owner.pending() return debt ~= nil end
 	function owner.retry_restore()
 		if debt == nil then return true end
-		if M.apply_scope_state(debt) ~= true then return false end
+		if uncertain then
+			if not source or type(candidate_bytes) ~= "string" then return false end
+			local called, bytes, status = pcall(TomlWriter.read_classified, _config_path)
+			if not called then return false end
+			if status == "ok" and bytes == candidate_bytes then
+				debt = nil
+				if retire_clicks then pcall(retire_clicks) end
+				if _gesture_click_fence == owner then _gesture_click_fence = nil end
+				return true, "committed"
+			end
+			if status ~= source.status or (status == "ok" and bytes ~= source.content) then return false end
+			uncertain = false
+		end
+		local called, restored = pcall(M.apply_scope_state, debt, preserve_scope_clicks)
+		if not called or restored ~= true then return false end
 		debt = nil
+		if _gesture_click_fence == owner then _gesture_click_fence = nil end
 		return true
 	end
-	-- A refused switch commits nothing, so a composed scope has nothing to undo.
 	function owner.revert() return false, "no committed gesture scope to revert" end
 	function owner.release() end
 	_scope_owner = owner
-	if owner.retry_restore() then
+	_gesture_click_fence = owner
+	retire_clicks = not enabled and _click_holds.capture_retirement() or nil
+	local updates = { { section = CONFIG_SECTION, key = "enabled", value = enabled } }
+	if _persist then
+		local prepared, accepted, _, bytes, original = pcall(TomlWriter.prepare_batch, _config_path, updates)
+		if not prepared or accepted ~= true then
+			debt = nil
+			if _gesture_click_fence == owner then _gesture_click_fence = nil end
+			return false
+		end
+		candidate_bytes, source = bytes, original
+	end
+	local called, applied = pcall(M.apply_scope_state, candidate, preserve_scope_clicks)
+	if called and applied == true then
+		local saved, accepted, detail = pcall(M._persist_updates,
+			updates, nil, owner, source)
+		if saved and accepted == true then
+			debt = nil
+			if retire_clicks then
+				local ok = pcall(retire_clicks)
+				if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+			end
+			if _gesture_click_fence == owner then _gesture_click_fence = nil end
+			return true
+		end
+		-- An exception may follow publication; do not guess which bytes won.
+		if not saved or detail == "publication_unknown" then uncertain = true end
+	end
+	local recovered, resolution = owner.retry_restore()
+	if recovered and resolution == "committed" then
+		Logger.warn(LOG, "Gesture state publication was confirmed after an uncertain response.")
+		return true
+	elseif recovered then
 		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
 	else
 		Logger.error(LOG, "Gesture state was refused — runtime rollback remains pending.")
@@ -1821,6 +1867,37 @@ function M.get_all_actions()
 	return t
 end
 
+--- Retains each physical obligation by identity across a provisional scope.
+--- @return function|nil finalize Called with the final commit verdict.
+function M.capture_scope_click_retirement()
+	if _gesture_click_fence ~= nil or _parameter_configuration_owner ~= nil then return nil end
+	local fence = {}
+	_gesture_click_fence = fence
+	local captured = {}
+	for slot, action in pairs(_actions) do
+		local button = action == "left_click_toggle" and "1" or action == "right_click_toggle" and "3" or nil
+		if button then captured[#captured + 1] = { slot = slot, action = action,
+			retire = _click_holds.capture_binding_retirement(button, slot) } end
+	end
+	return function(committed)
+		if _gesture_click_fence ~= fence then return end
+		for _, entry in ipairs(captured) do
+			if committed and (not _enabled or _actions[entry.slot] ~= entry.action) then
+				local ok = pcall(entry.retire)
+				if not ok then pcall(Logger.error, LOG, "Could not advance captured gesture click cleanup; its owner retains the debt.") end
+			end
+		end
+		if _gesture_click_fence == fence then _gesture_click_fence = nil end
+	end
+end
+
+--- Applies a snapshot while its scope retains the captured click obligations.
+--- @param candidate table Detached scope runtime snapshot.
+--- @return boolean acknowledged
+function M.apply_scope_state_provisional(candidate)
+	return M.apply_scope_state(candidate, preserve_scope_clicks)
+end
+
 --- Captures detached preferences and the acknowledged touchpad reader state.
 --- @return table|nil snapshot Nil when the current master has no live reader.
 function M.capture_scope_state()
@@ -1835,7 +1912,7 @@ end
 --- A failed native transition belongs to the caller's retained compensation.
 --- @param candidate table Detached scope runtime snapshot.
 --- @return boolean acknowledged
-function M.apply_scope_state(candidate)
+function M.apply_scope_state(candidate, preserve_clicks)
 	if _parameter_configuration_owner ~= nil then return false end
 	if type(candidate) ~= "table" or type(candidate.enabled) ~= "boolean"
 		or type(candidate.reading) ~= "boolean" or (candidate.enabled and not candidate.reading)
@@ -1858,7 +1935,10 @@ function M.apply_scope_state(candidate)
 	_scope_native = true
 	local called, acknowledged = pcall(function()
 		if candidate.reading then return M.start_reading() == true and M.is_reading() end
-		return M.stop_reading() == true and not M.is_reading()
+		local stopped
+		if preserve_clicks == preserve_scope_clicks then stopped = stop_reading_preserving_clicks()
+		else stopped = M.stop_reading() end
+		return stopped == true and not M.is_reading()
 	end)
 	_scope_native = false
 	if not called or acknowledged ~= true then return false end
@@ -1872,7 +1952,7 @@ end
 --- @param mode string `recommended` or `clear`.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply_scope(mode)
+function M.apply_scope(mode, deferred)
 	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
 	if not retire_window_operation() then return false, "native window retirement remains pending" end
@@ -1881,14 +1961,17 @@ function M.apply_scope(mode)
 	if _scope_owner and _scope_owner.pending() then
 		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end
 	end
+	if _gesture_click_fence ~= nil then return false, "gesture scope remains owned" end
 	_scope_sequence = _scope_sequence + 1
 	local backup = _config_path .. ".gestures-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _scope_sequence .. ".bak"
-	_scope_owner = require("infra.gesture_scope").new({
+	local owner = require("infra.gesture_scope").new({
 		path = _config_path,
 		backup_path = backup,
 		gestures = M,
 	})
-	local committed, detail = _scope_owner.apply(mode)
+	_scope_owner = owner
+	local committed, detail = owner.apply(mode)
+	if committed and deferred ~= true then owner.release() end
 	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
 	return committed, detail, backup
 end
@@ -1906,7 +1989,7 @@ end
 --- @return table participant See config_scope_composition.
 function M.scope_participant()
 	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply_scope(mode) end,
+		apply = function(mode) return M.apply_scope(mode, true) end,
 		owner = function() return _scope_owner end,
 	})
 end
@@ -1997,7 +2080,7 @@ end
 --- @param binding string|nil What asked for it, for the logs and the parameters.
 --- @return boolean True when a name was given at all.
 function M.execute_action(action_name, binding)
-	if _parameter_configuration_owner ~= nil and M.DEFAULT_GESTURES[binding] ~= nil
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and M.DEFAULT_GESTURES[binding] ~= nil
 		and (action_name == "left_click_toggle" or action_name == "right_click_toggle") then return false end
 	if type(action_name) ~= "string" or action_name == "" or action_name == "none" then
 		return false
@@ -2027,7 +2110,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	local action = _actions[slot]
-	if _parameter_configuration_owner ~= nil and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is
 		-- the normal state until the user chooses — saying so at INFO would make
@@ -2050,7 +2133,7 @@ function M.dispatch_gesture(gesture)
 	end
 
 	Logger.info(LOG, "GESTURE FIRE: slot=%s action=%s", slot, action)
-	if _parameter_configuration_owner ~= nil and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
+	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	_execute_action(action, nil, slot)
 	return true
 end
@@ -2164,9 +2247,9 @@ end
 
 --- Stops reading the touchpad.
 --- @return boolean True only when the reader acknowledges closure.
-function M.stop_reading()
+local function stop_reading(preserve_clicks)
 	if not _scope_native and not admit_mutation() then return false end
-	local clicks_retired = M.release_clicks()
+	local clicks_retired = preserve_clicks == true or M.release_clicks()
 	if _reading then
 		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 		local called, acknowledged, detail = false, nil, "reader close is unavailable"
@@ -2189,6 +2272,9 @@ function M.stop_reading()
 	Logger.info(LOG, "Touchpad reader stopped.")
 	return clicks_retired
 end
+
+stop_reading_preserving_clicks = function() return stop_reading(true) end
+function M.stop_reading() return stop_reading(false) end
 
 --- The touchpad being read, or nil.
 --- @return table|nil
@@ -2219,10 +2305,10 @@ end
 -- =========================================
 -- =========================================
 
-function M._persist_updates(updates, private)
+function M._persist_updates(updates, private, owner, expected_source)
 	-- Configuration cannot supersede a still-owned native window activation.
 	if not retire_window_operation() then return false end
-	if not admit_mutation() then return false end
+	if not admit_mutation(owner) then return false end
 	if not _persist then return true end
 	if type(updates) ~= "table" or #updates == 0 then
 		Logger.error(LOG, "Could not persist gesture configuration: update batch is empty or invalid.")
@@ -2237,7 +2323,7 @@ function M._persist_updates(updates, private)
 		return false
 	end
 
-	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates)
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates, nil, expected_source)
 	if not call_ok or committed ~= true then
 		if private == true then
 			Logger.error(LOG, "Could not persist private user program configuration.")
@@ -2245,7 +2331,7 @@ function M._persist_updates(updates, private)
 			Logger.error(LOG, "Could not persist gesture configuration: %s",
 			tostring(call_ok and err or committed))
 		end
-		return false
+		return false, not call_ok and "publication_unknown" or nil
 	end
 	return true
 end
