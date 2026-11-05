@@ -46,9 +46,9 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 			FileAppend("foreign fixture", DeadStage, "UTF-8-RAW")
 		} else if Mode = "journal" {
 			FileAppend("recovery fixture", DeadStage . "-journal", "UTF-8-RAW")
-		} else if Mode = "legacy" || Mode = "pre-collision-fix" || Mode = "pre-key-codec" {
+		} else if Mode = "legacy" || Mode = "pre-collision-fix" || Mode = "pre-key-codec" || Mode = "pre-title-count" {
 			Legacy := SQLite_Open(DeadStage)
-			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value=" . SQLite_Q(Mode = "legacy" ? "3" : Mode = "pre-key-codec" ? "17" : "16") . " WHERE key='format_version';"))
+			try AssertTrue(SQLite_Exec(Legacy, "UPDATE klr_cache_meta SET value=" . SQLite_Q(Mode = "legacy" ? "3" : Mode = "pre-title-count" ? "18" : Mode = "pre-key-codec" ? "17" : "16") . " WHERE key='format_version';"))
 			finally SQLite_Close(Legacy)
 		} else if Mode = "missing-cache" {
 			KLR_ResetCache()
@@ -101,3 +101,6 @@ Test("KLR cache stages: retire pre-collision-fix stages (klr-cache-stage-ownersh
 
 Test("KLR cache stages: retire pre-key-codec stages (walker-composite-stage)",
 	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-key-codec")))
+
+Test("KLR cache stages: retire obsolete window visit count images (window-title-app-attribution)",
+	_KLRDC_CheckTeardown.Bind(_KLRCS_ReapDeadProducer.Bind("pre-title-count")))

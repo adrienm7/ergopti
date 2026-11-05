@@ -174,7 +174,9 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 				KLW.batch["layouts"][lk]["count"] += 1
 		}
 
-		; Window-title tag (count bump; ms credited via window_switch).
+		; Retain the legacy scratch title tag for batch membership. Persisted
+		; manual keystroke c is rebuilt from typing projection; window_switch
+		; contributes only the previous title's focus time.
 		title := KLW_GetMap(entry, "title", "")
 		if (title != "") {
 				tk := app_day_key . Chr(1) . KLW_KeyPart(title)

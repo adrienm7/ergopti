@@ -1446,7 +1446,17 @@ KLR_RefreshResidentAggregates(db) {
 }
 
 KLR_RebuildTitleCounts(db, Dates := 0) {
-	return KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	; The shared page labels c as manual keystrokes, not focus visits. The
+	; accepted typing projection already excludes synthetic input and retains
+	; backspaces; group that exact count by the typing row's actual app/title.
+	return KLR_ExecAggregateStep(db, "window-titles",
+		"INSERT INTO agg_app_day_titles (device_id,date,app,title,c) "
+		. "SELECT t.device_id,t.date,t.app,t.title,SUM(p.chars) "
+		. "FROM events_typing AS t JOIN klr_reader_typing_counts AS p "
+		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "WHERE t.title IS NOT NULL AND t.title!=''" . _KLR_DateScope(Dates, "t.date")
+		. " GROUP BY t.device_id,t.date,t.app,t.title ON CONFLICT(device_id,date,app,title) "
+		. "DO UPDATE SET c=excluded.c;")
 }
 
 KLR_TrimTitles(db, Dates := 0) {
@@ -1643,17 +1653,17 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
+				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
+						"unknown", "unknown",
+						"typing projection preparation failed")
+				return -1
+		}
 		; SQL-only refreshes may have trimmed a title before its focus time was
 		; known. Restore authoritative counts before the first replay flush.
 		if !KLR_RebuildTitleCounts(db, Dates) {
 				KLR_CaptureReplayFailure("title-counts", "unknown", 0,
 						"unknown", "unknown", "title count restoration failed")
-				return -1
-		}
-		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
-				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
-						"unknown", "unknown",
-						"typing projection preparation failed")
 				return -1
 		}
 

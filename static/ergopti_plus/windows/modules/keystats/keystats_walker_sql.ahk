@@ -143,8 +143,8 @@ KLW_BuildBatchSql(DeviceId := "", TrimTitles := true) {
 		}
 
 		; agg_app_day_titles — walker owns `ms` (focus time per title); the
-		; occurrence count `c` is owned by KLR_RebuildAggregates (from
-		; events_window_switch), so it is not written here.
+		; manual keystroke count `c` is owned by KLR_RebuildAggregates (from
+		; events_typing manual keystroke projection), so it is not written here.
 		;
 		; Every app-day touched by this batch is collected while inserting so the
 		; per-app-day cap can be enforced once per group afterwards. Any app whose

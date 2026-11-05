@@ -37,3 +37,16 @@ KL_Start()
 ```
 
 The hot path (`KL_AppendLog`) uses a cached `FileObject` handle and a pre-encoded device-ID literal to keep per-keystroke overhead under one allocation. `state.json` is updated on every successful ingest tick so replay after a crash is idempotent.
+
+### Window title counters on Windows
+
+The applications dashboard labels `win_titles[title].c` as manual keystrokes.
+The reader derives it from the existing typing count projection grouped by each
+accepted typing row's device, day, application and title. Synthetic events are
+excluded and physical backspaces are included; committed text length and focus
+visit counts are different measurements. Empty titles contribute no title row.
+
+The walker separately attributes `ms` to the outgoing application's previous
+title when a window interval ends. The existing per-app/day cap ranks titles
+using `c + ms`. Both fields keep the canonical producer's privacy decisions;
+the reader does not collect new window text or reclassify history from live focus.
