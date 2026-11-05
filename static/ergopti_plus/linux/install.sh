@@ -974,9 +974,28 @@ SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 # The menu compares the old desktop digest before renewing ownership.
 PRESERVED_STARTUP_RECEIPTS=()
 preserve_desktop_choice=false
-if $INSTALL_SERVICE && [ -f "${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop" ] \
-	&& ergopti_desktop_entry_managed "${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop"; then
+prior_desktop="${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop"
+if $INSTALL_SERVICE && [ -f "$prior_desktop" ]; then
 	preserve_desktop_choice=true
+	# Only an unchanged installer-owned fallback may be migrated automatically.
+	# A manual or modified entry carries the user's own preference and data.
+	if ! ergopti_desktop_entry_managed "$prior_desktop" \
+		&& ! ergopti_desktop_entry_disabled "$prior_desktop"; then
+		prior_manifest="${LIB_DIR}/.ergopti-owned-files"
+		if [ -f "$prior_manifest" ] && [ ! -L "$prior_manifest" ]; then
+			prior_desktop_hash="$(sha256sum < "$prior_desktop")"
+			prior_desktop_hash="${prior_desktop_hash%% *}"
+			prior_desktop_rows=0 prior_desktop_match=false
+			while IFS=$'\t' read -r prior_digest prior_relative || [ -n "$prior_digest$prior_relative" ]; do
+				[ "$prior_relative" = @autostart ] || continue
+				prior_desktop_rows=$((prior_desktop_rows + 1))
+				[ "$prior_digest" != "$prior_desktop_hash" ] || prior_desktop_match=true
+			done < "$prior_manifest"
+			if [ "$prior_desktop_rows" -eq 1 ] && "$prior_desktop_match"; then
+				preserve_desktop_choice=false
+			fi
+		fi
+	fi
 fi
 if ! $INSTALL_SERVICE || "$preserve_desktop_choice"; then
 	prior_manifest="${LIB_DIR}/.ergopti-owned-files"
@@ -1279,7 +1298,7 @@ if $INSTALL_SERVICE; then
 	# and treat "no" as "install the unit, enable it later", never as a failure:
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
-	if [ -f "$AUTOSTART_FILE" ] && ergopti_desktop_entry_managed "$AUTOSTART_FILE"; then
+	if [ -f "$AUTOSTART_FILE" ] && "$preserve_desktop_choice"; then
 		# Updates preserve an explicit menu choice; installation is not consent
 		# to re-enable a startup entry the user disabled.
 		# Preserve the explicit XDG preference even if an independently enabled
