@@ -87,5 +87,5 @@ _TNLC_Case(Mode) {
   throw Primary
  AssertTrue(Retired, "The exact child must retire before private cleanup")
 }
-for _TNLC_Mode in ["queued", "waiting", "same-epoch", "in-flight", "acquire-in-flight"]
+for _TNLC_Mode in ["queued", "waiting", "same-epoch", "in-flight", "acquire-in-flight", "same-epoch-inline"]
  Test("TakeNote lifecycle: " . _TNLC_Mode . " preserves pause ownership (takenote-pause-lifecycle-owner)", _TNLC_Case.Bind(_TNLC_Mode))
