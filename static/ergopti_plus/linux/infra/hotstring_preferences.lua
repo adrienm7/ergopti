@@ -278,7 +278,7 @@ end
 --- @param values table Owned path to desired value.
 --- @return boolean committed
 --- @return string|nil reason
-function M.set_many(values)
+local function set_many(values, on_notice)
 	if _scope_owner ~= nil then return false, "a hotstring configuration scope is pending" end
 	local called, committed, detail = pcall(function()
 		assert(type(values) == "table", "hotstring preferences require a table of values")
@@ -301,7 +301,7 @@ function M.set_many(values)
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end
-		local written, why, content = Writer.batch_write(file(), rows, nil, source)
+		local written, why, content = Writer.batch_write(file(), rows, nil, source, nil, nil, on_notice)
 		if written ~= true then return false, why end
 		publish(decode(content))
 		return true
@@ -310,6 +310,14 @@ function M.set_many(values)
 	local reason = tostring(called and detail or committed)
 	Logger.error(LOG, "Hotstring preferences were not persisted: %s.", reason)
 	return false, reason
+end
+
+--- Publishes a batch using the historical acknowledgement contract.
+function M.set_many(values) return set_many(values) end
+
+--- Publishes one leaf with a callback owned by its exact write attempt.
+function M.set_with_notice(path, value, on_notice)
+	return set_many({ [path] = value }, on_notice)
 end
 
 --- Publishes one owned leaf.

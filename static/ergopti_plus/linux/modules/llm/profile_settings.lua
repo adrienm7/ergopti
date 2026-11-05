@@ -311,13 +311,15 @@ function M.get(name)
 	return shipped
 end
 
-local function persist_one(name, value, admission)
+local function persist_one(name, value, admission, on_notice)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then return false end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then return false end
 	local persisted
-	if admission ~= nil then
+	if on_notice then
+		persisted = Storage.set_many_with_notice({ [DEFINITIONS[name].path] = value }, nil, admission, on_notice)
+	elseif admission ~= nil then
 		persisted = type(Storage.set_many) == "function"
 			and Storage.set_many({ [DEFINITIONS[name].path] = value }, nil, admission)
 	else
@@ -336,7 +338,7 @@ end
 --- @param current_model string|nil
 --- @param admission function|nil Retained menu admission checked by the writer.
 --- @return boolean
-function M.set(name, value, current_model, admission)
+local function set(name, value, current_model, admission, on_notice)
 	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
 	if not valid(name, value) or default_for(name) == nil then
 		Logger.error(LOG, "Refused invalid profile setting %s=%s.", tostring(name), tostring(value))
@@ -356,13 +358,27 @@ function M.set(name, value, current_model, admission)
 		_values.active = value
 		_values.auto_profile_for_model = false
 	else
-		if not persist_one(name, value, admission) then
+		if not persist_one(name, value, admission, on_notice) then
 			Logger.error(LOG, "Profile setting '%s' could not be persisted; live state is unchanged.", name)
 			return false
 		end
 	end
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
+end
+
+function M.set(name, value, current_model, admission)
+	return set(name, value, current_model, admission)
+end
+
+--- Stores a preset and reports notice ownership for that exact write.
+--- @return boolean committed
+--- @return boolean noticed
+function M.set_with_notice(name, value)
+	if name ~= LEAF.NUM_PREDICTIONS then return false, false end
+	local noticed = false
+	local committed = set(name, value, nil, nil, function() noticed = true end)
+	return committed, noticed
 end
 
 --- Returns the profile that should drive the next request.

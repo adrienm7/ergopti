@@ -11,6 +11,124 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.ui.menu.llm.numeric_configuration_fixture")
 
 helpers.describe("numeric menu originating configuration", function()
+	for _, sample in ipairs({
+		{ name = "temperature", leaf = "temperature", value = "0.7", twin = "0.8", candidate = 0.9 },
+		{ name = "debounce_ms", leaf = "debounce_ms", value = "300", twin = "400", candidate = 450 },
+	}) do
+		helpers.it("does not duplicate the numeric dialog's own case-twin notice: " .. sample.name, function()
+			Fixture.with_configuration(function(f)
+				local path = f.dirs.a .. "/config.toml"
+				local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+				local original = sample.leaf .. " = " .. sample.value
+				local replacement = original .. "\n" .. sample.leaf:upper() .. " = " .. sample.twin
+				local changed, count = bytes:gsub(original, replacement, 1); assert(count == 1)
+				file = assert(io.open(path, "wb")); assert(file:write(changed)); assert(file:close())
+				local reports = 0
+				f.writer.set_case_twin_reporter(function() reports = reports + 1 end)
+				assert(f.open(sample.name))
+				helpers.assert_eq(f.save(sample.candidate).saved, false)
+				helpers.assert_eq({ reports, #f.notifications }, { 1, 0 })
+				helpers.assert_eq(f.bytes("a"), changed)
+			end)
+		end)
+	end
+	helpers.it("does not report a case twin from a numeric page replaced during preparation", function()
+		Fixture.with_configuration(function(f)
+			local path = f.dirs.a .. "/config.toml"
+			local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+			local changed = bytes:gsub("temperature = 0%.7", "temperature = 0.7\nTEMPERATURE = 0.8", 1)
+			file = assert(io.open(path, "wb")); assert(file:write(changed)); assert(file:close())
+			local reports = 0; f.writer.set_case_twin_reporter(function() reports = reports + 1 end)
+			assert(f.open("temperature"))
+			local original = f.writer.prepare_batch
+			f.writer.prepare_batch = function(...)
+				assert(f.host.hide("numeric_prompt")); assert(f.host.show("numeric_prompt"))
+				return original(...)
+			end
+			local result = f.save(0.9)
+			f.writer.prepare_batch = original
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq({ reports, #f.notifications }, { 0, 0 })
+			helpers.assert_eq(f.bytes("a"), changed)
+		end)
+	end)
+	helpers.it("does not report a case twin after its page changes during translation", function()
+		Fixture.with_configuration(function(f)
+			local path = f.dirs.a .. "/config.toml"
+			local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
+			local changed = bytes:gsub("temperature = 0%.7", "temperature = 0.7\nTEMPERATURE = 0.8", 1)
+			file = assert(io.open(path, "wb")); assert(file:write(changed)); assert(file:close())
+			local reports = 0; f.writer.set_case_twin_reporter(function() reports = reports + 1 end)
+			assert(f.open("temperature"))
+			local i18n, original = require("infra.i18n"), require("infra.i18n").get
+			i18n.get = function(key, ...)
+				local text = original(key, ...)
+				if key == "dialog.config_save.case_twin" then
+					assert(f.host.hide("numeric_prompt")); assert(f.host.show("numeric_prompt"))
+				end
+				return text
+			end
+			local called, result = pcall(f.save, 0.9)
+			i18n.get = original
+			helpers.assert_true(called); helpers.assert_eq(result.saved, false)
+			helpers.assert_eq({ reports, #f.notifications }, { 0, 0 })
+			helpers.assert_eq(f.bytes("a"), changed)
+		end)
+	end)
+	helpers.it("explains an incompatible word range without reporting a storage error", function()
+		Fixture.with_configuration(function(f)
+			assert(f.open("min_words"))
+			helpers.assert_eq(f.save(15).saved, false)
+			helpers.assert_eq(f.bytes("a"), f.initial.a)
+			helpers.assert_eq(f.notifications, { require("infra.i18n").get("menu.llm.word_limits_incompatible") })
+		end)
+	end)
+	helpers.it("does not claim rollback when the actual writer raises after publication", function()
+		Fixture.with_configuration(function(f)
+			assert(f.open("temperature"))
+			local original = f.writer.batch_write
+			f.writer.batch_write = function(...) assert(original(...) == true); error("inert post-publication failure") end
+			local result = f.save(0.9)
+			f.writer.batch_write = original
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(f.document("a").llm.generation.temperature, 0.9)
+			helpers.assert_eq(#f.notifications, 0)
+		end)
+	end)
+	helpers.it("does not send a refusal notice to a replacement prompt", function()
+		Fixture.with_configuration(function(f)
+			assert(f.open("temperature"))
+			local original = f.writer.batch_write
+			f.writer.batch_write = function(...)
+				assert(f.host.hide("numeric_prompt")); assert(f.host.show("numeric_prompt"))
+				return false
+			end
+			local result = f.save(0.9)
+			f.writer.batch_write = original
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#f.notifications, 0)
+		end)
+	end)
+	helpers.it("rechecks the prompt after translating a refusal", function()
+		Fixture.with_configuration(function(f)
+			assert(f.open("temperature"))
+			assert(f.settings.set("context_length", 1900))
+			local i18n = require("infra.i18n")
+			local original = i18n.get
+			i18n.get = function(key, ...)
+				local text = original(key, ...)
+				if key == "dialog.personal_info.save_failed_title" then
+					assert(f.host.hide("numeric_prompt")); assert(f.host.show("numeric_prompt"))
+				end
+				return text
+			end
+			local called, result = pcall(f.save, 0.9)
+			i18n.get = original
+			helpers.assert_true(called)
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(#f.notifications, 0)
+		end)
+	end)
 	helpers.it("returns reloaded original Paths and Storage to the runner's locator", function()
 		local names = { "infra.config_paths", "adapters.storage" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -82,6 +200,7 @@ helpers.describe("numeric menu originating configuration", function()
 			helpers.assert_eq(f.save(0.9).saved, false)
 			helpers.assert_true(switched, "the real conditional writer boundary was reached")
 			helpers.assert_eq(f.bytes("a"), f.initial.a); helpers.assert_eq(f.bytes("b"), f.initial.b)
+			helpers.assert_eq(#f.notifications, 0, "a successor source cannot receive the old failure")
 		end)
 	end)
 	helpers.it("refuses a cooperative preference ABA even when bytes return to the opening image", function()

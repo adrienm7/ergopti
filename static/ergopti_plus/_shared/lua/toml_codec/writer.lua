@@ -59,14 +59,29 @@ local function case_twin_name(section, key)
 	return section == "" and key or section .. "." .. key
 end
 
---- Tells the user which setting two spellings make unwritable, and the way out.
+--- Checks whether the originating page still admits a notification.
+--- @param admission function|nil Original page admission.
+--- @return boolean admitted
+local function notice_admitted(admission)
+	if admission == nil then return true end
+	if type(admission) ~= "function" then return false end
+	local called, accepted = pcall(admission)
+	return called and accepted == true
+end
+
+--- Reports the exact refused setting without changing another attempt's notice.
 --- @param setting string Dotted name of the refused setting.
-local function report_case_twin(setting)
-	if case_twin_reporter == nil then return end
+--- @param admission function|nil Original page admission.
+--- @param legacy_notice boolean Whether to update the historical notice channel.
+--- @return boolean shown
+local function report_case_twin(setting, admission, legacy_notice)
+	if case_twin_reporter == nil then return false end
+	if not notice_admitted(admission) then return false end
 	local now = os.time()
-	if case_twin_noticed.setting == setting and now - case_twin_noticed.at < CASE_TWIN_NOTICE_GAP_SECONDS then
-		case_twin_shown, case_twin_shown_at = setting, now
-		return
+	local elapsed = now - case_twin_noticed.at
+	if legacy_notice and case_twin_noticed.setting == setting and elapsed >= 0 and elapsed < CASE_TWIN_NOTICE_GAP_SECONDS then
+		if legacy_notice then case_twin_shown, case_twin_shown_at = setting, now end
+		return true
 	end
 	-- Literal replacement: a setting name may hold characters gsub would interpret.
 	local message = i18n.get("dialog.config_save.case_twin")
@@ -74,18 +89,22 @@ local function report_case_twin(setting)
 	-- A notice that cannot name the setting leaves the user no way to find it.
 	if not first then
 		Logger.error(LOG, "The case-twin notice has no {1} placeholder for setting '%s'.", setting)
-		return
+		return false
 	end
 	message = message:sub(1, first - 1) .. setting .. message:sub(last + 1)
 	first, last = message:find("{2}", 1, true)
 	if first then message = message:sub(1, first - 1) .. i18n.get("menu.global.clean_unused_keys") .. message:sub(last + 1) end
-	local shown, detail = pcall(case_twin_reporter, message)
-	if not shown then
+	if not notice_admitted(admission) then return false end
+	local shown, detail = pcall(case_twin_reporter, message, admission)
+	if not shown or detail == false then
 		Logger.error(LOG, "The case-twin notice could not be shown: %s.", tostring(detail))
-		return
+		return false
 	end
-	case_twin_noticed.setting, case_twin_noticed.at = setting, now
-	case_twin_shown, case_twin_shown_at = setting, now
+	if legacy_notice then
+		case_twin_noticed.setting, case_twin_noticed.at = setting, now
+		case_twin_shown, case_twin_shown_at = setting, now
+	end
+	return true
 end
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
@@ -1574,14 +1593,22 @@ end
 --- @param file_adapter table|nil Classified platform file adapter.
 --- @param expected_source table|nil Exact source precondition.
 --- @param on_error function|nil Receives only fixed failure categories.
+--- @param on_notice function|table|nil Acknowledgement callback, or { admit, acknowledge } for a retained page.
 --- @return boolean prepared
 --- @return string|nil detail
 --- @return string|nil content Candidate bytes.
 --- @return table|nil source Exact publication precondition.
-function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
-	case_twin_setting, case_twin_shown = nil, nil
+function M.prepare_batch(path, updates, file_adapter, expected_source, on_error, on_notice)
+	case_twin_setting = nil
+	if on_notice == nil then case_twin_shown = nil end
 	local prepared, detail, content, source = prepare_batch_checked(path, updates, file_adapter, expected_source, on_error)
-	if not prepared and case_twin_setting then report_case_twin(case_twin_setting) end
+	local setting = case_twin_setting
+	local admission = type(on_notice) == "table" and on_notice.admit or nil
+	local acknowledge = type(on_notice) == "table" and on_notice.acknowledge or on_notice
+	if not prepared and setting and report_case_twin(setting, admission, on_notice == nil) and type(acknowledge) == "function" then
+		local acknowledged = pcall(acknowledge)
+		if not acknowledged then Logger.error(LOG, "The case-twin notice acknowledgement callback raised.") end
+	end
 	return prepared, detail, content, source
 end
 
@@ -1601,7 +1628,8 @@ end
 function M.take_case_twin_notice()
 	local setting = case_twin_shown
 	case_twin_shown = nil
-	if setting == nil or os.time() - case_twin_shown_at >= CASE_TWIN_NOTICE_GAP_SECONDS then return nil end
+	local elapsed = os.time() - case_twin_shown_at
+	if setting == nil or elapsed < 0 or elapsed >= CASE_TWIN_NOTICE_GAP_SECONDS then return nil end
 	return setting
 end
 
@@ -1612,15 +1640,16 @@ end
 --- @param file_adapter table|nil Platform file adapter.
 --- @param expected_source table|nil Exact source precondition.
 --- @param on_error function|nil Receives only fixed failure categories.
+--- @param on_notice function|table|nil Acknowledgement callback, or { admit, acknowledge } for a retained page.
 --- @return boolean committed
 --- @return string|nil detail
 --- @return string|nil content Committed bytes.
 --- @return table|nil receipt Optional private native publication/release capability.
 --- @return string|nil candidate Prepared bytes only when a native receipt is returned.
-function M.batch_write(path, updates, file_adapter, expected_source, on_error, admission)
+function M.batch_write(path, updates, file_adapter, expected_source, on_error, admission, on_notice)
 	if admission ~= nil and type(admission) ~= "function" then return false, "publication admission must be a function" end
 	local report = OperationReporter.new(on_error, Logger, LOG)
-	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
+	local prepared, detail, content, source = M.prepare_batch(path, updates, file_adapter, expected_source, on_error, on_notice)
 	if not prepared then return false, detail end
 	local published, publish_err, receipt = publish_content(path, content, file_adapter, source, on_error, admission)
 	if not published then

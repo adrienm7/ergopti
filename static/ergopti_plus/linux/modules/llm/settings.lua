@@ -151,7 +151,7 @@ end
 --- @param expected_source table|nil Exact source retained by a deferred editor.
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean Whether it was accepted.
-local function set_with_reason(name, value, expected_source, admission)
+local function set_with_reason(name, value, expected_source, admission, on_notice)
 	local default = shipped()[name]
 	if default == nil then
 		Logger.error(LOG, "set(): '%s' has no shipped default — refusing to store it.", tostring(name))
@@ -187,7 +187,11 @@ local function set_with_reason(name, value, expected_source, admission)
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or type(admission) ~= "function"
 			or type(Storage.set_many) ~= "function" then return false, "invalid" end
-		persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, expected_source, admission)
+		if on_notice then
+			persisted = Storage.set_many_with_notice({ [FEATURE_PATH[name]] = value }, expected_source, admission, on_notice)
+		else persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, expected_source, admission) end
+	elseif on_notice then
+		persisted = Storage.set_with_notice(FEATURE_PATH[name], value, on_notice)
 	elseif value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
 		-- live for this user rather than being pinned at the moment they touched it.
@@ -211,8 +215,8 @@ end
 --- @param admission function|nil Original configuration admission.
 --- @return boolean accepted
 --- @return string|nil reason "invalid" or "persistence" on refusal.
-function M.set_with_reason(name, value, expected_source, admission)
-	return set_with_reason(name, value, expected_source, admission)
+function M.set_with_reason(name, value, expected_source, admission, on_notice)
+	return set_with_reason(name, value, expected_source, admission, on_notice)
 end
 
 --- Sets one value, retaining the original single-result contract.

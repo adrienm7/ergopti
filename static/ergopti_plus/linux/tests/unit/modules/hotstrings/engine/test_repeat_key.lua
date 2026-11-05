@@ -149,10 +149,10 @@ local function with_repeat(source, body)
 				get = function() return true end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}
-			Writer.batch_write = function(target, operations, files, expected)
+			Writer.batch_write = function(target, operations, files, expected, on_error, admission, on_notice)
 				if controls.external then Sandbox.write_bytes(target, controls.external) end
 				if controls.refuse then return false, "injected publication refusal" end
-				return original(target, operations, files, expected)
+				return original(target, operations, files, expected, on_error, admission, on_notice)
 			end
 			local function reload()
 				package.loaded["modules.hotstrings.repeat_key"] = nil
@@ -168,6 +168,247 @@ local function with_repeat(source, body)
 end
 
 local SOURCE = '[hotstrings]\nrepeat_key_enabled = true\nunknown = "keep"\n[other]\nvalue = 42\n'
+
+helpers.describe("repeat key menu persistence", function()
+	helpers.it("the actual bootstrap reporter forwards native notification admission", function()
+		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
+		local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
+		local closure = assert(source:match('set_case_twin_reporter%((function%(message, admission%)[%s%S]-end)%)'), "bootstrap reporter must exist")
+		local reporter = assert(loadstring("return " .. closure))()
+		local notifier = require("adapters.notifier")
+		local previous = notifier.send
+		local ok, err = pcall(function()
+			for _, result in ipairs({ false, true }) do
+				notifier.send = function(message, options)
+					helpers.assert_eq(message, "sample"); helpers.assert_eq(options.level, "error")
+					return result
+				end
+				helpers.assert_eq(reporter("sample"), result)
+			end
+			local calls = 0
+			notifier.send = function() calls = calls + 1; return true end
+			helpers.assert_eq(reporter("sample", function() return false end), false)
+			helpers.assert_eq(calls, 0)
+			helpers.assert_eq(reporter("sample", function() return true end), true)
+			helpers.assert_eq(calls, 1)
+		end)
+		notifier.send = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("a backwards clock does not suppress a new case-twin notice", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local writer = require("toml_codec.writer")
+		local path, time, reports = os.tmpname(), os.time, 0
+		local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
+		writer.set_case_twin_reporter(function() reports = reports + 1 end)
+		local now = 100; os.time = function() return now end
+		local ok, err = pcall(function()
+			assert(writer.prepare_batch(path, {{ section = "section", key = "key", value = 3 }}) == false)
+			now = 90
+			helpers.assert_nil(writer.take_case_twin_notice())
+			assert(writer.prepare_batch(path, {{ section = "section", key = "key", value = 3 }}) == false)
+			helpers.assert_eq(reports, 2)
+		end)
+		os.time = time; os.remove(path); package.loaded["toml_codec.writer"] = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("does not duplicate the case-twin notice from this exact write", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local ok, err = pcall(function()
+			with_repeat('[hotstrings]\nrepeat_key_enabled = true\nREPEAT_KEY_ENABLED = false\n', function()
+				local writer = require("toml_codec.writer")
+				local reports, notices, execute = 0, 0, os.execute
+				writer.set_case_twin_reporter(function() reports = reports + 1 end)
+				local rows = helpers.load_module("ui.menu.builder").build({ config = {
+					any_enabled = function() return true end, get_groups = function() return {} end,
+					is_group_enabled = function() return true end, is_section_enabled = function() return true end } })
+				local function find(items)
+					for _, row in ipairs(items or {}) do
+						if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+						local nested = find(row.menu); if nested then return nested end
+					end
+				end
+				local row = assert(find(rows))
+				os.execute = function(command) if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end; return execute(command) end
+				local called, result = pcall(row.fn)
+				os.execute = execute
+				helpers.assert_true(called); helpers.assert_eq(result, false)
+				helpers.assert_eq(reports, 1); helpers.assert_eq(notices, 0)
+			end)
+		end)
+		package.loaded["toml_codec.writer"] = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("does not grant a notice receipt when the reporter refuses", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local ok, err = pcall(function()
+			with_repeat('[hotstrings]\nrepeat_key_enabled = true\nREPEAT_KEY_ENABLED = false\n', function(subject)
+				local writer = require("toml_codec.writer")
+				writer.set_case_twin_reporter(function() return false end)
+				local committed, noticed = subject.toggle_with_notice()
+				helpers.assert_eq({ committed, noticed }, { false, false })
+			end)
+		end)
+		package.loaded["toml_codec.writer"] = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("keeps nested case-twin notice receipts with their own attempts", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local writer = require("toml_codec.writer")
+		local outer, inner = os.tmpname(), os.tmpname()
+		for _, path in ipairs({ outer, inner }) do
+			local file = assert(io.open(path, "w")); file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
+		end
+		local inner_notice, outer_notice, nested = false, false, false
+		writer.set_case_twin_reporter(function()
+			if not nested then
+				nested = true
+				local committed = writer.batch_write(inner, {{ section = "section", key = "key", value = 3 }}, nil, nil, nil, nil,
+					function() inner_notice = true end)
+				assert(committed == false)
+			end
+		end)
+		local committed = writer.batch_write(outer, {{ section = "section", key = "key", value = 3 }}, nil, nil, nil, nil,
+			function() outer_notice = true end)
+		os.remove(outer); os.remove(inner)
+		package.loaded["toml_codec.writer"] = previous
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq({ outer_notice, inner_notice }, { true, true })
+	end)
+	helpers.it("keeps a previous legacy notice while delivering a new owned notice", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local writer = require("toml_codec.writer")
+		local path = os.tmpname()
+		local file = assert(io.open(path, "w"))
+		file:write("[first]\nkey = 1\nKEY = 2\n[second]\nitem = 1\nITEM = 2\n"); file:close()
+		writer.set_case_twin_reporter(function() end)
+		assert(writer.prepare_batch(path, {{ section = "first", key = "key", value = 3 }}) == false)
+		local noticed = false
+		assert(writer.batch_write(path, {{ section = "second", key = "item", value = 3 }}, nil, nil, nil, nil,
+			function() noticed = true end) == false)
+		local prior = writer.take_case_twin_notice()
+		os.remove(path); package.loaded["toml_codec.writer"] = previous
+		helpers.assert_true(noticed)
+		helpers.assert_eq(prior, "first.KEY")
+	end)
+	helpers.it("reports a new owned attempt even when the same old setting was recently reported", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local writer = require("toml_codec.writer")
+		local path = os.tmpname(); local file = assert(io.open(path, "w"))
+		file:write("[first]\nkey = 1\nKEY = 2\n"); file:close()
+		local reports, noticed = 0, false
+		writer.set_case_twin_reporter(function() reports = reports + 1 end)
+		assert(writer.prepare_batch(path, {{ section = "first", key = "key", value = 3 }}) == false)
+		assert(writer.batch_write(path, {{ section = "first", key = "key", value = 3 }}, nil, nil, nil, nil,
+			function() noticed = true end) == false)
+		local previous_notice = writer.take_case_twin_notice()
+		os.remove(path); package.loaded["toml_codec.writer"] = previous
+		helpers.assert_eq(reports, 2)
+		helpers.assert_true(noticed)
+		helpers.assert_eq(previous_notice, "first.KEY")
+	end)
+	helpers.it("an owned notice does not extend the legacy notice suppression window", function()
+		local previous = package.loaded["toml_codec.writer"]
+		package.loaded["toml_codec.writer"] = nil
+		local writer = require("toml_codec.writer")
+		local path, old_time = os.tmpname(), os.time
+		local file = assert(io.open(path, "w")); file:write("[first]\nkey = 1\nKEY = 2\n"); file:close()
+		local reports, now = 0, 100
+		writer.set_case_twin_reporter(function() reports = reports + 1 end)
+		os.time = function() return now end
+		local ok, err = pcall(function()
+			local updates = {{ section = "first", key = "key", value = 3 }}
+			assert(writer.prepare_batch(path, updates) == false)
+			now = 104
+			assert(writer.batch_write(path, updates, nil, nil, nil, nil, function() end) == false)
+			now = 106
+			assert(writer.prepare_batch(path, updates) == false)
+			helpers.assert_eq(reports, 3)
+		end)
+		os.time = old_time; os.remove(path); package.loaded["toml_codec.writer"] = previous
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("a held scope reports its refusal without consuming an older TOML notice", function()
+		with_repeat(SOURCE, function()
+			local builder = helpers.load_module("ui.menu.builder")
+			local rows = builder.build({ config = { any_enabled = function() return true end,
+				get_groups = function() return {} end, is_group_enabled = function() return true end,
+				is_section_enabled = function() return true end } })
+			local function find(items)
+				for _, row in ipairs(items or {}) do
+					if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+					local nested = find(row.menu); if nested then return nested end
+				end
+			end
+			local row = assert(find(rows))
+			local preferences = require("infra.hotstring_preferences")
+			local owner = {}; assert(preferences.acquire(owner))
+			local prior = package.loaded["toml_codec.writer"]
+			package.loaded["toml_codec.writer"] = nil
+			local writer = require("toml_codec.writer")
+			local path = os.tmpname(); local file = assert(io.open(path, "w"))
+			file:write("[section]\nkey = 1\nKEY = 2\n"); file:close()
+			local reports = 0; writer.set_case_twin_reporter(function() reports = reports + 1 end)
+			assert(writer.prepare_batch(path, {{ section = "section", key = "key", value = 3 }}) == false)
+			local execute, notices = os.execute, 0
+			os.execute = function(command) if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end; return execute(command) end
+			local called, result = pcall(row.fn)
+			os.execute = execute
+			local retained = writer.take_case_twin_notice()
+			package.loaded["toml_codec.writer"] = prior
+			assert(preferences.release(owner)); os.remove(path)
+			helpers.assert_true(called); helpers.assert_eq(result, false); helpers.assert_eq(reports, 1)
+			helpers.assert_eq(notices, 1)
+			helpers.assert_not_nil(retained, "the prior caller retains its own notice receipt")
+		end)
+	end)
+	helpers.it("reports a refused real config write without redrawing success", function()
+		with_repeat(SOURCE, function(subject, _, path, _, sandbox)
+			local changes, notices = 0, 0
+			local old, rename = os.execute, os.rename
+			os.execute = function(command)
+				if command:find("dialog_host.lua", 1, true) then notices = notices + 1; return 0 end
+				return old(command)
+			end
+			local ok, err = pcall(function()
+				local builder = helpers.load_module("ui.menu.builder")
+				local rows = builder.build({ config = { any_enabled = function() return true end,
+					get_groups = function() return {} end, is_group_enabled = function() return true end,
+					is_section_enabled = function() return true end },
+					on_menu_changed = function() changes = changes + 1 end })
+				local function find(items)
+					for _, row in ipairs(items or {}) do
+						if row.title == require("infra.i18n").get("menu.hotstrings.repeat_key_toggle") then return row end
+						local nested = find(row.menu); if nested then return nested end
+					end
+				end
+				local row = assert(find(rows), "real repeat menu row must exist")
+				os.rename = function(from, to) if to == path then return false, "inert refusal" end; return rename(from, to) end
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(sandbox.read_bytes(path), SOURCE)
+				helpers.assert_eq(subject.is_enabled(), true)
+				os.rename = rename
+				local toggle = subject.toggle_with_notice
+				subject.toggle_with_notice = function() assert(toggle() == true); error("inert post-save exception") end
+				local called = pcall(row.fn)
+				subject.toggle_with_notice = toggle
+				helpers.assert_eq(called, false)
+			end)
+			os.execute, os.rename = old, rename
+			helpers.assert_true(ok, tostring(err))
+			helpers.assert_eq(changes, 0)
+			helpers.assert_eq(notices, 1)
+			helpers.assert_true(sandbox.read_bytes(path) ~= SOURCE)
+			helpers.assert_eq(subject.is_enabled(), false)
+		end)
+	end)
+end)
 helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("keeps an empty canonical config neutral despite a legacy true", function()
 		with_repeat(nil, function(subject, _, path, _, sandbox)

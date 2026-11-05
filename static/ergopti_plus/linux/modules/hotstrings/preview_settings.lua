@@ -133,7 +133,7 @@ end
 --- @param name string
 --- @param value boolean
 --- @return boolean
-function M.set(name, value)
+local function set(name, value, on_notice)
 	local toggle = by_name()[name]
 	if not toggle then
 		Logger.error(LOG, "set(): '%s' is not a preview toggle.", tostring(name))
@@ -145,7 +145,10 @@ function M.set(name, value)
 		return false
 	end
 	local wanted = value
-	if not Preferences.set(toggle.manifest, wanted) then
+	local saved
+	if on_notice then saved = Preferences.set_with_notice(toggle.manifest, wanted, on_notice)
+	else saved = Preferences.set(toggle.manifest, wanted) end
+	if not saved then
 		Logger.error(LOG, "Could not persist '%s' — the change would be lost at restart.", toggle.manifest)
 		return false
 	end
@@ -155,11 +158,22 @@ function M.set(name, value)
 	return true
 end
 
+function M.set(name, value) return set(name, value) end
+
 --- Flips one toggle.
 --- @param name string
 --- @return boolean
 function M.toggle(name)
 	return M.set(name, not M.get(name))
+end
+
+--- Flips one value and returns its own case-twin notice acknowledgement.
+--- @return boolean committed
+--- @return boolean noticed
+function M.toggle_with_notice(name)
+	local noticed = false
+	local committed = set(name, not M.get(name), function() noticed = true end)
+	return committed, noticed
 end
 
 

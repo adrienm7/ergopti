@@ -114,7 +114,7 @@ local function with_numeric_menu(options, exercise)
 	local loaded = {}
 	for key, value in pairs(package.loaded) do loaded[key] = value end
 	local path = os.tmpname()
-	local initial = "[llm]\nenabled = true\n[llm.generation]\ntemperature = 0.7\ncontext_length = 1600\nmin_words = 3\nmax_words = 10\n[llm.trigger]\ndebounce_ms = 300\n[future]\nkeep = \"foreign\"\n"
+	local initial = options.source or "[llm]\nenabled = true\n[llm.generation]\ntemperature = 0.7\ncontext_length = 1600\nmin_words = 3\nmax_words = 10\n[llm.trigger]\ndebounce_ms = 300\n[future]\nkeep = \"foreign\"\n"
 	NumericSandbox.write_bytes(path, initial)
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
@@ -135,7 +135,8 @@ local function with_numeric_menu(options, exercise)
 		local declaration = renderer.get_array("llm_numeric_custom_rows")
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
-		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {} }
+		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {}, reports = 0 }
+		if options.case_twin then writer.set_case_twin_reporter(function() log.reports = log.reports + 1 end) end
 		package.loaded["adapters.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
 		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
@@ -192,6 +193,22 @@ local function numeric_tail(fixture, context)
 end
 
 helpers.describe("tray (linux): declared free numeric tails", function()
+	for _, sample in ipairs({
+		{ key = "menu.llm.generation.temperature", section = "llm.generation", leaf = "temperature", a = "0.7", b = "0.8" },
+		{ key = "menu.llm.debounce_label", section = "llm.trigger", leaf = "debounce_ms", a = "300", b = "400" },
+		{ section = "llm.profiles", leaf = "num_predictions", a = "3", b = "4" },
+	}) do
+		helpers.it("does not duplicate the current preset's case-twin notice: " .. sample.leaf, function()
+			local source = "[llm]\nenabled = true\n[" .. sample.section .. "]\n" .. sample.leaf .. " = " .. sample.a
+				.. "\n" .. sample.leaf:upper() .. " = " .. sample.b .. "\n"
+			with_numeric_menu({ source = source, case_twin = true }, function(f)
+				local picker = sample.key and assert(numeric_picker(f.rows, sample.key, f.strings)) or count_row(ai_rows(f.rows))
+				helpers.assert_eq(picker.menu[1].fn(), false)
+				helpers.assert_eq({ f.log.reports, f.log.notices, f.log.changed }, { 1, 0, 0 })
+				helpers.assert_eq(numeric_read(f.path), source)
+			end)
+		end)
+	end
 	helpers.it("does not report a save failure for an invalid minimum word preset", function()
 		with_numeric_menu({}, function(f)
 			local picker = assert(numeric_picker(f.rows, "menu.llm.min_words_label", f.strings))

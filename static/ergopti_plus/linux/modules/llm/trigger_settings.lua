@@ -226,7 +226,7 @@ end
 --- @param expected_source table|nil Exact source retained by a deferred editor.
 --- @param admission function|nil Final originating configuration admission.
 --- @return boolean
-function M.set(name, value, expected_source, admission)
+local function set(name, value, expected_source, admission, on_notice)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid trigger setting %s=%s.", tostring(name), tostring(value))
@@ -242,9 +242,11 @@ function M.set(name, value, expected_source, admission)
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or admission ~= nil and type(admission) ~= "function"
 			or type(Storage.set_many) ~= "function" then return false end
-		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source, admission)
+		if on_notice then persisted = Storage.set_many_with_notice({[PREF_PREFIX .. name] = value}, expected_source, admission, on_notice)
+		else persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source, admission) end
 	else
-		persisted = Storage.set(PREF_PREFIX .. name, value)
+		if on_notice then persisted = Storage.set_with_notice(PREF_PREFIX .. name, value, on_notice)
+		else persisted = Storage.set(PREF_PREFIX .. name, value) end
 	end
 	if persisted ~= true then
 		Logger.error(LOG, "Trigger setting '%s' could not be persisted; live state is unchanged.", name)
@@ -253,6 +255,25 @@ function M.set(name, value, expected_source, admission)
 	_values[name] = detached(name, value)
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
+end
+
+function M.set(name, value, expected_source, admission)
+	return set(name, value, expected_source, admission)
+end
+
+--- Stores a value and returns whether this exact write already showed a notice.
+--- @return boolean committed
+--- @return boolean noticed
+function M.set_with_notice(name, value)
+	local noticed = false
+	local committed = set(name, value, nil, nil, function() noticed = true end)
+	return committed, noticed
+end
+
+--- Stores a retained setting with notice acknowledgement from its exact write.
+--- @return boolean committed
+function M.set_with_source_notice(name, value, expected_source, admission, on_notice)
+	return set(name, value, expected_source, admission, on_notice)
 end
 
 --- Flips one boolean setting transactionally.
