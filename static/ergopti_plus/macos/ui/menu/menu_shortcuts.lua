@@ -579,11 +579,8 @@ function M.build(ctx)
 				i18n.get("dialog.shortcuts.chatgpt_prompt"),
 				state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
 			if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
-				state.chatgpt_url = url
-				if type(shortcuts.set_chatgpt_url) == "function" then
-					pcall(shortcuts.set_chatgpt_url, url)
-				end
-				if ctx.save_prefs() ~= true then return false end
+				if type(ctx.commit_chatgpt_url) ~= "function"
+					or ctx.commit_chatgpt_url(url) ~= true then return false end
 				ctx.updateMenu()
 			end
 		end or nil
