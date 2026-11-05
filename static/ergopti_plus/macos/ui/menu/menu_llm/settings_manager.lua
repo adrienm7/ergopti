@@ -237,8 +237,9 @@ local function generic_numeric_prompt(
 			-- fraction made it extract an empty context.
 			return reject_numeric_input(title)
 		elseif new_val and is_finite_number(new_val) then
-			if min_val and new_val < min_val then new_val = min_val end
-			if max_val and new_val > max_val then new_val = max_val end
+			if (min_val and new_val < min_val) or (max_val and new_val > max_val) then
+				return reject_numeric_input(title, "numeric_prompt.out_of_range")
+			end
 
 			-- Reverse the factor if applied
 			local final_val = factor and (new_val / factor) or new_val
