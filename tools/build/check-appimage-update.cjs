@@ -30,6 +30,7 @@
 'use strict';
 
 const fs = require('node:fs');
+const { createHash } = require('node:crypto');
 const path = require('node:path');
 
 /** The release asset names, shared with the release assembly and the site. */
@@ -173,8 +174,10 @@ function verify(image, zsync) {
 			`zsync Length ${header.get('Length')} differs from the AppImage size ${image.length}`
 		);
 	}
-	if (!/^[0-9a-f]{40}$/.test(header.get('SHA-1') ?? ''))
-		problems.push('zsync SHA-1 is missing or malformed');
+	const sha1 = header.get('SHA-1') ?? '';
+	if (!/^[0-9a-f]{40}$/.test(sha1)) problems.push('zsync SHA-1 is missing or malformed');
+	else if (sha1 !== createHash('sha1').update(image).digest('hex'))
+		problems.push('zsync SHA-1 does not match the AppImage');
 	if (Number(header.get('__blocks')) <= 0)
 		problems.push('the .zsync file carries no block checksums');
 	if (!globMatches(parseUpdateInformation(UPDATE_INFORMATION).pattern, ZSYNC_ASSET)) {
