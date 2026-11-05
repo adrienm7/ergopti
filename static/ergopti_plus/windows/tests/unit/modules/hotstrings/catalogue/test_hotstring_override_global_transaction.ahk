@@ -726,7 +726,7 @@ _HSGP_Outcome(Denied) {
 			AssertEqual(BeforeRetry.Size, AfterRetry.Size)
 			AssertEqual(BeforeRetry.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", BeforeRetry,
 				"Ptr", AfterRetry, "UPtr", BeforeRetry.Size, "UPtr"))
-			AssertTrue(HotstringsReloadOverrides(), "the actual reload reconciles the complete native image")
+			AssertTrue(HotstringsConfigReload(), "the actual reload reconciles the complete native image")
 			AssertEqual("#222222", _HotstringsOverrides["rolls"].Color)
 		}
 		AssertTrue(HotstringsSetOverride("rolls", "", "color", "#333333"), "a current source receipt accepts a new fully native durable write")
