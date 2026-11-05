@@ -118,7 +118,7 @@ helpers.describe("gesture Actions search acquisition epoch", function()
 	for _, case in ipairs({
 		{ name = "cleanup after clear", controls = { search_reenter = "clear" } },
 		{ name = "admission close after timer acquisition", controls = {
-			aux_pause_on_query = 4,
+			aux_pause_on_query = 5,
 		} },
 	}) do
 		it("arms clipboard recovery after " .. case.name, function(fresh_actions, with_feature_lifecycles)

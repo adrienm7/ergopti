@@ -117,11 +117,17 @@ end
 --- Returns nil when the clipboard is empty; a truthy table otherwise.
 --- @return table|nil Pasteboard data table, or nil if empty/error.
 --- @return boolean read_ok True when nil means an empty clipboard, false on error.
+--- @return integer|nil count Native generation captured with the snapshot.
 function M.save()
 	-- Hammerspoon's readAllData() snapshots only the first pasteboard item.
 	-- Refuse known multi-item content so a later restore cannot discard items.
 	if not hs or not hs.pasteboard or type(hs.pasteboard.allContentTypes) ~= "function" then
 		Logger.error(LOG, "save(): pasteboard item enumeration is unavailable.")
+		return nil, false
+	end
+	local before = M._change_count()
+	if before == nil then
+		Logger.error(LOG, "save(): pasteboard generation is unavailable.")
 		return nil, false
 	end
 	local checked, items = pcall(hs.pasteboard.allContentTypes)
@@ -142,16 +148,38 @@ function M.save()
 		Logger.error(LOG, "save(): pasteboard returned %s instead of a data table", type(result))
 		return nil, false
 	end
+	local after = M._change_count()
+	if after == nil or after ~= before then
+		Logger.error(LOG, "save(): pasteboard changed or became unavailable during the snapshot.")
+		return nil, false
+	end
+	-- Hammerspoon's readAllData() omits a type when its native data provider
+	-- returns nil. Restoring that partial table would silently lose that type.
+	if #items == 1 then
+		if type(items[1]) ~= "table" then
+			Logger.error(LOG, "save(): pasteboard item types are unavailable.")
+			return nil, false
+		end
+		for _, uti in ipairs(items[1]) do
+			if type(uti) ~= "string" or type(result[uti]) ~= "string" then
+				Logger.error(LOG, "save(): a pasteboard type could not be preserved.")
+				return nil, false
+			end
+		end
+	elseif next(result) ~= nil then
+		Logger.error(LOG, "save(): pasteboard changed during the snapshot.")
+		return nil, false
+	end
 	-- readAllData() returns an empty table when clipboard is empty.
 	if next(result) == nil then
-		return nil, true
+		return nil, true, after
 	end
 
 	-- readAllData() is a UTI-string-keyed HASH table, not an array, so `#result`
 	-- always reports 0. Count with pairs() so the diagnostic is truthful (F-I3).
 	local n = TableUtil.count(result)
 	Logger.debug(LOG, "save(): clipboard snapshot taken (%d type(s)).", n)
-	return result, true
+	return result, true, after
 end
 
 --- Restores the clipboard to a previously saved value.

@@ -527,13 +527,13 @@ local function _json_text(v)
 	return encoded
 end
 
---- Typing events are replay source data: replacing a failed encoding with an
---- empty object would permanently discard the keystrokes from reconstruction.
-local function _typing_events_json(value)
+--- Raw event JSON is replay source data: an empty fallback would permanently
+--- discard the event's keystrokes or system metadata from reconstruction.
+local function _required_event_json(value, label)
 	if value == nil then return "{}" end
 	local ok, encoded = pcall(json.encode, value)
 	if not ok or type(encoded) ~= "string" or encoded == "" then
-		error("typing event JSON encoding failed", 0)
+		error(label .. " JSON encoding failed", 0)
 	end
 	return encoded
 end
@@ -568,7 +568,7 @@ function _builders.typing(e, id)
 	-- literally typed, so they are the only ones encrypted. The aggregates the
 	-- dashboard computes over stay in clear, which is what keeps reads fast.
 	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
-	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _typing_events_json(e.events))
+	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _required_event_json(e.events, "typing event"))
 	if enc_text == nil or enc_json == nil then
 		-- Encryption is on but could not run. Storing the plaintext would defeat
 		-- the setting the user turned on, so this row is not written at all.
@@ -647,7 +647,7 @@ function _builders.system(e, id, action_override)
 		-- column is NOT NULL, the exact swallow this function's docstring warns
 		-- about. Fall back to a sentinel so the event survives as an anomaly rather
 		-- than vanishing entirely.
-		action = tostring(action_override or e.action or "unknown"), metadata_json = _json_text(meta),
+		action = tostring(action_override or e.action or "unknown"), metadata_json = _required_event_json(meta, "system event"),
 	})
 end
 
