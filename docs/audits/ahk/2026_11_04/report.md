@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **125 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **126 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1895,3 +1895,15 @@ Severity: medium. Confidence: high. Evidence: actual AHK destructor and native-s
 Both cancellation and genuine one-shot completion reach global_retired1 with fake_callbacks0, then keep owner_deleted0 after exact native callback cancellation and release of local references. The independent acyclic control is destroyed once. The owner retains its BoundFunc, which retains that same owner; removing its global never breaks the cycle. The mechanism already exists at9154723b, so it is a new campaign finding rather than a regression introduced by the privacy correction. No RSS, byte-rate or latency claim is made.
 
 Commit06b42cec detaches the reverse edge before cancellation and in the old owner's own finally, even when a successor has been published. The original two lifetime tests remain unchanged. Ten privacy/reentry controls now retain actual callbacks before revocation and explicitly check that returning old frames preserve the successor. Postfix native qualification is pending.
+
+### Native qualification update: replays63 and64
+
+Replay42028281855 executes63 selected tests:57 pass and6 fail in both orders. Production compilation passes; neither E2E is selected. It qualifies AHK-125 callback retirement, the bare-extension name refusal, menu suffix preservation and the agent pause-capability controls. Four admitted TakeNote lifecycle failures establish AHK-126 below. Two actual TapHold source A-to-B failures extend072 and await correction.
+
+Replay42031267454 executes64 selected tests:54 pass and10 fail individually;53 pass and11 fail reversed. Production compilation passes; neither E2E is selected. It qualifies the TakeNote lifecycle correction, scalar source guards and all8 actual menu suffix/case tests. Two causal admission-order cases corroborate unresolved120 character loss: a genuine later native timer arrives during the genuine secure-field read and the final buffer is b rather than ab. Reverse plain-stays also loses a fresh B character. Eight model-browser tests fail their stale diagnostic catch-entry prerequisite before child construction; they establish no product defect and their fixture is repaired separately. Both native TapHold inheritance controls pass before the proposed leaf-writer correction, so no inheritance defect is counted.
+
+### AHK-126: Deferred note jobs survive suspension and resume
+
+Replay42028281855 admits the genuine lifecycle with keyboard_port1 and debt0. Queued, waiting, inflight-file and clock-acquisition probes all allow old note work after resume; the unchanged-epoch control passes. Both orders reproduce. A current-suspension check cannot withdraw an older request after resume.
+
+Commite5a7025d captures the epoch before callouts, revokes exact jobs during SuspendEnter and checks ownership before each external effect and pending publication. Replay42031267454 qualifies all6 lifecycle tests plus13 existing note controls in both orders. The clock-port cutpoint is controlled reentry, not a claim that A_TickCount spontaneously pumps a callback. Real Notepad same-basename document probes are a separate unexecuted hypothesis.
