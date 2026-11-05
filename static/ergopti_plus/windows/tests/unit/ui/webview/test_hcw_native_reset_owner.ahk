@@ -153,3 +153,7 @@ for _HNRT_RetirementMode in ["retire-pre", "retire-post"]
 for _HNRT_NumericMode in ["numeric-current", "numeric-overflow", "numeric-empty-delay", "numeric-empty-priority"]
 	Test("Native hotstrings numeric admission: " . _HNRT_NumericMode . " uses actual Edit and debounce (hcw-native-numeric-domain-owner)",
 		_HNRT_Case.Bind(_HNRT_NumericMode))
+
+for _HNRT_CompanionMode in ["numeric-pending-empty", "numeric-padded", "numeric-zero", "numeric-priority-clamp"]
+	Test("Native hotstrings numeric continuation: " . _HNRT_CompanionMode . " preserves admission and existing values (hcw-native-numeric-companion)",
+		_HNRT_Case.Bind(_HNRT_CompanionMode))

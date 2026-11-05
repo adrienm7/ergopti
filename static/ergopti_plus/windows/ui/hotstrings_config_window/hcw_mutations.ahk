@@ -16,6 +16,8 @@
 ; extension entries) or _HCW_PatchTomlMeta (for personal TOML files).
 ; ==============================================================================
 
+#Include ../../infra/number.ahk
+
 ; Override fields that are BAKED INTO EACH SPEC at registration time rather than
 ; derived at read time. Persisting one of these only bumps the resolve
 ; generation, so the window (which reads through HotstringsResolve) shows the new
@@ -187,7 +189,11 @@ _HCW_OnDelayChanged() {
 	global _HCWWidgets
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
-	Ms := _HCWWidgets.DelayEdit.Value + 0
+	if !NumberTryParseInputInteger(_HCWWidgets.DelayEdit.Value, &Ms) {
+		; A partial/invalid edit supersedes its own pending numeric candidate.
+		_HCW_CancelNumericWrite(Entry, Sec, "delay")
+		return
+	}
 	if (Ms < 0) {
 		Ms := 0
 	}
@@ -199,7 +205,10 @@ _HCW_OnPriorityChanged() {
 	global _HCWWidgets
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
-	Prio := _HCWWidgets.PriorityEdit.Value + 0
+	if !NumberTryParseInputInteger(_HCWWidgets.PriorityEdit.Value, &Prio) {
+		_HCW_CancelNumericWrite(Entry, Sec, "priority")
+		return
+	}
 	if (Prio < 0) {
 		Prio := 0
 	} else if (Prio > 100) {
