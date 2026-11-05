@@ -261,7 +261,7 @@ _UAN_Observe(State, Kind, Text) {
 		State.Entry := Entry
 		if Entry["finished"]
 			throw Error("No retired capture may prove the original command output")
-		Bytes := FSReadBytesStrict(Entry["out"])
+		Bytes := FSReadBytesStrict(Entry[State.HasOwnProp("CaptureField") ? State.CaptureField : "out"])
 		State.CaptureHex := _UAN_Hex(Bytes)
 		State.DeliveredUnits := StrLen(Text)
 		State.Kind := Kind
@@ -277,7 +277,7 @@ _UAN_Case(Mode) {
 	for Index, Byte in Raw
 		NumPut("UChar", Byte, Bytes, Index - 1)
 	ExpectedHex := _UAN_Hex(Bytes)
-	IsNul := Mode == "nul-copy" || Mode == "nul-type"
+	IsNul := Mode == "nul-copy" || Mode == "nul-type" || Mode == "nul-stderr"
 	ValidUtf8 := HTTPIsValidUtf8(Bytes, Bytes.Size)
 	AssertEqual(Mode != "invalid-utf8", !!ValidUtf8, "The native decoder precondition must distinguish valid UTF-8 containing NUL from malformed bytes")
 	if IsNul {
@@ -292,7 +292,8 @@ _UAN_Case(Mode) {
 	AssertTrue(Created is Integer && Created == 1, "The raw stdout witness directory must be acquired exclusively before any write or cleanup")
 	Path := Directory . "\stdout.raw", Handle := 0, OwnedFile := false
 	State := {Reads: 0, CaptureHex: "", DeliveredUnits: -1, Kind: "", Failure: 0,
-		Binding: "ua_counted_output", Entry: 0, Retired: true, Root: Directory}
+		Binding: "ua_counted_output", Entry: 0, Retired: true, Root: Directory,
+		CaptureField: Mode == "nul-stderr" ? "err" : "out"}
 	try {
 		Handle := DllCall("Kernel32\CreateFileW", "WStr", Path, "UInt", 0x40000000, "UInt", 1,
 			"Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
@@ -307,7 +308,8 @@ _UAN_Case(Mode) {
 		Handle := 0
 		AssertEqual(ExpectedHex, _UAN_Hex(FSReadBytesStrict(Path)), "The independent source file must retain every original byte")
 		Output := Mode == "nul-type" ? "type" : "copy"
-		Record := _UAN_Run('type "' . Path . '"', Output, State)
+		Command := 'type "' . Path . '"' . (Mode == "nul-stderr" ? " 1>&2 & exit /b 3" : "")
+		Record := _UAN_Run(Command, Output, State)
 		_TestPrint("# user-command-counted mode=" . Mode . " started=" . Record["started"]
 			. " finished=" . Record["finished"] . " expected_hex=" . ExpectedHex . " capture_hex=" . State.CaptureHex
 			. " valid_utf8=" . !!ValidUtf8 . " observations=" . State.Reads . " port=" . State.Kind
@@ -325,6 +327,12 @@ _UAN_Case(Mode) {
 			AssertEqual(1, Record["copied"].Length)
 			AssertEqual(ExpectedText, Record["copied"][1], "Ordinary accented and supplementary UTF-8 must retain complete output")
 			AssertEqual(3, StrLen(Record["copied"][1]))
+		} else if Mode == "nul-stderr" {
+			AssertEqual(0, Record["copied"].Length)
+			AssertEqual(0, Record["typed"].Length)
+			AssertEqual(1, Record["notices"].Length)
+			AssertEqual(StrReplace(t("user_actions.command_failed"), "{1}", "3"), Record["notices"][1],
+				"A binary error stream must keep the existing generic failed-exit receipt, never a truncated first-line detail")
 		} else {
 			AssertEqual(0, Record["copied"].Length, "Binary/invalid stdout must never publish a silently shortened copy")
 			AssertEqual(0, Record["typed"].Length, "Binary/invalid stdout must never publish a silently shortened typed prefix")
@@ -390,3 +398,6 @@ Test("User command first-line work at the actual capture limit retains its prefi
 	_UAFP_Work)
 
 #Include test_user_command_lifecycle_owner.ahk
+
+Test("Public command counted stderr: NUL capture retains the generic failed-exit receipt (user-command-counted-stderr)",
+	_UAN_Case.Bind("nul-stderr"))
