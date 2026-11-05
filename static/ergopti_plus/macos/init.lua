@@ -1418,20 +1418,21 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
---- Opens the native dialog that names the exact switch to turn on. It used to
---- be a one-line banner along the Dock; the dialog has steps and buttons and
---- the wait closes it when the grant arrives. Loaded here, not at the top, so a
---- UI failure can never stop the boot; guide_accessibility itself never raises.
---- @return function close Closes the dialog.
-local function show_accessibility_guidance()
-	local ok, close = xpcall(function()
-		return require("ui.permission_dialog").guide_accessibility(AccessibilityPermission)
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Accessibility dialog unavailable: %s.", tostring(close))
-		return function() end
+local ACCESSIBILITY_RESET_STORAGE_KEY = "accessibility_reset_install_v1"
+
+--- The install the Accessibility wait remembers its one stale-entry reset by:
+--- the launcher's version and the device and inode of its executable, which a
+--- reinstall or rebuild changes and a reload or relaunch keeps.
+--- @return string|nil identity Nil when the launcher exported no identity.
+--- @return string|nil detail Exact reason when identity is nil.
+local function accessibility_install_identity()
+	local parts = {}
+	for _, name in ipairs({ "ERGOPTI_LAUNCHER_VERSION", "ERGOPTI_LAUNCHER_DEVICE", "ERGOPTI_LAUNCHER_INODE" }) do
+		local value = os.getenv(name)
+		if type(value) ~= "string" or value == "" then return nil, name .. " is not exported" end
+		parts[#parts + 1] = value
 	end
-	return close
+	return table.concat(parts, ":")
 end
 
 --- Calls on_reopen each time the user opens ErgoptiPlus again during the wait.
@@ -1476,8 +1477,8 @@ Boot.stage_once("Accessibility permission")
 -- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
 -- Each ad hoc signed build also invalidates the previous grant while System
 -- Settings still shows it checked, so exiting with instructions left users
--- stuck. The wait clears that stale entry, prompts, opens the pane, and runs
--- this boot again once macOS trusts the process.
+-- stuck. The wait clears that stale entry once per install, shows macOS's own
+-- prompt, opens the pane, and runs this boot again once macOS trusts the process.
 local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
 if accessibility_trusted == nil then
 	emergency_exit_after_runtime_failure("accessibility",
@@ -1486,14 +1487,23 @@ if accessibility_trusted == nil then
 	return
 end
 if accessibility_trusted ~= true then
-	local close_guidance = function() end
+	local install_identity, identity_err = accessibility_install_identity()
+	if install_identity == nil then
+		emergency_exit_after_runtime_failure("accessibility",
+			"Accessibility wait has no install identity: " .. tostring(identity_err),
+			"startup.accessibility_required")
+		return
+	end
 	local waiting, wait_err = AccessibilityWait.start({
 		permission = AccessibilityPermission,
 		every = TimerScheduler.every,
 		cancel = TimerScheduler.cancel,
-		show_guidance = function() close_guidance = show_accessibility_guidance() end,
-		close_guidance = function() close_guidance() end,
 		watch_reopen = watch_launcher_reopen,
+		install_identity = install_identity,
+		reset_memory = {
+			get = function() return Storage.get(ACCESSIBILITY_RESET_STORAGE_KEY) end,
+			set = function(identity) return Storage.set(ACCESSIBILITY_RESET_STORAGE_KEY, identity) end,
+		},
 		-- Same guard as the first run below: a raise ends in the named exit.
 		on_trusted = function()
 			local resumed_ok, resumed_error = xpcall(finish_boot_after_onboarding, debug.traceback)
