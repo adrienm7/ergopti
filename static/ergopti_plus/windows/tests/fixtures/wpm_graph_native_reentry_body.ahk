@@ -7,13 +7,25 @@ _WPMG_Require(Condition, Message) {
 _WPMG_Store(Key, Value) => true
 _WPMG_Rebuild() => true
 _WPMG_Notify(*) => 0
+_WPMG_DestroyControl(State, This, Args*) {
+	if This == State.Old && !State.Refused {
+		State.Refused := true
+		if State.Mode == "destroy-after"
+			State.RealDestroy.Call(This, Args*)
+		throw Error("private fixture injected destroy refusal")
+	}
+	return State.RealDestroy.Call(This, Args*)
+}
 _WPMG_WindowProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 	State.Active += 1
 	try {
 		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
 		if State.Armed && !State.Seen && Hwnd == State.OldHwnd && Message == 2 {
 			State.Seen := true
-			if State.Mode == "reopen" {
+			if State.Mode == "hide-during-destroy" {
+				WPMWidget_Hide()
+				State.NewHide := true
+			} else if State.Mode == "reopen" {
 				WPMWidget_Show()
 				State.Successor := WPMWidget._graph_gui
 				if State.Successor is Gui {
@@ -30,9 +42,10 @@ _WPMG_WindowProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 }
 _WPMG_Main() {
 	global ConfigurationFile, Features, STORAGE_REG_BASE
-	_WPMG_Require(A_Args.Length == 2 && (A_Args[1] == "current" || A_Args[1] == "reopen"), "private test mode and root are required")
+	_WPMG_Require(A_Args.Length == 2 && (A_Args[1] == "current" || A_Args[1] == "reopen" || A_Args[1] == "destroy-before" || A_Args[1] == "destroy-after" || A_Args[1] == "hide-during-destroy"), "private test mode and root are required")
 	State := {Mode: A_Args[1], Armed: false, Seen: false, Active: 0, Failure: 0,
-		Old: 0, OldHwnd: 0, Proc: 0, Installed: false, Successor: 0, SuccessorHwnd: 0, Before: false}
+		Old: 0, OldHwnd: 0, Proc: 0, Installed: false, Successor: 0, SuccessorHwnd: 0, Before: false, Refused: false, RealDestroy: 0, NewHide: false}
+	DestroyDescriptor := Gui.Prototype.GetOwnPropDesc("Destroy"), State.RealDestroy := DestroyDescriptor.Call
 	try {
 		Creation := FSCreateDirectoryExclusiveStrict(A_Args[2] . "\config")
 		_WPMG_Require(Creation is Integer && Creation == 1, "the private configuration directory must be exclusively owned")
@@ -60,7 +73,21 @@ _WPMG_Main() {
 		_WPMG_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", State.OldHwnd, "Ptr", State.Proc,
 			"UPtr", 0x57504D47, "UPtr", 0, "Int"), "the compact HWND must own its destruction observer")
 		State.Installed := true, State.Armed := true
+		if InStr(State.Mode, "destroy-") == 1
+			Gui.Prototype.DefineProp("Destroy", {Call: _WPMG_DestroyControl.Bind(State)})
 		Result := _ToggleWpmWidgetGraph(0, _WPMG_Notify, 0, 0, _WPMG_Rebuild, _WPMG_Store)
+		if InStr(State.Mode, "destroy-") == 1 {
+			AliveBeforeRetry := !!DllCall("IsWindow", "Ptr", State.OldHwnd, "Int")
+			DebtBeforeRetry := _METWpmRetiredSurfaces.pending.Length
+			FileAppend("OBSERVATION wpm-graph-destroy mode=" . State.Mode . " refused=" . State.Refused
+				. " old_alive=" . AliveBeforeRetry . " debt=" . DebtBeforeRetry . "`n", "*")
+			_WPMG_Require(State.Refused && (State.Mode == "destroy-before" ? (AliveBeforeRetry && DebtBeforeRetry == 1)
+				: (!AliveBeforeRetry && DebtBeforeRetry == 0)), "failed Destroy must keep exact live custody and recognize actual destruction")
+			Gui.Prototype.DefineProp("Destroy", DestroyDescriptor)
+			_MET_WpmRetirePending()
+			_WPMG_Require(!_METWpmRetiredSurfaces.pending.Length
+				&& !DllCall("IsWindow", "Ptr", State.OldHwnd, "Int"), "exact old native owner must retire on retry")
+		}
 		State.Armed := false
 		Current := WPMWidget._graph_gui
 		After := State.Successor is Gui && Current == State.Successor
@@ -68,14 +95,20 @@ _WPMG_Main() {
 		FileAppend("OBSERVATION wpm-graph-native mode=" . State.Mode . " result=" . Result . " destroy_seen=" . State.Seen
 			. " before=" . State.Before . " after=" . After . " successor_alive="
 			. (State.SuccessorHwnd ? DllCall("IsWindow", "Ptr", State.SuccessorHwnd, "Int") : 0)
-			. " graph=" . WPMWidget.show_graph . " callback_failed=" . IsObject(State.Failure) . "`n", "*")
+			. " graph=" . WPMWidget.show_graph . " visible=" . WPMWidget.visible . " newer_hide=" . State.NewHide . " callback_failed=" . IsObject(State.Failure) . "`n", "*")
 		if IsObject(State.Failure)
 			throw State.Failure
-		_WPMG_Require(State.Seen && Result is Integer && Result == 1 && WPMWidget.show_graph && Current is Gui
-			&& DllCall("IsWindow", "Ptr", Current.Hwnd, "Int"), "the real graph toggle must commit and retain an actual graph surface")
+		if State.Mode == "hide-during-destroy"
+			_WPMG_Require(State.Seen && State.NewHide && Result is Integer && Result == 1
+				&& WPMWidget.show_graph && !WPMWidget.visible && !IsObject(Current),
+				"the newer public Hide during native destruction must remain in force")
+		else
+			_WPMG_Require(State.Seen && Result is Integer && Result == 1 && WPMWidget.show_graph && Current is Gui
+				&& DllCall("IsWindow", "Ptr", Current.Hwnd, "Int"), "the real graph toggle must commit and retain an actual graph surface")
 		if State.Mode == "reopen"
 			_WPMG_Require(State.Seen && State.Before && After, "the old toggle cannot destroy the exact newer graph surface")
 	} finally {
+		Gui.Prototype.DefineProp("Destroy", DestroyDescriptor)
 		State.Armed := false
 		WPMWidget_Hide()
 		Removed := !State.Installed || !DllCall("IsWindow", "Ptr", State.OldHwnd, "Int")

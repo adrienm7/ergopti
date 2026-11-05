@@ -86,9 +86,11 @@ _WPMPT_MenuActionsCommitBeforePublish() {
     Graph := _WPMPT_Body("_ToggleWpmWidgetGraph")
     GraphSave := InStr(Graph, "WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn, StoreFn)")
     HidePos := InStr(Graph, "WPMWidget_Hide()")
-    DestroyPos := InStr(Graph, ".Destroy()")
-    Assert(GraphSave > 0 && HidePos > GraphSave && DestroyPos > GraphSave,
-        "WPM graph toggle must persist graph mode and reset anchor before tearing down its live surface")
+    RetirePos := InStr(Graph, "_MET_WpmRetirePending()")
+    Retire := _WPMPT_Body("_MET_WpmRetirePending")
+    Assert(GraphSave > 0 && HidePos > GraphSave && RetirePos > HidePos
+        && InStr(Retire, "Window.Destroy()") > 0,
+        "WPM graph toggle must persist graph mode before retiring its detached live surface")
     Assert(InStr(Colors, "WPMWidget.use_colors :=") = 0
         && InStr(Graph, "WPMWidget.show_graph :=") = 0
         && InStr(Graph, "WpmWidget.pos_x :=") = 0
