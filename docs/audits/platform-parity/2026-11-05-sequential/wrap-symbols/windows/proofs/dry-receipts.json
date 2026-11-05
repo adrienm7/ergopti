@@ -1,0 +1,16 @@
+[
+	{
+		"pass": "A",
+		"source_contract_exit_code": 0,
+		"sha256": "e5ff44a9ea646ed847b0e2036b9db02809656014a5c53eb3692c09c787a6c501",
+		"result": "PASS: 2 nonvacuous source findings; native Windows execution count=0.",
+		"provenance": "source review and source-contract replay only; identical full log retained once"
+	},
+	{
+		"pass": "B",
+		"source_contract_exit_code": 0,
+		"sha256": "e5ff44a9ea646ed847b0e2036b9db02809656014a5c53eb3692c09c787a6c501",
+		"result": "PASS: 2 nonvacuous source findings; native Windows execution count=0.",
+		"provenance": "source review and source-contract replay only; identical full log retained once"
+	}
+]

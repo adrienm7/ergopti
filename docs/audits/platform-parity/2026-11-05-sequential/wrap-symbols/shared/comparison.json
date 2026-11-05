@@ -1,0 +1,4057 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-shared-contract",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"catalogue": {
+		"groups": [
+			{
+				"i18n": "menu.shortcuts.wrap_group_brackets",
+				"pairs": [
+					{
+						"left": "(",
+						"right": ")"
+					},
+					{
+						"left": "[",
+						"right": "]"
+					},
+					{
+						"left": "{",
+						"right": "}"
+					},
+					{
+						"left": "<",
+						"right": ">"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_quotes",
+				"pairs": [
+					{
+						"left": "\"",
+						"right": "\""
+					},
+					{
+						"left": "'",
+						"right": "'"
+					},
+					{
+						"left": "`",
+						"right": "`"
+					},
+					{
+						"left": "‘",
+						"right": "’"
+					},
+					{
+						"left": "“",
+						"right": "”"
+					},
+					{
+						"left": "„",
+						"right": "“"
+					},
+					{
+						"left": "« ",
+						"right": " »"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_angle",
+				"pairs": [
+					{
+						"left": "〈",
+						"right": "〉"
+					},
+					{
+						"left": "❬",
+						"right": "❭"
+					},
+					{
+						"left": "❰",
+						"right": "❱"
+					},
+					{
+						"left": "❲",
+						"right": "❳"
+					},
+					{
+						"left": "❴",
+						"right": "❵"
+					},
+					{
+						"left": "⟦",
+						"right": "⟧"
+					},
+					{
+						"left": "⟪",
+						"right": "⟫"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_cjk",
+				"pairs": [
+					{
+						"left": "「",
+						"right": "」"
+					},
+					{
+						"left": "【",
+						"right": "】"
+					},
+					{
+						"left": "〖",
+						"right": "〗"
+					},
+					{
+						"left": "《",
+						"right": "》"
+					},
+					{
+						"left": "〘",
+						"right": "〙"
+					},
+					{
+						"left": "〚",
+						"right": "〛"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_braces",
+				"pairs": [
+					{
+						"left": "⎴",
+						"right": "⎵"
+					},
+					{
+						"left": "⏞",
+						"right": "⏟"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_markdown",
+				"pairs": [
+					{
+						"left": "*",
+						"right": "*"
+					},
+					{
+						"left": "_",
+						"right": "_"
+					},
+					{
+						"left": "~",
+						"right": "~"
+					},
+					{
+						"left": "|",
+						"right": "|"
+					},
+					{
+						"left": "/",
+						"right": "/"
+					},
+					{
+						"left": "\\",
+						"right": "\\"
+					}
+				]
+			},
+			{
+				"i18n": "menu.shortcuts.wrap_group_other",
+				"pairs": [
+					{
+						"left": "@",
+						"right": "@"
+					},
+					{
+						"left": "#",
+						"right": "#"
+					},
+					{
+						"left": "%",
+						"right": "%"
+					},
+					{
+						"left": "$",
+						"right": "$"
+					},
+					{
+						"left": "&",
+						"right": "&"
+					},
+					{
+						"left": "!",
+						"right": "!"
+					},
+					{
+						"left": "?",
+						"right": "?"
+					},
+					{
+						"left": "+",
+						"right": "+"
+					},
+					{
+						"left": "=",
+						"right": "="
+					},
+					{
+						"left": ";",
+						"right": ";"
+					},
+					{
+						"left": ":",
+						"right": ":"
+					}
+				]
+			}
+		],
+		"rows": [
+			{
+				"left": "(",
+				"right": ")",
+				"group": "menu.shortcuts.wrap_group_brackets",
+				"group_index": 1,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "(",
+						"right": ")"
+					},
+					"right": {
+						"left": "(",
+						"right": ")"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "(",
+						"right": ")"
+					},
+					"right": {
+						"left": "(",
+						"right": ")"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "[",
+				"right": "]",
+				"group": "menu.shortcuts.wrap_group_brackets",
+				"group_index": 1,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "[",
+						"right": "]"
+					},
+					"right": {
+						"left": "[",
+						"right": "]"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "[",
+						"right": "]"
+					},
+					"right": {
+						"left": "[",
+						"right": "]"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "{",
+				"right": "}",
+				"group": "menu.shortcuts.wrap_group_brackets",
+				"group_index": 1,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "{",
+						"right": "}"
+					},
+					"right": {
+						"left": "{",
+						"right": "}"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "{",
+						"right": "}"
+					},
+					"right": {
+						"left": "{",
+						"right": "}"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "<",
+				"right": ">",
+				"group": "menu.shortcuts.wrap_group_brackets",
+				"group_index": 1,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "<",
+						"right": ">"
+					},
+					"right": {
+						"left": "<",
+						"right": ">"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "<",
+						"right": ">"
+					},
+					"right": {
+						"left": "<",
+						"right": ">"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "\"",
+				"right": "\"",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "\"",
+						"right": "\""
+					},
+					"right": {
+						"left": "\"",
+						"right": "\""
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "\"",
+						"right": "\""
+					},
+					"right": {
+						"left": "\"",
+						"right": "\""
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "'",
+				"right": "'",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "'",
+						"right": "'"
+					},
+					"right": {
+						"left": "'",
+						"right": "'"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "'",
+						"right": "'"
+					},
+					"right": {
+						"left": "'",
+						"right": "'"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "`",
+				"right": "`",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "`",
+						"right": "`"
+					},
+					"right": {
+						"left": "`",
+						"right": "`"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "`",
+						"right": "`"
+					},
+					"right": {
+						"left": "`",
+						"right": "`"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "‘",
+				"right": "’",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "‘",
+						"right": "’"
+					},
+					"right": {
+						"left": "‘",
+						"right": "’"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "‘",
+						"right": "’"
+					},
+					"right": {
+						"left": "‘",
+						"right": "’"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "“",
+				"right": "”",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 5,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "“",
+						"right": "”"
+					},
+					"right": {
+						"left": "“",
+						"right": "”"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "„",
+						"right": "“"
+					},
+					"right": {
+						"left": "“",
+						"right": "”"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "unknown_intent"
+			},
+			{
+				"left": "„",
+				"right": "“",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 6,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "„",
+						"right": "“"
+					},
+					"right": {
+						"left": "“",
+						"right": "”"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "„",
+						"right": "“"
+					},
+					"right": {
+						"left": "„",
+						"right": "“"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "unknown_intent"
+			},
+			{
+				"left": "« ",
+				"right": " »",
+				"group": "menu.shortcuts.wrap_group_quotes",
+				"group_index": 2,
+				"pair_index": 7,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "« ",
+						"right": " »"
+					},
+					"right": {
+						"left": "« ",
+						"right": " »"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "« ",
+						"right": " »"
+					},
+					"right": {
+						"left": "« ",
+						"right": " »"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": false,
+					"right": false
+				},
+				"classification": "os_owner_finding_reference"
+			},
+			{
+				"left": "〈",
+				"right": "〉",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "〈",
+						"right": "〉"
+					},
+					"right": {
+						"left": "〈",
+						"right": "〉"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "〈",
+						"right": "〉"
+					},
+					"right": {
+						"left": "〈",
+						"right": "〉"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "❬",
+				"right": "❭",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "❬",
+						"right": "❭"
+					},
+					"right": {
+						"left": "❬",
+						"right": "❭"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "❬",
+						"right": "❭"
+					},
+					"right": {
+						"left": "❬",
+						"right": "❭"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "❰",
+				"right": "❱",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "❰",
+						"right": "❱"
+					},
+					"right": {
+						"left": "❰",
+						"right": "❱"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "❰",
+						"right": "❱"
+					},
+					"right": {
+						"left": "❰",
+						"right": "❱"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "❲",
+				"right": "❳",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "❲",
+						"right": "❳"
+					},
+					"right": {
+						"left": "❲",
+						"right": "❳"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "❲",
+						"right": "❳"
+					},
+					"right": {
+						"left": "❲",
+						"right": "❳"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "❴",
+				"right": "❵",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 5,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "❴",
+						"right": "❵"
+					},
+					"right": {
+						"left": "❴",
+						"right": "❵"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "❴",
+						"right": "❵"
+					},
+					"right": {
+						"left": "❴",
+						"right": "❵"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "⟦",
+				"right": "⟧",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 6,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "⟦",
+						"right": "⟧"
+					},
+					"right": {
+						"left": "⟦",
+						"right": "⟧"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "⟦",
+						"right": "⟧"
+					},
+					"right": {
+						"left": "⟦",
+						"right": "⟧"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "⟪",
+				"right": "⟫",
+				"group": "menu.shortcuts.wrap_group_angle",
+				"group_index": 3,
+				"pair_index": 7,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "⟪",
+						"right": "⟫"
+					},
+					"right": {
+						"left": "⟪",
+						"right": "⟫"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "⟪",
+						"right": "⟫"
+					},
+					"right": {
+						"left": "⟪",
+						"right": "⟫"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "「",
+				"right": "」",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "「",
+						"right": "」"
+					},
+					"right": {
+						"left": "「",
+						"right": "」"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "「",
+						"right": "」"
+					},
+					"right": {
+						"left": "「",
+						"right": "」"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "【",
+				"right": "】",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "【",
+						"right": "】"
+					},
+					"right": {
+						"left": "【",
+						"right": "】"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "【",
+						"right": "】"
+					},
+					"right": {
+						"left": "【",
+						"right": "】"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "〖",
+				"right": "〗",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "〖",
+						"right": "〗"
+					},
+					"right": {
+						"left": "〖",
+						"right": "〗"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "〖",
+						"right": "〗"
+					},
+					"right": {
+						"left": "〖",
+						"right": "〗"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "《",
+				"right": "》",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "《",
+						"right": "》"
+					},
+					"right": {
+						"left": "《",
+						"right": "》"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "《",
+						"right": "》"
+					},
+					"right": {
+						"left": "《",
+						"right": "》"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "〘",
+				"right": "〙",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 5,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "〘",
+						"right": "〙"
+					},
+					"right": {
+						"left": "〘",
+						"right": "〙"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "〘",
+						"right": "〙"
+					},
+					"right": {
+						"left": "〘",
+						"right": "〙"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "〚",
+				"right": "〛",
+				"group": "menu.shortcuts.wrap_group_cjk",
+				"group_index": 4,
+				"pair_index": 6,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "〚",
+						"right": "〛"
+					},
+					"right": {
+						"left": "〚",
+						"right": "〛"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "〚",
+						"right": "〛"
+					},
+					"right": {
+						"left": "〚",
+						"right": "〛"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "⎴",
+				"right": "⎵",
+				"group": "menu.shortcuts.wrap_group_braces",
+				"group_index": 5,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "⎴",
+						"right": "⎵"
+					},
+					"right": {
+						"left": "⎴",
+						"right": "⎵"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "⎴",
+						"right": "⎵"
+					},
+					"right": {
+						"left": "⎴",
+						"right": "⎵"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "⏞",
+				"right": "⏟",
+				"group": "menu.shortcuts.wrap_group_braces",
+				"group_index": 5,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "⏞",
+						"right": "⏟"
+					},
+					"right": {
+						"left": "⏞",
+						"right": "⏟"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "⏞",
+						"right": "⏟"
+					},
+					"right": {
+						"left": "⏞",
+						"right": "⏟"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "*",
+				"right": "*",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "*",
+						"right": "*"
+					},
+					"right": {
+						"left": "*",
+						"right": "*"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "*",
+						"right": "*"
+					},
+					"right": {
+						"left": "*",
+						"right": "*"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "_",
+				"right": "_",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "_",
+						"right": "_"
+					},
+					"right": {
+						"left": "_",
+						"right": "_"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "_",
+						"right": "_"
+					},
+					"right": {
+						"left": "_",
+						"right": "_"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "~",
+				"right": "~",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "~",
+						"right": "~"
+					},
+					"right": {
+						"left": "~",
+						"right": "~"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "~",
+						"right": "~"
+					},
+					"right": {
+						"left": "~",
+						"right": "~"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "|",
+				"right": "|",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "|",
+						"right": "|"
+					},
+					"right": {
+						"left": "|",
+						"right": "|"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "|",
+						"right": "|"
+					},
+					"right": {
+						"left": "|",
+						"right": "|"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "/",
+				"right": "/",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 5,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "/",
+						"right": "/"
+					},
+					"right": {
+						"left": "/",
+						"right": "/"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "/",
+						"right": "/"
+					},
+					"right": {
+						"left": "/",
+						"right": "/"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "\\",
+				"right": "\\",
+				"group": "menu.shortcuts.wrap_group_markdown",
+				"group_index": 6,
+				"pair_index": 6,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "\\",
+						"right": "\\"
+					},
+					"right": {
+						"left": "\\",
+						"right": "\\"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "\\",
+						"right": "\\"
+					},
+					"right": {
+						"left": "\\",
+						"right": "\\"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "@",
+				"right": "@",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 1,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "@",
+						"right": "@"
+					},
+					"right": {
+						"left": "@",
+						"right": "@"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "@",
+						"right": "@"
+					},
+					"right": {
+						"left": "@",
+						"right": "@"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "#",
+				"right": "#",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 2,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "#",
+						"right": "#"
+					},
+					"right": {
+						"left": "#",
+						"right": "#"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "#",
+						"right": "#"
+					},
+					"right": {
+						"left": "#",
+						"right": "#"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "%",
+				"right": "%",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 3,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "%",
+						"right": "%"
+					},
+					"right": {
+						"left": "%",
+						"right": "%"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "%",
+						"right": "%"
+					},
+					"right": {
+						"left": "%",
+						"right": "%"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "$",
+				"right": "$",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 4,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "$",
+						"right": "$"
+					},
+					"right": {
+						"left": "$",
+						"right": "$"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "$",
+						"right": "$"
+					},
+					"right": {
+						"left": "$",
+						"right": "$"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "&",
+				"right": "&",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 5,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "&",
+						"right": "&"
+					},
+					"right": {
+						"left": "&",
+						"right": "&"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "&",
+						"right": "&"
+					},
+					"right": {
+						"left": "&",
+						"right": "&"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "!",
+				"right": "!",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 6,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "!",
+						"right": "!"
+					},
+					"right": {
+						"left": "!",
+						"right": "!"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "!",
+						"right": "!"
+					},
+					"right": {
+						"left": "!",
+						"right": "!"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "?",
+				"right": "?",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 7,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "?",
+						"right": "?"
+					},
+					"right": {
+						"left": "?",
+						"right": "?"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "?",
+						"right": "?"
+					},
+					"right": {
+						"left": "?",
+						"right": "?"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "+",
+				"right": "+",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 8,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "+",
+						"right": "+"
+					},
+					"right": {
+						"left": "+",
+						"right": "+"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "+",
+						"right": "+"
+					},
+					"right": {
+						"left": "+",
+						"right": "+"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": "=",
+				"right": "=",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 9,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": "=",
+						"right": "="
+					},
+					"right": {
+						"left": "=",
+						"right": "="
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": "=",
+						"right": "="
+					},
+					"right": {
+						"left": "=",
+						"right": "="
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": ";",
+				"right": ";",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 10,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": ";",
+						"right": ";"
+					},
+					"right": {
+						"left": ";",
+						"right": ";"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": ";",
+						"right": ";"
+					},
+					"right": {
+						"left": ";",
+						"right": ";"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			},
+			{
+				"left": ":",
+				"right": ":",
+				"group": "menu.shortcuts.wrap_group_other",
+				"group_index": 7,
+				"pair_index": 11,
+				"default_enabled": {
+					"windows": true,
+					"macos": true,
+					"linux": "all catalogue pairs; no per-pair choices"
+				},
+				"parameter_resolution": {
+					"left": {
+						"left": ":",
+						"right": ":"
+					},
+					"right": {
+						"left": ":",
+						"right": ":"
+					}
+				},
+				"native_trigger_mapping_source_only": {
+					"left": {
+						"left": ":",
+						"right": ":"
+					},
+					"right": {
+						"left": ":",
+						"right": ":"
+					}
+				},
+				"single_character_trigger_possible": {
+					"left": true,
+					"right": true
+				},
+				"classification": "parity"
+			}
+		],
+		"pair_count": 43,
+		"group_count": 7,
+		"lookup_unique_keys": 65,
+		"linux_picker_row_count_source_only": 42,
+		"mapping_provenance": "native_trigger_mapping_source_only is Python derivation of inspected assignment loops, never native execution"
+	},
+	"settings": [
+		{
+			"path": "shortcuts.wrap_text_if_selected",
+			"id": "wrap_text_if_selected",
+			"default": false,
+			"recommended": true,
+			"family": "feature",
+			"type": "boolean",
+			"description_key": "shortcuts.label_wrap_text",
+			"platforms": ["ahk", "linux"],
+			"requires": {
+				"linux": ["evdev", "uinput"],
+				"windows": []
+			},
+			"reason_key": "platform_reason.wrap_selection_is_a_shortcut_key_on_macos",
+			"search": [
+				{
+					"id": "search_engine",
+					"default": "https://www.google.com",
+					"recommended": "https://www.google.com",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.search",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				},
+				{
+					"id": "search_engine_url_query",
+					"default": "https://www.google.com/search?q=",
+					"recommended": "https://www.google.com/search?q=",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.search",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				}
+			],
+			"take_note": [
+				{
+					"id": "dated_notes",
+					"default": false,
+					"recommended": false,
+					"family": "setting",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.take_note",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				},
+				{
+					"id": "destination_folder",
+					"default": "D:\\Bureau",
+					"recommended": "D:\\Bureau",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.take_note",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				}
+			],
+			"a_grave": [
+				{
+					"id": "enabled",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.a_grave",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				},
+				{
+					"id": "letter",
+					"default": "v",
+					"recommended": "v",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.a_grave.letter",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				}
+			],
+			"e_acute": [
+				{
+					"id": "enabled",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.e_acute",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				},
+				{
+					"id": "letter",
+					"default": "c",
+					"recommended": "c",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.e_acute.letter",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				}
+			],
+			"e_circ": [
+				{
+					"id": "enabled",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.e_circ",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				},
+				{
+					"id": "letter",
+					"default": "x",
+					"recommended": "x",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.e_circ.letter",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				}
+			],
+			"e_grave": [
+				{
+					"id": "enabled",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.e_grave",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				},
+				{
+					"id": "letter",
+					"default": "z",
+					"recommended": "z",
+					"family": "setting",
+					"type": "string",
+					"description_key": "menu.shortcuts.e_grave.letter",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"reason_key": "platform_reason.accented_shortcuts_are_windows"
+				}
+			],
+			"key_combination_taps": [
+				{
+					"id": "alt_gr_then_left_alt",
+					"platforms": ["ahk", "linux"],
+					"requires": {
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "ctrl_backspace",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.key_combinations"
+				},
+				{
+					"id": "alt_gr_then_caps_lock",
+					"platforms": ["ahk", "linux"],
+					"requires": {
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "ctrl_delete",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.key_combinations"
+				},
+				{
+					"id": "left_alt_then_caps_lock",
+					"platforms": ["ahk", "linux"],
+					"requires": {
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "caps_word",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.key_combinations"
+				}
+			],
+			"personal": [
+				{
+					"id": "laptop_broken_key",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.personal.laptop_broken_key"
+				},
+				{
+					"id": "mouse_drag_window",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.personal.mouse_drag_window"
+				},
+				{
+					"id": "mouse_tab_switching",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.personal.mouse_tab_switching"
+				},
+				{
+					"id": "professional_environment",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": false,
+					"recommended": false,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.personal.professional_environment"
+				},
+				{
+					"id": "programmable_keyboard",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.personal.programmable_keyboard"
+				}
+			],
+			"script_control": [
+				{
+					"id": "chords_enabled",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": true,
+					"recommended": true,
+					"family": "setting",
+					"type": "boolean",
+					"description_key": "menu.shortcuts.script_shortcuts_enable"
+				},
+				{
+					"id": "script_altgr_backspace",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "script_reload",
+					"recommended": "script_reload",
+					"family": "feature",
+					"active_by_default": true,
+					"rule_exception": "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install.",
+					"cleared": "none",
+					"type": "action",
+					"description_key": "menu.shortcuts.script_control.script_altgr_backspace"
+				},
+				{
+					"id": "script_altgr_delete",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "open_personal_shortcuts",
+					"recommended": "open_personal_shortcuts",
+					"family": "feature",
+					"active_by_default": true,
+					"rule_exception": "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install.",
+					"cleared": "none",
+					"type": "action",
+					"description_key": "menu.shortcuts.script_control.script_altgr_delete"
+				},
+				{
+					"id": "script_altgr_enter",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "script_pause_toggle",
+					"recommended": "script_pause_toggle",
+					"family": "feature",
+					"active_by_default": true,
+					"rule_exception": "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install.",
+					"cleared": "none",
+					"type": "action",
+					"description_key": "menu.shortcuts.script_control.script_altgr_enter"
+				},
+				{
+					"id": "script_altgr_escape",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "script_quit",
+					"recommended": "script_quit",
+					"family": "feature",
+					"active_by_default": true,
+					"rule_exception": "Maintainer decision of 2026-09-30, confirmed for the three drivers: this chord pauses, reloads, quits or edits the driver, types nothing, and has to work from a fresh install.",
+					"cleared": "none",
+					"type": "action",
+					"description_key": "menu.shortcuts.script_control.script_altgr_escape"
+				}
+			],
+			"keyboard": [
+				{
+					"id": "magic_editor",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": [],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "open_hotstrings_editor",
+					"recommended": "open_hotstrings_editor",
+					"family": "feature",
+					"active_by_default": true,
+					"rule_exception": "Maintainer decision of 2026-10-02: the conditional editor shortcut ships on; it follows only the unmodified physical magic source and types nothing.",
+					"cleared": "none",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.magic_editor"
+				},
+				{
+					"id": "primary_b",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "microsoft_bold",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.ctrl_b"
+				},
+				{
+					"id": "meta_a",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "select_line",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_a"
+				},
+				{
+					"id": "meta_d",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "open_downloads",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_d"
+				},
+				{
+					"id": "meta_g",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "open_chatgpt",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_g"
+				},
+				{
+					"id": "meta_h",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "screen_capture",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_h"
+				},
+				{
+					"id": "meta_m",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "activity_simulation",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_m"
+				},
+				{
+					"id": "meta_n",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "take_note",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_n"
+				},
+				{
+					"id": "meta_o",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "surround_parens",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_o"
+				},
+				{
+					"id": "meta_s",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "copy_selected_path",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_s"
+				},
+				{
+					"id": "meta_sc029",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "screen_capture_instant",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_sc029"
+				},
+				{
+					"id": "meta_t",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "teleport_mouse",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_t"
+				},
+				{
+					"id": "meta_u",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "uppercase_selection",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_u"
+				},
+				{
+					"id": "meta_w",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "titlecase_selection",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_w"
+				},
+				{
+					"id": "meta_x",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "pick_color",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.win_x"
+				},
+				{
+					"id": "meta_capslock",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "toggle_capslock",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.meta_capslock"
+				},
+				{
+					"id": "meta_quote",
+					"platforms": ["ahk"],
+					"requires": {
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "spotlight_mouse",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.meta_quote"
+				},
+				{
+					"id": "secondary_space",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "llm_generate_prediction",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.hs_ctrl_space"
+				},
+				{
+					"id": "secondary_a",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "select_line",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_a"
+				},
+				{
+					"id": "secondary_d",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_downloads",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_d"
+				},
+				{
+					"id": "secondary_e",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_file_manager",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_e"
+				},
+				{
+					"id": "secondary_g",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_chatgpt",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_g"
+				},
+				{
+					"id": "secondary_h",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "screenshot_region_clipboard",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_h"
+				},
+				{
+					"id": "secondary_i",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_system_settings",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_i"
+				},
+				{
+					"id": "secondary_m",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "activity_simulation",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_m"
+				},
+				{
+					"id": "secondary_o",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "surround_parens",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_o"
+				},
+				{
+					"id": "secondary_p",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "display_mirror_toggle",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_p"
+				},
+				{
+					"id": "secondary_s",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "copy_selected_path",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_s"
+				},
+				{
+					"id": "secondary_t",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "teleport_mouse",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_t"
+				},
+				{
+					"id": "secondary_u",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "uppercase_selection",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_u"
+				},
+				{
+					"id": "secondary_w",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "titlecase_selection",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_w"
+				},
+				{
+					"id": "secondary_x",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "pick_color",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_x"
+				},
+				{
+					"id": "secondary_capslock",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "toggle_capslock",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_capslock"
+				},
+				{
+					"id": "secondary_l",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "lock_screen",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_l"
+				},
+				{
+					"id": "secondary_period",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_emoji_picker",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_period"
+				},
+				{
+					"id": "secondary_quote",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "spotlight_mouse",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_quote"
+				},
+				{
+					"id": "primary_shift_v",
+					"platforms": ["ahk", "hs"],
+					"requires": {
+						"macos": [],
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "paste_plain",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_cmd_shift_v"
+				},
+				{
+					"id": "primary_g",
+					"platforms": ["linux"],
+					"requires": {
+						"linux": ["evdev", "uinput"]
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "open_chatgpt",
+					"family": "feature",
+					"type": "action",
+					"description_key": "shortcuts.label_ctrl_g"
+				},
+				{
+					"id": "meta_space",
+					"platforms": ["ahk", "linux"],
+					"requires": {
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver",
+					"default": "none",
+					"recommended": "llm_generate_prediction",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.keyboard.super_space"
+				}
+			],
+			"tap_keys": [
+				{
+					"id": "number_row_left",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": [],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "screenshot_fullscreen_save",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.tap_keys.number_row_left"
+				},
+				{
+					"id": "number_row_right_1",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": [],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "none",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.tap_keys.number_row_right_1"
+				},
+				{
+					"id": "number_row_right_2",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": [],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": "none",
+					"recommended": "none",
+					"family": "feature",
+					"type": "action",
+					"description_key": "menu.shortcuts.tap_keys.number_row_right_2"
+				}
+			],
+			"caps_word": [
+				{
+					"id": "idle_timeout_seconds",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": 10,
+					"recommended": 10,
+					"family": "setting",
+					"type": "number",
+					"preset_values": [0, 1, 3, 5, 10, 30, 60],
+					"description_key": "menu.caps_word.idle_timeout"
+				},
+				{
+					"id": "terminators",
+					"platforms": ["ahk", "hs", "linux"],
+					"requires": {
+						"macos": ["karabiner"],
+						"linux": ["evdev", "uinput"],
+						"windows": []
+					},
+					"default": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+					"recommended": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+					"family": "setting",
+					"type": "array",
+					"description_key": "menu.caps_word.terminators_header",
+					"pointer": [
+						{
+							"id": "gesture",
+							"platforms": ["hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"]
+							},
+							"reason_key": "platform_reason.caps_word_gestures_stay_with_windows",
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.gesture"
+						},
+						{
+							"id": "pointer_motion",
+							"platforms": ["ahk", "hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"],
+								"windows": []
+							},
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.pointer_motion"
+						},
+						{
+							"id": "left_click",
+							"platforms": ["ahk", "hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"],
+								"windows": []
+							},
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.left_click"
+						},
+						{
+							"id": "right_click",
+							"platforms": ["ahk", "hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"],
+								"windows": []
+							},
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.right_click"
+						},
+						{
+							"id": "middle_click",
+							"platforms": ["ahk", "hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"],
+								"windows": []
+							},
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.middle_click"
+						},
+						{
+							"id": "other_buttons",
+							"platforms": ["ahk", "hs", "linux"],
+							"requires": {
+								"macos": ["karabiner"],
+								"linux": ["evdev", "uinput"],
+								"windows": []
+							},
+							"default": true,
+							"recommended": true,
+							"family": "setting",
+							"type": "boolean",
+							"description_key": "menu.caps_word.pointer.other_buttons"
+						}
+					]
+				}
+			],
+			"keys": [
+				{
+					"id": "wrap_text_if_selected",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "shortcuts.label_wrap_text",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				},
+				{
+					"id": "cmd_star",
+					"default": false,
+					"recommended": true,
+					"family": "feature",
+					"type": "boolean",
+					"description_key": "shortcuts.label_cmd_star",
+					"platforms": ["hs"],
+					"requires": {
+						"macos": []
+					},
+					"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+				}
+			]
+		},
+		{
+			"path": "shortcuts.keys.wrap_text_if_selected",
+			"id": "wrap_text_if_selected",
+			"default": false,
+			"recommended": true,
+			"family": "feature",
+			"type": "boolean",
+			"description_key": "shortcuts.label_wrap_text",
+			"platforms": ["hs"],
+			"requires": {
+				"macos": []
+			},
+			"reason_key": "platform_reason.shortcut_settings_are_stored_per_driver"
+		}
+	],
+	"macos_wrap_store_section": {
+		"description_key": "menu.shortcuts.wrap_symbols",
+		"platforms": ["hs"],
+		"reason_key": "platform_reason.wrap_symbols_store_is_macos"
+	},
+	"custom_pair_schema": {
+		"type": "object",
+		"additionalProperties": true,
+		"properties": {
+			"states": {
+				"type": "object",
+				"propertyNames": {
+					"minLength": 1
+				},
+				"additionalProperties": {
+					"type": "boolean"
+				}
+			},
+			"custom": {
+				"type": "array",
+				"items": {
+					"type": "object",
+					"required": ["left", "right"],
+					"properties": {
+						"left": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 1
+						},
+						"right": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 1
+						}
+					},
+					"additionalProperties": true
+				}
+			}
+		}
+	},
+	"controls": {
+		"wrap_symbols_global_controls": [
+			{
+				"type": "command",
+				"id": "wrap_symbols_enable_all",
+				"i18n": "menu.shortcuts.wrap_symbols_check_all",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "command",
+				"id": "wrap_symbols_disable_all",
+				"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "command",
+				"id": "wrap_symbols_restore",
+				"i18n": "common.restore_recommended",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			}
+		],
+		"wrap_symbols_group_controls": [
+			{
+				"type": "command",
+				"id": "wrap_symbols_enable_group",
+				"i18n": "menu.shortcuts.wrap_symbols_check_all",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "command",
+				"id": "wrap_symbols_disable_group",
+				"i18n": "menu.shortcuts.wrap_symbols_uncheck_all",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			}
+		],
+		"wrap_symbols_custom_separator": [
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			}
+		],
+		"wrap_symbols_custom_controls": [
+			{
+				"type": "command",
+				"id": "wrap_symbols_delete_custom",
+				"i18n": "button.delete",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			}
+		],
+		"wrap_symbols_add_controls": [
+			{
+				"type": "---",
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "command",
+				"id": "wrap_symbols_add_custom",
+				"i18n": "menu.shortcuts.wrap_symbols_add_custom",
+				"disabled_when": ["wrap_symbols_ready"],
+				"platforms": ["ahk", "hs"],
+				"unavailable": "hide"
+			}
+		]
+	},
+	"parent_frame": [
+		{
+			"type": "group",
+			"id": "shortcut_wrap_symbols_ahk",
+			"i18n": "menu.shortcuts.wrap_symbols_title",
+			"platforms": ["ahk"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "shortcut_wrap_symbols_hs",
+			"i18n": "menu.shortcuts.wrap_symbols",
+			"disabled_when": ["shortcut_wrap_hs_ready"],
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "shortcut_wrap_symbols_linux",
+			"i18n": "menu.shortcuts.wrap_symbols",
+			"platforms": ["linux"],
+			"unavailable": "hide"
+		}
+	],
+	"linux_live_control": [
+		{
+			"type": "check",
+			"id": "shortcut_wrap_on_type",
+			"i18n": "shortcuts.label_wrap_text",
+			"checked_when": ["shortcut_wrap_on_type_checked"],
+			"disabled_when": ["shortcut_wrap_on_type_ready"],
+			"platforms": ["linux"],
+			"unavailable": "hide"
+		}
+	],
+	"action": {
+		"platform": "all",
+		"parameter": "wrap_pair"
+	},
+	"capabilities": [
+		{
+			"id": "catalogue-source",
+			"contract": "43 pairs,7 ordered groups; source of truth JSON",
+			"windows": "load at startup -> pairs/groups",
+			"macos": "load at require -> WRAP_GROUPS/PAIRS",
+			"linux": "load at require -> lookup+ordered list",
+			"classification": "parity",
+			"basis": "actual shared parser consumes generated complete catalogue fixture; native consumers source traced"
+		},
+		{
+			"id": "load-failure",
+			"contract": "Do not silently certify empty catalogue",
+			"windows": "warn+six-pair emergency fallback",
+			"macos": "warn+six-pair emergency fallback",
+			"linux": "error+empty list/lookup",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "group-presentation",
+			"contract": "Labels/group order from catalogue",
+			"windows": "named groups preserve order",
+			"macos": "named groups preserve order",
+			"linux": "flat alphabetically sorted action rows",
+			"classification": "explicit_intent",
+			"basis": "management corpus explicitly says Linux has no management controls; do not infer missing all3 feature from stale README"
+		},
+		{
+			"id": "pair-defaults",
+			"contract": "Built-in pairs enabled unless false",
+			"windows": "disabled Map empty",
+			"macos": "state absent/true enables",
+			"linux": "all catalogue pairs active",
+			"classification": "parity",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "enable-defaults",
+			"contract": "Neutral default false, recommended true",
+			"windows": "shortcuts.wrap_text_if_selected",
+			"macos": "shortcuts.keys.wrap_text_if_selected",
+			"linux": "shortcuts.wrap_text_if_selected",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "store-namespace",
+			"contract": "Driver storage intentionally differs",
+			"windows": "wrap_symbols.toml",
+			"macos": "config.toml shortcuts.wrap_symbols states/custom",
+			"linux": "does not read this namespace",
+			"classification": "explicit_intent",
+			"basis": "feature section+reason text explicitly names stores"
+		},
+		{
+			"id": "strict-source-projection",
+			"contract": "Typed bool states and scalar custom array; unknown/invalid retained",
+			"windows": "dedicated TOML disabled/custom parser",
+			"macos": "actual shared WrapPreferences.project",
+			"linux": "not applicable",
+			"classification": "native_alternative",
+			"basis": "actual shared project/prepare probes; Windows native writer source only"
+		},
+		{
+			"id": "durable-publication",
+			"contract": "Only literal ACK publishes settings",
+			"windows": "durable stage/replace with path+epoch lease",
+			"macos": "WrapMutation candidate +native preferences writer",
+			"linux": "boolean switch persisted before applied",
+			"classification": "parity",
+			"basis": "actual pure mutation ACK/refusal/reentry/successor probes; no durable native write claimed"
+		},
+		{
+			"id": "symbol-toggle",
+			"contract": "Opening symbol canonical state key disables its native pair",
+			"windows": "native disabled set",
+			"macos": "map only strict false disables",
+			"linux": "no per-symbol settings",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "global-and-group",
+			"contract": "Enable/disable declared built-ins",
+			"windows": "all/group built-in keys; custom unchanged",
+			"macos": "all/group built-in keys; custom unchanged",
+			"linux": "absent by declared platform restriction",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "restore-recommended",
+			"contract": "Default choices and custom handling",
+			"windows": "clear disabled and custom",
+			"macos": "states/custom become empty",
+			"linux": "no corresponding pair-store control",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "custom-management",
+			"contract": "Ordered Unicode scalar pairs; blank right means mirror",
+			"windows": "two native prompts; scalar validator",
+			"macos": "two dialog prompts; exact_unicode_scalar",
+			"linux": "not implemented; action parameter provides alternative",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "custom-collision",
+			"contract": "Custom entries overlay built-ins",
+			"windows": "last custom pair wins both endpoints",
+			"macos": "last custom pair wins both endpoints",
+			"linux": "no management custom table",
+			"classification": "unknown_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "custom-multichar",
+			"contract": "Management scalar differs from binding parameter text",
+			"windows": "management rejects multi; action parser allows left|right",
+			"macos": "shared preferences scalar; shared parameter allows multi",
+			"linux": "parameter allows multi",
+			"classification": "explicit_intent",
+			"basis": "actual preferences and parameter probes distinguish intended surfaces"
+		},
+		{
+			"id": "parameter-parse",
+			"contract": "Trim outer whitespace; opening precedence; closing aliases; exactly one pipe custom",
+			"windows": "native WrapPairParse",
+			"macos": "shared WrapPair.parse",
+			"linux": "shared WrapPair.parse",
+			"classification": "parity",
+			"basis": "actual shared parser all43x2 endpoints+19 golden vectors; Windows execution owned by OS role"
+		},
+		{
+			"id": "parameter-invalid",
+			"contract": "Invalid pair refused before output",
+			"windows": "binding warning",
+			"macos": "binding warning",
+			"linux": "binding warning",
+			"classification": "parity",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "parameter-catalogue-independence",
+			"contract": "Binding parameter uses built-in list even pair disabled in typed wrap",
+			"windows": "full builtin list",
+			"macos": "wrap_pair_list full groups",
+			"linux": "full ordered builtin list",
+			"classification": "explicit_intent",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "pair-reversal",
+			"contract": "Closing symbol resolves original left/right; no direction reversal",
+			"windows": "native parser closing alias",
+			"macos": "shared parser",
+			"linux": "shared parser",
+			"classification": "parity",
+			"basis": "actual shared parser exhaustive endpoint probe"
+		},
+		{
+			"id": "quote-overlap",
+			"contract": "“ opens one pair and closes later „ pair",
+			"windows": "last assignment native map maps to „…“; parser opening-first",
+			"macos": "same native last assignment",
+			"linux": "same native last assignment",
+			"classification": "unknown_intent",
+			"basis": "explicit golden parser rule vs source-derived trigger mapping; no forced business finding"
+		},
+		{
+			"id": "collision-filtering",
+			"contract": "An enabled opener should remain when only overlapping pair disabled",
+			"windows": "rebuild filters disabled pair before assignment, preserving earlier opener",
+			"macos": "preflatten then filter: disable „ removes enabled “ opener",
+			"linux": "no per-pair choices",
+			"classification": "os_owner_finding_reference",
+			"basis": "macOS actual Text+eventtap owner probe; source difference in native projection order; no duplicate WSS finding"
+		},
+		{
+			"id": "spaced-guillemets",
+			"contract": "Output delimiters include spaces but typed characters are single",
+			"windows": "exact spaced trigger keys",
+			"macos": "exact spaced trigger keys",
+			"linux": "exact spaced trigger keys and single-character getter",
+			"classification": "os_owner_finding_reference",
+			"basis": "OS agents execute actual consumers; shared parser accepts bare symbol and emits spaced pair correctly; catalogue trigger/output conflation"
+		},
+		{
+			"id": "typed-enable",
+			"contract": "Wrap only when feature active and selection exists",
+			"windows": "PrefixWatcher+UIA",
+			"macos": "eventtap+AXSelectedText",
+			"linux": "daemon consumption+PRIMARY controller",
+			"classification": "native_alternative",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "typed-selection-api",
+			"contract": "Selection detection differs by backend",
+			"windows": "UIA selected text/cache",
+			"macos": "AXSelectedText/cache; no Ctrl+C on each typed key",
+			"linux": "PRIMARY baseline changed after selection context",
+			"classification": "native_constraint",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "typed-no-selection",
+			"contract": "Unconsumed raw character proceeds once",
+			"windows": "prefix continuation",
+			"macos": "eventtap returns false",
+			"linux": "controller returns false",
+			"classification": "parity",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "typed-refused-output",
+			"contract": "Only acknowledged output suppresses original key",
+			"windows": "_PrefixTryWrapSelection commit receipt",
+			"macos": "wrap_selection returns literal true required",
+			"linux": "type_text returns literal true required",
+			"classification": "parity",
+			"basis": "native owner seams OS role; source traced here"
+		},
+		{
+			"id": "linux-stale-primary",
+			"contract": "Safety over same-text reselect",
+			"windows": "not applicable",
+			"macos": "not applicable",
+			"linux": "unchanged PRIMARY refuses/retypes symbol even if same text reselected",
+			"classification": "explicit_intent",
+			"basis": "controller module explicitly documents safe missed wrap"
+		},
+		{
+			"id": "modifier-policy",
+			"contract": "Typing layer vs command modifiers",
+			"windows": "physical admitted characters from canonical input context",
+			"macos": "Cmd/Ctrl passthrough; Alt allowed for AltGr layout",
+			"linux": "Ctrl/Alt/Meta passthrough",
+			"classification": "native_alternative",
+			"basis": "modifier policy differs; no all3 hardware parity claim"
+		},
+		{
+			"id": "action-selection-empty",
+			"contract": "wrap_selection binding: empty selection does nothing",
+			"windows": "capture empty skips transform/paste",
+			"macos": "wrap_copied_selection clipboard transform",
+			"linux": "transform_selection; no fallback",
+			"classification": "explicit_intent",
+			"basis": "actions.toml declaration; action owners source traced"
+		},
+		{
+			"id": "linux-picker-empty",
+			"contract": "Direct menu selection picker empty behavior differs from binding",
+			"windows": "no direct menu action; checkboxes control typed wrap",
+			"macos": "no direct menu action; checkboxes control typed wrap",
+			"linux": "direct wrap_selection inserts empty left+right when reason=no_selection",
+			"classification": "native_alternative",
+			"basis": "binding path has no such fallback; do not report action contract violation"
+		},
+		{
+			"id": "text-content",
+			"contract": "Multiline/Unicode selected bytes wrapped verbatim",
+			"windows": "Left.Text.Right",
+			"macos": "left..sel..right",
+			"linux": "left..selected..right",
+			"classification": "parity",
+			"basis": "pure parser+scalar fixture only; actual selected receiving not exercised in shared role"
+		},
+		{
+			"id": "privacy-and-destination",
+			"contract": "Retain synthetic input destination; preserve privacy guards",
+			"windows": "UIA+input context fences; ClipboardAll for explicit action",
+			"macos": "text owner scope/broker/pasteboard transaction; rich restore",
+			"linux": "retained destination/PRIMARY typed path; text clipboard action",
+			"classification": "native_constraint",
+			"basis": "prior flows own clipboard restoration differences; no expanded privacy conclusion"
+		},
+		{
+			"id": "lifecycle",
+			"contract": "Paused/stale/config replacement cannot wrongly consume text",
+			"windows": "suspend/epoch checks in prefix and writer",
+			"macos": "eventtap lifecycle/admission+mutation read view",
+			"linux": "is_active/context_epoch/reentrant generation in controller",
+			"classification": "parity",
+			"basis": "shared mutation stale controls actual; platform lifecycle source-only"
+		},
+		{
+			"id": "live-update",
+			"contract": "Preference ACK changes active pairs without reload",
+			"windows": "atomic active map publish",
+			"macos": "getter builds active map from acknowledged Mutation.view",
+			"linux": "only boolean switch changes; catalogue at module require",
+			"classification": "native_alternative",
+			"basis": "source traced; native GUI unrun"
+		},
+		{
+			"id": "preview-label",
+			"contract": "Catalogue sample is pair/ellipsis, binding prompt describes full list",
+			"windows": "symbol pair row labels",
+			"macos": "symbol pair row labels+Pair.describe",
+			"linux": "flat pair/ellipsis row labels+Pair.describe",
+			"classification": "parity",
+			"basis": "pair labels are literal Unicode; group/control labels translated; no G5 visual proof"
+		},
+		{
+			"id": "locale-coverage",
+			"contract": "Every declared group/control/reason/action prompt key localized",
+			"windows": "t(key)",
+			"macos": "i18n.get(key)",
+			"linux": "i18n.get for applicable controls",
+			"classification": "parity",
+			"basis": "all21 locale dictionaries enumerated; frontend rendering unrun"
+		},
+		{
+			"id": "readme-drift",
+			"contract": "README says both drivers, wrong open/close/label_key shape",
+			"windows": "actual left/right native consumer exists",
+			"macos": "actual left/right consumer exists",
+			"linux": "actual third consumer exists",
+			"classification": "documentation_only",
+			"basis": "source traced; native GUI unrun"
+		}
+	],
+	"locales": {
+		"pt": {
+			"button.delete": "Excluir",
+			"common.restore_recommended": "↺ Restaurar os valores recomendados",
+			"dialog.gestures.param_err_wrap_pair": "Símbolo desconhecido. Introduza um dos símbolos listados ou um par escrito esquerda|direita.",
+			"dialog.gestures.param_wrap_pair": "Símbolos que vão envolver a seleção: um destes, ou o seu próprio par escrito esquerda|direita (por exemplo **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Introduza o símbolo de fecho (deixar vazio = simétrico):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Símbolo de fecho",
+			"dialog.shortcuts.wrap_symbol_invalid": "Introduza exactamente um carácter.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Introduza um símbolo de abertura (1 carácter):",
+			"dialog.shortcuts.wrap_symbol_title": "Adicionar um símbolo de enquadramento",
+			"menu.shortcuts.selection_symbol": "Seleção + símbolo",
+			"menu.shortcuts.wrap_group_angle": "Sinais de menor/maior e colchetes ornamentais",
+			"menu.shortcuts.wrap_group_braces": "Chaves horizontais",
+			"menu.shortcuts.wrap_group_brackets": "Parênteses e colchetes",
+			"menu.shortcuts.wrap_group_cjk": "Colchetes CJK",
+			"menu.shortcuts.wrap_group_markdown": "Ênfase Markdown",
+			"menu.shortcuts.wrap_group_other": "Outros símbolos",
+			"menu.shortcuts.wrap_group_quotes": "Aspas e apóstrofos",
+			"menu.shortcuts.wrap_symbols": "Símbolos que envolvem",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Adicionar um símbolo…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Marcar tudo",
+			"menu.shortcuts.wrap_symbols_custom_label": "Personalizado",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Símbolos que enquadram a seleção",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Desmarcar tudo",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Este atalho pertence ao sistema que o atribui: cada controlador oferece as suas ações nas combinações que o seu sistema deixa livres (combinações com a tecla Windows no Windows, Ctrl e Cmd no macOS, ranhuras de teclado no Linux) e guarda a escolha com o seu próprio nome.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Não com este nome no macOS: o macOS inclui esta opção entre os seus atalhos Ctrl e Cmd e guarda-a com eles, como shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Só no macOS com este nome: o macOS guarda as suas escolhas de símbolos envolventes nesta secção. O Windows guarda as suas em wrap_symbols.toml, e o Linux não lê esta secção.",
+			"sg_actions.wrap_selection": "⟦⟧ Envolver a seleção [configurável]",
+			"shortcuts.label_wrap_text": "Digitar um símbolo envolve a seleção"
+		},
+		"zh": {
+			"button.delete": "删除",
+			"common.restore_recommended": "↺ 恢复推荐值",
+			"dialog.gestures.param_err_wrap_pair": "未知符号。请输入列表中的符号之一，或按 左|右 格式书写的符号对。",
+			"dialog.gestures.param_wrap_pair": "用于包围所选内容的符号：以下之一，或按 左|右 格式书写的自定义符号对（例如 **|**）：\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "输入结束符号（留空 = 对称）:",
+			"dialog.shortcuts.wrap_symbol_close_title": "结束符号",
+			"dialog.shortcuts.wrap_symbol_invalid": "请输入恰好一个字符。",
+			"dialog.shortcuts.wrap_symbol_prompt": "输入一个起始符号（1个字符）:",
+			"dialog.shortcuts.wrap_symbol_title": "添加包围符号",
+			"menu.shortcuts.selection_symbol": "选中内容 + 符号",
+			"menu.shortcuts.wrap_group_angle": "尖括号和装饰括号",
+			"menu.shortcuts.wrap_group_braces": "水平花括号",
+			"menu.shortcuts.wrap_group_brackets": "圆括号和方括号",
+			"menu.shortcuts.wrap_group_cjk": "CJK 括号",
+			"menu.shortcuts.wrap_group_markdown": "Markdown 强调",
+			"menu.shortcuts.wrap_group_other": "其他符号",
+			"menu.shortcuts.wrap_group_quotes": "引号和撇号",
+			"menu.shortcuts.wrap_symbols": "包裹符号",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ 添加符号…]",
+			"menu.shortcuts.wrap_symbols_check_all": "全选",
+			"menu.shortcuts.wrap_symbols_custom_label": "自定义",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ 包围选区的符号",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "全部取消选中",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "此快捷键属于绑定它的系统：每个驱动把自己的操作放在其系统留空的组合上（Windows 上是 Windows 键组合，macOS 上是 Ctrl 和 Cmd，Linux 上是键盘槽位），并以自己的名称保存选择。",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS 上不使用此名称：macOS 将此选项列在其 Ctrl 和 Cmd 快捷键中并与之一同保存，即 shortcuts.keys.wrap_text_if_selected。",
+			"platform_reason.wrap_symbols_store_is_macos": "以此名称仅限 macOS：macOS 在此部分保存其包裹符号的选择。Windows 将自己的选择保存在 wrap_symbols.toml 中，Linux 不读取此部分。",
+			"sg_actions.wrap_selection": "⟦⟧ 包围所选内容 [可配置]",
+			"shortcuts.label_wrap_text": "输入符号包裹选中内容"
+		},
+		"no": {
+			"button.delete": "Slett",
+			"common.restore_recommended": "↺ Gjenopprett anbefalte verdier",
+			"dialog.gestures.param_err_wrap_pair": "Ukjent tegn. Skriv inn ett av tegnene i listen, eller et par skrevet venstre|høyre.",
+			"dialog.gestures.param_wrap_pair": "Tegn som skal omgi markeringen: ett av disse, eller ditt eget par skrevet venstre|høyre (for eksempel **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Angi det avsluttende symbolet (la stå tomt = symmetrisk):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Avsluttende symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Angi nøyaktig ett tegn.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Angi et åpningssymbol (1 tegn):",
+			"dialog.shortcuts.wrap_symbol_title": "Legg til et omsluttende symbol",
+			"menu.shortcuts.selection_symbol": "Merking + symbol",
+			"menu.shortcuts.wrap_group_angle": "Vinkel- og ornamentparenteser",
+			"menu.shortcuts.wrap_group_braces": "Vannrette klammeparenteser",
+			"menu.shortcuts.wrap_group_brackets": "Parenteser og klammer",
+			"menu.shortcuts.wrap_group_cjk": "CJK-parenteser",
+			"menu.shortcuts.wrap_group_markdown": "Markdown-utheving",
+			"menu.shortcuts.wrap_group_other": "Andre symboler",
+			"menu.shortcuts.wrap_group_quotes": "Anførselstegn og apostrofer",
+			"menu.shortcuts.wrap_symbols": "Omsluttende symboler",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Legg til et symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Merk alle",
+			"menu.shortcuts.wrap_symbols_custom_label": "Tilpasset",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symboler som omkranser valget",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Fjern alle markeringer",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Denne snarveien tilhører systemet som binder den: hver driver tilbyr handlingene sine på kombinasjonene systemet lar være ledige (Windows-tastkombinasjoner på Windows, Ctrl og Cmd på macOS, tastaturplasser på Linux) og lagrer valget under sitt eget navn.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Ikke under dette navnet på macOS: macOS viser dette valget blant Ctrl- og Cmd-snarveiene sine og lagrer det sammen med dem, som shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Bare macOS under dette navnet: macOS lagrer valgene sine av omsluttende symboler i denne delen. Windows lagrer sine i wrap_symbols.toml, og Linux leser ikke denne delen.",
+			"sg_actions.wrap_selection": "⟦⟧ Omgi markeringen [kan konfigureres]",
+			"shortcuts.label_wrap_text": "Tastering av symbol omgir merkingen"
+		},
+		"nl": {
+			"button.delete": "Verwijderen",
+			"common.restore_recommended": "↺ Aanbevolen waarden herstellen",
+			"dialog.gestures.param_err_wrap_pair": "Onbekend teken. Voer een van de vermelde tekens in, of een paar geschreven als links|rechts.",
+			"dialog.gestures.param_wrap_pair": "Tekens die de selectie omsluiten: een van deze, of een eigen paar geschreven als links|rechts (bijvoorbeeld **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Voer het sluitingssymbool in (leeg laten = symmetrisch):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Sluitingssymbool",
+			"dialog.shortcuts.wrap_symbol_invalid": "Voer precies één teken in.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Voer een openingssymbool in (1 teken):",
+			"dialog.shortcuts.wrap_symbol_title": "Een omsluitend symbool toevoegen",
+			"menu.shortcuts.selection_symbol": "Selectie + symbool",
+			"menu.shortcuts.wrap_group_angle": "Punthaken en sierhaken",
+			"menu.shortcuts.wrap_group_braces": "Horizontale accolades",
+			"menu.shortcuts.wrap_group_brackets": "Haakjes",
+			"menu.shortcuts.wrap_group_cjk": "CJK-haken",
+			"menu.shortcuts.wrap_group_markdown": "Markdown-nadruk",
+			"menu.shortcuts.wrap_group_other": "Andere symbolen",
+			"menu.shortcuts.wrap_group_quotes": "Aanhalingstekens en apostroffen",
+			"menu.shortcuts.wrap_symbols": "Omsluitende symbolen",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Een symbool toevoegen…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Alles aanvinken",
+			"menu.shortcuts.wrap_symbols_custom_label": "Aangepast",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symbolen die de selectie omsluiten",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Alles uitvinken",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Deze sneltoets hoort bij het systeem dat hem toewijst: elk stuurprogramma biedt zijn acties aan op de combinaties die zijn eigen systeem vrijlaat (Windows-toetscombinaties op Windows, Ctrl en Cmd op macOS, toetsenbordslots op Linux) en bewaart de keuze onder zijn eigen naam.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Niet onder deze naam op macOS: macOS zet deze optie tussen zijn Ctrl- en Cmd-sneltoetsen en bewaart haar daarbij, als shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Alleen macOS onder deze naam: macOS bewaart zijn keuzes voor omsluitsymbolen in deze sectie. Windows bewaart de zijne in wrap_symbols.toml en Linux leest deze sectie niet.",
+			"sg_actions.wrap_selection": "⟦⟧ Selectie omsluiten [instelbaar]",
+			"shortcuts.label_wrap_text": "Een symbool typen omsluit de selectie"
+		},
+		"hi": {
+			"button.delete": "हटाएँ",
+			"common.restore_recommended": "↺ अनुशंसित मान पुनर्स्थापित करें",
+			"dialog.gestures.param_err_wrap_pair": "अज्ञात चिह्न। सूची में से कोई चिह्न दर्ज करें, या बाएँ|दाएँ रूप में लिखा जोड़ा।",
+			"dialog.gestures.param_wrap_pair": "चयन को घेरने वाले चिह्न: इनमें से कोई एक, या बाएँ|दाएँ रूप में लिखा अपना जोड़ा (उदाहरण के लिए **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "समापन प्रतीक दर्ज करें (खाली छोड़ें = सममित):",
+			"dialog.shortcuts.wrap_symbol_close_title": "समापन प्रतीक",
+			"dialog.shortcuts.wrap_symbol_invalid": "कृपया बिल्कुल एक वर्ण दर्ज करें।",
+			"dialog.shortcuts.wrap_symbol_prompt": "एक आरंभिक प्रतीक दर्ज करें (1 वर्ण):",
+			"dialog.shortcuts.wrap_symbol_title": "एक आवरण प्रतीक जोड़ें",
+			"menu.shortcuts.selection_symbol": "चयन + प्रतीक",
+			"menu.shortcuts.wrap_group_angle": "कोणीय और अलंकृत कोष्ठक",
+			"menu.shortcuts.wrap_group_braces": "क्षैतिज मझले कोष्ठक",
+			"menu.shortcuts.wrap_group_brackets": "कोष्ठक",
+			"menu.shortcuts.wrap_group_cjk": "CJK कोष्ठक",
+			"menu.shortcuts.wrap_group_markdown": "Markdown ज़ोर",
+			"menu.shortcuts.wrap_group_other": "अन्य प्रतीक",
+			"menu.shortcuts.wrap_group_quotes": "उद्धरण चिह्न और एपोस्ट्रोफी",
+			"menu.shortcuts.wrap_symbols": "घेरने वाले प्रतीक",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ एक प्रतीक जोड़ें…]",
+			"menu.shortcuts.wrap_symbols_check_all": "सभी चुनें",
+			"menu.shortcuts.wrap_symbols_custom_label": "कस्टम",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ चयन को घेरने वाले प्रतीक",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "सभी अचुनें",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "यह शॉर्टकट उसी सिस्टम का है जो इसे बाँधता है: हर ड्राइवर अपनी क्रियाएँ उन कुंजी-संयोजनों पर देता है जो उसका सिस्टम खाली छोड़ता है (Windows पर Windows कुंजी संयोजन, macOS पर Ctrl और Cmd, Linux पर कीबोर्ड स्लॉट) और चुनाव अपने नाम से सहेजता है।",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS पर इस नाम से नहीं: macOS इस विकल्प को अपने Ctrl और Cmd शॉर्टकट के बीच दिखाता है और उन्हीं के साथ shortcuts.keys.wrap_text_if_selected के रूप में सहेजता है।",
+			"platform_reason.wrap_symbols_store_is_macos": "केवल macOS, इसी नाम से: macOS अपने रैप-प्रतीकों के चुनाव इसी अनुभाग में रखता है। Windows अपने चुनाव wrap_symbols.toml में रखता है, और Linux यह अनुभाग नहीं पढ़ता।",
+			"sg_actions.wrap_selection": "⟦⟧ चयन को घेरें [कॉन्फ़िगर करने योग्य]",
+			"shortcuts.label_wrap_text": "एक प्रतीक टाइप करने से चयन घिरता है"
+		},
+		"ar": {
+			"button.delete": "حذف",
+			"common.restore_recommended": "↺ استعادة القيم الموصى بها",
+			"dialog.gestures.param_err_wrap_pair": "رمز غير معروف. أدخل أحد الرموز المدرجة، أو زوجًا مكتوبًا بصيغة يسار|يمين.",
+			"dialog.gestures.param_wrap_pair": "الرموز التي ستحيط بالتحديد: أحد هذه الرموز، أو زوجك الخاص مكتوبًا بصيغة يسار|يمين (مثلًا **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "أدخل الرمز الختامي (اتركه فارغًا للتماثل):",
+			"dialog.shortcuts.wrap_symbol_close_title": "الرمز الختامي",
+			"dialog.shortcuts.wrap_symbol_invalid": "يرجى إدخال حرف واحد فقط.",
+			"dialog.shortcuts.wrap_symbol_prompt": "أدخل رمزًا افتتاحيًا (حرف واحد):",
+			"dialog.shortcuts.wrap_symbol_title": "إضافة رمز تأطير",
+			"menu.shortcuts.selection_symbol": "تحديد + رمز",
+			"menu.shortcuts.wrap_group_angle": "أقواس زاوية وأقواس زخرفية",
+			"menu.shortcuts.wrap_group_braces": "أقواس معقوفة أفقية",
+			"menu.shortcuts.wrap_group_brackets": "الأقواس",
+			"menu.shortcuts.wrap_group_cjk": "أقواس CJK",
+			"menu.shortcuts.wrap_group_markdown": "تمييز Markdown",
+			"menu.shortcuts.wrap_group_other": "رموز أخرى",
+			"menu.shortcuts.wrap_group_quotes": "علامات الاقتباس والفواصل العليا",
+			"menu.shortcuts.wrap_symbols": "الرموز المحيطة",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ إضافة رمز…]",
+			"menu.shortcuts.wrap_symbols_check_all": "تحديد الكل",
+			"menu.shortcuts.wrap_symbols_custom_label": "مخصص",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ رموز تحيط بالنص المحدد",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "إلغاء تحديد الكل",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "هذا الاختصار يخص النظام الذي يربطه: يعرض كل برنامج إجراءاته على التركيبات التي يتركها نظامه حرة (تركيبات مفتاح Windows في Windows، وCtrl وCmd في macOS، وخانات لوحة المفاتيح في Linux) ويحفظ الاختيار باسمه الخاص.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "ليس بهذا الاسم على macOS: يدرج macOS هذا الخيار ضمن اختصارات Ctrl وCmd ويحفظه معها، باسم shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "macOS فقط بهذا الاسم: يحتفظ macOS باختياراته لرموز التغليف في هذا القسم. يحتفظ Windows باختياراته في wrap_symbols.toml، ولا يقرأ Linux هذا القسم.",
+			"sg_actions.wrap_selection": "⟦⟧ إحاطة التحديد [قابل للتهيئة]",
+			"shortcuts.label_wrap_text": "كتابة رمز يُحيط التحديد"
+		},
+		"it": {
+			"button.delete": "Elimina",
+			"common.restore_recommended": "↺ Ripristina i valori consigliati",
+			"dialog.gestures.param_err_wrap_pair": "Simbolo sconosciuto. Inserisci uno dei simboli elencati o una coppia scritta sinistra|destra.",
+			"dialog.gestures.param_wrap_pair": "Simboli che racchiuderanno la selezione: uno di questi, oppure una coppia personale scritta sinistra|destra (ad esempio **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Inserisci il simbolo di chiusura (lascia vuoto = simmetrico):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Simbolo di chiusura",
+			"dialog.shortcuts.wrap_symbol_invalid": "Inserisci esattamente un carattere.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Inserisci un simbolo di apertura (1 carattere):",
+			"dialog.shortcuts.wrap_symbol_title": "Aggiungi un simbolo di racchiusura",
+			"menu.shortcuts.selection_symbol": "Selezione + simbolo",
+			"menu.shortcuts.wrap_group_angle": "Parentesi angolari e ornamentali",
+			"menu.shortcuts.wrap_group_braces": "Graffe orizzontali",
+			"menu.shortcuts.wrap_group_brackets": "Parentesi tonde e quadre",
+			"menu.shortcuts.wrap_group_cjk": "Parentesi CJK",
+			"menu.shortcuts.wrap_group_markdown": "Enfasi Markdown",
+			"menu.shortcuts.wrap_group_other": "Altri simboli",
+			"menu.shortcuts.wrap_group_quotes": "Virgolette e apostrofi",
+			"menu.shortcuts.wrap_symbols": "Simboli che racchiudono",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Aggiungi un simbolo…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Seleziona tutto",
+			"menu.shortcuts.wrap_symbols_custom_label": "Personalizzato",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Simboli che racchiudono la selezione",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Deseleziona tutto",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Questa scorciatoia appartiene al sistema che la assegna: ogni driver offre le sue azioni sulle combinazioni che il suo sistema lascia libere (combinazioni con il tasto Windows su Windows, Ctrl e Cmd su macOS, slot della tastiera su Linux) e salva la scelta con il proprio nome.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Non con questo nome su macOS: macOS elenca questa opzione tra le sue scorciatoie Ctrl e Cmd e la salva con esse, come shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Solo macOS con questo nome: macOS tiene le sue scelte dei simboli di racchiusura in questa sezione. Windows tiene le sue in wrap_symbols.toml, e Linux non legge questa sezione.",
+			"sg_actions.wrap_selection": "⟦⟧ Racchiudi la selezione [configurabile]",
+			"shortcuts.label_wrap_text": "Digitare un simbolo racchiude la selezione"
+		},
+		"da": {
+			"button.delete": "Slet",
+			"common.restore_recommended": "↺ Gendan anbefalede værdier",
+			"dialog.gestures.param_err_wrap_pair": "Ukendt tegn. Indtast et af de viste tegn eller et par skrevet venstre|højre.",
+			"dialog.gestures.param_wrap_pair": "Tegn, der skal omslutte markeringen: et af disse eller dit eget par skrevet venstre|højre (for eksempel **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Angiv det afsluttende symbol (lad være tomt = symmetrisk):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Afsluttende symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Angiv nøjagtigt ét tegn.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Angiv et åbningssymbol (1 tegn):",
+			"dialog.shortcuts.wrap_symbol_title": "Tilføj et omsluttende symbol",
+			"menu.shortcuts.selection_symbol": "Markering + symbol",
+			"menu.shortcuts.wrap_group_angle": "Vinkel- og ornamentparenteser",
+			"menu.shortcuts.wrap_group_braces": "Vandrette tuborgklammer",
+			"menu.shortcuts.wrap_group_brackets": "Parenteser og klammer",
+			"menu.shortcuts.wrap_group_cjk": "CJK-parenteser",
+			"menu.shortcuts.wrap_group_markdown": "Markdown-fremhævning",
+			"menu.shortcuts.wrap_group_other": "Andre symboler",
+			"menu.shortcuts.wrap_group_quotes": "Anførselstegn og apostroffer",
+			"menu.shortcuts.wrap_symbols": "Omsluttende symboler",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Tilføj et symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Markér alle",
+			"menu.shortcuts.wrap_symbols_custom_label": "Brugerdefineret",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symboler der omslutter valget",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Fravælg alle",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Denne genvej tilhører det system, der binder den: hver driver tilbyder sine handlinger på de kombinationer, dens eget system lader være frie (Windows-tastkombinationer på Windows, Ctrl og Cmd på macOS, tastaturpladser på Linux), og gemmer valget under sit eget navn.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Ikke under dette navn på macOS: macOS viser denne indstilling blandt sine Ctrl- og Cmd-genveje og gemmer den sammen med dem, som shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Kun macOS under dette navn: macOS gemmer sine valg af omsluttende symboler i dette afsnit. Windows gemmer sine i wrap_symbols.toml, og Linux læser ikke dette afsnit.",
+			"sg_actions.wrap_selection": "⟦⟧ Omslut markeringen [kan konfigureres]",
+			"shortcuts.label_wrap_text": "Indtastning af symbol omslutter valget"
+		},
+		"he": {
+			"button.delete": "מחק",
+			"common.restore_recommended": "↺ שחזר ערכים מומלצים",
+			"dialog.gestures.param_err_wrap_pair": "סימן לא מוכר. הזן אחד מהסימנים ברשימה, או זוג בכתיבה שמאל|ימין.",
+			"dialog.gestures.param_wrap_pair": "סימנים שיקיפו את הבחירה: אחד מאלה, או זוג משלך בכתיבה שמאל|ימין (למשל **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "הזן את הסמל הסוגר (השאר ריק = סימטרי):",
+			"dialog.shortcuts.wrap_symbol_close_title": "סמל סוגר",
+			"dialog.shortcuts.wrap_symbol_invalid": "אנא הזן בדיוק תו אחד.",
+			"dialog.shortcuts.wrap_symbol_prompt": "הזן סמל פותח (תו אחד):",
+			"dialog.shortcuts.wrap_symbol_title": "הוסף סמל מקיף",
+			"menu.shortcuts.selection_symbol": "בחירה + סמל",
+			"menu.shortcuts.wrap_group_angle": "סוגריים זוויתיים וקישוטיים",
+			"menu.shortcuts.wrap_group_braces": "סוגריים מסולסלים אופקיים",
+			"menu.shortcuts.wrap_group_brackets": "סוגריים",
+			"menu.shortcuts.wrap_group_cjk": "סוגריים מסוג CJK",
+			"menu.shortcuts.wrap_group_markdown": "הדגשת Markdown",
+			"menu.shortcuts.wrap_group_other": "סמלים אחרים",
+			"menu.shortcuts.wrap_group_quotes": "מירכאות וגרשים",
+			"menu.shortcuts.wrap_symbols": "סמלים עוטפים",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ הוסף סמל…]",
+			"menu.shortcuts.wrap_symbols_check_all": "סמן הכל",
+			"menu.shortcuts.wrap_symbols_custom_label": "מותאם אישית",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ סמלים המקיפים את הבחירה",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "בטל סימון הכל",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "קיצור זה שייך למערכת שקושרת אותו: כל מנהל התקן מציע את הפעולות שלו על צירופים שהמערכת שלו משאירה פנויים (צירופי מקש Windows ב-Windows, Ctrl ו-Cmd ב-macOS, משבצות מקלדת ב-Linux) ושומר את הבחירה בשמו שלו.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "לא בשם זה ב-macOS: macOS מציג אפשרות זו בין קיצורי Ctrl ו-Cmd שלו ושומר אותה יחד איתם, בשם shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "macOS בלבד בשם זה: macOS שומר את בחירות סמלי העטיפה שלו בסעיף זה. Windows שומר את שלו ב-wrap_symbols.toml, ו-Linux אינו קורא סעיף זה.",
+			"sg_actions.wrap_selection": "⟦⟧ הקף את הבחירה [ניתן להגדרה]",
+			"shortcuts.label_wrap_text": "הקלדת סמל עוטפת את הבחירה"
+		},
+		"fr": {
+			"button.delete": "Supprimer",
+			"common.restore_recommended": "↺ Restaurer les valeurs conseillées",
+			"dialog.gestures.param_err_wrap_pair": "Symbole inconnu. Saisissez l’un des symboles proposés, ou une paire écrite gauche|droite.",
+			"dialog.gestures.param_wrap_pair": "Symboles qui entoureront la sélection : l’un de ceux-ci, ou votre propre paire écrite gauche|droite (par exemple **|**) :\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Entrez le symbole fermant (laisser vide = symétrique) :",
+			"dialog.shortcuts.wrap_symbol_close_title": "Symbole fermant",
+			"dialog.shortcuts.wrap_symbol_invalid": "Saisissez exactement un caractère.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Entrez un symbole ouvrant (1 caractère) :",
+			"dialog.shortcuts.wrap_symbol_title": "Ajouter un symbole d'encadrement",
+			"menu.shortcuts.selection_symbol": "Sélection + symbole",
+			"menu.shortcuts.wrap_group_angle": "Chevrons et crochets ornementaux",
+			"menu.shortcuts.wrap_group_braces": "Accolades horizontales",
+			"menu.shortcuts.wrap_group_brackets": "Parenthèses et crochets",
+			"menu.shortcuts.wrap_group_cjk": "Crochets CJK",
+			"menu.shortcuts.wrap_group_markdown": "Emphase Markdown",
+			"menu.shortcuts.wrap_group_other": "Autres symboles",
+			"menu.shortcuts.wrap_group_quotes": "Guillemets et apostrophes",
+			"menu.shortcuts.wrap_symbols": "Symboles encadrants",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Ajouter un symbole…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Tout cocher",
+			"menu.shortcuts.wrap_symbols_custom_label": "Personnalisé",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symboles encadrant la sélection",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Tout décocher",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Ce raccourci appartient au système qui le lie : chaque pilote propose ses actions sur les combinaisons que son système laisse libres (touche Windows sous Windows, Ctrl et Cmd sous macOS, emplacements du clavier sous Linux) et enregistre le choix sous son propre nom.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Pas sous ce nom sous macOS : macOS range cette option parmi ses raccourcis Ctrl et Cmd et l’enregistre avec eux, sous shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "macOS uniquement sous ce nom : macOS garde ses choix de symboles d’encadrement dans cette section. Windows garde les siens dans wrap_symbols.toml, et Linux ne lit pas cette section.",
+			"sg_actions.wrap_selection": "⟦⟧ Encadrer la sélection [configurable]",
+			"shortcuts.label_wrap_text": "Taper un symbole encadre la sélection"
+		},
+		"de": {
+			"button.delete": "Löschen",
+			"common.restore_recommended": "↺ Empfohlene Werte wiederherstellen",
+			"dialog.gestures.param_err_wrap_pair": "Unbekanntes Zeichen. Geben Sie eines der aufgeführten Zeichen oder ein Paar im Format links|rechts ein.",
+			"dialog.gestures.param_wrap_pair": "Zeichen, die die Auswahl umschließen: eines davon oder ein eigenes Paar im Format links|rechts (zum Beispiel **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Schließendes Symbol eingeben (leer lassen = symmetrisch):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Schließendes Symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Bitte genau ein Zeichen eingeben.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Öffnendes Symbol eingeben (1 Zeichen):",
+			"dialog.shortcuts.wrap_symbol_title": "Umrahmungssymbol hinzufügen",
+			"menu.shortcuts.selection_symbol": "Auswahl + Symbol",
+			"menu.shortcuts.wrap_group_angle": "Spitze und ornamentale Klammern",
+			"menu.shortcuts.wrap_group_braces": "Horizontale geschweifte Klammern",
+			"menu.shortcuts.wrap_group_brackets": "Klammern",
+			"menu.shortcuts.wrap_group_cjk": "CJK-Klammern",
+			"menu.shortcuts.wrap_group_markdown": "Markdown-Hervorhebung",
+			"menu.shortcuts.wrap_group_other": "Andere Symbole",
+			"menu.shortcuts.wrap_group_quotes": "Anführungszeichen und Apostrophe",
+			"menu.shortcuts.wrap_symbols": "Umschließende Symbole",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Symbol hinzufügen…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Alle auswählen",
+			"menu.shortcuts.wrap_symbols_custom_label": "Benutzerdefiniert",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symbole, die die Auswahl einrahmen",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Alle abwählen",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Dieses Kürzel gehört zu dem System, das es belegt: Jeder Treiber bietet seine Aktionen auf den Kombinationen an, die sein System frei lässt (Windows-Tastenkombinationen unter Windows, Strg und Cmd unter macOS, Tastaturplätze unter Linux), und speichert die Wahl unter eigenem Namen.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Nicht unter diesem Namen unter macOS: macOS führt diese Option unter seinen Ctrl- und Cmd-Kurzbefehlen und speichert sie mit ihnen, als shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Nur macOS unter diesem Namen: macOS speichert seine Umschließungs-Symbole in diesem Abschnitt. Windows speichert seine in wrap_symbols.toml, und Linux liest diesen Abschnitt nicht.",
+			"sg_actions.wrap_selection": "⟦⟧ Auswahl umschließen [konfigurierbar]",
+			"shortcuts.label_wrap_text": "Symbol tippen umschließt die Auswahl"
+		},
+		"es": {
+			"button.delete": "Eliminar",
+			"common.restore_recommended": "↺ Restaurar los valores recomendados",
+			"dialog.gestures.param_err_wrap_pair": "Símbolo desconocido. Introduzca uno de los símbolos de la lista o un par escrito izquierda|derecha.",
+			"dialog.gestures.param_wrap_pair": "Símbolos que rodearán la selección: uno de estos, o su propio par escrito izquierda|derecha (por ejemplo **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Introduzca el símbolo de cierre (dejar vacío = simétrico):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Símbolo de cierre",
+			"dialog.shortcuts.wrap_symbol_invalid": "Introduzca exactamente un carácter.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Introduzca un símbolo de apertura (1 carácter):",
+			"dialog.shortcuts.wrap_symbol_title": "Añadir un símbolo de encuadre",
+			"menu.shortcuts.selection_symbol": "Selección + símbolo",
+			"menu.shortcuts.wrap_group_angle": "Ángulos y corchetes ornamentales",
+			"menu.shortcuts.wrap_group_braces": "Llaves horizontales",
+			"menu.shortcuts.wrap_group_brackets": "Paréntesis y corchetes",
+			"menu.shortcuts.wrap_group_cjk": "Corchetes CJK",
+			"menu.shortcuts.wrap_group_markdown": "Énfasis de Markdown",
+			"menu.shortcuts.wrap_group_other": "Otros símbolos",
+			"menu.shortcuts.wrap_group_quotes": "Comillas y apóstrofos",
+			"menu.shortcuts.wrap_symbols": "Símbolos envolventes",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Añadir un símbolo…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Marcar todo",
+			"menu.shortcuts.wrap_symbols_custom_label": "Personalizado",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Símbolos que enmarcan la selección",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Desmarcar todo",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Este atajo pertenece al sistema que lo asigna: cada controlador ofrece sus acciones en las combinaciones que su propio sistema deja libres (combinaciones con la tecla Windows en Windows, Ctrl y Cmd en macOS, ranuras de teclado en Linux) y guarda la elección con su propio nombre.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "No con este nombre en macOS: macOS incluye esta opción entre sus atajos Ctrl y Cmd y la guarda con ellos, como shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Solo macOS con este nombre: macOS guarda sus elecciones de símbolos envolventes en esta sección. Windows guarda las suyas en wrap_symbols.toml, y Linux no lee esta sección.",
+			"sg_actions.wrap_selection": "⟦⟧ Rodear la selección [configurable]",
+			"shortcuts.label_wrap_text": "Escribir un símbolo enmarca la selección"
+		},
+		"en": {
+			"button.delete": "Delete",
+			"common.restore_recommended": "↺ Restore recommended values",
+			"dialog.gestures.param_err_wrap_pair": "Unknown symbol. Enter one of the listed symbols, or a pair written left|right.",
+			"dialog.gestures.param_wrap_pair": "Symbols that will surround the selection: one of these, or your own pair written left|right (for example **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Enter the closing symbol (leave empty for symmetric):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Closing symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Please enter exactly one character.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Enter an opening symbol (1 character):",
+			"dialog.shortcuts.wrap_symbol_title": "Add a wrapping symbol",
+			"menu.shortcuts.selection_symbol": "Selection + symbol",
+			"menu.shortcuts.wrap_group_angle": "Angle and ornamental brackets",
+			"menu.shortcuts.wrap_group_braces": "Horizontal braces",
+			"menu.shortcuts.wrap_group_brackets": "Brackets",
+			"menu.shortcuts.wrap_group_cjk": "CJK brackets",
+			"menu.shortcuts.wrap_group_markdown": "Markdown emphasis",
+			"menu.shortcuts.wrap_group_other": "Other symbols",
+			"menu.shortcuts.wrap_group_quotes": "Quotes",
+			"menu.shortcuts.wrap_symbols": "Wrapping symbols",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Add a symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Check all",
+			"menu.shortcuts.wrap_symbols_custom_label": "Custom",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symbols that wrap the selection",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Uncheck all",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "This shortcut belongs to the system that binds it: each driver offers its actions on the chords its own system leaves free (Windows key combinations on Windows, Ctrl and Cmd on macOS, keyboard slots on Linux) and stores the choice under its own name.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Not on macOS under this name: macOS lists this option among its Ctrl and Cmd shortcuts and stores it with them, as shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "macOS only under this name: macOS keeps its wrap-symbol choices in this section. Windows keeps its own in wrap_symbols.toml, and Linux does not read this section.",
+			"sg_actions.wrap_selection": "⟦⟧ Wrap the selection [configurable]",
+			"shortcuts.label_wrap_text": "Typing a symbol wraps the selection"
+		},
+		"ko": {
+			"button.delete": "삭제",
+			"common.restore_recommended": "↺ 권장 값 복원",
+			"dialog.gestures.param_err_wrap_pair": "알 수 없는 기호입니다. 목록의 기호 중 하나 또는 왼쪽|오른쪽 형식의 쌍을 입력하세요.",
+			"dialog.gestures.param_wrap_pair": "선택 영역을 감쌀 기호: 아래 중 하나 또는 왼쪽|오른쪽 형식으로 쓴 직접 만든 쌍 (예: **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "닫는 기호를 입력하세요 (비워두면 = 대칭):",
+			"dialog.shortcuts.wrap_symbol_close_title": "닫는 기호",
+			"dialog.shortcuts.wrap_symbol_invalid": "정확히 한 글자를 입력하세요.",
+			"dialog.shortcuts.wrap_symbol_prompt": "여는 기호를 입력하세요 (1자):",
+			"dialog.shortcuts.wrap_symbol_title": "감싸기 기호 추가",
+			"menu.shortcuts.selection_symbol": "선택 영역 + 기호",
+			"menu.shortcuts.wrap_group_angle": "꺾쇠괄호와 장식 괄호",
+			"menu.shortcuts.wrap_group_braces": "가로 중괄호",
+			"menu.shortcuts.wrap_group_brackets": "괄호와 대괄호",
+			"menu.shortcuts.wrap_group_cjk": "CJK 괄호",
+			"menu.shortcuts.wrap_group_markdown": "Markdown 강조",
+			"menu.shortcuts.wrap_group_other": "기타 기호",
+			"menu.shortcuts.wrap_group_quotes": "따옴표와 아포스트로피",
+			"menu.shortcuts.wrap_symbols": "감싸는 기호",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ 기호 추가…]",
+			"menu.shortcuts.wrap_symbols_check_all": "모두 선택",
+			"menu.shortcuts.wrap_symbols_custom_label": "사용자 정의",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ 선택 영역을 감싸는 기호",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "모두 선택 해제",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "이 단축키는 그것을 지정하는 시스템에 속합니다. 각 드라이버는 자기 시스템이 비워 둔 조합(Windows는 Windows 키 조합, macOS는 Ctrl과 Cmd, Linux는 키보드 슬롯)에 동작을 제공하고 선택을 자신의 이름으로 저장합니다.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS에서는 이 이름이 아님: macOS는 이 옵션을 Ctrl 및 Cmd 단축키 사이에 두고 그것들과 함께 shortcuts.keys.wrap_text_if_selected로 저장합니다.",
+			"platform_reason.wrap_symbols_store_is_macos": "이 이름으로는 macOS 전용: macOS는 감싸기 기호 선택을 이 섹션에 저장합니다. Windows는 wrap_symbols.toml에 저장하고, Linux는 이 섹션을 읽지 않습니다.",
+			"sg_actions.wrap_selection": "⟦⟧ 선택 영역 감싸기 [설정 가능]",
+			"shortcuts.label_wrap_text": "기호를 입력하면 선택 영역을 감싸서"
+		},
+		"sv": {
+			"button.delete": "Radera",
+			"common.restore_recommended": "↺ Återställ rekommenderade värden",
+			"dialog.gestures.param_err_wrap_pair": "Okänt tecken. Ange ett av de listade tecknen eller ett par skrivet vänster|höger.",
+			"dialog.gestures.param_wrap_pair": "Tecken som ska omge markeringen: ett av dessa, eller ett eget par skrivet vänster|höger (till exempel **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Ange det avslutande symbolet (lämna tomt = symmetriskt):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Avslutande symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Ange exakt ett tecken.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Ange ett inledande symbol (1 tecken):",
+			"dialog.shortcuts.wrap_symbol_title": "Lägg till ett omslutande symbol",
+			"menu.shortcuts.selection_symbol": "Markering + symbol",
+			"menu.shortcuts.wrap_group_angle": "Vinkel- och ornamentparenteser",
+			"menu.shortcuts.wrap_group_braces": "Vågräta klamrar",
+			"menu.shortcuts.wrap_group_brackets": "Parenteser och hakparenteser",
+			"menu.shortcuts.wrap_group_cjk": "CJK-parenteser",
+			"menu.shortcuts.wrap_group_markdown": "Markdown-betoning",
+			"menu.shortcuts.wrap_group_other": "Andra symboler",
+			"menu.shortcuts.wrap_group_quotes": "Citattecken och apostrofer",
+			"menu.shortcuts.wrap_symbols": "Omslutande symboler",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Lägg till ett symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Markera alla",
+			"menu.shortcuts.wrap_symbols_custom_label": "Anpassad",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symboler som omger markeringen",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Avmarkera alla",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Den här genvägen tillhör systemet som binder den: varje drivrutin erbjuder sina åtgärder på de kombinationer som dess eget system lämnar lediga (Windows-tangentkombinationer i Windows, Ctrl och Cmd i macOS, tangentbordsplatser i Linux) och sparar valet under sitt eget namn.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Inte under detta namn på macOS: macOS listar detta alternativ bland sina Ctrl- och Cmd-genvägar och sparar det med dem, som shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Endast macOS under detta namn: macOS sparar sina val av omslutande symboler i det här avsnittet. Windows sparar sina i wrap_symbols.toml, och Linux läser inte det här avsnittet.",
+			"sg_actions.wrap_selection": "⟦⟧ Omge markeringen [konfigurerbart]",
+			"shortcuts.label_wrap_text": "Att skriva en symbol omger markeringen"
+		},
+		"uk": {
+			"button.delete": "Видалити",
+			"common.restore_recommended": "↺ Відновити рекомендовані значення",
+			"dialog.gestures.param_err_wrap_pair": "Невідомий символ. Введіть один із наведених символів або пару у вигляді лівий|правий.",
+			"dialog.gestures.param_wrap_pair": "Символи, що обрамлять виділення: один із цих або власна пара у вигляді лівий|правий (наприклад **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Введіть закриваючий символ (залиште порожнім = симетричний):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Закриваючий символ",
+			"dialog.shortcuts.wrap_symbol_invalid": "Введіть рівно один символ.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Введіть відкриваючий символ (1 знак):",
+			"dialog.shortcuts.wrap_symbol_title": "Додати обрамляючий символ",
+			"menu.shortcuts.selection_symbol": "Виділення + символ",
+			"menu.shortcuts.wrap_group_angle": "Кутові та орнаментальні дужки",
+			"menu.shortcuts.wrap_group_braces": "Горизонтальні фігурні дужки",
+			"menu.shortcuts.wrap_group_brackets": "Круглі та квадратні дужки",
+			"menu.shortcuts.wrap_group_cjk": "Дужки CJK",
+			"menu.shortcuts.wrap_group_markdown": "Виділення Markdown",
+			"menu.shortcuts.wrap_group_other": "Інші символи",
+			"menu.shortcuts.wrap_group_quotes": "Лапки та апострофи",
+			"menu.shortcuts.wrap_symbols": "Обрамлювальні символи",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Додати символ…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Позначити все",
+			"menu.shortcuts.wrap_symbols_custom_label": "Користувацький",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Символи, що обрамляють виділення",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Зняти всі позначки",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Це скорочення належить системі, яка його призначає: кожен драйвер пропонує свої дії на тих поєднаннях, які залишає вільними його система (поєднання з клавішею Windows у Windows, Ctrl і Cmd у macOS, слоти клавіатури в Linux), і зберігає вибір під власною назвою.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "У macOS не під цією назвою: macOS відносить цей параметр до своїх скорочень Ctrl і Cmd і зберігає його разом із ними, як shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Лише macOS під цією назвою: macOS зберігає вибір символів-обрамлень у цьому розділі. Windows зберігає свій у wrap_symbols.toml, а Linux цей розділ не читає.",
+			"sg_actions.wrap_selection": "⟦⟧ Обрамити виділення [налаштовується]",
+			"shortcuts.label_wrap_text": "Введення символу обрамляє виділення"
+		},
+		"ja": {
+			"button.delete": "削除",
+			"common.restore_recommended": "↺ 推奨値に戻す",
+			"dialog.gestures.param_err_wrap_pair": "不明な記号です。一覧の記号のいずれか、または 左|右 の形の組み合わせを入力してください。",
+			"dialog.gestures.param_wrap_pair": "選択範囲を囲む記号：以下のいずれか、または 左|右 の形で書いた独自の組み合わせ（例：**|**）：\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "終了記号を入力（空白 = 左右対称）:",
+			"dialog.shortcuts.wrap_symbol_close_title": "終了記号",
+			"dialog.shortcuts.wrap_symbol_invalid": "正確に1文字を入力してください。",
+			"dialog.shortcuts.wrap_symbol_prompt": "開始記号を入力（1文字）:",
+			"dialog.shortcuts.wrap_symbol_title": "囲み記号を追加",
+			"menu.shortcuts.selection_symbol": "選択範囲 + 記号",
+			"menu.shortcuts.wrap_group_angle": "山括弧と装飾括弧",
+			"menu.shortcuts.wrap_group_braces": "水平波括弧",
+			"menu.shortcuts.wrap_group_brackets": "丸括弧と角括弧",
+			"menu.shortcuts.wrap_group_cjk": "CJK括弧",
+			"menu.shortcuts.wrap_group_markdown": "Markdown強調",
+			"menu.shortcuts.wrap_group_other": "その他の記号",
+			"menu.shortcuts.wrap_group_quotes": "引用符とアポストロフィ",
+			"menu.shortcuts.wrap_symbols": "囲み記号",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ 記号を追加…]",
+			"menu.shortcuts.wrap_symbols_check_all": "すべてチェック",
+			"menu.shortcuts.wrap_symbols_custom_label": "カスタム",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ 選択範囲を囲む記号",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "すべてチェック解除",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "このショートカットはそれを割り当てるシステムのものです。各ドライバーは、そのシステムが空けている組み合わせ（Windows では Windows キーの組み合わせ、macOS では Ctrl と Cmd、Linux ではキーボードスロット）に操作を割り当て、選択を独自の名前で保存します。",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS ではこの名前ではありません：macOS はこのオプションを Ctrl と Cmd のショートカットの一つとして扱い、それらと一緒に shortcuts.keys.wrap_text_if_selected として保存します。",
+			"platform_reason.wrap_symbols_store_is_macos": "この名前では macOS のみ：macOS は囲み記号の選択をこのセクションに保存します。Windows は wrap_symbols.toml に保存し、Linux はこのセクションを読みません。",
+			"sg_actions.wrap_selection": "⟦⟧ 選択範囲を囲む [設定可能]",
+			"shortcuts.label_wrap_text": "記号を入力すると選択範囲を囲む"
+		},
+		"ru": {
+			"button.delete": "Удалить",
+			"common.restore_recommended": "↺ Восстановить рекомендуемые значения",
+			"dialog.gestures.param_err_wrap_pair": "Неизвестный символ. Введите один из перечисленных символов или пару в виде левый|правый.",
+			"dialog.gestures.param_wrap_pair": "Символы, которые обрамят выделение: один из этих или своя пара в виде левый|правый (например **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Введите закрывающий символ (оставьте пустым = симметричный):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Закрывающий символ",
+			"dialog.shortcuts.wrap_symbol_invalid": "Введите ровно один символ.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Введите открывающий символ (1 знак):",
+			"dialog.shortcuts.wrap_symbol_title": "Добавить обрамляющий символ",
+			"menu.shortcuts.selection_symbol": "Выделение + символ",
+			"menu.shortcuts.wrap_group_angle": "Угловые и орнаментальные скобки",
+			"menu.shortcuts.wrap_group_braces": "Горизонтальные фигурные скобки",
+			"menu.shortcuts.wrap_group_brackets": "Круглые и квадратные скобки",
+			"menu.shortcuts.wrap_group_cjk": "Скобки CJK",
+			"menu.shortcuts.wrap_group_markdown": "Выделение Markdown",
+			"menu.shortcuts.wrap_group_other": "Другие символы",
+			"menu.shortcuts.wrap_group_quotes": "Кавычки и апострофы",
+			"menu.shortcuts.wrap_symbols": "Обрамляющие символы",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Добавить символ…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Отметить все",
+			"menu.shortcuts.wrap_symbols_custom_label": "Пользовательский",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Символы, обрамляющие выделение",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Снять все отметки",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Это сочетание принадлежит системе, которая его назначает: каждый драйвер предлагает свои действия на тех сочетаниях, которые оставляет свободными его система (сочетания с клавишей Windows в Windows, Ctrl и Cmd в macOS, слоты клавиатуры в Linux), и хранит выбор под своим именем.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "В macOS не под этим именем: macOS относит этот параметр к своим сочетаниям Ctrl и Cmd и сохраняет его вместе с ними, как shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Только macOS под этим именем: macOS хранит выбор обрамляющих символов в этом разделе. Windows хранит свой в wrap_symbols.toml, а Linux этот раздел не читает.",
+			"sg_actions.wrap_selection": "⟦⟧ Обрамить выделение [настраивается]",
+			"shortcuts.label_wrap_text": "Ввод символа обрамляет выделение"
+		},
+		"pl": {
+			"button.delete": "Usuń",
+			"common.restore_recommended": "↺ Przywróć zalecane wartości",
+			"dialog.gestures.param_err_wrap_pair": "Nieznany symbol. Wpisz jeden z wymienionych symboli lub parę zapisaną jako lewy|prawy.",
+			"dialog.gestures.param_wrap_pair": "Symbole, które otoczą zaznaczenie: jeden z poniższych lub własna para zapisana jako lewy|prawy (na przykład **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Wprowadź symbol zamykający (pozostaw puste = symetryczny):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Symbol zamykający",
+			"dialog.shortcuts.wrap_symbol_invalid": "Wprowadź dokładnie jeden znak.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Wprowadź symbol otwierający (1 znak):",
+			"dialog.shortcuts.wrap_symbol_title": "Dodaj symbol obramowania",
+			"menu.shortcuts.selection_symbol": "Zaznaczenie + symbol",
+			"menu.shortcuts.wrap_group_angle": "Nawiasy ostrokątne i ozdobne",
+			"menu.shortcuts.wrap_group_braces": "Poziome nawiasy klamrowe",
+			"menu.shortcuts.wrap_group_brackets": "Nawiasy okrągłe i kwadratowe",
+			"menu.shortcuts.wrap_group_cjk": "Nawiasy CJK",
+			"menu.shortcuts.wrap_group_markdown": "Wyróżnienie Markdown",
+			"menu.shortcuts.wrap_group_other": "Inne symbole",
+			"menu.shortcuts.wrap_group_quotes": "Cudzysłowy i apostrofy",
+			"menu.shortcuts.wrap_symbols": "Symbole otaczające",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Dodaj symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Zaznacz wszystko",
+			"menu.shortcuts.wrap_symbols_custom_label": "Niestandardowy",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symbole otaczające zaznaczenie",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Odznacz wszystko",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Ten skrót należy do systemu, który go przypisuje: każdy sterownik oferuje swoje akcje na kombinacjach, które zostawia wolne jego system (kombinacje z klawiszem Windows w Windows, Ctrl i Cmd w macOS, miejsca klawiatury w Linuksie) i zapisuje wybór pod własną nazwą.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "Nie pod tą nazwą w macOS: macOS umieszcza tę opcję wśród swoich skrótów Ctrl i Cmd i zapisuje ją razem z nimi, jako shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Tylko macOS pod tą nazwą: macOS trzyma wybory symboli otaczających w tej sekcji. Windows trzyma swoje w wrap_symbols.toml, a Linux nie czyta tej sekcji.",
+			"sg_actions.wrap_selection": "⟦⟧ Otocz zaznaczenie [konfigurowalne]",
+			"shortcuts.label_wrap_text": "Wpisanie symbolu otacza zaznaczenie"
+		},
+		"cs": {
+			"button.delete": "Smazat",
+			"common.restore_recommended": "↺ Obnovit doporučené hodnoty",
+			"dialog.gestures.param_err_wrap_pair": "Neznámý symbol. Zadejte jeden z uvedených symbolů nebo dvojici ve tvaru levý|pravý.",
+			"dialog.gestures.param_wrap_pair": "Symboly, které obalí výběr: jeden z těchto, nebo vlastní dvojice ve tvaru levý|pravý (například **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Zadejte uzavírací symbol (prázdné = symetrické):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Uzavírací symbol",
+			"dialog.shortcuts.wrap_symbol_invalid": "Zadejte přesně jeden znak.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Zadejte otevírací symbol (1 znak):",
+			"dialog.shortcuts.wrap_symbol_title": "Přidat ohraničující symbol",
+			"menu.shortcuts.selection_symbol": "Výběr + symbol",
+			"menu.shortcuts.wrap_group_angle": "Špičaté a ozdobné závorky",
+			"menu.shortcuts.wrap_group_braces": "Vodorovné složené závorky",
+			"menu.shortcuts.wrap_group_brackets": "Závorky a hranaté závorky",
+			"menu.shortcuts.wrap_group_cjk": "Závorky CJK",
+			"menu.shortcuts.wrap_group_markdown": "Zvýraznění Markdown",
+			"menu.shortcuts.wrap_group_other": "Ostatní symboly",
+			"menu.shortcuts.wrap_group_quotes": "Uvozovky a apostrofy",
+			"menu.shortcuts.wrap_symbols": "Obklopující symboly",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Přidat symbol…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Zaškrtnout vše",
+			"menu.shortcuts.wrap_symbols_custom_label": "Vlastní",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Symboly ohraničující výběr",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Odškrtnout vše",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Tato zkratka patří systému, který ji váže: každý ovladač nabízí své akce na kombinacích, které jeho systém nechává volné (kombinace s klávesou Windows ve Windows, Ctrl a Cmd v macOS, sloty klávesnice v Linuxu), a volbu ukládá pod vlastním názvem.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "V macOS ne pod tímto názvem: macOS řadí tuto volbu mezi své zkratky Ctrl a Cmd a ukládá ji s nimi, jako shortcuts.keys.wrap_text_if_selected.",
+			"platform_reason.wrap_symbols_store_is_macos": "Jen macOS pod tímto názvem: macOS drží své volby obalových symbolů v této sekci. Windows má své ve wrap_symbols.toml a Linux tuto sekci nečte.",
+			"sg_actions.wrap_selection": "⟦⟧ Obalit výběr [nastavitelné]",
+			"shortcuts.label_wrap_text": "Psaní symbolu obklopuje výběr"
+		},
+		"tr": {
+			"button.delete": "Sil",
+			"common.restore_recommended": "↺ Önerilen değerleri geri yükle",
+			"dialog.gestures.param_err_wrap_pair": "Bilinmeyen simge. Listelenen simgelerden birini ya da sol|sağ biçiminde bir çift girin.",
+			"dialog.gestures.param_wrap_pair": "Seçimi saracak simgeler: bunlardan biri ya da sol|sağ biçiminde yazılmış kendi çiftiniz (örneğin **|**):\n{1}",
+			"dialog.shortcuts.wrap_symbol_close_prompt": "Kapanış sembolü girin (boş bırakın = simetrik):",
+			"dialog.shortcuts.wrap_symbol_close_title": "Kapanış sembolü",
+			"dialog.shortcuts.wrap_symbol_invalid": "Lütfen tam olarak bir karakter girin.",
+			"dialog.shortcuts.wrap_symbol_prompt": "Açılış sembolü girin (1 karakter):",
+			"dialog.shortcuts.wrap_symbol_title": "Çerçeveleme sembolü ekle",
+			"menu.shortcuts.selection_symbol": "Seçim + sembol",
+			"menu.shortcuts.wrap_group_angle": "Açılı ve süslü parantezler",
+			"menu.shortcuts.wrap_group_braces": "Yatay küme parantezleri",
+			"menu.shortcuts.wrap_group_brackets": "Parantezler ve köşeli parantezler",
+			"menu.shortcuts.wrap_group_cjk": "CJK parantezleri",
+			"menu.shortcuts.wrap_group_markdown": "Markdown vurgusu",
+			"menu.shortcuts.wrap_group_other": "Diğer simgeler",
+			"menu.shortcuts.wrap_group_quotes": "Tırnak işaretleri ve kesme işaretleri",
+			"menu.shortcuts.wrap_symbols": "Çevreleyen semboller",
+			"menu.shortcuts.wrap_symbols_add_custom": "[+ Sembol ekle…]",
+			"menu.shortcuts.wrap_symbols_check_all": "Tümünü işaretle",
+			"menu.shortcuts.wrap_symbols_custom_label": "Özel",
+			"menu.shortcuts.wrap_symbols_title": "  ↳ Seçimi çerçeveleyen semboller",
+			"menu.shortcuts.wrap_symbols_uncheck_all": "Tümünün işaretini kaldır",
+			"platform_reason.shortcut_settings_are_stored_per_driver": "Bu kısayol onu bağlayan sisteme aittir: her sürücü eylemlerini kendi sisteminin boş bıraktığı birleşimlerde sunar (Windows’ta Windows tuşu birleşimleri, macOS’ta Ctrl ve Cmd, Linux’ta klavye yuvaları) ve seçimi kendi adıyla saklar.",
+			"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS'ta bu adla değil: macOS bu seçeneği Ctrl ve Cmd kısayolları arasında listeler ve onlarla birlikte shortcuts.keys.wrap_text_if_selected olarak kaydeder.",
+			"platform_reason.wrap_symbols_store_is_macos": "Bu adla yalnızca macOS: macOS sarmalama simgesi seçimlerini bu bölümde tutar. Windows kendisininkini wrap_symbols.toml içinde tutar, Linux ise bu bölümü okumaz.",
+			"sg_actions.wrap_selection": "⟦⟧ Seçimi sar [yapılandırılabilir]",
+			"shortcuts.label_wrap_text": "Sembol yazmak seçimi çerçeveler"
+		}
+	},
+	"missing_locale_keys": {},
+	"source_paths": {
+		"shared": [
+			"static/ergopti_plus/_shared/modules/wrap_symbols/wrap_symbols.json",
+			"static/ergopti_plus/_shared/modules/wrap_symbols/README.md",
+			"static/ergopti_plus/_shared/lua/wrap_pair/init.lua",
+			"static/ergopti_plus/_shared/lua/menu/wrap_preferences.lua",
+			"static/ergopti_plus/_shared/lua/menu/wrap_mutation.lua",
+			"static/ergopti_plus/_shared/core/config_schema/config.schema.json",
+			"static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"static/ergopti_plus/_shared/tests/corpus/action_parameters/wrap_pair_vectors.json",
+			"static/ergopti_plus/_shared/tests/corpus/menus/wrap_symbol_controls.json"
+		],
+		"windows": [
+			"static/ergopti_plus/windows/infra/wrap_symbols_config.ahk",
+			"static/ergopti_plus/windows/infra/wrap_pair.ahk",
+			"static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"static/ergopti_plus/windows/modules/gestures/actions.ahk"
+		],
+		"macos": [
+			"static/ergopti_plus/macos/modules/shortcuts/actions/text.lua",
+			"static/ergopti_plus/macos/modules/shortcuts/actions/system.lua",
+			"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+			"static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+			"static/ergopti_plus/macos/modules/gestures/actions.lua"
+		],
+		"linux": [
+			"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua",
+			"static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua"
+		]
+	},
+	"native_gui_executed": false,
+	"classification_legend": {
+		"parity": "source aligned; execution basis stated",
+		"explicit_intent": "declaration or corpus distinguishes policy",
+		"native_alternative": "different OS workflow; no inferred missing parity",
+		"native_constraint": "native selection/storage mechanics differ, native receiving unrun",
+		"unknown_intent": "ambiguous source policy, outside canonical findings",
+		"os_owner_finding_reference": "actual platform probes owned by OS role, no duplicate shared ID",
+		"documentation_only": "stale prose cannot establish missing implementation"
+	}
+}

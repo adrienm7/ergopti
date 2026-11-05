@@ -1,0 +1,30 @@
+local root='/workspace/worktrees/parity-sequential-2026-11-05/linux/static/ergopti_plus/'
+package.path=root..'linux/?.lua;'..root..'linux/?/init.lua;'..root..'_shared/lua/?.lua;'..root..'_shared/lua/?/init.lua;'..package.path
+require('compat.utf8').install();require('test.runner_home').isolate()
+local path='/workspace/scratch/parity-sequential-2026-11-05/wrap-symbols/linux/probes/private-parameter.toml'
+local seed='[gestures]\nenabled = false\ntap_3 = "wrap_selection"\n[private_probe]\nsentinel = "keep"\n'
+local f=assert(io.open(path,'wb'));assert(f:write(seed));assert(f:close())
+local G=require('modules.gestures.manager')
+G.init({enabled=false,persist=true,config_path=path})
+assert(G.validate_action_parameter('wrap_selection','【|】'))
+assert(G.set_action_parameter('tap_3','wrap_selection','【|】'))
+assert(G.get_action_parameter('tap_3','wrap_selection')=='【|】')
+local guard=G.capture_parameter_delivery_guard();assert(guard())
+local f=assert(io.open(path,'rb'));local bytes=f:read('*a');f:close()
+local document=require('toml_codec').decode(bytes)
+assert(document.gesture_parameters.tap_3__wrap_selection=='【|】' and document.private_probe.sentinel=='keep')
+print('CUSTOM_PERSIST value=【|】 actual_file=true unknown_leaf=keep')
+assert(not G.set_action_parameter('tap_3','wrap_selection','left||right'))
+assert(G.get_action_parameter('tap_3','wrap_selection')=='【|】' and guard())
+local lease={};assert(G.acquire_parameter_configuration(lease));assert(not guard())
+assert(not G.set_action_parameter('tap_3','wrap_selection','<|>'))
+assert(G.release_parameter_configuration(lease));assert(not guard())
+assert(G.set_action_parameter('tap_3','wrap_selection','OPEN|CLOSE'))
+assert(not guard())
+package.loaded['modules.gestures.manager']=nil
+G=require('modules.gestures.manager');G.init({enabled=false,persist=true,config_path=path})
+assert(G.get_action_parameter('tap_3','wrap_selection')=='OPEN|CLOSE')
+assert(G.get_action('tap_3')=='wrap_selection')
+print('CUSTOM_RELOAD value=OPEN|CLOSE binding=tap_3 action=wrap_selection')
+print('INVALID_AND_LEASE_REFUSALS preserve_value=true old_delivery_guard_revoked=true')
+print('PASS actual gesture parameter owner and actual TOML writer; no evdev/clipboard/output')

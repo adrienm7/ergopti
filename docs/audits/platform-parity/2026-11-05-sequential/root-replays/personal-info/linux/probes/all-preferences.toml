@@ -1,0 +1,24 @@
+
+[hotstrings.dynamic.date_long_fr]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = true
+
+[hotstrings.dynamic.date]
+enabled = true
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = true
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = true
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = true
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = true
+
+[hotstrings.dynamic]
+enabled = true

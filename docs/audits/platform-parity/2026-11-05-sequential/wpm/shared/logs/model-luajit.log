@@ -1,0 +1,57 @@
+CONTROL empty actual=0
+CONTROL one-character actual=0
+CONTROL ten-character-burst-minimum-duration actual=60
+CONTROL decay-at-two-seconds actual=60
+CONTROL decay-at-four-seconds actual=30
+CONTROL idle-exact-boundary-is-live actual=24
+CONTROL idle-after-five-seconds actual=0
+CONTROL window-exact-boundary-kept actual=10
+CONTROL window-old-stamps-pruned actual=0
+CONTROL source-time-seconds actual=10
+CONTROL variant-is-group actual=magickey
+CONTROL hold-exact-boundary actual=magickey
+CONTROL hold-expired actual=none
+CONTROL neutral-none actual=#0055cc
+CONTROL neutral-manual actual=#0055cc
+CONTROL neutral-hotstring actual=#0055cc
+CONTROL neutral-repeat_key actual=#0055cc
+CONTROL neutral-rolls actual=#0055cc
+CONTROL AI-source actual=#7a30b0
+CONTROL resolver-receives-group actual=magickey
+CONTROL group-override actual=#ff8800
+CONTROL group-invalid-fallback actual=#007aff
+CONTROL group-throw-fallback actual=#007aff
+CONTROL strip-rounding actual=#002252
+CONTROL missing-required-key-refused actual=nil
+CONTROL invalid-colour-refused actual=nil
+CONTROL missing-canon-file-refused actual=nil
+CONTROL decoder-throw-refused actual=nil
+CONTROL colours-off-manual-fill actual=#0055cc
+CONTROL localized-unit actual=MPM
+CONTROL localized-label actual=60 MPM
+CONTROL menubar-uncoloured-background actual=nil
+CONTROL history-bound actual=60
+CONTROL history-oldest actual=6
+CONTROL graph-high-clipped actual=23
+CONTROL negative-monitor-anchor-x actual=-85
+CONTROL full-screen-anchor-y actual=1007
+CONTROL graph-anchor-roundtrip-x actual=-85
+CONTROL graph-anchor-roundtrip-y actual=1007
+CONTROL menubar-empty-hide actual=false
+CONTROL menubar-preview-show actual=true
+CONTROL widget-never-active-hide actual=false
+CONTROL widget-idle-hide actual=false
+CONTROL widget-zero-speed-new-mouse-hide actual=false
+CONTROL widget-preview-survives-mouse actual=true
+TRACE now=10.2 actual-wpm=60 mouse-after-key=10.1 show=true last_active=10.2
+CONTROL DISCREPANCY-observation-new-mouse-cannot-hide-positive-wpm actual=true
+POLICY_DISCREPANCY H-WPMS-001 mouse after last key: declaration and Windows counterpart imply show=false; actual Lua show=true; user-facing intent unconfirmed
+TRACE now=10.4 actual-wpm=60 mouse-after-key=10.1 show=true last_active=10.4
+TRACE now=11.0 actual-wpm=60 mouse-after-key=10.1 show=true last_active=11.0
+TRACE now=13.2 actual-wpm=38 mouse-after-key=10.1 show=true last_active=13.2
+TRACE now=14.8 actual-wpm=25 mouse-after-key=10.1 show=true last_active=14.8
+TRACE now=15.2 actual-wpm=0 mouse-after-key=10.1 show=true last_active=14.8
+TRACE now=17.6 actual-wpm=0 mouse-after-key=10.1 show=true last_active=14.8
+TRACE now=17.8 actual-wpm=0 mouse-after-key=10.1 show=false last_active=14.8
+CONTROL LIMIT-missing-rolls-key-accepted actual=true
+TOTAL observation assertions=47 observed policy discrepancies=1; confirmed findings=0; model execution only, no native desktop receiving

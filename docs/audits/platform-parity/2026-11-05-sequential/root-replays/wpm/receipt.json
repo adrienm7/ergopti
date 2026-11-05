@@ -1,0 +1,55 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"replays": [
+		{
+			"role": "windows",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/node",
+				"/workspace/scratch/parity-sequential-2026-11-05/wpm/windows/proofs/source-contract.mjs",
+				"/workspace/worktrees/parity-sequential-2026-11-05/windows"
+			],
+			"exit_code": 0,
+			"log": "windows.txt"
+		},
+		{
+			"role": "macos",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/wpm/macos/probes/owner.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"log": "macos.txt"
+		},
+		{
+			"role": "linux",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/wpm/linux/probes/owner.lua",
+				"throw"
+			],
+			"exit_code": 0,
+			"log": "linux.txt"
+		},
+		{
+			"role": "shared-lua",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/lua",
+				"/workspace/scratch/parity-sequential-2026-11-05/wpm/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared"
+			],
+			"exit_code": 0,
+			"log": "shared-lua.txt"
+		},
+		{
+			"role": "shared-jit",
+			"command": [
+				"/workspace/scratch/parity-toolchain/ci-bin/luajit",
+				"/workspace/scratch/parity-sequential-2026-11-05/wpm/shared/probes/shared-model.lua",
+				"/workspace/worktrees/parity-sequential-2026-11-05/shared"
+			],
+			"exit_code": 0,
+			"log": "shared-jit.txt"
+		}
+	]
+}

@@ -1,0 +1,209 @@
+Source: https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/canvas/libcanvas.m
+Ref: 1.1.1
+SHA256 full downloaded file: 07281122f7a7ef11aa3f967afef6dc2fc7e6c77fca2b9b1dc62ada7062d34c92
+Native source only; Darwin runtime not executed.
+
+Lines 515-548:
+515:         @"trackMouseEnterExit" : @{
+516:             @"class"       : @[ [NSNumber class] ],
+517:             @"luaClass"    : @"boolean",
+518:             @"objCType"    : @([@(YES) objCType]),
+519:             @"nullable"    : @(YES),
+520:             @"default"     : @(NO),
+521:             @"optionalFor" : VISIBLE,
+522:         },
+523:         @"trackMouseDown" : @{
+524:             @"class"       : @[ [NSNumber class] ],
+525:             @"luaClass"    : @"boolean",
+526:             @"objCType"    : @([@(YES) objCType]),
+527:             @"nullable"    : @(YES),
+528:             @"default"     : @(NO),
+529:             @"optionalFor" : VISIBLE,
+530:         },
+531:         @"trackMouseUp" : @{
+532:             @"class"       : @[ [NSNumber class] ],
+533:             @"luaClass"    : @"boolean",
+534:             @"objCType"    : @([@(YES) objCType]),
+535:             @"nullable"    : @(YES),
+536:             @"default"     : @(NO),
+537:             @"optionalFor" : VISIBLE,
+538:         },
+539:         @"trackMouseMove" : @{
+540:             @"class"       : @[ [NSNumber class] ],
+541:             @"luaClass"    : @"boolean",
+542:             @"objCType"    : @([@(YES) objCType]),
+543:             @"nullable"    : @(YES),
+544:             @"default"     : @(NO),
+545:             @"optionalFor" : VISIBLE,
+546:         },
+547:         @"transformation" : @{
+548:             @"class"       : @[ [NSAffineTransform class] ],
+
+Lines 998-1020:
+998: #pragma mark -
+999: @implementation HSCanvasView
+1000: - (instancetype)initWithFrame:(NSRect)frameRect {
+1001:     self = [super initWithFrame:frameRect];
+1002:     if (self) {
+1003:         _selfRef               = LUA_NOREF ;
+1004:         _selfRefCount          = 0 ;
+1005:         _wrapperWindow         = nil ;
+1006: 
+1007:         _mouseCallbackRef      = LUA_NOREF;
+1008:         _draggingCallbackRef   = LUA_NOREF;
+1009:         _canvasDefaults        = [[NSMutableDictionary alloc] init] ;
+1010:         _elementList           = [[NSMutableArray alloc] init] ;
+1011:         _elementBounds         = [[NSMutableArray alloc] init] ;
+1012:         _canvasTransform       = [NSAffineTransform transform] ;
+1013:         _imageAnimations       = [NSMapTable weakToStrongObjectsMapTable] ;
+1014: 
+1015:         _canvasMouseDown       = NO ;
+1016:         _canvasMouseUp         = NO ;
+1017:         _canvasMouseEnterExit  = NO ;
+1018:         _canvasMouseMove       = NO ;
+1019: 
+1020:         _mouseTracking         = NO ;
+
+Lines 1194-1260:
+1194: - (void)mouseDown:(NSEvent *)theEvent {
+1195:     [NSApp preventWindowOrdering];
+1196:     if (_mouseCallbackRef != LUA_NOREF) {
+1197:         BOOL isDown = (theEvent.type == NSEventTypeLeftMouseDown)  ||
+1198:                       (theEvent.type == NSEventTypeRightMouseDown) ||
+1199:                       (theEvent.type == NSEventTypeOtherMouseDown) ;
+1200: 
+1201:         NSPoint event_location = theEvent.locationInWindow;
+1202:         NSPoint local_point = [self convertPoint:event_location fromView:nil];
+1203: //         [LuaSkin logWarn:[NSString stringWithFormat:@"mouse click at (%f, %f)", local_point.x, local_point.y]] ;
+1204: 
+1205:         __block id targetID = nil ;
+1206:         __block NSPoint actualPoint = local_point ;
+1207: 
+1208:         [_elementBounds enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSDictionary *box, __unused NSUInteger idx, BOOL *stop) {
+1209:             NSUInteger elementIdx  = [box[@"index"] unsignedIntegerValue] ;
+1210:             if ([[self getElementValueFor:(isDown ? @"trackMouseDown" : @"trackMouseUp") atIndex:elementIdx] boolValue]) {
+1211:                 NSAffineTransform *pointTransform = [self->_canvasTransform copy] ;
+1212:                 [pointTransform appendTransform:[self getElementValueFor:@"transformation" atIndex:elementIdx]] ;
+1213:                 [pointTransform invert] ;
+1214:                 BOOL isView = [[self getElementValueFor:@"type" atIndex:elementIdx] isEqualToString:@"canvas"] ;
+1215:                 actualPoint = isView ? local_point : [pointTransform transformPoint:local_point] ;                actualPoint = [pointTransform transformPoint:local_point] ;
+1216:                 if (box[@"imageByBounds"] && ![box[@"imageByBounds"] boolValue]) {
+1217:                     NSImage *theImage = self->_elementList[elementIdx][@"image"] ;
+1218:                     if (theImage) {
+1219:                         NSRect hitRect = NSMakeRect(actualPoint.x, actualPoint.y, 1.0, 1.0) ;
+1220:                         NSRect imageRect = [box[@"frame"] rectValue] ;
+1221:                         if ([theImage hitTestRect:hitRect withImageDestinationRect:imageRect
+1222:                                                                            context:nil
+1223:                                                                              hints:nil
+1224:                                                                            flipped:YES]) {
+1225:                         targetID = [self getElementValueFor:@"id" atIndex:elementIdx onlyIfSet:YES] ;
+1226:                         if (!targetID) targetID = @(elementIdx + 1) ;
+1227:                             *stop = YES ;
+1228:                         }
+1229:                     }
+1230:                 } else if ((box[@"frame"] && NSPointInRect(actualPoint, [box[@"frame"] rectValue])) || (box[@"path"] && [box[@"path"] containsPoint:actualPoint])) {
+1231:                     targetID = [self getElementValueFor:@"id" atIndex:elementIdx onlyIfSet:YES] ;
+1232:                     if (!targetID) targetID = @(elementIdx + 1) ;
+1233:                     *stop = YES ;
+1234:                 }
+1235:                 if (*stop) {
+1236:                     if (isDown && [[self getElementValueFor:@"trackMouseDown" atIndex:elementIdx] boolValue]) {
+1237:                         [self doMouseCallback:@"mouseDown" for:targetID at:local_point] ;
+1238:                     }
+1239:                     if (!isDown && [[self getElementValueFor:@"trackMouseUp" atIndex:elementIdx] boolValue]) {
+1240:                         [self doMouseCallback:@"mouseUp" for:targetID at:local_point] ;
+1241:                     }
+1242:                 }
+1243:             }
+1244:         }] ;
+1245: 
+1246:         if (!targetID) {
+1247:             if (isDown && _canvasMouseDown) {
+1248:                 [self doMouseCallback:@"mouseDown" for:@"_canvas_" at:local_point] ;
+1249:             } else if (!isDown && _canvasMouseUp) {
+1250:                 [self doMouseCallback:@"mouseUp" for:@"_canvas_" at:local_point] ;
+1251:             }
+1252:         }
+1253:     }
+1254: }
+1255: 
+1256: - (void)rightMouseDown:(NSEvent *)theEvent { [self mouseDown:theEvent] ; }
+1257: - (void)otherMouseDown:(NSEvent *)theEvent { [self mouseDown:theEvent] ; }
+1258: - (void)mouseUp:(NSEvent *)theEvent        { [self mouseDown:theEvent] ; }
+1259: - (void)rightMouseUp:(NSEvent *)theEvent   { [self mouseDown:theEvent] ; }
+1260: - (void)otherMouseUp:(NSEvent *)theEvent   { [self mouseDown:theEvent] ; }
+
+Lines 2691-2742:
+2691: /// hs.canvas:mouseCallback(mouseCallbackFn) -> canvasObject
+2692: /// Method
+2693: /// Sets a callback for mouse events with respect to the canvas
+2694: ///
+2695: /// Parameters:
+2696: ///  * `mouseCallbackFn`   - A function, can be nil, that will be called when a mouse event occurs within the canvas, and an element beneath the mouse's current position has one of the `trackMouse...` attributes set to true.
+2697: ///
+2698: /// Returns:
+2699: ///  * The canvas object
+2700: ///
+2701: /// Notes:
+2702: ///  * The callback function should expect 5 arguments: the canvas object itself, a message specifying the type of mouse event, the canvas element `id` (or index position in the canvas if the `id` attribute is not set for the element), the x position of the mouse when the event was triggered within the rendered portion of the canvas element, and the y position of the mouse when the event was triggered within the rendered portion of the canvas element.
+2703: ///  * See also [hs.canvas:canvasMouseEvents](#canvasMouseEvents) for tracking mouse events in regions of the canvas not covered by an element with mouse tracking enabled.
+2704: ///
+2705: ///  * The following mouse attributes may be set to true for a canvas element and will invoke the callback with the specified message:
+2706: ///    * `trackMouseDown`      - indicates that a callback should be invoked when a mouse button is clicked down on the canvas element.  The message will be "mouseDown".
+2707: ///    * `trackMouseUp`        - indicates that a callback should be invoked when a mouse button has been released over the canvas element.  The message will be "mouseUp".
+2708: ///    * `trackMouseEnterExit` - indicates that a callback should be invoked when the mouse pointer enters or exits the  canvas element.  The message will be "mouseEnter" or "mouseExit".
+2709: ///    * `trackMouseMove`      - indicates that a callback should be invoked when the mouse pointer moves within the canvas element.  The message will be "mouseMove".
+2710: ///
+2711: ///  * The callback mechanism uses reverse z-indexing to determine which element will receive the callback -- the topmost element of the canvas which has enabled callbacks for the specified message will be invoked.
+2712: ///
+2713: ///  * No distinction is made between the left, right, or other mouse buttons. If you need to determine which specific button was pressed, use `hs.eventtap.checkMouseButtons()` within your callback to check.
+2714: ///
+2715: ///  * The hit point detection occurs by comparing the mouse pointer location to the rendered content of each individual canvas object... if an object which obscures a lower object does not have mouse tracking enabled, the lower object will still receive the event if it does have tracking enabled.
+2716: ///
+2717: ///  * Clipping regions which remove content from the visible area of a rendered object are ignored for the purposes of element hit-detection.
+2718: static int canvas_mouseCallback(lua_State *L) {
+2719:     LuaSkin *skin = [LuaSkin sharedWithState:L];
+2720:     [skin checkArgs:LS_TUSERDATA, USERDATA_TAG,
+2721:                     LS_TFUNCTION | LS_TNIL,
+2722:                     LS_TBREAK] ;
+2723: 
+2724:     HSCanvasView   *canvasView   = [skin luaObjectAtIndex:1 toClass:"HSCanvasView"] ;
+2725:     HSCanvasWindow *canvasWindow = canvasView.wrapperWindow ;
+2726: 
+2727:     // We're either removing callback(s), or setting new one(s). Either way, remove existing.
+2728:     canvasView.mouseCallbackRef = [skin luaUnref:refTable ref:canvasView.mouseCallbackRef];
+2729:     canvasView.previousTrackedIndex = NSNotFound ;
+2730:     canvasWindow.ignoresMouseEvents = YES ;
+2731: 
+2732:     if (lua_type(L, 2) == LUA_TFUNCTION) {
+2733:         lua_pushvalue(L, 2);
+2734:         canvasView.mouseCallbackRef = [skin luaRef:refTable] ;
+2735:         canvasWindow.ignoresMouseEvents = NO ;
+2736:     }
+2737: 
+2738:     lua_pushvalue(L, 1);
+2739:     return 1;
+2740: }
+2741: 
+2742: /// hs.canvas:clickActivating([flag]) -> canvasObject | currentValue
+
+Lines 2777-2795:
+2777: /// hs.canvas:canvasMouseEvents([down], [up], [enterExit], [move]) -> canvasObject | current values
+2778: /// Method
+2779: /// Get or set whether or not regions of the canvas which are not otherwise covered by an element with mouse tracking enabled should generate a callback for mouse events.
+2780: ///
+2781: /// Parameters:
+2782: ///  * `down`      - an optional boolean, or nil placeholder, specifying whether or not the mouse button being pushed down should generate a callback for the canvas areas not otherwise covered by an element with mouse tracking enabled.
+2783: ///  * `up`        - an optional boolean, or nil placeholder, specifying whether or not the mouse button being released should generate a callback for the canvas areas not otherwise covered by an element with mouse tracking enabled.
+2784: ///  * `enterExit` - an optional boolean, or nil placeholder, specifying whether or not the mouse pointer entering or exiting the canvas bounds should generate a callback for the canvas areas not otherwise covered by an element with mouse tracking enabled.
+2785: ///  * `move`      - an optional boolean, or nil placeholder, specifying whether or not the mouse pointer moving within the canvas bounds should generate a callback for the canvas areas not otherwise covered by an element with mouse tracking enabled.
+2786: ///
+2787: /// Returns:
+2788: ///  * If any arguments are provided, returns the canvas Object, otherwise returns the current values as four separate boolean values (i.e. not in a table).
+2789: ///
+2790: /// Notes:
+2791: ///  * Each value that you wish to set must be provided in the order given above, but you may specify a position as `nil` to indicate that whatever it's current state, no change should be applied.  For example, to activate a callback for entering and exiting the canvas without changing the current callback status for up or down button clicks, you could use: `hs.canvas:canvasMouseTracking(nil, nil, true)`.
+2792: ///
+2793: ///  * Use [hs.canvas:mouseCallback](#mouseCallback) to set the callback function.  The identifier field in the callback's argument list will be "_canvas_", but otherwise identical to those specified in [hs.canvas:mouseCallback](#mouseCallback).
+2794: static int canvas_canvasMouseEvents(lua_State *L) {
+2795:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;

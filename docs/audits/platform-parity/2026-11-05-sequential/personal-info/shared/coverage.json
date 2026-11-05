@@ -1,0 +1,110 @@
+{
+	"schema_version": 1,
+	"scope": "personal-info-shared-contract",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"confirmed_shared_findings": ["PIS-001"],
+	"inventory": {
+		"canonical_fields": 15,
+		"secret_preview_fields": 4,
+		"public_preview_fields": 11,
+		"example_aliases": 13,
+		"feature_families": 4,
+		"capabilities": 42,
+		"locales": 21,
+		"source_files_hashed": 62
+	},
+	"actual_shared_owners_executed": [
+		"personal_info/mask.lua",
+		"dynamic_hotstrings/init.lua",
+		"menu/frames/personal_info_source.lua",
+		"toml_codec",
+		"compat/utf8"
+	],
+	"actual_os_business_owners_executed": [
+		"Linux modules/dynamic_hotstrings/prefix_rules.lua actual purebuild andcounts",
+		"Linux modules/dynamic_hotstrings/manager.lua actual prefix_mappings/active_count with actual scratch preferences"
+	],
+	"runtimes": {
+		"Lua5.4": "108 value/refusal assertions",
+		"LuaJIT": "108 value/refusal assertions+actual manager2mappings/4count",
+		"Node22": "actual shared script39 assertions with minimal DOM/bridge ports"
+	},
+	"golden_vectors": {
+		"toml_preview": 16,
+		"json_mask": 15,
+		"invalid_policy": 6
+	},
+	"healthy_controls": [
+		"all15fields/redaction for everyfield",
+		"supplementary Unicode and accents",
+		"NBSP/hyphen separators",
+		"preview boundaries and fullhidden shortvalues",
+		"spaced prefix producer/count match",
+		"empty/disabled prefix producer",
+		"native-independent editor source identity",
+		"frontend15field save/cancel/ready"
+	],
+	"refused_controls": [
+		"invalid/missing policies",
+		"missing/unknown field provenance",
+		"mutated/replaced/withdrawn sourcefacade",
+		"unknown declaration property",
+		"metatable source"
+	],
+	"canonical_proof": {
+		"PIS-001": "actual shared helper+actual pure producer+actual Linux manager; native menu caller source traced; macOS sourceanalogue only; no Windows shared-helper claim"
+	},
+	"os_owner_references": [
+		"Linux source-directory override/missingfile/editor paths",
+		"macOS fixed-schema customalias/source loss",
+		"macOS PIM002 ordinary-prefix personal tokenization",
+		"Windows pregenerated combo assembly and patternbound observedlimit"
+	],
+	"known_duplicates": [
+		"TODO first item/international national0",
+		"TODO first item/Linux shortestphone magic key",
+		"prior editor/config/CAS and nativeUI refusal/close",
+		"prior text/metrics crypto"
+	],
+	"localization": {
+		"checked_dictionaries": 21,
+		"actual_field_editor_action_caption_keys": "present on all21",
+		"metadata_key_missing_all21": "menu.hotstrings.dynamic.text_expansion_personal_information",
+		"actual_family_caption_present": "dynamichotstrings.textexpansionpersonalinformation",
+		"wrong_native_row_claim": false
+	},
+	"native_gui_executed": false,
+	"native_receiving_executed": false,
+	"source_only": [
+		"all3 full injection/lifecycle/metadata paths outside explicit probes",
+		"Windows AHK twin masking/UTF16 surrogate combining",
+		"macOS shared-helper countsection integration",
+		"actual menu count rendering",
+		"GUI labels/prompts",
+		"diagnostic redaction consumer"
+	],
+	"unmeasured": [
+		"native AHK execution",
+		"native app focus/field navigation/output",
+		"GUI and real backend async scheduling",
+		"high pattern-length hang/latency/memory",
+		"G4/performance",
+		"whole persisted logging pipeline",
+		"real userconfig/clipboard/secrets/services"
+	],
+	"sweeps": [
+		{
+			"id": "a",
+			"new_roots_after_PIS001": 0,
+			"log": "logs/sweep-a.log",
+			"sha256": "cf20603aa2f4fa867aafe21b69a55373f00184bfd676cfdbbd6cda8bd3fa280e"
+		},
+		{
+			"id": "b",
+			"new_roots_after_PIS001": 0,
+			"log": "logs/sweep-b.log",
+			"sha256": "ce7ea7ec1ebe9f701c3016321357f094579e5852f66510e0dcc8f87358fda9c1"
+		}
+	],
+	"artifact_validation": "probes/validate-artifacts.py; repository validator externalpath/customscope rejection retained"
+}

@@ -1,0 +1,82 @@
+{
+	"schema_version": 1,
+	"scope": "wpm-shared-contract",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"native_delivery_executed": false,
+	"confirmed_findings": 0,
+	"inventory": {
+		"capability_rows": 36,
+		"preference_settings": 5,
+		"menu_commands": 6,
+		"locale_units_and_reasons": 21,
+		"source_files_hashed": 52
+	},
+	"actual_business_owners_executed": [
+		"_shared/lua/wpm_widget/model.lua",
+		"_shared/lua/keystats/live_wpm.lua",
+		"_shared/lua/keystats/metrics.lua",
+		"_shared/lua/toml_codec/init.lua"
+	],
+	"runtimes": ["genuine Lua5.4", "genuine LuaJIT"],
+	"observation_assertions_per_runtime": 47,
+	"healthy_controls": [
+		"live calculation/window/min-duration/idle boundaries",
+		"source time and hold boundaries",
+		"neutral/AI/group colors and localization",
+		"compact strip rounding",
+		"bounded graph/clipping/anchor conversions",
+		"widget idle/mouse/preview decisions"
+	],
+	"refused_controls": [
+		"malformed colour",
+		"missing required graph scale",
+		"missing canon file",
+		"throwing decoder",
+		"invalid/throwing group resolver"
+	],
+	"policy_discrepancies": [
+		"H-WPMS-001: positive WPM overrides pointer hide; rolling speed refreshes idle clock; unknown user-facing intent",
+		"AI-first Windows vs last-synthetic Lua source colour priority; source-only",
+		"Windows lacks5s numeric idle reset; source-only",
+		"WebView2 dependency metadata for native WPM rendering; no proved readiness refusal",
+		"stale WPM READMEs name absent file/default and always-visible panel behavior"
+	],
+	"known_duplicates_excluded": [
+		"TODO.md:28 Windows tray-readout alternative",
+		"prior saved-coordinate pair finding"
+	],
+	"source_trace_only": [
+		"native render instructions",
+		"Windows keystats/AI producer loops and calculation",
+		"menu dispatch/check/disabled/reason bridge on all3",
+		"native storage/config/lifecycle adapters",
+		"display and native drag behavior"
+	],
+	"unmeasured": [
+		"native desktop rendering/receiving",
+		"pointer events from real native window",
+		"screen hotplug placement",
+		"durable native setting writes",
+		"platform callback scheduling/refusal",
+		"performance/latency/G4",
+		"memory growth"
+	],
+	"sweeps": [
+		{
+			"id": "a",
+			"log": "logs/sweep-a.log",
+			"new_confirmed_roots": 0,
+			"sha256": "c5f8114e29e9af164a5c2797297b7a945c37fd275e1057af52436baaffce301c"
+		},
+		{
+			"id": "b",
+			"log": "logs/sweep-b.log",
+			"new_confirmed_roots": 0,
+			"sha256": "6d3edd2a42efa0abcbea6329f0eda3d80fc25a9ef3a8d2ba610a8e2139a591d6"
+		}
+	],
+	"schema_validation": {
+		"repository_validator": "incompatible: only repository docs/audits/(ahk|hammerspoon)/dated manifests, while brief requires scratch/custom scope",
+		"custom_validator": "probes/validate-artifacts.py checks brief schema, exact inventories, unique IDs, source/sweep evidence and LF"
+	}
+}

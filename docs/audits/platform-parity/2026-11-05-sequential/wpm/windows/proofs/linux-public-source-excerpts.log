@@ -1,0 +1,48 @@
+
+--- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if type(replacement) ~= "string" or replacement == "" then return end
+	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
+	for _, app in ipairs({ live, dated }) do
+		app.hs_chars = app.hs_chars + char_count(replacement)
+		app.hs_triggers = app.hs_triggers + 1
+		app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	end
+	append_synthetic_events(app_id, replacement, "hotstring",
+		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
+		is_private, clock)
+	-- This public delimiter already exists in the physical input journal. Keep
+	-- its replay in the ordered stream without changing the logical replacement.
+	if type(replay_terminator) == "string" and replay_terminator ~= "" then
+		append_synthetic_events(app_id, replay_terminator, "hotstring", 0, false, clock)
+	end
+	if type(timestamp_ms) == "number" then
+		-- The group names the colour the readouts take; a private expansion
+		-- still colours them — the colour says a hotstring fired, not what it typed.
+		LiveWpm.record(_live, char_count(replacement), timestamp_ms)
+		LiveWpm.mark_source(_live, "hotstring", h_type, timestamp_ms)
+	end
+	if is_private then
+		Logger.debug(LOG, "Private expansion fired (content withheld).")
+		return
+function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if type(text) ~= "string" or text == "" then return end
+	local kind = type(source) == "string" and source or "other"
+	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
+	if kind == "llm" then
+		for _, app in ipairs({ live, dated }) do
+			app.llm_chars = app.llm_chars + char_count(text)
+			app.llm_triggers = app.llm_triggers + 1
+			app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
+		end
+	end
+	append_synthetic_events(app_id, text, kind, deletes, false, clock)
+	if type(timestamp_ms) == "number" then
+		LiveWpm.record(_live, char_count(text), timestamp_ms)
+		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
+	end
+end
+
+--- Records a foreground application transition from the process lifecycle port.

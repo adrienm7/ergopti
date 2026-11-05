@@ -1,0 +1,378 @@
+
+ui/wpm/widget.lua
+247: 	return true
+248: end
+249: 
+250: --- Applies the persisted choices and shows the widget if it was left on.
+251: --- @return boolean True when the widget is running after this call.
+252: function M.restore()
+253: 	if _restore_debt or not Preferences.admit() then return false end
+254: 	local preferences = Preferences.snapshot()
+255: 	_state.use_source_colors = preferences[PREF_PATHS.source_colors]
+256: 	_state.graph = preferences[PREF_PATHS.graph]
+257: 	_state.anchor = stored_anchor()
+258: 	local visible = preferences[PREF_PATHS.visible]
+259: 	Logger.info(LOG, "Restored: visible=%s, source colours=%s, graph=%s.",
+260: 		tostring(visible), tostring(_state.use_source_colors), tostring(_state.graph))
+261: 	if not visible then return false end
+262: 	return start_widget(false)
+263: end
+264: 
+265: function M.start()
+266: 	if _restore_debt or not Preferences.admit() then return false end
+267: 	return start_widget(true)
+268: end
+269: 
+270: local function hide()
+
+ui/wpm/widget.lua
+285: 	if _restore_debt then return nil end
+286: 	return clone(_state)
+287: end
+288: 
+289: --- Applies a complete runtime image; its transaction owns compensation.
+290: --- @param candidate table Detached configuration snapshot.
+291: --- @return boolean acknowledged Native visibility settled.
+292: function M.apply_configuration(candidate)
+293: 	if type(candidate) ~= "table" then return false end
+294: 	for _, key in ipairs({ "running", "shown", "graph", "use_source_colors" }) do
+295: 		if type(candidate[key]) ~= "boolean" then return false end
+296: 	end
+297: 	if type(candidate.history) ~= "table" or (candidate.shown and not candidate.running) then return false end
+298: 	if candidate.shown then
+299: 		if type(candidate.last_frame) ~= "table" or type(candidate.anchor) ~= "table" then return false end
+300: 		local Surface, canon = surface(), Constants.load()
+301: 		if not Surface or not canon then return false end
+302: 		local x, y = Model.frame_origin(canon, candidate.last_frame, candidate.anchor.x, candidate.anchor.y)
+303: 		local called, drawn = pcall(Surface.draw, clone(candidate.last_frame), x, y)
+304: 		if not called or drawn ~= true then return false end
+305: 	elseif hide() ~= true then
+306: 		return false
+307: 	end
+308: 	_state = clone(candidate)
+309: 	return true
+310: end
+311: 
+312: --- Retries an exact inverse retained after an ordinary stop failed.
+313: --- @return boolean restored
+314: function M.retry_configuration_restore()
+315: 	if not _restore_debt then return true end
+316: 	local called, restored = pcall(M.apply_configuration, _restore_debt)
+317: 	if not called or restored ~= true then return false end
+318: 	_restore_debt = nil
+319: 	return true
+320: end
+321: 
+322: --- Stops the widget and hides its window.
+323: --- @return boolean
+324: function M.stop()
+325: 	if _restore_debt or not Preferences.admit() then return false end
+326: 	if not _state.running then return true end
+327: 	_restore_debt = clone(_state)
+328: 	local candidate = clone(_state)
+329: 	candidate.running, candidate.shown = false, false
+330: 	if M.apply_configuration(candidate) ~= true or not store_bool("visible", false) then
+331: 		M.retry_configuration_restore()
+332: 		Logger.error(LOG, "The widget stop was refused; its previous state is retained for restoration.")
+333: 		return false
+334: 	end
+335: 	_restore_debt = nil
+336: 	Logger.info(LOG, "WPM widget stopped.")
+337: 	return true
+338: end
+
+ui/wpm/widget.lua
+416: --- @param now_s number Monotonic seconds.
+417: --- @return table|nil The frame drawn, for tests and diagnostics.
+418: function M.tick(stats, now_s)
+419: 	if _restore_debt or not Preferences.admit() then return nil end
+420: 	if not _state.running then return nil end
+421: 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
+422: 	_state.last_draw_s = now_s
+423: 	local canon = Constants.load()
+424: 	local Surface = surface()
+425: 	if not canon or not Surface or not Surface.is_available() then return nil end
+426: 
+427: 	local opts = M.frame_options(now_s, _state.use_source_colors)
+428: 	local source = Model.active_source(stats, HOLD_S, now_s)
+429: 	local wpm = tonumber(stats and stats.wpm) or 0
+430: 	Model.push_history(canon, _state.history, wpm, source)
+431: 	watch_pointer(Surface, now_s)
+432: 
+433: 	local show, last_active = Model.widget_visible({
+434: 		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
+435: 		last_active_s = _state.last_active_s, last_mouse_s = _state.last_mouse_s,
+436: 		idle_hide_s = IDLE_HIDE_S,
+437: 	})
+438: 	_state.last_active_s = last_active
+439: 	-- A drag moves the pointer; the widget the user is holding must not vanish.
+440: 	if Surface.is_dragging() then show = true end
+441: 	if not show then
+442: 		if _state.shown then hide() end
+443: 		return nil
+444: 	end
+445: 
+446: 	local frame = _state.graph and Model.graph_frame(canon, _state.history, stats, opts)
+447: 		or Model.compact_frame(canon, stats, opts)
+448: 	if not _state.anchor then
+449: 		local screen = Surface.screen_frame()
+450: 		if not screen then
+451: 			Logger.debug(LOG, "No screen geometry yet — nothing drawn.")
+452: 			return nil
+453: 		end
+454: 		local x, y = Model.default_anchor(canon, screen)
+455: 		_state.anchor = { x = x, y = y }
+456: 	end
+457: 	local x, y = Model.frame_origin(canon, frame, _state.anchor.x, _state.anchor.y)
+458: 	_state.last_frame = frame
+459: 	_state.shown = Surface.draw(frame, x, y) == true
+460: 	return frame
+461: end
+462: 
+463: --- Test seam: replaces the drawing surface.
+464: --- @param value table|nil
+
+ui/wpm/tray_readout.lua
+250: 
+251: --- Captures choices and presentation independently of the mutable native handle.
+252: --- @return table snapshot Detached runtime state.
+253: function M.configuration_snapshot()
+254: 	if _restore_debt then return nil end
+255: 	local copy = {}
+256: 	for key, value in pairs(_state) do
+257: 		if key ~= "handle" then copy[key] = clone(value) end
+258: 	end
+259: 	return copy
+260: end
+261: 
+262: --- Applies native presentation without ordinary persistence or metric mutation.
+263: --- @param candidate table Detached configuration snapshot.
+264: --- @return boolean acknowledged Native presentation settled.
+265: function M.apply_configuration(candidate)
+266: 	if type(candidate) ~= "table" or type(candidate.running) ~= "boolean"
+267: 		or type(candidate.use_colors) ~= "boolean" then return false end
+268: 	local presentation = candidate.presentation
+269: 	if presentation ~= nil then
+270: 		if not candidate.running or type(presentation) ~= "table" or type(presentation.icon) ~= "string"
+271: 			or type(presentation.title) ~= "string" or type(presentation.active) ~= "boolean" then return false end
+272: 		local Tray = tray()
+273: 		local handle = ensure_item(presentation.icon)
+274: 		if not Tray or not handle then return false end
+275: 		local called, updated = pcall(Tray.update_item, handle, clone(presentation))
+276: 		if not called or updated ~= true then return false end
+277: 	elseif remove_item() ~= true then
+278: 		return false
+279: 	end
+280: 	local handle = _state.handle
+281: 	_state = clone(candidate)
+282: 	_state.handle = handle
+283: 	return true
+284: end
+285: 
+286: --- Retains the exact inverse until native restoration acknowledges completion.
+287: --- @return boolean restored
+288: function M.retry_configuration_restore()
+289: 	if not _restore_debt then return true end
+290: 	local called, restored = pcall(M.apply_configuration, _restore_debt)
+291: 	if not called or restored ~= true then return false end
+292: 	_restore_debt = nil
+293: 	return true
+294: end
+295: 
+296: --- @return boolean
+297: function M.stop()
+298: 	if _restore_debt or not Preferences.admit() then return false end
+299: 	if not _state.running then return true end
+300: 	local candidate = M.configuration_snapshot()
+301: 	_restore_debt = M.configuration_snapshot()
+302: 	candidate.running, candidate.presentation = false, nil
+303: 	if M.apply_configuration(candidate) ~= true or not store_bool("visible", false) then
+304: 		M.retry_configuration_restore()
+305: 		Logger.error(LOG, "The tray readout stop was refused; its previous state is retained for restoration.")
+306: 		return false
+307: 	end
+308: 	_restore_debt = nil
+309: 	Logger.info(LOG, "WPM tray readout stopped.")
+310: 	return true
+311: end
+312: 
+313: --- @param enabled boolean
+314: --- @return boolean
+315: function M.set_use_source_colors(enabled)
+316: 	if _restore_debt or not Preferences.admit() then return false end
+317: 	local wanted = enabled and true or false
+318: 	if not store_bool("colors", wanted) then
+319: 		Logger.error(LOG, "The colour state could not be persisted — it was not changed.")
+320: 		return false
+321: 	end
+
+ui/wpm/tray_readout.lua
+347: --- @return table|nil The frame shown, or nil when hidden.
+348: function M.tick(stats, now_s)
+349: 	if _restore_debt or not Preferences.admit() then return nil end
+350: 	if not _state.running then return nil end
+351: 	if _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
+352: 	_state.last_update_s = now_s
+353: 	local canon = Constants.load()
+354: 	if not canon then return nil end
+355: 	local frame = Model.menubar_frame(canon, stats, Widget.frame_options(now_s, _state.use_colors))
+356: 	local Tray = tray()
+357: 	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
+358: 		if _state.handle and Tray then
+359: 			local called, updated = pcall(Tray.update_item, _state.handle, { active = false })
+360: 			if not called or updated ~= true then return nil end
+361: 			if _state.presentation then _state.presentation.active = false end
+362: 		end
+363: 		_state.last_key = nil
+364: 		return nil
+365: 	end
+366: 	local key = frame.number .. "|" .. tostring(frame.background)
+367: 	if key == _state.last_key then return frame end
+368: 	local icon = write_icon(frame)
+369: 	if not icon then return nil end
+370: 	local handle = ensure_item(icon)
+371: 	if not handle or not Tray then return nil end
+372: 	local presentation = { icon = icon, title = frame.label, active = true }
+373: 	local called, updated = pcall(Tray.update_item, handle, presentation)
+374: 	if not called or updated ~= true then return nil end
+375: 	_state.presentation = presentation
+376: 	_state.last_key = key
+377: 	return frame
+378: end
+379: 
+380: --- Test seams.
+381: function M._set_tray(value) _tray = value end
+382: function M._set_painter(value) _painter = value end
+383: function M._defaults()
+
+adapters/wpm_surface.lua
+316: --- The window's top-left corner, or nil when there is none.
+317: --- @return number|nil x, number|nil y
+318: function M.position()
+319: 	if not _window then return nil end
+320: 	return _window:get_position()
+321: end
+322: 
+323: --- Whether the user is dragging the widget now.
+324: --- @return boolean
+325: function M.is_dragging()
+326: 	return _drag ~= nil
+327: end
+328: 
+329: --- Registers what runs when the user drops the widget somewhere.
+330: --- @param fn function|nil (x, y)
+331: function M.on_moved(fn)
+332: 	_on_moved = fn
+333: end
+334: 
+335: --- The primary monitor's geometry.
+336: --- @return table|nil { x, y, w, h }
+337: function M.screen_frame()
+338: 	local g = bind()
+339: 	if not g then return nil end
+340: 	local ok, rect = pcall(function()
+341: 		local display = g.Gdk.Display.get_default()
+342: 		local monitor = display:get_primary_monitor() or display:get_monitor(0)
+343: 		return monitor:get_geometry()
+344: 	end)
+345: 	if not ok or not rect then return nil end
+346: 	return { x = rect.x, y = rect.y, w = rect.width, h = rect.height }
+347: end
+348: 
+349: --- Where the pointer is, or nil when the display will not say.
+350: --- @return number|nil x, number|nil y
+351: function M.pointer_position()
+352: 	local g = bind()
+353: 	if not g then return nil end
+354: 	local ok, x, y = pcall(function()
+
+adapters/tray_menu.lua
+227: function M.destroy()
+228: 	if not _started then return end
+229: 	Indicator.destroy()
+230: 	_started = false
+231: 	_backend = nil
+232: 	_items = {}
+233: 	_paused = false
+234: end
+235: 
+236: --- Drains pending tray events. Never blocks.
+237: function M.pump()
+238: 	if not _started then return end
+239: 	Indicator.pump()
+240: end
+
+ergopti_hotstrings.lua
+2717: 	if not privacy_owners.startup_checkpoint() then return end
+2718: 	-- 8.10b') Put the WPM widget back the way the user left it. Its visibility and
+2719: 	-- colour mode were not stored at all until now, so a user who turned it on
+2720: 	-- found it gone after the next restart with the menu row unticked — which
+2721: 	-- reads as a control that does not work rather than one whose answer is not
+2722: 	-- kept.
+2723: 	if wpm_widget and type(wpm_widget.restore) == "function" then
+2724: 		local ok_restore, err_restore = pcall(wpm_widget.restore)
+2725: 		if not ok_restore then
+2726: 			Logger.error(LOG, "WPM widget state could not be restored: %s.", tostring(err_restore))
+2727: 		end
+2728: 	end
+2729: 	if not privacy_owners.startup_checkpoint() then return end
+2730: 	-- The tray readout needs a tray: without --tray there is no panel item to sit beside.
+2731: 	if wpm_tray_readout and opts.tray and tray_menu then
+2732: 		local ok_restore, err_restore = pcall(wpm_tray_readout.restore)
+2733: 		if not ok_restore then
+2734: 			Logger.error(LOG, "WPM tray readout state could not be restored: %s.", tostring(err_restore))
+2735: 		end
+2736: 	end
+2737: 
+
+ergopti_hotstrings.lua
+3042: 		-- The WPM readouts' clock: the floating widget and the tray readout each
+3043: 		-- redraw at their shared rate however often this runs, from the live
+3044: 		-- stats — the speed of the text reaching the page, and its source.
+3045: 		if wpm_widget or wpm_tray_readout then
+3046: 			local now_ms = Monotonic.now_ms()
+3047: 			local live = keystats.get_live_stats(now_ms)
+3048: 			if wpm_widget then
+3049: 				local owner = wpm_widget
+3050: 				RuntimeGuard.call("WPM widget tick", function()
+3051: 					owner.tick(live, now_ms / 1000)
+3052: 				end, function()
+3053: 					if type(owner.stop) == "function" then owner.stop() end
+3054: 					wpm_widget = nil
+3055: 				end)
+3056: 			end
+3057: 			if wpm_tray_readout then
+3058: 				local owner = wpm_tray_readout
+3059: 				RuntimeGuard.call("WPM tray readout tick", function()
+3060: 					owner.tick(live, now_ms / 1000)
+3061: 				end, function()
+3062: 					wpm_tray_readout = nil
+3063: 				end)
+3064: 			end
+3065: 		end
+
+ergopti_hotstrings.lua
+3193: 				return
+3194: 			end
+3195: 			if tray_menu then
+3196: 				local owner = tray_menu
+3197: 				RuntimeGuard.call("tray pump", owner.pump, function()
+3198: 					if type(owner.destroy) == "function" then owner.destroy() end
+3199: 					tray_menu = nil
+3200: 				end)
+3201: 			end
+3202: 			privacy_owners.watch.pump()
+3203: 			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
+3204: 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
+
+infra/metrics_scope.lua
+25: 		if source then Preferences.resolve(Codec.decode(source.content or "")) end
+26: 		local state = { collector = collector.configuration_snapshot(),
+27: 			widget = widget.configuration_snapshot(), readout = readout.configuration_snapshot() }
+28: 		for _, key in ipairs({ "collector", "widget", "readout" }) do
+29: 			if type(state[key]) ~= "table" then return nil end
+30: 		end
+31: 		return state
+32: 	end
+33: 	local function apply_state(state)
+34: 		-- Stop collection before any other boundary. The exact final consent is

@@ -1,0 +1,84 @@
+[
+	{
+		"path": "static/layouts/registry/ergopti/ergopti.keylayout",
+		"line": 524,
+		"text": "<key code=\"16\" output=\" »\"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00A0", "U+00BB"]
+	},
+	{
+		"path": "static/layouts/registry/ergopti/ergopti.keylayout",
+		"line": 525,
+		"text": "<key code=\"17\" output=\"« \"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00AB", "U+00A0"]
+	},
+	{
+		"path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+		"line": 524,
+		"text": "<key code=\"16\" output=\" »\"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00A0", "U+00BB"]
+	},
+	{
+		"path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+		"line": 525,
+		"text": "<key code=\"17\" output=\"« \"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00AB", "U+00A0"]
+	},
+	{
+		"path": "static/layouts/registry/bepo/bepo.keylayout",
+		"line": 4227,
+		"text": "<when state=\"none\" output=\"«\"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00AB"]
+	},
+	{
+		"path": "static/layouts/registry/bepo/bepo.keylayout",
+		"line": 4285,
+		"text": "<when state=\"none\" output=\"»\"/>",
+		"guillemet_and_space_codepoints": ["U+0020", "U+0020", "U+00BB"]
+	},
+	{
+		"path": "static/layouts/registry/ergol/ergol.keylayout",
+		"line": 781,
+		"text": "<when state=\"none\"       output=\"«\" />",
+		"guillemet_and_space_codepoints": [
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+00AB",
+			"U+0020"
+		]
+	},
+	{
+		"path": "static/layouts/registry/ergol/ergol.keylayout",
+		"line": 791,
+		"text": "<when state=\"none\"       output=\"»\" />",
+		"guillemet_and_space_codepoints": [
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+0020",
+			"U+00BB",
+			"U+0020"
+		]
+	}
+]

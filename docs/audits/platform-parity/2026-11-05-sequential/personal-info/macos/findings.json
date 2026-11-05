@@ -1,0 +1,52 @@
+{
+	"schema_version": 1,
+	"scope": "personal-info-macos",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md",
+	"findings": [
+		{
+			"id": "PIM-001",
+			"title": "Added valid ASCII aliases are ignored and removed by unrelated personal-info saves",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["configured alias/source integrity"],
+			"reproduction": "Add [letters] x=\"city\" with a known string city field. Actual Keymap/Personal preview/dispatch of @x\u2605 declines without output, while p=\"city\" in the same source previews/emits Audit City. Normal Personal.save_info(last_name change) returns true and removes letters.x from actual before/after TOML.",
+			"root_cause": "parse_toml_section iterates only DEFAULT_CONFIG.letters; LETTER_KEYS and serialize_config use the same fixed13-key whitelist, silently omitting added aliases accepted by the collector alphabet and shared one-letter-to-known-field contract.",
+			"silent_failure": "Startup and unrelated save both report success. The declared alias produces nil preview, false consume and no output; no unsupported-alphabet diagnostic is issued. Reassigning an existing default alias is a working backstop. No generic ADR009 preservation rule is inferred for this separate file.",
+			"regression_test": "Through actual startup, dispatch, editor save and restart, require added lowercase ASCII x mapping to a known field to remain operational and present on disk. Keep existing-alias remap, invalid-reference, static ownership and all-or-nothing controls; define any intentional fixed alphabet explicitly rather than silently discarding source.",
+			"evidence": [
+				"report.md",
+				"probes/engine.lua",
+				"probes/engine.log",
+				"probes/aliases.before.toml",
+				"probes/aliases.after.toml",
+				"probes/contract-excerpts.txt"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md",
+			"basis": "Actual Keymap/Personal/Rules/Registry/Expander/Synthetic and native-shaped WebView editor boundary; synthetic files and recorded event effects, no Darwin desktop receiving."
+		},
+		{
+			"id": "PIM-002",
+			"title": "Personal prefix expansion interprets accepted field data as key commands",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["data-versus-command integrity"],
+			"reproduction": "Through actual editor/controller/UIBuilder save bridge, accept phone_number=\"0123{Tab}45\". @t\u2605 control emits full literal value and no Tab command. With phoneprefixes enabled, typing0123 consumes and constructs one Tab key pair at the native event seam, with logical text containing an actual tab instead of literal {Tab}. No actual desktop focus change is claimed.",
+			"root_cause": "RulesEngine.register_prefix_entries supplies raw personal values to ordinary Registry.add; Registry pretokenizes Send syntax and Expander.emit_dispatch chooses emit_tokens when raw/plain replacements differ. field/is_private metadata affects masking/logging but does not preserve literal-data provenance. The @-combo owner separately emits each field as literal text.",
+			"silent_failure": "The unrestricted text input, string-only backend validation, source commit, registration and replacement all succeed without failure. Readme promises full-value emission. @ alias is a working alternative. This output-command path is distinct from prior MH001 preview-only projection.",
+			"regression_test": "Execute actual editor\u2192save\u2192prefix Registry/Expander/SyntheticInput with accepted brace/key-looking strings; require literal full values and zero unexpected key commands, while preserving ordinary hotstring Send syntax and intentional separate inter-field Tab events. Include healthy numeric value, stale source, consent and native refusal controls.",
+			"evidence": [
+				"report.md",
+				"probes/prefix.lua",
+				"probes/prefix.log",
+				"probes/engine.lua",
+				"probes/contract-excerpts.txt"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/personal-info/macos/report.md",
+			"basis": "Actual Keymap/Personal/Rules/Registry/Expander/Synthetic and native-shaped WebView editor boundary; synthetic files and recorded event effects, no Darwin desktop receiving."
+		}
+	]
+}

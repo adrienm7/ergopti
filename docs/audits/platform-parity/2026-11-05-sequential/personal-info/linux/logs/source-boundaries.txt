@@ -1,0 +1,375 @@
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+127: local function _parse_personal_info_toml(path)
+128: 	local fh = io.open(path, "r")
+129: 	if not fh then return {}, {} end
+130: 	local content = fh:read("*a")
+131: 	fh:close()
+132: 
+133: 	-- Delegate all TOML parsing to the shared codec; decode returns nil on a
+134: 	-- spec violation.
+135: 	local parsed = TomlCodec.decode(content)
+136: 	if type(parsed) ~= "table" then
+137: 		Logger.error(LOG, "personal_info.toml at '%s' is malformed — @-tag shortcuts disabled.", path)
+138: 		return {}, {}
+139: 	end
+140: 
+141: 	local info    = (type(parsed.info) == "table") and parsed.info or {}
+142: 	local letters = (type(parsed.letters) == "table") and parsed.letters or {}
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+179: 	-- Resolve personal_info.toml path.
+180: 	local default_path = require("infra.config_paths").default_config_dir() .. "/personal_info.toml"
+181: 	local info_path = options.personal_info_path or default_path
+182: 
+183: 	-- Load shared engine.
+184: 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+420: 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
+421: 		Logger.warn(LOG,
+422: 			"Injector not available — @-combo '@%s' dropped (%d field(s), %d-byte content withheld).",
+423: 			tag, #values, total)
+424: 		return false
+425: 	end
+426: 
+427: 	-- "@" + the letters + the trigger: everything the user typed for this.
+428: 	local backspace_count = tag_length + 2
+429: 	-- is_private is not optional: every value here comes out of personal_info.toml,
+430: 	-- so the payload is the user's own data by construction.
+431: 	local delivery = injector.inject_fields(backspace_count, values, true)
+432: 	if type(delivery) ~= "table" or delivery.ok ~= true then
+433: 		Logger.error(LOG,
+434: 			"@-combo output did not commit for '@%s' (%d field(s), %d-byte content withheld).",
+435: 			tag, #values, total)
+436: 		return false
+437: 	end
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+488: 		-- letters AND is the short-date rule, and the registration is what decides.
+489: 		local expanded, event = _fire_combo(prefix, t)
+490: 		if expanded then return expanded, event end
+491: 		if UserCode.request(prefix) then return true, { pending_user = true } end
+492: 		return false
+493: 	end
+494: 
+495: 	-- Inject: erase the suffix + trigger, type the result.
+496: 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
+497: 	local suffix_length = strict_codepoint_length(match.rule.suffix)
+498: 	local result_length = strict_codepoint_length(match.result)
+499: 	if not suffix_length or not result_length then
+500: 		Logger.error(LOG, "Dynamic rule output is invalid UTF-8 (%d-byte resolved content withheld); expansion refused.",
+501: 			#match.result)
+502: 		return false
+503: 	end
+504: 	local backspace_count = suffix_length + 1  -- suffix + trigger
+505: 	if type(publication) ~= "table" or getmetatable(publication) ~= nil
+506: 		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
+507: 		Logger.warn(LOG, "Dynamic single-field expansion refused: no retained text destination.")
+508: 		return false
+509: 	end
+510: 	-- Injector is loaded once at require-time; the hotstrings injector module
+511: 	-- wraps ydotool and is always available on Linux.
+512: 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
+513: 	if ok_inj and injector and type(injector.inject) == "function" then
+514: 		local delivery = injector.inject(backspace_count, match.result,
+515: 			match.rule.section == PERSONAL_SECTION, nil, publication)
+516: 		if type(delivery) ~= "table" or delivery.ok ~= true then
+517: 			Logger.error(LOG,
+518: 				"Dynamic expansion output did not commit for '%s' (family=%s, %d-char content withheld).",
+519: 				match.rule.suffix, tostring(match.rule.section), result_length)
+520: 			return false
+521: 		end
+522: 		-- `match.result` is the RESOLVED value: for "@i★" it is the user's IBAN,
+523: 		-- for "@t★" their phone number. This line used to print it in full, at
+524: 		-- INFO, with the shared logger's default level at 10 — so it reached the
+525: 		-- driver's log unconditionally, no opt-in, on every expansion. Windows
+526: 		-- redacts the equivalent site and macOS has no such line at all; Linux was
+527: 		-- the only driver still writing it.
+528: 		--
+529: 		-- Redacted rather than dropped: the length is what tells you WHICH field
+530: 		-- expanded when a rule misfires, and it is the only diagnostic this line
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+725: --- Captures fresh personal fields with an opaque source and initialization receipt.
+726: --- @return table|nil receipt Private edit capability, never a page payload.
+727: --- @return table|nil info Detached fields from the exact captured file.
+728: --- @return table|nil letters Detached aliases from the same file.
+729: --- @return string|nil trigger Active trigger character.
+730: function M.capture_info_edit()
+731: 	local path, generation, trigger = _info_path, _info_generation, _trigger_char
+732: 	if type(path) ~= "string" or path == "" then return nil end
+733: 	local read, content, status = pcall(TomlWriter.read_classified, path)
+734: 	if not read or status ~= "ok" or type(content) ~= "string" then return nil end
+735: 	local decoded, document = pcall(TomlCodec.decode, content)
+736: 	if not decoded or type(document) ~= "table" or type(document.info) ~= "table"
+737: 		or path ~= _info_path or generation ~= _info_generation or trigger ~= _trigger_char then return nil end
+738: 	local info, letters, keys = {}, {}, {}
+739: 	for key, value in pairs(document.info) do info[key], keys[key] = value, true end
+740: 	for key, value in pairs(type(document.letters) == "table" and document.letters or {}) do letters[key] = value end
+741: 	local receipt = {}
+742: 	_info_edits[receipt] = { path = path, generation = generation, trigger = trigger,
+743: 		keys = keys, source = { status = "ok", content = content } }
+744: 	return receipt, info, letters, trigger
+745: end
+746: 
+747: 
+748: --- Persists edited personal-information fields and refreshes their live rules.
+749: ---
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+753: --- @param values table Map of field names to string values.
+754: --- @param receipt table|nil Opaque display source; omitted for an immediate API edit.
+755: --- @param admission function|nil Final page admission, rechecked by the native writer.
+756: --- @return boolean committed
+757: --- @return table|nil next_receipt Receipt for only the acknowledged committed bytes.
+758: function M.save_info(values, receipt, admission)
+759: 	if type(values) ~= "table" or next(values) == nil then
+760: 		Logger.error(LOG, "Personal-info save requires at least one edited field.")
+761: 		return false
+762: 	end
+763: 	if type(_info_path) ~= "string" or _info_path == "" then
+764: 		Logger.error(LOG, "Personal-info save refused before its source path was initialised.")
+765: 		return false
+766: 	end
+767: 
+768: 	if admission ~= nil and type(admission) ~= "function" then return false end
+769: 	if receipt == nil then receipt = M.capture_info_edit() end
+770: 	local edit = type(receipt) == "table" and _info_edits[receipt] or nil
+771: 	local function current()
+772: 		if not edit or edit.path ~= _info_path or edit.generation ~= _info_generation
+773: 			or edit.trigger ~= _trigger_char then return false end
+774: 		if admission == nil then return true end
+775: 		local called, admitted = pcall(admission)
+776: 		return called and admitted == true and edit.path == _info_path
+777: 			and edit.generation == _info_generation and edit.trigger == _trigger_char
+778: 	end
+779: 	if not current() then return false end
+780: 
+781: 	local keys = {}
+782: 	for key, value in pairs(values) do
+783: 		if type(key) ~= "string" or not edit.keys[key] then
+784: 			Logger.error(LOG, "Personal-info save refused an unknown field '%s'.", tostring(key))
+785: 			return false
+786: 		end
+787: 		if type(value) ~= "string" then
+788: 			Logger.error(LOG, "Personal-info field '%s' must be a string.", key)
+789: 			return false
+790: 		end
+791: 		keys[#keys + 1] = key
+792: 	end
+793: 	table.sort(keys)
+794: 
+795: 	local updates = {}
+796: 	for _, key in ipairs(keys) do
+797: 		updates[#updates + 1] = { section = "info", key = key, value = values[key] }
+798: 	end
+799: 	local written, write_err, committed_content = TomlWriter.batch_write(edit.path, updates, nil, edit.source, nil, current)
+800: 	if written ~= true then
+801: 		Logger.error(LOG, "Personal-info publication failed: %s.", tostring(write_err))
+802: 		return false
+803: 	end
+804: 
+805: 	local was_enabled = M.is_enabled()
+806: 	local refreshed = M.init({ trigger_char = _trigger_char, personal_info_path = _info_path })
+807: 	if refreshed ~= true then
+808: 		Logger.error(LOG, "Personal-info source committed but live rule refresh failed.")
+
+static/ergopti_plus/linux/modules/hotstrings/injector.lua
+1005: function M.inject_fields(backspace_count, values, is_private)
+1006: 	if type(backspace_count) ~= "number" or type(values) ~= "table" then
+1007: 		Logger.error(LOG, "inject_fields(): invalid arguments — bc is %s, values is %s.",
+1008: 			type(backspace_count), type(values))
+1009: 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
+1010: 	end
+1011: 	local snapshot = snapshot_fields(values)
+1012: 	if not snapshot then
+1013: 		Logger.error(LOG, "inject_fields(): expected a dense plain array of strings.")
+1014: 		return { ok = false, error = "invalid field values", cleanup_ok = true }
+1015: 	end
+1016: 	values = snapshot
+1017: 	if #values == 0 then
+1018: 		Logger.error(LOG, "inject_fields(): no values — the trigger would be erased for nothing.")
+1019: 		return { ok = false, error = "no values", cleanup_ok = true }
+1020: 	end
+1021: 
+1022: 	-- One value is the ordinary case and needs no Tab at all; routing it through
+1023: 	-- inject() keeps a single implementation of the modifier neutralisation, the
+1024: 	-- two-phase timing and the clipboard fallback.
+1025: 	if #values == 1 then
+1026: 		return M.inject(backspace_count, values[1], is_private)
+1027: 	end
+1028: 	local owner = capture_replacement_owner()
+1029: 	if not retire_clipboard() then
+1030: 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+1031: 	end
+1032: 
+1033: 	if is_private then
+1034: 		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
+1035: 			backspace_count, #values)
+1036: 	else
+1037: 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
+1038: 	end
+1039: 	local checked, prepared, fields = pcall(prepare_fields, values, owner)
+1040: 	if not checked then
+1041: 		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
+
+static/ergopti_plus/linux/modules/hotstrings/injector.lua
+1060: 				-- focus yet is the failure this delay buys off. Same constant the
+1061: 				-- backspace phase uses, for the same reason.
+1062: 				sleep_ms(INTER_PHASE_DELAY_MS)
+1063: 			end
+1064: 		end
+1065: 	end, nil, prepared)
+1066: 
+1067: 	if result.ok then
+1068: 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
+1069: 		notify_output(table.concat(values, "\t"))
+1070: 	end
+1071: 	return result
+1072: end
+1073: 
+
+static/ergopti_plus/linux/ergopti_hotstrings.lua
+934: 	if dyn_hotstrings then
+935: 		dyn_hotstrings.init({ trigger_char = MagicKey.get() })
+936: 		Logger.info(LOG, "Dynamic hotstrings initialised (%d rule(s)).",
+937: 			dyn_hotstrings.get_rules_count())
+938: 
+939: 		-- Rebuilt on every load rather than cached: the user can edit
+940: 		-- personal_info.toml or switch a prefix family off, and either has to change
+941: 		-- what the engine holds. The gate is read here and not at match time because
+942: 		-- the ordinary matcher knows nothing about dynamic families.
+943: 		hotstrings_config.set_extra_mappings_provider(function()
+944: 			return dyn_hotstrings.prefix_mappings()
+
+static/ergopti_plus/linux/ergopti_hotstrings.lua
+1580: 			if not opts.dry_run and dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
+1581: 				local ok_dh2, expanded, dynamic_event = pcall(function()
+1582: 					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination)
+1583: 				end)
+1584: 				if ok_dh2 and expanded then
+1585: 					if dynamic_event and not dynamic_event.pending_user then
+
+static/ergopti_plus/linux/ergopti_hotstrings.lua
+2710: 		if dyn_hotstrings then
+2711: 			dyn_hotstrings.init({ trigger_char = new_char })
+2712: 		end
+2713: 		reload_hotstrings("the magic key")
+
+static/ergopti_plus/linux/infra/config_paths.lua
+115: --- The default driver configuration directory, without a user override.
+116: --- @return string Absolute path, no trailing slash.
+117: function M.default_config_dir()
+118: 	return child_directory(M.config_home(), AppDirs.linux.folder_name)
+119: end
+120: 
+121: --- The effective driver configuration directory.
+122: ---
+123: --- The override lives in the bootstrap storage, whose own location depends only
+124: --- on config_home(). It therefore remains discoverable after the directory it
+125: --- points at changes and cannot recurse through M.config().
+126: --- @return string Absolute path, no trailing slash.
+127: function M.get_config_dir()
+128: 	local ok, Storage = pcall(require, "adapters.storage")
+129: 	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
+130: 		return M.default_config_dir()
+131: 	end
+132: 	local configured = Storage.get(CONFIG_DIR_STORAGE_KEY, nil)
+133: 	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
+134: 		return M.default_config_dir()
+135: 	end
+136: 	if configured:match("^/+$") then return "/" end
+137: 	configured = configured:gsub("/+$", "")
+138: 	return configured ~= "" and configured or M.default_config_dir()
+139: end
+
+static/ergopti_plus/linux/infra/config_paths.lua
+175: function M.set_config_dir(path)
+176: 	local normalized = normalize_config_override(path)
+177: 	if normalized == nil then return false end
+178: 
+179: 	local ok, Storage = pcall(require, "adapters.storage")
+180: 	if not ok or type(Storage) ~= "table" then return false end
+181: 	if not prepare_config_directory(normalized) then return false end
+182: 	local committed
+183: 	if normalized == "" or normalized == M.default_config_dir() then
+184: 		committed = type(Storage.delete) == "function"
+185: 			and Storage.delete(CONFIG_DIR_STORAGE_KEY) == true
+186: 	else
+187: 		committed = type(Storage.set) == "function"
+188: 			and Storage.set(CONFIG_DIR_STORAGE_KEY, normalized) == true
+189: 	end
+190: 	if committed then follow_config_dir_in_logs() end
+191: 	return committed
+
+static/ergopti_plus/linux/infra/config_paths.lua
+204: --- @param rel string|nil Path relative to the driver config dir.
+205: --- @return string Absolute path, no trailing slash.
+206: function M.config(rel)
+207: 	local base = M.get_config_dir()
+208: 	if type(rel) ~= "string" or rel == "" then return base end
+209: 	return ((base == "/" and "" or base) .. "/" .. (rel:gsub("^/+", "")))
+210: end
+211: 
+
+static/ergopti_plus/linux/ui/personal_info_editor/bridge.lua
+110: 		if type(context) == "table" and context.epoch ~= nil then
+111: 			local dynamic = dependency(state, "dyn_hotstrings", "modules.dynamic_hotstrings.manager")
+112: 			local host = dependency(state, "webview_manager", "ui.webview_manager")
+113: 			if type(host) ~= "table" or type(dynamic) ~= "table" or type(dynamic.capture_info_edit) ~= "function" then
+114: 				return { pushed = false }
+115: 			end
+116: 			if context.app_name ~= APP_NAME or type(context.epoch) ~= "number" or context.epoch <= 0
+117: 				or context.epoch % 1 ~= 0 or type(host.current_epoch) ~= "function" then return { pushed = false } end
+118: 			local previous = _opening
+119: 			local checked, epoch = pcall(host.current_epoch, APP_NAME)
+120: 			if not checked or epoch ~= context.epoch or _opening ~= previous then return { pushed = false } end
+121: 			local owner = { dynamic = dynamic, host = host, epoch = context.epoch,
+122: 				current_epoch = host.current_epoch, page_current = host.page_current }
+123: 			_opening = owner
+124: 			current = function() return opening_current(owner, state, context) end
+125: 			if not current() then return { pushed = false } end
+126: 			local called, receipt, info, letters, trigger = pcall(dynamic.capture_info_edit)
+127: 			if not called or type(receipt) ~= "table" or type(info) ~= "table" or type(letters) ~= "table"
+128: 				or type(trigger) ~= "string" or not current() then return { pushed = false } end
+129: 			candidate = { owner = owner, receipt = receipt }
+130: 			captured = { info = info, letters = letters, trigger = trigger }
+131: 		end
+132: 		local data = _build_initial_payload(state, captured)
+133: 		local pushed = data ~= nil and push_init(state, data, current)
+134: 		if pushed and candidate and current() then candidate.owner.receipt = candidate.receipt end
+135: 		if not pushed then Logger.error(LOG, "Personal-info initial data could not reach the page.") end
+136: 		return { pushed = pushed, data = data }
+
+static/ergopti_plus/linux/ui/personal_info_editor/bridge.lua
+140: 		local saved, receipt, current, owner = false, nil, nil, nil
+141: 		if type(context) == "table" and context.epoch ~= nil then
+142: 			owner = _opening
+143: 			current = function() return opening_current(owner, state, context) end
+144: 			if not current() or owner.receipt == nil then
+145: 				if current() then notify_refused(state) end
+146: 				return { saved = false, reloaded = false, closed = false }
+147: 			end
+148: 			receipt = owner.receipt
+149: 		end
+150: 		if type(payload.values) == "table" and dynamic and type(dynamic.save_info) == "function" then
+151: 			local ok_save, committed, next_receipt = pcall(dynamic.save_info, payload.values, receipt, current)
+152: 			saved = ok_save and committed == true
+153: 			if saved and owner and current() then owner.receipt = type(next_receipt) == "table" and next_receipt or nil end
+154: 			if not ok_save then Logger.error(LOG, "Personal-info persistence raised: %s.", tostring(committed)) end
+155: 		end
+156: 		if not saved then
+157: 			Logger.error(LOG, "Personal information was not committed; editor remains open.")
+158: 			if not current or current() then notify_refused(state) end
+159: 			return { saved = false, reloaded = false, closed = false }
+
+static/ergopti_plus/linux/modules/gestures/manager.lua
+456: --- environment.
+457: local OPEN_PATH = {
+458: 	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
+459: 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
+460: 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
+461: 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
+462: 	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
+463: }

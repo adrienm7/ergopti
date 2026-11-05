@@ -1,0 +1,143 @@
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/canvas/libcanvas.m
+SHA256 07281122f7a7ef11aa3f967afef6dc2fc7e6c77fca2b9b1dc62ada7062d34c92
+515:         @"trackMouseEnterExit" : @{
+516:             @"class"       : @[ [NSNumber class] ],
+517:             @"luaClass"    : @"boolean",
+518:             @"objCType"    : @([@(YES) objCType]),
+519:             @"nullable"    : @(YES),
+520:             @"default"     : @(NO),
+521:             @"optionalFor" : VISIBLE,
+522:         },
+523:         @"trackMouseDown" : @{
+524:             @"class"       : @[ [NSNumber class] ],
+525:             @"luaClass"    : @"boolean",
+526:             @"objCType"    : @([@(YES) objCType]),
+527:             @"nullable"    : @(YES),
+528:             @"default"     : @(NO),
+529:             @"optionalFor" : VISIBLE,
+530:         },
+531:         @"trackMouseUp" : @{
+532:             @"class"       : @[ [NSNumber class] ],
+533:             @"luaClass"    : @"boolean",
+534:             @"objCType"    : @([@(YES) objCType]),
+535:             @"nullable"    : @(YES),
+536:             @"default"     : @(NO),
+537:             @"optionalFor" : VISIBLE,
+538:         },
+539:         @"trackMouseMove" : @{
+540:             @"class"       : @[ [NSNumber class] ],
+541:             @"luaClass"    : @"boolean",
+542:             @"objCType"    : @([@(YES) objCType]),
+543:             @"nullable"    : @(YES),
+544:             @"default"     : @(NO),
+545:             @"optionalFor" : VISIBLE,
+1015:         _canvasMouseDown       = NO ;
+1016:         _canvasMouseUp         = NO ;
+1017:         _canvasMouseEnterExit  = NO ;
+1018:         _canvasMouseMove       = NO ;
+1194: - (void)mouseDown:(NSEvent *)theEvent {
+1195:     [NSApp preventWindowOrdering];
+1196:     if (_mouseCallbackRef != LUA_NOREF) {
+1197:         BOOL isDown = (theEvent.type == NSEventTypeLeftMouseDown)  ||
+1198:                       (theEvent.type == NSEventTypeRightMouseDown) ||
+1199:                       (theEvent.type == NSEventTypeOtherMouseDown) ;
+1200: 
+1201:         NSPoint event_location = theEvent.locationInWindow;
+1202:         NSPoint local_point = [self convertPoint:event_location fromView:nil];
+1203: //         [LuaSkin logWarn:[NSString stringWithFormat:@"mouse click at (%f, %f)", local_point.x, local_point.y]] ;
+1204: 
+1205:         __block id targetID = nil ;
+1206:         __block NSPoint actualPoint = local_point ;
+1207: 
+1208:         [_elementBounds enumerateObjectsWithOptions:NSEnumerationReverse usingBlock:^(NSDictionary *box, __unused NSUInteger idx, BOOL *stop) {
+1209:             NSUInteger elementIdx  = [box[@"index"] unsignedIntegerValue] ;
+1210:             if ([[self getElementValueFor:(isDown ? @"trackMouseDown" : @"trackMouseUp") atIndex:elementIdx] boolValue]) {
+1211:                 NSAffineTransform *pointTransform = [self->_canvasTransform copy] ;
+1212:                 [pointTransform appendTransform:[self getElementValueFor:@"transformation" atIndex:elementIdx]] ;
+1213:                 [pointTransform invert] ;
+1214:                 BOOL isView = [[self getElementValueFor:@"type" atIndex:elementIdx] isEqualToString:@"canvas"] ;
+1215:                 actualPoint = isView ? local_point : [pointTransform transformPoint:local_point] ;                actualPoint = [pointTransform transformPoint:local_point] ;
+1216:                 if (box[@"imageByBounds"] && ![box[@"imageByBounds"] boolValue]) {
+1217:                     NSImage *theImage = self->_elementList[elementIdx][@"image"] ;
+1218:                     if (theImage) {
+1219:                         NSRect hitRect = NSMakeRect(actualPoint.x, actualPoint.y, 1.0, 1.0) ;
+1220:                         NSRect imageRect = [box[@"frame"] rectValue] ;
+1221:                         if ([theImage hitTestRect:hitRect withImageDestinationRect:imageRect
+1222:                                                                            context:nil
+1223:                                                                              hints:nil
+1224:                                                                            flipped:YES]) {
+1225:                         targetID = [self getElementValueFor:@"id" atIndex:elementIdx onlyIfSet:YES] ;
+1226:                         if (!targetID) targetID = @(elementIdx + 1) ;
+1227:                             *stop = YES ;
+1228:                         }
+1229:                     }
+1230:                 } else if ((box[@"frame"] && NSPointInRect(actualPoint, [box[@"frame"] rectValue])) || (box[@"path"] && [box[@"path"] containsPoint:actualPoint])) {
+1231:                     targetID = [self getElementValueFor:@"id" atIndex:elementIdx onlyIfSet:YES] ;
+1232:                     if (!targetID) targetID = @(elementIdx + 1) ;
+1233:                     *stop = YES ;
+1234:                 }
+1235:                 if (*stop) {
+1236:                     if (isDown && [[self getElementValueFor:@"trackMouseDown" atIndex:elementIdx] boolValue]) {
+1237:                         [self doMouseCallback:@"mouseDown" for:targetID at:local_point] ;
+1238:                     }
+1239:                     if (!isDown && [[self getElementValueFor:@"trackMouseUp" atIndex:elementIdx] boolValue]) {
+1240:                         [self doMouseCallback:@"mouseUp" for:targetID at:local_point] ;
+2830: /// hs.canvas:topLeft([point]) -> canvasObject | currentValue
+2831: /// Method
+2832: /// Get or set the top-left coordinate of the canvas object
+2833: ///
+2834: /// Parameters:
+2835: ///  * `point` - An optional point-table specifying the new coordinate the top-left of the canvas object should be moved to
+2836: ///
+2837: /// Returns:
+2838: ///  * If an argument is provided, the canvas object; otherwise the current value.
+2839: ///
+2840: /// Notes:
+2841: ///  * a point-table is a table with key-value pairs specifying the new top-left coordinate on the screen of the canvas (keys `x`  and `y`). The table may be crafted by any method which includes these keys, including the use of an `hs.geometry` object.
+2842: static int canvas_topLeft(lua_State *L) {
+2843:     LuaSkin *skin = [LuaSkin sharedWithState:L];
+2844:     [skin checkArgs:LS_TUSERDATA, USERDATA_TAG,
+2845:                     LS_TTABLE | LS_TOPTIONAL,
+2846:                     LS_TBREAK] ;
+2847: 
+2848:     HSCanvasView   *canvasView   = [skin luaObjectAtIndex:1 toClass:"HSCanvasView"] ;
+2849:     if (parentIsWindow(canvasView)) {
+2850:         HSCanvasWindow *canvasWindow = (HSCanvasWindow *)canvasView.window ;
+2851:         NSRect oldFrame = RectWithFlippedYCoordinate(canvasWindow.frame);
+2852: 
+2853:         if (lua_gettop(L) == 1) {
+2854:             [skin pushNSPoint:oldFrame.origin] ;
+2855:         } else {
+2856:             NSPoint newCoord = [skin tableToPointAtIndex:2] ;
+2857:             NSRect  newFrame = RectWithFlippedYCoordinate(NSMakeRect(newCoord.x, newCoord.y, oldFrame.size.width, oldFrame.size.height)) ;
+2858:             [canvasWindow setFrame:newFrame display:YES animate:NO];
+2859:             lua_pushvalue(L, 1);
+2860:         }
+2861:     } else {
+2862:         return luaL_argerror(L, 1, "method unavailable for canvas as a subview") ;
+2863:     }
+2864:     return 1;
+2865: }
+2866: 
+2867: /// hs.canvas:imageFromCanvas() -> hs.image object
+2868: /// Method
+2869: /// Returns an image of the canvas contents as an `hs.image` object.
+2870: ///
+2871: /// Parameters:
+2872: ///  * None
+2873: ///
+2874: /// Returns:
+2875: ///  * an `hs.image` object
+2876: ///
+2877: /// Notes:
+2878: ///  * The canvas does not have to be visible in order for an image to be generated from it.
+2879: static int canvas_canvasAsImage(lua_State *L) {
+2880:     LuaSkin *skin = [LuaSkin sharedWithState:L];
+2881:     [skin checkArgs:LS_TUSERDATA, USERDATA_TAG,
+2882:                     LS_TBREAK] ;
+2883: 
+2884:     HSCanvasView   *canvasView   = [skin luaObjectAtIndex:1 toClass:"HSCanvasView"] ;
+2885:     NSImage *image = [canvasView imageWithSubviews] ;
+2886:     [skin pushNSObject:image] ;
+2887:     return 1;
+2888: }

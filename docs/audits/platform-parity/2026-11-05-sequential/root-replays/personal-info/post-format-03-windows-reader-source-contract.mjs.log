@@ -1,0 +1,68 @@
+PROVENANCE: source-only PIW-002. No AHK execution. Actual Lua codec compatibility oracle is separate; no ported regex is counted as Windows execution.
+sha256 09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9 static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk
+sha256 8c50e6cd75a8ee7980fb88aa4f19f1a4097df6a823a7ca820c30264a5917ead9 static/ergopti_plus/windows/infra/toml/toml_loader.ahk
+sha256 d8b8c28875206529bb7f5ec4558ddc3824b97c110759951dfb8cf25c8b4fb6af static/ergopti_plus/windows/infra/toml/toml_helpers.ahk
+sha256 38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224 static/ergopti_plus/windows/modules/gestures/actions.ahk
+sha256 003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6 static/ergopti_plus/windows/ui/editors.ahk
+PIW-002 source: valid literal-string/quoted-key known fields have no matching assignment branch, yet source cache records admitted bytes and runtime retains defaults. Explicit form Save requires source consent but that certifies source bytes, not successful field decoding.
+static/ergopti_plus/windows/modules/gestures/actions.ahk:168
+168: 		"open_personal_info", {
+169: 				Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalInfoTomlPath"]),
+170: 		},
+171: 		"open_config", {
+static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk:1254
+1252: 		}
+1253: 		; Key = "value" pair
+1254: 		if RegExMatch(Line, 'i)^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
+1255: 			Key := KM[1]
+1256: 			Val := UnescapeTomlString(KM[2])
+1257: 			if (CurrentSection == "info") {
+1258: 				if NextInformation.Has(Key)
+1259: 					NextInformation[Key] := Val
+1260: 			} else if (CurrentSection == "letters") {
+1261: 				if (StrLen(Key) != 1) {
+1262: 					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because it is not one character.", Key)
+static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk:1232
+1230: 		if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+1231: 			_TomlUnreadableFiles.Delete(FilePath)
+1232: 		NextInformation := OpeningInformation.Clone()
+1233: 	} finally Critical(PreviousCritical)
+1234: 	NextLetters := Map()
+1235: 	SawLetters := false
+1236: 	FileContent := StrReplace(FileContent, "`r`n", "`n")
+1237: 	FileContent := StrReplace(FileContent, "`r", "`n")
+static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk:1289
+1285: 		if SawLetters
+1286: 			PersonalInformationLetters := NextLetters
+1287: 		_ReadPersonalInfoTomlCache := Map("info", PersonalInformation.Clone(),
+1288: 			"letters", PersonalInformationLetters.Clone(),
+1289: 			"source", Map("admitted", true, "present", true, "bytes", Bytes, "path", FilePath))
+1290: 	} finally Critical(PreviousCritical)
+1291: }
+1292: 
+static/ergopti_plus/windows/ui/editors.ahk:850
+849: 				ReverseLetters[v] := k
+850: 		for PersonalInformationKey, OldValue in EditorSource["information"] {
+851: 				TextToAdd := ""
+852: 				if ReverseLetters.Has(PersonalInformationKey)
+853: 						TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
+854: 				GuiToShow.SetFont("bold")
+855: 				GuiToShow.Add("Text", , PersonalInformationKey . TextToAdd)
+856: 				GuiToShow.SetFont("norm")
+857: 				NewValue := GuiToShow.Add("Edit", "w300", OldValue)
+858: 				UpdatedPersonalInformation[PersonalInformationKey] := NewValue
+859: 		}
+860: 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click",
+861: 			(*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation, 0, 0, 0, 0, 0, 0, 0, EditorSource))
+static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk:1683
+1680: 		Source := _PersonalInfoReadWriteSource(FilePath)
+1681: 		if IsSet(EditorSource) {
+1682: 			if !_PersonalInfoEditorSourceCurrent(EditorSource, FilePath)
+1683: 				|| !_PersonalInfoEditorSourcesEqual(EditorSource["source"], Source)
+1684: 				return false
+1685: 			Source["editor_owner"] := EditorSource
+1686: 		}
+1687: 		if !Source["admitted"] || !_PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
+1688: 			try LoggerError("PersonalToml",
+Generated actual-owner AHK reader fixture and3 private synthetic sources, UNEXECUTED. sha256=76e12248c3ad47f8aa2de26db23019c451ea6f8462435eb0bf4adc256d4038bf
+PASS source contract. Native Windows execution=0.

@@ -1,0 +1,34 @@
+[
+	{
+		"pass": "A",
+		"owner": "combo",
+		"exit_code": 0,
+		"sha256": "32dc45bae3e033d133d0e17eb809220a4382023085a1a1b2844b17bd90e9d7bf",
+		"last_line": "PASS: one grouped source-confirmed owner defect; source mutation sensitivity controls; native Windows executions=0.",
+		"provenance": "source-contract replay only; identical decisive full log retained once"
+	},
+	{
+		"pass": "A",
+		"owner": "reader",
+		"exit_code": 0,
+		"sha256": "f0dca99db629c1eb6ce10e6a13fd6c31f42f89702844023f98fa8e2c1faf89ae",
+		"last_line": "PASS source contract. Native Windows execution=0.",
+		"provenance": "source-contract replay only; identical decisive full log retained once"
+	},
+	{
+		"pass": "B",
+		"owner": "combo",
+		"exit_code": 0,
+		"sha256": "32dc45bae3e033d133d0e17eb809220a4382023085a1a1b2844b17bd90e9d7bf",
+		"last_line": "PASS: one grouped source-confirmed owner defect; source mutation sensitivity controls; native Windows executions=0.",
+		"provenance": "source-contract replay only; identical decisive full log retained once"
+	},
+	{
+		"pass": "B",
+		"owner": "reader",
+		"exit_code": 0,
+		"sha256": "f0dca99db629c1eb6ce10e6a13fd6c31f42f89702844023f98fa8e2c1faf89ae",
+		"last_line": "PASS source contract. Native Windows execution=0.",
+		"provenance": "source-contract replay only; identical decisive full log retained once"
+	}
+]

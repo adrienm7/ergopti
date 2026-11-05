@@ -1,0 +1,2 @@
+PASS actual shared Lua wrap_pair parser: 19 corpus vectors plus supplementary-Unicode and line-break controls. Runtime=Lua 5.4 PUC
+LIMIT: pure Lua parameter owner execution only; not AutoHotkey or desktop selection/clipboard/output receiving.

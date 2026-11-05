@@ -1,0 +1,3 @@
+LuaJIT=LuaJIT 2.1.1793383622
+lgi=false
+	libgtk-3.so.0 (libc6,x86-64) => /lib/x86_64-linux-gnu/libgtk-3.so.0

@@ -1,0 +1,2 @@
+PASS scratch schema1; 2 findings; IDs/severity/confidence/G1-G5/required text/evidence existence/UTF8-LF checked.
+Repository workflow.cjs validator not applicable to the scratch contract: refused report outside repository, and requires docs/audits/<ahk|hammerspoon>/<date>/ paths plus platform IDs. No repository write used to bypass that refusal.

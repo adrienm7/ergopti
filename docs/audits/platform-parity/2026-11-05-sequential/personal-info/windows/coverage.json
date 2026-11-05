@@ -1,0 +1,248 @@
+{
+	"schema_version": 1,
+	"scope": "personal-info-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"provenance": "Windows conclusions source-only; no AHK/native GUI/form/Send/clipboard executions",
+	"windows_execution_count": 0,
+	"source_owners": [
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk",
+			"sha256": "45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
+			"sha256": "c2473eac43ac80812cc14dcff0d2e436143f9f6ceac082e64a9d573588f1454a",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/personal_info_mask.ahk",
+			"sha256": "6f1ea8c2e9952065a6620542e341a4b018c691784056a731daa6e770a18a954a",
+			"review": "full file"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/personal_info_preview.ahk",
+			"sha256": "c580be723f9431ce71d6a0e318885ba54cdd2180ec420e7582b7375311097893",
+			"review": "full file"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk",
+			"sha256": "09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_builder.ahk",
+			"sha256": "d33df4df2fef9e7009cd51698b35463c5bbb6cf9b2e0b2fffc893075b272fd5f",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/text_utils.ahk",
+			"sha256": "7fde3e32975575bfc60068a7f4662a16077fd3c1f7c85c3834f5d6e4a42fba26",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/toml/toml_helpers.ahk",
+			"sha256": "d8b8c28875206529bb7f5ec4558ddc3824b97c110759951dfb8cf25c8b4fb6af",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/toml/toml_loader.ahk",
+			"sha256": "8c50e6cd75a8ee7980fb88aa4f19f1a4097df6a823a7ca820c30264a5917ead9",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/personal_info_editor/init.ahk",
+			"sha256": "eea7c487931b4da5cdefbb0fa7be6c5ab8a70b2f1988819532d3a4215fb4e70d",
+			"review": "full file"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/personal_info_editor/README.md",
+			"sha256": "334f928aef794434e441ccd5bf1ddf0476cabf79b8c24f7672031d1b82c19fa2",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/editors.ahk",
+			"sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
+			"sha256": "7103a527175ed11eac5423a1c543e75a1e55286a937d9575973b494b7cb7679d",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/menu_helpers.ahk",
+			"sha256": "e55e9ac75b9a024544314d2a0c304903effe57682f2ad55f9d6b4f2811fc2c42",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"review": "complete bounded personal-info ownership/callers"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_hotstring_log.ahk",
+			"sha256": "ad7f97ae3fc93acc4331a8fc836fcfef8998c0afd51534adb2728c4aeffdba45",
+			"review": "complete bounded personal-info ownership/callers"
+		}
+	],
+	"field_count": 15,
+	"default_alias_count": 13,
+	"literal_tag_count": 8,
+	"topics": [
+		{
+			"surface": "fields/defaults/all aliases/literal-tag precedence",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "eager/lazy compounds/order/repeated/empty fields",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "Unicode/metacharacter/Tab/newline exact-value construction",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "phone/SSN/IBAN private prefixes and OnlyText final owner",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "canonical engine decisions/frozen preview/masking/typed value separation",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "source load/raw decode/reader publication/cache/currentness",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "raw file open/editor public action and native/WebView Save",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "consent/source bytes/path/session/map/generation",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "stage/replace/publish/reload and failure diagnostics",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "pause/master gates/stale/duplicate callbacks/teardown",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "private log redaction and prefix/LLM context clearing",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		},
+		{
+			"surface": "previous native-ui/config/crypto/clipboard duplicates",
+			"status": "source reviewed",
+			"native_receiving": "unavailable"
+		}
+	],
+	"executed_comparisons": [
+		{
+			"probe": "proofs/shared-mask.lua",
+			"owner": "actual shared Lua mask + actual TOML declaration",
+			"runtimes": ["Lua5.4", "LuaJIT"],
+			"vectors": 15,
+			"invalid_policy_controls": 6,
+			"fields": 15,
+			"result": "pass",
+			"not_windows": true
+		},
+		{
+			"probe": "proofs/literal-toml.lua",
+			"owner": "actual shared TOML codec",
+			"runtimes": ["Lua5.4", "LuaJIT"],
+			"private_sources": 3,
+			"result": "pass",
+			"not_windows": true
+		}
+	],
+	"source_probes": ["proofs/source-contract.mjs", "proofs/reader-source-contract.mjs"],
+	"unexecuted_native_owner_fixtures": [
+		"proofs/owner-unexecuted.ahk",
+		"proofs/reader-unexecuted.ahk"
+	],
+	"observed_limits": [
+		{
+			"name": "eager registration cardinality for accepted max setting",
+			"provenance": "static arithmetic only",
+			"default_aliases": 13,
+			"max1": "13",
+			"max2": "182",
+			"max4": "30940",
+			"max8": "883708280",
+			"max16": "720867993281778160",
+			"latency_memory_measured": false,
+			"canonical_finding": false
+		}
+	],
+	"noncanonical": [
+		"uppercase and non-ASCII alias semantics unresolved across drivers",
+		"obsolete shared README Windows-preview status",
+		"optimistic source witness not OS-atomic compare-and-swap",
+		"native output/field focus/preview/save receiving unmeasured"
+	],
+	"dry_sweeps": [
+		{
+			"pass": "A",
+			"whole_bounded_scope": true,
+			"new_roots": 0
+		},
+		{
+			"pass": "B",
+			"whole_bounded_scope": true,
+			"new_roots": 0
+		}
+	],
+	"excluded_prior_findings": [
+		"generic clipboard destination/pause and restoration flows",
+		"encryption/config transaction findings",
+		"existing native-ui personal/editor error/lifecycle findings"
+	],
+	"limits": [
+		"No native AHK parser, owner, editor, Send or desktop execution",
+		"AHK fixtures generated but unexecuted; not counted as tests passed",
+		"Lua owner success does not qualify Windows port",
+		"No user secrets/config/clipboard/log/service reads",
+		"No G4/performance/CPU/memory measurements"
+	]
+}

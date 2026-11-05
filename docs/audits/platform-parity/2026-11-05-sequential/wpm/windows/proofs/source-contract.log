@@ -1,0 +1,186 @@
+PROVENANCE: Node source-contract checks only. No AHK, HWND, native Windows timers, GDI, desktop or user interactions executed. Projected transitions in report are source deductions, not measured runtime.
+sha256 520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161 static/ergopti_plus/windows/ErgoptiPlus.ahk
+sha256 203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055 static/ergopti_plus/windows/ui/wpm/wpm_display.ahk
+sha256 84c17eb40cbcacdc93c652179ae5f8a9619cc7d561addf1bd6de2102b53ffe77 static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk
+sha256 210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446 static/ergopti_plus/windows/ui/wpm/wpm_config.ahk
+sha256 7e38096d767693fbfaf4a805c5175590d3411e99c6550f7955254830c2111dbe static/ergopti_plus/windows/ui/menu/menu_metrics_actions.ahk
+sha256 066f3f4757b650a137796474cb2a79709bf87e3dab13202091c13cfd6bc4751b static/ergopti_plus/windows/adapters/graphics_renderer.ahk
+sha256 2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197 static/ergopti_plus/_shared/modules/menu/menu.toml
+sha256 539d08be5ae002e70650ebd0f8b48160942bd1c10f7f9901a21995918d5f4f76 static/ergopti_plus/_shared/lua/wpm_widget/model.lua
+sha256 7e2353387b34d4fdbd1cfe20924ab30bedf354f8312837d1ad927287b86db13d static/ergopti_plus/_shared/lua/keystats/live_wpm.lua
+sha256 04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6 static/ergopti_plus/macos/modules/keystats/init.lua
+WPMW-001 source contract: ready/public menu precedes armed +2500ms Show; Hide never cancels it; callback publishes true without validating latest preference.
+static/ergopti_plus/windows/ErgoptiPlus.ahk:1549
+1547: _DriverBootTailPending := false
+1548: ; Release retained lifecycle commands only after real input readiness.
+1549: _TrayStartupCommands.NotifyReady()
+1550: ; A tray clicked while the keyboard was registering opens now, from a timer, and
+1551: ; never earlier (maintainer decision, 3 November 2026). A root a restored pause
+1552: ; refused publishes later and releases the click itself (_TrayRootBuildBoot).
+1553: if _DriverMenuReady
+1554: 	_TrayStartupClick.NotifyReady()
+1555: _BootTotalMs := BootProfile_CompletedBootMs(BootProfile_TotalBootMs())
+1556: _BootOpenStages := BootProfile_OpenStageNames()
+1557: if (_BootOpenStages != "")
+static/ergopti_plus/windows/ErgoptiPlus.ahk:1705
+1699: if (MetricsShortcuts.enabled and WPMWidget.visible) {
+1700: 	; Graph mode: pre-create the GDI+ layered window + warm GDI+ in the quiet slot
+1701: 	; before the emoji pass, so its one-time DWM allocation is paid off the typing
+1702: 	; path rather than as a ~110 ms tooltip blip when the widget first appears.
+1703: 	if WPMWidget.show_graph
+1704: 		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
+1705: 	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
+1706: }
+1707: ; Publish the metrics dashboards' sidecars in a background worker once boot has
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:533
+533: WPMWidget_Show() {
+534:     LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
+535:         WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
+536:     if WPMWidget.show_graph {
+537:         if !WPMWidget._graph_gui
+538:             WPMWidget_BuildGraph()
+539:     } else {
+540:         if !WPMWidget._gui
+541:             WPMWidget_BuildCompact()
+542:     }
+543: 
+544:     WPMWidget.visible := true
+545: 
+546:     ; Start from a clean slate -- discard any keystrokes counted during boot or
+547:     ; reload so the surface stays hidden until the user types AFTER it is shown.
+548:     _WPMWidget_ResetRolling()
+549: 
+550:     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+551: 
+552:     ; Both modes start invisible; the tick reveals the surface once the user types.
+553:     ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
+554:     ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
+555:     ; out WinSetTransparent here — the two layering modes are mutually exclusive).
+556:     ; Compact mode uses the same "Hide" approach — no flash on startup.
+557:     _WPMWidget_ApplySurfaceGeometry(gui_ref)
+558: 
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:572
+572: WPMWidget_Hide() {
+573:     WPMWidget.visible := false
+574:     SetTimer(WPMWidget_Tick, 0)
+575:     SetTimer(WPMWidget_MouseWatch, 0)
+576:     if WPMWidget._gui
+577:         try WPMWidget._gui.Hide()
+578:     if WPMWidget._graph_gui
+579:         try WPMWidget._graph_gui.Hide()
+580:     try LoggerDone("WPMWidget", "Widget hidden.")
+581: }
+582: 
+583: 
+584: 
+585: 
+static/ergopti_plus/_shared/modules/menu/menu.toml:1925
+1924: type = "check"
+1925: id = "wpm_widget"
+1926: i18n = "menu.metrics.show_wpm_widget"
+1927: checked_when = ["wpm_widget_visible"]
+1928: disabled_when = ["keystats_enabled"]
+1929: 
+static/ergopti_plus/windows/ui/menu/menu_metrics_actions.ahk:100
+100: 	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMWidget_Toggle()
+101: 	if !(Toggled is Integer) || Toggled != 1
+102: 		return false
+103: 	return _MET_RebuildWidgetMenu(RebuildFn)
+104: }
+105: 
+WPMW-002 source contract: native upload false is a returned receipt; no lower error/notification observer; renderer discards receipt and publishes true, tick reveals retained surface.
+static/ergopti_plus/windows/adapters/graphics_renderer.ahk:303
+302: 		NumPut("UChar", 1, Blend, 3)
+303: 		Succeeded := Native.UpdateLayeredWindow(Handle, Dest, Size,
+304: 			Receipt["memory_dc"], Source, Blend)
+305: 	} finally {
+306: 		Released := _GRBitmapSettle(Receipt, Native)
+307: 	}
+308: 	return Succeeded == true and Released
+309: }
+310: 
+311: ; Sets up a 32-bpp GDI memory DC, calls DrawFn(pGfx, MemDC, W, H) so the
+static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk:281
+279: 								throw Error("WPM GDI+ frame failed: " . FrameResult["error"])
+280: 				}
+281: 				GR_DrawBitmap(g.Hwnd, DrawFn)
+282: 				return true
+283: 		} finally {
+284: 				PreviousCritical := Critical("On")
+285: 				try WPMWidget._gdip_frame_rendering := false
+286: 				finally Critical(PreviousCritical)
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:662
+660:             accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
+661:             label  := wpm_str . " " . t("menu.metrics.wpm_unit")
+662:             if !WPMWidget_RenderGraph(label, accent)
+663:                 return
+664:             GR_Show(WPMWidget._graph_gui.Hwnd)
+665:         } catch as _e {
+666:             ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
+667:             ; A bare catch that only dropped the handle left the widget dead until
+668:             ; the user happened to toggle the mode by hand, with nothing anywhere
+669:             ; to say a render had thrown — the two branches of the same tick
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:505
+500:         ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
+501:         _WPMWidget_ApplySurfaceGeometry(g)
+502:         WPMWidget_EnsureGdip()
+503:         GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+504:         GR_Hide(g.Hwnd)
+505:         LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
+506:     } catch as e {
+507:         LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
+508:     }
+WPMW-003 source contract: independent source holds and AI-first precedence on Windows; last accepted source replaces prior source on Lua producers.
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:377
+376:     if use_colors {
+377:         if has_ai
+378:             return WPMWidgetConst.COLOR_BG_AI
+379:         if has_hs {
+380:             LoggerDebug("WPMWidget", "ResolveBgColor: has_hs cat='{1}'", WPMWidget._last_hs_category)
+381:             ; A group with no usable colour takes the canon's fallback accent,
+382:             ; as it does on macOS and Linux.
+383:             return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_FALLBACK, WPMWidget._last_hs_section)
+384:         }
+385:         if has_ac
+386:             return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_FALLBACK)
+387:     }
+static/ergopti_plus/windows/ui/wpm/wpm_display.ahk:253
+251: 		WPMWidget._last_ac := is_ac
+252: 		if is_hs {
+253: 			WPMWidget._last_hs_tick := now_t
+254: 			WPMWidget._last_hs_category := (category != "") ? category : "magickey"
+255: 			WPMWidget._last_hs_section := section
+256: 			StoredCategory := WPMWidget._last_hs_category
+257: 		}
+258: 		if is_ai
+259: 			WPMWidget._last_ai_tick := now_t
+260: 		if is_ac
+261: 			WPMWidget._last_ac_tick := now_t
+262: 	} finally {
+263: 		; Preserve an outer injection transaction. Unconditionally switching
+static/ergopti_plus/_shared/lua/wpm_widget/model.lua:151
+151: function M.active_source(stats, hold_s, now_s)
+152: 	if type(stats) ~= "table" then return "none" end
+153: 	local source = stats.source_variant or stats.source or "none"
+154: 	if source == "none" then return "none" end
+155: 	if (now_s - (tonumber(stats.source_time) or 0)) > hold_s then return "none" end
+156: 	return source
+157: end
+158: 
+159: --- The colour a source paints with.
+static/ergopti_plus/_shared/lua/keystats/live_wpm.lua:98
+97: 	if type(source) ~= "string" or source == "" then return end
+98: 	tracker.source = source
+99: 	tracker.source_variant = (type(variant) == "string" and variant ~= "") and variant or source
+100: 	tracker.source_ms = now_ms
+101: end
+102: 
+103: 
+static/ergopti_plus/macos/modules/keystats/init.lua:1603
+1602: 
+1603: 	CoreState.last_source_type    = source_type
+1604: 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
+1605: 	CoreState.last_source_time    = timestamp_ms / 1000
+1606: 	return true
+1607: end
+PASS: three nonvacuous source-contract claims; zero Windows execution claims.

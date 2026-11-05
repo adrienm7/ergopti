@@ -1,0 +1,65 @@
+{
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"phases": [
+		{
+			"module": "wpm",
+			"state": "bounded_review_closed",
+			"closed_utc": "2026-11-05T08:55:58.647708+00:00",
+			"roles": ["windows", "macos", "linux", "shared"],
+			"canonical_ids": ["WPMW-001", "WPMW-002", "WPMM-001", "WPMM-002", "WPML-001"],
+			"root_replays": "root-replays/wpm/receipt.json",
+			"adjudications": [
+				"Pointer-hide and source-priority are unknown-intent parity discrepancies, not confirmed bugs.",
+				"Linux rollback debt is guarded recovery limitation; no-tray/headless policy is unresolved.",
+				"Native false GTK resize is wrapper-only; canonical WPML001 uses throwing native seam."
+			]
+		},
+		{
+			"module": "wrap-symbols",
+			"state": "bounded_review_closed",
+			"started_utc": "2026-11-05T08:55:58.647740+00:00",
+			"closed_utc": "2026-11-05T09:20:04.932622+00:00",
+			"roles": ["windows", "macos", "linux", "shared"],
+			"canonical_ids": [
+				"WSW-001",
+				"WSW-002",
+				"WSM-001",
+				"WSM-002",
+				"WSM-003",
+				"WSL-001",
+				"WSL-002"
+			],
+			"root_replays": "root-replays/wrap-symbols/receipt.json",
+			"adjudications": [
+				"Guillemet trigger mismatch and flattened catalogue collision are each grouped across OS manifestations.",
+				"Windows spaced direct-remapped route can succeed; do not claim every Windows guillemet route absent.",
+				"Registered macOS combined wrap fixture has four order-sensitive failures; isolated delivery fixture passes. No claim of a fully green registered suite."
+			]
+		},
+		{
+			"module": "personal-info",
+			"state": "bounded_review_closed",
+			"started_utc": "2026-11-05T09:20:04.932639+00:00",
+			"closed_utc": "2026-11-05T09:43:18.178746+00:00",
+			"roles": ["windows", "macos", "linux", "shared"],
+			"canonical_ids": [
+				"PIW-001",
+				"PIW-002",
+				"PIM-001",
+				"PIM-002",
+				"PIL-001",
+				"PIL-002",
+				"PIL-003",
+				"PIS-001"
+			],
+			"root_replays": "root-replays/personal-info/receipt.json",
+			"adjudications": [
+				"Existing international-phone and short-prefix defects remain references rather than new findings.",
+				"Alias alphabet outside demonstrated lowercase ASCII remains unknown intent; generic personal-file unknown-leaf preservation is not inferred.",
+				"High Windows pattern setting is static cardinality/observed limit, no timing or memory measurement.",
+				"Shared status count uses a named additional property, not an invented guarantee label."
+			]
+		}
+	],
+	"timestamp_semantics": "Integration journal checkpoints, not per-agent process launch timestamps. Root confirmed all decisive wrap replay results before issuing personal-info followups; the closure/start markers were persisted afterward. No reviewer began another module before root confirmation."
+}

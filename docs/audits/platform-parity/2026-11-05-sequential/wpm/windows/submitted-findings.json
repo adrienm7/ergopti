@@ -1,0 +1,33 @@
+{
+	"schema_version": 1,
+	"scope": "wpm-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "WPMW-001",
+			"title": "Delayed boot Show overrides a newer widget disable",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "SOURCE PROJECTION, not Windows execution: metrics and widget enabled at boot; use the available ready Metrics checkbox to commit widget disabled during the armed 2500 ms post-ready Show delay; release native menu; allow callback and type two characters. Show restores visible=true and recurring timers despite persisted false. Healthy no-disable and refused-write controls differ as described in report.",
+			"root_cause": "Boot arms unrestricted WPMWidget_Show once; committed disable/Hide never revokes it, and Show unconditionally sets visible true without checking latest preference/generation.",
+			"silent_failure": "The stale callback logs successful Show, not refusal; normal exception backstop sees no exception. Menu can retain stale false check; SaveFullConfig later serializes erroneous live true.",
+			"regression_test": "Genuine isolated AHK startup/tray receiving: commit disable through configured menu before one-shot deadline; assert HWND stays hidden, recurring timers do not re-arm, live/persisted false remain; healthy, refused-write, post-show-disable and duplicate controls.",
+			"evidence": ["proofs/source-contract.mjs", "proofs/source-contract.log"]
+		},
+		{
+			"id": "WPMW-002",
+			"title": "Graph reports success after native bitmap upload refuses",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "SOURCE PROJECTION, not Windows execution: active graph with an accepted prior bitmap; next native UpdateLayeredWindow returns zero with otherwise healthy frame/draw/cleanup. _GRDrawBitmapRun returns false, RenderGraph returns true anyway, Tick shows retained stale/empty surface with no refusal diagnostic. Persistent refusal prevents frame progress; healthy next upload can recover.",
+			"root_cause": "WPMWidget_RenderGraph discards GR_DrawBitmap Boolean receipt and returns true; PrewarmGraph similarly logs success without consuming the receipt. Lower bitmap facade returns false rather than throwing.",
+			"silent_failure": "All lower bitmap acquisition/upload/release/debt owners were checked: no logger, notifier or refusal observer on native false paths. No exception reaches the WPM catch/global OnError; GDI+ thrown failure backstops cover different paths.",
+			"regression_test": "Run actual AHK RenderGraph->GR_DrawBitmap->_GRDrawBitmapRun with faithful native false-upload/allocation/cleanup-debt seams and healthy/throw controls. Assert refusal reaches caller with visible diagnostic and no false presentation acknowledgment, then healthy retry progresses.",
+			"evidence": ["proofs/source-contract.mjs", "proofs/source-contract.log"]
+		}
+	]
+}

@@ -1,0 +1,16 @@
+FIELD bic alias=a masked=true insertion_full=true private=true
+FIELD city alias=b masked=false insertion_full=true private=true
+FIELD country alias=c masked=false insertion_full=true private=true
+FIELD credit_card alias=d masked=true insertion_full=true private=true
+FIELD date_of_birth alias=e masked=false insertion_full=true private=true
+FIELD email_address alias=f masked=false insertion_full=true private=true
+FIELD first_name alias=g masked=false insertion_full=true private=true
+FIELD iban alias=h masked=true insertion_full=true private=true
+FIELD last_name alias=i masked=false insertion_full=true private=true
+FIELD phone_number alias=j masked=false insertion_full=true private=true
+FIELD phone_number_clean alias=k masked=false insertion_full=true private=true
+FIELD postal_code alias=l masked=false insertion_full=true private=true
+FIELD social_security_number alias=m masked=true insertion_full=true private=true
+FIELD street_address alias=n masked=false insertion_full=true private=true
+FIELD work_email_address alias=o masked=false insertion_full=true private=true
+PASS all15 policy fields/custom aliases, full private insertion seam, full-value editor payload; no native input/display
