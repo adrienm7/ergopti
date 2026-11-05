@@ -243,6 +243,9 @@ try {
 		`${ownedDesktop} Exec=/other/program\n`,
 		`${ownedDesktop}Exec =/other/program\n`,
 		`${ownedDesktop}Exec\t=/other/program\n`,
+		`${ownedDesktop}\rExec=/other/program\n`,
+		`${ownedDesktop}Exec\f=/other/program\n`,
+		`${ownedDesktop}\f[Desktop Entry]\nExec=/other/program\n`,
 		`${ownedDesktop} [Desktop Entry] \nExec=/other/program\n`,
 		`[Desktop Entry]\nExec=/other/program\n[Desktop Action Example]\n${ownedDesktop.match(/^Exec=.*$/m)[0]}\n`
 	]) {
@@ -251,6 +254,8 @@ try {
 		assert.notEqual(run('enable').status, 0, 'ambiguous desktop command must be preserved');
 		assert.equal(fs.readFileSync(desktop, 'utf8'), mixed);
 	}
+	fs.writeFileSync(desktop, ownedDesktop.replaceAll('\n', '\r\n'));
+	assert.equal(run('status').stdout.trim(), 'disabled', 'CRLF desktop entries are accepted');
 	fs.writeFileSync(
 		desktop,
 		ownedDesktop.replace('[Desktop Entry]', ' [Desktop Entry] ').replace(/^Exec=/m, ' Exec = ')
@@ -260,6 +265,13 @@ try {
 		'disabled',
 		'GLib whitespace is accepted for the owned command'
 	);
+	fs.writeFileSync(
+		desktop,
+		ownedDesktop.replace('Hidden=true', 'Hidden=false') + '[Desktop Action Example]\nHidden=true\n'
+	);
+	assert.equal(run('status').stdout.trim(), 'enabled', 'an action cannot hide the main entry');
+	fs.writeFileSync(desktop, `${ownedDesktop} Hidden = false\n`);
+	assert.equal(run('status').stdout.trim(), 'enabled', 'the last primary Hidden value wins');
 	fs.writeFileSync(desktop, `${ownedDesktop}[Desktop Action Example]\nExec=/other/program\n`);
 	assert.equal(
 		run('status').stdout.trim(),
