@@ -50,6 +50,20 @@ helpers.it("(linux-reload-cli-lock-types) refuses FIFO, symlink and directory lo
 	local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool))
 	helpers.assert_true(status == true or status == 0, "invalid lock objects must be refused without changing them")
 end)
+
+helpers.it("(linux-reload-cli-decimal) accepts leading zeroes and refuses overflow before publication", function()
+	local quote = require("text_utils").shell_quote
+	local driver = helpers.driver_root()
+	local fixture = driver .. "/tests/fixtures/reload_cli_decimal.sh"
+	local tool = driver .. "/../../../tools/control/request_driver_reload.sh"
+	for _, shell in ipairs({ "sh", "dash", "bash" }) do
+		local available = os.execute("command -v " .. quote(shell) .. " >/dev/null 2>&1")
+		if available == true or available == 0 then
+			local status = os.execute("sh " .. quote(fixture) .. " " .. quote(tool) .. " " .. quote(shell))
+			helpers.assert_true(status == true or status == 0, shell .. " must accept decimal timeouts and reject overflow before signalling")
+		end
+	end
+end)
 end
 
 --- A session over in-memory files.
