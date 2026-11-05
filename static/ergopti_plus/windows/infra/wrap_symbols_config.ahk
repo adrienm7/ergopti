@@ -441,6 +441,11 @@ _WS_CommitCandidate(BuildFn, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 		}
 
 		StartEpoch := _WS_StateEpoch
+		SourceReceipt := _WS_CurrentSourceReceipt(BoundPath)
+		if !IsObject(SourceReceipt) || !_FSSourceIsUnchanged(BoundPath, SourceReceipt.source) {
+			try LoggerError("WrapSymbols", "The wrap-symbol source changed since load; reload before retrying.")
+			return false
+		}
 		CandidateDisabled := _WS_Disabled.Clone()
 		CandidateCustom := _WS_CloneCustom(_WS_Custom)
 		if !(CandidateCustom is Array) {
@@ -463,7 +468,7 @@ _WS_CommitCandidate(BuildFn, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 			return false
 		}
 		return _WS_Save(CandidateDisabled, CandidateCustom, CandidateActive,
-			OwnerToken, BoundPath, StartEpoch, WriterFn, ReplaceFn, DeleteFn)
+			OwnerToken, BoundPath, StartEpoch, WriterFn, ReplaceFn, DeleteFn, 0, SourceReceipt)
 	} finally _ConfigWriteLeaseRelease(OwnerToken)
 }
 
@@ -619,15 +624,62 @@ _WS_ProjectCustom(Entry, Custom) {
 	Custom.Push(Map("left", Left, "right", Right))
 }
 
+
+; A receipt belongs to the two actual parsed/published objects, never a clone.
+; The metadata has no backreference to its Array or Map and needs no ledger.
+_WS_BindSourceReceipt(Custom, Disabled, Path, Source) {
+	if !(Custom is Array) || !(Disabled is Map) || !(Source is Map)
+		throw TypeError("A wrap source receipt needs a complete projection")
+	Status := Source.Get("status", "")
+	if (Status != "ok" && Status != "absent") || !(Source.Get("content", 0) is String)
+		throw ValueError("An unreadable wrap source cannot issue write permission")
+	Receipt := {custom: ObjPtr(Custom), disabled: ObjPtr(Disabled),
+		path: _ConfigWriteLeaseKey(Path), source: Map("status", Status, "content", Source["content"])}
+	Custom.DefineProp("_WS_SourceReceipt", {Value: Receipt})
+	return Receipt
+}
+_WS_CurrentSourceReceipt(Path) {
+	global _WS_Custom, _WS_Disabled
+	if !(_WS_Custom is Array) || !(_WS_Disabled is Map)
+		return 0
+	if !Object.Prototype.HasOwnProp.Call(_WS_Custom, "_WS_SourceReceipt")
+		return 0
+	Receipt := Object.Prototype.GetOwnPropDesc.Call(_WS_Custom, "_WS_SourceReceipt").Value
+	return _WS_SourceReceiptCurrent(Receipt, Path) ? Receipt : 0
+}
+_WS_SourceReceiptCurrent(Receipt, Path) {
+	global _WS_Custom, _WS_Disabled
+	if !IsObject(Receipt) || !(_WS_Custom is Array) || !(_WS_Disabled is Map)
+		return false
+	if !Object.Prototype.HasOwnProp.Call(_WS_Custom, "_WS_SourceReceipt")
+		return false
+	return Object.Prototype.GetOwnPropDesc.Call(_WS_Custom, "_WS_SourceReceipt").Value == Receipt
+		&& Receipt.custom == ObjPtr(_WS_Custom) && Receipt.disabled == ObjPtr(_WS_Disabled)
+		&& Receipt.path == _ConfigWriteLeaseKey(Path)
+}
+_WS_FinalSourceAdmission(OwnerToken, Path, Epoch, Receipt) {
+	return _WS_AuthorizeCommit(OwnerToken, Path, Epoch)
+		&& _WS_SourceReceiptCurrent(Receipt, Path)
+}
+
 ; Parse into detached state, then publish only a complete admitted projection.
 ; Unknown roots retain the previous owner's ignored-root policy; malformed or
 ; unprojectable owned leaves latch so a later save cannot erase their data.
 _WS_Load() {
 	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
-	if !FileExist(_WS_Config_Path)
-		return
 	try {
-		Content := FileRead(_WS_Config_Path, "UTF-8")
+		Source := FSReadWithStatus(_WS_Config_Path)
+		if Source["status"] == "absent" {
+			_WS_BindSourceReceipt(_WS_Custom, _WS_Disabled, _WS_Config_Path, Source)
+			return
+		}
+		if Source["status"] != "ok"
+			throw Error("The wrap source cannot be read as exact UTF-8")
+		Content := Source["content"]
+		; FileRead(UTF-8) previously consumed a BOM; keep that decoder boundary
+		; while retaining its exact bytes in the source receipt.
+		if SubStr(Content, 1, 1) == Chr(0xFEFF)
+			Content := SubStr(Content, 2)
 		Document := TOML_ParseDocument(_WS_CanonicalTomlSource(Content), &Records, &Physical)
 		for Record in Physical
 			if Record.Kind == "opaque"
@@ -650,6 +702,7 @@ _WS_Load() {
 				_WS_ProjectCustom(Entry, Custom)
 		}
 		_WS_Disabled := Disabled, _WS_Custom := Custom
+		_WS_BindSourceReceipt(Custom, Disabled, _WS_Config_Path, Source)
 		try LoggerDebug("WrapSymbols", "Loaded: {1} disabled, {2} custom.", _WS_Disabled.Count, _WS_Custom.Length)
 	} catch as Err {
 		; Only Init may clear this latch. Never serialize an incomplete view.
@@ -663,7 +716,7 @@ _WS_Load() {
 ; live state instead of bypassing the transaction gateway.
 _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		ActiveCandidate := unset, OwnerToken := 0, BoundPath := unset,
-		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, BeforeNativeFn := 0) {
+		StartEpoch := unset, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, BeforeNativeFn := 0, ExpectedSource := 0) {
 	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
 	global _WS_StateEpoch
 	BorrowedOwner := OwnerToken is Object
@@ -680,9 +733,10 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 			return false
 		}
 		try {
+			CompatibilitySource := _WS_CurrentSourceReceipt(CompatibilityPath)
 			return _WS_Save(unset, unset, unset, CompatibilityOwner,
 				CompatibilityPath, _WS_StateEpoch,
-				WriterFn, ReplaceFn, DeleteFn, BeforeNativeFn)
+				WriterFn, ReplaceFn, DeleteFn, BeforeNativeFn, CompatibilitySource)
 		} finally _ConfigWriteLeaseRelease(CompatibilityOwner)
 	}
 
@@ -703,6 +757,12 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	}
 	if _WS_LoadFailed {
 		try LoggerError("WrapSymbols", "Refusing to save wrap_symbols.toml: it could not be read at load, so the live state is untrustworthy. Restart the driver once the file is readable.")
+		return false
+	}
+
+	if !_WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+			|| !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source) {
+		try LoggerError("WrapSymbols", "Refusing to reconstruct a wrap-symbol source no longer owned by this loaded projection.")
 		return false
 	}
 
@@ -787,8 +847,8 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		return false
 	}
 
-	; Atomic replacement can block in filesystem filters or antivirus code.
-	; Keep the exact global owner, but never keep Critical, across this OS call.
+	; Keep source reads and staging outside Critical. Only the native wrapper
+	; protects the final memory admission and its immediately following rename.
 	Replaced := false
 	ReplaceError := ""
 	try {
@@ -798,9 +858,19 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 			BeforeNativeFn.Call()
 		else if !((BeforeNativeFn is Integer) && BeforeNativeFn == 0)
 			throw TypeError("The private native cutpoint is not callable")
-		Replaced := HasMethod(ReplaceFn, "Call")
-			? ReplaceFn.Call(StagePath, BoundPath)
-			: FSAtomicMoveReplace(StagePath, BoundPath)
+		; Complete the exact source read outside Critical. The immediately
+		; following native wrapper rechecks only memory ownership under Critical.
+		; This is not a cross-process kernel compare-and-swap of file contents.
+		if !_FSSourceIsUnchanged(BoundPath, ExpectedSource.source)
+			throw Error("The wrap-symbol source changed before native publication")
+		FinalAdmission := _WS_FinalSourceAdmission.Bind(OwnerToken, BoundPath, StartEpoch, ExpectedSource)
+		if HasMethod(ReplaceFn, "Call") {
+			; Preserve the existing adapter ABI, but never grant it a stale source.
+			Replaced := FinalAdmission.Call() && ReplaceFn.Call(StagePath, BoundPath)
+		} else if ExpectedSource.source["status"] == "absent"
+			Replaced := FSConfigAtomicMoveCreate(StagePath, BoundPath, FinalAdmission)
+		else
+			Replaced := FSConfigAtomicMoveReplace(StagePath, BoundPath, &NativeError, FinalAdmission)
 	}
 	catch as Err {
 		Replaced := false
@@ -817,14 +887,28 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		return false
 	}
 
+	PublishedSource := FSReadWithStatus(BoundPath)
+	if PublishedSource["status"] != "ok" || PublishedSource["content"] !== Content {
+		try LoggerError("WrapSymbols", "The durable wrap-symbol source did not match its candidate; reload before retrying.")
+		return false
+	}
+
 	; Only the memory projection is atomic. Disk is already durable and the
 	; global owner still prevents any sibling writer or terminal transition.
 	Published := false
 	PublishError := ""
 	PreviousCritical := Critical("On")
 	try {
-		try Published := _WS_PublishCandidate(DisabledCandidate,
-			CustomCandidate, ActiveCandidate, StartEpoch)
+		try {
+			; Durability is already acknowledged. A later pause cannot revoke
+			; this memory projection, but a replacement source owner still can.
+			if _WS_SourceReceiptCurrent(ExpectedSource, BoundPath)
+					&& _ConfigWriteLeaseKey(_WS_Config_Path) == _ConfigWriteLeaseKey(BoundPath) {
+				_WS_BindSourceReceipt(CustomCandidate, DisabledCandidate, BoundPath, PublishedSource)
+				Published := _WS_PublishCandidate(DisabledCandidate,
+					CustomCandidate, ActiveCandidate, StartEpoch)
+			}
+		}
 		catch as Err {
 			Published := false
 			PublishError := Err.Message
