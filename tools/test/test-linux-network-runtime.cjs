@@ -93,6 +93,47 @@ function portable() {
 			}
 		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 	});
+	check('failed native ownership receipt publication retires its temporary file', () => {
+		if (process.platform !== 'linux') return;
+		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-receipt-'));
+		try {
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const start = installer.indexOf('if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then');
+			const end = installer.indexOf('\nif [ -n "$NATIVE_LUV_STAGE" ]; then', start);
+			assert.ok(start >= 0 && end > start, 'actual receipt publication block');
+			const block = installer.slice(start, end);
+			const library = path.join(scratch, 'lib');
+			fs.mkdirSync(path.join(library, 'linux/bin'), { recursive: true });
+			fs.writeFileSync(path.join(library, 'linux/bin/libergopti_archive_publication.so'), 'binary');
+			const receipt = path.join(library, '.ergopti-owned-files');
+			fs.writeFileSync(receipt, 'abc\tlinux/sentinel\n');
+			for (const failure of ['write', 'mv']) {
+				const stub = failure === 'write' ? 'printf() { return 71; }' : 'mv() { return 71; }';
+				const result = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\n${stub}\n${block}`], {
+					encoding: 'utf8', timeout: 10000,
+					env: { ...process.env, LIB_DIR: library, NATIVE_OUTPUT_STAGE: '/unused-stage', NATIVE_LUV_STAGE: '', NATIVE_LUV_RETAINED_DIGEST: '' }
+				});
+				assert.notEqual(result.status, 0, `${failure} must fail publication`);
+				assert.deepEqual(fs.readdirSync(library).sort(), ['.ergopti-owned-files', 'linux']);
+				assert.equal(fs.readFileSync(receipt, 'utf8'), 'abc\tlinux/sentinel\n');
+			}
+			const stage = path.join(scratch, 'native-stage');
+			fs.mkdirSync(stage);
+			fs.writeFileSync(path.join(stage, 'libergopti_archive_publication.so'), 'built binary');
+			fs.mkdirSync(path.join(library, 'linux/native_modules'));
+			fs.writeFileSync(path.join(library, 'linux/native_modules/luv.so'), 'luv module');
+			const success = spawnSync(bashExecutable(), ['-c', `set -euo pipefail\n${block}`], {
+				encoding: 'utf8', timeout: 10000,
+				env: { ...process.env, LIB_DIR: library, NATIVE_OUTPUT_STAGE: stage, NATIVE_LUV_STAGE: '/luv-stage', NATIVE_LUV_RETAINED_DIGEST: '' }
+			});
+			assert.equal(success.status, 0, success.stderr);
+			const rows = fs.readFileSync(receipt, 'utf8');
+			assert.match(rows, /^abc\tlinux\/sentinel$/m);
+			assert.match(rows, /^[0-9a-f]{64}\tlinux\/bin\/libergopti_archive_publication\.so$/m);
+			assert.match(rows, /^[0-9a-f]{64}\tlinux\/native_modules\/luv\.so$/m);
+			assert.equal(fs.existsSync(stage), false);
+		} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
+	});
 	check('native luv build stage is representable in Lua paths', () => {
 		if (process.platform !== 'linux') return;
 		const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-stage-'));
