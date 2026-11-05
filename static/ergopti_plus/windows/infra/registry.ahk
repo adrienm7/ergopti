@@ -354,6 +354,18 @@ Reg_TryEnumValueNames(keyPath, &Names) {
 			}
 			if Status != 0 || Characters >= Capacity
 				break
+			; NT permits counted names that contain NUL, while the Win32 value
+			; operations terminate there. Refuse the complete inventory before
+			; StrGet can discard that suffix and lend its shorter neighbor a name.
+			Addressable := true
+			Loop Characters {
+				if NumGet(Name, (A_Index - 1) * 2, "UShort") == 0 {
+					Addressable := false
+					break
+				}
+			}
+			if !Addressable
+				break
 			Collected.Push(Characters ? StrGet(Name, Characters, "UTF-16") : "")
 			Index += 1
 		}

@@ -409,6 +409,11 @@ _STNT_ClearCountedName(CountedNul) {
 		AssertTrue((Result is Integer) && (Result == 0 || Result == 1))
 		if Result
 			AssertEqual(0, AfterCount, "a clear ACK must not leave a counted native value hidden behind its shorter Win32 alias")
+		if CountedNul && !Result {
+			AssertEqual(BeforeCount, AfterCount, "an unaddressable inventory must refuse before deleting any prefix value")
+			AssertEqual("Original", ST_Get("owned", "missing"), "the legitimate shorter native neighbor remains intact on enumeration refusal")
+			AssertEqual(0, ST_Keys().Length, "public keys retains its documented empty-array-on-inventory-error contract")
+		}
 		if !CountedNul {
 			AssertTrue(Result, "the same actual NT producer remains an ordinary supported-name positive control")
 			AssertEqual(0, AfterCount)
