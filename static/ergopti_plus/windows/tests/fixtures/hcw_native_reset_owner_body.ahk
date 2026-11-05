@@ -405,6 +405,8 @@ _HNRC_NumericRun() {
 	Node := FinalDocument.Get(Entry.Key, Map())
 	if Section != ""
 		Node := Node.Get(Section, Map())
+	Unlimited := Node.Get("delay_unlimited", false)
+	UnlimitedEnabled := Unlimited is TOML_Bool && Unlimited.Value
 	Offset := Node.Get("delay_offset", "absent")
 	WrappedDurable := Offset is Number && Abs((HotstringsBaseDelay() + Offset) - 0.003) < 0.000000001
 	FileAppend("OBSERVATION hcw-native-numeric mode=" . _HNRC.Mode . " field=" . _HNRC.NumericField
@@ -415,7 +417,7 @@ _HNRC_NumericRun() {
 		. " errors=" . _HNRC.Errors.Length . " async_failure=" . IsObject(_HNRC.Failure)
 		. " before_delay=" . BeforeResolved.Delay . " final_delay=" . FinalResolved.Delay
 		. " before_priority=" . BeforeResolved.Priority . " final_priority=" . FinalResolved.Priority
-		. " wrapped_durable=" . WrappedDurable . " unlimited=" . Node.Get("delay_unlimited", false)
+		. " wrapped_durable=" . WrappedDurable . " unlimited=" . UnlimitedEnabled
 		. " bytes_changed=" . (BeforeHash != FinalHash) . "`n", "*", "UTF-8-RAW")
 	_HNRC_Require(_HNRC.NumericInputs == 1 && _HNRC.NumericBefore > 0 && _HNRC.NumericDrained
 		&& _HNRC.RawNumericText == _HNRC.NumericText && Result is Integer && Result == false
@@ -436,7 +438,7 @@ _HNRC_NumericRun() {
 			&& FinalResolved.Priority == 47 && BeforeHash != FinalHash,
 			"Zero-padded ordinary input must preserve the same durable/live 3ms intention")
 	else if _HNRC.Mode == "numeric-zero"
-		_HNRC_Require(_HNRC.Errors.Length == 0 && Node.Get("delay_unlimited", false) == true
+		_HNRC_Require(_HNRC.Errors.Length == 0 && UnlimitedEnabled
 			&& !Node.Has("delay_offset") && FinalResolved.Delay == 0 && FinalResolved.Priority == 47 && BeforeHash != FinalHash,
 			"Actual numeric zero must still persist the supported unlimited delay without changing priority")
 	else if _HNRC.Mode == "numeric-priority-clamp"
