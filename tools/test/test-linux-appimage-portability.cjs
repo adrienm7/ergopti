@@ -73,6 +73,8 @@ for (const [name, exceeds] of [
 	['GLIBC_2.36', true],
 	['GLIBC_3.0', true],
 	['GLIBC_PRIVATE', true],
+	['GLIBC_ABI_DT_RELR', true],
+	['GLIBC_ABI_UNKNOWN', true],
 	['GLIBC_2.35', false],
 	['GLIBC_2.34', false],
 	['GLIBC_2.2.5', false],
