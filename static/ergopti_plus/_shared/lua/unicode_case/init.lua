@@ -68,6 +68,7 @@ function M.lower(text)
 	end
 	local function is_cased(character)
 		return Data.upper[character] ~= nil or Data.lower[character] ~= nil
+			or Data.cased_without_mapping[character] == true
 	end
 	local cased_before = {}
 	local preceding_is_cased = false

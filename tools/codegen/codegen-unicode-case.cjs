@@ -65,6 +65,7 @@ const title = [];
 const boundary = [];
 const wordSeparator = [];
 const caseIgnorable = [];
+const casedWithoutMapping = [];
 for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (codepoint >= 0xd800 && codepoint <= 0xdfff) continue;
 	const character = String.fromCodePoint(codepoint);
@@ -73,6 +74,16 @@ for (let codepoint = 0; codepoint <= 0x10ffff; codepoint++) {
 	if (/^[\p{White_Space}\p{P}]$/u.test(character)) boundary.push(character);
 	if (/^[\p{White_Space}\p{Pd}]$/u.test(character)) wordSeparator.push(character);
 	if (/^\p{Case_Ignorable}$/u.test(character)) caseIgnorable.push(character);
+	// Final sigma uses Unicode Cased, which also contains characters such as
+	// U+00AA that have no upper/lower mapping. Ignorable characters do not
+	// affect the surrounding context and need no extra entry here.
+	if (
+		/^\p{Cased}$/u.test(character) &&
+		!/^\p{Case_Ignorable}$/u.test(character) &&
+		uppercase === character &&
+		lowercase === character
+	)
+		casedWithoutMapping.push(character);
 	if (uppercase !== character) {
 		upper.push([character, uppercase]);
 		const titlecase = titlecaseCharacter(character);
@@ -87,12 +98,13 @@ if (
 	title.length < 1500 ||
 	boundary.length < 800 ||
 	wordSeparator.length < 45 ||
-	caseIgnorable.length < 2700
+	caseIgnorable.length < 2700 ||
+	casedWithoutMapping.length < 1000
 ) {
 	throw new Error(
 		`case data unexpectedly small: upper=${upper.length}, lower=${lower.length}, ` +
 			`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
-			`caseIgnorable=${caseIgnorable.length}`
+			`caseIgnorable=${caseIgnorable.length}, casedWithoutMapping=${casedWithoutMapping.length}`
 	);
 }
 if (
@@ -143,7 +155,8 @@ for (const [name, rows] of [
 for (const [name, characters] of [
 	['boundary', boundary],
 	['word_separator', wordSeparator],
-	['case_ignorable', caseIgnorable]
+	['case_ignorable', caseIgnorable],
+	['cased_without_mapping', casedWithoutMapping]
 ]) {
 	lines.push(`\t${name} = {`);
 	for (const character of characters) lines.push(`\t\t[${quote(character)}] = true,`);
@@ -158,5 +171,6 @@ console.log(
 	`[OK] Unicode ${EXPECTED_UNICODE_VERSION}: ${upper.length} upper, ${lower.length} lower, ` +
 		`${title.length} title mappings, ${boundary.length} word boundaries, ` +
 		`${wordSeparator.length} title-case word separators, ` +
-		`${caseIgnorable.length} case-ignorable characters.`
+		`${caseIgnorable.length} case-ignorable characters, ` +
+		`${casedWithoutMapping.length} cased characters without mappings.`
 );
