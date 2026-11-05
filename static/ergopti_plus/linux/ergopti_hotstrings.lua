@@ -1731,7 +1731,8 @@ local function main()
 					current = function() return authorized() and destination.current() and authorized() end,
 					cached = function() return authorized() and destination.cached() and authorized() end,
 				}
-				local result = injector.inject(candidate.deletes, candidate.to_type, false, nil, publication)
+				-- Generated text may contain the user's context; never put it in trace logs.
+				local result = injector.inject(candidate.deletes, candidate.to_type, true, nil, publication)
 				return type(result) == "table" and result.ok == true and publication.cached()
 			end,
 			-- Revalidate the original range before injection, then retain its exact
