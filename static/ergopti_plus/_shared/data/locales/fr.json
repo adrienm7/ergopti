@@ -1957,6 +1957,7 @@
 	"model_browser.add_provider_label": "Fournisseur d'API à ajouter",
 	"model_browser.add_provider_button": "Ajouter ce fournisseur…",
 	"model_browser.status_downloading": "Téléchargement…",
+	"model_browser.inventory_unavailable": "La liste des modèles installés est indisponible.",
 	"model_browser.install_runtime": "Installer %s",
 	"model_browser.install_installed": "Déjà installé sur cet ordinateur.",
 	"model_browser.install_running": "Installation de {name}…",

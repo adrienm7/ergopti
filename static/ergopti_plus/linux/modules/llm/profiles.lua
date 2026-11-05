@@ -158,6 +158,15 @@ function M.get_cached_models()
 	return _inventory and _inventory.peek() or {}
 end
 
+--- Returns the cache and whether it belongs to the current runtime source.
+--- @return table models
+--- @return boolean known
+--- @return table|nil identity Opaque identity of the exact published cache.
+function M.get_cached_models_status()
+	if not _inventory then return {}, false end
+	return _inventory.peek_status()
+end
+
 --- Requests a deferred refresh, coalescing with retained work.
 --- @return table Immediate array projection.
 function M.refresh_models()

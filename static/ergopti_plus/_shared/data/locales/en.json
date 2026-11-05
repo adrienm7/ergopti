@@ -1957,6 +1957,7 @@
 	"model_browser.add_provider_label": "API provider to add",
 	"model_browser.add_provider_button": "Add this provider…",
 	"model_browser.status_downloading": "Downloading…",
+	"model_browser.inventory_unavailable": "Installed model list is unavailable.",
 	"model_browser.install_runtime": "Install %s",
 	"model_browser.install_installed": "Already installed on this computer.",
 	"model_browser.install_running": "Installing {name}…",

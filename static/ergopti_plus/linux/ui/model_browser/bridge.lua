@@ -49,9 +49,8 @@ local function load_catalogue()
 	return _catalogue
 end
 
-local function installed_lookup(frame)
+local function installed_lookup(models)
 	local lookup = {}
-	local models = frame.llm_ports.get_cached_models()
 	for _, name in ipairs(type(models) == "table" and models or {}) do
 		lookup[normalise_name(name)] = true
 	end
@@ -111,8 +110,18 @@ end
 
 local projection_current
 
-local function build_payload(frame)
-	local installed = installed_lookup(frame)
+local function build_payload(frame, force_unknown)
+	local models, inventory_known, inventory_identity
+	if force_unknown then models, inventory_known = {}, false
+	else
+		local ok
+		ok, models, inventory_known, inventory_identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok then models, inventory_known, inventory_identity = {}, false, nil end
+	end
+	if inventory_known ~= true or type(inventory_identity) ~= "table" then
+		models, inventory_known, inventory_identity = {}, false, nil
+	end
+	local installed = installed_lookup(models)
 	local current = frame.llm_ports.get_current_model() or ""
 	local backend = type(frame.llm.get_backend) == "function" and frame.llm.get_backend() or "ollama"
 	local runs = {}
@@ -127,7 +136,7 @@ local function build_payload(frame)
 		end
 	end
 	local custom = {}
-	for _, name in ipairs(frame.llm_ports.get_cached_models() or {}) do
+	for _, name in ipairs(type(models) == "table" and models or {}) do
 		if not in_catalogue[normalise_name(name)] then
 			custom[#custom + 1] = { name = name, runtime_name = name, custom = true, installed = true }
 		end
@@ -170,13 +179,18 @@ local function build_payload(frame)
 	end
 	local rows, urls = {}, {}
 	for _, row in ipairs(payload.models) do
+		if row.backend == "ollama" and inventory_known ~= true then
+			row.available = false
+			row.inventory_unknown = true
+			row.hint_key = "model_browser.inventory_unavailable"
+		end
 		-- A pull still running keeps its percentage across a new payload.
 		local percent = row.backend == "ollama" and frame.progress[row.runtime_name] or nil
 		if percent ~= nil then row.pending, row.progress = "download", percent end
 		rows[(row.backend or "") .. "\0" .. row.name] = row
 		if type(row.url) == "string" and row.url ~= "" then urls[row.url] = true end
 	end
-	return payload, rows, urls, runs
+	return payload, rows, urls, runs, models, inventory_known == true, inventory_identity
 end
 
 local function retained(frame)
@@ -197,16 +211,45 @@ projection_current = function(frame)
 	return ports.document_owner_retained(frame.document) == true and retained(frame)
 end
 
-local function push_payload(frame)
-	if not projection_current(frame) then return false, nil end
-	local payload, rows, urls, runs = build_payload(frame)
-	if not projection_current(frame) then return false, nil end
+--- Checks that the model observation still belongs to the current runtime.
+local function inventory_current(frame, models, known, identity)
+	local ok, current, current_known, current_identity = pcall(frame.llm_ports.get_cached_models_status)
+	if not ok or (current_known == true) ~= known or type(current) ~= "table" then return false end
+	if not known then return true end
+	if type(identity) ~= "table" or not rawequal(identity, current_identity) then return false end
+	if type(models) ~= "table" or #models ~= #current then return false end
+	for index, name in ipairs(models) do if current[index] ~= name then return false end end
+	return true
+end
+
+local function push_payload(frame, force_unknown)
+	frame.projection_serial = (frame.projection_serial or 0) + 1
+	local serial = frame.projection_serial
+	local function owned_projection()
+		return frame.projection_serial == serial and projection_current(frame) and frame.projection_serial == serial
+	end
+	if not owned_projection() then return false, nil end
+	local payload, rows, urls, runs, models, known, identity = build_payload(frame, force_unknown)
+	if not owned_projection() then return false, nil end
 	local ok_json, encoded = pcall(Json.encode, payload)
-	if not ok_json or type(encoded) ~= "string" or not projection_current(frame) then return false, nil end
+	if not ok_json or type(encoded) ~= "string" or not owned_projection() then return false, nil end
+	if not force_unknown and not inventory_current(frame, models, known, identity) then
+		if frame.projection_serial ~= serial then return false, nil end
+		return push_payload(frame, true)
+	end
+	if frame.projection_serial ~= serial then return false, nil end
 	local called, accepted = pcall(frame.manager_ports.eval_owned_js, APP_NAME, frame.document,
 		"if(window.injectModels)window.injectModels(" .. encoded .. ")")
-	local pushed = called and accepted == true and projection_current(frame)
-	if pushed then frame.rows, frame.urls, frame.runs = rows, urls, runs end
+	local pushed = called and accepted == true and owned_projection()
+	if pushed and not force_unknown and not inventory_current(frame, models, known, identity) then
+		if frame.projection_serial ~= serial then return false, nil end
+		return push_payload(frame, true)
+	end
+	if frame.projection_serial ~= serial then return false, nil end
+	if pushed then
+		frame.rows, frame.urls, frame.runs = rows, urls, runs
+		frame.inventory_known, frame.inventory_identity = known, identity
+	end
 	return pushed, payload
 end
 
@@ -268,7 +311,7 @@ local function capture_projection(state, context)
 		if type(manager[name]) ~= "function" then return nil end
 		frame.manager_ports[name] = manager[name]
 	end
-	for _, name in ipairs({ "get_cached_models", "get_current_model", "refresh_models" }) do
+	for _, name in ipairs({ "get_cached_models", "get_cached_models_status", "get_current_model", "refresh_models" }) do
 		if type(state.llm[name]) ~= "function" then return nil end
 		frame.llm_ports[name] = state.llm[name]
 	end
@@ -404,14 +447,22 @@ function M.on_message(payload, state, context)
 	if payload.action ~= "open_url" and not ollama_ready() then return { selected = false } end
 
 	local function installed_now()
-		local ok, models = pcall(frame.llm_ports.get_cached_models)
-		if not ok or type(models) ~= "table" or not projection_current(frame) then return nil end
+		if not projection_current(frame) then return nil end
+		local ok, models, known, identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok or known ~= true or type(models) ~= "table" or frame.inventory_known ~= true
+			or not rawequal(identity, frame.inventory_identity) or not projection_current(frame) then return nil end
+		-- The document probe above can itself retire the inventory source. Read
+		-- it again after that callback and use only pure retained-frame checks
+		-- before handing the decision to its immediate caller.
+		ok, models, known, identity = pcall(frame.llm_ports.get_cached_models_status)
+		if not ok or known ~= true or type(models) ~= "table" or not rawequal(identity, frame.inventory_identity)
+			or not retained(frame) then return nil end
 		local target = normalise_name(row.runtime_name)
 		for _, model in ipairs(models) do
 			if type(model) ~= "string" then return nil end
-			if normalise_name(model) == target then return projection_current(frame) and true or nil end
+			if normalise_name(model) == target then return retained(frame) and true or nil end
 		end
-		if not projection_current(frame) then return nil end
+		if not retained(frame) then return nil end
 		return false
 	end
 	if payload.action == "select_model" then
@@ -437,7 +488,7 @@ function M.on_message(payload, state, context)
 			if live_installed ~= nil and projection_current(frame) then push_payload(frame) end
 			return { downloading = false }
 		end
-		local downloading = type(frame.llm_ports.download_model) == "function" and projection_current(frame)
+		local downloading = type(frame.llm_ports.download_model) == "function"
 			and frame.llm_ports.download_model(row.runtime_name, row.name, function(succeeded)
 				if succeeded then changed() end
 			end) == true

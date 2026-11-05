@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "مزوّد API المراد إضافته",
 	"model_browser.add_provider_button": "إضافة هذا المزوّد…",
 	"model_browser.status_downloading": "جارٍ التنزيل…",
+	"model_browser.inventory_unavailable": "قائمة النماذج المثبتة غير متاحة.",
 	"model_browser.install_runtime": "تثبيت %s",
 	"model_browser.install_installed": "مثبّت بالفعل على هذا الحاسوب.",
 	"model_browser.install_running": "جارٍ تثبيت {name}…",

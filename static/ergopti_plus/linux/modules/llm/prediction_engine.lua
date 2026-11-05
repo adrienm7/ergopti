@@ -4060,6 +4060,16 @@ function M.get_cached_models()
 	return profiles and type(profiles.get_cached_models) == "function" and profiles.get_cached_models() or {}
 end
 
+--- Returns the current runtime's cached models without starting acquisition.
+--- @return table models
+--- @return boolean known
+--- @return table|nil identity Opaque identity of the exact published cache.
+function M.get_cached_models_status()
+	local profiles = get_profiles()
+	if not profiles or type(profiles.get_cached_models_status) ~= "function" then return {}, false end
+	return profiles.get_cached_models_status()
+end
+
 function M.get_current_model()
 	local profiles = get_profiles()
 	return profiles and type(profiles.get_current_model) == "function" and profiles.get_current_model() or nil

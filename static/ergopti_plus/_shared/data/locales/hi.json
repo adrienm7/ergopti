@@ -2327,6 +2327,7 @@
 	"model_browser.add_provider_label": "जोड़ने के लिए API प्रदाता",
 	"model_browser.add_provider_button": "यह प्रदाता जोड़ें…",
 	"model_browser.status_downloading": "डाउनलोड हो रहा है…",
+	"model_browser.inventory_unavailable": "इंस्टॉल किए गए मॉडलों की सूची उपलब्ध नहीं है।",
 	"model_browser.install_runtime": "%s इंस्टॉल करें",
 	"model_browser.install_installed": "इस कंप्यूटर पर पहले से इंस्टॉल है।",
 	"model_browser.install_running": "{name} इंस्टॉल हो रहा है…",
