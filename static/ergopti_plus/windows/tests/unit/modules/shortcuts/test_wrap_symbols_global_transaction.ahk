@@ -65,7 +65,7 @@ _WSGT20260813_WriteSuccess(StagePath, Content) {
 	_WSGT20260813_Events.Push("write")
 	_WSGT20260813_RecordCritical("write")
 	_WSGT20260813_RecordLive("write")
-	return 1
+	return FSWriteDurable(StagePath, Content)
 }
 
 _WSGT20260813_WriteRefused(StagePath, Content) {
@@ -113,7 +113,7 @@ _WSGT20260813_ReplaceSuccess(StagePath, TargetPath) {
 	_WSGT20260813_Events.Push("replace")
 	_WSGT20260813_RecordCritical("replace")
 	_WSGT20260813_RecordLive("replace")
-	return 1
+	return FSAtomicMoveReplace(StagePath, TargetPath)
 }
 
 _WSGT20260813_ReplaceRefused(StagePath, TargetPath) {
@@ -133,7 +133,7 @@ _WSGT20260813_ReplaceStringOne(StagePath, TargetPath) {
 _WSGT20260813_DeleteSuccess(StagePath) {
 	global _WSGT20260813_DeleteCalls
 	_WSGT20260813_DeleteCalls += 1
-	return 1
+	return FileExist(StagePath) ? FSDeleteStrict(StagePath) : 1
 }
 
 _WSGT20260813_DeleteStringOne(StagePath) {
@@ -176,29 +176,13 @@ _WSGT20260813_AssertRefused(Result, Context) {
 }
 
 _WSGT20260813_WithState(TestFn) {
-	global _WS_Config_Path, _WS_Disabled, _WS_Custom, _WS_LoadFailed
-	global _WS_StateEpoch, _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS
-	Saved := {
-		config_path: _WS_Config_Path,
-		disabled: _WS_Disabled,
-		custom: _WS_Custom,
-		load_failed: _WS_LoadFailed,
-		epoch: _WS_StateEpoch,
-		active: _WS_ACTIVE_PAIRS,
-		builtins: _WS_BUILTIN_PAIRS
-	}
-	Path := A_Temp . "\ergopti_wrap_symbols_global_transaction_"
-		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
-	AssertFalse(A_IsSuspended,
-		"the wrap-symbol transaction fixture must start unsuspended")
-	_WS_Config_Path := Path
-	_WS_BUILTIN_PAIRS := [
-		Map("left", "(", "right", ")"),
-		Map("left", "[", "right", "]")
-	]
-	_WS_Disabled := Map("[", true)
-	_WS_Custom := [Map("left", "a", "right", "b")]
-	_WS_LoadFailed := false
+	return _WSSA_WithOwnedSource(_WSGT20260813_WithAdmittedState.Bind(TestFn))
+}
+_WSGT20260813_WithAdmittedState(TestFn, Root, Path, Source) {
+	global _WS_StateEpoch, _WS_ACTIVE_PAIRS, _WS_BUILTIN_PAIRS, _WS_Disabled, _WS_Custom
+	; The outer scope already called genuine Init on the physical seed. Keep
+	; the historic small catalogue while retaining the actual admitted objects.
+	_WS_BUILTIN_PAIRS := [Map("left", "(", "right", ")"), Map("left", "[", "right", "]")]
 	_WS_StateEpoch := 2026081300
 	_WS_ACTIVE_PAIRS := _WS_BuildActivePairs(_WS_Disabled, _WS_Custom)
 	_WSGT20260813_ResetSeams()
@@ -209,14 +193,6 @@ _WSGT20260813_WithState(TestFn) {
 		CurrentOwner := _ConfigWriteLeaseCurrent(Path)
 		if CurrentOwner is Object
 			_ConfigWriteLeaseRelease(CurrentOwner)
-		_WS_Config_Path := Saved.config_path
-		_WS_Disabled := Saved.disabled
-		_WS_Custom := Saved.custom
-		_WS_LoadFailed := Saved.load_failed
-		_WS_StateEpoch := Saved.epoch
-		_WS_ACTIVE_PAIRS := Saved.active
-		_WS_BUILTIN_PAIRS := Saved.builtins
-		try FileDelete(Path)
 	}
 }
 
@@ -744,11 +720,11 @@ _WSGT20260813_GuillemetsBody(Path) {
 	AssertTrue(InStr(Content, "char = " . Chr(0x22) . Guillemet . Chr(0x22)) > 0,
 		"the staged TOML keeps the exact spaced guillemet")
 
-	; The saved file must load back the same disabled value.
-	FileAppend(Content, Path, "UTF-8-RAW")
-	_WS_Disabled := Map()
-	_WS_Custom := []
-	_WS_Load()
+	; Successful ports performed real I/O. Reload those actual acknowledged
+	; bytes rather than appending a second complete serialization to the file.
+	AssertEqual(Content, FSReadUtf8Exact(Path))
+	SplitPath(Path, &FileName, &Directory)
+	AssertTrue(WrapSymbols_Init(Directory . "\"))
 	AssertTrue(_WS_Disabled.Has(Guillemet), "a reload keeps the guillemets disabled")
 }
 Test("wrap symbols: the spaced guillemets toggle, group and global actions commit (wrap-guillemets-length)",
@@ -988,8 +964,8 @@ for _WSSA_Mode in ["stale-add", "stale-toggle", "reload-add-control", "reload-to
 	Test("wrap source ownership: " . _WSSA_Mode, _WSSA_WithOwnedSource.Bind(_WSSA_ExternalSource.Bind(_WSSA_Mode)))
 
 _WSSA_NativeForward(State, This, Args*) {
-	AssertEqual(9, Args.Length, "the actual public mutation must reach the existing private save ABI")
-	Args.Push(_WSSA_NativeCutpoint.Bind(State))
+	AssertEqual(11, Args.Length, "the actual public mutation must forward its captured source receipt to the private save")
+	Args[10] := _WSSA_NativeCutpoint.Bind(State)
 	return Func.Prototype.Call.Call(This, Args*)
 }
 _WSSA_NativeCutpoint(State) {
@@ -1007,11 +983,16 @@ _WSSA_NativeCutpoint(State) {
 		Suspend(true)
 	else if State.mode == "reinitialize"
 		AssertTrue(WrapSymbols_Init(State.root . "\"), "a genuine successor init retires the old publication epoch")
+	else if State.mode == "source-edit" {
+		State.external := State.source . '[[custom]]`nleft = "e"`nright = "f"`n'
+		AssertTrue(FSWriteDurable(State.path, State.external))
+	} else if State.mode == "source-same-image-control"
+		AssertTrue(FSWriteDurable(State.path, State.source), "an actual new write of the same source image does not revoke its semantic owner")
 	State.retained := {custom: _WS_Custom, disabled: _WS_Disabled, active: _WS_ACTIVE_PAIRS, epoch: _WS_StateEpoch}
 }
 _WSSA_FinalNative(Mode, Root, Path, Source) {
 	global _WS_Custom, _WS_Disabled, _WS_ACTIVE_PAIRS, _WS_StateEpoch
-	State := {mode: Mode, root: Root, path: Path, Fired: 0, retained: 0}
+	State := {mode: Mode, root: Root, path: Path, source: Source, external: "", Fired: 0, retained: 0}
 	Owner := _WS_Save
 	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
 	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
@@ -1020,12 +1001,13 @@ _WSSA_FinalNative(Mode, Root, Path, Source) {
 		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _WSSA_NativeForward.Bind(State)})
 		Result := WrapSymbols_AddCustom("c", "d")
 		AssertEqual(1, State.Fired, "the actual public mutation must reach the private final native observation")
-		if Mode == "live-control" {
+		if Mode == "live-control" || Mode == "source-same-image-control" {
 			AssertTrue(Result)
 			AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
 			AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"))
 		} else {
-			AssertEqual(Source, FSReadUtf8Exact(Path), "a retired publication cannot alter its native durable source")
+			ExpectedSource := Mode == "source-edit" ? State.external : Source
+			AssertEqual(ExpectedSource, FSReadUtf8Exact(Path), "a retired publication cannot alter its native durable source")
 			AssertFalse(Result)
 			AssertTrue(_WS_Custom == State.retained.custom && _WS_Disabled == State.retained.disabled && _WS_ACTIVE_PAIRS == State.retained.active,
 				"the actual retained or successor RAM projection must remain attached")
@@ -1039,5 +1021,45 @@ _WSSA_FinalNative(Mode, Root, Path, Source) {
 		Suspend(WasSuspended)
 	}
 }
-for _WSSA_NativeMode in ["suspend", "reinitialize", "live-control"]
+for _WSSA_NativeMode in ["suspend", "reinitialize", "live-control", "source-edit", "source-same-image-control"]
 	Test("wrap final native admission: " . _WSSA_NativeMode, _WSSA_WithOwnedSource.Bind(_WSSA_FinalNative.Bind(_WSSA_NativeMode)))
+
+_WSSA_ObserveAckRead(State, This, Args*) {
+	Read := Func.Prototype.Call.Call(This, Args*)
+	if !State.Fired && Args.Length > 0 && Args[1] == State.path && Read is Map && Read.Get("status", "") == "ok" {
+		Document := _WSIC_Document(Read["content"])
+		if Document.Has("custom") && _WSIC_HasPair(Document["custom"], "c", "d") {
+			State.Fired := true
+			AssertFalse(A_IsCritical, "the genuine post-rename readback must execute outside a memory Critical span")
+			if State.mode == "pause-after-ack"
+				Suspend(true)
+		}
+	}
+	return Read
+}
+_WSSA_PostAck(Mode, Root, Path, Source) {
+	global _WS_Custom, _WS_ACTIVE_PAIRS
+	State := {mode: Mode, path: Path, Fired: false}
+	Owner := FSReadWithStatus
+	HadCall := Object.Prototype.HasOwnProp.Call(Owner, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(Owner, "Call") : false
+	WasSuspended := A_IsSuspended
+	try {
+		AssertFalse(HadCall, "the post-ACK observer must not bypass an unknown read owner")
+		Object.Prototype.DefineProp.Call(Owner, "Call", {Call: _WSSA_ObserveAckRead.Bind(State)})
+		Result := WrapSymbols_AddCustom("c", "d")
+		AssertTrue(State.Fired, "the real native rename must precede the observed readback of its new exact bytes")
+		AssertTrue(Result, "a later pause cannot revoke a write that already became durable")
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "c", "d"), "the acknowledged projection must publish even if pause follows the native commit")
+		AssertTrue(_WS_ACTIVE_PAIRS.Has("c"))
+		AssertTrue(_WSIC_HasPair(_WSIC_Document(FSReadUtf8Exact(Path))["custom"], "c", "d"))
+	} finally {
+		if HadCall
+			Object.Prototype.DefineProp.Call(Owner, "Call", SavedCall)
+		else if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			Object.Prototype.DeleteProp.Call(Owner, "Call")
+		Suspend(WasSuspended)
+	}
+}
+for _WSSA_AckMode in ["pause-after-ack", "live-after-ack-control"]
+	Test("wrap acknowledged publication: " . _WSSA_AckMode, _WSSA_WithOwnedSource.Bind(_WSSA_PostAck.Bind(_WSSA_AckMode)))
