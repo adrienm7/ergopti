@@ -49,6 +49,7 @@ M.reset_ngram_ctx = C.reset_ngram_ctx
 M.set_device_id  = C.set_device_id
 M.get_device_id  = C.get_device_id
 
+M.settle_contexts   = Events.settle_contexts
 M.walk_typing       = Events.walk_typing
 M.walk_app_switch   = Events.walk_app_switch
 M.walk_window_switch = Events.walk_window_switch

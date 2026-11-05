@@ -54,4 +54,24 @@ helpers.describe("rules_engine: prefixes register at start() without enable_grou
 		helpers.assert_eq(options["06*"].is_magic_trigger, true,
 			"an already-substituted dynamic trigger must carry explicit magic ownership")
 	end)
+	helpers.it("registers compact and formatted IBAN prefixes with nonbreaking spaces", function()
+		local RE = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
+		local added = {}
+		local km = {
+			add = function(trigger, repl) added[trigger] = repl end,
+			is_section_enabled = function() return true end,
+			set_group_context = function() end, sort_mappings = function() end,
+			register_lua_group = function() end, set_post_load_hook = function() end,
+			register_interceptor = function() end, register_preview_provider = function() end,
+			registry_transaction = function(_, mutation) return mutation() == true end,
+		}
+		local iban = "FR76 12 3456"
+		RE.inject_data({ iban = iban, social_security_number = "1 23 45 678" }, "*")
+		RE.start(km)
+		helpers.assert_eq(added["FR7612"], "FR76123456")
+		helpers.assert_eq(added["FR76 12"], iban)
+		helpers.assert_eq(added["12345"], "12345678")
+		helpers.assert_eq(added["1 23 45"], "1 23 45 678")
+	end)
+
 end)

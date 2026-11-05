@@ -1778,7 +1778,7 @@ TapHoldHoldLayerImport(HoldOpt, LayersConfigDir) {
 	}
 	Import["path"] := Path
 	if FileExist(Path)
-		return Import
+		return _TapHoldReadableLayer(Path) ? Import : false
 	Owner := _ConfigWriteLeaseTryAcquire(Path, "nav-layer-import")
 	if !(Owner is Object) {
 		try LoggerError("TapHoldWriter",
@@ -1795,7 +1795,7 @@ TapHoldHoldLayerImport(HoldOpt, LayersConfigDir) {
 	if !(Created is Integer) || Created != 1 {
 		; CREATE_NEW refuses a file that appeared since the probe: it is the user's.
 		if FileExist(Path)
-			return Import
+			return _TapHoldReadableLayer(Path) ? Import : false
 		try LoggerError("TapHoldWriter",
 			"The recommended navigation layer could not be written to '{1}'. The hold was not changed.", Path)
 		return false
@@ -1804,6 +1804,18 @@ TapHoldHoldLayerImport(HoldOpt, LayersConfigDir) {
 	Import["content"] := Preset["text"]
 	try LoggerInfo("TapHoldWriter", "Recommended navigation layer imported into '{1}'.", Path)
 	return Import
+}
+
+; A present path is not necessarily a readable layer (it may be a directory or
+; access may be denied). Never report a successful import in that case.
+_TapHoldReadableLayer(Path) {
+	try {
+		FSReadBytesStrict(Path)
+		return true
+	} catch {
+		try LoggerError("TapHoldWriter", "Cannot read the existing navigation layer '{1}'. The hold was not changed.", Path)
+		return false
+	}
 }
 
 ; Removes the layers.toml TapHoldHoldLayerImport created, while it still holds

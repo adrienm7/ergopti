@@ -51,13 +51,37 @@ function M.walk_typing(entry)
 		local hour, minute = os.date("%H"), tonumber(os.date("%M"))
 		slot = { hour = hour, min5 = string.format("%s:%02d", hour, math.floor(minute / 5) * 5) }
 	end
-	C.walker.walk_typing(S.agg_batch, C.get_app_ctx(app), {
+	local date = timestamp and timestamp:match("^(%d%d%d%d%-%d%d%-%d%d)") or C.today()
+	local ctx = C.get_app_ctx(app)
+	-- The shared walker attributes a naturally completed word, burst or
+	-- session to the day of the event that completes it. Remember the last
+	-- event day for streams still open when a durable boundary arrives.
+	-- A date change alone never closes or resets the context.
+	if #entry.events > 0 then ctx.typing_date = date end
+	C.walker.walk_typing(S.agg_batch, ctx, {
 		app = app,
-		date = timestamp and timestamp:match("^(%d%d%d%d%-%d%d%-%d%d)") or C.today(),
+		date = date,
 		events = entry.events,
 		layout = entry.layout,
 		title = entry.title,
 	}, function() return slot end)
+end
+
+
+--- Finish every open logical stream using its captured day before retirement.
+--- Unknown historical owners cannot be assigned to a guessed day.
+function M.settle_contexts()
+	if not C.require_init("settle_contexts") then return false end
+	C.ensure_batch()
+	for app, ctx in pairs(S.ngram_ctx or {}) do
+		if type(ctx) ~= "table" then error("invalid aggregate context", 0) end
+		if ctx.typing_date then
+			C.walker.settle(S.agg_batch, ctx, ctx.typing_date, app, nil, true)
+		elseif (ctx.cur_word or "") ~= "" or ctx.current_burst or ctx.current_session or ctx.last_was_bs then
+			error("aggregate context has no typing date", 0)
+		end
+	end
+	return true
 end
 
 

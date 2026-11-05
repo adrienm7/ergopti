@@ -12,8 +12,8 @@
 --- same contract in windows/platform/remap/layers_loader.ahk.
 ---
 --- FEATURES & RATIONALE:
---- 1. Additive only: an existing layers.toml — edited, empty, or unreadable —
----    is the user's and is never replaced, merged into or removed.
+--- 1. Additive only: an existing layers.toml is the user's and is never
+---    replaced, merged into or removed. An unreadable path refuses the import.
 --- 2. Exact: the file is created with the preset's bytes through the shared
 ---    writer's "must still be absent" precondition, and undo() removes it only
 ---    while it still holds those bytes, so a later edit always survives.
@@ -121,10 +121,8 @@ function M.import_if_absent(opts)
 	local preset = M.read(opts.shared_root, opts.toml_decode)
 	local path = folder(opts.config_dir) .. "/" .. preset.user_file
 	local _, status, detail = TomlWriter.read_classified(path, opts.file_adapter)
-	if status ~= "absent" then
-		return { status = M.KEPT, path = path,
-			detail = status ~= "ok" and tostring(detail or status) or nil }
-	end
+	if status == "ok" then return { status = M.KEPT, path = path } end
+	if status ~= "absent" then return nil, path .. ": " .. tostring(detail or status) end
 	local written, err, retry_cleanup = TomlWriter.publish_if_unchanged(path, preset.text, opts.file_adapter, { status = "absent" })
 	if written ~= true then
 		local failed = type(retry_cleanup) == "function" and {

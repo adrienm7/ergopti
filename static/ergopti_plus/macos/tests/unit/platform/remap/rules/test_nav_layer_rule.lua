@@ -388,6 +388,21 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 		end
 	end)
 
+	helpers.it("refuses an unreadable existing navigation layer", function()
+		with_folder(function(dir)
+			local writes = 0
+			local import, err = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir,
+				file_adapter = {
+					read_with_status = function() return nil, "error", "permission denied" end,
+					write_if_unchanged = function() writes = writes + 1; return true end,
+				},
+			})
+			helpers.assert_nil(import, "an unreadable layer must not be reported as usable")
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(writes, 0, "the inaccessible file remains untouched")
+		end)
+	end)
+
 	helpers.it("(nav-layer-fresh-install-default) an undo removes only the file the import created, as it created it", function()
 		with_folder(function(dir)
 			local import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
