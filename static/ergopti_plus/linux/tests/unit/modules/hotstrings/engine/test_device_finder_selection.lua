@@ -403,6 +403,14 @@ helpers.describe("device_finder: a path must be able to produce key events", fun
 			"and the reason must say what kind of path was expected")
 	end)
 
+	helpers.it("refuses a different file with the basename of a listed event node", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local devices = finder.parse_devices(PHYSICAL_KEYBOARD)
+		local ok, why = finder.is_key_device("/tmp/event3", devices)
+		helpers.assert_true(not ok, "an unrelated readable file must not inherit a keyboard's capabilities")
+		helpers.assert_true(type(why) == "string" and why:find("eventN", 1, true) ~= nil)
+	end)
+
 	helpers.it("refuses an eventN node the kernel does not list", function()
 		local finder = helpers.load_module("modules.hotstrings.device_finder")
 		local ok, why = finder.is_key_device("/dev/input/event99", {})

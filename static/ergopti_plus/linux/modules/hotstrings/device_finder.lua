@@ -220,7 +220,8 @@ function M.is_key_device(path, devices)
 		return false, "no device path"
 	end
 	local basename = NativePath.basename(path)
-	if not basename or not basename:match("^event%d+$") then
+	-- Proc handlers name nodes in /dev/input, not arbitrary matching basenames.
+	if not basename or not basename:match("^event%d+$") or path ~= DEV_INPUT_DIR .. basename then
 		return false, path .. " is not an /dev/input/eventN node"
 	end
 	for _, dev in ipairs(type(devices) == "table" and devices or read_proc_devices()) do
