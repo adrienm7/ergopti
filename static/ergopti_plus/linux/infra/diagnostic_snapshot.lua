@@ -63,7 +63,17 @@ local function os_release_value(text, key)
 	if type(text) ~= "string" then return nil end
 	for line in text:gmatch("[^\n]+") do
 		local k, v = line:match("^([%u_]+)=(.*)$")
-		if k == key then return (v:gsub('^"(.*)"$', "%1")) end
+		if k == key then
+			local quote = v:sub(1, 1)
+			if #v >= 2 and quote == "'" and v:sub(-1) == quote then return v:sub(2, -2) end
+			if #v >= 2 and quote == '"' and v:sub(-1) == quote then
+				return (v:sub(2, -2):gsub("\\(.)", function(char)
+					if char == "\\" or char == '"' or char == "$" or char == string.char(96) then return char end
+					return "\\" .. char
+				end))
+			end
+			return v
+		end
 	end
 	return nil
 end
