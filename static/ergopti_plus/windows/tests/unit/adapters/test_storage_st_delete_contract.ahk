@@ -272,3 +272,158 @@ for _STNN_Mode in ["set", "get", "has", "delete", "unicode-control", "default-co
 
 for _STNC_Mode in ["integer-key-control", "float-key-control"]
 	Test("storage native name legacy coercion: " . _STNC_Mode . " (storage-native-name-coercion)", _STNN_ActualName.Bind(_STNC_Mode))
+
+_STSP_FloatBits(Value) {
+	if !(Value is Float)
+		return "<" . Type(Value) . ">"
+	Bytes := Buffer(8)
+	NumPut("Double", Value, Bytes)
+	return Format("{:016x}", NumGet(Bytes, 0, "Int64"))
+}
+
+_STSP_ActualPayload(Mode) {
+	global STORAGE_REG_BASE
+	SavedBase := STORAGE_REG_BASE
+	Subkey := "Software\Ergopti_StorageScalarAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := "HKCU\" . Subkey, Owned := false, Handle := 0
+	if Mode == "float-wide" || Mode == "float-exact-control" {
+		Requested := JsonParse(Mode == "float-wide" ? '{"value":0.30000000000000004}' : '{"value":42.5}')["value"]
+		AssertTrue(Requested is Float)
+		AssertEqual(Mode == "float-wide" ? "3fd3333333333334" : "4045400000000000", _STSP_FloatBits(Requested),
+			"the genuine JSON producer must first retain the independent expected binary64 value")
+	} else {
+		Payload := JsonParse('{"value":"A\u0000B"}')
+		Scalar := Payload["value"]
+		AssertEqual(3, StrLen(Scalar))
+		AssertEqual(0, NumGet(StrPtr(Scalar), 2, "UShort"))
+		AssertEqual(66, NumGet(StrPtr(Scalar), 4, "UShort"))
+		Requested := Mode == "nul-map-control" ? Payload : Scalar
+	}
+	try {
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 0xF003F,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		Owned := Status == 0 && Disposition == 1
+		AssertTrue(Owned)
+		AssertTrue(Handle != 0)
+		STORAGE_REG_BASE := Path
+		AssertTrue(ST_Set("payload", "Original"))
+		AssertEqual("Original", ST_Get("payload", "missing"))
+		Result := ST_Set("payload", Requested)
+		Actual := ST_Get("payload", "missing")
+		Observed := Mode == "nul-map-control" && (Actual is Map) && Actual.Has("value") ? Actual["value"] : Actual
+		_TestPrint("# storage-scalar-persistence mode=" . Mode . " disposition=" . Disposition . " result=" . Result
+			. " actual_type=" . Type(Actual) . " actual_float_bits=" . _STSP_FloatBits(Actual)
+			. " actual_string_units=" . (Observed is String ? StrLen(Observed) : -1))
+		if Mode == "float-wide" || Mode == "float-exact-control" {
+			AssertTrue(Result)
+			AssertTrue(Actual is Float)
+			AssertEqual(_STSP_FloatBits(Requested), _STSP_FloatBits(Actual), "a successful persistent numeric value must retain every original binary64 bit")
+		} else if Result {
+			if Mode == "nul-map-control"
+				AssertTrue(Actual is Map, "the ordinary JSON envelope remains a genuine supported nested-value control")
+			AssertTrue(Observed is String)
+			AssertEqual(3, StrLen(Observed), "a successful persisted String must retain its original complete native units")
+			AssertEqual(65, NumGet(StrPtr(Observed), 0, "UShort"))
+			AssertEqual(0, NumGet(StrPtr(Observed), 2, "UShort"))
+			AssertEqual(66, NumGet(StrPtr(Observed), 4, "UShort"))
+		} else {
+			AssertTrue(Mode == "nul-string", "the genuinely supported JSON-map control must not be refused")
+			AssertEqual("Original", Actual, "an unsupported scalar must refuse without replacing its original value")
+		}
+	} finally {
+		STORAGE_REG_BASE := SavedBase
+		try {
+			if Owned
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647, "Str", Subkey, "UInt"))
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+		}
+	}
+}
+for _STSP_Mode in ["float-wide", "float-exact-control", "nul-string", "nul-map-control"]
+	Test("storage scalar persistence: " . _STSP_Mode . " (storage-native-scalar-persistence)", _STSP_ActualPayload.Bind(_STSP_Mode))
+
+_STNT_NativeValueCount(Handle) {
+	Status := DllCall("Advapi32\RegQueryInfoKeyW", "Ptr", Handle,
+		"Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr", 0,
+		"UInt*", &Count := 0, "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if Status != 0
+		throw OSError(Status, "private native registry value-count query")
+	return Count
+}
+
+_STNT_ClearCountedName(CountedNul) {
+	global STORAGE_REG_BASE, STORAGE_VALUE_PREFIX
+	SavedBase := STORAGE_REG_BASE
+	Subkey := "Software\Ergopti_StorageCountedAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := "HKCU\" . Subkey, Handle := 0, Owned := false
+	Name := JsonParse(CountedNul ? '{"name":"owned\u0000foreign"}' : '{"name":"owned_foreign"}')["name"]
+	AssertEqual(13, StrLen(Name))
+	NameBytes := Buffer((StrLen(Name) + 1) * 2, 0)
+	DllCall("ntdll\RtlMoveMemory", "Ptr", NameBytes, "Ptr", StrPtr(Name), "UPtr", StrLen(Name) * 2)
+	if CountedNul {
+		AssertEqual(0, NumGet(NameBytes, 10, "UShort"))
+		AssertEqual(Ord("f"), NumGet(NameBytes, 12, "UShort"))
+	}
+	try {
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 0xF003F,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		Owned := Status == 0 && Disposition == 1
+		AssertTrue(Owned)
+		AssertTrue(Handle != 0)
+		STORAGE_REG_BASE := Path
+		AssertTrue(ST_Set("owned", "Original"))
+		Value := STORAGE_VALUE_PREFIX . "s:Distinct"
+		ValueBytes := Buffer(StrPut(Value, "UTF-16") * 2, 0)
+		StrPut(Value, ValueBytes, "UTF-16")
+		UnicodeName := Buffer(2 * A_PtrSize, 0)
+		NumPut("UShort", StrLen(Name) * 2, "UShort", NameBytes.Size, UnicodeName)
+		NumPut("Ptr", NameBytes.Ptr, UnicodeName, A_PtrSize)
+		NtStatus := DllCall("ntdll\NtSetValueKey", "Ptr", Handle, "Ptr", UnicodeName,
+			"UInt", 0, "UInt", 1, "Ptr", ValueBytes, "UInt", ValueBytes.Size, "UInt")
+		_TestPrint("# storage-counted-name setup counted_nul=" . CountedNul . " nt_status=" . Format("0x{:08X}", NtStatus))
+		AssertEqual(0, NtStatus, "the actual NT counted-name producer must successfully create this distinct private native value")
+		BeforeCount := _STNT_NativeValueCount(Handle)
+		AssertEqual(2, BeforeCount)
+		AssertEqual("Original", ST_Get("owned", "missing"), "the counted-name producer must not have overwritten its distinct short neighbor")
+		FullNativeNames := 0
+		loop BeforeCount {
+			Characters := 64, RawName := Buffer(Characters * 2, 0)
+			EnumStatus := DllCall("Advapi32\RegEnumValueW", "Ptr", Handle, "UInt", A_Index - 1,
+				"Ptr", RawName, "UInt*", &Characters, "Ptr", 0, "Ptr", 0, "Ptr", 0, "Ptr", 0, "UInt")
+			AssertEqual(0, EnumStatus)
+			if Characters == StrLen(Name) && DllCall("ntdll\RtlCompareMemory", "Ptr", RawName,
+					"Ptr", NameBytes, "UPtr", Characters * 2, "UPtr") == Characters * 2
+				FullNativeNames += 1
+		}
+		AssertEqual(1, FullNativeNames, "the actual Win32 inventory must retain all counted UTF-16 units before any String conversion")
+		Result := ST_Clear()
+		AfterCount := _STNT_NativeValueCount(Handle)
+		_TestPrint("# storage-counted-name clear counted_nul=" . CountedNul . " native_full_names=" . FullNativeNames
+			. " before_count=" . BeforeCount . " result=" . Result . " after_count=" . AfterCount)
+		AssertTrue((Result is Integer) && (Result == 0 || Result == 1))
+		if Result
+			AssertEqual(0, AfterCount, "a clear ACK must not leave a counted native value hidden behind its shorter Win32 alias")
+		if !CountedNul {
+			AssertTrue(Result, "the same actual NT producer remains an ordinary supported-name positive control")
+			AssertEqual(0, AfterCount)
+		}
+	} finally {
+		STORAGE_REG_BASE := SavedBase
+		try {
+			if Owned
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647, "Str", Subkey, "UInt"))
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+		}
+	}
+}
+for _STNT_Counted in [true, false]
+	Test("storage counted native name inventory: nul=" . _STNT_Counted
+		. " (storage-native-counted-inventory)", _STNT_ClearCountedName.Bind(_STNT_Counted))
