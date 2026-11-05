@@ -263,24 +263,9 @@ end
 -- =====================================
 -- =====================================
 
---- Counts the code points of a UTF-8 text without the utf8 library LuaJIT lacks.
---- @param text string
---- @return integer|nil count Nil when the text is not valid UTF-8.
-local function utf8_length(text)
-	local count, i, n = 0, 1, #text
-	while i <= n do
-		local b = text:byte(i)
-		local len = b < 0x80 and 1 or (b >= 0xC2 and b <= 0xDF) and 2 or (b >= 0xE0 and b <= 0xEF) and 3
-			or (b >= 0xF0 and b <= 0xF4) and 4 or nil
-		if len == nil or i + len - 1 > n then return nil end
-		for k = i + 1, i + len - 1 do
-			local c = text:byte(k)
-			if c < 0x80 or c > 0xBF then return nil end
-		end
-		count, i = count + 1, i + len
-	end
-	return count
-end
+-- The shared validator rejects overlong sequences, surrogate code points and
+-- values above U+10FFFF as well as malformed continuation bytes.
+local utf8_length = require("compat.utf8").len
 
 --- Reports whether a value is an email address.
 --- @param value any
