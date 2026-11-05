@@ -240,7 +240,7 @@ helpers.describe("linux-native-focus-identity", function()
 			for tick = 1, 5 do lifecycle.tick(tick) end
 			lifecycle.stop()
 			shell._reset_runner()
-			helpers.assert_eq(probes, 10, "five polls need one window ID and one title query each, never a second focus snapshot")
+			helpers.assert_eq(probes, 15, "five polls need one window ID, title and PID query each, never a second focus snapshot")
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		helpers.assert_true(ok, tostring(failure))

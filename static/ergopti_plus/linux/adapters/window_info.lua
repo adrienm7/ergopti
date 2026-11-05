@@ -173,13 +173,17 @@ local function focused_x11()
 		if not win_id then return nil end
 		title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
 		if not title then return nil end
-		native_pid = nil
+		native_pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
 	end
 
 	local info = empty_info()
 	info.windowTitle = title
 
-	if win_id == _x11_cache.id and title == _x11_cache.title and _x11_cache.appId ~= "" then
+	-- The X server can reuse a window ID and title for a different process.
+	-- A native query already carries its PID, so it must still match the owner
+	-- behind the cached attribution (including when the property disappears).
+	local same_native_owner = tonumber(native_pid) == _x11_cache.pid
+	if win_id == _x11_cache.id and title == _x11_cache.title and same_native_owner and _x11_cache.appId ~= "" then
 		info.appId = _x11_cache.appId
 		return info, _x11_cache.identity, _x11_cache.pid
 	end
@@ -189,9 +193,6 @@ local function focused_x11()
 	-- already attributed to, and what the other two drivers report; WM_CLASS
 	-- would be a nicer identity and a silent break of every stored attribution.
 	local pid = native_pid
-	if pid == nil and (native_reason ~= nil or not X11Focus.has_transport()) then
-		pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
-	end
 	info.appId = comm_of(pid)
 
 	_x11_cache.id = win_id
