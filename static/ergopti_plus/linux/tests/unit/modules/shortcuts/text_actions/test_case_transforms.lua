@@ -541,7 +541,7 @@ helpers.describe("shared selection helper command ownership", function()
 				helpers.assert_eq(effects.chords, vector.chords)
 				if vector.clipboard then
 					helpers.assert_eq(effects.reads, 1)
-					helpers.assert_eq(effects.injections, { { 0, vector.clipboard, false } })
+					helpers.assert_eq(effects.injections, { { 0, vector.clipboard, true } })
 				else
 					helpers.assert_eq(effects.reads, 0)
 					helpers.assert_eq(#effects.injections, 0)
@@ -623,7 +623,7 @@ helpers.describe("shared selection helper command ownership", function()
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(effects.reads, 2)
 				helpers.assert_eq(#effects.injections, failure == "refuse_read" and 1 or 2)
-				helpers.assert_eq(effects.injections[#effects.injections], { 0, "été Straße Москва", false })
+				helpers.assert_eq(effects.injections[#effects.injections], { 0, "été Straße Москва", true })
 			end)
 		end)
 	end
