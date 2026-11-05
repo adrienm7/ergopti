@@ -35,7 +35,7 @@ end
 --- @param test function Receives the loaded module and the queued requests.
 local function isolated(test)
 	local saved = {}
-	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote" }) do saved[name] = package.loaded[name] end
+	for _, name in ipairs({ "adapters.http_client", "modules.llm.api_remote" }) do saved[name] = { value = package.loaded[name] } end
 	local calls = {}
 	package.loaded["adapters.http_client"] = {
 		post = function(url, headers, body, callback)
@@ -49,8 +49,7 @@ local function isolated(test)
 		remote._reset_for_test()
 		test(remote, calls)
 	end)
-	for name, value in pairs(saved) do package.loaded[name] = value end
-	if saved["modules.llm.api_remote"] == nil then package.loaded["modules.llm.api_remote"] = nil end
+	for name, entry in pairs(saved) do package.loaded[name] = entry.value end
 	if not ok then error(err, 0) end
 end
 
