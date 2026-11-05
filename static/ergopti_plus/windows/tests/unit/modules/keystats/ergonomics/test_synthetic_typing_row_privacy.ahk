@@ -431,7 +431,7 @@ Test("meta hotstrings: a private fire raises the buffer-residue latch (personal-
 ; the real source, rather than assumed. If this test fails, section 1 has
 ; stopped testing the persisted row and must be re-pointed, never relaxed.
 _STRP_FlushPersistsTheBufferVerbatim() {
-	Body := _DriverFuncBody("KL_FlushBuffer")
+	Body := _DriverFuncBody("_KL_DetachBufferSnapshot")
 	Assert(RegExMatch(Body, "snap_text[ \t]*:=[ \t]*Keystats\.buffer_text"),
 		"KL_FlushBuffer must snapshot Keystats.buffer_text — the field this file asserts on")
 	Assert(RegExMatch(Body, "snap_events[ \t]*:=[ \t]*Keystats\.buffer_events"),

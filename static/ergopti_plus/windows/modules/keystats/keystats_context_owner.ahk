@@ -2,6 +2,7 @@
 ; Independent context-clock receipts. Publication guards and acknowledgements
 ; are RAM-only; preparation/classification stays outside their Critical sections.
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\keystats_buffer_snapshot.ahk
 
 _KL_ContextConfigStamp() {
 	return [ObjPtr(MetricsFilters.disabled_apps), MetricsFilters.private_browsing,
@@ -43,7 +44,7 @@ _KL_ContextNewFrame(Mode, NewApp, NewTitle, EndTick) {
 		: NewTitle !== KLHook.prev_title || AppNeeded
 	return {Mode: Mode, OldApp: KLHook.prev_app, OldTitle: KLHook.prev_title,
 		NewApp: NewApp, NewTitle: NewTitle, EndTick: EndTick, Config: _KL_ContextConfigStamp(),
-		Prepared: false, PrepareToken: false, Completed: false,
+		Prepared: false, BufferStaged: false, PrepareToken: false, Completed: false,
 		App: {Required: AppNeeded, Done: !AppNeeded, Filtered: false, Writer: false,
 			Origin: KLHook.app_entered_at, Shift: 0},
 		Title: {Required: TitleNeeded, Done: !TitleNeeded, Filtered: false, Writer: false,
@@ -108,6 +109,17 @@ _KL_ContextPrepare(Frame, Generation, Stopped) {
 			return true
 		Token := {}
 		Frame.PrepareToken := Token
+		if Frame.Mode = "transition" && !Frame.BufferStaged && (Frame.App.Required || Frame.Title.Required) {
+			; New input can arrive while the old payload's privacy classification
+			; yields. Detach A and name the empty live buffer B in this same claim,
+			; even when another flush is already publishing an older snapshot.
+			Snapshot := _KL_DetachBufferSnapshot()
+			if IsObject(Snapshot)
+				Keystats._retry_snapshots.Push(Snapshot)
+			Keystats.session_app := Frame.NewApp
+			Keystats.session_title := Frame.NewTitle
+			Frame.BufferStaged := true
+		}
 	} finally Critical(PreviousCritical)
 	if Frame.App.Required || Frame.Title.Required {
 		Guard := _KL_ContextPrepareCurrent.Bind(Frame, Token, Generation, Stopped)

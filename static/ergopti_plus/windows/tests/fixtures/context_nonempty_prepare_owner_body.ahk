@@ -15,15 +15,41 @@ _KCNP_Position() {
 _KCNP_Timer() {
 	global _KCNP
 	try {
-		_KSD_Require(Keystats._flush_in_progress && Keystats.mouse_distance == 0,
+		_KSD_Require(Keystats._flush_in_progress,
 			"The original A snapshot must already be detached while its real flush is active")
 		_KSD_Require(MetricsFocusCache.state.process_name == _KCNP.B.App,
 			"The actual canonical privacy owner must already identify the public B input")
+		if _KCNP.Mode == "external-active" || _KCNP.Mode == "abc-deferred" {
+			_KCNP.RefreshReturned := KL_Hook_RefreshContext(true)
+			if _KCNP.Mode == "abc-deferred"
+				_KSD_Require(!_KCNP.RefreshReturned && Keystats._flush_in_progress
+					&& IsObject(KLHook.context_transition),
+					"The real B context frame must remain deferred behind the older active flush")
+		}
 		_KCNP.SessionAtInput := Keystats.session_app
+		BeforeDistance := Keystats.mouse_distance
+		_KSD_Require(BeforeDistance == 0 || (_KCNP.Mode == "existing-retry-stop" && BeforeDistance == 5),
+			"Only the genuine preexisting A live buffer may precede this new public B sample")
 		KL_Mouse_ParkTick(, _KCNP_Position)
-		_KSD_Require(Keystats.mouse_distance == 5 && _KCNP.Samples == 3,
-			"The genuine public pointer producer must add exactly five new units into the fresh live buffer")
-		if _KCNP.Mode == "stop-during-prepare" {
+		_KSD_Require(Keystats.mouse_distance == BeforeDistance + 5
+			&& _KCNP.Samples == (_KCNP.Mode == "abc-deferred" ? 3 : _KCNP.ExpectedSamples),
+			"The genuine public pointer producer must add exactly five new B units")
+		if _KCNP.Mode == "abc-deferred" {
+			BeforeGeneration := MetricsFocusCache.generation
+			_KSD_Acquire(_KCNP.C)
+			_KSD_Require(MetricsFocusCache.generation > BeforeGeneration && !MF_ShouldFilter(),
+				"A third public context must be published by the real canonical focus owner")
+			_KCNP.CRefreshReturned := KL_Hook_RefreshContext(true)
+			_KSD_Require(!_KCNP.CRefreshReturned && Keystats._flush_in_progress
+				&& IsObject(KLHook.context_transition),
+				"The prior B frame must still be deferred when C input arrives")
+			_KCNP.SessionAtCInput := Keystats.session_app
+			BeforeC := Keystats.mouse_distance
+			KL_Mouse_ParkTick(, _KCNP_Position)
+			_KSD_Require(Keystats.mouse_distance == BeforeC + 5 && _KCNP.Samples == 4,
+				"The real public pointer producer must add exactly five new C units")
+		}
+		if _KCNP.Mode == "stop-during-prepare" || _KCNP.Mode == "existing-retry-stop" {
 			_KCNP.FirstStop := KL_Hook_Stop()
 			_KSD_Require(!_KCNP.FirstStop && KLHook.capture_stopping && IsObject(KLHook.context_stop),
 				"The nested real Stop must retain its close while the original nonempty flush is still active")
@@ -49,14 +75,28 @@ MF_ShouldFilter() {
 	}
 	return Result
 }
+; A controlled publication guard revokes a genuine detached attempt. It does
+; not manufacture a retry row, event id or app attribution; the real rollback
+; owner must return the exact snapshot and the exact pre-attempt flush clock.
+_KCNP_SeedGuard() {
+	global _KCNP
+	if Keystats._flush_in_progress {
+		_KCNP.SeedAttemptTick := Keystats.last_flush_time
+		return false
+	}
+	return true
+}
 _KCNP_Main() {
 	global _KSD, _KCNP
 	Keystats.initialized := true
 	MetricsFilters.secure_field := false
 	A := {App: "fixture-prepare-a.exe", Title: "Public prepare A", Hwnd: 1801}
 	_KCNP.B := {App: "fixture-prepare-b.exe", Title: "Public prepare B", Hwnd: 1802}
+	_KCNP.C := {App: "fixture-prepare-c.exe", Title: "Public prepare C", Hwnd: 1803}
+	if _KCNP.Mode == "abc-deferred"
+		_KCNP.ExpectedSamples := 4
 	KLAppCat.file_path := _KSD.Log . ".categories"
-	for Identity in [A, _KCNP.B]
+	for Identity in [A, _KCNP.B, _KCNP.C]
 		KLAppCat.categories[Identity.App] := Map("type", "fixture-known", "score", 0)
 	_KSD_Acquire(A)
 	_KSD_Require(KL_Hook_RefreshContext(true), "The actual initial public A must establish its native context")
@@ -64,40 +104,73 @@ _KCNP_Main() {
 	KL_Mouse_ParkTick(, _KCNP_Position)
 	_KSD_Require(Keystats.mouse_distance == 5 && Keystats.session_app == A.App,
 		"Exactly five original units must belong to A before the transition")
+	if _KCNP.Mode == "existing-retry-stop" {
+		_KCNP.ExpectedSamples := 4
+		_KCNP.ExpectedAUnits := 10
+		_KCNP.ExpectedRows := 3
+		BeforeFlushTime := Keystats.last_flush_time
+		Sleep(20)
+		_KSD_Require(!KL_FlushBuffer(_KCNP_SeedGuard), "The real publication guard must retain its detached A snapshot")
+		_KSD_Require(Keystats._retry_snapshots.Length == 1 && Keystats.mouse_distance == 0
+			&& Keystats._retry_snapshots[1].Distance == 5 && Keystats._retry_snapshots[1].App == A.App,
+			"The real failed attempt must own exactly its original A payload in the native retry FIFO")
+		_KSD_Require(_KCNP.SeedAttemptTick > BeforeFlushTime && Keystats.last_flush_time == BeforeFlushTime,
+			"Refusing a real attempt must restore its exact earlier flush clock")
+		_KCNP.SeedId := Keystats._retry_snapshots[1].EventId
+		KL_Mouse_ParkTick(, _KCNP_Position)
+		_KSD_Require(Keystats.mouse_distance == 5, "The preexisting retry must coexist with five real live A units")
+	}
 	Sleep(30)
 	_KSD_Acquire(_KCNP.B)
 	_KCNP.Armed := true
-	_KCNP.RefreshReturned := KL_Hook_RefreshContext(true)
+	_KCNP.RefreshReturned := (_KCNP.Mode == "external-active" || _KCNP.Mode == "abc-deferred")
+		? KL_FlushBuffer() : KL_Hook_RefreshContext(true)
 	if IsObject(_KCNP.Failure)
 		throw _KCNP.Failure
-	_KSD_Require(_KCNP.Cutpoints == 1 && _KCNP.TimerDone && _KCNP.Samples == 3,
+	_KSD_Require(_KCNP.Cutpoints == 1 && _KCNP.TimerDone && _KCNP.Samples == _KCNP.ExpectedSamples,
 		"A real nonempty flush and its one native input/Stop cutpoint must execute")
 	_KCNP.FinalStop := KL_Hook_Stop()
 	_KSD_Require(_KCNP.FinalStop, "The actual final Stop or retained Stop retry must settle before attribution is sampled")
-	AUnits := 0, BUnits := 0, Rows := 0
+	AUnits := 0, BUnits := 0, CUnits := 0, Rows := 0, LastTypingId := 0, SeedSeen := false
 	for Entry in Keystats._pending_entries {
 		FileAppend("ROW " . KL_JsonEncode(Entry) . "`n", "*", "UTF-8")
 		if Entry["type"] != "typing"
 			continue
 		Rows += 1
+		_KSD_Require(Entry["_event_id"] > LastTypingId, "The actual typing FIFO must preserve reserved event-id order")
+		LastTypingId := Entry["_event_id"]
+		if Entry["_event_id"] == _KCNP.SeedId
+			SeedSeen := Entry["app"] == A.App && Entry["mouse_distance_px"] == 5
 		if Entry["app"] == A.App
 			AUnits += Entry["mouse_distance_px"]
 		else if Entry["app"] == _KCNP.B.App
 			BUnits += Entry["mouse_distance_px"]
+		else if Entry["app"] == _KCNP.C.App
+			CUnits += Entry["mouse_distance_px"]
 	}
 	FileAppend("OBSERVATION context-nonempty-prepare mode=" . _KCNP.Mode . " first_stop=" . _KCNP.FirstStop
 		. " final_stop=" . _KCNP.FinalStop . " refresh_returned=" . _KCNP.RefreshReturned
-		. " live_session_at_b_input=" . _KCNP.SessionAtInput . " a_units=" . AUnits . " b_units=" . BUnits
-		. " typing_rows=" . Rows . " samples=" . _KCNP.Samples . " errors=" . _KSD.Errors . "`n", "*")
+		. " live_session_at_b_input=" . _KCNP.SessionAtInput . " live_session_at_c_input=" . _KCNP.SessionAtCInput
+		. " c_refresh_returned=" . _KCNP.CRefreshReturned . " a_units=" . AUnits . " b_units=" . BUnits . " c_units=" . CUnits
+		. " typing_rows=" . Rows . " samples=" . _KCNP.Samples . " seed_id=" . _KCNP.SeedId . " seed_seen=" . SeedSeen . " errors=" . _KSD.Errors . "`n", "*")
 	_KSD_Require(_KSD.Errors == 0 && !IsObject(_KSD.Failure), "No dependency failure may impersonate a context transition refusal")
-	_KSD_Require(AUnits == 5 && BUnits == 5 && Rows == 2,
-		"A new public B input admitted during nonempty preparation must never be flushed under the older A context after Stop or retry")
+	if _KCNP.Mode == "existing-retry-stop"
+		_KSD_Require(SeedSeen, "The original retry identity and payload must survive staging and Stop without adoption")
+	if _KCNP.Mode == "abc-deferred"
+		_KSD_Require(AUnits == 5 && BUnits == 5 && CUnits == 5 && Rows == 3,
+			"A, B and C public samples retain their own contexts across a deferred preparation")
+	else
+		_KSD_Require(AUnits == _KCNP.ExpectedAUnits && BUnits == 5 && Rows == _KCNP.ExpectedRows,
+			"A new public B input admitted during nonempty preparation must never be flushed under the older A context after Stop or retry")
 }
-if A_Args.Length != 2 || !(A_Args[1] == "ordinary-control" || A_Args[1] == "stop-during-prepare")
+if A_Args.Length != 2 || !(A_Args[1] == "ordinary-control" || A_Args[1] == "stop-during-prepare"
+	|| A_Args[1] == "existing-retry-stop" || A_Args[1] == "external-active" || A_Args[1] == "abc-deferred")
 	throw Error("The private nonempty context probe requires its exact mode and owned source directory")
 global _KSD := {Mode: A_Args[1], Log: A_Args[2] . "\private.log", Probes: 0, Errors: 0, LogCalls: 0, FlushCalls: 0, Failure: 0}
 global _KCNP := {Mode: A_Args[1], B: 0, Armed: false, Samples: 0, Cutpoints: 0, TimerDone: false,
-	FirstStop: false, FinalStop: false, RefreshReturned: false, SessionAtInput: "", Failure: 0}
+	FirstStop: false, FinalStop: false, RefreshReturned: false, SessionAtInput: "", Failure: 0,
+	C: 0, CRefreshReturned: false, SessionAtCInput: "",
+	ExpectedSamples: 3, ExpectedAUnits: 5, ExpectedRows: 2, SeedId: 0, SeedAttemptTick: 0}
 try {
 	_KCNP_Main()
 	FileAppend("PASS context-nonempty-prepare " . _KCNP.Mode . "`n", "*", "UTF-8")
