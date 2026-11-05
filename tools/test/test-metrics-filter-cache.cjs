@@ -1326,7 +1326,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 			assert.deepEqual(Array.from(chart.data.labels), vector.labels);
 			assert.deepEqual(
 				Array.from(chart.data.datasets[0].data),
-				vector.period === 'day' ? [0.17, 0.33] : [2, 1]
+				vector.period === 'day' ? [600000 / 3600000, 1200000 / 3600000] : [2, 1]
 			);
 			assert.equal(page.context.getAggregatedData().rich.date_range.days, vector.dates.length);
 			assert.equal(
