@@ -991,8 +991,18 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if !(ExactSectionPrefixes is Array)
 				throw TypeError("ExactSectionPrefixes must be an Array")
 		for _, Prefix in ExactSectionPrefixes {
+				if Prefix is String
+						SourceTextRequireUnicodeScalars(StrPtr(Prefix), 0, StrLen(Prefix))
 				if !(Prefix is String) or Prefix = ""
 						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
+		}
+		; Native Map keys compare NUL-terminated identities. Validate original
+		; update names before any lookup can alias a distinct shorter setting.
+		for Update in Updates {
+			for Name in [Update.Section, Update.Key] {
+				if Name is String
+					SourceTextRequireUnicodeScalars(StrPtr(Name), 0, StrLen(Name))
+			}
 		}
 		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
 				return FSNativeAcknowledge(AdmissionFn)
@@ -1288,6 +1298,8 @@ _TOML_AdmitHeldStage(State, Path, SourcePresent, SourceBytes, Candidate) {
 }
 
 TOML_RenderKey(k) {
+		if k is String
+				SourceTextRequireUnicodeScalars(StrPtr(k), 0, StrLen(k))
 		; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
 		if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
 				return k
