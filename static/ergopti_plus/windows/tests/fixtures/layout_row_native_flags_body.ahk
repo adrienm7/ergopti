@@ -32,7 +32,9 @@ _LRNF_Target() {
 _LRNF_Dispatch(Original, Name) {
 	global _LRNF
 	_LRNF_Target()
-	_LRNF.Callbacks.Push({Name: Name, Shift: !!(DllCall("GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000)})
+	_LRNF.Callbacks.Push({Name: Name, Shift: !!(DllCall("GetAsyncKeyState", "Int", 0x10, "Short") & 0x8000),
+		LogicalShift: !!GetKeyState("Shift"), ThreadShift: !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000),
+		LogicalCtrl: !!GetKeyState("Ctrl"), ThreadCtrl: !!(DllCall("GetKeyState", "Int", 0x11, "Short") & 0x8000)})
 	return Original.Call(Name)
 }
 _LRNF_Register(Name, Callback, Options) {
@@ -120,7 +122,9 @@ _LRNF_Main() {
 			_LRNF_Require(_LRNF.ShiftReleased && !Callback.Shift, "The original native Shift-up must precede the admitted callback.")
 		_LRNF_Require(Received.Shift == (_LRNF.Mode != "plain"),
 			"The receiving key must retain the original modifier flags: mode=" . _LRNF.Mode . ", variant=" . Callback.Name
-			. ", shift_released=" . _LRNF.ShiftReleased . ", callback_shift=" . Callback.Shift . ", receiver_shift=" . Received.Shift)
+			. ", shift_released=" . _LRNF.ShiftReleased . ", callback_shift=" . Callback.Shift
+			. ", logical_shift=" . Callback.LogicalShift . ", thread_shift=" . Callback.ThreadShift
+			. ", logical_ctrl=" . Callback.LogicalCtrl . ", thread_ctrl=" . Callback.ThreadCtrl . ", receiver_shift=" . Received.Shift)
 	} finally {
 		SetTimer(_LRNF_Inject, 0)
 		OnMessage(0x100, _LRNF_Receive, 0)

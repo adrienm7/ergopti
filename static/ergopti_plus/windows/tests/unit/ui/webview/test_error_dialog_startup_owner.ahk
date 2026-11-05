@@ -177,6 +177,7 @@ for _EDOT_Mode in ["current", "close-resolve", "reopen-resolve", "close-reject",
 	"current-refusal", "reopen-resolve-refusal"]
 	Test("Error dialog startup: " . _EDOT_Mode . " retains its current owner (error-dialog-startup-owner)", _EDOT_Case.Bind(_EDOT_Mode))
 
-for _LOB_Mode in ["errors", "main", "errors-denied", "main-denied", "errors-busy", "main-busy"]
+for _LOB_Mode in ["errors", "main", "errors-denied", "main-denied", "errors-busy", "main-busy",
+	"daylog", "daylog-denied", "daylog-busy"]
 	Test("Log openers: " . _LOB_Mode . " reads the settled native buffered sink (log-openers-buffered-owner)",
 		_EDOT_Case.Bind(_LOB_Mode, true))

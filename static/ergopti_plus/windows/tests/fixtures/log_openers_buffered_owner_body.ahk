@@ -35,6 +35,22 @@ _LOB_Notify(*) {
 }
 _LOB_Open() {
 	global _LOB
+	if InStr(_LOB.Mode, "daylog") == 1 {
+		; The real diagnostic attachment reader shares this native logger.
+		Read := _DayLog_ReadToday(HealthCheck_Config()["day_log"]["max_bytes"])
+		HasWarning := Read["found"] && InStr(Read["text"], _LOB.Message) > 0
+		FileAppend("RECEIPT day-log-buffered mode=" . _LOB.Mode . " found=" . Read["found"]
+			. " has_buffered_warning=" . HasWarning . "`n", "*", "UTF-8-RAW")
+		if !Read["found"] {
+			_LOB_Require(Read.Get("reason", "") == "failed", "An unsettled diagnostic reader must report delivery failure, not missing log.")
+			return false
+		}
+		_LOB_Require(HasWarning, "The actual diagnostic log reader must not accept stale native contents before its queued warning is durable.")
+		_LOB_Require(InStr(Read["text"], _LOB.Message, , InStr(Read["text"], _LOB.Message) + StrLen(_LOB.Message)) == 0,
+			"A retried diagnostic attachment must contain the real warning exactly once.")
+		_LOB.Launches += 1
+		return true
+	}
 	return _LOB.Errors ? LogOpeners_OpenTodayErrors(_LOB_Launch, _LOB_Notify) : LogOpeners_OpenTodayLog(_LOB_Launch)
 }
 _LOB_Exercise() {

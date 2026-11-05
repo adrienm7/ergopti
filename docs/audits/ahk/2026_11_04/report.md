@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **71 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **74 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1232,4 +1232,46 @@ Run41926489533 executes75 cases:64 pass,10 assertions fail and one constructor-s
 
 Run41927538467 at09e8ea2 executes58 cases in each order:55 pass and3 fail. All selected AHK-068 business cases pass; one empty-file fixture fails before the reader and is corrected separately. Screenshot pre-write failure deletes an independently owned file; its no-stage control passes. The proposed zero-access metadata lease is experimentally rejected because it does not block native deletion. All4 bounded PCRE cases pass; no Windows PCRE resource defect is established at the measured sizes. Both runs compile the complete production entry and pass90/90 native hotstring E2E; HTTP E2E is not selected.
 
-The register contains71 distinct findings. AHK-071 is confirmed with regressions but its production correction is still pending native lease qualification; no claim of71 completed fixes is made. The requested1,000 target remains unmet.
+The register now contains74 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 remains confirmed and uncorrected. The requested1,000 target remains unmet.
+
+## AHK-072: Override saves overwrite a source changed after the loaded snapshot
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The full-state override writer serializes its cached Map without proving that the current exact source bytes still belong to that same loaded Map. A path or cloned Map alone is not source authority.
+
+Reproduction: Native run41930158432 at5d857ae: four external-source changes and one staging-time change are silently overwritten by public override saves; three unchanged-source controls pass. The inverse repeats the same five failures.
+
+Consequence: An acknowledged setting edit erases edits made by another writer after loading, including changes during save preparation.
+
+Regression: Integrated receipts bind exact UTF-8 source state, canonical path and actual Map identity. Save admission checks the captured receipt again after staging; successful readback publishes a new receipt with RAM. Eight original native probes, two final-gate cases and two direct-owner cases cover refusal and controls. Existing actual-writer fixtures are adapted; post-fix qualification pending.
+
+## AHK-073: Anthropic requests transmit temperatures outside the provider domain
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+The generic0..2 option range reaches the Anthropic-specific serializer unchanged although this provider accepts only0..1.
+
+Reproduction: Native run41930158432 at5d857ae: actual Anthropic request building emits1.02 and2.0 from accepted settings; the0.9 control passes. Official versioned Anthropic SDK documents temperature0.0..1.0 for the configured model family. No upstream HTTP request was made.
+
+Consequence: A supported UI configuration constructs a request outside the provider temperature contract.
+
+Regression: The Anthropic builder now clamps to its documented0..1 domain, leaving other providers unchanged. Three actual request-building cases await post-fix qualification. Versioned SDK URLs, content hashes and normative excerpts are retained in anthropic-sampling-contract.json.
+
+## AHK-074: Deferred layout-row replay loses a captured Shift modifier
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+\_LayoutRowPassthrough replays only the scan code with Blind and discards the selected modifier identity. Current key state no longer describes the original event after deferred dispatch.
+
+Reproduction: Native run41930158432 at5d857ae: the +SC010 variant is selected, Shift is released before dispatch, and callback/receiver both observeShift0. Plain and still-held modifier controls pass; inverse repeats the failure.
+
+Consequence: A captured modified key can reach the application as an unmodified key and invoke a different action.
+
+Regression: Three genuine native handler/receiver probes establish the defect. Additional thread-state diagnostics are integrated. No production correction is integrated yet: wildcard modifier combinations and external receiver semantics still require a sound solution. This confirmed finding is not counted as fixed.
+
+## Native qualification at 5d857ae
+
+Run41930158432 executes60 cases in each order:48 pass and12 assertions fail, with no timeout and complete production compilation. AHK-025 durable outcomes, AHK-063 constructor ownership, AHK-069 supplementary keys, AHK-070 crash Unicode and the AHK-066 integer-price case pass. The real read lease passes all3 GDI compatibility cases. Five stale-source failures establish AHK-072; two Anthropic contract failures establish AHK-073; one deferred layout failure establishes AHK-074. Two finite-cost failures and two request-budget failures extend existing numeric and deadline findings rather than adding duplicate counts. Both optional E2E groups were explicitly not selected.
+
+Native run41930158432 proves that a GENERIC_READ lease with read/write sharing permits actual GDI encoding while retaining stage identity and preventing deletion. The integrated fix acquires CREATE_NEW before capture, retains the native handle and snapshot through publication/cleanup, refuses unowned stages, preserves close-failure debt and releases unstarted job cycles. Existing cleanup fixtures now carry actual ownership receipts. Three real one-pixel composition tests and two unstarted lifetime witnesses are added; post-fix Windows qualification pending.

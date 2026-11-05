@@ -337,3 +337,21 @@ _LNR_DisplayIndentCatalogueOwnsItsReader() {
 }
 Test("LLM display: the native reader owns the complete checked indent catalogue "
 	. "(llm-indent-include-owner)", _LNR_DisplayIndentCatalogueOwnsItsReader)
+
+_LNR_IntegerPromptCannotWrapIntoAllowedRange() {
+	Notices := [], Normalized := false
+	Notice := (Body, Title) => Notices.Push(Map("body", Body, "title", Title))
+	AssertTrue(_LLM_Menu_TryNormalizeIntegerPrompt("OK", "3", "n_predictions", &Normalized, Notice),
+		"The selected option really admits the small value the overflowing decimal could alias")
+	AssertEqual(3, Normalized)
+	AssertEqual(0, Notices.Length)
+	Accepted := _LLM_Menu_TryNormalizeIntegerPrompt("OK", "18446744073709551619",
+		"n_predictions", &Normalized, Notice)
+	_TestPrint("# llm-ui-integer-decimal-overflow accepted=" . Accepted
+		. " normalized=" . String(Normalized) . " notices=" . Notices.Length)
+	AssertFalse(Accepted, "An overflowing decimal must be refused before its wrapped integer can enter the allowed1..N option range")
+	AssertEqual(false, Normalized)
+	AssertEqual(1, Notices.Length)
+}
+Test("LLM integer prompt: an overflowing decimal cannot alias a valid prediction count (ui-decimal-sibling-domain)",
+	_LNR_IntegerPromptCannotWrapIntoAllowedRange)
