@@ -997,7 +997,9 @@ local function open_exchange(scope, on_done, admission)
 		scope.active = nil
 		if deliver and type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
-			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
+			if not ok then Logger.error(LOG, "Terminal callback raised — %s",
+				(type(callback_err) == "string" or type(callback_err) == "number") and "details withheld"
+					or ErrorDescription.describe(callback_err)) end
 		end
 	end
 	return epoch, done, admission ~= nil and authorized or nil
@@ -1438,7 +1440,9 @@ function M.list_models(entry, on_done)
 	if type(on_done) ~= "function" then error("api_remote.list_models requires on_done", 2) end
 	local function finish(state)
 		local ok, err = pcall(on_done, state)
-		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s", ErrorDescription.describe(err)) end
+		if not ok then Logger.error(LOG, "Remote model listing callback raised — %s",
+			(type(err) == "string" or type(err) == "number") and "details withheld"
+				or ErrorDescription.describe(err)) end
 	end
 	-- An access-token provider lists once its token is fetched
 	local waited = with_access(entry, function() return true end, function() return list_models_now(entry, finish) end,
