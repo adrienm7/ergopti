@@ -1469,3 +1469,144 @@ _OAF_FolderPathDoesNotLaunchPrefix() {
 	}
 }
 Test("system actions: existing folder path does not launch an executable prefix (open-app-native-folder)", _OAF_FolderPathDoesNotLaunchPrefix)
+
+
+class _OAN_Control extends _OAP_NativeControl {
+	__New() {
+		super.__New()
+		this.LaunchCalls := 0, this.FileProbes := 0, this.LaunchError := ""
+	}
+	IsExistingFile(Path) {
+		this.FileProbes += 1
+		return super.IsExistingFile(Path)
+	}
+	Launch(Target, WorkingDir := "", Options := "") {
+		this.LaunchCalls += 1
+		try return super.Launch(Target, WorkingDir, Options)
+		catch as Err {
+			this.LaunchError := Err.Message
+			throw
+		}
+	}
+}
+
+; JSON really constructs a counted NUL String. The application action and native
+; adapter are measured separately: a safe action refusal is not an adapter ACK.
+_OAN_OriginalJsonNul(Mode) {
+	global _OAP_RetirementDebt
+	AssertFalse(IsObject(_OAP_RetirementDebt), "a foreign retained witness prevents another launcher")
+	Root := A_Temp . "\ergopti_openapp_nul_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount . "_" . Random(100000, 999999)
+	AssertFalse(RegExMatch(Root, "\s"), "no earlier whitespace component may resolve to an unowned executable")
+	Creation := FSCreateDirectoryExclusiveStrict(Root)
+	Created := (Creation is Integer) && Creation == 1
+	AssertTrue(Created, "the launcher owns an exclusive private directory")
+	EventHandle := 0, Control := _OAN_Control()
+	try {
+		EventName := "Local\ErgoptiNulLaunch_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount . "_" . Random(100000, 999999)
+		EventHandle := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", EventName, "Ptr")
+		EventError := A_LastError
+		AssertTrue(EventHandle && EventError != 183, "the private witness event must be created exclusively")
+		Compiler := A_WinDir . "\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+		AssertTrue(FileExist(Compiler) != "", "the actual C# witness compiler is available")
+		Target := Root . "\witness.exe", SourcePath := Root . "\witness.cs", Receipt := Root . "\receipt.txt"
+		Code := 'using System; using System.IO; using System.Diagnostics; using System.Threading; '
+			. 'class Witness { static int Main() { try { var p = Process.GetCurrentProcess(); '
+			. 'File.WriteAllText(@"' . Receipt . '.pending", p.Id.ToString() + "|" + '
+			. 'p.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() + "|" + p.MainModule.FileName); '
+			. 'File.Move(@"' . Receipt . '.pending", @"' . Receipt . '"); '
+			. 'using (var e = EventWaitHandle.OpenExisting(@"' . EventName
+			. '")) { return e.WaitOne(30000) ? 0 : 3; } } catch { return 4; } } }'
+		AssertEqual(1, FSWriteCreateDurable(SourcePath, Code))
+		AssertEqual(0, RunWait('"' . Compiler . '" /nologo /target:exe /out:"' . Target . '" "' . SourcePath . '"', , "Hide"))
+		; Prequalify the genuine native launch and authenticate the handle before
+		; claiming that a later no-process result represents a safe refusal.
+		Control.Launch('"' . Target . '"')
+		AssertEqual(Target, _OAP_AwaitReceipt(Receipt, Control, Target, Target))
+		_OAP_Join(Control, EventHandle)
+		FileDelete(Receipt)
+		AssertTrue(DllCall("Kernel32\ResetEvent", "Ptr", EventHandle, "Int"))
+		Control.LaunchCalls := 0, Control.FileProbes := 0, Control.LaunchError := ""
+		AssertFalse(A_IsSuspended, "the action boundary must be unpaused before a refusal verdict")
+		Before := FSReadBytesStrict(Target)
+		Encoded := JsonStringLiteral(Target)
+		if Mode != "valid"
+			Encoded := SubStr(Encoded, 1, StrLen(Encoded) - 1) . '\u0000unrepresentable-suffix"'
+		JsonText := '{"application_path":' . Encoded . '}'
+		Value := JsonParse(JsonText)["application_path"]
+		ExpectedUnits := StrLen(Target) + (Mode == "valid" ? 0 : 1 + StrLen("unrepresentable-suffix"))
+		AssertEqual(ExpectedUnits, StrLen(Value), "the real JSON producer retains every original UTF-16 unit")
+		if Mode != "valid" {
+			AssertEqual(0, NumGet(StrPtr(Value), StrLen(Target) * 2, "UShort"), "the original embedded NUL really precedes the suffix")
+			AssertEqual(0x75, NumGet(StrPtr(Value), (StrLen(Target) + 1) * 2, "UShort"))
+		}
+		Admitted := false, BoundaryRefused := false
+		try Admitted := GestureAppParameterIsValid(Value)
+		catch as Err {
+			if Mode == "valid"
+				throw
+			BoundaryRefused := true
+		}
+		FileAlias := -1
+		if Mode == "adapter" {
+			; Use a separately parsed String for the native classifier, retaining
+			; the original launch input and its counted metadata unchanged.
+			try FileAlias := Control.Native.IsExistingFile(JsonParse(JsonText)["application_path"])
+			catch {
+				FileAlias := -2
+			}
+			try Control.Launch(Value)
+			catch {
+				BoundaryRefused := true
+			}
+		} else {
+			try _OAP_RunAction(Control, Value)
+			catch as Err {
+				if Mode == "valid"
+					throw
+				BoundaryRefused := true
+			}
+		}
+		Launched := Control.ProcessHandle != 0 || Control.UnownedPid != 0
+		ActualImage := "<none>"
+		if Control.ProcessHandle {
+			ActualImage := _OAP_AwaitReceipt(Receipt, Control, Target, Target)
+			_OAP_Join(Control, EventHandle)
+		}
+		After := FSReadBytesStrict(Target)
+		_TestPrint("# original-nul-launch mode=" . Mode . " units=" . StrLen(Value) . " expected_units=" . ExpectedUnits
+			. " app_admitted=" . Admitted . " boundary_refused=" . BoundaryRefused
+			. " file_alias=" . FileAlias . " file_probes=" . Control.FileProbes
+			. " launch_calls=" . Control.LaunchCalls . " launched=" . Launched . " actual_image=" . ActualImage
+			. " native_error=" . (Control.LaunchError != ""))
+		AssertEqual(ExpectedUnits, StrLen(Value), "a native boundary cannot shorten the producer's original String")
+		AssertEqual(Before.Size, After.Size)
+		AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before, "Ptr", After,
+			"UPtr", Before.Size, "UPtr"), "launch or refusal cannot mutate the selected executable")
+		if Mode == "valid" {
+			AssertTrue(Admitted && Launched, "the valid JSON path must reach the real action and genuine native launcher")
+			AssertEqual(Target, ActualImage)
+		} else
+			AssertFalse(Launched, "an unrepresentable original path cannot launch the different prefix executable")
+	} finally {
+		try _OAP_Join(Control, EventHandle)
+		finally {
+			if Control.ProcessHandle || Control.UnownedPid {
+				_OAP_RetirementDebt := {Control: Control, Root: Root, EventHandle: EventHandle}
+			} else {
+				if EventHandle && !DllCall("Kernel32\CloseHandle", "Ptr", EventHandle, "Int") {
+					_OAP_RetirementDebt := {Control: Control, Root: Root, EventHandle: EventHandle}
+					throw OSError(A_LastError, -1, "close private original-NUL launch event")
+				}
+				if Created
+					try DirDelete(Root, true)
+					catch as Err {
+						_OAP_RetirementDebt := {Control: Control, Root: Root, EventHandle: 0}
+						throw
+					}
+			}
+		}
+	}
+}
+for _OAN_Mode in ["action", "adapter", "valid"]
+	Test("open app original NUL: " . _OAN_Mode . " observes a private native process (open-app-original-nul)",
+		_OAN_OriginalJsonNul.Bind(_OAN_Mode))
