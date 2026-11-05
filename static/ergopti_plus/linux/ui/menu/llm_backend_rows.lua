@@ -159,6 +159,12 @@ end
 --- @param provider table
 --- @param on_changed function|nil
 local function add_entry(llm, remote, entries, dialogs, provider, on_changed, page_current)
+	local function page_owned()
+		if page_current == nil then return true end
+		local ok, current = pcall(page_current)
+		return ok and current == true
+	end
+	if not page_owned() then return false end
 	local heading = tr("menu.llm.api_dialog_title") .. " — " .. provider.label
 	local base_url = ""
 	local fields = UrlTemplate.fields(provider.base_url)
@@ -168,7 +174,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 		for _, name in ipairs(fields) do
 			local label = tr("menu.llm.api_prompt_field." .. name)
 			local value = dialogs.prompt(heading, label, "")
-			if not value then return end
+			if not value or not page_owned() then return false end
 			values[name] = TextUtils.trim(value)
 			if not UrlTemplate.valid_value(values[name]) then
 				dialogs.error(label .. " " .. tr("menu.llm.api_prompt_field_invalid"), heading)
@@ -181,7 +187,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 		-- The catalogue's address works; one optional value replaces it
 		local optional = provider.optional_address
 		local value = dialogs.prompt(heading, tr("menu.llm.api_prompt_field." .. optional.field), "")
-		if not value then return end
+		if not value or not page_owned() then return false end
 		local filled = UrlTemplate.optional_url(optional, TextUtils.trim(value))
 		if not filled then
 			Logger.error(LOG, "API entry address refused: the '%s' value cannot fill it.", optional.field)
@@ -193,7 +199,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 	-- default visible while allowing the same custom endpoint as the generic form.
 	elseif provider.base_url == "" or provider.id == "openai" then
 		base_url = dialogs.prompt(heading, tr("menu.llm.api_prompt_url"), provider.base_url)
-		if not base_url or base_url == "" then return end
+		if not base_url or base_url == "" or not page_owned() then return false end
 		if not remote.normalize_base_url(base_url) then
 			dialogs.error(tr("menu.llm.api_prompt_url") .. " " .. base_url, heading)
 			return
@@ -202,17 +208,18 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 	local prompt = type(remote.token_allowed) == "function" and remote.token_allowed(provider.id, "", base_url) == true
 		and fill(tr("dialog.local_servers.key_prompt"), { provider.label }) or tr("menu.llm.api_prompt_token")
 	local token = dialogs.prompt(heading, prompt, "", true)
-	if not token then return end
+	if not token or not page_owned() then return false end
 	-- The actual provider owns optional authentication; never trim secret bytes.
 	if token == "" and (type(remote.token_allowed) ~= "function"
 		or remote.token_allowed(provider.id, token, base_url) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
-	if not model then return end
+	if not model or not page_owned() then return false end
 	model = TextUtils.trim(model)
 	if model == "" then model = provider.default_model end
 	if model == "" then return end
 
 	local chat = remote.serves(provider.id, "chat")
+	if not page_owned() then return false end
 	local ticket, current, finish
 	if chat then
 		local begin = llm.begin_api_selection
@@ -227,6 +234,13 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed, pa
 			return false
 		end
 		ticket = receipt
+	end
+	if not page_owned() then
+		if chat then
+			local retired, ack = pcall(finish, ticket, false, true)
+			if not retired or ack ~= true then Logger.error(LOG, "The API selection owner could not retire after the page closed.") end
+		end
+		return false
 	end
 	local function admitted()
 		local ok, value = pcall(current, ticket)

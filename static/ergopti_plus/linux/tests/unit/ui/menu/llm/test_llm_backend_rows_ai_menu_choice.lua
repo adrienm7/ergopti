@@ -50,6 +50,54 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	helpers.it("retains a refused selection retirement after its page closes", function()
+		local build, state, restore = setup("api")
+		local live = true
+		state.page_current = function() return live end
+		state.on_begin = function() live = false end
+		state.refuse_finish = true
+		state.answers = { "test-key", "qwen" }
+		find(build(), "➕ Cerebras").action()
+		live, state.on_begin = true, nil
+		state.answers = { "next-key", "qwen" }
+		local again = find(build(), "➕ Cerebras").action()
+		local admissions, entries = state.admissions, #state.entries
+		restore()
+		helpers.assert_eq(again, false)
+		helpers.assert_eq(admissions, 1)
+		helpers.assert_eq(entries, 0)
+	end)
+
+	helpers.it("retires the selection receipt if its page closes during acquisition", function()
+		local build, state, restore = setup("api")
+		local live = true
+		state.page_current = function() return live end
+		state.on_begin = function() live = false end
+		state.answers = { "test-key", "qwen" }
+		local result = find(build(), "➕ Cerebras").action()
+		local admissions, finished, entries = state.admissions, state.finished, #state.entries
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(admissions, 1)
+		helpers.assert_eq(finished, 1)
+		helpers.assert_eq(entries, 0)
+	end)
+
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("does not save a " .. kind .. " API entry after its page closes during input", function()
+			local build, state, restore = setup("api")
+			local live = true
+			state.page_current = function() return live end
+			state.on_prompt = function() live = false end
+			state.answers = { "test-key", kind == "chat" and "qwen" or "jev-latest" }
+			find(build(), kind == "chat" and "➕ Cerebras" or "➕ TypeSafe").action()
+			local count, tests = #state.entries, #state.tests
+			restore()
+			helpers.assert_eq(count, 0)
+			helpers.assert_eq(tests, 0)
+		end)
+	end
+
 	for _, kind in ipairs({ "chat", "system" }) do
 		helpers.it("does not remove " .. kind .. " after the owning page closes during confirmation", function()
 			local build, state, restore = setup("api")
