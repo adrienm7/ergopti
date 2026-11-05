@@ -146,6 +146,7 @@ local function record(existing)
 			return {}
 		end,
 		exists = function(path) return (existing or {})[path] == true end,
+		path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return "" end,
@@ -545,4 +546,57 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 		helpers.assert_eq(world.written, { "/home/ada/notes.txt" })
 		helpers.assert_eq(world.opened, {})
 	end)
+end)
+
+helpers.describe('open selected paths ending in punctuation', function()
+  for _, item in ipairs({
+    { '/tmp/report.', '/tmp/report.' },
+    { '"/tmp/report."', '/tmp/report.' },
+    { 'file:///tmp/report.', '/tmp/report.' },
+    { '$HOME/report.', '/home/ada/report.' },
+  }) do
+    helpers.it('prefers the exact existing selection '..item[1], function()
+      local original = item[2]
+      local cleaned = original:sub(1, -2)
+      local world, subject = record({ [original]=true, [cleaned]=true })
+      local ok, err = pcall(function()
+        helpers.assert_true(subject.open(item[1]))
+        helpers.assert_eq(world.opened, { original })
+      end)
+      subject._set_deps_for_test(nil)
+      if not ok then error(err, 0) end
+    end)
+  end
+  helpers.it('still strips prose punctuation when only the cleaned path exists', function()
+    local world, subject = record({ ['/tmp/report']=true })
+    local ok, err = pcall(function()
+      helpers.assert_true(subject.open('/tmp/report.'))
+      helpers.assert_eq(world.opened, { '/tmp/report' })
+    end)
+    subject._set_deps_for_test(nil)
+    if not ok then error(err, 0) end
+  end)
+end)
+
+helpers.describe('exact path metadata refusal', function()
+  for _, failure in ipairs({'error', 'raise'}) do
+    helpers.it('does not open the cleaned path on metadata '..failure, function()
+      local subject = require('modules.shortcuts.open_selection')
+      local opened, notices = {}, {}
+      subject._set_deps_for_test({
+        exists = function() return true end,
+        path_status = function() if failure == 'raise' then error('native refusal') end; return 'error' end,
+        open = function(path) opened[#opened + 1] = path; return {} end,
+        message = function() return 'Cannot open %s' end,
+        notify = function(text) notices[#notices + 1] = text; return true end,
+      })
+      local ok, err = pcall(function()
+        helpers.assert_eq(subject.open('/tmp/report.'), false)
+        helpers.assert_eq(opened, {})
+        helpers.assert_eq(notices, { 'Cannot open …' })
+      end)
+      subject._set_deps_for_test(nil)
+      if not ok then error(err, 0) end
+    end)
+  end
 end)

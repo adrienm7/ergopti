@@ -1506,3 +1506,28 @@ helpers.describe("FileSystem initializer configuration identities", function()
 end)
 
 require("test.file_system_ports_contract").register(helpers, "linux", 8, function() return fs end)
+
+helpers.describe('selected path metadata classification', function()
+  helpers.it('distinguishes present, absent, dangling link and inaccessible directory', function()
+    local uv = require('luv')
+    local fs = require('adapters.file_system')
+    local dir = os.tmpname(); os.remove(dir)
+    assert(uv.fs_mkdir(dir, 448))
+    local target = dir .. '/report.'
+    local file = assert(io.open(target, 'wb')); file:write('exact'); file:close()
+    assert(uv.fs_symlink('missing', dir .. '/link.'))
+    local ok, err = xpcall(function()
+      helpers.assert_eq(fs.path_status(target), 'present')
+      helpers.assert_eq(fs.path_status(dir .. '/link.'), 'present')
+      helpers.assert_eq(fs.path_status(dir .. '/missing.'), 'absent')
+      local account = type(uv.os_get_passwd) == "function" and uv.os_get_passwd() or nil
+      if account and account.uid and account.uid ~= 0 then
+        assert(uv.fs_chmod(dir, 0))
+        helpers.assert_eq(fs.path_status(target), 'error')
+      end
+    end, debug.traceback)
+    uv.fs_chmod(dir, 448)
+    uv.fs_unlink(dir .. '/link.'); uv.fs_unlink(target); uv.fs_rmdir(dir)
+    if not ok then error(err, 0) end
+  end)
+end)
