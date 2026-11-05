@@ -527,7 +527,7 @@ _UIA_SelectionPollTick() {
 		if !Cache.Has(ProcName)
 			continue
 		Entry := Cache[ProcName]
-		if !TickExpired(Entry.Tick, Entry.DurationMs, Now) {
+		if !TickExpired64(Entry.Tick, Entry.DurationMs, Now) {
 			_UIA_SelectionCache := 0
 			return
 		}
@@ -583,7 +583,7 @@ GetUIASelection() {
 		if !IsObject(Snapshot)
 			return ""
 		Elapsed := Snapshot.HasOwnProp("CapturedAt")
-			? TickElapsed(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
+			? TickElapsed64(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
 		Selection := UIASW_ConsumeSelectionSnapshot(Snapshot,
 			WIGetForegroundHwnd(), WIGetFocusedControlToken(),
 			_UIA_CurrentInputEpoch(), Elapsed, UIA_SELECTION_MAX_AGE_MS)
@@ -609,7 +609,7 @@ _WrapSelectionNeedsFreshRead(Snapshot, Target) {
 	}
 	return Snapshot.Text is String && Snapshot.Text != "" && !Snapshot.Consumed
 		&& Snapshot.Hwnd == Target["hwnd"] && Snapshot.Control == Target["control"]
-		&& TickElapsed(Snapshot.CapturedAt) <= UIA_SELECTION_MAX_AGE_MS
+		&& TickElapsed64(Snapshot.CapturedAt) <= UIA_SELECTION_MAX_AGE_MS
 		&& Snapshot.InputEpoch != _UIA_CurrentInputEpoch()
 }
 

@@ -205,7 +205,7 @@ _WTE_ChildSource() {
 	Code .= "global UIA_SELECTION_MAX_AGE_MS := " . Integer(Age[1]) . "`n"
 	for Name in ["ErgoptiLayout_Action", "WrapTextIfSelected", "_WrapSelectionNeedsFreshRead", "_WrapSelectionReady", "_WrapSelectionEmpty", "WrapSymbols_IsEnabled", "GetUIASelection",
 		"UIASW_ConsumeSelectionSnapshot", "_UIA_CurrentInputEpoch", "KS_GetPhysicalInputEpoch", "_SendInstantCaptureTarget", "_SendInstantTargetCurrent", "WIGetForegroundHwnd",
-		"WIGetFocusedControlToken", "TickElapsed", "SendInstant", "_SendInstantReport", "SendNewResult", "_SendVerdictSucceeded"] {
+		"WIGetFocusedControlToken", "TickElapsed", "TickElapsed64", "SendInstant", "_SendInstantReport", "SendNewResult", "_SendVerdictSucceeded"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The unchanged trigger admission owner must exist: " . Name)
 		Code .= Definition . "`n"
