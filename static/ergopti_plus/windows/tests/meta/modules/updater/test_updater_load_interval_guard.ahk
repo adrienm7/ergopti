@@ -18,19 +18,12 @@
 ; were already wrapped in try. An uncaught throw at line 614 aborts the
 ; remainder of the auto-execute boot section, leaving the driver half-initialised.
 ;
-; The fix:
-;   1. Add IsNumber(raw) validation in Updater_LoadCheckInterval before the
-;      arithmetic, falling back to UPDATER_DEFAULT_INTERVAL with a LoggerWarn.
-;   2. Wrap the call site at ErgoptiPlus.ahk with try.
-;
-; A parallel fix in Updater_SetCheckInterval already existed and used try/catch
-; around Integer(Seconds) — this test ensures the loader has the same protection.
-;
-; This test asserts:
-;   (a) Updater_LoadCheckInterval source body uses IsNumber(raw) before Integer().
-;   (b) The ErgoptiPlus.ahk call site uses try Updater_LoadCheckInterval().
-;
-; SCOPE: source introspection of modules/updater.ahk and ErgoptiPlus.ahk.
+; The current loader admits finite non-negative whole numbers from typed
+; bootstrap ownership. Detached legacy maps retain their explicit value types.
+; Runtime assertions reject strings, fractions, negatives and overflow while
+; preserving deliberate zero and valid preset cadence. The production call site
+; remains guarded so a refusal does not abort unrelated startup work.
+; SCOPE: actual loader behavior and the production entry call site.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -74,28 +67,33 @@ _ULIG_ExtractLoaderBody(Src) {
 ; =========================================================
 
 _ULIG_CheckIsNumberGuard() {
-	Src := _DriverDirConcat("modules/updater")
-	Assert(Src != "", "the modules/updater module must be readable")
-
-	Body := _ULIG_ExtractLoaderBody(Src)
-	Assert(Body != "", "Updater_LoadCheckInterval must be present in the modules/updater module")
-
-	; (a) IsNumber(raw) validation must be present before the Integer() call.
-	Assert(InStr(Body, "IsNumber(raw)"),
-		"Updater_LoadCheckInterval must validate raw with IsNumber() before arithmetic (HIGH-08 fix-updater-load-interval-non-numeric-throws)")
-
-	; The old bare Integer(raw + 0) without an IsNumber guard must not be the
-	; primary path (the guard must come before it).
-	IsNumberPos := InStr(Body, "IsNumber(raw)")
-	IntegerPos  := InStr(Body, "Integer(raw + 0)")
-	Assert(IsNumberPos > 0 && IntegerPos > 0 && IsNumberPos < IntegerPos,
-		"IsNumber(raw) check must appear before Integer(raw + 0) in Updater_LoadCheckInterval")
-
-	; The fallback on non-numeric input should use UPDATER_DEFAULT_INTERVAL.
-	Assert(InStr(Body, "UPDATER_DEFAULT_INTERVAL"),
-		"Updater_LoadCheckInterval must fall back to UPDATER_DEFAULT_INTERVAL on non-numeric input")
-	Assert(InStr(Body, "try seconds := Integer(raw + 0)") > 0 && InStr(Body, "out-of-range check_interval_seconds") > 0,
-		"numeric but out-of-range check_interval_seconds values must fail closed instead of aborting boot")
+	global _IniCache, UPDATER_CHECK_INTERVAL, UPDATER_DEFAULT_INTERVAL
+	HadCache := IsSet(_IniCache)
+	if HadCache
+		SavedCache := _IniCache
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		; Keep the historical test identity, but check the actual owner instead
+		; of pinning IsNumber(), which also accepted malformed numeric strings.
+		for Raw in ["fast", "0", 0.5, -1, 1.0e100] {
+			_IniCache := Map("updater", Map("check_interval_seconds", Raw))
+			UPDATER_CHECK_INTERVAL := -1
+			Updater_LoadCheckInterval()
+			AssertEqual(UPDATER_DEFAULT_INTERVAL, UPDATER_CHECK_INTERVAL,
+				"malformed or out-of-domain cadence must retain the default without throwing: " . String(Raw))
+		}
+		for Raw in [0, 3600] {
+			_IniCache := Map("updater", Map("check_interval_seconds", Raw))
+			Updater_LoadCheckInterval()
+			AssertEqual(Raw, UPDATER_CHECK_INTERVAL, "valid native presets must keep their actual cadence")
+		}
+	} finally {
+		if HadCache
+			_IniCache := SavedCache
+		else
+			_IniCache := unset
+		UPDATER_CHECK_INTERVAL := SavedInterval
+	}
 }
 
 _ULIG_CheckCallSiteGuarded() {
@@ -113,7 +111,7 @@ _ULIG_CheckCallSiteGuarded() {
 }
 
 
-Test("meta fix-updater-load-interval: Updater_LoadCheckInterval uses IsNumber guard before Integer()",
+Test("meta fix-updater-load-interval: Updater_LoadCheckInterval rejects malformed cadence before Integer()",
 	_ULIG_CheckIsNumberGuard)
 
 Test("meta fix-updater-load-interval: Updater_LoadCheckInterval() call site in ErgoptiPlus.ahk is try-wrapped",
