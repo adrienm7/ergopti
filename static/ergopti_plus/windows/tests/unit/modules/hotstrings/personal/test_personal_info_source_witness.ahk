@@ -219,7 +219,7 @@ _PISYN_PublicRoundTrip(Mode) {
 			: Mode == "multiline-literal-control" ? "Ada'#Place" : Mode == "quoted-hash-control" ? "Ada#Place" : "Ada"
 		RawFirst := Mode == "unsupported-info-type" ? "42" : Mode == "bare-date-type" ? "1979-05-27"
 			: Mode == "multiline-literal-control" ? Chr(39) . Chr(39) . Chr(39) . First . Chr(39) . Chr(39) . Chr(39)
-			: Mode == "literal-info" ? "'Ada'" : Mode == "multiline-info" ? '"""Ada"""' : TOML_RenderString(First)
+			: Mode == "literal-info" ? "'Ada'" : Mode == "multiline-info" ? Chr(34) . Chr(34) . Chr(34) . "Ada" . Chr(34) . Chr(34) . Chr(34) : TOML_RenderString(First)
 		InfoHeader := Mode == "header-comment" ? "[info] # valid annotation" : "[info]"
 		RawLetter := Mode == "literal-letter" ? "'first_name'" : TOML_RenderString("first_name")
 		Source := InfoHeader . "`nfirst_name = " . RawFirst . '`nlast_name = "Initial"`n'
