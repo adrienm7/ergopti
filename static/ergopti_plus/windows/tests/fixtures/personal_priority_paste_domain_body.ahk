@@ -68,7 +68,7 @@ _PPNC_ReadValueReceipt(Edit, Stage, Requested) {
  return Value
 }
 
-_PPNC_Paste(Edit, Text) {
+_PPNC_Paste(Edit, Text, ExpectedNative) {
  global _PPNC_State
  Edit.Value := ""
  if Text == ""
@@ -84,8 +84,10 @@ _PPNC_Paste(Edit, Text) {
    _PPNC_Require(CB_GetSequenceNumber() == Sequence, "A foreign later copy cannot supply the private paste")
    DllCall("User32\SendMessageW", "Ptr", Edit.Hwnd, "UInt", 0x0302, "Ptr", 0, "Ptr", 0, "Ptr")
    _PPNC_State.PasteCalls += 1
+   NativeText := _PPNC_RawTextReceipt(Edit.Hwnd), ExpectedUnits := _PPNC_StringUnits(ExpectedNative)
+   _PPNC_Require(NativeText.Length == ExpectedUnits.Length && NativeText.Units == ExpectedUnits.Units, "Raw UTF-16 must establish admission before the Value getter runs")
    PastedValue := _PPNC_ReadValueReceipt(Edit, "post-paste", Text)
-   _PPNC_Require(PastedValue == Text, "The genuine ES_NUMBER control must admit this exact native pasted text")
+   _PPNC_Require(PastedValue == ExpectedNative, "The genuine numeric Edit must retain exactly the declared admitted text")
   } finally Critical(PreviousCritical)
  } finally {
   if Sequence > 0 {
@@ -125,16 +127,24 @@ _PPNC_Run(Mode) {
   _PPNC_Require(WinGetClass("ahk_id " . Priority.Hwnd) == "Edit" && WinGetPID("ahk_id " . Priority.Hwnd) == ProcessExist(), "Only the child-owned native Edit can receive paste")
   _PPNC_Require((WinGetStyle("ahk_id " . Priority.Hwnd) & 0x2000) != 0, "The shipped ES_NUMBER style must be genuine")
   _PPNC_Require(DllCall("User32\SendMessageW", "Ptr", Priority.Hwnd, "UInt", 0x00D5, "Ptr", 0, "Ptr", 0, "Ptr") == 3, "The shipped native three-character limit must remain active")
-  Vectors := Invalid ? [["abc", "invalid"]] : [["47", 47], ["", ""], ["999", 100], ["-3", 0], ["1.5", 1.5]]
+  ; Genuine WM_PASTE rejects noninteger text before any public handler reads it.
+  Vectors := Invalid ? [["abc", ""], ["1.5", ""]] : [["47", 47], ["", ""], ["999", 100], ["-3", 0]]
   for Vector in Vectors {
    Existing := Map("trigger", "abcd", "output", "original", "line_index", 17, "priority", 47)
    _PersonalEditorData := Map("sections", Map("private", Map("entries", Adding ? [] : [Existing])))
    Before := _PersonalEditorData, BeforeCount := _PPNC_State.Publications.Length
    Status.Value := "initial"
-   _PPNC_Paste(Priority, Vector[1])
+   ExpectedNative := Invalid ? "" : Vector[1]
+   _PPNC_Paste(Priority, Vector[1], ExpectedNative)
    Button.Focus()
    FocusedValue := _PPNC_ReadValueReceipt(Priority, "post-focus", Vector[1])
-   _PPNC_Require(FocusedValue == Vector[1], "The pasted value must survive leaving the UpDown buddy before the public action")
+   _PPNC_Require(FocusedValue == ExpectedNative, "The admitted native value must survive leaving the UpDown buddy")
+   if Invalid {
+    _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount && Status.Value == "initial", "Rejected native input must not publish or invoke a form action")
+    _PPNC_Require(_PersonalEditorData == Before && Existing["priority"] == 47 && Existing["output"] == "original", "Rejected native input must preserve the exact displayed model")
+    FileAppend("OBSERVATION personal-priority mode=" . Mode . " text=" . Vector[1] . " rejected_before_handler=1 publications=0`n", "*", "UTF-8-RAW")
+    continue
+   }
    Failure := 0
    try {
     if Adding
@@ -145,23 +155,17 @@ _PPNC_Run(Mode) {
     Failure := ErrorValue
    FileAppend("OBSERVATION personal-priority mode=" . Mode . " text=" . Vector[1] . " pastes=" . _PPNC_State.PasteCalls
     . " publications=" . (_PPNC_State.Publications.Length - BeforeCount) . " exception=" . (IsObject(Failure) ? Type(Failure) . ":" . Failure.Message : "none") . " status=" . Status.Value . "`n", "*", "UTF-8-RAW")
-   _PPNC_Require(!IsObject(Failure), "Pasted nonnumeric priority must be a friendly form refusal, never an unhandled numeric conversion")
+   _PPNC_Require(!IsObject(Failure), "Accepted native integer and inherited priority must complete without an exception")
    _PPNC_Require(_PersonalEditorData == Before, "The displayed model cannot change before the explicit private publication acknowledgement")
    _PPNC_Require(Before["sections"]["private"]["entries"].Length == (Adding ? 0 : 1), "Building a candidate cannot mutate the original collection")
    if !Adding
     _PPNC_Require(Existing["priority"] == 47 && Existing["output"] == "original" && Existing["line_index"] == 17, "The actual selected source entry cannot be changed before publication")
-   if Invalid {
-    _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount, "Invalid priority cannot reach the publication destination")
-    _PPNC_Require(Status.Value == "numeric_prompt.not_a_number", "The actual public handler must explain numeric refusal through the existing translated status key")
-    _PPNC_Require(Priority.Value == "abc", "The user's rejected draft must remain editable")
-   } else {
-    _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount + 1, "Every ordinary and inherited priority must still reach publication exactly once")
-    Candidate := _PPNC_State.Publications[-1]
-    Entry := Candidate["sections"]["private"]["entries"][1]
-    _PPNC_Require(Type(Entry["priority"]) == Type(Vector[2]) && Entry["priority"] == Vector[2], "Accepted blank, integer, clamped and fractional priorities retain their original semantics")
-    if !Adding
-     _PPNC_Require(Entry["line_index"] == 17, "Saving preserves the exact selected source record")
-   }
+   _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount + 1, "Every ordinary and inherited priority must still reach publication exactly once")
+   Candidate := _PPNC_State.Publications[-1]
+   Entry := Candidate["sections"]["private"]["entries"][1]
+   _PPNC_Require(Type(Entry["priority"]) == Type(Vector[2]) && Entry["priority"] == Vector[2], "Accepted blank, integer and clamped priorities retain their original semantics")
+   if !Adding
+    _PPNC_Require(Entry["line_index"] == 17, "Saving preserves the exact selected source record")
   }
  } finally {
   _PersonalEditorPrioCtrl := 0
