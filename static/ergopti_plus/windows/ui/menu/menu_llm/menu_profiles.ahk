@@ -114,13 +114,13 @@ _LLM_Menu_UniqueMenuLabel(Seen, Label) {
 		Seen[UsedKey] := Used
 	}
 	Used := Seen[UsedKey]
-	Number := (Seen.Has(Label) ? Seen[Label] : 0) + 1
-	Candidate := Number > 1 ? Label . " #" . Number : Label
+	Ordinal := (Seen.Has(Label) ? Seen[Label] : 0) + 1
+	Candidate := Ordinal > 1 ? Label . " #" . Ordinal : Label
 	while Used.Has(Candidate) {
-		Number := Max(2, Number + 1)
-		Candidate := Label . " #" . Number
+		Ordinal := Max(2, Ordinal + 1)
+		Candidate := Label . " #" . Ordinal
 	}
-	Seen[Label] := Number
+	Seen[Label] := Ordinal
 	Used[Candidate] := true
 	return Candidate
 }
