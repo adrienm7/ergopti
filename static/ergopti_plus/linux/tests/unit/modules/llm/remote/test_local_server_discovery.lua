@@ -260,6 +260,34 @@ helpers.describe("Linux local server discovery ownership", function()
 			helpers.assert_true(changes>=1)
 		end)
 	end)
+	for _, mode in ipairs({ "nil", "throw", "nonboolean" }) do
+		helpers.it("an unreadable pause state refuses local server discovery: " .. mode, function()
+			isolated(function(_, _, calls)
+				local llm = { get_backend = function() return "ollama" end,
+					can_configure_local_servers = function() return true end, is_enabled = function() return true end }
+				local rows = require("ui.menu.local_server_rows").rows(llm, {}, function() end,
+					{ is_paused = function()
+						if mode == "throw" then error("pause unavailable") end
+						if mode == "nonboolean" then return "no" end
+					end })
+				helpers.assert_type(rows, "table")
+				helpers.assert_eq(#calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("an unavailable local configuration owner refuses discovery", function()
+		isolated(function(_, _, calls)
+			local llm = { get_backend = function() return "ollama" end,
+				can_configure_local_servers = function() error("scope unavailable") end,
+				is_enabled = function() return true end }
+			local rows = require("ui.menu.local_server_rows").rows(llm, {}, function() end,
+				{ is_paused = function() return false end })
+			helpers.assert_type(rows, "table")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
 	helpers.it("a closed model page receives no invalid local address error", function()
 		isolated(function()
 			local live, errors = true, 0

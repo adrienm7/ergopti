@@ -26,9 +26,12 @@ local function server_options(llm, dialogs, changed, context)
 			local ok, current = pcall(context.page_current)
 			return ok and current == true
 		end
-		return page_owned() and context.paused ~= true and context.is_paused() ~= true
-			and type(llm.can_configure_local_servers) == "function" and llm.can_configure_local_servers() == true
-			and page_owned()
+		if not page_owned() or context.paused == true then return false end
+		local paused_ok, paused = pcall(context.is_paused)
+		if not paused_ok or paused ~= false or not page_owned()
+			or type(llm.can_configure_local_servers) ~= "function" then return false end
+		local scope_ok, allowed = pcall(llm.can_configure_local_servers)
+		return scope_ok and allowed == true and page_owned()
 	end
 	local function ai_on()
 		return type(llm.is_enabled) == "function" and llm.is_enabled() == true
