@@ -117,10 +117,10 @@ try {
 	NECR.Root := A_Args[1], NECR.Delay := A_Args[2] == "delay"
 	BaseName := A_Args[3]
 	for Suffix in ["entered", "release", "stop"] {
-		Handle := DllCall("Kernel32\OpenEventW", "UInt", 0x100002, "Int", false,
+		EntryEventHandle := DllCall("Kernel32\OpenEventW", "UInt", 0x100002, "Int", false,
 			"Str", BaseName . "_" . Suffix, "Ptr")
-		_NECR_Require(Handle != 0, "receiver event open refused")
-		NECR.Events.Push(Handle)
+		_NECR_Require(EntryEventHandle != 0, "receiver event open refused")
+		NECR.Events.Push(EntryEventHandle)
 	}
 	NECR.Parent := DllCall("Kernel32\OpenProcess", "UInt", 0x100000, "Int", false,
 		"UInt", Integer(A_Args[4]), "Ptr")
@@ -136,6 +136,6 @@ try {
 	NECR.Subclassed := true
 	_NECR_Publish("ready", ProcessExist() . "|" . NECR.Window.Hwnd . "|" . NECR.Edit.Hwnd)
 	SetTimer(_NECR_Watch, 10)
-} catch as Err {
-	_NECR_Error(Err)
+} catch as EntryFailure {
+	_NECR_Error(EntryFailure)
 }

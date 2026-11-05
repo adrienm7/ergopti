@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **81 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **84 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1232,7 +1232,7 @@ Run41926489533 executes75 cases:64 pass,10 assertions fail and one constructor-s
 
 Run41927538467 at09e8ea2 executes58 cases in each order:55 pass and3 fail. All selected AHK-068 business cases pass; one empty-file fixture fails before the reader and is corrected separately. Screenshot pre-write failure deletes an independently owned file; its no-stage control passes. The proposed zero-access metadata lease is experimentally rejected because it does not block native deletion. All4 bounded PCRE cases pass; no Windows PCRE resource defect is established at the measured sizes. Both runs compile the complete production entry and pass90/90 native hotstring E2E; HTTP E2E is not selected.
 
-The register now contains81 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 has an integrated original-event correction awaiting native post-fix qualification. The requested1,000 target remains unmet.
+The register now contains84 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 has an integrated original-event correction awaiting native post-fix qualification. The requested1,000 target remains unmet.
 
 ## AHK-072: Override saves overwrite a source changed after the loaded snapshot
 
@@ -1367,3 +1367,43 @@ Regression: Two real native-writer/dispatcher cases assert exact durable/live ag
 ## Native qualification at 0888bda
 
 Run41940017179 executes68 cases in each order:58 pass and the same10 fail. Complete production compilation passes; optional E2E groups are not selected. All3 external modifier cases pass, including released Shift. Three local children satisfy their strict character/key/provenance assertions and emit PASS, but the parent incorrectly rejects the preceding observation line; its receipt check is repaired to require both exact lines. The other failures establish AHK-078 through081: two CapsWord numeric cases, one effective duration case, one wrong Explorer rename target and two cached gesture publication cases. The CapsWord cached-publication sibling stops before its first writer acknowledges, so no business conclusion is drawn for it. The target of1,000 remains unmet.
+
+## AHK-082: Boot readers bypass the admitted typed configuration and reinterpret outdated values
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+KeyCombinationChordsReadConfig reads the compatibility cache and coerces its leaves instead of consuming the associated admitted typed source. Compatibility cache integers cannot retain the Boolean-versus-number distinction.
+
+Reproduction: Native run41943680113 at231d481: quoted false and numeric2 activate chord symmetry; quoted500 and Boolean true replace the canonical100ms timing with500ms or1ms. The actual source snapshot already supplies the correct defaults. Four malformed-source failures repeat in reverse; three valid controls pass.
+
+Consequence: Outdated configuration can route a chord to its reverse action or unexpectedly shorten/extend its recognition window despite the canonical loader rejecting that value.
+
+Regression: Seven actual parse/snapshot/policy cases establish fail-before and controls. The integrated reader takes delay, symmetry and enabled from one admitted snapshot. Related LoneTap/CapsWord readers now consume their associated canonical leaves while detached Map contracts remain intact. Thirteen additive sibling/enabled cases await qualification; no separate defect is counted per leaf or consumer.
+
+## AHK-083: The native profile prompt truncates pasted multiline instructions to one line
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The system prompt fallback uses InputBox, whose native Edit is single-line even when the dialog height is increased.
+
+Reproduction: Native run41943680113: genuine WM_PASTE of a two-line Unicode clipboard into the actual profile fallback produces multiline_style0, one control/returned/durable line and a successful save containing only the first line. Single-line save and second-prompt cancellation controls pass in both orders.
+
+Consequence: An acknowledged profile edit permanently loses all pasted instruction lines after the first.
+
+Regression: Three real dialog/WM_PASTE/durable codec cases retain the exact multiline text and cancellation behavior. The integrated native fallback uses a real multiline Edit with WantReturn and no text limit, explicit OK/Cancel/Timeout receipts and owned timer/window teardown. Existing input ports remain compatible. Native automation targets the actual replacement control and buttons; post-fix qualification pending.
+
+## AHK-084: Window-title rollups attribute destination captions to the outgoing application
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+KLR_RebuildTitleCounts groups next_title under the outgoing app from events_window_switch. It also counts focus visits although the shared applications table labels c as manual keystrokes.
+
+Reproduction: Native run41943680113 cross-app SQLite/rebuild/manifest probe observes appA/TitleB and appB/TitleA counters; the same-app round trip control passes. Source events deliberately follow the genuine outgoing-app producer contract, and independent walker durations remain2500/3500ms.
+
+Consequence: The applications dashboard shows another application's caption, omits the correctly timed title when c is0, and presents visit counts as character activity.
+
+Regression: The integrated reader sums its existing accepted typing projection by actual typing app/title, excluding synthetic output and retaining physical backspaces; the walker continues to own ms. Tests add exact3/4 typing counts independent of committed text length while preserving app ownership and2500/3500ms assertions. Native title-cap/refusal and obsolete cache18 controls are retained; cache19/checkpoint5 force reconstruction before new admission. Post-fix qualification pending.
+
+## Native qualification at 231d481
+
+Run41943680113 executes94 cases after the earlier strict discovery mismatch was corrected from21 to24 CapsWord matches. Each order has81 successes and13 failures. All selected075–081 primitive fixes pass, including8 default-migration,4 effective-duration,6 CapsWord-domain,24 auto-off,4 LLM integer,3 idle decimal,1 token-margin,2 Explorer and both gesture publication probes. The repaired CapsWord concurrent-publication sibling fails and is corrected separately. Profiles establish083 and an extension of072; malformed chord settings establish082; cross-app title attribution establishes084. The scalar failures stop at canonical key spelling or hook readiness; they do not yet prove native leakage and are being repaired without a subject change. Both actual native DLL editor cases reach their text/caret/timeout/retirement assertions successfully but reject a fixture warning in the exact completion receipt; local/global variable names are repaired before qualification. The full production graph compiles; optional E2E groups are not selected. The target of1,000 distinct defects remains unmet.

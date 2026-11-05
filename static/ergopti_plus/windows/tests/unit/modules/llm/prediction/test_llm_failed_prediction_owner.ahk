@@ -223,3 +223,206 @@ _LFO_Case(Mode) {
 for _LFO_Mode in ["current", "stale-entry", "logger-gap"]
 	Test("LLM failed prediction: " . _LFO_Mode . " preserves the presentation owner (llm-failure-finalizer-owner)",
 		_LFO_Case.Bind(_LFO_Mode))
+
+; Append to test_llm_failed_prediction_owner.ahk. Real parser/engine remain unchanged.
+_LSP_LastSlot() {
+    global _Stub_LlmTooltipCalls
+    AssertTrue(_Stub_LlmTooltipCalls.Length > 0)
+    Call := _Stub_LlmTooltipCalls[_Stub_LlmTooltipCalls.Length]
+    AssertTrue(Call.slots.Length == 1)
+    return Call.slots[1]
+}
+_LSP_AdmitB(State) {
+    global _LLM_Engine, _Stub_LlmPresentedRecord
+    try {
+        AssertFalse(A_IsCritical)
+        State.TimerCalls += 1
+        Before := State.Calls.Length
+        LLM_Engine_FirePrediction("Je dis bonjou")
+        AssertEqual(Before + 1, State.Calls.Length, "B must cross the genuine public network-dispatch boundary once")
+        Call := State.Calls[State.Calls.Length]
+        State.BId := Call["request_id"]
+        AssertTrue(State.BId != State.AId && _LLM_Engine["request_id"] == State.BId)
+        _LPP_Answer(Call, "TAIL_CORRECTED: Je dis bonjour`nNEXT_WORDS: tout le monde")
+        State.BRoles := _LLS_Roles(_LSP_LastSlot())
+        State.BText := _LLM_SlotGetText(_LSP_LastSlot())
+        AssertEqual("r tout le monde", State.BText)
+        AssertEqual("typed:bonjou|corrected:r|next: tout le monde", State.BRoles,
+            "the affirmative current B must really publish the parser's three-piece projection")
+        State.BRecord := _Stub_LlmPresentedRecord
+        AssertTrue(IsObject(State.BRecord) && State.BRecord.IsFinal
+            && State.BRecord.Lifecycle.OfferId == State.BId)
+    } catch Any as Failure {
+        State.Failure := Failure
+    } finally State.Done := true
+}
+_LSP_Log(State, Line) {
+    if !InStr(Line, "[WARNING] [LLM.parser] Prediction refused: model text exceeds the shared parser resource limits.")
+        return
+    State.FailedLines += 1
+    if State.Mode != "parse-gap" || !State.Armed
+        return
+    State.Armed := false
+    AssertFalse(A_IsCritical)
+    SetTimer(State.Timer, -State.FloorMs)
+    _LFO_WaitForB(State)
+}
+_LSP_ReplayB(State) {
+    global _LLM_Engine, _Stub_LlmPresentedRecord
+    try {
+        State.ReplayCalls += 1
+        Before := State.Calls.Length
+        LLM_Engine_FirePrediction("Je dis bonjou")
+        State.ReplayNetworkDelta := State.Calls.Length - Before
+        State.ReplayId := _LLM_Engine["request_id"]
+        State.ReplayRoles := _LLS_Roles(_LSP_LastSlot())
+        State.ReplayText := _LLM_SlotGetText(_LSP_LastSlot())
+        State.ReplayRecord := _Stub_LlmPresentedRecord
+    } catch Any as Failure {
+        State.Failure := Failure
+    } finally State.Replayed := true
+}
+_LSP_Exercise(State) {
+    global _LLM_Engine, _SharedDir
+    State.FloorMs := _LLM_Engine["min_request_interval_ms"] + 1
+    AssertTrue(State.FloorMs is Integer && State.FloorMs > 1 && State.FloorMs < 3000)
+    State.Timer := _LSP_AdmitB.Bind(State)
+    State.ReplayTimer := _LSP_ReplayB.Bind(State)
+    State.Replayed := false, State.ReplayCalls := 0
+    State.BRoles := "", State.ReplayRoles := "", State.ReplayText := "", State.ReplayId := 0
+    State.ReplayNetworkDelta := -1, State.ReplayRecord := 0
+    Limits := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\llm\parser_limits.json"))
+    Huge := ""
+    Loop Limits["max_operand_bytes"] + 1
+        Huge .= "x"
+    RawA := "TAIL_CORRECTED: " . Huge . "`nNEXT_WORDS: refused"
+    LLM_Engine_FirePrediction("Le premier message")
+    AssertEqual(1, State.Calls.Length)
+    State.AId := State.Calls[1]["request_id"]
+    if State.Mode == "stale-entry" {
+        SetTimer(State.Timer, -State.FloorMs)
+        _LFO_WaitForB(State)
+    } else {
+        AssertEqual("parse-gap", State.Mode)
+        State.Armed := true
+    }
+    _LPP_Answer(State.Calls[1], RawA)
+    if IsObject(State.Failure)
+        throw State.Failure
+    AssertTrue(State.Done && State.TimerCalls == 1)
+    AssertEqual(State.Mode == "parse-gap" ? 1 : 0, State.FailedLines,
+        "only the mid-parser case crosses the real refusal diagnostic; the stale-entry control is rejected before parsing")
+    AssertEqual(State.BId, _LLM_Engine["request_id"], "the stale callback cannot take B's request identity")
+    AssertEqual("Je dis bonjou", _LLM_Engine["last_ctx"], "the current cache must still belong to B")
+    SetTimer(State.ReplayTimer, -State.FloorMs)
+    Started := A_TickCount
+    while !State.Replayed && TickElapsed(Started) < 3000
+        Sleep(10)
+    if IsObject(State.Failure)
+        throw State.Failure
+    Store := _LLM_Engine_SlotDisplayStore()
+    _TestPrint("# SLOT_DISPLAY_STALE_PARSER " . KL_JsonEncode(Map("mode", State.Mode,
+        "a_id", State.AId, "b_id", State.BId, "timer_calls", State.TimerCalls,
+        "parser_refusals", State.FailedLines, "replay_calls", State.ReplayCalls,
+        "replay_network_delta", State.ReplayNetworkDelta, "replay_id", State.ReplayId,
+        "initial_roles", State.BRoles, "replay_roles", State.ReplayRoles,
+        "initial_text", State.BText, "replay_text", State.ReplayText, "display_store_context", Store.Ctx)))
+    AssertTrue(State.Replayed && State.ReplayCalls == 1)
+    AssertEqual(0, State.ReplayNetworkDelta, "the public replay must use B's genuine exact-result cache")
+    AssertTrue(State.ReplayId != State.BId && IsObject(State.ReplayRecord)
+        && State.ReplayRecord.Lifecycle.OfferId == State.ReplayId && State.ReplayRecord.IsFinal)
+    AssertEqual(State.BText, State.ReplayText, "the cached physical injection text stays unchanged")
+    AssertEqual(State.BRoles, State.ReplayRoles, "a superseded parser cannot erase the current result's typed/corrected/next projection")
+}
+_LSP_Case(Mode) {
+	global _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport, _LLM_Live
+	global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Ollama_Async
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Pending, _LLM_Bridge_PrefixObserver
+	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord, _Stub_LlmLogCalls
+	global _Stub_LlmLogFailedCalls, _Stub_LlmSuggestedCalls
+	global _LLM_ProfilesCache, _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	Names := ["_LLM_Engine", "_LLM_Menu", "_LLM_Engine_RemoteTransport", "_LLM_Live",
+		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
+		"_LLM_Ollama_ActiveStreams", "_LLM_Ollama_Pending", "_LLM_Bridge_PrefixObserver",
+		"_Stub_LlmTooltipCalls", "_Stub_LlmTooltipVisible", "_Stub_LlmTooltipLoading",
+		"_Stub_LlmTooltipText", "_Stub_LlmPresentedRecord", "_Stub_LlmLogCalls",
+		"_Stub_LlmLogFailedCalls", "_Stub_LlmSuggestedCalls", "_LLM_ProfilesCache",
+		"_LLM_COMMON_INFERENCE", "_LLM_COMMON_INFERENCE_RAW", "_LOGGER_TEST_SINK",
+		"_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED",
+		"_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+	PreviousCritical := Critical("On")
+	Saved := Map(), SavedLogger := _TLOG_CaptureLoggerState()
+	for Name in Names
+		Saved[Name] := {Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0}
+	Store := _LLM_Engine_SlotDisplayStore()
+	SavedCtx := Store.Ctx, SavedDisplays := Store.ByText
+	State := {Mode: Mode, Calls: [], AId: 0, BId: 0, Timer: 0, TimerCalls: 0,
+		Done: false, Failure: 0, FailedLines: 0, Armed: false, FloorMs: 0, BRecord: 0, BText: ""}
+	Primary := 0, PrivateEngineOwned := false
+	try {
+		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		_LLM_Remote_Async := Map(), _LLM_Remote_BackboardExchanges := Map(), _LLM_Ollama_Async := Map()
+		_LLM_Ollama_ActiveStreams := [], _LLM_Ollama_Pending := "", _LLM_Bridge_PrefixObserver := 0
+		_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
+		_LLM_Engine := _LPP_Engine(Saved["_LLM_Engine"].Value)
+		PrivateEngineOwned := true
+		_LLM_Engine["pending_timer"] := "", _LLM_Engine["timer_active"] := false
+		_LLM_Menu := _LPP_Menu()
+		_Stub_LlmTooltipCalls := [], _Stub_LlmTooltipVisible := false, _Stub_LlmTooltipLoading := false
+		_Stub_LlmTooltipText := "", _Stub_LlmPresentedRecord := 0
+		_Stub_LlmLogCalls := [], _Stub_LlmLogFailedCalls := [], _Stub_LlmSuggestedCalls := []
+		_LLM_ProfilesCache := unset, _LLM_COMMON_INFERENCE := unset, _LLM_COMMON_INFERENCE_RAW := unset
+		Store.Ctx := "", Store.ByText := Map()
+		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
+		_LOGGER_TEST_SINK := _LSP_Log.Bind(State)
+		Critical("Off")
+		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", 1, "show_info_bar", false))
+		_LSP_Exercise(State)
+	} catch Any as Failure {
+		Primary := Failure
+	}
+	try {
+		State.Armed := false
+		if IsObject(State.Timer)
+			SetTimer(State.Timer, 0)
+		if State.HasOwnProp("ReplayTimer") && IsObject(State.ReplayTimer)
+			SetTimer(State.ReplayTimer, 0)
+		if PrivateEngineOwned {
+			LLM_Engine_StopGeneration()
+			AssertFalse(_LLM_Engine["timer_active"])
+			AssertEqual(0, _LLM_Remote_Async.Count)
+			AssertEqual(0, _LLM_Ollama_Async.Count)
+		}
+	} catch Any as Failure {
+		if !IsObject(Primary)
+			Primary := Failure
+	} finally {
+		Critical("On")
+		try {
+			State.Timer := 0
+			State.Calls := []
+			State.BRecord := 0
+			Store.Ctx := SavedCtx, Store.ByText := SavedDisplays
+			_TLOG_RestoreLoggerState(SavedLogger)
+			for Name, Item in Saved
+				%Name% := Item.Present ? Item.Value : unset
+		} finally Critical(PreviousCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+for _LSP_Mode in ["stale-entry", "parse-gap"]
+    Test("LLM slot display: " . _LSP_Mode . " preserves the current cached projection (llm-slot-display-stale-parser)",
+        _LSP_Case.Bind(_LSP_Mode))
