@@ -488,3 +488,89 @@ _TSLR_ScalarRestore(Mode) {
 for _TSLR_Mode in ["owned", "user-still-held", "user-released"]
 	Test("scalar lifted restoration: " . _TSLR_Mode . " retains exact release custody (synthetic-lifted-down-refusal)",
 		_TSLR_ScalarRestore.Bind(_TSLR_Mode))
+
+
+_TSLX_PostPortCustody(Mode) {
+	global _AHK_SendInput, _TSUH_Sent, _TSUH_Logical, _TSUH_Physical
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+	User := Mode == "pending-up"
+	_TSUH_Begin(User ? Map("LCtrl", true) : Map(), User ? Map("LCtrl", true) : Map())
+	State := {armed: false, nested: false, allowUp: false, downs: 0, ups: 0, refusedUps: 0,
+		throws: 0, retired: false, sibling: 0, siblingAck: false, original: 0}
+	Emit(Keys) {
+		_TSUH_Sent.Push(Keys)
+		if Keys == "{LCtrl Down}" {
+			State.downs += 1
+			if State.armed && !State.nested {
+				if Mode == "withdrawn" {
+					State.retired := TapHoldReleaseSyntheticKeys()
+				} else if Mode == "sibling" {
+					State.nested := true
+					State.retired := TapHoldSyntheticKeyUp("LCtrl", State.original)
+					State.sibling := TapHoldNewOwner()
+					State.siblingAck := TapHoldSyntheticKeyDown("LCtrl", State.sibling)
+					State.nested := false
+				} else
+					_TSUH_Physical.Delete("LCtrl")
+				_TSUH_Logical["LCtrl"] := true
+				State.throws += 1
+				throw Error("Restoration refused after custody changed and modeled Down arrived")
+			}
+			_TSUH_Logical["LCtrl"] := true
+		} else if Keys == "{LCtrl Up}" {
+			if State.armed && Mode == "pending-up" && !State.allowUp {
+				State.refusedUps += 1
+				throw Error("Balancing Up refused before modeled delivery")
+			}
+			State.ups += 1
+			if _TSUH_Logical.Has("LCtrl")
+				_TSUH_Logical.Delete("LCtrl")
+		}
+		return 0
+	}
+	try {
+		_AHK_SendInput := Emit
+		if !User {
+			State.original := TapHoldNewOwner()
+			AssertTrue(TapHoldSyntheticKeyDown("LCtrl", State.original))
+			AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+		}
+		UserHeld := _TH_UserHoldsDeliveredKey("LCtrl")
+		AssertEqual(User, UserHeld)
+		AssertTrue(TapHoldLiftKey("LCtrl"))
+		State.armed := true
+		Result := TapHoldRestoreLiftedKey("LCtrl", UserHeld)
+		_TestPrint("# lifted restore custody mode=" . Mode . " result=" . Result . " downs=" . State.downs
+			. " ups=" . State.ups . " throws=" . State.throws . " refused_ups=" . State.refusedUps
+			. " retired=" . State.retired . " sibling_ack=" . State.siblingAck
+			. " held=" . _TH_SyntheticHeldKeys.Count . " pending=" . _TH_SyntheticReleasePendingKeys.Count)
+		AssertEqual(1, State.throws, "the scalar producer must actually reach the post-effect refusal")
+		AssertFalse(Result, "recovery must never turn a refused Down into a restoration ACK")
+		if Mode == "pending-up" {
+			AssertFalse(_TSUH_Physical.Has("LCtrl"), "the user really releases during the Down port")
+			AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS, State.refusedUps)
+			AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl") && _TSUH_Logical.Has("LCtrl"),
+				"the actual unproved balancing Up must remain explicitly owned")
+			State.allowUp := true
+		} else {
+			AssertTrue(State.retired, "the genuine original owner must retire before the final Down arrives")
+			if Mode == "sibling" {
+				AssertTrue(State.siblingAck && State.sibling.Held)
+				AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+				AssertEqual(2, State.ups, "the refused restore cannot release the fresh sibling's key")
+				AssertTrue(_TSUH_Logical.Has("LCtrl"))
+			} else {
+				AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+				AssertFalse(_TSUH_Logical.Has("LCtrl"), "an obsolete captured Owned flag cannot strand a key after actual owner retirement")
+			}
+		}
+		AssertTrue(TapHoldReleaseSyntheticKeys())
+		AssertFalse(_TSUH_Logical.Has("LCtrl"))
+		AssertEqual(User ? 2 : 3, State.ups, "every actual owner or uncertain Down gets exactly its acknowledged balancing release")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count)
+	} finally _TSUH_End()
+}
+for _TSLX_Mode in ["withdrawn", "sibling", "pending-up"]
+	Test("lifted restoration custody: " . _TSLX_Mode . " resolves after the real sender port (synthetic-lifted-down-custody)",
+		_TSLX_PostPortCustody.Bind(_TSLX_Mode))
