@@ -72,6 +72,36 @@ local NAMED_ENTITIES = { lt = "<", gt = ">", amp = "&", quot = '"', apos = "'" }
 -- ====================================
 -- ====================================
 
+--- Keeps hexadecimal integer text from wrapping through Lua 5.4's signed domain.
+--- Decimal and floating-point syntax retain the reader's existing number grammar.
+local function exact_number(value)
+	if type(value) == "string" then
+		local sign, digits = value:match("^%s*([+-]?)0[xX]([%da-fA-F]+)%s*$")
+		if digits then
+			digits = digits:gsub("^0+", ""):upper()
+			if digits == "" then digits = "0" end
+			local limit = sign == "-" and "8000000000000000" or "7FFFFFFFFFFFFFFF"
+			if #digits > #limit or (#digits == #limit and digits > limit) then return nil end
+		end
+	end
+	return tonumber(value)
+end
+
+--- Validates before conversion so an oversized hexadecimal entity cannot alias.
+local function entity_scalar(digits, base)
+	local significant = digits:gsub("^0+", ""):upper()
+	if significant == "" then significant = "0" end
+	local limit = base == 16 and "10FFFF" or "1114111"
+	if #significant > #limit or (#significant == #limit and significant > limit) then
+		error("numeric character reference is outside the supported Unicode scalar domain", 0)
+	end
+	local cp = tonumber(significant, base)
+	if cp >= 0xD800 and cp <= 0xDFFF then
+		error("numeric character reference is outside the supported Unicode scalar domain", 0)
+	end
+	return cp
+end
+
 --- Encodes one code point as UTF-8.
 --- @param cp number
 --- @return string
@@ -90,8 +120,8 @@ end
 --- @return string
 local function decode_entities(value)
 	return (value:gsub("&(#?x?[%w]+);", function(token)
-		if token:sub(1, 2) == "#x" and token:sub(3):match("^%x+$") then return utf8_char(tonumber(token:sub(3), 16)) end
-		if token:sub(1, 1) == "#" and token:sub(2):match("^%d+$") then return utf8_char(tonumber(token:sub(2))) end
+		if token:sub(1, 2) == "#x" and token:sub(3):match("^%x+$") then return utf8_char(entity_scalar(token:sub(3), 16)) end
+		if token:sub(1, 1) == "#" and token:sub(2):match("^%d+$") then return utf8_char(entity_scalar(token:sub(2), 10)) end
 		return NAMED_ENTITIES[token]
 	end))
 end
@@ -254,10 +284,12 @@ function M.parse(text)
 			elseif kind == "modifierMap" then
 				if not attrs.id then return nil, "modifierMap without id" end
 				current_modifier_map = attrs.id
-				modifier_maps[current_modifier_map] = { default_index = tonumber(attrs.defaultIndex or "0"), selects = {} }
+				local default_index = exact_number(attrs.defaultIndex or "0")
+				if not default_index then return nil, "modifierMap without a valid defaultIndex" end
+				modifier_maps[current_modifier_map] = { default_index = default_index, selects = {} }
 			elseif kind == "keyMapSelect" and current_modifier_map ~= nil then
-				if not tonumber(attrs.mapIndex) then return nil, "keyMapSelect without mapIndex" end
-				current_select = { index = tonumber(attrs.mapIndex), modifiers = {} }
+				if not exact_number(attrs.mapIndex) then return nil, "keyMapSelect without mapIndex" end
+				current_select = { index = exact_number(attrs.mapIndex), modifiers = {} }
 				local selects = modifier_maps[current_modifier_map].selects
 				selects[#selects + 1] = current_select
 			elseif kind == "modifier" and current_select ~= nil then
@@ -272,7 +304,7 @@ function M.parse(text)
 					set_order[#set_order + 1] = current_set
 				end
 			elseif kind == "keyMap" and current_set ~= nil then
-				local index = tonumber(attrs.index)
+				local index = exact_number(attrs.index)
 				if not index then return nil, "keyMap without index" end
 				local set = sets[current_set]
 				if not set.maps[index] then
@@ -281,13 +313,13 @@ function M.parse(text)
 				end
 				current_map = set.maps[index]
 				if attrs.baseIndex ~= nil then
-					local base_index = tonumber(attrs.baseIndex)
+					local base_index = exact_number(attrs.baseIndex)
 					if not base_index then return nil, "keyMap with a non-numeric baseIndex" end
 					current_map.base = { set = attrs.baseMapSet or current_set, index = base_index }
 				end
 				if tag.self_closing then current_map = nil end
 			elseif kind == "key" and current_set ~= nil and current_map ~= nil then
-				local code = tonumber(attrs.code)
+				local code = exact_number(attrs.code)
 				if not code then return nil, "key without code" end
 				if current_map.keys[code] == nil then
 					if attrs.output ~= nil then
@@ -416,8 +448,8 @@ function M.positions(body)
 				set = { open_stop = tag.next, maps = {} }
 				out.key_map_sets[attrs.id] = set
 				if tag.self_closing then set.close_start, set = tag.next, nil end
-			elseif kind == "keyMap" and set ~= nil and tonumber(attrs.index) ~= nil then
-				local index = tonumber(attrs.index)
+			elseif kind == "keyMap" and set ~= nil and exact_number(attrs.index) ~= nil then
+				local index = exact_number(attrs.index)
 				if set.maps[index] then return nil, "keyMap " .. index .. " is defined twice" end
 				map = { start = open, open_stop = tag.next, self_closing = tag.self_closing }
 				set.maps[index] = map
@@ -441,8 +473,8 @@ function M.key_positions(content)
 			pos = open + 1
 		else
 			pos = tag.next
-			if tag.name == "key" and not tag.closing and tonumber(tag.attrs.code) ~= nil then
-				keys[#keys + 1] = { code = tonumber(tag.attrs.code), start = open, stop = tag.next,
+			if tag.name == "key" and not tag.closing and exact_number(tag.attrs.code) ~= nil then
+				keys[#keys + 1] = { code = exact_number(tag.attrs.code), start = open, stop = tag.next,
 					self_closing = tag.self_closing }
 			end
 		end
