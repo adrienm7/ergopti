@@ -107,7 +107,8 @@ local function handle(payload, state, request)
 	if action == "export" then
 		if state.keystats and type(state.keystats.export_json) == "function" then
 			local ok, json = pcall(state.keystats.export_json)
-			return with_payload({ exported = ok, json = ok and json or nil })
+			local exported = ok and type(json) == "string"
+			return with_payload({ exported = exported, json = exported and json or nil })
 		end
 		return with_payload({ exported = false })
 	end

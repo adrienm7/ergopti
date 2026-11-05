@@ -26,6 +26,7 @@
 
 local M = {}
 local TableUtil = require("table_util")
+local StrictUtf8 = require("compat.utf8")
 local ErrorDescription = require("error_description")
 local Calendar = require("modules.keystats.calendar")
 
@@ -2220,15 +2221,18 @@ function M.export_session()
 	}
 end
 
---- Serialises the session to a JSON string.
---- @return string
+--- Serialises the session only when the result is valid UTF-8 JSON.
+--- @return string|nil json JSON text, or nil when native bytes are not UTF-8.
+--- @return string|nil reason Refusal reason when no JSON could be published.
 function M.export_json()
 	local data = M.export_session()
 	-- Application ids and evdev codes are maps even when empty or when their
 	-- numeric keys happen to form an array prefix.
 	local objects = { [data.apps] = true }
 	for _, app in pairs(data.apps) do objects[app.physical_scancodes] = true end
-	return _to_json(data, objects)
+	local json = _to_json(data, objects)
+	if not StrictUtf8.len(json) then return nil, "session contains invalid UTF-8" end
+	return json
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
@@ -2850,7 +2854,12 @@ local function flush_json()
 		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
 		return false
 	end
-	local written, write_err = FileSystem.write_if_unchanged(path, M.export_json() .. "\n", { status = status, content = previous })
+	local json, export_err = M.export_json()
+	if not json then
+		Logger.error(LOG, "flush(): cannot encode session summary — %s.", tostring(export_err))
+		return false
+	end
+	local written, write_err = FileSystem.write_if_unchanged(path, json .. "\n", { status = status, content = previous })
 	if written ~= true then
 		Logger.error(LOG, "flush(): cannot publish the summary at '%s' — %s.", path, tostring(write_err))
 		return false
