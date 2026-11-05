@@ -174,6 +174,9 @@ function verify(image, zsync) {
 			`zsync Length ${header.get('Length')} differs from the AppImage size ${image.length}`
 		);
 	}
+	const blocksize = header.get('Blocksize') ?? '';
+	if (!/^[0-9]+$/.test(blocksize) || !Number.isSafeInteger(Number(blocksize)) || Number(blocksize) <= 0)
+		problems.push('zsync Blocksize is missing or invalid');
 	const sha1 = header.get('SHA-1') ?? '';
 	if (!/^[0-9a-f]{40}$/.test(sha1)) problems.push('zsync SHA-1 is missing or malformed');
 	else if (sha1 !== createHash('sha1').update(image).digest('hex'))
