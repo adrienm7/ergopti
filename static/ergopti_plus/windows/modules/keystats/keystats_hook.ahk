@@ -240,13 +240,14 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		; the one the user switched into (F9 fix).
 		outgoing_app := KLHook.prev_app
 		outgoing_title := KLHook.prev_title
+		AppChanged := NewApp != "" && NewApp != outgoing_app
 
 		; Emit app_switch / window_switch the first time we observe a change.
 		; HS tracks app and title separately because a window-title-only change
 		; (e.g. switching tabs in a browser) is interesting on its own — it
 		; surfaces in the metrics dashboard as a per-app context shift without
 		; double-counting as an app switch.
-		if (NewApp != "" and NewApp != KLHook.prev_app) {
+		if AppChanged {
 				if (KLHook.prev_app != "") {
 		duration := TickElapsed(KLHook.app_entered_at, Now)
 						; Flush before logging so the typing buffer is attributed to the
@@ -266,8 +267,10 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 				KLHook.prev_app := NewApp
 				KLHook.app_entered_at := Now
 		}
-		if (NewTitle != KLHook.prev_title) {
-				if (KLHook.prev_title != "" and outgoing_app != "") {
+		; A caption belongs to its application. Equal text in a new process
+		; still closes the old title interval and starts a fresh native origin.
+		if (NewTitle != outgoing_title || AppChanged) {
+				if (outgoing_title != "" and outgoing_app != "") {
 		duration := TickElapsed(KLHook.title_entered_at, Now)
 						; Flush before logging so the typing buffer is attributed to
 						; the previous window context, not the new one. Mirrors the
@@ -281,7 +284,7 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 								try LoggerWarn("keystats_hook", "Captured window-switch destination could not be classified; its row was refused.")
 						}
 						if !DestinationFiltered
-								try KL_LogWindowSwitch(outgoing_app, KLHook.prev_title, NewTitle, duration)
+								try KL_LogWindowSwitch(outgoing_app, outgoing_title, NewTitle, duration)
 				}
 				KLHook.prev_title := NewTitle
 				KLHook.title_entered_at := Now
