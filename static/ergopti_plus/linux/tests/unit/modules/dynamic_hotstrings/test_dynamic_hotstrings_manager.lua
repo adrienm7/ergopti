@@ -167,6 +167,36 @@ assert(next(manager.get_info()) == nil)
       helpers.assert_true(type(ok) == "boolean", "on_trigger returns boolean")
     end)
 
+    helpers.it("uses one calendar instant across a date expansion at midnight", function()
+      local info_path = os.tmpname(); os.remove(info_path)
+      dh.init({ trigger_char = "\\", personal_info_path = info_path })
+      local old_date, old_time = os.date, os.time
+      local boundary = old_time({ year = 2024, month = 12, day = 31, hour = 23, min = 59, sec = 59 })
+      local previous = package.loaded["modules.hotstrings.injector"]
+      local injected
+      package.loaded["modules.hotstrings.injector"] = { inject = function(_, text) injected = text; return { ok = true } end }
+      local calls = 0
+      os.time = function() return boundary end
+      os.date = function(format, instant)
+        if instant == nil then calls = calls + 1; instant = boundary + (calls > 1 and 1 or 0) end
+        return old_date(format, instant)
+      end
+      local ok, err = pcall(function()
+        dh.set_enabled(true)
+        local fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "date\\", "\\", true)
+        helpers.assert_true(fired)
+        helpers.assert_eq(injected, "mardi 31 décembre 2024", "a single expansion cannot mix calendar dates")
+        calls = 0
+        local dates = require("dynamic_hotstrings").today_date_strings()
+        helpers.assert_eq(dates.iso, "2024_12_31")
+        helpers.assert_eq(dates.fr, "31/12/2024")
+        helpers.assert_eq(dates.long_fr, "mardi 31 décembre 2024")
+      end)
+      os.date, os.time = old_date, old_time
+      package.loaded["modules.hotstrings.injector"] = previous
+      if not ok then error(err, 0) end
+    end)
+
     helpers.it("on_trigger when disabled returns false", function()
       dh.set_enabled(false)
       local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "td\\", "\\", true)
