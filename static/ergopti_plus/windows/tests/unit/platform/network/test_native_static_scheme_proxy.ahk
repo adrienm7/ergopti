@@ -47,6 +47,12 @@ _NativeStaticSchemeProxy_Controls() {
 			}
 			LegacyDirect := LegacyDirect && Answer["proxy"] == ""
 		}
+		for Invalid in ["http=proxy.invalid:notaport", "https=proxy.invalid:notaport", "ftp=proxy.invalid:21"] {
+			Config := Map("proxy", Invalid, "bypass", "", "pac_url", "", "auto_detect", false)
+			AssertThrows(SystemProxy_SelectStatic.Bind(Config, "http://example.invalid/", true),
+				"Malformed or unsupported static maps must stay refused")
+		}
+		AssertTrue(Receipt.Get("invalid_refused", false), "Native malformed-map controls must stay refused")
 		AssertTrue(Receipt.Get("http_direct", false) && Receipt.Get("https_direct", false) && LegacyDirect,
 			"Absent protocol mappings must remain DIRECT in PS and strict AHK selectors; native receipt="
 			. Observed[1]["stdout"] . " legacy_direct=" . LegacyDirect)

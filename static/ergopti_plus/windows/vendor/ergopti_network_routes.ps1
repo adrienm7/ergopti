@@ -502,6 +502,11 @@ function Get-ErgoptiStaticRoutes {
         elseif ($Name -eq '') { $Generic += $Relay }
     }
     $Chosen = @(if ($Specific.Count -gt 0) { $Specific } else { $Generic })
+    # WinHTTP leaves an unmapped protocol direct; every declared endpoint has
+    # already been admitted above, so malformed maps cannot take this branch.
+    if ($Chosen.Count -eq 0 -and $SeenSchemes.Count -gt 0) {
+        return ,@(@{ Kind = 'direct'; Endpoint = ''; Authentication = 'none'; Source = $Source + '_direct' })
+    }
     if ($Chosen.Count -ne 1) { throw 'WinINet static route capability was refused.' }
     return ,@(@{ Kind = 'proxy'; Endpoint = [string]$Chosen[0]; Source = $Source + '_proxy'; Authentication = 'current_user_proxy_only' })
 }
