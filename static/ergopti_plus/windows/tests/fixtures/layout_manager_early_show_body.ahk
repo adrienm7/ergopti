@@ -68,6 +68,10 @@ class _LMSO_Core {
 	}
 	WebMessageReceived(Callback) {
 		global _LMSO, _LayMgrWeb_Controller
+		if HasProp(_LMSO, "SettingsMode") && InStr(_LMSO.SettingsMode, "navigation-") == 1 {
+			_LMSO.MessageCalls += 1
+			return _LMSO_Subscription(Callback, _LayMgrWeb_Controller)
+		}
 		if !HasProp(_LMSO, "SettingsMode") || !InStr(_LMSO.SettingsMode, "subscription-")
 			return {Callback: Callback}
 		Controller := _LayMgrWeb_Controller
@@ -75,7 +79,14 @@ class _LMSO_Core {
 		_LMSO_SubscriptionBoundary()
 		return _LMSO_Subscription(Callback, Controller)
 	}
-	NavigationCompleted(Callback) => {Callback: Callback}
+	NavigationCompleted(Callback) {
+		global _LMSO, _LayMgrWeb_Controller
+		if !HasProp(_LMSO, "SettingsMode") || InStr(_LMSO.SettingsMode, "navigation-") != 1
+			return {Callback: Callback}
+		Controller := _LayMgrWeb_Controller
+		_LMSO_NavigationBoundary()
+		return _LMSO_Subscription(Callback, Controller)
+	}
 	SetVirtualHostNameToFolderMapping(*) => 0
 	Navigate(Url) => 0
 }
@@ -422,6 +433,93 @@ _LMSO_SettingsGeneration(Mode) {
 	}
 }
 
+
+_LMSO_NavigationBoundary() {
+	global _LMSO, _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView
+	global _LayMgrWeb_SessionEpoch, _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	_LMSO.NavigationCalls += 1
+	if _LMSO.ClosePosted
+		return
+	_LMSO_Require(_LMSO.NavigationCalls == 1 && _LMSO.MessageCalls == 1 && IsSet(_LayMgrWeb_MsgSub)
+		&& IsObject(_LayMgrWeb_MsgSub), "The first genuine message handle must already be carried before navigation subscribes")
+	_LMSO_Require(DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int")
+		&& WinGetPID("ahk_id " . _LMSO.Hwnd) == ProcessExist(), "Only the exact owned native window may receive Close")
+	_LMSO.ClosePosted := true
+	Before := _LayMgrWeb_SessionEpoch
+	_LMSO_Require(DllCall("PostMessageW", "Ptr", _LMSO.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Int"),
+		"The navigation effect port must deliver genuine native WM_CLOSE")
+	Started := A_TickCount
+	while _LayMgrWeb_SessionEpoch == Before && A_TickCount - Started < 1000
+		Sleep(1)
+	_LMSO.CloseObserved := _LayMgrWeb_SessionEpoch != Before
+	_LMSO_Require(_LMSO.CloseObserved, "The real Close handler must withdraw its epoch before navigation returns")
+	if _LMSO.SettingsMode == "navigation-reopen" {
+		_LMSO_Require(LayoutManager_Open(), "The public constructor must admit B while A still owns its pending navigation call")
+		_LMSO.SuccessorGui := _LayMgrWeb_Gui, _LMSO.SuccessorController := _LayMgrWeb_Controller
+		_LMSO.SuccessorView := _LayMgrWeb_WebView, _LMSO.SuccessorEpoch := _LayMgrWeb_SessionEpoch
+		; Identity scalars preserve the oracle without keeping an unsubscribe
+		; handle alive past B's own final native Close during fixture cleanup.
+		_LMSO.SuccessorMsgPtr := ObjPtr(_LayMgrWeb_MsgSub), _LMSO.SuccessorNavPtr := ObjPtr(_LayMgrWeb_NavSub)
+	}
+}
+_LMSO_NavigationGeneration(Mode) {
+	global _LMSO, _WebView_SharedEnv, _WebView_SharedEnvRetired
+	global _LayMgrWeb_Gui, _LayMgrWeb_Controller, _LayMgrWeb_WebView, _LayMgrWeb_SessionEpoch
+	global _LayMgrWeb_MsgSub, _LayMgrWeb_NavSub
+	_LMSO_Refuse(!!_LayMgrWeb_Gui, "A navigation opening cannot borrow a foreign native host")
+	PreviousEnv := _WebView_SharedEnv, PreviousRetired := _WebView_SharedEnvRetired
+	PreviousCritical := Critical("Off"), Environment := _LMSO_Environment()
+	_LMSO := {SettingsMode: Mode, SettingsCalls: 0, Window: 0, Hwnd: 0, ClosePosted: false, CloseObserved: false,
+		MessageCalls: 0, NavigationCalls: 0, Unsubscribed: 0, UnsubscribedAfterClose: 0, AllowRetry: true}
+	Started := false, OpeningFailure := 0, Threw := false
+	try {
+		_WebView_SharedEnv := Environment, _WebView_SharedEnvRetired := false
+		_LMSO_Require(_LayMgrWeb_Available(), "The genuine SDK loader must be available")
+		Thread("Interrupt", 0)
+		try Started := LayoutManager_Open()
+		catch Any as Failure {
+			OpeningFailure := Failure, Threw := true
+		}
+		Expected := Mode == "navigation-reopen" ? 2 : 1
+		FileAppend("OBSERVATION layout-navigation mode=" . Mode . " messages=" . _LMSO.MessageCalls
+			. " navigations=" . _LMSO.NavigationCalls . " close_observed=" . _LMSO.CloseObserved
+			. " unsubscribed=" . _LMSO.Unsubscribed . " unsubscribe_after_close=" . _LMSO.UnsubscribedAfterClose
+			. " controllers=" . Environment.Controllers.Length . " started=" . Started . " threw=" . Threw . "`n", "*")
+		_LMSO_Require(_LMSO.ClosePosted && _LMSO.CloseObserved && _LMSO.MessageCalls == Expected
+			&& _LMSO.NavigationCalls == Expected && Environment.Controllers.Length == Expected,
+			"The actual carried-message and navigation-subscription paths must reach their exact native Close and optional successor")
+		_LMSO_Require(!Threw && !Started && _LMSO.Unsubscribed == 2 && _LMSO.UnsubscribedAfterClose == 0,
+			"Both original handles must unsubscribe before old controller Close; its frame must return cancellation")
+		_LMSO_Require(Environment.Controllers[1].Closed == 1 && !DllCall("IsWindow", "Ptr", _LMSO.Hwnd, "Int"),
+			"The exact original controller and HWND must retire once after navigation returns")
+		if Mode == "navigation-reopen" {
+			_LMSO_Require(HasProp(_LMSO, "SuccessorGui") && _LayMgrWeb_Gui == _LMSO.SuccessorGui
+				&& _LayMgrWeb_Controller == _LMSO.SuccessorController && _LayMgrWeb_WebView == _LMSO.SuccessorView
+				&& _LayMgrWeb_SessionEpoch == _LMSO.SuccessorEpoch,
+				"The old navigation continuation cannot replace B's exact GUI/controller/view/epoch")
+			_LMSO_Require(ObjPtr(_LayMgrWeb_MsgSub) == _LMSO.SuccessorMsgPtr && ObjPtr(_LayMgrWeb_NavSub) == _LMSO.SuccessorNavPtr
+				&& DllCall("IsWindow", "Ptr", _LMSO.SuccessorGui.Hwnd, "Int")
+				&& _LMSO.SuccessorController.Closed == 0 && _LMSO.SuccessorController.Fills == 1,
+				"B must retain both independent handles and its one native fill")
+		} else
+			_LMSO_Require(!_LayMgrWeb_Gui && !IsSet(_LayMgrWeb_Controller) && !IsSet(_LayMgrWeb_WebView)
+				&& !IsSet(_LayMgrWeb_MsgSub) && !IsSet(_LayMgrWeb_NavSub), "A closed A cannot republish either late handle")
+	} finally {
+		_LayMgrWeb_Close()
+		_LayMgrWeb_RetryRetiredHosts()
+		_LayMgrWeb_MsgSub := unset, _LayMgrWeb_NavSub := unset
+		for Controller in Environment.Controllers
+			if !Controller.Closed
+				Controller.Close()
+		if IsObject(_LMSO.Window)
+			try _LMSO.Window.Destroy()
+		if HasProp(_LMSO, "SuccessorGui")
+			try _LMSO.SuccessorGui.Destroy()
+		_WebView_SharedEnv := PreviousEnv, _WebView_SharedEnvRetired := PreviousRetired
+		Critical(PreviousCritical)
+	}
+}
+
 if A_Args.Length != 2 || A_Args[2] != _LMSO_Root
 	ExitApp(2)
 try {
@@ -429,7 +527,9 @@ try {
 	_LMSO_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
 		"The isolated UI role must remain genuinely outside primary configuration admission.")
 	LoggerInit()
-	if A_Args[1] == "settings-current" || A_Args[1] == "settings-close" || A_Args[1] == "settings-reopen"
+	if A_Args[1] == "navigation-close" || A_Args[1] == "navigation-reopen"
+		_LMSO_NavigationGeneration(A_Args[1])
+	else if A_Args[1] == "settings-current" || A_Args[1] == "settings-close" || A_Args[1] == "settings-reopen"
 		|| A_Args[1] == "subscription-current" || A_Args[1] == "subscription-close"
 		|| A_Args[1] == "subscription-refuse-close" || A_Args[1] == "subscription-destroy-throw"
 		_LMSO_SettingsGeneration(A_Args[1])
