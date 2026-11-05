@@ -43,6 +43,18 @@ local helpers, it, Walker, key, typed, count_of =
 -- =================================================================
 
 helpers.describe("aggregate walker: the streaks the layout exists to reduce", function()
+	helpers.it("maps both levels of actual Linux AZERTY and QWERTY keys", function()
+		for _, case in ipairs({
+			{ layout = "azerty", text = "é2", streak = 2 },
+			{ layout = "azerty", text = ",?", streak = 2 },
+			{ layout = "azerty", text = "!?", streak = 1 },
+			{ layout = "qwerty", text = "1!", streak = 2 },
+		}) do
+			local batch = Walker.walk(typed(case.text, 90), "2026-08-06", "app", nil,
+				{ physical_layout = case.layout })
+			helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, case.streak, case.text)
+		end
+	end)
 
 	local FingerMap = helpers.load_module("keystats.finger_map")
 
