@@ -63,6 +63,15 @@ local function with_paths(env, stored, body)
 end
 
 helpers.describe("logs folder resolution (logs-dir-resolver)", function()
+	helpers.it("linux-logs-dir-root: root selection remains an absolute override", function()
+		with_paths({ XDG_STATE_HOME = "/state" }, {}, function(paths, _, values)
+			for _, root in ipairs({ "/", "///" }) do
+				helpers.assert_true(paths.set_logs_dir(root))
+				helpers.assert_eq(values["paths.logs_dir"], "/ergopti_plus")
+				helpers.assert_eq(paths.get_logs_dir(), "/ergopti_plus")
+			end
+		end)
+	end)
 	helpers.it("linux-logs-dir-nul: refuses a NUL override when reading and saving", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, { ["paths.logs_dir"] = "/tmp\0/other" }, function(paths, _, values)
 			helpers.assert_eq(paths.get_logs_dir(), "/state/ergopti_plus/logs")
