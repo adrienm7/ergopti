@@ -242,14 +242,12 @@ LayoutCatalogue_IsErgopti(Entry) {
 ; ==============================
 ; ==============================
 
-; Acquire the stage exclusively: a pre-existing sidecar belongs to another owner.
+; Retain creation-time stage custody through publication and refused cleanup.
+; A pre-existing sidecar belongs to another owner and remains byte exact.
 _LayoutCatalogueWriteText(Path, Text) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	if !FSWriteCreateDurable(Partial, Text)
-		throw Error("Cannot write " . Partial)
-	if !FSAtomicMoveReplace(Partial, Path)
-		throw Error("Cannot publish " . Path)
+	if !FSWriteReplaceOwned(Path, Text, LAYOUT_REGISTRY_PARTIAL_SUFFIX, &Detail)
+		throw Error("Cannot publish " . Path . ": " . Detail)
 }
 
 ; Minimal JSON writer for the installed record, which holds a verified index

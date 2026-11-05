@@ -1013,10 +1013,69 @@ FSCopyReplaceAtomic(Source, RootDir, Relative, &Detail := "") {
 	}
 }
 
+; Writes a UTF-8 replacement through a creation-time stage handle. The held
+; parent and sharing-denied stage remain the same objects through write,
+; flush, rename and failed-attempt cleanup; a foreign sidecar is never adopted.
+; @param Path {String} Target below an existing parent directory.
+; @param Content {String} Complete UTF-8 text, without a BOM.
+; @param StageSuffix {String} Non-empty leaf suffix reserved by this publisher.
+; @param Detail {VarRef} Native failure and any retained-stage cleanup debt.
+; @return {Boolean} True only after the owned replacement was published/flushed.
+FSWriteReplaceOwned(Path, Content, StageSuffix, &Detail := "") {
+	Detail := ""
+	if !FSPathIsAdmissible(Path) || !(Content is String) || !FSPathIsAdmissible(StageSuffix)
+			|| InStr(StageSuffix, "\") || InStr(StageSuffix, "/") || InStr(StageSuffix, ":") {
+		Detail := "inadmissible text publication path or stage suffix"
+		return false
+	}
+	SplitPath(Path, &Leaf, &Parent)
+	if Leaf == "" || Parent == "" || Leaf == "." || Leaf == ".." || InStr(Leaf, ":") {
+		Detail := "text publication requires an existing parent and target leaf"
+		return false
+	}
+	FolderHandle := -1, StageHandle := -1, Published := false
+	try {
+		; Relative create/rename need add-file and traverse, not directory
+		; enumeration or permission to create subdirectories.
+		FolderHandle := _FSHoldRootFolder(Parent, 0x2 | 0x20)
+		StageHandle := _FSCreateHeldStage(FolderHandle, Leaf . StageSuffix, 0)
+		ByteCount := StrPut(Content, "UTF-8") - 1
+		Utf8 := Buffer(ByteCount + 1, 0)
+		if ByteCount > 0
+			StrPut(Content, Utf8, ByteCount + 1, "UTF-8")
+		Offset := 0
+		while Offset < ByteCount {
+			Written := 0
+			if !_FSNativeWrite(StageHandle, Utf8.Ptr + Offset, ByteCount - Offset, &Written)
+					|| Written <= 0 || Written > ByteCount - Offset
+				throw OSError(A_LastError, "owned text stage write")
+			Offset += Written
+		}
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "owned text stage flush")
+		_FSHeldRename(StageHandle, FolderHandle, Leaf)
+		Published := true
+		if !DllCall("kernel32\FlushFileBuffers", "Ptr", StageHandle, "Int")
+			throw OSError(A_LastError, "published text flush")
+		return true
+	} catch as Err {
+		Detail := (Published ? "published, but " : "") . Err.Message
+		if !Published && StageHandle != -1
+			Detail .= _FSDiscardHeldStage(StageHandle)
+		return false
+	} finally {
+		if StageHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", StageHandle, "Int")
+		if FolderHandle != -1
+			DllCall("kernel32\CloseHandle", "Ptr", FolderHandle, "Int")
+	}
+}
+
 ; Opens the anchor folder: the one pathname of a held copy.
-_FSHoldRootFolder(RootDir) {
+_FSHoldRootFolder(RootDir, Access := unset) {
 	static OPEN_EXISTING := 3, FILE_FLAG_BACKUP_SEMANTICS := 0x02000000, SYNCHRONIZE := 0x100000
-	Handle := DllCall("kernel32\CreateFileW", "Str", RootDir, "UInt", FS_HELD_FOLDER_ACCESS | SYNCHRONIZE,
+	DesiredAccess := IsSet(Access) ? Access : FS_HELD_FOLDER_ACCESS
+	Handle := DllCall("kernel32\CreateFileW", "Str", RootDir, "UInt", DesiredAccess | SYNCHRONIZE,
 		"UInt", FS_HELD_FOLDER_SHARE, "Ptr", 0, "UInt", OPEN_EXISTING,
 		"UInt", FILE_FLAG_BACKUP_SEMANTICS, "Ptr", 0, "Ptr")
 	if Handle == -1
