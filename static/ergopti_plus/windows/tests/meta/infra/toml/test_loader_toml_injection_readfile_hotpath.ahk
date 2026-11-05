@@ -103,7 +103,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses durable atomic replacement 
 
 _LTI_LoaderWarnsOnTruncatedConfig() {
 	Src := _LTI_ReadSource("tap_hold_loader.ahk")
-	Seg := _LTI_FuncBody(Src, "LoadTapHoldToml(FilePath, DefaultsFilePath := " . Chr(34) . Chr(34) . ") {")
+	Seg := _DriverFuncBody("LoadTapHoldToml")
 	Assert(Seg != "", "LoadTapHoldToml declaration must exist in tap_hold_loader.ahk")
 	; The sentinel fires only when the parsed config has 0 keys and the user did
 	; not explicitly opt out (InheritDefaults still true). Both conditions plus a
