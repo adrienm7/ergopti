@@ -33,7 +33,7 @@ _LIWE_AssertWordEndTrigger() {
 	Assert(OnChar != "", "LLM_Bridge_OnChar must exist")
 	Notify := _DriverFuncBody("_LLM_Bridge_NotifyChar")
 	Assert(Notify != "", "the shared character observer must exist")
-	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)",
+	AssertContains(OnChar, "_LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer, Current, Source, Receipt)",
 		"ordinary character admission must reach the shared observer")
 	AssertContains(Notify, "_LLM_Bridge_IsWordEndTrigger(ch)",
 		"the observer must recognize a completed word (llm-instant-word-end-trigger)")

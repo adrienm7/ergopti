@@ -98,9 +98,9 @@ global SFD_UIA_CONTEXT_MATCH_FN := 0
 ; Returns true if the focused control is secure OR cannot yet be classified.
 ; The cheap native path is synchronous; an inconclusive browser/Electron/WPF
 ; control is denied once and confirmed with UIA on a deferred callback.
-SFD_IsSecureField() {
-	Hwnd := SFD_FocusedHwnd()
-	if !Hwnd
+SFD_IsSecureField(KnownFocusedHwnd := unset) {
+	Hwnd := IsSet(KnownFocusedHwnd) ? KnownFocusedHwnd : SFD_FocusedHwnd()
+	if !(Hwnd is Integer) || Hwnd <= 0
 		return true
 	SFD_EnsureFocusTracking()
 	Focus := SFD_FocusSnapshot()
