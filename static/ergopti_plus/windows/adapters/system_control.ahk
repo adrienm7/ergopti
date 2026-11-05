@@ -423,6 +423,58 @@ class SystemControl {
 		return Files
 	}
 
+	; Enumerate only ordinary entries for the confirmed unblock action. This is
+	; a cooperative pathname walk: a component may still be replaced concurrently.
+	; Every skipped reparse point, native enumeration failure or bound exhaustion
+	; is reported, while files already enumerated remain available to the caller.
+	; At most 65536 entries and 4 Mi UTF-16 path units are retained/visited.
+	EnumerateUnblockFiles(Dir, MaxEntries := 65536, MaxPathUnits := 4194304) {
+		Files := [], Pending := [Dir], Failed := 0, Entries := 0, Units := StrLen(Dir)
+		if MaxEntries < 1 || MaxPathUnits < Units
+			return { Files: Files, Failed: 1 }
+		Exhausted := false
+		while Pending.Length && !Exhausted {
+			Current := Pending.Pop(), Data := Buffer(592, 0)
+			Search := DllCall("Kernel32\FindFirstFileW", "Str", RTrim(Current, "\/") . "\*", "Ptr", Data, "Ptr")
+			if Search == -1 {
+				; No matches is a valid empty directory; all other failures are incomplete.
+				if A_LastError != 2
+					Failed += 1
+				continue
+			}
+			try {
+				loop {
+					Name := StrGet(Data.Ptr + 44, "UTF-16")
+					if Name != "." && Name != ".." {
+						Entries += 1
+						Path := RTrim(Current, "\/") . "\" . Name
+						Units += StrLen(Path)
+						if Entries > MaxEntries || Units > MaxPathUnits {
+							Failed += 1, Exhausted := true
+							break
+						}
+						Attributes := NumGet(Data, 0, "UInt")
+						if Attributes & 0x400 ; FILE_ATTRIBUTE_REPARSE_POINT
+							Failed += 1
+						else if Attributes & 0x10 ; FILE_ATTRIBUTE_DIRECTORY
+							Pending.Push(Path)
+						else
+							Files.Push(Path)
+					}
+					if !DllCall("Kernel32\FindNextFileW", "Ptr", Search, "Ptr", Data, "Int") {
+						if A_LastError != 18 ; ERROR_NO_MORE_FILES
+							Failed += 1
+						break
+					}
+				}
+			} finally {
+				if !DllCall("Kernel32\FindClose", "Ptr", Search, "Int")
+					Failed += 1
+			}
+		}
+		return { Files: Files, Failed: Failed }
+	}
+
 	; @returns {String} The Windows Terminal alias, or "" when it is not installed.
 	WindowsTerminalPath() {
 		Path := EnvGet("LOCALAPPDATA") . "\Microsoft\WindowsApps\wt.exe"

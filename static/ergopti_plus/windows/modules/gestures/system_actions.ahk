@@ -594,7 +594,13 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	}
 	Removed := 0, Failed := 0
 	for Path in Paths {
-		for Target in (Sys.IsDirectory(Path) ? Sys.FilesUnder(Path) : [Path]) {
+		Targets := [Path]
+		if Sys.IsDirectory(Path) {
+			Scan := Sys.EnumerateUnblockFiles(Path)
+			Targets := Scan.Files
+			Failed += Scan.Failed
+		}
+		for Target in Targets {
 			if A_IsSuspended {
 				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: the script is suspended.")
 				return false
@@ -607,7 +613,7 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 		}
 	}
 	if Failed
-		LoggerError("gestures", "unblock_file_selection: {1} file(s) unblocked, {2} could not be.", Removed, Failed)
+		LoggerError("gestures", "unblock_file_selection: {1} file(s) unblocked, {2} file(s) or folder(s) could not be processed.", Removed, Failed)
 	else
 		LoggerInfo("gestures", "unblock_file_selection: {1} file(s) unblocked.", Removed)
 }

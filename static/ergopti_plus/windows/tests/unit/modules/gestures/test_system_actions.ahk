@@ -107,6 +107,7 @@ class _SysActionsFake {
 	}
 	IsDirectory(Path) => this.Directories.Has(Path)
 	FilesUnder(Dir) => this.Directories[Dir]
+	EnumerateUnblockFiles(Dir) => { Files: this.FilesUnder(Dir), Failed: 0 }
 	WindowsTerminalPath() => this.Terminal
 	MousePosition() => this.Pointer
 	Monitors() => this.MonitorList
@@ -782,6 +783,7 @@ class _SAJ_NativeControl extends _SysActionsFake {
 	}
 	IsDirectory(Path) => this.Native.IsDirectory(Path)
 	FilesUnder(Path) => this.Native.FilesUnder(Path)
+	EnumerateUnblockFiles(Path) => this.Native.EnumerateUnblockFiles(Path)
 	DeleteZoneIdentifier(Path) => this.Native.DeleteZoneIdentifier(Path)
 }
 _SAJ_RunIsolated(Control) {
@@ -873,6 +875,7 @@ class _SAA_NativeControl extends _SysActionsFake {
 	}
 	IsDirectory(Path) => this.Native.IsDirectory(Path)
 	FilesUnder(Path) => this.Native.FilesUnder(Path)
+	EnumerateUnblockFiles(Path) => this.Native.EnumerateUnblockFiles(Path)
 	DeleteZoneIdentifier(Path) => this.Native.DeleteZoneIdentifier(Path)
 }
 _SAA_RunIsolated(Control) {
@@ -1003,3 +1006,21 @@ _SAA_InaccessibleSubtreeReported() {
 	}
 }
 Test("system actions: inaccessible selected subtree is reported (unblock-native-acl)", _SAA_InaccessibleSubtreeReported)
+
+_SAA_EnumerationBoundsReported() {
+	Root := A_Temp . "\ergopti-unblock-limits-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	try {
+		FileAppend("one", Root . "\one.txt"), FileAppend("two", Root . "\two.txt")
+		Native := SystemControl()
+		ByCount := Native.EnumerateUnblockFiles(Root, 1)
+		AssertEqual(1, ByCount.Files.Length, "one native entry is retained within the count bound")
+		AssertEqual(1, ByCount.Failed, "entry bound reports incomplete traversal")
+		ByUnits := Native.EnumerateUnblockFiles(Root, 100, StrLen(Root))
+		AssertEqual(0, ByUnits.Files.Length, "path budget refuses the first entry")
+		AssertEqual(1, ByUnits.Failed, "path bound reports incomplete traversal")
+	} finally DirDelete(Root, true)
+}
+Test("system actions: native unblock enumeration reports both resource bounds (unblock-native-limits)", _SAA_EnumerationBoundsReported)
