@@ -103,10 +103,15 @@ function readEmbeddedUpdateInformation(image) {
 		};
 	};
 	const names = section(namesIndex);
+	if (names.offset + names.size > image.length)
+		throw new Error('the ELF section name table is truncated');
 	for (let index = 0; index < count; index++) {
 		const entry = section(index);
+		if (entry.name >= names.size) throw new Error('the ELF section name is out of bounds');
 		const start = names.offset + entry.name;
 		const end = image.indexOf(0, start);
+		if (end < 0 || end >= names.offset + names.size)
+			throw new Error('the ELF section name is not terminated within its table');
 		if (image.toString('latin1', start, end) !== UPDATE_SECTION) continue;
 		if (entry.offset + entry.size > image.length)
 			throw new Error('the update section is truncated');
