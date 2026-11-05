@@ -715,6 +715,11 @@ _LLV_ExpansionObserverRequiresCurrentFocus() {
 		Changed := _LLV_CaptureRealTimer(ChangeTarget)
 		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
 		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
+		OtherTarget := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
+		AssertFalse(OtherTarget.Active, "a stable new target cannot relabel the context captured in control 102")
+		AssertEqual(0, Calls.Length, "control 103 receives no old-target transport without new admitted typing")
+		Focus["control"] := 102
 		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
 			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")
