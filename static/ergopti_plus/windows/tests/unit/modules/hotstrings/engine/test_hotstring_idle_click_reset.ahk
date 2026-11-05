@@ -337,3 +337,47 @@ _HICR_OverflowingDecimalPrompt() {
 }
 Test("hotstring idle reset: overflowing decimal float refuses before Round (idle-delay-decimal-domain)",
 	_HICR_OverflowingDecimalPrompt)
+
+
+_HICR_WideIntegerKeepsTheActualWord() {
+ global HSE_IdleResetSeconds, _PrefixFocusedControlToken, HSE_Buffer
+ SavedSeconds := HSE_IdleResetSeconds, SavedToken := _PrefixFocusedControlToken
+ Raw := "4611686018427387904"
+ Parsed := ParseHotstringsIdleResetSeconds(Raw)
+ AssertTrue(Parsed is Integer && Parsed == 0x4000000000000000, "The actual prompt must preserve an exact native2^62 integer, not a JSON-rounded decimal")
+ Document := TOML_ParseDocument("[hotstrings]`nidle_reset_seconds = " . Raw . "`n")
+ Seconds := Document["hotstrings"]["idle_reset_seconds"]
+ AssertTrue(Seconds is Integer && Seconds == Parsed, "The real typed TOML and native prompt agree on the original integer")
+ AssertTrue(HSE_ValidIdleResetSeconds(Seconds), "The declared policy accepts every finite nonnegative duration without a new cap")
+ try {
+  HSE_TestReset()
+  HSE_IdleResetSeconds := Seconds
+  _PrefixFocusedControlToken := 1
+  _PrefixApplyIdleReset(1000)
+  HSE_FeedChar("x", true)
+  AssertEqual("x", HSE_Buffer, "The real rolling engine must contain an admitted in-progress word")
+  Changed := _PrefixApplyIdleReset(1001)
+  _TestPrint("# idle-native-integer raw=" . Raw . " type=" . Type(Seconds) . " reset=" . Changed . " buffer=" . HSE_Buffer)
+  AssertFalse(Changed, "One millisecond cannot satisfy an admitted2^62-second idle delay")
+  AssertEqual("x", HSE_Buffer, "Overflow cannot silently erase the active word")
+ } finally {
+  HSE_IdleResetSeconds := SavedSeconds
+  _PrefixFocusedControlToken := SavedToken
+  HSE_TestReset()
+ }
+}
+Test("Hotstring idle retains its actual word for a wide native integer (hotstring-idle-native-integer-domain)", _HICR_WideIntegerKeepsTheActualWord)
+
+_HICR_IdleNativePrecisionControls() {
+ Seconds := 0x7FFFFFFFFFFFFFFF // 1000
+ Deadline := Seconds * 1000
+ AssertFalse(HSE_IdleResetsWord(0, Deadline - 1, Seconds), "The largest whole-second native deadline retains its exact millisecond before expiry")
+ AssertTrue(HSE_IdleResetsWord(0, Deadline, Seconds), "A representable native integer deadline still expires exactly at its original inclusive boundary")
+ AssertTrue(HSE_IdleResetsWord(0, Deadline + 1, Seconds), "A represented native millisecond past the same deadline remains expired")
+ for Seconds in [0x4000000000000000, 0x7FFFFFFFFFFFFFFF, 1e308]
+  AssertFalse(HSE_IdleResetsWord(1000, 1001, Seconds), "Wide admitted finite values cannot wrap into immediate reset")
+ AssertFalse(HSE_IdleResetsWord(1000, 2499, 1.5))
+ AssertTrue(HSE_IdleResetsWord(1000, 2500, 1.5))
+ AssertFalse(HSE_IdleResetsWord(0, 999999, 0), "Explicit zero continues to disable idle reset")
+}
+Test("Hotstring idle keeps exact deadlines and uncapped finite delays (hotstring-idle-native-integer-domain)", _HICR_IdleNativePrecisionControls)
