@@ -4,6 +4,28 @@
 
 ; These private IO ports model only query results and record requested effects.
 ; No registry value, application window or audio endpoint is changed.
+class _SAIL_EjectItem {
+ __New(Sys) => this.Sys := Sys
+ InvokeVerb(Verb) {
+  _LCPC_Require(Verb == "Eject", "The private drive supports only its exact eject request")
+  this.Sys.Effects.Push("eject")
+ }
+}
+class _SAIL_EjectComputer {
+ __New(Sys) => this.Sys := Sys
+ ParseName(Name) {
+  _LCPC_Require(Name == "E:\", "Only the private E drive may be requested")
+  return _SAIL_EjectItem(this.Sys)
+ }
+}
+class _SAIL_EjectShell {
+ __New(Sys) => this.Sys := Sys
+ Namespace(Id) {
+  _LCPC_Require(Id == GESTURE_SYS_CSIDL_DRIVES, "The real drive namespace constant must reach the private port")
+  return _SAIL_EjectComputer(this.Sys)
+ }
+}
+
 class _SAIL_System extends SystemControl {
  __New(Pauses) {
   this.Pauses := Pauses, this.Queries := 0, this.PulseCompleted := false
@@ -17,6 +39,11 @@ class _SAIL_System extends SystemControl {
    this.PulseCompleted := true
   }
  }
+ RemovableDrives() {
+  this._Read()
+  return "E"
+ }
+ ShellApplication() => _SAIL_EjectShell(this)
  ReadDword(Key, Name) {
   _LCPC_Require(Name == "AppsUseLightTheme", "The real theme query must reach its expected registry value")
   this._Read()
@@ -58,7 +85,7 @@ _SAIL_Main() {
  global _LCPC_World, _ConfigDir, _UserProgramPaused
  _LCPC_Require(A_Args.Length == 3, "Mode, private directory and shared source are required")
  Mode := A_Args[1], Fields := StrSplit(Mode, "-")
- _LCPC_Require(Fields.Length == 2 && (Fields[1] == "theme" || Fields[1] == "quit" || Fields[1] == "mic")
+ _LCPC_Require(Fields.Length == 2 && (Fields[1] == "theme" || Fields[1] == "quit" || Fields[1] == "mic" || Fields[1] == "eject")
   && (Fields[2] == "pulse" || Fields[2] == "same"), "Unknown in-flight lifecycle mode")
  Action := Fields[1], Pauses := Fields[2] == "pulse"
  _LCPC_World := {Ports: Map()}, _ConfigDir := A_Args[2]
@@ -66,7 +93,7 @@ _SAIL_Main() {
  Logs := []
  LoggerSetTestSink((Line) => Logs.Push(Line))
  Sys := _SAIL_System(Pauses), Done := {Value: false}
- ActionFn := Action == "theme" ? GestureSysToggleDarkMode : Action == "quit" ? GestureSysQuitFrontmostApp : GestureSysMicMuteToggle
+ ActionFn := Action == "theme" ? GestureSysToggleDarkMode : Action == "quit" ? GestureSysQuitFrontmostApp : Action == "mic" ? GestureSysMicMuteToggle : GestureSysEjectAllDisks
  Barrier := (*) => Done.Value := true
  PreviousCritical := Critical("On")
  try {
@@ -93,7 +120,7 @@ _SAIL_Main() {
   _LCPC_Require(Sys.Effects.Length == (Pauses ? 0 : (Action == "theme" ? 3 : 1)),
    "An in-flight pre-pause read cannot authorize the first native effect after resume; a same-epoch action must retain its full transaction")
   if !Pauses {
-   Expected := Action == "theme" ? ["write:AppsUseLightTheme:0", "write:SystemUsesLightTheme:0", "broadcast:ImmersiveColorSet"] : [Action == "quit" ? "close" : "mute"]
+   Expected := Action == "theme" ? ["write:AppsUseLightTheme:0", "write:SystemUsesLightTheme:0", "broadcast:ImmersiveColorSet"] : [Action == "quit" ? "close" : Action == "mic" ? "mute" : "eject"]
    for Index, Effect in Expected
     _LCPC_Require(Sys.Effects[Index] == Effect, "The same-epoch control must request the exact established effects in order")
   }
