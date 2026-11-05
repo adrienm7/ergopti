@@ -15,6 +15,17 @@ process-context hook installation and receive real start/join through the
 opt-in lifecycle fixture after native loader or build changes; keep the DLL
 pinned until its actual hook thread has joined.
 
+### project-ahk-tickcount-is-native64
+
+AutoHotkey v2.0.26 implements `BIV_TickCount` with `GetTickCount64()` in
+[upstream source/lib/vars.cpp](https://github.com/AutoHotkey/AutoHotkey/blob/v2.0.26/source/lib/vars.cpp).
+An `A_TickCount` origin or filename component therefore has the native 64-bit
+domain. Use `TickElapsed64` for those ages and validate the complete decimal
+value before conversion. Keep the separate DWORD contracts of `GetMessageTime`,
+clipboard sequence numbers and the physical-input epoch; their masks cannot be
+removed by a blanket migration. A clock-port probe covers this numeric domain,
+not an observed period of physical uptime.
+
 ### feedback-ahk-source-encoding
 
 Every `.ahk` source file is UTF-8 with BOM and LF endings. Encoding drift can
