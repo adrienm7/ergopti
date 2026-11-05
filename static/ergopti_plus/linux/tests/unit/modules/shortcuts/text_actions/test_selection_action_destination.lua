@@ -42,14 +42,17 @@ local function with_action(session, action, change, body)
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
 		"adapters.event_loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
-		"adapters.window_info",
+		"adapters.window_info", "logger.shim",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector
 	local ok, detail = pcall(function()
 		fixture.with(function(guard, state, _, _, watch)
-			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0 }
+			local world = { clipboard = "saved clipboard", writes = {}, pasted = {}, events = {}, held = {}, reads = 0, logs = {} }
+			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			logger.set_level("trace"); logger.set_sink(function(line) world.logs[#world.logs + 1] = line end)
+			package.loaded["logger.shim"] = logger
 			local pending, changed = nil, false
 			local function retire(point)
 				if changed or change ~= point then return end
@@ -183,6 +186,13 @@ end)
 
 helpers.describe("plain paste retains its destination before reading the clipboard", function()
 	for _, session in ipairs({ "x11", "wayland" }) do
+		helpers.it("plain paste keeps clipboard content out of trace logs " .. session, function()
+			with_action(session, "paste_plain", "stable", function(world)
+				helpers.assert_true(world.action_result)
+				helpers.assert_true(not table.concat(world.logs, "\n"):find("saved clipboard", 1, true),
+					"clipboard contents must not enter trace logs")
+			end)
+		end)
 		helpers.it("plain-paste-owner commits stable " .. session, function()
 			with_action(session, "paste_plain", "stable", function(world)
 				helpers.assert_true(world.action_result)

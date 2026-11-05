@@ -678,7 +678,8 @@ function M.paste_plain()
 		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
 		return false
 	end
-	local result = Injector.inject(0, text, false, nil, publication)
+	-- Clipboard text can contain private user data and must not enter TRACE.
+	local result = Injector.inject(0, text, true, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
