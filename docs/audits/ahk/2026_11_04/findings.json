@@ -928,6 +928,50 @@
 			"root_cause": "KLR_RebuildTitleCounts groups next_title under the outgoing app from events_window_switch. It also counts focus visits although the shared applications table labels c as manual keystrokes.",
 			"silent_failure": "The applications dashboard shows another application's caption, omits the correctly timed title when c is0, and presents visit counts as character activity.",
 			"regression_test": "The integrated reader sums its existing accepted typing projection by actual typing app/title, excluding synthetic output and retaining physical backspaces; the walker continues to own ms. Tests add exact3/4 typing counts independent of committed text length while preserving app ownership and2500/3500ms assertions. Native title-cap/refusal and obsolete cache18 controls are retained; cache19/checkpoint5 force reconstruction before new admission. Post-fix qualification pending."
+		},
+		{
+			"id": "AHK-085",
+			"title": "Same-caption application switches retain the outgoing title clock",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Switch between two public applications with the same window caption, then change the second caption.",
+			"root_cause": "KL_Hook_RefreshContext in modules/keystats/keystats_hook.ahk: title interval retirement compares caption text alone, after app identity changes.",
+			"silent_failure": "Native run41947380519 observes only one window row and an unchanged title origin after the application switch; the distinct-caption control passes.",
+			"regression_test": "Actual context refresh and canonical append must emit both application-owned title intervals and advance their real clock even when captions match."
+		},
+		{
+			"id": "AHK-086",
+			"title": "Superseded parsers replace the active slot display metadata",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Allow a parser refusal diagnostic to admit a new request, then resume the old parser and replay the new request from its exact cache.",
+			"root_cause": "_LLM_Engine_ParseSlots in modules/llm/prediction_exec.ahk: RememberSlotDisplays runs after a yielding parser without rechecking request and semantic ownership.",
+			"silent_failure": "Native run41947380519 records one parser refusal, one cache replay and no additional network call, but corrected text becomes continuation text in the active cached display.",
+			"regression_test": "Require current request identity after actual parser reentry and preserve the active correction projection on exact cache replay; retain stale-entry and pure parser controls."
+		},
+		{
+			"id": "AHK-087",
+			"title": "Refused layout publication strands its owned download stage",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Hold the target against replacement, attempt composer or local catalogue publication, release the handle and retry.",
+			"root_cause": "_LayoutCatalogueWriteText in modules/keymap/keylayout/layout_catalogue.ahk creates a fixed .download stage but never retires that owned stage when replacement fails.",
+			"silent_failure": "Native run41947380519 repeats first_ok0, stage_left1 and retry_ok0 for composer, layout and record targets in both orders.",
+			"regression_test": "Three real filesystem refusal/retry cases require owned stage retirement and successful retry; twelve foreign-stage controls must preserve foreign bytes."
+		},
+		{
+			"id": "AHK-088",
+			"title": "Malformed updater cadence silently disables update checks",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Boot from an actual typed TOML snapshot containing false, quoted zero or fractional0.5 as check_interval_seconds.",
+			"root_cause": "Updater_LoadCheckInterval in modules/updater/core.ahk reads the compatibility cache and coerces/truncates wrong source types before interval admission.",
+			"silent_failure": "Native run41947380519 resolves all three malformed values to0 instead of the86400-second default, disabling checks; legitimate0 and3600 controls pass.",
+			"regression_test": "Five actual boot snapshot/loader cases preserve legitimate disabled and hourly settings while malformed source types fall to the canonical default; runtime guards cover strings, negative and huge values."
 		}
 	]
 }

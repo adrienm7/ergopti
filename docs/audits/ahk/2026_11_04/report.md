@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **84 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **88 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1407,3 +1407,63 @@ Regression: The integrated reader sums its existing accepted typing projection b
 ## Native qualification at 231d481
 
 Run41943680113 executes94 cases after the earlier strict discovery mismatch was corrected from21 to24 CapsWord matches. Each order has81 successes and13 failures. All selected075–081 primitive fixes pass, including8 default-migration,4 effective-duration,6 CapsWord-domain,24 auto-off,4 LLM integer,3 idle decimal,1 token-margin,2 Explorer and both gesture publication probes. The repaired CapsWord concurrent-publication sibling fails and is corrected separately. Profiles establish083 and an extension of072; malformed chord settings establish082; cross-app title attribution establishes084. The scalar failures stop at canonical key spelling or hook readiness; they do not yet prove native leakage and are being repaired without a subject change. Both actual native DLL editor cases reach their text/caret/timeout/retirement assertions successfully but reject a fixture warning in the exact completion receipt; local/global variable names are repaired before qualification. The full production graph compiles; optional E2E groups are not selected. The target of1,000 distinct defects remains unmet.
+
+## Native qualification at f6245d0
+
+Run41947380519 admits98 selected cases. Both orders return73 successes and the same25 failures; the production graph compiles. All24 profile cases, title attribution/cap/cache controls and both shipped native-editor cases pass. The scalar Backspace probes now reach their receiver assertions and prove original-key leakage in one-shot and dead-key paths, extending053. The run establishes085–088 below. It also exposes a genuine082 integration regression: a private enabled switch has no manifest default, and generic parser caches were incorrectly treated as boot-owned snapshots. Both are repaired before the next replay. Bare numeric0/1 are valid legacy Boolean spellings: two malformed fixtures are changed to signed zero and the numeric marker-one probe is retained as a valid migration control. Wrap probes stop at a missing parent setup global, so they establish no business defect yet. Optional E2E groups are not selected. No native success is inferred for the remaining fixes.
+
+## AHK-085: Same-caption application switches retain the outgoing title clock
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+KL_Hook_RefreshContext in modules/keystats/keystats_hook.ahk: title interval retirement compares caption text alone, after app identity changes.
+
+Reproduction: Switch between two public applications with the same window caption, then change the second caption.
+
+Observation: Native run41947380519 observes only one window row and an unchanged title origin after the application switch; the distinct-caption control passes.
+
+Regression: Actual context refresh and canonical append must emit both application-owned title intervals and advance their real clock even when captions match.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-086: Superseded parsers replace the active slot display metadata
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+\_LLM_Engine_ParseSlots in modules/llm/prediction_exec.ahk: RememberSlotDisplays runs after a yielding parser without rechecking request and semantic ownership.
+
+Reproduction: Allow a parser refusal diagnostic to admit a new request, then resume the old parser and replay the new request from its exact cache.
+
+Observation: Native run41947380519 records one parser refusal, one cache replay and no additional network call, but corrected text becomes continuation text in the active cached display.
+
+Regression: Require current request identity after actual parser reentry and preserve the active correction projection on exact cache replay; retain stale-entry and pure parser controls.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-087: Refused layout publication strands its owned download stage
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+\_LayoutCatalogueWriteText in modules/keymap/keylayout/layout_catalogue.ahk creates a fixed .download stage but never retires that owned stage when replacement fails.
+
+Reproduction: Hold the target against replacement, attempt composer or local catalogue publication, release the handle and retry.
+
+Observation: Native run41947380519 repeats first_ok0, stage_left1 and retry_ok0 for composer, layout and record targets in both orders.
+
+Regression: Three real filesystem refusal/retry cases require owned stage retirement and successful retry; twelve foreign-stage controls must preserve foreign bytes.
+
+The production correction is integrated; post-fix native qualification is pending.
+
+## AHK-088: Malformed updater cadence silently disables update checks
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+Updater_LoadCheckInterval in modules/updater/core.ahk reads the compatibility cache and coerces/truncates wrong source types before interval admission.
+
+Reproduction: Boot from an actual typed TOML snapshot containing false, quoted zero or fractional0.5 as check_interval_seconds.
+
+Observation: Native run41947380519 resolves all three malformed values to0 instead of the86400-second default, disabling checks; legitimate0 and3600 controls pass.
+
+Regression: Five actual boot snapshot/loader cases preserve legitimate disabled and hourly settings while malformed source types fall to the canonical default; runtime guards cover strings, negative and huge values.
+
+The production correction is integrated; post-fix native qualification is pending.
