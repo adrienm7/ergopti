@@ -1,0 +1,102 @@
+{
+	"schema_version": 1,
+	"module": "one-shot-shift",
+	"audited_sha": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"pre_receipt_commit": "4ca161c3e512eecc4c78499db0465139c9a71861",
+	"integrated_base": "7ebb56b137623fb80d8bf1a387dd984baa0263fd",
+	"results": {
+		"os_scoped_findings": 5,
+		"initial_heterogeneous_coverage_summaries": 90,
+		"generated_capability_rows": 20,
+		"source_receipt_associations": 218,
+		"distinct_authenticated_paths": 135,
+		"full_integrated_js_checks_passed": 572,
+		"full_integrated_js_checks_failed": 0,
+		"final_owner_replay_processes_passed": 37,
+		"supplemental_validators_passed": 5,
+		"latest_upstream_targeted_checks_passed": 4,
+		"stubbed_virtual_keyboard_passed": 181,
+		"stubbed_virtual_keyboard_skipped": 1
+	},
+	"evidence": {
+		"full_gate": "validation/integrated-verification.json",
+		"final_checks": "validation/final-checks/manifest.json",
+		"validator_outcomes": "validation/final-checks/validator-invocations.json",
+		"source_identity": "validation/final-numeric-source-authentication.json",
+		"real_private_config": "macos/real-config-domain/source-and-replay-receipt.json"
+	},
+	"prior_preflight": {
+		"id": 42099804561,
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/42099804561",
+		"status": "completed",
+		"conclusion": "failure",
+		"failures": [
+			{
+				"name": "macOS / E2E tests (Virtual-keyboard replay (stubbed))",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "Linux / Integration tests (arch)",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "Common / E2E tests (Shared UI rendering)",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "Linux / Verdict (All mandatory results)",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "Common / Verdict (All mandatory results)",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "macOS / Verdict (All mandatory results)",
+				"status": "completed",
+				"conclusion": "failure"
+			},
+			{
+				"name": "Release / Verify all lanes and original plan",
+				"status": "completed",
+				"conclusion": "failure"
+			}
+		],
+		"diagnosed_boundaries": {
+			"arch": "Native LLM detection integration: textgen_webui stand-in never listened on its selected port; not closed by portable audit checks.",
+			"shared_ui": "Install shared UI browsers failed before rendering tests. No rendering pass is claimed.",
+			"macos_stubbed": "New upstream cf18689745 is included; original stubbed harness now passes181/181 locally with1 skipped vector. This is not native Hammerspoon receiving."
+		}
+	},
+	"followup_preflight": {
+		"sha": "4ca161c3e512eecc4c78499db0465139c9a71861",
+		"ref": "tmp/preflight-dev-one-shot-followup-4ca161c3e512",
+		"os_lanes": "all",
+		"runs": [
+			{
+				"conclusion": "",
+				"databaseId": 42108198520,
+				"headSha": "4ca161c3e512eecc4c78499db0465139c9a71861",
+				"status": "in_progress",
+				"url": "https://github.com/adrienm7/ergopti/actions/runs/42108198520"
+			}
+		]
+	},
+	"delivery_policy": {
+		"push_authorized": "User explicitly requested all work on dev and push in this conversation.",
+		"partial_native_delivery_reference": "docs/memory/maintainer-decisions.md:295",
+		"qualification": "Feasible container checks completed. Hosted/native failures and remaining device qualifications stay explicit; no overall three-OS CI success is claimed. A fresh follow-up workflow was dispatched without cancelling or restarting the earlier run."
+	},
+	"limits": [
+		"Windows modified named-control finding remains conditional source evidence; no real AHK receiving ran in this audit.",
+		"Lua original-owner replay and stubbed virtual keyboard do not establish native keyboard/app receiving.",
+		"Original Config/TOML/private Linux file bytes and readbacks were measured; native macOS filesystem metadata, dialog processes, leases, regeneration and deployment remain qualified fixture boundaries.",
+		"Snapshot replay success reproduces known bad behavior; all five findings remain open in TODO.",
+		"Full572 gate ran at acb52cf; later upstream changes outside the135 named paths received four targeted checks and another complete owner/validator replay. Final receipt/output changes contain audit documents only."
+	]
+}

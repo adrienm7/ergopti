@@ -1,0 +1,84 @@
+Selecting exact test module: "tests/unit/modules/gestures/config/test_conflicts.lua"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.gestures.config.test_conflicts
+
+=== Conflicts.on_action_changed ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"returns nil for action 'none'","status":"pass","elapsed_ms":0.003675,"timing_error":""}
+  ok   returns nil for action 'none'
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"returns warning for tap_3 with non-none action","status":"pass","elapsed_ms":0.008313,"timing_error":""}
+  ok   returns warning for tap_3 with non-none action
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"returns nil for unknown slot","status":"pass","elapsed_ms":0.001512,"timing_error":""}
+  ok   returns nil for unknown slot
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"returns warning for swipe_3_horiz","status":"pass","elapsed_ms":0.005218,"timing_error":""}
+  ok   returns warning for swipe_3_horiz
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"returns warning for swipe_4_up (in vertical group)","status":"pass","elapsed_ms":0.005558,"timing_error":""}
+  ok   returns warning for swipe_4_up (in vertical group)
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"warning URL is a System Settings deeplink","status":"pass","elapsed_ms":0.005037,"timing_error":""}
+  ok   warning URL is a System Settings deeplink
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"warning message starts with a separator dash line","status":"pass","elapsed_ms":0.003836,"timing_error":""}
+  ok   warning message starts with a separator dash line
+
+=== Conflicts current macOS preference checks ===
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"suppresses a three-finger tap warning only when macOS reports it disabled","status":"pass","elapsed_ms":7.085832,"timing_error":""}
+  ok   suppresses a three-finger tap warning only when macOS reports it disabled
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"keeps the warning when any current macOS source still enables the native gesture","status":"pass","elapsed_ms":8.965905,"timing_error":""}
+  ok   keeps the warning when any current macOS source still enables the native gesture
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"logs a conflict once however many menu rebuilds ask for it (issue #95)","status":"pass","elapsed_ms":7.188476,"timing_error":""}
+  ok   logs a conflict once however many menu rebuilds ask for it (issue #95)
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"does not warn at startup for blank gesture values","status":"pass","elapsed_ms":6.950288,"timing_error":""}
+  ok   does not warn at startup for blank gesture values
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"suppresses every active startup warning whose native gesture is confirmed disabled","status":"pass","elapsed_ms":7.178221,"timing_error":""}
+  ok   suppresses every active startup warning whose native gesture is confirmed disabled
+
+=== Conflicts — slots taken by a macOS gesture ===
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"takes the slots of every macOS gesture that is on, and only those","status":"pass","elapsed_ms":7.385282,"timing_error":""}
+  ok   takes the slots of every macOS gesture that is on, and only those
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"frees every slot once the macOS gestures are off, App Exposé included","status":"pass","elapsed_ms":7.242748,"timing_error":""}
+  ok   frees every slot once the macOS gestures are off, App Exposé included
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"holds the slots when the read returned nothing, and frees nothing before the first read","status":"pass","elapsed_ms":15.520400,"timing_error":""}
+  ok   holds the slots when the read returned nothing, and frees nothing before the first read
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"rechecks: a macOS gesture turned on, then off, greys then restores its slot","status":"pass","elapsed_ms":7.841326,"timing_error":""}
+  ok   rechecks: a macOS gesture turned on, then off, greys then restores its slot
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"arms one recheck timer and stops it at shutdown","status":"pass","elapsed_ms":6.910739,"timing_error":""}
+  ok   arms one recheck timer and stops it at shutdown
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"never writes a macOS preference","status":"pass","elapsed_ms":281.383044,"timing_error":""}
+  ok   never writes a macOS preference
+
+=== Conflicts — purity under repetition and hostile input ===
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"the same slot and action give the same answer every time","status":"pass","elapsed_ms":0.324718,"timing_error":""}
+  ok   the same slot and action give the same answer every time
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"an unknown slot answers nil, and does not poison the next real query","status":"pass","elapsed_ms":0.007111,"timing_error":""}
+  ok   an unknown slot answers nil, and does not poison the next real query
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"non-ASCII and empty action names answer without crashing","status":"pass","elapsed_ms":0.008753,"timing_error":""}
+  ok   non-ASCII and empty action names answer without crashing
+
+=== Conflicts.apply_all_overrides ===
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"does not error with an empty actions table","status":"pass","elapsed_ms":1.445951,"timing_error":""}
+  ok   does not error with an empty actions table
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"does not error with active actions","status":"pass","elapsed_ms":0.002854,"timing_error":""}
+  ok   does not error with active actions
+
+=== Conflicts.restore_all_overrides ===
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"is a no-op","status":"pass","elapsed_ms":0.197026,"timing_error":""}
+  ok   is a no-op
+
+=== Conflicts — the detector reports, it never acts ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"the module does not reach for any user-visible surface","status":"pass","elapsed_ms":5.237496,"timing_error":""}
+  ok   the module does not reach for any user-visible surface
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"200 checks leave the answer unchanged","status":"pass","elapsed_ms":0.394863,"timing_error":""}
+  ok   200 checks leave the answer unchanged
+
+=== Conflicts — the macOS settings read is started ===
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.gestures.config.test_conflicts","name":"starts every prepared read and greys the four-finger swipe macOS uses","status":"pass","elapsed_ms":6.479080,"timing_error":""}
+  ok   starts every prepared read and greys the four-finger swipe macOS uses
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.gestures.config.test_conflicts","name":"tests.unit.modules.gestures.config.test_conflicts","status":"pass","elapsed_ms":395.938809,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  27
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

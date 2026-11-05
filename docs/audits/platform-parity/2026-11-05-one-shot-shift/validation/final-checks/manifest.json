@@ -1,0 +1,425 @@
+{
+	"head": "4ca161c3e512eecc4c78499db0465139c9a71861",
+	"base": "7ebb56b137623fb80d8bf1a387dd984baa0263fd",
+	"qualification": "Final owner/metadata/persistence replays on the latest integrated parent. Passing snapshot replay reproduces known defects, not repaired parity. The virtual keyboard is stubbed, not a native Hammerspoon session.",
+	"files": [
+		{
+			"path": "latest-base-checks/macos-conflicts.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "latest-base-checks/macos-conflicts.stdout.txt.txt",
+			"sha256": "7475aab84979e430c6ec12aa6c4cde03ae36774969004f61b2f51c04662884cf"
+		},
+		{
+			"path": "latest-base-checks/macos-system-conflicts.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "latest-base-checks/macos-system-conflicts.stdout.txt.txt",
+			"sha256": "5b3609eab28246a5cf73f2da106031951f3e34ce17f79eae82637510d9c7250d"
+		},
+		{
+			"path": "latest-base-checks/macos-virtual-keyboard.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "latest-base-checks/macos-virtual-keyboard.stdout.txt.txt",
+			"sha256": "fcc1ed1a454de5911544aa9c903871a175c8a4a8585af380e3189c6ff296949c"
+		},
+		{
+			"path": "latest-base-checks/receipt.json.txt",
+			"sha256": "ae11f94fdf291c7df66b1c281e14938340639d3d8fe03715b1e2df489111b7fb"
+		},
+		{
+			"path": "latest-base-checks/windows-seal.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "latest-base-checks/windows-seal.stdout.txt.txt",
+			"sha256": "73ddae184594c58679534ea6fa99ff6d23a3e937ae1142c604929af5d730a137"
+		},
+		{
+			"path": "final-owner-replay/aggregate-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/aggregate-source.stdout.txt.txt",
+			"sha256": "f161db4d09303b736e278af9f6a7029175795d9a71c25aef08bfa32cd5847fe6"
+		},
+		{
+			"path": "final-owner-replay/infinity-qualification.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/infinity-qualification.stdout.txt.txt",
+			"sha256": "dd64dee8a99131745d49eac632168b84c44bf3b50a02c2d048b2445e2ee0597d"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-channel-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-channel-probe.lua.stdout.txt.txt",
+			"sha256": "8aad38e60275747218c76376b4e1134810f173ff2ff0e67fea543a41076a2289"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-public-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-public-probe.lua.stdout.txt.txt",
+			"sha256": "a872c87eeec0a94181f19035d31f56ee6d2e593fd6dbab5986d4d1e478c74512"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-lua-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-channel-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-channel-probe.lua.stdout.txt.txt",
+			"sha256": "c86b88264011d39265948e6a286b5a3d3aa076d7bc67e2b492f863441910ab56"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-public-probe.lua.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-public-probe.lua.stdout.txt.txt",
+			"sha256": "868006d98338e21bd26d1a99325ab7f48d99f10ae4144612728e05412f4b3a27"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.meta.corpus.test_corpus_tap_hold_decisions.stdout.txt.txt",
+			"sha256": "c5af697e1184733d882c658aea7c21cd44e7fd748c6521d809036afcd4714385"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.adapters.keyboard_hook.test_keyboard_hook_tap_hold.stdout.txt.txt",
+			"sha256": "9588ba5daca2267a1191b9c3582869e846fac70ce6861e9050263972b8db3f93"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.modules.shortcuts.key_combinations.test_key_combinations.stdout.txt.txt",
+			"sha256": "7b5c2829fb1ebb8544ea21800ddfd185a74acc1b13871dacd6048c5d264666d8"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key.stdout.txt.txt",
+			"sha256": "6ec77ff46273957342f4a3ef6e036daa7e0ab49748a997a66c4b6c521157bbc8"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer.stdout.txt.txt",
+			"sha256": "48ea61c8ca9dc8c877d6f1cb9e70f757399bbb843c3dc5da4ed9ed2cbd3badfe"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_integration.stdout.txt.txt",
+			"sha256": "c0a7a0d200f38240f8edf9d1fdd892b6226f041512416b1557ca49224c35e199"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/linux-luajit-tests.unit.platform.remap.tap_hold.test_tap_hold_roll.stdout.txt.txt",
+			"sha256": "99cc3b4f135a0e20a0882531360dc83e2f6b2a67a4a9c33549e60a35d0c81f2a"
+		},
+		{
+			"path": "final-owner-replay/macos-config.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-config.stdout.txt.txt",
+			"sha256": "0b578100534d1efc0f49659d27d56d28400e871ab0aa1650278ae3eb84af1392"
+		},
+		{
+			"path": "final-owner-replay/macos-public.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-public.stdout.txt.txt",
+			"sha256": "72f72dba8944056642d57717ecf115158858f2e6d36e3a3828fd0cd637157617"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-1.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-1.stdout.txt.txt",
+			"sha256": "1f1d07b81ee8c3049631a56caae1050a9434e82783e38818175f8c26ee48d07b"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-2.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-2.stdout.txt.txt",
+			"sha256": "d1d2cbd94810ba73d5394af5af20c954afd5f2608904c776b1a368090e01997c"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-3.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-3.stdout.txt.txt",
+			"sha256": "45d5fb9ea1d598de0c50e65705411133e4c598b8668a8f525bce8df61924b2e1"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-4.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-4.stdout.txt.txt",
+			"sha256": "3c7a5432b14a9bcb7a8f5027454951ea1b0b3b8bc4b0eabcec793aa029129e08"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-5.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-5.stdout.txt.txt",
+			"sha256": "2a3777e34c4d3a79951a18c4bb3bb9b0533268487e9f5a835d4d0aef4a8e517e"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-6.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/macos-registered-6.stdout.txt.txt",
+			"sha256": "089bafe61477e9e3d6fd261eb34cecbee89eefabd3365435a97ec7bcb5ac6cb4"
+		},
+		{
+			"path": "final-owner-replay/metadata-controls.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/metadata-controls.stdout.txt.txt",
+			"sha256": "b4adb90622bb6ef54a0b44c51b25e7354d30d4f1b85d5314fa1a9ba1aa17619b"
+		},
+		{
+			"path": "final-owner-replay/native-inverse.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/native-inverse.stdout.txt.txt",
+			"sha256": "9c5dc4fe13ba97277dbcb99af25bb30ded429649deedfeb5800695a41736b2a4"
+		},
+		{
+			"path": "final-owner-replay/receipts.json.txt",
+			"sha256": "82969d12d2cb4263a4716f84da069d97aeb54951263909b1bf77117d7ab8e6c9"
+		},
+		{
+			"path": "final-owner-replay/shared-catalogue-guard.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-catalogue-guard.stdout.txt.txt",
+			"sha256": "edcebe120e38daba02e054914afb4a45c81231e1a32fe5a1592b83899ba9813e"
+		},
+		{
+			"path": "final-owner-replay/shared-declarations.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-declarations.stdout.txt.txt",
+			"sha256": "b62e6f9308e539e3d5f3e69100fdb501b2f833138a0ce54fe39c78f26be3f486"
+		},
+		{
+			"path": "final-owner-replay/shared-pinned-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-pinned-source.stdout.txt.txt",
+			"sha256": "319263084f7795e416c3b82bdc9c1238d0db85b443e4c89ed39e1b0d05a549c8"
+		},
+		{
+			"path": "final-owner-replay/shared-policy-lua54.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-policy-lua54.stdout.txt.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"path": "final-owner-replay/shared-policy-luajit.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-policy-luajit.stdout.txt.txt",
+			"sha256": "b06cd29455176504260909decbea0501f3fc439780dfb48dfb2577f144cc08f1"
+		},
+		{
+			"path": "final-owner-replay/shared-single-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/shared-single-source.stdout.txt.txt",
+			"sha256": "04a3fef985b6d5644eacb5883107af58b25c12d8a6172e9c8c1fff69babe6a8a"
+		},
+		{
+			"path": "final-owner-replay/source-check.json.txt",
+			"sha256": "b55e23527d2ee10f1ef1063cd195c4ca1ba67d089f3559f0ffea7ecedc06eed9"
+		},
+		{
+			"path": "final-owner-replay/windows-source.stderr.txt.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final-owner-replay/windows-source.stdout.txt.txt",
+			"sha256": "0b12e2fccb13014a8c953569b3d012b22fea7a6fc509db8c726d8503fcbd92f5"
+		},
+		{
+			"path": "final-check_source_guards/source-guards.json.txt",
+			"sha256": "60fb1e9deac84134a49f03d0b2bf3c9e106f7aeb5c3c755188d65d99e6049567"
+		},
+		{
+			"path": "final-check_public_channel_admission/public-channel-admission-lua.txt.txt",
+			"sha256": "21ff287ca48a05e4c870c8d7c60230c3a1825564093cc6aa8f01bab590b8f33f"
+		},
+		{
+			"path": "final-check_public_channel_admission/public-channel-admission-luajit.txt.txt",
+			"sha256": "45083e936c46d84b23927081b416f05dffa29a825b5de0ca0278af4c4857ab4e"
+		},
+		{
+			"path": "final-check_public_channel_admission/public-channel-admission-receipt.json.txt",
+			"sha256": "8c0461cd66457189d350ec900e3a2c8bd27de6ec4a036dcd4cc8cf85ae2e8e9f"
+		},
+		{
+			"path": "final-check_config_domain/config-domain-boundaries-current.log.txt",
+			"sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc"
+		},
+		{
+			"path": "final-check_config_domain/config-domain-receipt.json.txt",
+			"sha256": "8085d12d2b448b9099f25eb65b9f03de7c0c2da0ea52501da65229ecdd09aa59"
+		},
+		{
+			"path": "final-check_config_domain/logger-domain-boundaries-current.log.txt",
+			"sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c"
+		},
+		{
+			"path": "final-check_config_domain/public-arm-domain-boundaries-current.log.txt",
+			"sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e"
+		},
+		{
+			"path": "final-check_menu_domain/source-and-replay-receipt.json.txt",
+			"sha256": "235ded80b383b46d916d0f8482db084efbe3830bbe660392a7d1bcef11d3d513"
+		},
+		{
+			"path": "final-check_menu_domain/sweep-1-menu-domain.log.txt",
+			"sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006"
+		},
+		{
+			"path": "final-check_menu_domain/sweep-2-menu-domain.log.txt",
+			"sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006"
+		},
+		{
+			"path": "final-check_real_config/source-and-replay-receipt.json.txt",
+			"sha256": "d6f1f8234419008ed7510b6979d44e9b6082fd0001a8662048f0cd0320f5c572"
+		},
+		{
+			"path": "final-check_real_config/sweep-1-real-config-domain.log.txt",
+			"sha256": "845737096d41dd14dc2cf81f320ff01914d254ed6e52b6c2986d5eb6b00c6b50"
+		},
+		{
+			"path": "final-check_real_config/sweep-1-real-menu-persistence.log.txt",
+			"sha256": "a146bd057a18500b61c50572a0330c06ea2e944b0459a4054a7f31874683fdf3"
+		},
+		{
+			"path": "final-check_real_config/sweep-2-real-config-domain.log.txt",
+			"sha256": "845737096d41dd14dc2cf81f320ff01914d254ed6e52b6c2986d5eb6b00c6b50"
+		},
+		{
+			"path": "final-check_real_config/sweep-2-real-menu-persistence.log.txt",
+			"sha256": "a146bd057a18500b61c50572a0330c06ea2e944b0459a4054a7f31874683fdf3"
+		}
+	],
+	"owner_replay_processes": 37,
+	"owner_replay_failed": 0,
+	"latest_upstream_checks": 4,
+	"latest_upstream_checks_failed": 0,
+	"virtual_keyboard": {
+		"passed": 181,
+		"skipped": 1,
+		"native": false
+	},
+	"named_sources": {
+		"unique_paths": 135,
+		"receipt_associations": 218,
+		"pin_and_current_match": true
+	}
+}
