@@ -198,14 +198,18 @@ local function probe_capabilities(path)
 	if not opened or fd == nil or fd < 0 then return nil end
 	local called, result = pcall(function()
 		local abs, keys = ffi.new("uint8_t[8]"), ffi.new("uint8_t[42]")
-		if tonumber(ioctl_port(fd, 0x80084523, abs)) ~= 8
-			or tonumber(ioctl_port(fd, 0x802a4521, keys)) ~= 42 then return nil end
+		if tonumber(ioctl_port(fd, 0x80084523, abs)) ~= 8 then return nil end
+		-- The slot and key count are independent: a refused key bitmap leaves
+		-- the count unknown, without discarding an already confirmed touchpad.
+		local key_called, key_bytes = pcall(ioctl_port, fd, 0x802a4521, keys)
 		local function bit_set(bytes, bit)
 			return math.floor(tonumber(bytes[math.floor(bit / 8)]) / 2 ^ (bit % 8)) % 2 == 1
 		end
 		local maximum = 0
-		for _, entry in ipairs(FINGER_BITS) do
-			if bit_set(keys, entry.bit) and entry.fingers > maximum then maximum = entry.fingers end
+		if key_called and tonumber(key_bytes) == 42 then
+			for _, entry in ipairs(FINGER_BITS) do
+				if bit_set(keys, entry.bit) and entry.fingers > maximum then maximum = entry.fingers end
+			end
 		end
 		return { slot = bit_set(abs, ABS_MT_SLOT), max_fingers = maximum }
 	end)

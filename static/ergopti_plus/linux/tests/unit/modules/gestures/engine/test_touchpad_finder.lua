@@ -137,6 +137,33 @@ B: ABS=8000 0
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("keeps a confirmed slot when the separate finger-count query fails", function()
+		local previous_ffi, previous_open = package.loaded.ffi, io.open
+		local closes = 0
+		local fake = { os = "Linux", cdef = function() end, new = function(kind)
+			local result = {}; for i = 0, tonumber(kind:match("%[(%d+)%]")) - 1 do result[i] = 0 end
+			return result
+		end }
+		fake.C = { open = function() return 31 end, close = function() closes = closes + 1; return 0 end,
+			ioctl = function(_, request, bytes)
+				if request == 0x80084523 then bytes[5] = 128; return 8 end
+				return -1
+			end }
+		package.loaded.ffi = fake
+		io.open = function(path, mode)
+			if path ~= "/proc/bus/input/devices" then return previous_open(path, mode) end
+			return { read = function() return candidate end, close = function() return true end }
+		end
+		local ok, err = xpcall(function()
+			local found = Finder.find()
+			helpers.assert_true(found ~= nil, "an unavailable finger count cannot erase a confirmed slot")
+			helpers.assert_eq(found.max_fingers, 0)
+			helpers.assert_eq(closes, 1)
+		end, debug.traceback)
+		package.loaded.ffi, io.open = previous_ffi, previous_open
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("does not admit an ambiguous non-touchpad on an fd refusal", function()
 		local found = Finder.find(candidate, function() return { slot = false, max_fingers = 3 } end)
 		helpers.assert_nil(found)
