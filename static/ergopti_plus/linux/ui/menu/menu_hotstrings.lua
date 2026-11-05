@@ -517,7 +517,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- Refused rather than clamped: a negative or fractional millisecond is a
 		-- typo, and silently rounding it would store a number the user never chose
 		-- and cannot see is different from what they typed.
-		if not value or value < 0 or value ~= math.floor(value) then
+		if not require("number_policy").is_finite(value) or value < 0 or value ~= math.floor(value) then
 			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
 			return nil
 		end
