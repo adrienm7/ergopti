@@ -570,13 +570,19 @@ _LLMRemote_RequestOwns(req_id, reservation) {
 }
 
 _LLMRemote_DeleteOwned(req_id, reservation, DeliveryPending := false) {
-    global _LLM_Remote_Async
+    global _LLM_Remote_Async, _LLM_Remote_RetryOf
     Deleted := false
     PreviousCritical := Critical("On")
     try {
         if (_LLM_Remote_Async.Has(req_id)
                 and ObjPtr(_LLM_Remote_Async[req_id]) == ObjPtr(reservation)) {
             _LLM_Remote_Async.Delete(req_id)
+            Originals := []
+            for Original, Child in _LLM_Remote_RetryOf
+                if Child == req_id
+                    Originals.Push(Original)
+            for Original in Originals
+                _LLM_Remote_RetryOf.Delete(Original)
             Deleted := true
         }
     } finally Critical(PreviousCritical)
@@ -1402,8 +1408,8 @@ _LLMRemote_TrimAsyncRegistry() {
     oldest_entry := _LLM_Remote_Async[oldest_id]
     ; Detach before cleanup or callbacks: either boundary can re-enter dispatch,
     ; and the terminated owner must no longer participate in successor trimming.
-    _LLM_Remote_Async.Delete(oldest_id)
-    _LLMRemote_StopAccessDeadline(oldest_entry)
+    if !_LLMRemote_DeleteOwned(oldest_id, oldest_entry, true)
+        return
         ; Abort the live WinHTTP request so the COM object + socket are
         ; released now rather than lingering until WinHTTP's own timeout.
         if oldest_entry.Has("http")
@@ -2294,9 +2300,14 @@ _LLMRemoteThinkingRefusal(Resolved, Info, Added, &Body) {
 ; @param {Integer} Original The prediction's id.
 ; @param {Integer} Retry The retry's id.
 _LLMRemoteRetryOf(Original, Retry) {
-    global _LLM_Remote_RetryOf
-    if Retry
-        _LLM_Remote_RetryOf[Original] := Retry
+    global _LLM_Remote_RetryOf, _LLM_Remote_Async
+    ; Dispatch may complete or cancel inline, before it returns its child id.
+    ; Only a still-live child can acquire new cancellation custody.
+    PreviousCritical := Critical("On")
+    try {
+        if Retry && _LLM_Remote_Async.Has(Retry) && !_LLM_Remote_Async[Retry]["cancelled"]
+            _LLM_Remote_RetryOf[Original] := Retry
+    } finally Critical(PreviousCritical)
     return Retry
 }
 
