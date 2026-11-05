@@ -1,103 +1,87 @@
 {
-	"expected_count": 63,
+	"expected_count": 64,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "llm-prefix-observer-lifetime",
-			"expected_count": 2
-		},
-		{
-			"contains": "llm-typing-source-privacy",
-			"expected_count": 10
-		},
-		{
-			"contains": "profile-suffix-menu-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "personal-suffix-menu-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "duplicate-user-profile-label-menu-collapse",
-			"expected_count": 2
-		},
-		{
-			"contains": "menu_helpers: unique descriptions pass through unchanged",
-			"expected_count": 1
-		},
-		{
-			"contains": "menu_helpers: duplicate descriptions get a unique numeric suffix",
-			"expected_count": 1
-		},
-		{
-			"contains": "menu_helpers: three-way duplicate descriptions each get a distinct suffix",
-			"expected_count": 1
-		},
-		{
-			"contains": "menu: personal-section Check/Uncheck uses disambiguated labels",
-			"expected_count": 1
-		},
-		{
-			"contains": "menu-native-case-receipt",
-			"expected_count": 1
-		},
-		{
-			"contains": "override-reserved-root-roundtrip",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstrings-override-rollback-on-write-failure",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstrings-override-lease-reentrant-writer",
-			"expected_count": 1
-		},
-		{
-			"contains": "agent-pause-timer-owner",
-			"expected_count": 3
-		},
-		{
-			"contains": "LLM agent: with the prediction bridge stopped, a typing pause is triaged and nothing predicts",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: with the prediction bridge stopped, the agent on action watches no typing",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: leaving the automatic mode stops the typing feed, entering it starts it",
-			"expected_count": 1
-		},
-		{
-			"contains": "LLM agent: a pause stops the typing feed, the resume lets it start again",
-			"expected_count": 1
-		},
-		{
-			"contains": "ai-off-auto",
+			"contains": "takenote-pause-lifecycle-owner",
 			"expected_count": 6
 		},
 		{
-			"contains": "agent-caret-context",
-			"expected_count": 11
+			"contains": "takenote-native64-deadline",
+			"expected_count": 3
 		},
 		{
-			"contains": "LLM agent: active prediction context matches native Unicode Backspace (unicode-erase)",
+			"contains": "takenote-async-job",
+			"expected_count": 3
+		},
+		{
+			"contains": "takenote-hotpath-nonblocking",
+			"expected_count": 2
+		},
+		{
+			"contains": "takenote-timeout-cause",
 			"expected_count": 1
 		},
 		{
-			"contains": "LLM agent: agent-only context matches native Unicode Backspace (unicode-erase)",
+			"contains": "takenote-suspend-effect-time",
 			"expected_count": 1
 		},
 		{
-			"contains": "takenote-pause-lifecycle-owner",
-			"expected_count": 5
+			"contains": "TakeNote: shared job observes existence and focus before explicit maximize",
+			"expected_count": 1
 		},
 		{
-			"contains": "tap-hold-external-source",
+			"contains": "TakeNote: shared job reports a bounded focus/launch timeout",
+			"expected_count": 1
+		},
+		{
+			"contains": "shortcuts: TakeNote defers and targets maximize safely",
+			"expected_count": 1
+		},
+		{
+			"contains": "prefix-scalar-framing",
+			"expected_count": 16
+		},
+		{
+			"contains": "LLM live mode: expansion observers require an unchanged verified typing target",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-native-admission-order",
+			"expected_count": 2
+		},
+		{
+			"contains": "profile-suffix-menu-owner",
 			"expected_count": 4
+		},
+		{
+			"contains": "personal-suffix-menu-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "model-browser-native-backend",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-close-pause-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "tap-hold-native-inheritance",
+			"expected_count": 2
 		}
 	]
 }
