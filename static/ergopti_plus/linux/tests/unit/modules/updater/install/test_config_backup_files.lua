@@ -641,6 +641,40 @@ helpers.describe("installer-native-exit-receipt", function()
 		if not ok then error(err, 0) end
 	end
 
+	helpers.it("(installer-archive-valid-name) accepts a regular filename containing consecutive dots", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local root = Fixture.scratch()
+		local archive = root .. "/bundle.tar.gz"
+		local ok, err = pcall(function()
+			for _, name in ipairs({ "linux", "_shared", "bin" }) do assert(uv.fs_mkdir(root .. "/" .. name, 448)) end
+			Fixture.write(root .. "/linux/notes..toml", "valid ordinary file\n")
+			Fixture.write(root .. "/install.sh", "#!/bin/sh\n")
+			-- Run the shipped archive builder, with only its stamp/runtime staging
+			-- collaborators replaced; the real tar and admission owner remain.
+			local scripts = root .. "/scripts"
+			assert(uv.fs_mkdir(scripts, 448))
+			helpers.assert_true(Shell.run("mkdir -p -- " .. Shell.quote(root .. "/AppDir/usr/lib/ergopti")))
+			Fixture.write(root .. "/AppDir/usr/lib/ergopti/network-runtime-env.sh", "runtime fixture\n")
+			Fixture.write(scripts .. "/write_build_stamp.sh", "#!/bin/bash\nexit 0\n")
+			Fixture.write(scripts .. "/stage-linux-private-runtime.sh", "#!/bin/bash\nmkdir -p -- \"$2\"\n")
+			local builder = helpers.driver_root() .. "/../../../tools/build/build-linux-bundle-archive.sh"
+			assert(uv.fs_copyfile(builder, scripts .. "/builder.sh"))
+			helpers.assert_true(Shell.run("ERGOPTI_LINUX_BUILD_DIR=" .. Shell.quote(root) .. " bash " .. Shell.quote(scripts .. "/builder.sh") .. " bundle.tar.gz >/dev/null"))
+			local accepted, reason = Installer.DEFAULT_OPS.validate_archive(archive)
+			helpers.assert_eq(accepted, true, tostring(reason))
+			-- An actual parent component remains unsafe even though dots within
+			-- a filename are admitted. GNU tar may itself refuse the listing.
+			local unsafe = root .. "/unsafe.tar.gz"
+			helpers.assert_true(Shell.run("tar -czf " .. Shell.quote(unsafe) .. " -C " .. Shell.quote(root)
+				.. " --transform=" .. Shell.quote("s|^linux/notes[.][.]toml$|linux/../outside|") .. " linux _shared bin install.sh"))
+			local admitted, refusal = Installer.DEFAULT_OPS.validate_archive(unsafe)
+			helpers.assert_eq(admitted, false, "actual parent components remain refused")
+			helpers.assert_contains(refusal, "archive contains an unsafe path:")
+		end)
+		Fixture.remove(root)
+		if not ok then error(err, 0) end
+	end)
+
 	for _, exit_code in ipairs({ 0, 73 }) do
 		helpers.it("(installer-native-exit-receipt) complete native listings retain exit " .. exit_code, function()
 			with_listing_child(exit_code, function(Installer, root, marker)
