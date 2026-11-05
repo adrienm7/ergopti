@@ -68,7 +68,76 @@ _SAIL_Case(Mode) {
   throw Primary
  AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
 }
-for _SAIL_Action in ["theme", "quit", "mic", "eject"] {
+for _SAIL_Action in ["theme", "quit", "mic", "eject", "ejectnamespace", "ejectitem", "ejectbetween"] {
  Test("System action in-flight lifecycle: " . _SAIL_Action . " retires its pre-pause read (system-action-inflight-lifecycle)", _SAIL_Case.Bind(_SAIL_Action . "-pulse"))
  Test("System action in-flight lifecycle: " . _SAIL_Action . " preserves its same-epoch effect (system-action-inflight-lifecycle)", _SAIL_Case.Bind(_SAIL_Action . "-same"))
+}
+
+
+_SIB_Source() {
+ global _DriverDir
+ Source := _SAIL_Source()
+ Footer := "#Include " . _DriverDir . "\tests\fixtures\system_action_inflight_lifecycle_body.ahk`n"
+ AssertEqual(Footer, SubStr(Source, -StrLen(Footer)), "The existing genuine composition must retain its fixture boundary")
+ Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+ Owner := _DriverProductionFileForSymbol("GestureSysCenterMouse", _DriverDir)
+ Text := FSReadStrict(Owner)
+ for Symbol in ["GestureSysCenterMouse", "GestureSysMonitorCenter", "GestureSysOpenTerminalHere",
+  "GestureSysNewTextFileHere", "GestureSysCreateTextFile", "_GestureSysActiveFolder", "_GestureSysActiveExplorer",
+  "GestureSysExplorerWindowFor", "GestureSysExplorerFolderPath", "GestureSysIsFileSystemPath"] {
+  Body := _DriverExtractFunctionBody(&Text, Symbol)
+  AssertTrue(Body != "", "Every sibling action and geometry/discovery helper must retain its genuine complete body: " . Symbol)
+  Source .= Body . "`n"
+ }
+ LocaleOwner := _DriverProductionFileForSymbol("t", _DriverDir)
+ AssertTrue(LocaleOwner != "" && _DriverFuncBody("t") != "", "The isolated display port must correspond to the actual production translator")
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\system_action_sibling_lifecycle_body.ahk`n"
+}
+
+_SIB_Case(Mode) {
+ global _DriverDir
+ static Debt := 0
+ AssertFalse(IsObject(Debt), "A retained child prevents another timer case")
+ Root := A_Temp . "\ergopti_system_sibling_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+ FSCreateDirectoryExclusiveStrict(Root)
+ State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+ PreviousCritical := Critical("Off")
+ try {
+  Script := Root . "\subject.ahk"
+  AssertEqual(1, FSWriteCreateDurable(Script, Chr(0xFEFF) . _SIB_Source()))
+  _TestPrint("# system-action-sibling-lifecycle source=" . CryptoSha256Bytes(FSReadBytesStrict(Script)))
+  Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, Root, _DriverDir . "\..\_shared"], _LCPC_Done.Bind(State))
+  AssertTrue(Handle.start(), "The exact private timer child must really start")
+  Started := A_TickCount
+  while !State.Calls && TickElapsed64(Started) < 15000 {
+   _SR_TreePoll()
+   Sleep(10)
+  }
+  _TestPrint("# system-action-sibling-lifecycle mode=" . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+  AssertEqual(1, State.Calls)
+  AssertEqual("", State.ErrorText)
+  AssertEqual(0, State.Code, State.Output)
+  AssertContains(State.Output, "PASS system-action-sibling-lifecycle " . Mode)
+ } catch Any as Failure
+  Primary := Failure
+ try {
+  Receipt := IsObject(Handle) ? Handle.terminate() : 1
+  Retired := Receipt is Integer && Receipt == 1
+ } catch Any as Failure {
+  if !IsObject(Primary)
+   Primary := Failure
+ }
+ try {
+  if !Retired
+   Debt := {Root: Root, Handle: Handle}
+  else if !IsObject(Primary)
+   DirDelete(Root, true)
+ } finally Critical(PreviousCritical)
+ if IsObject(Primary)
+  throw Primary
+ AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
+}
+for _SIB_Action in ["center", "terminal", "newfile", "newfilecreated", "newfilecollision"] {
+ Test("System action sibling lifecycle: " . _SIB_Action . " retires its original authority (system-action-sibling-lifecycle)", _SIB_Case.Bind(_SIB_Action . "-pulse"))
+ Test("System action sibling lifecycle: " . _SIB_Action . " retains its exact same-epoch effects (system-action-sibling-lifecycle)", _SIB_Case.Bind(_SIB_Action . "-same"))
 }
