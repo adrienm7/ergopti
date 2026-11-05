@@ -1274,7 +1274,7 @@ if $INSTALL_SERVICE; then
 	# and treat "no" as "install the unit, enable it later", never as a failure:
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
-	if [ -f "$AUTOSTART_FILE" ] && grep -Fxq 'X-Ergopti-Startup=true' "$AUTOSTART_FILE"; then
+	if [ -f "$AUTOSTART_FILE" ] && ergopti_desktop_entry_managed "$AUTOSTART_FILE"; then
 		# Updates preserve an explicit menu choice; installation is not consent
 		# to re-enable a startup entry the user disabled.
 		# Preserve the explicit XDG preference even if an independently enabled

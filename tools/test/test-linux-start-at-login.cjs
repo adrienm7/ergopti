@@ -238,6 +238,25 @@ try {
 	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
 	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
+	const customized = ownedDesktop.replace('Hidden=true', 'Hidden=true\nX-GNOME-Autostart-enabled=false\nX-User-Custom=keep') +
+		'[Desktop Action Example]\nName=User action\nExec=/other/program\n';
+	fs.writeFileSync(desktop, customized);
+	assert.notEqual(run('enable', { REFUSE: '1' }).status, 0, 'a service refusal still rolls back');
+	assert.equal(fs.readFileSync(desktop, 'utf8'), customized, 'rollback restores all user customizations');
+	assert.equal(run('enable').status, 0, 'owned desktop with user customizations can be enabled');
+	const retained = fs.readFileSync(desktop, 'utf8');
+	assert.match(retained, /^X-User-Custom=keep$/m);
+	assert.match(retained, /\[Desktop Action Example\]\nName=User action\nExec=\/other\/program\n/);
+	assert.match(retained, /^Hidden=false$/m);
+	assert.doesNotMatch(retained, /^X-GNOME-Autostart-enabled=false$/m);
+	assert.equal(run('disable').status, 0);
+	assert.match(fs.readFileSync(desktop, 'utf8'), /\[Desktop Action Example\]\nName=User action\nExec=\/other\/program\n/);
+	fs.writeFileSync(desktop, customized.slice(0, -1));
+	assert.equal(run('enable').status, 0);
+	assert.ok(fs.readFileSync(desktop, 'utf8').endsWith('Exec=/other/program'), 'preserve a final action without newline');
+
+
+
 	for (const mixed of [
 		`${ownedDesktop}Exec=/other/program\n`,
 		`${ownedDesktop} Exec=/other/program\n`,

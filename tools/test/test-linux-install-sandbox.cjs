@@ -958,7 +958,7 @@ for (const kind of [
 }
 
 // An expected command in a duplicate key or action does not own the main entry.
-for (const kind of ['duplicate', 'key-space', 'key-tab', 'group-space', 'action-decoy']) {
+for (const kind of ['duplicate', 'key-space', 'key-tab', 'key-return', 'key-formfeed', 'group-space', 'action-decoy']) {
 	let original;
 	const run = runInstaller({
 		desktopProvided: true,
@@ -970,6 +970,8 @@ for (const kind of ['duplicate', 'key-space', 'key-tab', 'group-space', 'action-
 				duplicate: 'Exec=/other/program',
 				'key-space': ' Exec =/other/program',
 				'key-tab': 'Exec\t=/other/program',
+				'key-return': '\rExec=/other/program',
+				'key-formfeed': 'Exec\f=/other/program',
 				'group-space': ' [Desktop Entry] \nExec=/other/program'
 			};
 			original =
@@ -1212,17 +1214,17 @@ for (const fault of ['refuseUnitWrite', 'refuseUnitMode', 'refuseUnitPublish']) 
 }
 
 // An update must preserve a choice already made through the startup menu.
-{
+for (const format of ['plain', 'crlf', 'spaced']) {
 	const run = runInstaller({
 		desktopProvided: true,
 		systemdEnabled: true,
 		seed(home) {
 			const directory = path.join(home, '.config/autostart');
 			fs.mkdirSync(directory, { recursive: true });
-			fs.writeFileSync(
-				path.join(directory, 'ergopti-hotstrings.desktop'),
-				`[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`
-			);
+			let entry = `[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`;
+			if (format === 'crlf') entry = entry.replaceAll('\n', '\r\n');
+			if (format === 'spaced') entry = entry.replace('Hidden=true', ' Hidden = true').replace('X-Ergopti-Startup=true', ' X-Ergopti-Startup = true');
+			fs.writeFileSync(path.join(directory, 'ergopti-hotstrings.desktop'), entry);
 		}
 	});
 	try {
