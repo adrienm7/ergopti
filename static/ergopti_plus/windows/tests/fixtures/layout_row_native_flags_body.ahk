@@ -13,7 +13,7 @@ global Features := Map("layout", Map("ergopti_base", true,
 	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
 global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC030")
 global _LRNF := {Mode: A_Args[5], Window: 0, Edit: 0, Received: [], Callbacks: [],
-	ShiftReleased: false, ShiftOwned: false, Failure: 0, Vk: 0, OriginalMarker: 0x4C524E46}
+	ShiftReleased: false, ShiftOwned: false, Failure: 0, Vk: 0, Observer: 0, ObservedKeys: 0, ObservedText: "", ExpectedHost: "", OriginalMarker: 0x4C524E46}
 
 LoggerStart(*) => 0
 LoggerSuccess(*) => 0
@@ -88,8 +88,19 @@ _LRNF_Receive(WParam, LParam, Message, Hwnd) {
 		return
 	_LRNF.Received.Push({Shift: !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000),
 		Extra: DllCall("GetMessageExtraInfo", "UPtr")})
-	return 0
+	return
 }
+
+_LRNF_ObservedKey(Hook, Vk, Sc) {
+	global _LRNF
+	if Sc == 0x10
+		_LRNF.ObservedKeys += 1
+}
+_LRNF_ObservedChar(Hook, Text) {
+	global _LRNF
+	_LRNF.ObservedText .= Text
+}
+
 _LRNF_Main() {
 	global _LRNF
 	_LRNF.Window := Gui(, "Ergopti native row flag probe")
@@ -104,6 +115,12 @@ _LRNF_Main() {
 			_LRNF_Require(!GetKeyState(Name, "P") && !GetKeyState(Name), "Release modifiers before this native probe.")
 		_LRNF.Vk := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
 		_LRNF_Require(_LRNF.Vk >= 0x41 && _LRNF.Vk <= 0x5A, "The native top-row key must resolve to a letter VK.")
+		_LRNF.ExpectedHost := _LRN_HostCharacter(_LRNF.Vk, _LRNF.Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
+		_LRNF.Observer := InputHook("V L0 I1")
+		_LRNF.Observer.KeyOpt("{All}", "N")
+		_LRNF.Observer.OnKeyDown := _LRNF_ObservedKey
+		_LRNF.Observer.OnChar := _LRNF_ObservedChar
+		_LRNF.Observer.Start()
 		_LRNF_Require(_LayoutRowPassthroughCriterion("SC010", "+SC010"), "The real disabled-row criterion must admit the native variant.")
 		OnMessage(0x100, _LRNF_Receive)
 		_LRNF_Require(RegisterLayoutRowPassthrough(_LRNF_Register, HotIf) == 240, "The genuine native registrar must install all original variants.")
@@ -114,10 +131,20 @@ _LRNF_Main() {
 		if IsObject(_LRNF.Failure)
 			throw _LRNF.Failure
 		_LRNF_ReleaseShift()
+		ObservedAt := A_TickCount
+		while (_LRNF.ObservedKeys == 0 || _LRNF.ObservedText == "") && A_TickCount - ObservedAt < 500
+			Sleep(5)
+		Sleep(25)
+		FileAppend("OBSERVATION row-native-feed mode=" . _LRNF.Mode . " observer_level=" . _LRNF.Observer.MinSendLevel
+			. " keydowns=" . _LRNF.ObservedKeys . " char_units=" . StrLen(_LRNF.ObservedText)
+			. " expected_units=" . StrLen(_LRNF.ExpectedHost) . "`n", "*")
+		_LRNF_Require(_LRNF.Observer.MinSendLevel == 1 && _LRNF.ObservedKeys == 1 && _LRNF.ObservedText == _LRNF.ExpectedHost,
+			"The true I1 observer must receive one keydown and the exact host character, without a duplicate feed; keys=" . _LRNF.ObservedKeys . ", units=" . StrLen(_LRNF.ObservedText))
+		_LRNF_Require(_LRNF.Edit.Value == _LRNF.ExpectedHost, "The owned Edit must receive the host character exactly once.")
 		_LRNF_Require(_LRNF.Callbacks.Length == 1 && _LRNF.Received.Length == 1,
 			"Exactly one real row callback and one receiving keydown are required; callbacks=" . _LRNF.Callbacks.Length . ", keydowns=" . _LRNF.Received.Length)
 		Callback := _LRNF.Callbacks[1], Received := _LRNF.Received[1]
-		_LRNF_Require(Received.Extra != _LRNF.OriginalMarker, "The receiving key must be the real SendEvent replay, not an original event escaping its hotkey.")
+		_LRNF_Require(SubStr(Callback.Name, 1, 1) == "~" && Received.Extra == _LRNF.OriginalMarker, "The native tilde owner must pass the exact original event to its receiver.")
 		if _LRNF.Mode == "released"
 			_LRNF_Require(_LRNF.ShiftReleased && !Callback.Shift, "The original native Shift-up must precede the admitted callback.")
 		_LRNF_Require(Received.Shift == (_LRNF.Mode != "plain"),
@@ -127,6 +154,8 @@ _LRNF_Main() {
 			. ", logical_ctrl=" . Callback.LogicalCtrl . ", thread_ctrl=" . Callback.ThreadCtrl . ", receiver_shift=" . Received.Shift)
 	} finally {
 		SetTimer(_LRNF_Inject, 0)
+		if IsObject(_LRNF.Observer)
+			_LRNF.Observer.Stop()
 		OnMessage(0x100, _LRNF_Receive, 0)
 		_LRNF_ReleaseShift()
 		_LRNF.Window.Destroy()

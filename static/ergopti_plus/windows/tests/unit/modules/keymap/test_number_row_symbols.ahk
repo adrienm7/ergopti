@@ -773,7 +773,8 @@ _NRP_RowScopes() {
 		Names := Map()
 		Criteria := Map()
 		Current := {Criterion: 0}
-		Count := RegisterLayoutRowPassthrough((Name, Callback, Options) => (Names[Name] := Options, Criteria[Name] := Current.Criterion),
+		Count := RegisterLayoutRowPassthrough((Name, Callback, Options) => (AssertTrue(SubStr(Name, 1, 1) == "~"),
+			Names[StrReplace(Name, "~")] := Options, Criteria[StrReplace(Name, "~")] := Current.Criterion),
 			(Args*) => Current.Criterion := Args.Length ? Args[1] : 0)
 		AssertEqual(Total * LAYOUT_ROW_PASSTHROUGH_PREFIXES.Length, Count, "every level of every row key")
 		AssertEqual("I3", Names["!SC010"], "the Alt level keeps the Alt input level")

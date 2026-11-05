@@ -15,6 +15,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\layout_row_host_character.ahk
+
 
 
 
@@ -134,6 +136,8 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 		AssertTrue(Definition != "", "the real row policy helper must exist: " . Name)
 		Code .= Definition . "`n"
 	}
+	if BodyName == "layout_row_native_flags_body.ahk" || BodyName == "layout_row_external_flags_body.ahk"
+		Code .= "#Include " . _DriverDir . "\tests\fixtures\layout_row_host_character.ahk`n"
 	Code .= ExtraSource . "`n"
 	Code .= FileRead(_DriverDir . "\tests\fixtures\" . BodyName, "UTF-8")
 	return Code
@@ -198,8 +202,8 @@ _LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs
 
 for _LRPS_CallerLevel in [0, 2, 3]
 	for _LRPS_Throws in [false, true]
-		Test("layout row sender: caller level " . _LRPS_CallerLevel . " survives " . (_LRPS_Throws ? "refusal" : "success")
-			. " without rehooking (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
+		Test("layout row native callback: caller level " . _LRPS_CallerLevel . " ignores a " . (_LRPS_Throws ? "refusing" : "recording") . " sender trap"
+			. " without synthetic replay (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
 
 
 _LRPW_ChildSource() {
@@ -435,7 +439,7 @@ _LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
 		} catch as Err
 			Record["failure"] := Err
 	}
-	return 0
+	return
 }
 
 _LRNX_Case(Mode) {
@@ -464,6 +468,7 @@ _LRNX_Case(Mode) {
 			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
 		Record["vk"] := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
 		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
+		ExpectedHost := _LRN_HostCharacter(Record["vk"], Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
 		OnMessage(0x100, Receiver)
 		Args := ["/ErrorStdOut=UTF-8", Script, "--allow-explicit-family-edit-row-flags", Mode,
 			String(Record["window"].Hwnd), String(Record["edit"].Hwnd), String(DllCall("GetCurrentProcessId", "UInt")),
@@ -478,6 +483,7 @@ _LRNX_Case(Mode) {
 		FileAppend("# external-row-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText . "`n", "*")
 		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
 		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
+		AssertEqual(ExpectedHost, Record["edit"].Value, "the separate receiving process must obtain the host character exactly once")
 		if IsObject(Record["failure"])
 			throw Record["failure"]
 		AssertEqual(0, State.Code, "the native external row sender refused: " . State.ErrorText . State.Output)
