@@ -425,7 +425,7 @@ _LTE_GenerateCancelled() {
 Test("Token exchange: a cancelled prediction leaves the shared exchange running", _LTE_GenerateCancelled)
 
 _LTE_ResumeDispatches() {
-	Reservation := Map("cancelled", false, "requester_current", 0)
+	Reservation := Map("cancelled", false, "requester_current", 0, "start_tick", A_TickCount, "timeout_ms", 20000)
 	global _LLM_Remote_Async
 	Id := 0x7FFFFF01
 	_LLM_Remote_Async[Id] := Reservation
@@ -1094,3 +1094,249 @@ for _LTEWB_Backend in ["generate", "rawpost"] {
     Test("Token exchange request budget: " . _LTEWB_Backend . " immediate reply (token-wait-request-budget)", _LTEWB_Run.Bind(_LTEWB_Backend, false))
     Test("Token exchange request budget: " . _LTEWB_Backend . " pending beyond deadline (token-wait-request-budget)", _LTEWB_Run.Bind(_LTEWB_Backend, true))
 }
+
+; Add after existing _LTEWB_* probes. Native AHK UNRUN.
+_LTEWDF_WaitBudget(Owner) {
+    State := {Observed: false}, Observe := _LTEWB_Observe.Bind(State)
+    try {
+        SetTimer(Observe, -(Owner["timeout_ms"] + 1))
+        Started := A_TickCount
+        while !State.Observed && TickElapsed(Started) < 2000
+            Sleep(1)
+        AssertTrue(State.Observed)
+        AssertTrue(_LLM_DeadlineExpired(Owner["start_tick"], Owner["timeout_ms"]))
+    } finally SetTimer(Observe, 0)
+}
+
+_LTEWDF_Body(CancelShort, Posts, Lines) {
+    global _LLM_Remote_Async, LLM_API_PROVIDERS, LTE_PROVIDER
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Short := [], Long := [], Ids := [], Owners := [], Answered := false, Primary := 0
+    Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+    PreviousCritical := Critical("Off")
+    try {
+        Id1 := LLM_RemoteGenerate_Async(_LTE_Entry(), "s", "u", 0.1,
+            (*) => Short.Push(Map("ok", true)), (Info := "") => Short.Push(Map("ok", false, "info", Info)),
+            "", 8, "short_access_wait", 96)
+        Ids.Push(Id1)
+        Owner1 := _LLM_Remote_Async[Id1]
+        Owners.Push(Owner1)
+        if !CancelShort {
+            Resolved := _LLMRemoteResolveEntry(_LTE_Entry())
+            Id2 := LLM_RemotePostBody_Async(Resolved, "https://token-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+                (*) => Long.Push(Map("ok", true)), (Info := "") => Long.Push(Map("ok", false, "info", Info)),
+                20000, "long_access_wait")
+            Ids.Push(Id2)
+            Owner2 := _LLM_Remote_Async[Id2]
+            Owners.Push(Owner2)
+        }
+        _LTE_Pump()
+        AssertEqual(1, Posts.Length)
+        AssertTrue(Slot["pending"])
+        AssertEqual(0, Short.Length)
+        if CancelShort
+            LLM_RemoteCancelAsync(Id1)
+        _LTEWDF_WaitBudget(Owner1)
+        BeforeShort := Short.Length, BeforePresent := _LLM_Remote_Async.Has(Id1)
+        BeforeTimer := Owner1.Has("access_deadline")
+        BeforePending := Slot["pending"]
+        if !CancelShort {
+            BeforeLong := Long.Length, BeforeLongPresent := _LLM_Remote_Async.Has(Id2)
+            BeforeLongTimer := Owner2.Has("access_deadline")
+        }
+        Answered := true
+        ; No transport can dispatch: the sole cancelled owner is gone, or the
+        ; live long waiter receives a genuine access refusal instead of a token.
+        _LTE_Answer(Posts[1], CancelShort ? "fixture-access-token" : "", CancelShort ? 200 : 403)
+        Receipt := Map("cancel_short", CancelShort, "token_posts", Posts.Length,
+            "short_callbacks_before", BeforeShort, "short_present_before", BeforePresent,
+            "short_timer_before", BeforeTimer, "shared_pending_before", BeforePending,
+            "short_callbacks_after", Short.Length, "short_present_after", _LLM_Remote_Async.Has(Id1))
+        if !CancelShort {
+            Receipt["long_callbacks_before"] := BeforeLong
+            Receipt["long_present_before"] := BeforeLongPresent
+            Receipt["long_timer_before"] := BeforeLongTimer
+            Receipt["long_callbacks_after"] := Long.Length
+            Receipt["long_present_after"] := _LLM_Remote_Async.Has(Id2)
+            Receipt["long_timer_after"] := Owner2.Has("access_deadline")
+        }
+        _TestPrint("# TOKEN_WAIT_OWNER " . KL_JsonEncode(Receipt))
+        AssertTrue(BeforePending, "retiring one request must leave the shared access exchange pending")
+        AssertFalse(BeforePresent)
+        AssertFalse(BeforeTimer, "retired request must release its exact bound deadline callback")
+        AssertEqual(CancelShort ? 0 : 1, BeforeShort)
+        AssertEqual(CancelShort ? 0 : 1, Short.Length)
+        if CancelShort {
+            AssertEqual("fixture-access-token", LLM_TokenExchange_Current(LTE_PROVIDER,
+                LLM_API_PROVIDERS[LTE_PROVIDER]["Auth"], _LTE_Key()))
+        } else {
+            AssertEqual("timeout", Short[1]["info"]["reason"])
+            AssertEqual(0, BeforeLong)
+            AssertTrue(BeforeLongPresent && BeforeLongTimer, "the other actual request keeps its own deadline and authority")
+            AssertEqual(1, Long.Length)
+            AssertFalse(Long[1]["ok"])
+            AssertEqual("token_exchange", Long[1]["info"]["reason"])
+            AssertEqual(403, Long[1]["info"]["status"])
+            AssertFalse(_LLM_Remote_Async.Has(Id2))
+            AssertFalse(Owner2.Has("access_deadline"), "settlement must also release the live waiter's deadline callback")
+        }
+        AssertFalse(Slot["pending"])
+        for Owner in Owners
+            AssertFalse(Owner.Has("http"), "these controls must launch no remote transport")
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        try {
+            for Index, Id in Ids
+                if Index <= Owners.Length && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owners[Index]
+                    LLM_RemoteCancelAsync(Id)
+            StartedCleanup := A_TickCount
+            while !Answered && Posts.Length == 0 && Slot["pending"] && TickElapsed(StartedCleanup) < 1000
+                Sleep(1)
+            if !Answered && Posts.Length {
+                _LTE_Answer(Posts[1], "", 403)
+                Answered := true
+            }
+            for Index, Id in Ids {
+                if Index <= Owners.Length && _LLM_Remote_Async.Has(Id) && _LLM_Remote_Async[Id] == Owners[Index] {
+                    LLM_RemoteCancelAsync(Id)
+                    _LLMRemote_PollRequest(Id)
+                }
+                AssertFalse(_LLM_Remote_Async.Has(Id))
+            }
+            AssertFalse(Slot["pending"])
+        } catch Any as CleanupFailure {
+            _TestPrint("# TOKEN_WAIT_OWNER_CLEANUP " . KL_JsonEncode(Map("cancel_short", CancelShort,
+                "error", Type(CleanupFailure), "message", SubStr(CleanupFailure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := CleanupFailure
+        }
+        Critical(PreviousCritical)
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LTEWDF_Run(CancelShort) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTEWDF_Body.Bind(CancelShort)))
+}
+Test("Token exchange request budget: short expiry retains another actual request (token-wait-request-budget)", _LTEWDF_Run.Bind(false))
+Test("Token exchange request budget: cancelled pending owner retires silently (token-wait-request-budget)", _LTEWDF_Run.Bind(true))
+
+; Add after existing _LTEWB_* probes. Native AHK UNRUN.
+; Intrinsic native timer range only; no product timeout ceiling is invented.
+_LTEWBI_Body(Backend, Posts, Lines) {
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LTE_PROVIDER
+    AssertFalse(A_IsSuspended)
+    AssertEqual(0, _LLM_Remote_Async.Count)
+    Before := _LLM_Remote_AsyncCounter
+    Slot := _LLM_TokenExchange_Slot(LTE_PROVIDER, _LTE_Key())
+    Heard := [], Raised := 0, CapturedId := 0, CapturedOwner := 0, Answered := false, Primary := 0
+    PreviousCritical := Critical("On")
+    try {
+        try {
+            Timeout := 1 << 40
+            if Backend == "generate"
+                LLM_RemoteGenerate_Async(_LTE_Entry(), "s", "u", 0.1,
+                    (*) => Heard.Push("ok"), (*) => Heard.Push("fail"), "", 8, "invalid_access_delay_control", Timeout)
+            else {
+                Resolved := _LLMRemoteResolveEntry(_LTE_Entry())
+                LLM_RemotePostBody_Async(Resolved, "https://token-fixture.invalid/v1/chat/completions", '{"messages":[]}',
+                    (*) => Heard.Push("ok"), (*) => Heard.Push("fail"), Timeout, "invalid_access_delay_control")
+            }
+        } catch Any as Failure {
+            Raised := Failure
+        }
+        After := _LLM_Remote_AsyncCounter
+        if After == Before + 1 && _LLM_Remote_Async.Has(After)
+                && _LLM_Remote_Async[After].Get("kind", "") == "invalid_access_delay_control" {
+            CapturedId := After
+            CapturedOwner := _LLM_Remote_Async[After]
+        }
+        Receipt := Map("backend", Backend, "raised", IsObject(Raised),
+            "error", IsObject(Raised) ? Type(Raised) : "", "registry_count", _LLM_Remote_Async.Count,
+            "counter_delta", After - Before, "callbacks", Heard.Length,
+            "token_posts_at_rejection", Posts.Length, "shared_pending", Slot["pending"])
+        ; Allow the already shared Begin timer only after the rejection snapshot.
+        Critical(PreviousCritical)
+        _TestPrint("# TOKEN_WAIT_INVALID_TIMER " . KL_JsonEncode(Receipt))
+        AssertTrue(IsObject(Raised) && Raised is ValueError, "the existing native-range refusal must propagate unchanged")
+        AssertTrue(InStr(Raised.Message, "refuses a timer delay", true) > 0)
+        AssertEqual(1, Receipt["counter_delta"], "constructor uses a real unique reservation before its native timing boundary")
+        AssertEqual(0, Receipt["registry_count"], "a refused timer cannot retain the constructor's reservation")
+        AssertEqual(0, Receipt["callbacks"], "invalid native timing raises rather than manufacturing an asynchronous verdict")
+        AssertEqual(0, Receipt["token_posts_at_rejection"], "no native/shared PostFn started before the invalid timer was refused")
+        AssertTrue(Receipt["shared_pending"], "rejecting this request must not revoke the shared credential preparation")
+    } catch Any as Failure {
+        Primary := Failure
+    } finally {
+        Critical(PreviousCritical)
+        try {
+            if CapturedOwner is Map && _LLM_Remote_Async.Has(CapturedId) && _LLM_Remote_Async[CapturedId] == CapturedOwner
+                LLM_RemoteCancelAsync(CapturedId)
+            StartedCleanup := A_TickCount
+            while Posts.Length == 0 && Slot["pending"] && TickElapsed(StartedCleanup) < 1000
+                Sleep(1)
+            if Posts.Length && !Answered {
+                _LTE_Answer(Posts[1], "", 403)
+                Answered := true
+            }
+            if CapturedOwner is Map && _LLM_Remote_Async.Has(CapturedId) && _LLM_Remote_Async[CapturedId] == CapturedOwner {
+                LLM_RemoteCancelAsync(CapturedId)
+                _LLMRemote_PollRequest(CapturedId)
+            }
+            AssertEqual(0, _LLM_Remote_Async.Count)
+            AssertFalse(Slot["pending"], "settle the actual queued Begin before fixture ports restore")
+        } catch Any as CleanupFailure {
+            _TestPrint("# TOKEN_WAIT_INVALID_TIMER_CLEANUP " . KL_JsonEncode(Map("backend", Backend,
+                "error", Type(CleanupFailure), "message", SubStr(CleanupFailure.Message, 1, 250))))
+            if !IsObject(Primary)
+                Primary := CleanupFailure
+        }
+    }
+    if IsObject(Primary)
+        throw Primary
+}
+_LTEWBI_Run(Backend) {
+    _ManagedRemoteFixtureWithLlmTimings(_LTE_Run.Bind(_LTEWBI_Body.Bind(Backend)))
+}
+for _LTEWBI_Backend in ["generate", "rawpost"]
+    Test("Token exchange request budget: " . _LTEWBI_Backend . " refuses unrepresentable native delay cleanly (token-wait-request-budget)",
+        _LTEWBI_Run.Bind(_LTEWBI_Backend))
+
+; Append to test_llm_api_token_exchange.ahk; select (token-margin-integer-domain).
+_LTEMD_Parse() {
+    Corpus := _LTE_ExchangeCorpus()
+    Rows := [
+        Map("name", "ordinary", "default", 3600, "margin", 60, "valid", true),
+        Map("name", "last_integer_below_odd_half", "default", 61, "margin", 30, "valid", true),
+        Map("name", "above_odd_half", "default", 61, "margin", 31, "valid", false),
+        Map("name", "equal_even_half", "default", 60, "margin", 30, "valid", false),
+        Map("name", "integer_double_overflow", "default", 3600, "margin", 0x4000000000000000, "valid", false),
+        Map("name", "max_native_integer", "default", 3600, "margin", 0x7FFFFFFFFFFFFFFF, "valid", false)]
+    Receipts := [], Results := []
+    for Row in Rows {
+        Raw := _LTE_Block(Corpus, "google", Map("default_expires_seconds", Row["default"],
+            "refresh_margin_seconds", Row["margin"]))
+        Auth := LLM_TokenExchange_Parse(Raw, &Reason)
+        Receipt := Map("name", Row["name"], "admitted", Auth is Map, "reason", Reason)
+        if Auth is Map {
+            Cached := LLM_TokenExchange_Read(Auth, 200, Map(Auth["token_field"], "fixture-token",
+                Auth["expires_field"], Row["default"]), 1000)
+            Receipt["usable"] := LLM_TokenExchange_State(Auth, Cached, 1001, &Refresh)
+            Receipt["refresh_one_second_after_issue"] := Refresh
+        }
+        Receipts.Push(Receipt)
+        Results.Push(Map("row", Row, "receipt", Receipt))
+    }
+    _TestPrint("# TOKEN_MARGIN_INTEGER_DOMAIN " . KL_JsonEncode(Receipts))
+    for Result in Results {
+        Row := Result["row"], Receipt := Result["receipt"]
+        AssertEqual(Row["valid"], Receipt["admitted"], Row["name"] . ": the margin must stay strictly below half the lifetime")
+        if Row["valid"] {
+            AssertTrue(Receipt["usable"], Row["name"])
+            AssertFalse(Receipt["refresh_one_second_after_issue"], Row["name"] . ": a newly issued token is fresh")
+        }
+    }
+}
+Test("Token exchange: refresh-margin validation cannot overflow (token-margin-integer-domain)", _LTEMD_Parse)
