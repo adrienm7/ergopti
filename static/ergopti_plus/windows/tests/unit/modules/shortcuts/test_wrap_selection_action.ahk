@@ -276,7 +276,7 @@ _GTRF_ChildSource() {
 		"KL_MarkSynthetic", "KL_ClearSynthetic", "TimingsGet", "IniCacheGet"]
 		Code .= _DriverFuncBody(Name) . "`n"
 	Copy := _DriverFuncBody("_SelectionSendCopy")
-	Copy := StrReplace(Copy, "SendEvent.Bind(""^c"")", "_GTRF_NativeCopy", true, &Copies)
+	Copy := StrReplace(Copy, 'SendEvent.Bind("^c")', "_GTRF_NativeCopy", true, &Copies)
 	AssertEqual(1, Copies, "The real copy helper must delegate only its native transport to the owned-window guard.")
 	Code .= Copy . "`n"
 	Code .= "global _SelectionCaptureJob := false, _SelectionCaptureNextId := 0, _KS_PhysicalInputGeneration := 0`n"
@@ -287,8 +287,8 @@ _GTRF_ChildSource() {
 		AssertTrue(RegExMatch(Source, Pattern, &Value), "The native child requires the production constant " . Name)
 		Code .= "global " . Name . " := " . Value[1] . "`n"
 	}
-	Code .= "global Keystats := {synth_owners: [], synth_active: 0, synth_type: ""none"", synth_private: false}`n"
-	Code .= "global _TimingsCache := Map(""gestures"", Map(""synthetic_clear_ms"", " . TimingsGet("gestures", "synthetic_clear_ms") . "))`n"
+	Code .= 'global Keystats := {synth_owners: [], synth_active: 0, synth_type: "none", synth_private: false}' . "`n"
+	Code .= 'global _TimingsCache := Map("gestures", Map("synthetic_clear_ms", ' . TimingsGet("gestures", "synthetic_clear_ms") . "))`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
 }
 _GTRF_Case(Mode) {
@@ -344,3 +344,66 @@ _GTRF_Case(Mode) {
 
 for _GTRF_Mode in ["current", "redirect"]
 	Test("gesture transform native clipboard renderer: " . _GTRF_Mode . " (gesture-transform-native-render-focus)", _GTRF_Case.Bind(_GTRF_Mode))
+
+; Requires the genuine gesture/capture composition defined alongside WRCF.
+_SCCF_ChildSource() {
+	global _DriverDir
+	Code := _GTRF_ChildSource()
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the private fixture body changes; every real capture/context/send owner remains intact.")
+	return SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
+		. FSReadStrict(_DriverDir . "\tests\fixtures\selection_capture_control_focus_body.ahk")
+}
+_SCCF_Case(Mode) {
+	global SEND_INSTANT_PASTE_DELAY_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired owned clipboard probe prevents another native publisher.")
+	Root := A_Temp . "\ergopti_selection_capture_control_focus_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Primary := 0, Retired := false
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The fixture must exclusively own its script and evidence directory.")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _SCCF_ChildSource()))
+		OwnerSource := FSReadStrict(_DriverProductionFileForSymbol("GetUIASelection"))
+		AssertTrue(RegExMatch(OwnerSource, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age),
+			"The isolated child must receive the actual production snapshot age literal, not an unavailable harness global.")
+		MaxAge := Integer(Age[1])
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-clipboard-render-focus", Mode,
+				String(SEND_INSTANT_PASTE_DELAY_MS), String(MaxAge)], _WRCF_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native clipboard/render subject must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 12000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		_TestPrint("# selection-capture-control-focus " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(1, State.Calls, "The actual clipboard and native paste owner must settle exactly once.")
+		AssertEqual(0, State.Code, "The native wrap render focus probe failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS selection-capture-control-focus " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := {Handle: Handle, Root: Root}
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact clipboard subject must retire before its script directory is removed.")
+}
+
+for _SCCF_Mode in ["current", "redirect"]
+	Test("selection capture native same-window focus: " . _SCCF_Mode . " (selection-capture-native-control-focus)", _SCCF_Case.Bind(_SCCF_Mode))
