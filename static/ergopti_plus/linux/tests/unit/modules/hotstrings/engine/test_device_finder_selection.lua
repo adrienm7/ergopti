@@ -158,6 +158,53 @@ end)
 
 helpers.describe("device_finder: synthetic devices are excluded", function()
 
+	helpers.it("keeps a physical keyboard whose name contains a synthetic-device word", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local descriptor = block({ name = "Acme Virtual Keyboard", sysfs = "/devices/pci0000:00/usb1/input/input31",
+			ev = "120013", handlers = "sysrq kbd event31" })
+		local devices = Finder.parse_devices(descriptor)
+		local paths = Finder.select_keyboards(devices)
+		helpers.assert_eq(paths, { "/dev/input/event31" }, "physical sysfs must take precedence over name heuristics")
+		local origins = Finder.physical_sources(paths, devices)
+		helpers.assert_true(origins[1].physical, "the same physical identity must be available to input admission")
+	end)
+
+	helpers.it("still excludes virtual sysfs and synthetic names without a kernel path", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local virtual = block({ name = "Generic Keyboard", sysfs = "/devices/virtual/input/input32",
+			ev = "120013", handlers = "kbd event32" })
+		local unknown = block({ name = "Ergopti Virtual Keyboard", sysfs = "",
+			ev = "120013", handlers = "kbd event33" })
+		local devices = Finder.parse_devices(virtual .. unknown)
+		helpers.assert_eq(Finder.select_keyboards(devices), {})
+		local origins = Finder.physical_sources({ "/dev/input/event32", "/dev/input/event33" }, devices)
+		helpers.assert_eq(origins[1].physical, false)
+		helpers.assert_eq(origins[2].physical, false)
+	end)
+
+	helpers.it("does not certify malformed sysfs text as physical origin", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		local descriptor = block({ name = "Keyboard", sysfs = "not-a-kernel-path",
+			ev = "120013", handlers = "kbd event34" })
+		local devices = Finder.parse_devices(descriptor)
+		local origins = Finder.physical_sources({ "/dev/input/event34" }, devices)
+		helpers.assert_eq(origins[1].physical, false)
+	end)
+
+	helpers.it("does not trust malformed or virtual-root sysfs as a physical keyboard", function()
+		local Finder = require("modules.hotstrings.device_finder")
+		for _, sysfs in ipairs({ "/devices/virtual", "/devices/pci0000:00", "/devices/pci/input/input42/extra",
+			"/devices/../virtual/input/input42",
+			"/devices/pci//input/input42", "/devices/pci/./input/input42", "/devices/pci/input/input42/" }) do
+			for _, name in ipairs({ "Virtual Keyboard", "Generic Keyboard" }) do
+				local devices = Finder.parse_devices(block({ name = name, sysfs = sysfs,
+					ev = "120013", handlers = "kbd event42" }))
+				helpers.assert_eq(Finder.select_keyboards(devices), {}, sysfs .. ": " .. name)
+				helpers.assert_eq(Finder.physical_sources({ "/dev/input/event42" }, devices)[1].physical, false, sysfs)
+			end
+		end
+	end)
+
 	helpers.it("never grabs our own uinput device, even though its name says keyboard", function()
 		-- The regression. "Ergopti Virtual Keyboard" contains "keyboard", so the
 		-- name heuristic put it in the preferred tier; listing it first is what a
