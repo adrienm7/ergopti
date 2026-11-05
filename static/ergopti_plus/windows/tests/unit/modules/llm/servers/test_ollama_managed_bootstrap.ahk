@@ -954,3 +954,126 @@ _G4L_CancelLifetime() {
 	AssertEqual(1, Counter.Deleted, "a canceled replaceable bootstrap must release its bound polling callback")
 }
 Test("managed bootstrap: canceled replaceable owner releases its actual timer (managed-bootstrap-lifetime)", _G4L_CancelLifetime)
+
+; Real production port objects retain the bootstrap through their terminal
+; observer slots, even with no native task. A timer-only fixture cannot see it.
+_G4LG_BindProductionPorts(Flow, State) {
+	Files := OllamaInstallFilesPort(Map("helper", "C:\owned\files.ps1",
+		"powershell", "C:\owned\powershell.exe", "capture_bytes", 4096,
+		"spawn", _G4LG_Spawn.Bind(State),
+		"on_physical", ObjBindMethod(Flow, "_Physical"), "on_error", ObjBindMethod(Flow, "_Error")))
+	Runtime := OllamaRuntimeOwner(Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+		"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"environment", "C:\bundled\managed_ollama_environment.json",
+		"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		"proxy", _ORT_Proxy(), "on_retired", ObjBindMethod(Flow, "_RuntimeRetired"),
+		"on_error", ObjBindMethod(Flow, "_Error")))
+	Flow.Files := Files, Flow.Runtime := Runtime
+	return [Files, Runtime]
+}
+_G4LG_Spawn(State, Exe, Args, Done, Adopt, Capture) {
+	Task := {start: (*) => true, requestTerminate: (*) => State.StopAck}
+	State.Done := Done, State.Task := Task
+	AssertTrue(Adopt.Call(Task), "the real file port must adopt the exact passive IO task")
+	return Task
+}
+_G4LG_Case(Mode) {
+	global _LLM_Deps_Epoch, _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_FailureMessage
+	AssertFalse(OllamaNativeIdentityHasDebt(), "the idle graph cannot borrow another native identity debt")
+	Saved := [_LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_FailureMessage]
+	Priority := DllCall("GetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt")
+	AssertTrue(Priority != 0, "the scope must capture its actual native priority")
+	Counter := {Deleted: 0, Ready: 0}, State := {StopAck: false, Done: 0, Task: 0}
+	Flow := 0, Callback := 0
+	PreviousCritical := Critical("On")
+	try {
+		Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+			"runtime", {Stop: (*) => true, HasOwner: (*) => false}, "current", (*) => true)
+		Flow := OllamaManagedBootstrap("", _LLM_Deps_Epoch, (*) => Counter.Ready += 1, (*) => true, Port)
+		Flow.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+		Roots := _G4LG_BindProductionPorts(Flow, State)
+		Callback := Flow.Timer
+		AssertTrue(TimerSetCallback(Callback, -60000))
+		if Mode == "ready" {
+			AssertTrue(Flow._Complete(), "the actual ready branch publishes its callback")
+			AssertEqual(1, Counter.Ready)
+			AssertTrue(Flow.Ready)
+		} else if Mode == "failed" {
+			AssertFalse(Flow._Fail("lifetime-fixture"))
+			AssertTrue(Flow.Failed)
+		} else if Mode == "file-debt" {
+			AssertTrue(Roots[1].Run("inspect", Map(),
+				Map("authorize", (*) => true, "is_current", (*) => true), (*) => true))
+			AssertFalse(Flow.Cancel(), "a refused passive task retirement remains genuine file-port debt")
+			AssertFalse(Flow.CanReplace())
+			AssertTrue(Roots[1].HasOwner())
+			AssertTrue(Flow.Timer == Callback, "debt retains the existing callback for later cleanup")
+			AssertTrue(HasMethod(Roots[1].Options["on_physical"], "Call"))
+			AssertTrue(HasMethod(Roots[2].Options["on_retired"], "Call"))
+			; This is the captured IO completion, not a forged file-port record or
+			; an invented quiescence ACK. The real port adopts its physical proof.
+			State.Done.Call(0, '{"ok":true}', "")
+			AssertFalse(Roots[1].HasOwner())
+		}
+		AssertTrue(Flow.Cancel())
+		AssertTrue(Flow.Cancel(), "terminal callback release must remain idempotent")
+		AssertTrue(Flow.CanReplace())
+		AssertTrue(TimerSetCallback(Callback, 0))
+		Callback := 0
+		Flow := 0
+		; A late physical receipt schedules the real one-shot Cancel callback.
+		; Let that independent native reference finish before testing collection.
+		Critical("Off")
+		Started := A_TickCount
+		while Counter.Deleted == 0 && TickElapsed64(Started) < 1000
+			Sleep(10)
+		_TestPrint("# MANAGED_BOOTSTRAP_GRAPH mode=" . Mode . " owner_deleted=" . Counter.Deleted)
+		AssertEqual(1, Counter.Deleted, "no terminal production observer may retain the canceled bootstrap")
+	} finally {
+		if IsObject(Callback)
+			TimerSetCallback(Callback, 0)
+		if IsObject(Flow)
+			Flow.Cancel()
+		try {
+			_LLM_Deps_State := Saved[1], _LLM_Deps_Checking := Saved[2], _LLM_Deps_FailureMessage := Saved[3]
+			AssertTrue(DllCall("SetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt", Priority, "Int") != 0,
+				"failure publication must restore this fixture's exact native priority")
+		} finally Critical(PreviousCritical)
+	}
+}
+for _G4LG_Mode in ["cancel", "ready", "failed", "file-debt"]
+	Test("managed bootstrap lifetime: " . _G4LG_Mode . " retires the actual file/runtime observer graph (managed-bootstrap-graph-lifetime)",
+		_G4LG_Case.Bind(_G4LG_Mode))
+
+class _G4LG_InlineRuntime extends _G4B_Runtime {
+	Start(Target, Authority, Ready, Exit) {
+		Accepted := super.Start(Target, Authority, Ready, Exit)
+		if Accepted
+			this.PublishReady()
+		return Accepted
+	}
+}
+_G4LG_CancelReady(State, Fixture, This, Value) {
+	State.Calls += 1
+	return Fixture.Flow.Cancel()
+}
+_G4LG_InlineCancel() {
+	Fixture := _G4B_Fixture(), State := {Calls: 0}
+	Fixture.Runtime := _G4LG_InlineRuntime(Fixture)
+	; Start installs Flow before any actual runtime callback is delivered.
+	Fixture.DefineProp("ReadyCalls", {Get: (*) => State.Calls, Set: _G4LG_CancelReady.Bind(State, Fixture)})
+	try {
+		Fixture.Start()
+		AssertEqual(1, State.Calls)
+		AssertTrue(Fixture.Flow.Cancelled)
+		AssertTrue(Fixture.Flow.CanReplace())
+		AssertFalse(IsObject(Fixture.Flow.Timer), "the returning Start frame must not rearm its retired callback")
+	} finally {
+		Fixture.Close()
+		Fixture.Runtime.Ready := 0
+		Fixture.DeleteProp("ReadyCalls")
+		Fixture.ReadyCalls := State.Calls
+	}
+}
+Test("managed bootstrap lifetime: inline READY cancellation cannot rearm the returning Start frame (managed-bootstrap-timer-control)",
+	_G4LG_InlineCancel)

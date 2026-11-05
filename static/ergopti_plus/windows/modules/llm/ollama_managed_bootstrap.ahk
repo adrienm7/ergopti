@@ -658,8 +658,7 @@ class OllamaManagedBootstrap {
 		Authority := Map("authorize", (*) => this._Current(), "is_current", (*) => this._Current())
 		if !this._True(this.Runtime.Start(Target, Authority, ObjBindMethod(this, "_ServerReady"), ObjBindMethod(this, "_ServerExited")))
 			return this._Fail("runtime_start")
-		SetTimer(this.Timer, 150)
-		return true
+		return this._ArmPolling()
 	}
 
 	_Tick() {
@@ -1002,7 +1001,8 @@ class OllamaManagedBootstrap {
 			return this.Cancel()
 		this.Ready := true
 		this.Silent := false
-		SetTimer(this.Timer, 150)
+		if !this._ArmPolling()
+			return false
 		if !(this.Port is Map) && this.UiShown
 			OllamaWV_Done(true, t("ollama.deps_step_ready"))
 		_LLM_Deps_State := "ready"
@@ -1111,6 +1111,30 @@ class OllamaManagedBootstrap {
 			this._Error("runtime_receipt_cleanup", Error("Exact runtime receipt retirement was refused."))
 	}
 
+	; Native readiness can cancel inline before the original arming caller returns.
+	_ArmPolling() {
+		PreviousCritical := Critical("On")
+		try {
+			if this.Cancelled || this.Failed || !IsObject(this.Timer)
+				return false
+			SetTimer(this.Timer, 150)
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
+	; Keep the existing callback while native/file debt still needs this owner.
+	; CanReplace has already settled the yielding auxiliary cleanup check.
+	_RetirePolling() {
+		PreviousCritical := Critical("On")
+		try {
+			if !this.Cancelled || this.Files.HasOwner() || this.Runtime.HasOwner()
+					|| IsObject(this.PullTask) || this.Debts.Count
+				return false
+			this.Timer := 0
+			return true
+		} finally Critical(PreviousCritical)
+	}
+
 	/** Invalidates logic first; retained native/file owners block all successors. */
 	Cancel(*) {
 		global _LLM_ManagedBootstrap, _LLM_Deps_State
@@ -1121,7 +1145,8 @@ class OllamaManagedBootstrap {
 				&& _LLM_Deps_State == "ready"
 			_LLM_Deps_State := "pending"
 		this.Ready := false
-		SetTimer(this.Timer, 0)
+		if IsObject(this.Timer)
+			SetTimer(this.Timer, 0)
 		AuxStopped := true
 		if !(this.Port is Map) {
 			LLM_AuxRetirePrefix(this.AuxPrefix)
@@ -1146,7 +1171,10 @@ class OllamaManagedBootstrap {
 		RuntimeStopped := this._True(this.Runtime.Stop())
 		if FilesStopped && this.Debts.Count
 			this._Drain(() => true)
-		return AuxStopped && PullStopped && FilesStopped && RuntimeStopped && this.Debts.Count == 0
+		if !(AuxStopped && PullStopped && FilesStopped && RuntimeStopped && this.Debts.Count == 0)
+				|| !this.CanReplace()
+			return false
+		return this._RetirePolling()
 	}
 
 	/** Keeps installed versions and model files; only owned temporary files retire. */
@@ -1227,7 +1255,8 @@ class OllamaManagedBootstrap {
 		if !this.UiShown {
 			OllamaWV_Show("ollama_install", t("ollama.install_subtitle"), (*) => LLM_Deps_Cancel(), ObjBindMethod(this, "_Retry"))
 			this.UiShown := true
-			SetTimer(this.Timer, 150)
+			if !this._ArmPolling()
+				return
 		}
 		OllamaWV_SetStep(this._Message(Key, Model))
 	}
