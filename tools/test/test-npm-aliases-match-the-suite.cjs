@@ -100,6 +100,8 @@ const NOT_SUITE_ENTRIES = new Set([
 	// Real Chromium and WebKit rendering is required separately by Core / js;
 	// test-desktop-ci-evidence.cjs rejects a missing or forgiven browser step.
 	'tools/test/browser/layer-editor.playwright.cjs',
+	// Real rendering checks literal newlines in the hotstring editor.
+	'tools/test/browser/hotstring-editor-whitespace.playwright.cjs',
 	// Real Chromium and WebKit layout of the composer runs separately in Core / js;
 	// test-desktop-ci-evidence.cjs rejects a missing or skipped browser step.
 	'tools/test/browser/layout-composer.playwright.cjs',

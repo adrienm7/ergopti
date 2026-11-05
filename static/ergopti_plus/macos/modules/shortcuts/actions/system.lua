@@ -1241,11 +1241,12 @@ local function read_wrap_ax_selection_cached()
 	return sel
 end
 
---- Records that the cached selection has been consumed by a wrap, WITHOUT
+--- Records that the cached selection may have been consumed, WITHOUT
 --- discarding the cache entry.
 ---
---- wrap_selection replaces the selection it was given, so the cached value is
---- stale the instant a wrap fires. Within the TTL the next wrap key then re-wrapped
+--- An accepted wrap replaces the selection; a refused wrap passes its symbol
+--- through, which can replace the same selection. In both cases the cached value
+--- is no longer safe to reuse. Within the TTL the next wrap key then re-wrapped
 --- text that was no longer selected: the keystroke was swallowed and the previous
 --- selection duplicated. Marking it as a fresh NEGATIVE (rather than clearing the
 --- validity flag) is deliberate — clearing would re-pay both AX calls on every
@@ -1325,6 +1326,7 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs, admission_guard)
 			text_acts.wrap_selection, sel, pair.left, pair.right,
 			SHORTCUT_ACTION_PARENT)
 		if not ok_wrap then
+			mark_wrap_selection_consumed()
 			SyntheticInput.defer_after_callback("wrap-selection diagnostic", function()
 				Logger.error(LOG, "Could not wrap the active selection: %s.",
 					tostring(wrapped_or_err))
@@ -1333,9 +1335,12 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs, admission_guard)
 		end
 		-- A match is not an output. wrap_selection may deliberately decline while a
 		-- clipboard transaction is already in flight (or after an adapter failure).
-		-- Suppress the physical symbol and invalidate the AX cache only after the
-		-- callee confirms that it actually scheduled the replacement.
-		if wrapped_or_err ~= true then return finish_tap(false, fence_events) end
+		-- Suppress the physical symbol only when the replacement is scheduled.
+		-- Retire the cached selection after every attempted replacement.
+		if wrapped_or_err ~= true then
+			mark_wrap_selection_consumed()
+			return finish_tap(false, fence_events)
+		end
 		mark_wrap_selection_consumed()
 		return finish_tap(true, fence_events)
 	end, "selection wrapping")

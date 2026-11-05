@@ -279,6 +279,17 @@ local function close_webview()
 	return true
 end
 
+local function report_save_failure(detail)
+	Logger.error(LOG, "Paths editor save failed: %s.", tostring(detail))
+	local ok_dialog, dialog = pcall(require, "infra.dialog_util")
+	if ok_dialog and dialog and type(dialog.block_alert) == "function" then
+		pcall(dialog.block_alert,
+			i18n.get("paths_editor.save_failed_title"),
+			i18n.get("paths_editor.save_failed"),
+			i18n.get("onboarding.btn.ok"))
+	end
+end
+
 --- Applies the new folders and triggers a reload.
 --- @param new_dir string The chosen configuration folder (with trailing slash).
 --- @param new_logs_dir string|nil The chosen logs folder, "" for the default, nil to keep it.
@@ -291,14 +302,7 @@ local function apply_and_reload(new_dir, new_logs_dir)
 	-- replaces.
 	local persisted, changed_or_err = persist_config_dir(new_dir, new_logs_dir)
 	if not persisted then
-		Logger.error(LOG, "Paths editor save failed: %s.", tostring(changed_or_err))
-		local ok_dialog, dialog = pcall(require, "infra.dialog_util")
-		if ok_dialog and dialog and type(dialog.block_alert) == "function" then
-			pcall(dialog.block_alert,
-				i18n.get("paths_editor.save_failed_title"),
-				i18n.get("paths_editor.save_failed"),
-				i18n.get("onboarding.btn.ok"))
-		end
+		report_save_failure(changed_or_err)
 		return false
 	end
 
@@ -477,8 +481,11 @@ local function handle_message(body)
 		end)
 	elseif action == "save" then
 		-- A missing logsDir keeps the stored logs folder; "" asks for the default.
-		apply_and_reload(type(body.configDir) == "string" and body.configDir or "",
-			type(body.logsDir) == "string" and body.logsDir or nil)
+		if type(body.configDir) ~= "string" or (body.logsDir ~= nil and type(body.logsDir) ~= "string") then
+			report_save_failure("invalid folder fields")
+			return
+		end
+		apply_and_reload(body.configDir, body.logsDir)
 	elseif action == "cancel" then
 		close_webview()
 	end

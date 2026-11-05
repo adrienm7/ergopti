@@ -166,7 +166,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		end)
 	end)
 
-	helpers.it("a declined wrap passes the physical symbol and preserves the cached selection (HS-H-01)", function()
+	helpers.it("a declined wrap passes the physical symbol and retires the cached selection (HS-H-01)", function()
 		with_fixture(function()
 			local ax_reads, wrap_attempts = 0, 0
 			local fixture = load_h01_system({
@@ -195,10 +195,10 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 				"a declined replacement must leave both original physical symbols untouched")
 			helpers.assert_nil(first_returned)
 			helpers.assert_nil(second_returned)
-			helpers.assert_eq(wrap_attempts, 2,
-				"declining is not a fire; the cached live selection must remain eligible")
+			helpers.assert_eq(wrap_attempts, 1,
+				"the passed-through symbol can replace the old selection")
 			helpers.assert_eq(ax_reads, 1,
-				"the second attempt must reuse, not invalidate, the still-live AX cache")
+				"the negative cache must avoid another synchronous AX read")
 			helpers.assert_eq(fixture.synthetic.stats().pending, pending_before,
 				"passthrough stays physical and must not enqueue an owned replay")
 		end)
