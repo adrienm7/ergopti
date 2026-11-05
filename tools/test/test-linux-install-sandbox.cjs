@@ -1128,10 +1128,12 @@ for (const fault of ['refuseAutostartWrite', 'refuseAutostartMode', 'refuseAutos
 		seed(home, configRoot) {
 			const file = path.join(configRoot, 'autostart/ergopti-hotstrings.desktop');
 			fs.mkdirSync(path.dirname(file), { recursive: true });
-			fs.writeFileSync(
-				file,
-				`[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`
-			);
+			const previous = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\n# previous\n`;
+			fs.writeFileSync(file, previous);
+			const library = path.join(home, '.local/lib/ergopti');
+			fs.mkdirSync(library, { recursive: true });
+			const digest = createHash('sha256').update(previous).digest('hex');
+			fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${digest}\t@autostart\n`);
 		}
 	});
 	try {
@@ -1283,6 +1285,57 @@ for (const kind of ['unowned', 'modified', 'owned']) {
 		else {
 			const digest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
 			assert.equal(row, `${digest}\t@autostart`);
+		}
+	} finally { run.cleanup(); }
+}
+
+// A manually created compatible entry has its own startup preference and data.
+{
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.writeFileSync(desktop, `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\n# personal manual choice\n`);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		const content = fs.readFileSync(desktop, 'utf8');
+		assert.match(content, /^Hidden=true$/m);
+		assert.match(content, /^# personal manual choice$/m);
+		const receipt = fs.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8');
+		assert.doesNotMatch(receipt, /\t@autostart\n/);
+	} finally { run.cleanup(); }
+}
+
+// Existing fallback receipts authorize migration only while bytes still match.
+for (const kind of ['owned', 'modified', 'owned-disabled']) {
+	const run = runInstaller({
+		desktopProvided: true,
+		seed(home) {
+			const desktop = path.join(home, '.config/autostart/ergopti-hotstrings.desktop');
+			const library = path.join(home, '.local/lib/ergopti');
+			const original = `[Desktop Entry]\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=${kind === 'owned' ? 'false' : 'true'}\n`;
+			fs.mkdirSync(path.dirname(desktop), { recursive: true });
+			fs.mkdirSync(library, { recursive: true });
+			fs.writeFileSync(desktop, original + (kind === 'modified' ? '# personal setting\n' : ''));
+			fs.writeFileSync(path.join(library, '.ergopti-owned-files'), `${createHash('sha256').update(original).digest('hex')}\t@autostart\n`);
+		}
+	});
+	try {
+		assert.equal(run.status, 0, run.output);
+		const desktop = path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop');
+		const content = fs.readFileSync(desktop, 'utf8');
+		if (kind === 'modified') {
+			assert.match(content, /^# personal setting$/m);
+			assert.match(content, /^Hidden=true$/m);
+		} else {
+			if (kind === 'owned') assert.match(content, /^X-GNOME-Autostart-enabled=true$/m);
+			else assert.match(content, /^Hidden=true$/m);
+			const digest = createHash('sha256').update(content).digest('hex');
+			assert.ok(fs.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8').includes(`${digest}\t@autostart\n`));
 		}
 	} finally { run.cleanup(); }
 }
