@@ -466,6 +466,53 @@ helpers.describe("window_info: Wayland", function()
 		restore()
 	end)
 
+	helpers.it("(linux-wayland-null-focus) uses XWayland class when sway app_id is null", function()
+		local tree = '{"focused":true,"id":7,"pid":4321,"name":"Editor",'
+			.. '"app_id":null,"window_properties":{"class":"editor"}}'
+		local wi = under("wayland", "sway", {
+			{ "command -v 'swaymsg'", true }, { "swaymsg -t get_tree", tree },
+		})
+		helpers.assert_eq(wi.getFocused().appId, "editor")
+		helpers.assert_eq(wi.getFocused().appId, "editor", "repeated polls cannot manufacture new identities")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) resolves a null niri app_id from its process", function()
+		local wi = under("wayland", "niri", {
+			{ "command -v 'niri'", true },
+			{ "niri msg --json", '{"id":7,"pid":4321,"title":null,"app_id":null}' },
+			{ "/proc/4321/comm", "editor\n" },
+		})
+		local info = wi.getFocused()
+		helpers.assert_eq(info.appId, "editor")
+		helpers.assert_eq(info.windowTitle, "")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) resolves a null Hyprland class from its process", function()
+		local wi = under("wayland", "Hyprland", {
+			{ "command -v 'hyprctl'", true },
+			{ "hyprctl activewindow", '{"address":"0x123","pid":4321,"title":null,"class":null}' },
+			{ "/proc/4321/comm", "editor\n" },
+		})
+		local info = wi.getFocused()
+		helpers.assert_eq(info.appId, "editor")
+		helpers.assert_eq(info.windowTitle, "")
+		restore()
+	end)
+
+	helpers.it("(linux-wayland-null-focus) does not query procfs for a null PID", function()
+		local wi, log = under("wayland", "niri", {
+			{ "command -v 'niri'", true },
+			{ "niri msg --json", '{"id":7,"pid":null,"title":null,"app_id":null}' },
+		})
+		helpers.assert_eq(wi.getFocused().appId, "")
+		for _, command in ipairs(log) do
+			helpers.assert_true(not command:find("/proc/", 1, true), "null is not a process identifier")
+		end
+		restore()
+	end)
+
 	helpers.it("does not stop at an unfocused floating window", function()
 		local wi = under("wayland", "sway", {
 			{ "command -v 'swaymsg'", true },
