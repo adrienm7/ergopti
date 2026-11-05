@@ -50,6 +50,25 @@ end)
 
 
 helpers.describe("model selector test ownership", function()
+	for _, kind in ipairs({ "chat", "system" }) do
+		helpers.it("does not remove " .. kind .. " after the owning page closes during confirmation", function()
+			local build, state, restore = setup("api")
+			local entry = { id = "chosen", provider = kind == "chat" and "cerebras" or "typesafe",
+				model = "qwen", token = "test", base_url = "" }
+			state.entries, state.active = { entry }, kind == "chat" and entry or nil
+			local live = true
+			state.page_current = function() return live end
+			local remove = find(build(), "🗑️").action
+			state.confirm = function() live = false; return true end
+			local result = remove()
+			local kept, count = state.entries[1], state.removal_sets or 0
+			restore()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(kept, entry)
+			helpers.assert_eq(count, 0)
+		end)
+	end
+
 	helpers.it("does not remove an active API entry replaced during confirmation", function()
 		local build, state, restore = setup("api")
 		local old = { id = "chosen", provider = "cerebras", model = "qwen", token = "old", base_url = "" }
