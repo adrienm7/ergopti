@@ -473,7 +473,10 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			{},
 			{}
 		);
-		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderDayTimeline({ rich: { timeline_day: { date: hostile, rows: [] } } });
+		context.renderTopSessionsTable({
+			rich: { sessions: { rows: [{ date: hostile, app: 'Editor', ms: 1000, chars: 3 }] } }
+		});
 		context.renderTopDaysTable({ rich: { by_date: { [hostile]: { chars: 3 } } } });
 		for (const [id, element] of Object.entries(elements)) {
 			assert.ok(element.innerHTML.includes('&lt;img'), `${id} must preserve escaped date text`);
@@ -485,7 +488,10 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 			{},
 			{}
 		);
-		vm.runInContext('renderDayTimeline(); renderTopSessionsTable();', context);
+		context.renderDayTimeline({ rich: { timeline_day: { date: '2026-10-11', rows: [] } } });
+		context.renderTopSessionsTable({
+			rich: { sessions: { rows: [{ date: '2026-10-11', app: 'Editor', ms: 1000, chars: 3 }] } }
+		});
 		context.renderTopDaysTable({ rich: { by_date: { '2026-10-11': { chars: 3 } } } });
 		for (const element of Object.values(elements))
 			assert.ok(element.innerHTML.includes('11/10/2026'));
@@ -4218,4 +4224,127 @@ for (const host of ['windows', 'macos', 'linux']) {
 		);
 	});
 }
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} top sessions honor selected period and category`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('top_sessions_tbody', page.context.document.createElement('tbody'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				OldEditor: { category: 'Productivity', session_longest_ms: 900000 },
+				Editor: { category: 'Entertainment', session_longest_ms: 720000 }
+			},
+			'2026-10-02': {
+				Editor: { category: 'Productivity', session_longest_ms: 120000 },
+				Browser: { category: 'Entertainment', session_longest_ms: 600000 }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'day'; currentSelectedDate = '2026-10-02'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		const agg = page.context.getAggregatedData();
+		assert.deepEqual(Object.keys(agg.apps), ['Editor']);
+		page.context.renderTopSessionsTable(agg);
+		const rows = page.elements.get('top_sessions_tbody').innerHTML;
+		assert.match(rows, /Editor/);
+		assert.doesNotMatch(rows, /OldEditor|Browser/);
+		vm.runInContext("currentPeriod = 'all';", page.context);
+		page.context.renderTopSessionsTable(page.context.getAggregatedData());
+		const allRows = page.elements.get('top_sessions_tbody').innerHTML;
+		assert.match(allRows, /OldEditor/);
+		assert.doesNotMatch(allRows, /12m|Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set();', page.context);
+		page.context.renderTopSessionsTable(page.context.getAggregatedData());
+		assert.doesNotMatch(page.elements.get('top_sessions_tbody').innerHTML, /Editor|Browser/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} day timeline honors selected weekday and category`, () => {
+		const page = loadMetricsAppsPage(host);
+		page.elements.set('day_timeline_container', page.context.document.createElement('div'));
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				Editor: { category: 'Productivity', app_time_ms: 60000, hourly: { 12: { c: 4 } } }
+			},
+			'2026-10-02': {
+				Browser: { category: 'Entertainment', app_time_ms: 60000, hourly: { 12: { c: 4 } } },
+				Editor: { category: 'Productivity', app_time_ms: 120000, hourly: { 12: { c: 4 } } }
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentSelectedDate = '2026-10-02'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		let timeline = page.elements.get('day_timeline_container').innerHTML;
+		assert.match(timeline, /Editor/);
+		assert.doesNotMatch(timeline, /Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set([3]);', page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		timeline = page.elements.get('day_timeline_container').innerHTML;
+		assert.match(timeline, /01\/10\/2026/);
+		assert.doesNotMatch(timeline, /02\/10\/2026|Browser/);
+		vm.runInContext('currentWeekdayFilter = new Set();', page.context);
+		page.context.renderDayTimeline(page.context.getAggregatedData());
+		assert.doesNotMatch(page.elements.get('day_timeline_container').innerHTML, /Editor|Browser/);
+	});
+}
+
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} app modal excludes days with a rejected app category`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'app_drilldown_modal',
+			'app_modal_title',
+			'app_modal_tiles',
+			'app_modal_hourly',
+			'app_modal_dests',
+			'app_modal_layouts',
+			'app_modal_records',
+			'app_modal_assist'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		const charts = [];
+		page.context.Chart = class {
+			constructor(_port, config) {
+				charts.push(config);
+			}
+			destroy() {}
+		};
+		page.elements.get('app_modal_hourly').getContext = () => ({});
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': {
+				Editor: {
+					category: 'Entertainment',
+					chars: 99,
+					hourly: { 12: { c: 99 } },
+					layouts_seen: { HiddenLayout: 99 }
+				}
+			},
+			'2026-10-02': {
+				Editor: {
+					category: 'Productivity',
+					chars: 2,
+					hourly: { 12: { c: 2 } },
+					layouts_seen: { VisibleLayout: 2 }
+				}
+			}
+		});
+		vm.runInContext(
+			"currentPeriod = 'all'; currentCategoryFilter = new Set([getAppCategory('Editor', 'Productivity').type]);",
+			page.context
+		);
+		const agg = page.context.getAggregatedData();
+		assert.equal(agg.apps.Editor.chars, 2);
+		page.context.window._lastAggData = agg;
+		page.context.openAppDrilldown('Editor');
+		assert.equal(charts[0].data.datasets[0].data[12], 2);
+		const layouts = page.elements.get('app_modal_layouts').innerHTML;
+		assert.match(layouts, /VisibleLayout/);
+		assert.doesNotMatch(layouts, /HiddenLayout/);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);

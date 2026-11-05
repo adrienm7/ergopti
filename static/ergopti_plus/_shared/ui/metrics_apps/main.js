@@ -1056,11 +1056,11 @@ function renderDashboard() {
 		renderDailyTrajectories(aggData);
 
 		// Day timeline (#33) and app-pairs table (#36)
-		renderDayTimeline();
+		renderDayTimeline(aggData);
 		renderAppPairsTable(aggData);
 
 		// Top sessions (#37) and top days (#38)
-		renderTopSessionsTable();
+		renderTopSessionsTable(aggData);
 		renderTopDaysTable(aggData);
 
 		// Session boxplots (#28) and top windows table (#39)
