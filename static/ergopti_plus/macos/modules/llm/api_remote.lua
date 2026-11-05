@@ -52,6 +52,7 @@ local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
 local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
 local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
 local _check_client  = _http_adapter.new(_http_options)   -- used for explicit availability checks
+local _listing_client = _http_adapter.new(_http_options) -- model selector listings have independent ownership
 local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independent cancellation ownership
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
@@ -850,6 +851,7 @@ local function invalidate_identity()
 	_is_ready = false
 	for label, client in pairs({
 		availability = _check_client,
+		listing = _listing_client,
 		inference = _infer_client,
 		warmup = _warmup_client,
 	}) do
@@ -2484,7 +2486,7 @@ function M.list_active_models(on_done)
 		end
 		local format = provider.format
 		_listing_state[entry.id] = { state = "pending" }
-		local dispatched = dispatch_probe(_check_client, base, format, entry.token, function(r)
+		local dispatched = dispatch_probe(_listing_client, base, format, entry.token, function(r)
 			if my_identity ~= _identity_generation then
 				-- The entry changed under the listing: it is no longer pending.
 				local held = _listing_state[entry.id]
