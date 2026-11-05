@@ -177,6 +177,39 @@ end
 
 helpers.describe("LLM semantic HTTP ownership", function()
 
+	helpers.it("remote model listing state and waiter retire when the same entry changes", function()
+		local api = fresh_backend("modules.llm.api_remote")
+		configure_remote(api)
+		local state, restore = instrument_client(get_upvalue(api.list_active_models, "_listing_client"))
+		local ok, err = xpcall(function()
+			local plan = require("llm.api_model_listing").plan
+			local view = { model = "new-model", default_model = "fallback", extras = {}, format = "openai" }
+			local calls, reason = 0, nil
+			api.list_active_models(function(_, why)
+				calls, reason = calls + 1, why
+				helpers.assert_eq(api.get_entries()[1].base_url, "https://new.invalid")
+			end)
+			helpers.assert_eq(api.listing_state("entry-a").state, "pending")
+			api.set_entries({ { id = "entry-a", provider = "fixture", base_url = "https://new.invalid",
+				token = "new-token", model = "new-model" } })
+			helpers.assert_nil(api.listing_state("entry-a"))
+			helpers.assert_eq(plan(view, api.listing_state("entry-a")).models[1].model, "new-model")
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(reason, "stale_identity")
+			state.requests[1].deliver({ ok = true, status = 200, body = [[{"data":[{"id":"old"}]}]] }, true)
+			helpers.assert_nil(api.listing_state("entry-a"))
+			helpers.assert_eq(plan(view, api.listing_state("entry-a")).models[1].model, "new-model")
+			api.list_active_models(function() end)
+			state.requests[2].deliver({ ok = true, status = 200, body = [[{"data":[{"id":"new"}]}]] })
+			helpers.assert_eq(api.listed_models("entry-a")[1], "new")
+			api.set_entries({ { id = "entry-a", provider = "fixture", base_url = "https://third.invalid",
+				token = "other-token", model = "third-model" } })
+			helpers.assert_nil(api.listing_state("entry-a"))
+		end, debug.traceback)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("remote model selector does not cancel an in-flight availability check", function()
 		local api = fresh_backend("modules.llm.api_remote")
 		configure_remote(api)
