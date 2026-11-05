@@ -115,6 +115,7 @@ _MBPO_Destroy(WParam, LParam, Message, Hwnd) {
 _MBPO_Prepare() {
 	global _MBPO, ConfigurationFile, Features, _IniCache, _LLM_Menu, _LLM_Menu_Loaded, LLM_Defaults
 	global _LLM_MenuBuildCoordinator, _LLM_MBW_Gui, _LLM_MBW_SessionEpoch
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_WarmupHttp, _LLM_ManagedBootstrap, _OllamaWV_Gui
 	global _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub, _LLM_MBW_ResetDone, _LLM_MBW_Ready
 	Directory := A_Args[2] . "\config"
 	Creation := FSCreateDirectoryExclusiveStrict(Directory)
@@ -153,6 +154,17 @@ _MBPO_Prepare() {
 		&& _LLM_Menu["model"] == _MBPO.ModelA && !_LLM_Menu["auto_profile_for_model"],
 		"The private disabled state must preserve its actual backend/model without starting network dependencies.")
 	_MBPO_Require(!_LLM_Menu_Loaded, "Candidate collection must use its real explicit menu source, not a fabricated loaded flag.")
+	if _MBPO.Mode == "native-backend-current" || _MBPO.Mode == "native-backend-api" {
+		; Model activation always invalidates its previous Ollama owners, even
+		; when inference is disabled. Run that genuine neutral cleanup before SUT.
+		_MBPO_Require(_LLM_AuxOwners.Count == 0 && _LLM_AuxCleanupDebt.Count == 0
+			&& _LLM_Ollama_WarmupHttp == 0 && !IsObject(_LLM_ManagedBootstrap) && !IsSet(_OllamaWV_Gui),
+			"The actual runtime owners must start idle without a transport, installer or browser")
+		_MBPO_Require(LLM_Menu_CancelOllamaOwnership() == true && _MBPO.Errors.Length == 0,
+			"The genuine idle Ollama lifecycle must be admitted without missing owners before native model selection")
+		FileAppend("RECEIPT native-model-lifecycle idle_cleanup_confirmed=1 errors=" . _MBPO.Errors.Length . "`n", "*", "UTF-8-RAW")
+	}
+
 	_MBPO.Original := FSReadBytesStrict(ConfigurationFile)
 	_MBPO.OriginalHash := CryptoSha256Bytes(_MBPO.Original)
 	_MBPO_Require(_MBPO.OriginalHash != "", "The independent original RAW image must be measurable.")
