@@ -238,10 +238,17 @@ try {
 	);
 	assert.doesNotMatch(fs.readFileSync(calls, 'utf8').slice(offlineCalls), /--no-reload disable/);
 	assert.equal(run('disable', { SHOW_REFUSE: '1' }).status, 0);
-	assert.equal(run('enable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0, 'forced systemd colors do not change offline state');
+	assert.equal(
+		run('enable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status,
+		0,
+		'forced systemd colors do not change offline state'
+	);
 	assert.equal(run('disable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
-	const binaryCustomization = Buffer.concat([Buffer.from(ownedDesktop), Buffer.from('# personal\0data\n')]);
+	const binaryCustomization = Buffer.concat([
+		Buffer.from(ownedDesktop),
+		Buffer.from('# personal\0data\n')
+	]);
 	fs.writeFileSync(desktop, binaryCustomization);
 	assert.notEqual(run('enable').status, 0, 'binary custom data cannot be rewritten as text');
 	assert.deepEqual(fs.readFileSync(desktop), binaryCustomization, 'binary user bytes stay intact');
@@ -341,12 +348,25 @@ try {
 		for (const name of ['start_at_login.sh', 'desktop_entry.sh', 'config_home.sh'])
 			fs.copyFileSync(path.join(installed, name), path.join(unusualInstall, name));
 		provideShellMessages(unusualInstall);
-		const refused = spawnSync(bashExecutable(), [posix(path.join(unusualInstall, 'start_at_login.sh')), 'enable'], {
-			encoding: 'utf8', timeout: 10000,
-			env: { ...env, XDG_CONFIG_HOME: posix(unusualConfig), PATH: `${posix(stubs)}:/usr/bin:/bin`, NO_UNIT: '1' }
-		});
+		const refused = spawnSync(
+			bashExecutable(),
+			[posix(path.join(unusualInstall, 'start_at_login.sh')), 'enable'],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...env,
+					XDG_CONFIG_HOME: posix(unusualConfig),
+					PATH: `${posix(stubs)}:/usr/bin:/bin`,
+					NO_UNIT: '1'
+				}
+			}
+		);
 		assert.notEqual(refused.status, 0, 'an unrepresentable desktop path must fail');
-		assert.equal(fs.existsSync(path.join(unusualConfig, 'autostart/ergopti-hotstrings.desktop')), false);
+		assert.equal(
+			fs.existsSync(path.join(unusualConfig, 'autostart/ergopti-hotstrings.desktop')),
+			false
+		);
 	}
 	if (process.platform === 'linux') {
 		// Native packages have no standalone ownership receipt: a similarly
@@ -491,19 +511,26 @@ try {
 		const customDesktop = disabled + '# personal setting\n';
 		for (const kind of ['modified', 'unowned', 'unchanged']) {
 			fs.writeFileSync(desktop, kind === 'modified' ? customDesktop : disabled);
-			const initial = `${'a'.repeat(64)}\tlinux/retained-file\n` +
+			const initial =
+				`${'a'.repeat(64)}\tlinux/retained-file\n` +
 				(kind === 'unowned' ? '' : `${oldDigest}\t@autostart\n`);
 			fs.writeFileSync(manifest, initial);
 			assert.equal(run('enable').status, 0, `${kind} startup update`);
 			const result = fs.readFileSync(manifest, 'utf8');
 			if (kind === 'modified') {
-				assert.ok(result.includes(`${oldDigest}\t@autostart\n`), 'modified entry keeps its prior digest');
+				assert.ok(
+					result.includes(`${oldDigest}\t@autostart\n`),
+					'modified entry keeps its prior digest'
+				);
 				assert.match(fs.readFileSync(desktop, 'utf8'), /^# personal setting$/m);
 			} else if (kind === 'unowned') {
 				assert.doesNotMatch(result, /\t@autostart\n/, 'an unowned entry is not adopted');
 			} else {
 				const digest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
-				assert.ok(result.includes(`${digest}\t@autostart\n`), 'an unchanged owned entry receives its new digest');
+				assert.ok(
+					result.includes(`${digest}\t@autostart\n`),
+					'an unchanged owned entry receives its new digest'
+				);
 			}
 		}
 		fs.unlinkSync(desktop);
@@ -668,8 +695,8 @@ try {
 			'startup-receipt-transaction: refusal preserves startup settings, ownership and service state'
 		);
 		const disagreements = [];
-		const configLua = ['luajit', 'lua5.4', 'lua'].find((candidate) =>
-			spawnSync(candidate, ['-v'], { encoding: 'utf8', timeout: 10000 }).status === 0
+		const configLua = ['luajit', 'lua5.4', 'lua'].find(
+			(candidate) => spawnSync(candidate, ['-v'], { encoding: 'utf8', timeout: 10000 }).status === 0
 		);
 		assert.ok(configLua, 'a Lua runtime is required to compare configuration roots');
 		for (const [index, value] of [
