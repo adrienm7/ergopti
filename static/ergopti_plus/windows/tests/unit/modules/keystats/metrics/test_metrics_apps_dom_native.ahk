@@ -218,7 +218,7 @@ _KLWF_Source(Root) {
 		AssertTrue(Body != "", "The actual reusable fixture owner must exist: " . Name)
 		Code .= Body . "`n"
 	}
-	for Name in ["KL_Init", "MF_RefreshFocus", "WICaptureBoundedFocusSnapshot"] {
+	for Name in ["KL_Init", "MF_RefreshFocus", "WICaptureBoundedFocusSnapshot", "Reg_Read"] {
 		Owner := _DriverProductionFileForSymbol(Name)
 		AssertTrue(Owner != "" && _DriverIsProductionSource(Owner), "The actual foreground producer graph must exist: " . Name)
 		Code .= "#Include " . Owner . "`n"

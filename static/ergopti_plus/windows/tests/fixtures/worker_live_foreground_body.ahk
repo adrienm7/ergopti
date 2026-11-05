@@ -47,16 +47,39 @@ _KLWF_Main() {
 	KeystatsWalkerLoadTimings()
 	ReceiverGui := Gui(, "Ergopti owned live foreground worker receiver")
 	Receiver := ReceiverGui.AddEdit("w320 r3", "owned receiver")
-	SnapshotPath := KLPF_PrefetchPath("apps", _MAD_Root)
+	SnapshotPath := "", InitAttempted := false
 	PublishedReceipt := 0
 	try {
+		; The shared staging helper created this exact empty synthetic-device
+		; child. Real discovery must not adopt a directory without device.json.
+		DirDelete(_MAD_Root . "\by_device\owned")
+		_KLWF_Require(FSCreateDirectoryExclusiveStrict(_MAD_Root . "\private-temp") == 1,
+			"The actual initializer's temporary files must stay in the private owned subtree.")
+		EnvSet("TMP", _MAD_Root . "\private-temp")
+		EnvSet("TEMP", _MAD_Root . "\private-temp")
+		_KLWF_Require(!Keystats.initialized, "The native baseline must call real cold initialization, not borrow initialized RAM.")
+		InitAttempted := true
+		_KLWF_Require(KL_Init(_MAD_Root), "The real device, journal and state initialization must succeed for this exact store.")
+		_KLWF_Require(ConfigTransitionNormalizeConfigDir(Keystats.metrics_dir) == ConfigTransitionNormalizeConfigDir(_MAD_Root)
+			&& Keystats.data_sql_path == Keystats.by_device_dir . "data.sql"
+			&& Keystats.by_device_dir == Keystats.metrics_dir . "by_device\" . Keystats.device_id . "\",
+			"The actual canonical initializer must bind the foreground source to the store passed to the worker.")
+		_KLWF_Require(KL_TimerGroupStop(Keystats, ["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"], SetTimer, "core"),
+			"The three actual initializer-owned core timers must retire before the controlled foreground observation.")
+		KL_Mig_Cancel()
+		_KLWF_Require(!KL_Mig_IsActive() && !KLMigration.syncPending,
+			"The actual initializer-owned deferred migration must be cancelled before projection.")
+		_KLWF_Require(FSCreateDirectoryExclusiveStrict(_MAD_Root . "\by_device\owned") == 1,
+			"The separate independently authored source device must be recreated exclusively.")
+		SnapshotPath := KLPF_PrefetchPath("apps", _MAD_Root)
+		FileAppend("OBS live-worker-init actual_init=1 store_match=1 device_path_match=1 core_timers_retired=1 migration_retired=1`n", "*", "UTF-8-RAW")
 		ReceiverGui.Show()
 		_KLWF_Require(WinGetPID("ahk_id " . ReceiverGui.Hwnd) == ProcessExist(),
 			"Only this exact process may own the private focus receiver.")
 		WinActivate("ahk_id " . ReceiverGui.Hwnd)
 		_KLWF_Require(WinWaitActive("ahk_id " . ReceiverGui.Hwnd, , 2), "The owned native receiver must become active.")
 		Receiver.Focus()
-		Keystats.initialized := true
+		_KLWF_Require(Keystats.initialized, "The admitted real initialization must still own the context producer.")
 		MetricsFilters.secure_field := false
 		_KLWF_Require(MF_RefreshFocus(true), "The real bounded OS focus acquisition must publish successfully.")
 		Focus := MF_GetFocusSnapshot()
@@ -105,6 +128,12 @@ _KLWF_Main() {
 		}
 	} finally {
 		_KLWF_Require(KLPF_CancelAll(), "Every actual worker must physically retire before its store or snapshot is deleted.")
+		if InitAttempted {
+			_KLWF_Require(KL_TimerGroupStop(Keystats, ["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"], SetTimer, "core"),
+				"Every exact initializer core callback must retire before child cleanup.")
+			KL_Mig_Cancel()
+			_KLWF_Require(KL_CloseTodayFh(), "The actual initialized journal handle must retire before process cleanup.")
+		}
 		Keystats.initialized := false
 		KLR_ResetCache()
 		if PublishedReceipt is Map
