@@ -82,9 +82,12 @@ helpers.describe("model selector API listing on Linux", function()
 			end }
 			local llm = engine(calls)
 			llm.can_configure_local_servers = function() return true end
-			Rows.api_page(llm, dialogs, nil, { is_paused = function() return false end }, nil, owner)
+			local context = { paused = false, is_paused = function() return false end }
+			Rows.api_page(llm, dialogs, nil, context, nil, owner)
 			helpers.assert_true(captured ~= nil)
 			helpers.assert_eq(captured.page_current, owner)
+			context.paused = true
+			helpers.assert_eq(captured.paused, true)
 		end)
 	end)
 
