@@ -219,6 +219,38 @@ assert.equal(
 	0,
 	'a saved zero section delay remains visible instead of the global hint'
 );
+const zeroGlobal = hostState();
+zeroGlobal.global_default_delay_ms = 0;
+zeroGlobal.categories.forEach((category) => {
+	delete category.delay_default_ms;
+	category.sections.forEach((section) => delete section.delay_default_ms);
+});
+sandbox.setData(zeroGlobal);
+assert.equal(
+	cards()[0].querySelector('.field-delay').querySelector('input').placeholder,
+	0,
+	'the absent file default inherits the saved zero global delay'
+);
+assert.equal(
+	cards()[0].querySelector('.sections').querySelector('.field-delay').querySelector('input')
+		.placeholder,
+	0,
+	'the absent section default inherits the saved zero global delay'
+);
+const noGlobal = hostState();
+delete noGlobal.global_default_delay_ms;
+sandbox.setData(noGlobal);
+assert.equal(
+	cards()[0].querySelector('.field-delay').querySelector('input').placeholder,
+	750,
+	'a missing global delay retains the historical fallback'
+);
+sandbox.setData(hostState());
+assert.equal(
+	cards()[0].querySelector('.field-delay').querySelector('input').placeholder,
+	750,
+	'a positive global delay remains the hint'
+);
 for (const card of cards()) {
 	assert.equal(card.querySelector('.sections').hidden, false, 'a category opens unfolded');
 	assert.equal(card.querySelector('.sections').children.length, 1, 'its sections are drawn');
