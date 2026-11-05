@@ -133,6 +133,27 @@ helpers.describe("the wizard's Tap-Holds answer imports the checked keys", funct
 			helpers.assert_eq(Fixture.count_deferred(state, RELOAD), 0)
 		end)
 	end)
+
+	helpers.it("refuses an empty-folder retry until the destination is selected again", function()
+		local calls = 0
+		local menu_paths = {
+			persist_config_dir_for_wizard = function() return true end,
+			get = function()
+				calls = calls + 1
+				if calls == 1 then error("temporarily unavailable") end
+				return "/virtual/moved/hammerspoon/config.toml"
+			end,
+		}
+		with_finish({ answers = answers({}, "/virtual/moved"), menu_paths = menu_paths }, function(state)
+			helpers.assert_eq(#state.writes, 0)
+			state.finish(answers({}, ""))
+			helpers.assert_eq(#state.writes, 0, "the empty field still names the captured old folder")
+			helpers.assert_eq(calls, 1, "empty input must not silently change its promised destination")
+			state.finish(answers({}, "/virtual/moved"))
+			helpers.assert_eq(#state.writes, 1)
+			helpers.assert_eq(state.writes[1].path, "/virtual/moved/hammerspoon/config.toml")
+		end)
+	end)
 end)
 
 
