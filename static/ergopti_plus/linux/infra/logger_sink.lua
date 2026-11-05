@@ -461,8 +461,10 @@ local function fan_out(line)
 				local path = _dir .. "/" .. sub.name
 				handle = require("infra.regular_file_writer").open(path, topical_mode(path, _date))
 				if not handle then
-					io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
-						.. " could not be opened — retired for today; logging continues through other outputs.\n"))
+					pcall(function()
+						io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
+							.. " could not be opened — retired for today; logging continues through other outputs.\n"))
+					end)
 				end
 			end
 			_topical[sub.name] = handle and append_line(handle, line, "topical " .. sub.name) or false

@@ -1074,6 +1074,22 @@ helpers.describe("linux-logger-topical-fan-out", function()
 		end)
 	end)
 
+	helpers.it("linux-logger-topical-fan-out: closed stderr cannot block later topics", function()
+		with_sink("closed-stderr", function(_, Logger, dir)
+			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_gestures.log'")
+			local stderr = io.stderr
+			io.stderr = { write = function() error("attempt to use a closed file") end }
+			local ok, err = pcall(function()
+				Logger.info("modules.llm.inference", "gesture marker-both-topics")
+			end)
+			io.stderr = stderr
+			if not ok then error(err) end
+			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
+			helpers.assert_not_nil(llm, "a refused earlier topic must not starve the next")
+			helpers.assert_contains(llm, "marker-both-topics")
+		end)
+	end)
+
 	helpers.it("linux-logger-topical-fan-out: the generated table is exactly sub_files.toml's linux entries", function()
 		local raw = read_file(DRIVER_ROOT .. "/../_shared/modules/logger/sub_files.toml")
 		helpers.assert_not_nil(raw, "the canonical routing file must be readable")
