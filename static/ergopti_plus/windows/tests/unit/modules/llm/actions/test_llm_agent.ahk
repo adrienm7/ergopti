@@ -976,14 +976,14 @@ Test("agent context: timezone fallback across sampled second (agent-timezone-nat
 ; Independent native control: convert one UTC SYSTEMTIME to local time and
 ; compare the resulting FILETIMEs, without changing the OS clock or zone.
 _TZF_ReferenceOffset() {
-	Utc := Buffer(16, 0), Local := Buffer(16, 0)
+	Utc := Buffer(16, 0), LocalTime := Buffer(16, 0)
 	UtcFile := Buffer(8, 0), LocalFile := Buffer(8, 0)
 	DllCall("Kernel32\GetSystemTime", "Ptr", Utc)
-	if !DllCall("Kernel32\SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", Utc, "Ptr", Local, "Int")
+	if !DllCall("Kernel32\SystemTimeToTzSpecificLocalTime", "Ptr", 0, "Ptr", Utc, "Ptr", LocalTime, "Int")
 		throw OSError(A_LastError, "native UTC-to-local conversion")
 	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", Utc, "Ptr", UtcFile, "Int")
 		throw OSError(A_LastError, "native UTC SYSTEMTIME conversion")
-	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", Local, "Ptr", LocalFile, "Int")
+	if !DllCall("Kernel32\SystemTimeToFileTime", "Ptr", LocalTime, "Ptr", LocalFile, "Int")
 		throw OSError(A_LastError, "native local SYSTEMTIME conversion")
 	Ticks := NumGet(LocalFile, 0, "Int64") - NumGet(UtcFile, 0, "Int64")
 	if Mod(Ticks, 600000000) != 0
