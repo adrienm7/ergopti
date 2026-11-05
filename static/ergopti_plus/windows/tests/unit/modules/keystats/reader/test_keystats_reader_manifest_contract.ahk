@@ -1196,3 +1196,123 @@ _KMD_DurableCase(Mode) {
 for _KMD_Mode in ["with-click-control", "direct-movement-only", "periodic-movement-only"]
 	Test("Keystats pointer distance: " . _KMD_Mode . " survives actual flush to canonical SQL (mouse-distance-flush-owner)",
 		_KMD_DurableCase.Bind(_KMD_Mode))
+
+_KTAC_ChildSource() {
+	global _DriverDir
+	Source := _KFCD_ChildSource()
+	Footer := "#Include " . _DriverDir . "\tests\fixtures\final_context_duration_owner_body.ahk`n"
+	AssertEqual(Footer, SubStr(Source, StrLen(Source) - StrLen(Footer) + 1))
+	Source := SubStr(Source, 1, StrLen(Source) - StrLen(Footer))
+	; Rename only inherited TEST observation wrappers. Native producer bodies,
+	; canonical append, clock samples and their accepted queue stay untouched.
+	for Name in ["KL_LogAppSwitch", "KL_LogWindowSwitch"] {
+		Source := RegExReplace(Source, "m)^" . Name . "\(", "_KTAC_Inherited" . Name . "(", &Changed)
+		AssertEqual(1, Changed)
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\context_clock_ack_owner_body.ahk`n"
+}
+
+_KTAC_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_context_clock_ack_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Creation := FSCreateDirectoryExclusiveStrict(Directory)
+	AssertTrue(Creation is Integer && Creation == 1, "The child must exclusively acquire its directory before writing or recursive cleanup.")
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KTAC_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KSD_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact switch-destination child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# context-clock-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS context-clock-ack " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+	return AtDeadline.Output
+}
+
+_KTAC_DurableCase(Mode) {
+	Output := _KTAC_Case(Mode)
+	Db := 0, State := 0
+	try {
+		Db := _KLRManifest_OpenFixture()
+		for Line in StrSplit(Output, "`n", "`r") {
+			if SubStr(Line, 1, 6) == "STATE " {
+				State := StrSplit(SubStr(Line, 7), "|")
+				continue
+			}
+			if SubStr(Line, 1, 4) != "ROW "
+				continue
+			Entry := JsonParse(SubStr(Line, 5))
+			for Sql in KL_BuildInserts(Entry)
+				AssertTrue(SQLite_Exec(Db, Sql))
+		}
+		AssertTrue(State is Array && State.Length == 6, "The exact native cutpoint must provide its independent clock bound")
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		AppMs := SQLite_Query(Db, "SELECT COALESCE(SUM(app_time_ms),0) AS ms FROM agg_app_day WHERE app IN ('fixture-tail-a.exe','fixture-tail-b.exe')")[1]["ms"]
+		TitleMs := SQLite_Query(Db, "SELECT COALESCE(SUM(ms),0) AS ms FROM agg_app_day_titles WHERE app IN ('fixture-tail-a.exe','fixture-tail-b.exe')")[1]["ms"]
+		Foreign := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_window_switch WHERE app='fixture-tail-b.exe' AND prev_title='Fixture source title A'")[1]["n"]
+		_TestPrint("# context-clock-ack-durable mode=" . Mode . " app_ms=" . AppMs . " title_ms=" . TitleMs
+			. " native_bound=" . State[4] . " foreign_titles=" . Foreign . " stable=" . State[1])
+		AssertTrue(AppMs <= Integer(State[4]), "Accepted app interval plus tail may not count an earlier accepted origin twice")
+		AssertTrue(TitleMs <= Integer(State[4]), "Accepted title interval plus tail may not count an earlier accepted origin twice")
+		AssertEqual(0, Foreign, "An app ACK cannot transfer the still-outgoing title clock to its destination")
+		if Integer(State[6]) {
+			AssertEqual(1, Integer(State[1]), "An interrupted context producer cannot resurrect its app/title/origins after actual Stop")
+			AssertEqual(Integer(State[2]), Integer(State[3]), "An interrupted producer cannot append a new row after actual Stop")
+		}
+	} finally {
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for _KTAC_Mode in ["app-control", "title-control", "app-stop", "title-stop"]
+	Test("Keystats context clock ACK: " . _KTAC_Mode . " respects accepted-row and native-stop ownership (context-clock-ack-owner)",
+		_KTAC_DurableCase.Bind(_KTAC_Mode))
