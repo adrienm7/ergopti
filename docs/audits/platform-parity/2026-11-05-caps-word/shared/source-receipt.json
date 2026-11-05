@@ -1,0 +1,202 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"sources": [
+		{
+			"path": "docs/memory/linux-web-release.md",
+			"sha256": "eec06e1f26814576e0e0e71bc517abb556dc36794d5f9021754462d7a9f4c5ef"
+		},
+		{
+			"path": "src/routes/ergopti-plus/feature-inventory.json",
+			"sha256": "5edb4101f1523786323fba71a5c2f40ab26eb329b7f4183da1ca121dc5d0241f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/domain/Terminators.spec.js",
+			"sha256": "fecbe89672d0d8bee62813658faa7cdab131815efe49a437e2750de8246dac8a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/test/caps_word_auto_off_contract.lua",
+			"sha256": "41a802394a6f4fa32b6dfabc1cdcbe7092e49d037b6aca61fedfaa020f56ffb9"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/README.md",
+			"sha256": "8df4d0a1f4d2241e73be8f2977e6d05568369f6c8e928f4cd24ccb589ae1fb79"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+			"sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+			"sha256": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+			"sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+			"sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c"
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"sha256": "d353c6688da5fef97792e07a433defff19ff21408094eb985a8f0a1e904a0331"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_caps_word.lua",
+			"sha256": "b4fe09cac794a6677881488f6687814e64b25a84960b19807afabe209103ec7e"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+			"sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+			"sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+			"sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8"
+		},
+		{
+			"path": "tools/build/build-features-manifest.js",
+			"sha256": "102d3db701ca3a55a46addf9f5e3c98394d68d3a2c0bb76cdce3bee5e9edd03a"
+		},
+		{
+			"path": "tools/test/test-caps-word-auto-off-single-source.cjs",
+			"sha256": "32b9eeb429c596a072d9a49cc4b35d7f60c69e64be5ed7354b6ca10d2c2fd092"
+		}
+	],
+	"qualification": "Named source inputs used by actual probes and reviewed neighboring owners, including all 21 locale files; not complete transitive/native dependency coverage. The lexical probe separately authenticates ten positive relationships over seven files."
+}

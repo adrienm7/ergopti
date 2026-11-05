@@ -1,0 +1,1954 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"qualification": "Custody/count/source authentication only. Reviewer findings require root adjudication. Repeated runs, duplicate claims and successful primitive probes are not semantic or native parity certification.",
+	"roles": [
+		{
+			"role": "windows",
+			"current_archive_files": 14,
+			"coverage_rows": 37,
+			"findings": 2,
+			"source_files": 32
+		},
+		{
+			"role": "macos",
+			"current_archive_files": 56,
+			"coverage_rows": 42,
+			"findings": 3,
+			"source_files": 46
+		},
+		{
+			"role": "linux",
+			"current_archive_files": 89,
+			"coverage_rows": 55,
+			"findings": 2,
+			"source_files": 27
+		},
+		{
+			"role": "shared",
+			"current_archive_files": 50,
+			"coverage_rows": 25,
+			"findings": 2,
+			"source_files": 49
+		}
+	],
+	"totals": {
+		"role_archive_files": 209,
+		"coverage_rows": 159,
+		"submitted_findings": 9,
+		"source_role_claims": 154,
+		"distinct_source_paths": 127,
+		"primary_worker_artifact_hash_claims": 127,
+		"primary_current_matches": 114,
+		"primary_exact_original_matches": 13,
+		"handoff_envelope_hash_claims": 4,
+		"verified_nested_hash_claims": 144,
+		"format_provenance_rows": 15,
+		"editorial_corrections": 1
+	},
+	"primary_worker_hash_claims": [
+		{
+			"path": "windows/report.md",
+			"expected": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276",
+			"current": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/findings.json",
+			"expected": "d19d1c51d5fc097bf875a3781271dca490db09a76eb288cdd89cac6cb3f8e626",
+			"current": "62fd77c4df0dad036a1be4edb824fd614da3d1a2f49ad02c221fd932ad71d4f5",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/findings.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/coverage.json",
+			"expected": "b8592a36417b6f085f49545bc33bb71119bd650335d28daa09f0279a91bbee0d",
+			"current": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/coverage.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/source-contract.py",
+			"expected": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"current": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/source-contract.json",
+			"expected": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd",
+			"current": "b4e77e6cfcbb0507021f163fbabfe0ac16349bedccbca3c663e853637a548b10",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/source-contract.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-A.json",
+			"expected": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"current": "66f9aefc315b72f57041347c823b9d8360745e7bcb7d4f0d9200cfedb5b99522",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-B.json",
+			"expected": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"current": "05aac30a3bf0a5ea162c9009caa6e4cca3adf5492e0bdf5e383d7bafb038b141",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-sweeps.json",
+			"expected": "74376bda07160285d80759d8becfdb8bed596f6c9ba2036f0f14d55dd9e7790a",
+			"current": "13ff238a7265d58c7772b8a0efbb5112cbf21e3953233dfa76ead9ec5bd6e3a5",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-sweeps.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/reader-controls.json",
+			"expected": "ee9dc128ed3f322a8cd74ae67ac580cfd53e3fdc12e004b22299e8f63d000744",
+			"current": "d7ffaef8ecccf6c90350ae9ac80cb214d89bb41237c0ef1497cbf40ba94cfad2",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/reader-controls.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/prior-search.json",
+			"expected": "d1e716100a5041e7537044bc3d48dc323e4da584e61c31f1d1461087ec6eee17",
+			"current": "77600dc0889dcdf61ad53b4dedc7f95ebaf3bf4d136c61534ee81aa94b38b03e",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/prior-search.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/false-green-scan.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/format.txt",
+			"expected": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a",
+			"current": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/format-dry.txt",
+			"expected": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98",
+			"current": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/activation-graph.lua",
+			"expected": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"current": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/activation-graph.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/coverage.json",
+			"expected": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa",
+			"current": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stdout.txt",
+			"expected": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"current": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stdout.txt",
+			"expected": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"current": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/receipt.json",
+			"expected": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62",
+			"current": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stdout.txt",
+			"expected": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"current": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stdout.txt",
+			"expected": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"current": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/receipt.json",
+			"expected": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1",
+			"current": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/false-greens.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/findings.json",
+			"expected": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87",
+			"current": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.lua",
+			"expected": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"current": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-idle.lua",
+			"expected": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"current": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-idle.txt",
+			"expected": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"current": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.lua",
+			"expected": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"current": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.lua",
+			"expected": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"current": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.txt",
+			"expected": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"current": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/replay.py",
+			"expected": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59",
+			"current": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/report.md",
+			"expected": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce",
+			"current": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/run-module.lua",
+			"expected": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"current": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/run-tests.py",
+			"expected": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58",
+			"current": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/source-hashes.json",
+			"expected": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86",
+			"current": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/test-results.json",
+			"expected": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b",
+			"current": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/meta_architecture_test_capsword_auto_off_single_source.txt",
+			"expected": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"current": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/meta_architecture_test_karabiner_capsword_lock_release.txt",
+			"expected": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"current": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_adapters_synthetic_input_test_text_sender_capsword_output.txt",
+			"expected": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"current": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_infra_config_test_capsword_auto_off_settings.txt",
+			"expected": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"current": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_modules_gestures_actions_test_karabiner_actions_reachable.txt",
+			"expected": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"current": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_generator_test_generator_capsword_setting_exits.txt",
+			"expected": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"current": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"expected": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"current": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_caps_word_auto_off_policy.txt",
+			"expected": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"current": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_capsword_control_signal.txt",
+			"expected": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"current": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword.txt",
+			"expected": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"current": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"expected": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"current": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword_release_race.txt",
+			"expected": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"current": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"expected": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"current": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_ui_menu_shortcuts_test_menu_caps_word.txt",
+			"expected": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"current": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/owner-probe.lua",
+			"expected": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"current": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/run-registered.lua",
+			"expected": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"current": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/run-proofs.py",
+			"expected": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858",
+			"current": "3bee53b32036bf4d19fa86f5d62a4d149e489ff7b180045665acebd8fee6b858",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/source-probe.py",
+			"expected": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"current": "98323f37fea813d97928c5b9340d9363c8e9ec0d2bf276976268e8d76aa365ed",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/source-receipt.json",
+			"expected": "fd42494d7e1ab4884ed8cb41d1cd8df26c885a4ecb287480dd15f6e63dcf6e7b",
+			"current": "1b5b7bb1b4b0e614c692f188c134253f5d7cfb455df2ead74342977414506c50",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/source-receipt.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/coverage.json",
+			"expected": "80484a424d6cf974501a948c205918ed9ebdd6751c9e5f29b829e74f7c91155c",
+			"current": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/coverage.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/findings.json",
+			"expected": "23c5928f286e95bf101611e809d7174d152a6a796c245df24d7067a94c7d3a1e",
+			"current": "e2d520d4ea5804a262fd620343d44780cc8631817775b4053fa197965120da86",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/findings.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/report.md",
+			"expected": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd",
+			"current": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/report.md.txt",
+			"editorial_correction": "Explicit custody note; not formatting-only or semantic equivalence."
+		},
+		{
+			"path": "linux/final-proofs/receipts.json",
+			"expected": "248954f92f93f115ddc6624890339c6f8226c8b447b686b7c3383fd0dc53f935",
+			"current": "3570f789a083f989d7224f0223f765ca24de53e307cb78c72c7b78abfe5148a3",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/final-proofs/receipts.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "linux/false-green-baseline.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/capabilities.json",
+			"expected": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400",
+			"current": "416985aa8b2222e61524ae55479e17b0c32378976f48d86ecb741d3946609400",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/coverage.json",
+			"expected": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652",
+			"current": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declaration-probe.cjs",
+			"expected": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"current": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-format.txt",
+			"expected": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f",
+			"current": "bde5ac6c92de79a956d5b0368979c6bf86682b0043fb53d1b3dcf0764291894f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-receipts.json",
+			"expected": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6",
+			"current": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/false-greens.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/final-format.txt",
+			"expected": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b",
+			"current": "59861b7ea2e6100122aa6ad9cd4a196f4677dc81bee63ba38a8a3b0b08ea538b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/findings.json",
+			"expected": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99",
+			"current": "f2563fc5c68fe5ee0f54a54b492ce813650c1821fb91097194bac33896e69d99",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/format.txt",
+			"expected": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715",
+			"current": "826384b55271325bce9c9152abf3caf262303d0d4d5ebd0af936ae531d67b715",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/handoff-format.txt",
+			"expected": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834",
+			"current": "13afb27a07e61bf9065e3ef4fd351af6e8c14d2a478e0ae1ad6dcb151b749834",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/report.md",
+			"expected": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe",
+			"current": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/ruff-check.txt",
+			"expected": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+			"current": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/ruff-format.txt",
+			"expected": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df",
+			"current": "96a977f329ec3c59092d40e041a019b49dcf03ca04055e177aa0ccb8c27234df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/run-dry.py",
+			"expected": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469",
+			"current": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/single-source-gate.txt",
+			"expected": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772",
+			"current": "5415f06627ee7f77437588395924c27f0b14f49a61dc295d32fc3e3b34457772",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.py",
+			"expected": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"current": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-receipt.json",
+			"expected": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4",
+			"current": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4",
+			"resolution": "current_archive"
+		}
+	],
+	"handoff_envelope_hash_claims": [
+		{
+			"path": "windows/handoff.json",
+			"expected": "6ffe9f21a83c354556a21b6b066fe2289d825af4d6a57fbeaa03d2884f9463c1",
+			"current": "305fa35a1e4d9bf4fb66107d2e3406fbf7fb810ae4293667ab9ed6daaac8098f",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/handoff.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "macos/handoff.json",
+			"expected": "459669a2a50b73692ce6ac8ba7f1ec35335e5facab3056ca683b74432204c2b3",
+			"current": "459669a2a50b73692ce6ac8ba7f1ec35335e5facab3056ca683b74432204c2b3",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/handoff.json",
+			"expected": "fc8da6ba3a6037f8abd0443d994b3e48af55a6431bc450ac66f1af08bf904f41",
+			"current": "f9ad6ed847cdbd6b5511b43f2036f5ea7d88da7f44b26ecc4ca826ad5b5901d7",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/linux/handoff.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "shared/handoff.json",
+			"expected": "9337f6a2b81bfdee80a573284413c1911ef13b2eb6de1b538bd1d69585bf16ba",
+			"current": "9337f6a2b81bfdee80a573284413c1911ef13b2eb6de1b538bd1d69585bf16ba",
+			"resolution": "current_archive"
+		}
+	],
+	"nested_hash_claims": [
+		{
+			"path": "windows/dry-A.json",
+			"expected": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"current": "66f9aefc315b72f57041347c823b9d8360745e7bcb7d4f0d9200cfedb5b99522",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-B.json",
+			"expected": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"current": "05aac30a3bf0a5ea162c9009caa6e4cca3adf5492e0bdf5e383d7bafb038b141",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "macos/public-idle.lua",
+			"expected": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"current": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stdout.txt",
+			"expected": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"current": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.lua",
+			"expected": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"current": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.lua",
+			"expected": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"current": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stdout.txt",
+			"expected": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"current": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.lua",
+			"expected": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"current": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/activation-graph.lua",
+			"expected": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"current": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-idle.lua",
+			"expected": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"current": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stdout.txt",
+			"expected": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"current": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.lua",
+			"expected": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"current": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.lua",
+			"expected": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"current": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stdout.txt",
+			"expected": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"current": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.lua",
+			"expected": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"current": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/activation-graph.lua",
+			"expected": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"current": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declaration-probe.cjs",
+			"expected": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"current": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.py",
+			"expected": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"current": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-A-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/policy-probe.lua",
+			"expected": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"current": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.txt",
+			"expected": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"current": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-policy-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-lua54.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/magic-key-policy.lua",
+			"expected": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"current": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.txt",
+			"expected": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"current": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-magic-luajit.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/declaration-probe.cjs",
+			"expected": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"current": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.txt",
+			"expected": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"current": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-declarations.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/source-contract.py",
+			"expected": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"current": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.txt",
+			"expected": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"current": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "shared/dry-B-pinned-source.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/owner-probe.lua",
+			"expected": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"current": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/run-registered.lua",
+			"expected": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"current": "9ff42ffd6ae6a93b5f3045bccaf7ed05f8f3ad4f195e8f9cc257d253211668c7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/A-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"current": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"current": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"current": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"current": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"current": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"current": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"current": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"current": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"current": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/final-proofs/B-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-owner.stdout.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-owner.stderr.txt",
+			"expected": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6",
+			"current": "91b3e4285f53dbef132f6844fed4cac86888ea7e538b27b8d25fcd3d9dd510b6",
+			"resolution": "current_archive"
+		}
+	],
+	"deliberately_unretained_old_successful_logs": [
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-owner.stdout.txt",
+			"expected": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-owner.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-lua-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off.stdout.txt",
+			"expected": "8d9643cbd821c985c28587ade9b8daf56232fb49f0b5992a97ded4c8d12ba1cf",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off_policy.stdout.txt",
+			"expected": "fff72682701e671c377f1abafc0c8000b95bf92f7dd368f076ca8f6e8e2949fc",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off_policy.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stdout.txt",
+			"expected": "bd60c67aa9a7b6cbdafa90294609647ff06a19d985f5b399677d3e41ca8db9f7",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_word_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stdout.txt",
+			"expected": "c042d3692398fa4c34bb49ac68f72581a5aa7d408def2aebf2ebe4ca419e16c5",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_lock_state.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stdout.txt",
+			"expected": "df9a175875197b61074c17766d58cc9c54c9efb7925ebc88e81533c538e02e9a",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_keyboard_hook_caps_lock_seed.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_injector_caps_lock.stdout.txt",
+			"expected": "3f02cad5586008ca7c626d01edc588a605c30ca02dba3c3d664a8bf826d95dd1",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_injector_caps_lock.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_injector_output_observer.stdout.txt",
+			"expected": "ae1ddf1162fcb966a71ccd6edf5452a70b24a3a52a465584c4ea116497aad6de",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_injector_output_observer.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off_menu.stdout.txt",
+			"expected": "56c16748b5b9136e3db1ebe789563c56d0f6eaad3afbd55fcaf204b36c961747",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		},
+		{
+			"path": "linux/pre-isolation-proofs/A-luajit-test_caps_word_auto_off_menu.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_original_matches": true,
+			"qualification": "Duplicate successful initial-batch output deliberately not archived; not canonical evidence or an unresolved final-sweep proof."
+		}
+	],
+	"editorial_correction": {
+		"path": "linux/report.md",
+		"original_bytes": "validation/original-submissions/linux/report.md.txt",
+		"original_sha256": "73493878ee5c20a3a19b06be800707875887a89d4d1862d4b4883d83069fc1cd",
+		"corrected_sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8",
+		"notes": "validation/custody-notes.md",
+		"qualification": "Editorial correction of unsupported byte-identical standalone claim; not formatting-only or semantic-equivalence proof. Actual unchanged owner later passed both process-private TMPDIR sweeps. Suspected temporary-name collision was not reconstructed."
+	},
+	"portable_current_source_check": "check_sources.py",
+	"source_claim_receipt": "all-role-source-claims.json"
+}

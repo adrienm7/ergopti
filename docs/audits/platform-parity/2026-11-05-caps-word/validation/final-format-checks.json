@@ -1,0 +1,17 @@
+[
+	{
+		"name": "archive-prettier",
+		"exit_code": 0,
+		"files": 35
+	},
+	{
+		"name": "archive-ruff-format",
+		"exit_code": 0,
+		"files": 7
+	},
+	{
+		"name": "archive-ruff-lint",
+		"exit_code": 0,
+		"files": 7
+	}
+]

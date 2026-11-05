@@ -1,0 +1,84 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"module": "Linux CapsWord synthetic-output consumer follow-up",
+	"initial_scope_untouched": true,
+	"new_independent_roots": 0,
+	"known_root_extensions": ["WRSL-001"],
+	"observation_rows": 12,
+	"final_dry_sweeps": 2,
+	"runtimes": ["Lua5.4", "LuaJIT"],
+	"processes": 4,
+	"all_exit_zero": true,
+	"source_files": 23,
+	"source_relationships": 6,
+	"qualified_refutations": [
+		"ordinary tap_action enter/tab relays through KEY_TAPS to Hook and works",
+		"follow-up genuine Ctrl and Shift keysym roles strengthen, but do not rewrite, initial fixture claims"
+	],
+	"files": [
+		{
+			"path": "probe.lua",
+			"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+		},
+		{
+			"path": "replay.py",
+			"sha256": "f41c97119e5fd0f817110cb933f2243574548675cc5aae66d774122cafbfdc37"
+		},
+		{
+			"path": "source-probe.py",
+			"sha256": "cdddc3e88a84ecdcaf0ec91d8a42a1b5cca3663992d923174cd783a4d7d01e0c"
+		},
+		{
+			"path": "source-receipt.json",
+			"sha256": "50b7b37fa32955300589e69bf65fbcbe5ebdc934aea446aabcc6a03b65084712"
+		},
+		{
+			"path": "report.md",
+			"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "7e07dc050f44177feeaae4c7e046d7e97d8efba72d784b15de5af1730299bcf8"
+		},
+		{
+			"path": "findings.json",
+			"sha256": "e36870a866a578e3cbf5de6b747c95dbc82ffa19cc6d2a72c8f3f02ab9f0b440"
+		},
+		{
+			"path": "final/receipts.json",
+			"sha256": "b1c92d6fc316b868d13f2cc311b83812661b27023f0472ddac2bad698877eb28"
+		},
+		{
+			"path": "final/A-lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final/A-lua.stdout.txt",
+			"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+		},
+		{
+			"path": "final/A-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final/A-luajit.stdout.txt",
+			"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+		},
+		{
+			"path": "final/B-lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final/B-lua.stdout.txt",
+			"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+		},
+		{
+			"path": "final/B-luajit.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "final/B-luajit.stdout.txt",
+			"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+		}
+	]
+}

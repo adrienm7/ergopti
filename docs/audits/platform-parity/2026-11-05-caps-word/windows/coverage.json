@@ -1,0 +1,267 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"module": "capsword",
+	"platform": "windows",
+	"qualification": "Aspect rows are bounded reviewer coverage, not independently executed scenarios. Every executable check is source-only.",
+	"rows": [
+		{
+			"aspect": "effective-defaults",
+			"outcome": "present",
+			"basis": "source",
+			"evidence": "shared manifest, source check1",
+			"qualification": "Shared manifest defines10s and eight selected typed delimiters; old adapter no-delay header is stale."
+		},
+		{
+			"aspect": "action-equivalence",
+			"outcome": "explicit-intent",
+			"basis": "source",
+			"evidence": "shared action catalogue, source check4",
+			"qualification": "Windows/Linux caps_word corresponds to macOS capsword; different ids are an explicit catalogue alias."
+		},
+		{
+			"aspect": "direct-toggle-state",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "capsword_state.ahk",
+			"qualification": "State owner flips the Boolean and arms/disarms then synchronizes native CapsLock. Actual state/LED not executed."
+		},
+		{
+			"aspect": "genuine-capslock-preserved",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "entry and CapsWordLedWanted",
+			"qualification": "Native intent is seeded pre-pump and ORed with CapsWord for LED; ending temporary mode preserves genuine CapsLock."
+		},
+		{
+			"aspect": "genuine-capslock-toggle-feedback",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "one_shot_shift.ahk",
+			"qualification": "ToggleCapsLock deactivates then flips recorded intent without deriving it from its own LED output."
+		},
+		{
+			"aspect": "space-custom-backspace",
+			"outcome": "unverified-native-priority",
+			"basis": "source",
+			"evidence": "report.md priority qualification",
+			"qualification": "Callable dispatcher would deactivate before remapped Backspace, but actual SC039 admission competes with native CapsWord hotkey. Existing include-order test does not prove HotIf priority; physical repro not confirmed."
+		},
+		{
+			"aspect": "tab-custom-backspace",
+			"outcome": "confirmed-source-finding",
+			"basis": "source",
+			"evidence": "CW-W001",
+			"qualification": "Tap-only SC00F route declines empty AI tooltip then deactivates for physical tab before emitting Backspace; no CapsWord SC00F competitor."
+		},
+		{
+			"aspect": "capslock-custom-enter",
+			"outcome": "confirmed-source-finding",
+			"basis": "source",
+			"evidence": "CW-W001",
+			"qualification": "Non-delimiter physical id misses its real emitted Enter; hidden native key output has no CapsWord observer."
+		},
+		{
+			"aspect": "altgr-capsword-toggle",
+			"outcome": "confirmed-source-finding",
+			"basis": "source",
+			"evidence": "CW-W002",
+			"qualification": "An admitted AltGr tap unconditionally clears before caps_word toggles; repeated tap cannot turn off."
+		},
+		{
+			"aspect": "altgr-nondelimiter-custom-action",
+			"outcome": "same-root-symptom",
+			"basis": "source",
+			"evidence": "CW-W002",
+			"qualification": "AltGr Backspace pre-clears with all automatic-end settings disabled; do not count another root."
+		},
+		{
+			"aspect": "tap-admission-guards",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "TapHoldDispatchTap",
+			"qualification": "Suspend and recent activity cancellation occur before shared dispatcher deactivation; real key/timer dispatch unexecuted."
+		},
+		{
+			"aspect": "native-space-enter",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "capsword.ahk, CapsWordAutoOffNativeKey",
+			"qualification": "Dedicated hotkeys ask active selected delimiter and pass generation through send/wait finally; sender false/native timing not measured."
+		},
+		{
+			"aspect": "native-tab-and-multi-scalar",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "_CapsWordAutoOff_OnChar",
+			"qualification": "Typed character callback evaluates full payload via shared policy; actual Tab/IME capture not executed."
+		},
+		{
+			"aspect": "dead-key-and-layer-literal-output",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "layout.ahk, hotstring_send.ahk",
+			"qualification": "Recorded literal text from layout ring and TextSend/hotstrings calls shared observer; actual dead-key/IME/native payload qualification remains."
+		},
+		{
+			"aspect": "synthetic-native-key-output",
+			"outcome": "confirmed-source-finding",
+			"basis": "source",
+			"evidence": "text_sender.ahk, hotstring_buffer_effects.ahk",
+			"qualification": "Native-key funnel uses SendLevel0 and synthetic buffer model without CapsWord literal publication; covered as CW-W001 opposite-direction mechanism."
+		},
+		{
+			"aspect": "literal-output-direct",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "TextSend direct branch",
+			"qualification": "TextSend direct reports only after successful sender verdict; native receiving not measured."
+		},
+		{
+			"aspect": "literal-output-queued",
+			"outcome": "unknown-intent",
+			"basis": "source",
+			"evidence": "TextSend queue branches, editor_replace.ahk",
+			"qualification": "Native/clipboard TextSend reports at queueing, potentially before later admission refusal. No common pending-output policy established; not a confirmed third defect."
+		},
+		{
+			"aspect": "pointer-kind-coverage",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffPointerEvents, pointer poll",
+			"qualification": "Five Windows manifest kinds map left/right/middle/X buttons and native movement; actual devices unexecuted."
+		},
+		{
+			"aspect": "wheel-pointer-motion",
+			"outcome": "explicit-implementation-mapping",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffPointerEvents",
+			"qualification": "All four scroll directions count as pointer_motion; disabling that kind keeps CapsWord through these mappings."
+		},
+		{
+			"aspect": "touchpad-gesture-exclusion",
+			"outcome": "explicit-native-constraint",
+			"basis": "source",
+			"evidence": "shared manifest platform/reason",
+			"qualification": "Windows gesture kind absent by manifest reason; OS-owned gesture signals distinct from observable scrolling."
+		},
+		{
+			"aspect": "pointer-same-position",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "Arm, _CapsWordAutoOff_OnMotionPoll",
+			"qualification": "Poll returns on unchanged coordinates and current activation records a fresh position. No throttle carried from old session."
+		},
+		{
+			"aspect": "idle-zero",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffArm",
+			"qualification": "Zero arms no idle timer or key-down reset subscription; runtime timer behavior not measured."
+		},
+		{
+			"aspect": "idle-keydown-modifiers",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "_CapsWordAutoOff_OnKeyDown",
+			"qualification": "Every dispatcher key-down rearms armed idle; no modifier-key filter. Linux may differ and broad shared keystroke semantics need comparison."
+		},
+		{
+			"aspect": "idle-threshold-and-clock",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffArm, timer adapter boundary",
+			"qualification": "Configured delay schedules timer; no manual32-bit tick subtraction in this module, so no rollover defect asserted."
+		},
+		{
+			"aspect": "live-config-publication",
+			"outcome": "documented-implementation-policy",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffStore, _CapsWordAutoOffPublish",
+			"qualification": "Successful store publishes Configured/Values for next activation; active Armed policy and current timers are intentionally retained. CrossOS product intent not inferred."
+		},
+		{
+			"aspect": "failed-config-store",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffStore",
+			"qualification": "ConfigCommitUpdates must return success before publishing policy. No disk write/persistence replay executed."
+		},
+		{
+			"aspect": "stale-callback-generation",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "_CapsWordAutoOffActive, ownership test",
+			"qualification": "Bound original generation must equal current before borrowing active state. Existing AHK timer interruption tests reviewed not executed."
+		},
+		{
+			"aspect": "disarm-before-cleanup",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffDisarm",
+			"qualification": "Generation advances and owner fields detach before unregister, timer cancellation or logger boundary."
+		},
+		{
+			"aspect": "end-callback-log-interruption",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "_CapsWordAutoOffEnd",
+			"qualification": "Saved end callback retired before logging then exact retired generation rechecked under Critical; successor cannot be ended by old logger continuation."
+		},
+		{
+			"aspect": "native-space-send-wait-interruption",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "CapsWordAutoOffNativeKey, ownership test",
+			"qualification": "Native delimiter keeps original generation through send and bounded wait/finally; old operation cannot retire replacement activation."
+		},
+		{
+			"aspect": "same-activation-idle-interruption",
+			"outcome": "unverified",
+			"basis": "source",
+			"evidence": "_CapsWordAutoOff_OnIdle",
+			"qualification": "Precise key-down versus already-entered idle callback needs real AHK scheduler fixture; no promoted race without admitted reproducible interruption."
+		},
+		{
+			"aspect": "suspend-cleanup",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "HookDispatcher.Dispatch, lifecycle.ahk",
+			"qualification": "Central dispatcher rejects events while suspended and lifecycle explicitly deactivates CapsWord before pause. Actual pause/native lock unexecuted."
+		},
+		{
+			"aspect": "fatal-cleanup",
+			"outcome": "source-control",
+			"basis": "source",
+			"evidence": "error_net.ahk, _CapsWordAutoOffActive",
+			"qualification": "Fatal net clears flag and synchronizes LED; inactive future callbacks disarm; native lock/refusal not executed."
+		},
+		{
+			"aspect": "quit-and-reload",
+			"outcome": "unverified-native-semantics",
+			"basis": "source",
+			"evidence": "Ergopti_OnShutdown, entry pre-pump",
+			"qualification": "Shutdown has no explicit CapsWord restore, successor seeds current native toggle; native AHK exit restoration unresolved, kept conditional rather than confirmed."
+		},
+		{
+			"aspect": "existing-regression-test-trust",
+			"outcome": "source-review",
+			"basis": "source",
+			"evidence": "capsword_taphold_unlatch/state/ownership tests",
+			"qualification": "Source-scanned markers cannot establish actual configured tap semantics; direct state tests bypass AltGr producer. Existing tests not claimed executed."
+		},
+		{
+			"aspect": "performance-and-memory",
+			"outcome": "unmeasured",
+			"basis": "source",
+			"evidence": "report.md qualifications",
+			"qualification": "No G4, wall-clock latency or long-duration memory-growth measurements. Source cleanup topology reviewed only."
+		},
+		{
+			"aspect": "native-receiving-boundaries",
+			"outcome": "unverified",
+			"basis": "source",
+			"evidence": "source-contract.json qualification",
+			"qualification": "No real editor/caps LED/keypad Enter/IME/deadkey/pointer or live Win32 hook was exercised."
+		}
+	]
+}

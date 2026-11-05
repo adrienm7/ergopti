@@ -1,0 +1,6 @@
+
+=== caps word auto-off menu (Linux) ===
+  ok   caps word auto-off menu, draws one checkbox per delimiter and per declared pointer kind
+  ok   caps word auto-off menu, a delimiter and a pointer checkbox publish their change
+  ok   caps word auto-off menu, the delay choice stores the picked preset
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":3}

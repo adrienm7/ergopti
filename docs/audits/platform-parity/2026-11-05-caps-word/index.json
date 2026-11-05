@@ -1,0 +1,4424 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"created_at": "2026-11-05",
+	"module": "caps-word",
+	"roles": [
+		{
+			"role": "windows",
+			"report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+				},
+				{
+					"path": "windows/source-contract.json",
+					"sha256": "b4e77e6cfcbb0507021f163fbabfe0ac16349bedccbca3c663e853637a548b10"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			],
+			"ids": ["CWW-001", "CWW-002"],
+			"coverage": [
+				{
+					"aspect": "effective-defaults",
+					"outcome": "present",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Shared manifest defines10s and eight selected typed delimiters; old adapter no-delay header is stale.",
+					"submitted_evidence": "shared manifest, source check1"
+				},
+				{
+					"aspect": "action-equivalence",
+					"outcome": "explicit-intent",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Windows/Linux caps_word corresponds to macOS capsword; different ids are an explicit catalogue alias.",
+					"submitted_evidence": "shared action catalogue, source check4"
+				},
+				{
+					"aspect": "direct-toggle-state",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "State owner flips the Boolean and arms/disarms then synchronizes native CapsLock. Actual state/LED not executed.",
+					"submitted_evidence": "capsword_state.ahk"
+				},
+				{
+					"aspect": "genuine-capslock-preserved",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Native intent is seeded pre-pump and ORed with CapsWord for LED; ending temporary mode preserves genuine CapsLock.",
+					"submitted_evidence": "entry and CapsWordLedWanted"
+				},
+				{
+					"aspect": "genuine-capslock-toggle-feedback",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "ToggleCapsLock deactivates then flips recorded intent without deriving it from its own LED output.",
+					"submitted_evidence": "one_shot_shift.ahk"
+				},
+				{
+					"aspect": "space-custom-backspace",
+					"outcome": "unverified-native-priority",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Callable dispatcher would deactivate before remapped Backspace, but actual SC039 admission competes with native CapsWord hotkey. Existing include-order test does not prove HotIf priority; physical repro not confirmed.",
+					"submitted_evidence": "report.md priority qualification"
+				},
+				{
+					"aspect": "tab-custom-backspace",
+					"outcome": "confirmed-source-finding",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Tap-only SC00F route declines empty AI tooltip then deactivates for physical tab before emitting Backspace; no CapsWord SC00F competitor.",
+					"submitted_evidence": "CW-W001"
+				},
+				{
+					"aspect": "capslock-custom-enter",
+					"outcome": "confirmed-source-finding",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Non-delimiter physical id misses its real emitted Enter; hidden native key output has no CapsWord observer.",
+					"submitted_evidence": "CW-W001"
+				},
+				{
+					"aspect": "altgr-capsword-toggle",
+					"outcome": "confirmed-source-finding",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "An admitted AltGr tap unconditionally clears before caps_word toggles; repeated tap cannot turn off.",
+					"submitted_evidence": "CW-W002"
+				},
+				{
+					"aspect": "altgr-nondelimiter-custom-action",
+					"outcome": "same-root-symptom",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "AltGr Backspace pre-clears with all automatic-end settings disabled; do not count another root.",
+					"submitted_evidence": "CW-W002"
+				},
+				{
+					"aspect": "tap-admission-guards",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Suspend and recent activity cancellation occur before shared dispatcher deactivation; real key/timer dispatch unexecuted.",
+					"submitted_evidence": "TapHoldDispatchTap"
+				},
+				{
+					"aspect": "native-space-enter",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Dedicated hotkeys ask active selected delimiter and pass generation through send/wait finally; sender false/native timing not measured.",
+					"submitted_evidence": "capsword.ahk, CapsWordAutoOffNativeKey"
+				},
+				{
+					"aspect": "native-tab-and-multi-scalar",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Typed character callback evaluates full payload via shared policy; actual Tab/IME capture not executed.",
+					"submitted_evidence": "_CapsWordAutoOff_OnChar"
+				},
+				{
+					"aspect": "dead-key-and-layer-literal-output",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Recorded literal text from layout ring and TextSend/hotstrings calls shared observer; actual dead-key/IME/native payload qualification remains.",
+					"submitted_evidence": "layout.ahk, hotstring_send.ahk"
+				},
+				{
+					"aspect": "synthetic-native-key-output",
+					"outcome": "confirmed-source-finding",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Native-key funnel uses SendLevel0 and synthetic buffer model without CapsWord literal publication; covered as CW-W001 opposite-direction mechanism.",
+					"submitted_evidence": "text_sender.ahk, hotstring_buffer_effects.ahk"
+				},
+				{
+					"aspect": "literal-output-direct",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "TextSend direct reports only after successful sender verdict; native receiving not measured.",
+					"submitted_evidence": "TextSend direct branch"
+				},
+				{
+					"aspect": "literal-output-queued",
+					"outcome": "unknown-intent",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Native/clipboard TextSend reports at queueing, potentially before later admission refusal. No common pending-output policy established; not a confirmed third defect.",
+					"submitted_evidence": "TextSend queue branches, editor_replace.ahk"
+				},
+				{
+					"aspect": "pointer-kind-coverage",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Five Windows manifest kinds map left/right/middle/X buttons and native movement; actual devices unexecuted.",
+					"submitted_evidence": "CapsWordAutoOffPointerEvents, pointer poll"
+				},
+				{
+					"aspect": "wheel-pointer-motion",
+					"outcome": "explicit-implementation-mapping",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "All four scroll directions count as pointer_motion; disabling that kind keeps CapsWord through these mappings.",
+					"submitted_evidence": "CapsWordAutoOffPointerEvents"
+				},
+				{
+					"aspect": "touchpad-gesture-exclusion",
+					"outcome": "explicit-native-constraint",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Windows gesture kind absent by manifest reason; OS-owned gesture signals distinct from observable scrolling.",
+					"submitted_evidence": "shared manifest platform/reason"
+				},
+				{
+					"aspect": "pointer-same-position",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Poll returns on unchanged coordinates and current activation records a fresh position. No throttle carried from old session.",
+					"submitted_evidence": "Arm, _CapsWordAutoOff_OnMotionPoll"
+				},
+				{
+					"aspect": "idle-zero",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Zero arms no idle timer or key-down reset subscription; runtime timer behavior not measured.",
+					"submitted_evidence": "CapsWordAutoOffArm"
+				},
+				{
+					"aspect": "idle-keydown-modifiers",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Every dispatcher key-down rearms armed idle; no modifier-key filter. Linux may differ and broad shared keystroke semantics need comparison.",
+					"submitted_evidence": "_CapsWordAutoOff_OnKeyDown"
+				},
+				{
+					"aspect": "idle-threshold-and-clock",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Configured delay schedules timer; no manual32-bit tick subtraction in this module, so no rollover defect asserted.",
+					"submitted_evidence": "CapsWordAutoOffArm, timer adapter boundary"
+				},
+				{
+					"aspect": "live-config-publication",
+					"outcome": "documented-implementation-policy",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Successful store publishes Configured/Values for next activation; active Armed policy and current timers are intentionally retained. CrossOS product intent not inferred.",
+					"submitted_evidence": "CapsWordAutoOffStore, _CapsWordAutoOffPublish"
+				},
+				{
+					"aspect": "failed-config-store",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "ConfigCommitUpdates must return success before publishing policy. No disk write/persistence replay executed.",
+					"submitted_evidence": "CapsWordAutoOffStore"
+				},
+				{
+					"aspect": "stale-callback-generation",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Bound original generation must equal current before borrowing active state. Existing AHK timer interruption tests reviewed not executed.",
+					"submitted_evidence": "_CapsWordAutoOffActive, ownership test"
+				},
+				{
+					"aspect": "disarm-before-cleanup",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Generation advances and owner fields detach before unregister, timer cancellation or logger boundary.",
+					"submitted_evidence": "CapsWordAutoOffDisarm"
+				},
+				{
+					"aspect": "end-callback-log-interruption",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Saved end callback retired before logging then exact retired generation rechecked under Critical; successor cannot be ended by old logger continuation.",
+					"submitted_evidence": "_CapsWordAutoOffEnd"
+				},
+				{
+					"aspect": "native-space-send-wait-interruption",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Native delimiter keeps original generation through send and bounded wait/finally; old operation cannot retire replacement activation.",
+					"submitted_evidence": "CapsWordAutoOffNativeKey, ownership test"
+				},
+				{
+					"aspect": "same-activation-idle-interruption",
+					"outcome": "unverified",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Precise key-down versus already-entered idle callback needs real AHK scheduler fixture; no promoted race without admitted reproducible interruption.",
+					"submitted_evidence": "_CapsWordAutoOff_OnIdle"
+				},
+				{
+					"aspect": "suspend-cleanup",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Central dispatcher rejects events while suspended and lifecycle explicitly deactivates CapsWord before pause. Actual pause/native lock unexecuted.",
+					"submitted_evidence": "HookDispatcher.Dispatch, lifecycle.ahk"
+				},
+				{
+					"aspect": "fatal-cleanup",
+					"outcome": "source-control",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Fatal net clears flag and synchronizes LED; inactive future callbacks disarm; native lock/refusal not executed.",
+					"submitted_evidence": "error_net.ahk, _CapsWordAutoOffActive"
+				},
+				{
+					"aspect": "quit-and-reload",
+					"outcome": "unverified-native-semantics",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Shutdown has no explicit CapsWord restore, successor seeds current native toggle; native AHK exit restoration unresolved, kept conditional rather than confirmed.",
+					"submitted_evidence": "Ergopti_OnShutdown, entry pre-pump"
+				},
+				{
+					"aspect": "existing-regression-test-trust",
+					"outcome": "source-review",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "Source-scanned markers cannot establish actual configured tap semantics; direct state tests bypass AltGr producer. Existing tests not claimed executed.",
+					"submitted_evidence": "capsword_taphold_unlatch/state/ownership tests"
+				},
+				{
+					"aspect": "performance-and-memory",
+					"outcome": "unmeasured",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "No G4, wall-clock latency or long-duration memory-growth measurements. Source cleanup topology reviewed only.",
+					"submitted_evidence": "report.md qualifications"
+				},
+				{
+					"aspect": "native-receiving-boundaries",
+					"outcome": "unverified",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce"
+						}
+					],
+					"qualification": "No real editor/caps LED/keypad Enter/IME/deadkey/pointer or live Win32 hook was exercised.",
+					"submitted_evidence": "source-contract.json qualification"
+				}
+			]
+		},
+		{
+			"role": "macos",
+			"report": "macos/report.md",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+				},
+				{
+					"path": "macos/source-hashes.json",
+					"sha256": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			],
+			"ids": ["CWM-001", "CWM-002", "CWM-003"],
+			"coverage": [
+				{
+					"aspect": "canonical_action_alias",
+					"outcome": "capsword is the macOS equivalent of Windows/Linux caps_word; separate IDs are not a missing whole feature.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "deployed_graph_activation",
+					"outcome": "RightOption+CapsLock sets scoped variable1 and emits one CapsLock event plus one control tag.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "deployed_graph_priority",
+					"outcome": "CapsWord rule remains first in actual generated graph.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "setting_exit_removal",
+					"outcome": "Space/Return/Tab/g/v/button1/button2 are dropped from deployable graph, retained in historical anchor.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "fixed_exit_retention",
+					"outcome": "CapsLock/Escape/Delete/arrows/Page/Home/End/F1-F12 stay fixed Karabiner exits; bounded probes explicitly cover a subset.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "catalogue_activation_settlement",
+					"outcome": "Catalogue handler requests lock true only after write settles; preexisting recorder false/true both request true.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/activation-graph.txt",
+							"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "activation-graph.txt"
+				},
+				{
+					"aspect": "idle_zero",
+					"outcome": "Zero creates no idle timer.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "idle_positive_boundary",
+					"outcome": "1-second idle requests clear at its due clock; existing module also tests last-keystroke residual delay.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "live_idle_enable",
+					"outcome": "CW-M001:0→1 via actual menu leaves no timer, including after next letter.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "live_idle_shorten",
+					"outcome": "CW-M001:10→1 remains on past new deadline until original10-second callback.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "live_idle_disable_extend",
+					"outcome": "1→0 and1→10 alter existing callback behavior, refuting an intentional frozen active policy on macOS.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "live_idle_reenable",
+					"outcome": "CW-M001:1→0→1 after zero callback loses idle clock until a new activation.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "menu_refusal_rollback",
+					"outcome": "Failed save restores prior state/policy; save acknowledgement is a port, not disk persistence.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "menu_delimiter_live_change",
+					"outcome": "Actual comma checkbox change takes effect on next key in the same active session.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "next_activation_control",
+					"outcome": "New activation acquires newly selected1-second policy.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-idle.txt",
+							"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-idle.txt"
+				},
+				{
+					"aspect": "fractional_idle_rounding",
+					"outcome": "Shared-only issue:0.0001seconds compiles0ms and schedules0, distinct from zero never;0.001compiles1ms.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "typed_nbsp",
+					"outcome": "Checked U+00A0 deactivates.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "typed_nnbsp",
+					"outcome": "Checked U+202F deactivates.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "typed_multiscalar",
+					"outcome": "Carrier containing checked NBSP/semicolon deactivates; ordinary letters do not.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "typed_cr_lf_tab",
+					"outcome": "CR/LF/Tab payload controls deactivate.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "typed_etx",
+					"outcome": "ETX payload does not deactivate; physical keypad-Enter payload remains unqualified.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "pointer_kind_switches",
+					"outcome": "Each configured kind and disabled counterpart are covered in registered watcher auto-off22-case module.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+							"sha256": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt"
+				},
+				{
+					"aspect": "inactive_pointer_throttle",
+					"outcome": "CW-M002:inactive motion stamps gate; new activation checked click/gesture/scroll50ms later is discarded.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "pointer_threshold_controls",
+					"outcome": "Fresh activation with no preceding inactive event and exact100ms boundary both clear.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "immediate_vs_pointer_gate",
+					"outcome": "Typed delimiter bypasses100ms pointer throttle when no pending clear exists.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "pending_clear_new_activation",
+					"outcome": "CW-M003:old completion-pending flag discards new activation delimiter; native publication0 precedes reactivation.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "stale_led_revision",
+					"outcome": "Old clear completion correctly declines stale LED write after newer revision; lost delimiter still is not retried.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "after_settlement_control",
+					"outcome": "Later delimiter after completion queues current clear and requests LED false.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-admission.txt",
+							"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-admission.txt"
+				},
+				{
+					"aspect": "direct_sender_accepted",
+					"outcome": "Actual TextSender accepted output reports a checked delimiter and clears.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "direct_sender_refused",
+					"outcome": "Actual TextSender refused output does not clear.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "relay_invalid_empty",
+					"outcome": "Empty/nonstring output relay is ignored.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-payload.txt",
+							"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-payload.txt"
+				},
+				{
+					"aspect": "renamed_magic_menu",
+					"outcome": "Actual submenu renders § caption through supplied production-equivalent context formatter; checked policy still matches old★ after real Terminators.rename. Shared root only.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/public-magic-menu.txt",
+							"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "public-magic-menu.txt"
+				},
+				{
+					"aspect": "watcher_teardown_retry",
+					"outcome": "25 registered retry/retention cases pass; retained capabilities are not discarded on refused stop.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+							"sha256": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt"
+				},
+				{
+					"aspect": "control_generation_guard",
+					"outcome": "Actual serialized/control tests reject wrong token/paused lease and gate stale revisions.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						},
+						{
+							"path": "macos/tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+							"sha256": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93"
+						}
+					],
+					"qualification": "Actual Lua owners over explicit native ports; no physical receiving.",
+					"submitted_evidence": "tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt"
+				},
+				{
+					"aspect": "initial_capslock_restoration",
+					"outcome": "No previous-lock snapshot is kept by watcher; its owned clear requests false. Native key toggle outcome with initialCapsLock on is unmeasured.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/platform/remap/watchers.lua"
+				},
+				{
+					"aspect": "action_reinvocation_semantics",
+					"outcome": "Catalogue action writes1; keyboard-native action has variable_unless1; this differs from a generic toggle and needs cross-OS intent classification.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/modules/gestures/actions.lua"
+				},
+				{
+					"aspect": "hold_action_limit",
+					"outcome": "Native capsword action is holdable=false; do not promise Linux while_released behavior.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/platform/remap/data/actions.json"
+				},
+				{
+					"aspect": "modifier_transition_idle",
+					"outcome": "Watcher subscribes keyDown but not flagsChanged/keyUp; pure modifier edges are not this owner's idle activity. Shared keystroke intent remains qualified.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/platform/remap/watchers.lua"
+				},
+				{
+					"aspect": "pause_stop_capslock",
+					"outcome": "Watcher stop clears observers/timers/watchers, not an explicit native CapsLock reset; broader lease/native receiving still requires qualification.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/platform/remap/init.lua"
+				},
+				{
+					"aspect": "expander_output_relay",
+					"outcome": "Committed expansion publishes logical_text to CapsWordOutput after canonical state commit.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/modules/keymap/expander.lua"
+				},
+				{
+					"aspect": "setting_loader_acceptance",
+					"outcome": "Preference scalar validator accepts finite nonnegative seconds by shared policy, including tiny positive values.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/infra/preferences.lua"
+				},
+				{
+					"aspect": "live_apply_contract",
+					"outcome": "Menu says applies at once; settings owner/menu_state say next event. This supportsCW-M001 without assuming Windows same-session policy.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa"
+						}
+					],
+					"qualification": "Source-derived; no native execution.",
+					"submitted_evidence": "static/ergopti_plus/macos/ui/menu/menu_state.lua"
+				}
+			]
+		},
+		{
+			"role": "linux",
+			"report": "linux/report.md",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+				},
+				{
+					"path": "linux/source-receipt.json",
+					"sha256": "1b5b7bb1b4b0e614c692f188c134253f5d7cfb455df2ead74342977414506c50"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				},
+				{
+					"path": "linux-synthetic-followup/report.md",
+					"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+				},
+				{
+					"path": "linux-synthetic-followup/coverage.json",
+					"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+				}
+			],
+			"ids": ["CWL-001", "CWL-002", "WRSL-001"],
+			"coverage": [
+				{
+					"id": "CWL-C001",
+					"aspect": "normal-10-second-idle",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C002",
+					"aspect": "zero-never-idle",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C003",
+					"aspect": "tiny-positive",
+					"basis": "actual-owner",
+					"classification": "shared_finding_evidence",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0,
+						"cached_idle": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C004",
+					"aspect": "one-ms-positive",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C005",
+					"aspect": "live-idle-zero-to-one",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 0,
+						"cached_idle": 1000
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C006",
+					"aspect": "live-idle-ten-to-one",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1,
+						"cached_idle": 1000
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C007",
+					"aspect": "live-uncheck-space",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C008",
+					"aspect": "live-uncheck-pointer",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C009",
+					"aspect": "modifier-does-not-wake",
+					"basis": "actual-owner",
+					"classification": "unknown_intent",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Root custody qualification: the initial native key_sym port returned nil, so this row does not establish actual modifier-role admission. Corrected-symbol supplementary controls supersede that interpretation without changing the historical observation.",
+					"submitted_qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C010",
+					"aspect": "arrow-wakes",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C011",
+					"aspect": "text-delimiter- ",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C012",
+					"aspect": "text-delimiter- ",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C013",
+					"aspect": "text-delimiter- ",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C014",
+					"aspect": "text-delimiter-\t",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C015",
+					"aspect": "text-delimiter-\n",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C016",
+					"aspect": "text-delimiter-,",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C017",
+					"aspect": "text-delimiter-;",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C018",
+					"aspect": "text-delimiter-.",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C019",
+					"aspect": "text-delimiter- :",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C020",
+					"aspect": "text-delimiter-A !",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C021",
+					"aspect": "unchecked-text--",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C022",
+					"aspect": "unchecked-text-A",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C023",
+					"aspect": "unchecked-text-9",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C024",
+					"aspect": "unchecked-text-é",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C025",
+					"aspect": "unchecked-text-",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C026",
+					"aspect": "pointer-checked-left_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C027",
+					"aspect": "pointer-unchecked-left_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C028",
+					"aspect": "pointer-checked-right_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C029",
+					"aspect": "pointer-unchecked-right_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C030",
+					"aspect": "pointer-checked-middle_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C031",
+					"aspect": "pointer-unchecked-middle_click",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C032",
+					"aspect": "pointer-checked-other_buttons",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C033",
+					"aspect": "pointer-unchecked-other_buttons",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C034",
+					"aspect": "pointer-checked-gesture",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C035",
+					"aspect": "pointer-unchecked-gesture",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C036",
+					"aspect": "native-tab-checked",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C037",
+					"aspect": "native-enter-checked",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C038",
+					"aspect": "ctrl-tab-checked",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Root custody qualification: the initial native key_sym port returned nil, so this row does not establish actual modifier-role admission. Corrected-symbol supplementary controls supersede that interpretation without changing the historical observation.",
+					"submitted_qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C039",
+					"aspect": "native-tab-unchecked",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C040",
+					"aspect": "preexisting-user-caps",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": true,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C041",
+					"aspect": "nonlocking-map-refusal",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C042",
+					"aspect": "user-caps-press",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C043",
+					"aspect": "lifecycle-stop",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C044",
+					"aspect": "lifecycle-cancel",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C045",
+					"aspect": "lifecycle-init",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C046",
+					"aspect": "lifecycle-disable",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C047",
+					"aspect": "public-menu-uncheck-space",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1,
+						"menu_changes": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C048",
+					"aspect": "public-menu-space-next-session-control",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 2
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C049",
+					"aspect": "public-menu-enable-left-click",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-002"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 1,
+						"menu_checked": true,
+						"menu_changes": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C050",
+					"aspect": "public-menu-left-click-next-session-control",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 2
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C051",
+					"aspect": "configured-magic-star-label",
+					"basis": "actual-owner",
+					"classification": "shared_finding_evidence",
+					"finding_ids": [],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 0,
+						"checked_label": "§ : Touche magique",
+						"magic_key": "§"
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C052",
+					"aspect": "literal-star-still-ends",
+					"basis": "actual-owner",
+					"classification": "shared_finding_evidence",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C053",
+					"aspect": "absolute-pointer-motion-ignored",
+					"basis": "actual-owner",
+					"classification": "observed_defect",
+					"finding_ids": ["CWL-001"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C054",
+					"aspect": "relative-pointer-motion-control",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 0
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWL-C055",
+					"aspect": "touch-gesture-default-control",
+					"basis": "actual-owner",
+					"classification": "positive_control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"pending": 1
+					},
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "3226591e1ec9ae9ae0fe3e184214fcc29fa8bace871c93edc571fa93aeea4de8"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "5a93f88b9181641190d70e60b837eeef9e1d4592e286e442204a020b4cec646a"
+						},
+						{
+							"path": "linux/owner-probe.lua",
+							"sha256": "ad100f3d3b35f87f0b70e6d80b7f5ca89b0372eda8b2a4dfdef34f2ec4fd7d50"
+						},
+						{
+							"path": "linux/final-proofs/A-lua-owner.stdout.txt",
+							"sha256": "3d0ad58ee18adb29466a50d1136ca92884697dca9e685e7bbc3b4b595b1288a6"
+						}
+					],
+					"qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed.",
+					"submitted_evidence": ["owner-probe.lua", "final-proofs/A-lua-owner.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C001",
+					"aspect": "synthetic-followup: catalogue-enter-checked-but-not-observed",
+					"basis": "actual-owner",
+					"classification": "existing-root-extension",
+					"finding_ids": ["WRSL-001"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"emitted_code": 28,
+						"emitted_downs": 1,
+						"emitted_ups": 1
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C002",
+					"aspect": "synthetic-followup: logical-keyboard-slot-enter-checked-but-not-observed",
+					"basis": "actual-owner",
+					"classification": "existing-root-extension",
+					"finding_ids": ["WRSL-001"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"emitted_code": 28,
+						"emitted_downs": 1,
+						"emitted_ups": 1,
+						"binding": "primary_a",
+						"consumed_chords": 1,
+						"next_text": "B"
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C003",
+					"aspect": "synthetic-followup: physical-enter-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C004",
+					"aspect": "synthetic-followup: literal-injector-enter-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"emitted_code": 28,
+						"emitted_downs": 1,
+						"emitted_ups": 1,
+						"observer_calls": 1
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C005",
+					"aspect": "synthetic-followup: tap-engine-enter-semantic-relay-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"emitted_code": 28,
+						"hook_emitted_downs": 1,
+						"catalogue_tap_callbacks": 0
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C006",
+					"aspect": "synthetic-followup: catalogue-tab-checked-but-not-observed",
+					"basis": "actual-owner",
+					"classification": "existing-root-extension",
+					"finding_ids": ["WRSL-001"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"emitted_code": 15,
+						"emitted_downs": 1,
+						"emitted_ups": 1
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C007",
+					"aspect": "synthetic-followup: logical-keyboard-slot-tab-checked-but-not-observed",
+					"basis": "actual-owner",
+					"classification": "existing-root-extension",
+					"finding_ids": ["WRSL-001"],
+					"observation": {
+						"active": true,
+						"capture_caps": true,
+						"emitted_code": 15,
+						"emitted_downs": 1,
+						"emitted_ups": 1,
+						"binding": "primary_a",
+						"consumed_chords": 1,
+						"next_text": "B"
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C008",
+					"aspect": "synthetic-followup: physical-tab-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C009",
+					"aspect": "synthetic-followup: literal-injector-tab-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"emitted_code": 15,
+						"emitted_downs": 1,
+						"emitted_ups": 1,
+						"observer_calls": 1
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C010",
+					"aspect": "synthetic-followup: tap-engine-tab-semantic-relay-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false,
+						"emitted_code": 15,
+						"hook_emitted_downs": 1,
+						"catalogue_tap_callbacks": 0
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C011",
+					"aspect": "synthetic-followup: qualified-ctrl-tab-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				},
+				{
+					"id": "CWLF-C012",
+					"aspect": "synthetic-followup: qualified-shift-idle-control",
+					"basis": "actual-owner",
+					"classification": "positive-control",
+					"finding_ids": [],
+					"observation": {
+						"active": false,
+						"capture_caps": false
+					},
+					"evidence": [
+						{
+							"path": "linux-synthetic-followup/report.md",
+							"sha256": "33779459ca840409042b2504acbefa5f37ccdcf3b00878a0c0da440676265ef6"
+						},
+						{
+							"path": "linux-synthetic-followup/coverage.json",
+							"sha256": "79b885fd41155bf753fa248ecb5dcec2cff76e85e59e1f65e410105cf4b3c98f"
+						},
+						{
+							"path": "linux-synthetic-followup/probe.lua",
+							"sha256": "859863495a70625660926a9996da8e017d6502e70c1f1605fab227f07b4b4989"
+						},
+						{
+							"path": "linux-synthetic-followup/final/A-lua.stdout.txt",
+							"sha256": "5af456e2afa7a2faf708aded73faf78f8c88c95b600e85806fc25b8f89472d2f"
+						}
+					],
+					"qualification": "Actual owners over recording native ports; no full Main or native receiving. Callback/admission ports are explicit fixtures. Ordinary KEY_TAPS uses semantic Hook relay; catalogue cases are a known-root consumer extension.",
+					"submitted_evidence": ["probe.lua", "final/A-lua.stdout.txt"]
+				}
+			]
+		},
+		{
+			"role": "shared",
+			"report": "shared/report.md",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+				},
+				{
+					"path": "shared/source-receipt.json",
+					"sha256": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "59d9e4168ba4bd7bf4058e9171a924ca386ee47ff9a9458ea1ea2c1f56dcad1f"
+				}
+			],
+			"ids": ["CWS-001", "CWS-002"],
+			"coverage": [
+				{
+					"id": "CW-S-C01",
+					"aspect": "Eight parameter declarations and requirements",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Actual feature model: all eight are settings. Supported macOS rows require Karabiner, Linux requires evdev/uinput, and Windows requires none. No native availability certification.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C02",
+					"aspect": "Idle default/recommended/neutral and closed presets",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Both default and recommended are 10 s; presets are 0, 1, 3, 5, 10, 30, 60. A setting does not independently activate CapsWord. The actual menu has no free-entry command.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C03",
+					"aspect": "Zero idle is disabled",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Actual shared corpus and extended zero control; AHK uses a zero sentinel rather than Lua nil.",
+					"submitted_evidence": [
+						"policy-probe.lua",
+						"dry-A-policy-lua54.txt",
+						"dry-A-policy-luajit.txt"
+					]
+				},
+				{
+					"id": "CW-S-C04",
+					"aspect": "Exact idle thresholds and fraction2.5s",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Corpus covers before, at and after thresholds; extended 0.5 ms and 1 ms accepted values expire at 1 ms after quantization. Controlled numeric clocks only.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C05",
+					"aspect": "Sub-millisecond positive idle quantization",
+					"outcome": "observed-defect",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b"
+						}
+					],
+					"qualification": "CW-S001: measured Lua policy outputs, source-only AHK comparison. Handwritten configuration edge; no shipped preset affected.",
+					"submitted_evidence": ["policy-probe.lua", "source-contract.txt"]
+				},
+				{
+					"id": "CW-S-C06",
+					"aspect": "Finite upper-edge millisecond overflow",
+					"outcome": "qualified-gap",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "1e308 seconds is accepted and converted to positive infinity. Policy-only result; native timer admission and Windows arithmetic are unexecuted. No separate confirmed finding.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"]
+				},
+				{
+					"id": "CW-S-C07",
+					"aspect": "Eight shipped delimiters",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Shared-model default and recommended lists agree: space, nbsp, nnbsp, tab, enter, comma, semicolon, period.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C08",
+					"aspect": "Every built-in character selectable and uncheckable",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "All 25 built-in slots and 26 characters; generated catalogue source, not native key delivery.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C09",
+					"aspect": "CR and LF share one Enter slot",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "One Enter key owns two scalar spellings. A mixed CRLF text payload is covered. Physical Return and keypad receiving are driver-owned.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"]
+				},
+				{
+					"id": "CW-S-C10",
+					"aspect": "Unicode French spaces and mixed scalar payloads",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Independent NBSP/NNBSP and astral-prefix controls prove any checked character anywhere in a valid UTF-8 payload can terminate.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C11",
+					"aspect": "Unchecked punctuation remains active",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Unchecked dot versus comma, star versus section sign, and the empty-policy controls. Physical remap decoding is not covered by the shared policy.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"]
+				},
+				{
+					"id": "CW-S-C12",
+					"aspect": "Unknown native semantic keys refuse",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Actual registered corpus asserts throws for spacebar, return, empty and separator: these are not accepted semantic aliases.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C13",
+					"aspect": "Only built-in delimiters offered",
+					"outcome": "explicit-intent",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "A custom hotstring delimiter appended at runtime has no CapsWord choice and cannot compile. The built-in-only rule is explicit in policy and corpus.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"]
+				},
+				{
+					"id": "CW-S-C14",
+					"aspect": "Six pointer identities declared",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Gesture, pointer_motion, left_click, right_click, middle_click, other_buttons. Driver mapping and native event delivery remain separate.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C15",
+					"aspect": "Windows gesture exclusion and reason",
+					"outcome": "explicit-intent",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Gesture is declared only for macOS/Linux because Windows keeps touchpad gestures. Its shared reason is present in all 21 locales.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C16",
+					"aspect": "Pointer false/true and undeclared-kind refusal",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Actual corpus covers all-true, all-false and gesture-only switches, plus undeclared-kind throws. No native pointer input executed.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C17",
+					"aspect": "Malformed policy values refuse by reason",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-luajit.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Actual 14 compile vectors plus NaN, infinite, negative and type controls. Not every malformed developer-owned pointer array is covered.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-luajit.txt"]
+				},
+				{
+					"id": "CW-S-C18",
+					"aspect": "Canonical checkbox list order and duplicates",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/policy-probe.lua",
+							"sha256": "6f1a5f095ccc89adf5b4e83314358f4e6ce26abc7a541b5cf4801f99ba6443f1"
+						},
+						{
+							"path": "shared/dry-A-policy-lua54.txt",
+							"sha256": "0278302772405c48c85542e4156aacc1ce891c947fc993ee761d6bcd53111e7f"
+						}
+					],
+					"qualification": "Registered corpus checks addition, removal and order, and refuses duplicate, unknown and type cases. Configuration-load cleanup is driver-owned.",
+					"submitted_evidence": ["policy-probe.lua", "dry-A-policy-lua54.txt"]
+				},
+				{
+					"id": "CW-S-C19",
+					"aspect": "Site projection matches8×3platformflags",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Twenty-four actual generated flags agree with the shared model. Declaration is not semantic or hardware proof.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C20",
+					"aspect": "Every required caption/reason exists in21locales",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "Actual caption and required reason values are nonempty in all current 21 locale JSON files. Translation quality is not measured.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C21",
+					"aspect": "CapsWord action aliases are equivalents",
+					"outcome": "explicit-intent",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "The aliases are explicitly equivalent action identities, not identical repeated-invocation semantics: Windows and Linux toggle; macOS catalogue activation sets the variable to one, while generated physical Karabiner activation is guarded when already active. Common intended re-invocation policy is not established.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C22",
+					"aspect": "CapsLock action remains distinct",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/declaration-probe.cjs",
+							"sha256": "d84017d85d875b693f502b20b932103f4cd673b233eaa1c9cda54b590666826a"
+						},
+						{
+							"path": "shared/declarations.txt",
+							"sha256": "e8ae8e477e91af9a4d2ad0803f939c77db4db1e778fd52dab0e7a8b7de19495d"
+						}
+					],
+					"qualification": "toggle_capslock is declared on all OSes; caps_lock spelling differs by OS. Existing-user-lock restoration requires actual driver receipts.",
+					"submitted_evidence": ["declaration-probe.cjs", "declarations.txt"]
+				},
+				{
+					"id": "CW-S-C23",
+					"aspect": "Policy snapshot versus live-apply ownership",
+					"outcome": "documentation-only",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/source-contract.py",
+							"sha256": "a453c9252b9ca4dd393fca5238b91f67bff63bf03cbf958ce0a40fa32debb3df"
+						},
+						{
+							"path": "shared/source-contract.txt",
+							"sha256": "0b7c29cd22c3648b5e856414af958be7cb83aeb5339ee9ee5d760a62c8bf3d4b"
+						}
+					],
+					"qualification": "Windows explicitly publishes settings for the next activation. Linux Manager stores an activation snapshot, but its real menu promises changes apply to the running session on the next event; this contradiction is being adjudicated in the Linux scope. macOS owner explicitly publishes live apply for the next event. Shared policy alone does not establish all driver timer scheduling.",
+					"submitted_evidence": ["source-contract.py", "source-contract.txt"]
+				},
+				{
+					"id": "CW-S-C24",
+					"aspect": "Two final bounded dry sweeps",
+					"outcome": "present",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/run-dry.py",
+							"sha256": "bb7b0d9cbb46246dc1593ded7428381d3740eded270380745b929624cb810469"
+						},
+						{
+							"path": "shared/dry-receipts.json",
+							"sha256": "a5d5de64363234a44bf19f759dfe123e105c61d0381befde377e59f162d762d6"
+						}
+					],
+					"qualification": "Final A/B sweeps each run six processes, including both magic-key characterizations after CW-S002. No additional root was found in this bounded scope; repetitions do not add distinct coverage or certify native parity.",
+					"submitted_evidence": ["run-dry.py", "dry-receipts.json"]
+				},
+				{
+					"id": "CW-S-C25",
+					"aspect": "Renamed magic-key caption versus active CapsWord delimiter",
+					"outcome": "observed-defect",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "13c465fa80d55aa1f313e2736ed2a076a78e1be9d90815a732aa04ef2a6f1afe"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "d61715c08124f0e0a2346139e5b9e511fcbfa9b72e2006cc05aec5059cf1f652"
+						},
+						{
+							"path": "shared/magic-key-policy.lua",
+							"sha256": "24f53bb717416df2ad8065e97598c89ff4e0436d120a06afe204c132d4f83a1d"
+						},
+						{
+							"path": "shared/magic-key-lua54.txt",
+							"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+						},
+						{
+							"path": "shared/magic-key-luajit.txt",
+							"sha256": "65f852d308aca13d8365a4d08ce4d9fdbef4de8f193d37d7a9e14d11cb03714c"
+						},
+						{
+							"path": "shared/source-receipt.json",
+							"sha256": "03eb82c4b22e758717f36306e44c67d60205f1f0929ade0839c3e495f1cbecf4"
+						}
+					],
+					"qualification": "CW-S002: actual shared load/mutation characterization and exact menu source; public caller corroboration belongs to the macOS/Linux roles and root replay. Local literal-versus-dynamic intent remains unresolved. Windows fresh literal catalogue is explicit, full caption not claimed.",
+					"submitted_evidence": [
+						"magic-key-policy.lua",
+						"magic-key-lua54.txt",
+						"magic-key-luajit.txt",
+						"source-receipt.json"
+					]
+				}
+			]
+		}
+	]
+}

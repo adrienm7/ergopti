@@ -1,0 +1,959 @@
+[
+  {
+    "id": "CWL-C001",
+    "aspect": "normal-10-second-idle",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C002",
+    "aspect": "zero-never-idle",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C003",
+    "aspect": "tiny-positive",
+    "basis": "actual-owner",
+    "classification": "shared_finding_evidence",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0,
+      "cached_idle": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C004",
+    "aspect": "one-ms-positive",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C005",
+    "aspect": "live-idle-zero-to-one",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 0,
+      "cached_idle": 1000
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C006",
+    "aspect": "live-idle-ten-to-one",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1,
+      "cached_idle": 1000
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C007",
+    "aspect": "live-uncheck-space",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C008",
+    "aspect": "live-uncheck-pointer",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C009",
+    "aspect": "modifier-does-not-wake",
+    "basis": "actual-owner",
+    "classification": "unknown_intent",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C010",
+    "aspect": "arrow-wakes",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C011",
+    "aspect": "text-delimiter- ",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C012",
+    "aspect": "text-delimiter-\u00a0",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C013",
+    "aspect": "text-delimiter-\u202f",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C014",
+    "aspect": "text-delimiter-\t",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C015",
+    "aspect": "text-delimiter-\n",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C016",
+    "aspect": "text-delimiter-,",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C017",
+    "aspect": "text-delimiter-;",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C018",
+    "aspect": "text-delimiter-.",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C019",
+    "aspect": "text-delimiter-\u00a0:",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C020",
+    "aspect": "text-delimiter-A\u202f!",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C021",
+    "aspect": "unchecked-text--",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C022",
+    "aspect": "unchecked-text-A",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C023",
+    "aspect": "unchecked-text-9",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C024",
+    "aspect": "unchecked-text-\u00e9",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C025",
+    "aspect": "unchecked-text-",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C026",
+    "aspect": "pointer-checked-left_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C027",
+    "aspect": "pointer-unchecked-left_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C028",
+    "aspect": "pointer-checked-right_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C029",
+    "aspect": "pointer-unchecked-right_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C030",
+    "aspect": "pointer-checked-middle_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C031",
+    "aspect": "pointer-unchecked-middle_click",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C032",
+    "aspect": "pointer-checked-other_buttons",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C033",
+    "aspect": "pointer-unchecked-other_buttons",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C034",
+    "aspect": "pointer-checked-gesture",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C035",
+    "aspect": "pointer-unchecked-gesture",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C036",
+    "aspect": "native-tab-checked",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C037",
+    "aspect": "native-enter-checked",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C038",
+    "aspect": "ctrl-tab-checked",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C039",
+    "aspect": "native-tab-unchecked",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C040",
+    "aspect": "preexisting-user-caps",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": true,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C041",
+    "aspect": "nonlocking-map-refusal",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C042",
+    "aspect": "user-caps-press",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C043",
+    "aspect": "lifecycle-stop",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C044",
+    "aspect": "lifecycle-cancel",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C045",
+    "aspect": "lifecycle-init",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C046",
+    "aspect": "lifecycle-disable",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving."
+  },
+  {
+    "id": "CWL-C047",
+    "aspect": "public-menu-uncheck-space",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1,
+      "menu_changes": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C048",
+    "aspect": "public-menu-space-next-session-control",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 2
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C049",
+    "aspect": "public-menu-enable-left-click",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L002"
+    ],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 1,
+      "menu_checked": true,
+      "menu_changes": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C050",
+    "aspect": "public-menu-left-click-next-session-control",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 2
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C051",
+    "aspect": "configured-magic-star-label",
+    "basis": "actual-owner",
+    "classification": "shared_finding_evidence",
+    "finding_ids": [],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 0,
+      "checked_label": "\u00a7 : Touche magique",
+      "magic_key": "\u00a7"
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C052",
+    "aspect": "literal-star-still-ends",
+    "basis": "actual-owner",
+    "classification": "shared_finding_evidence",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original submenu closure and real shared renderer execute; the outer unrelated menu renderer is intercepted to select this group, with no native tray session."
+  },
+  {
+    "id": "CWL-C053",
+    "aspect": "absolute-pointer-motion-ignored",
+    "basis": "actual-owner",
+    "classification": "observed_defect",
+    "finding_ids": [
+      "CW-L001"
+    ],
+    "observation": {
+      "active": true,
+      "capture_caps": true,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C054",
+    "aspect": "relative-pointer-motion-control",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 0
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  },
+  {
+    "id": "CWL-C055",
+    "aspect": "touch-gesture-default-control",
+    "basis": "actual-owner",
+    "classification": "positive_control",
+    "finding_ids": [],
+    "observation": {
+      "active": false,
+      "capture_caps": false,
+      "pending": 1
+    },
+    "evidence": [
+      "owner-probe.lua",
+      "final-proofs/A-lua-owner.stdout.txt"
+    ],
+    "qualification": "Actual manager, settings, hook, XKB adapter, emitter, broker and writer over controlled native ports; no native keyboard or compositor receiving. Original Hook pointer function retrieved by debug upvalue with source identity authenticated; callback is a recorded port forwarding to actual Manager. Main forwarding is source-only, not copied/executed."
+  }
+]

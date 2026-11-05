@@ -1,0 +1,32 @@
+
+=== watchers input-source teardown is exact and retryable ===
+  ok   skips an unresolved notification and lets the poll recover
+  ok   contains a throwing broker subscription before timer acquisition
+  ok   contains a throwing poll-timer acquisition and retries with one timer
+  ok   retains an activated poll timer when start throws and cleanup refuses
+  ok   rejects a chainable poll start whose native state stays stopped
+  ok   keeps a synchronously delivered poll callback inert until commit
+  ok   retains a chainably stopped layout timer until native state settles
+  ok   logs a throwing recurring poll callback and keeps its timer manageable
+  ok   retains broker cleanup debt after a nil poll timer until exact retry
+  ok   retries a refused layout read on the next tick and fences its retained watchdog
+  ok   rejects an uncommitted watchdog and settles it before one successor
+  ok   retries a refused timeout termination before starting one successor
+  ok   (layout-read-exit-pending) reports an accepted timeout termination as a warning
+  ok   settles a once-refused in-flight read before restarting the watcher
+  ok   ignores a superseded debounce whose native stop failed
+  ok   retains every failed handle, fences callbacks, then settles the retry
+  ok   removes only its named broker subscriber and preserves a sibling
+  ok   retries an orphaned callback capability before restart
+  ok   never mistakes a live watcher subscription for orphaned cleanup
+
+=== watchers app-switch teardown is exact and retryable ===
+  ok   (same-name-app-history) tracks distinct bundle identities with the same display name
+  ok   recovers an inactive watcher retained after start and rollback refusal
+  ok   falls through false launch results to the application object
+  ok   keeps a failed watcher inert and settles it before restart
+
+=== watchers window switching honours native focus results ===
+  ok   contains an exception raised by an F17 action
+  ok   continues after one candidate refuses focus
+AUDIT_RESULT	25	0

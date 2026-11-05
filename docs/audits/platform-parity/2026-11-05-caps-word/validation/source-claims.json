@@ -1,0 +1,1432 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"current_head": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"claims": 177,
+	"distinct_paths": 136,
+	"per_role_claims": {
+		"windows": 32,
+		"macos": 46,
+		"linux": 27,
+		"shared": 49,
+		"linux-followup": 23
+	},
+	"qualification": "Named source files only; overlapping role claims are not unique coverage. Both pinned Git bytes and current bytes must match. No transitive completeness, semantic parity, native execution or automatic metadata re-hashing is inferred.",
+	"results": [
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+			"sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+			"sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+			"sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/hook_dispatcher.ahk",
+			"sha256": "815b776cfa26935041130add0447994adacef4685be9f1670891de302112e79c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/error_net.ahk",
+			"sha256": "247476b9bc6f58912ffc8d97e0065891e811dbe94b1efcd45c2102c3ad928bf7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk",
+			"sha256": "334ef8e027b2e1691166e7dd838053e286dbddb0eb57e485ef34589d62d2af3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/space.ahk",
+			"sha256": "6dca1d47a45e3812937615aaea3ba7d3765e01ecb106b0e1b22c340983426dae",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/tab.ahk",
+			"sha256": "50564663982a6b9652577dda003269230702d89df10e818dca6e5d28df5f7cca",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/altgr.ahk",
+			"sha256": "012721c98190cc52d5b0ae57736db28d7cf55baadd7a783c1b9d254bf7cf2ddb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/capslock.ahk",
+			"sha256": "db29014b9c4cc2d9ecbbfeaa11009c4fd77a40ef5e5dab044b42544ecba275e9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+			"sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+			"sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+			"sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/adapters/editor_replace.ahk",
+			"sha256": "39532999a1909117fae6be31f92acbbe45e8ca146ab7a8c9b8a56a1a80490cf3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+			"sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off.ahk",
+			"sha256": "4e10b85d4b3656724994723c154c3e784983c629bd46f267837195dc8ff61347",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off_ownership.ahk",
+			"sha256": "8f47fb993bbaf59a36168702fc567985c6bea577c271abc37cc477c3191ad6ee",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_state.ahk",
+			"sha256": "6da6684053ac87eccbd50acedb68fbe379e0476a5828c87936851fef54facc83",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/tests/unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk",
+			"sha256": "96fb9a789e87aee64d3e24afc4c5603adb308d92ecdcbfa579f9611eba7263bc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/windows/tests/meta/modules/shortcuts/test_capsword_auto_off_single_source.ahk",
+			"sha256": "ae7b52d3e2e7bb67f53360c6ed8536ef84aa4e5df5aeb7eedf339c4bc2818258",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+			"sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "windows",
+			"receipt": "windows/source-contract.json",
+			"path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+			"sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+			"sha256": "9a5cec016f0ac91d0f57e360f97d3b40291be473c83caca33951f8cfb75f4763",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+			"sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/infra/capsword_output.lua",
+			"sha256": "eaff5c5baa507b2190cbd550aa4fc2201ff2a499130b2f21fbd16193054a6f22",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/ke_variables.lua",
+			"sha256": "5a581a712d07c493dcfad4d09d4d3dfa46a576a7f7d7e9635f2d3da33bd469fa",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/generator.lua",
+			"sha256": "b59c65a4754519dadeb59d2ae1b7b6a6a2c4427caae1b8b273ffc3ec483f69c8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/data/capsword.json",
+			"sha256": "682fe4582ac995fc5746397626ada12effc135ef835d736992479b31007bb1bc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"sha256": "d353c6688da5fef97792e07a433defff19ff21408094eb985a8f0a1e904a0331",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/ui/menu/menu_caps_word.lua",
+			"sha256": "b4fe09cac794a6677881488f6687814e64b25a84960b19807afabe209103ec7e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/ui/menu/shortcuts_scope.lua",
+			"sha256": "1e49c23402159d24a2c013b7d38db740a20fb072bf8e94afd82649d4d94d991d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/modules/keymap/control_sentinels.lua",
+			"sha256": "902a03f908e3825a47e6b44f683917001e6cfab3493e59c96a82fd49201ff527",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/adapters/text_sender.lua",
+			"sha256": "b8b8a4f5c2b672874feab51192185f1100b67495f1a3071470c06ffd83caef9f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/adapters/key_state.lua",
+			"sha256": "dd1aef831dca054289302230699fd40b6ba8eb372fe492031c4c2dc9ffb83205",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"sha256": "fdf9ad188c0feacc37be2b3aaf9f82fced2c9cb0ac68366de4d5b0d6d4463a86",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/platform/remap/lease_contract.lua",
+			"sha256": "055b2eee9707fba34378d49ed9ce2bcb71d7d549aec14f22442546ad3e711ef6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/stubs/hs.lua",
+			"sha256": "c1702704058115f7573ef4da2dc2924a72c45b0229c00e5ea932c89f27f3b8f6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/support/source_file.lua",
+			"sha256": "0ce4d907e8e08fd028bb44a798f612631cc23c3f18edc5b427c98f35863d037a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/support/karabiner_model.lua",
+			"sha256": "4fe3a0b0000cb7a08c8ed45094289a2210d5909601ac56f32edc9ce0184bef98",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/core/domain/Terminators.spec.js",
+			"sha256": "fecbe89672d0d8bee62813658faa7cdab131815efe49a437e2750de8246dac8a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword.lua",
+			"sha256": "629d5beea6d5fe6052f24f562ac6e9fe6c99013e7297d25464f6d96e4cf925ec",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword_auto_off.lua",
+			"sha256": "ad9c29746e8e263ac0a312e197a345cb2852abfd4b6e1032bc7af28ab4aacc05",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword_release_race.lua",
+			"sha256": "212d5e2a27a8a90a524b72e55884bbabd319c9d1bc890d6719b3ec58d821006f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_capsword_control_signal.lua",
+			"sha256": "b3dff4972bdbf6811c0a7c4e4725e1bb162c5c26d0fdff080d0dd013c6c093bd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_caps_word_auto_off_policy.lua",
+			"sha256": "e8043175f30dd3596bd01c40dfd5a85b8ba5414607daa1fd3e8d90a1e07413b3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_teardown_retry.lua",
+			"sha256": "6af8ede7e804867d6223d5709e12569aad0370f902b21fba600e549058523c20",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/generator/test_generator_capsword_setting_exits.lua",
+			"sha256": "e548971af6c447b96dbede1ca893f71ccbcccce7397bcc120f0a2b0e9ed13fbf",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/infra/config/test_capsword_auto_off_settings.lua",
+			"sha256": "74e79e690e0c39041d7e2083e938f2ed2dfd5449f444c997eae9607d425a9e71",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/shortcuts/test_menu_caps_word.lua",
+			"sha256": "fc5a0f0846560f1f104d355aaf84ea76daf65a998158440516813608856b4a2e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/adapters/synthetic_input/test_text_sender_capsword_output.lua",
+			"sha256": "f48be21ee2b4aaeba0331db52d56cf38ddfefb3b1890310c4a9e31f1069380bd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_karabiner_actions_reachable.lua",
+			"sha256": "e2a0abee8d2eb2174978a01845da70b84effc6e83addb47ae9c61f40f5a562b4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/ke_lifecycle/test_ke_variables_serialized_batches.lua",
+			"sha256": "c4f5b3bdef7392d97a585171abc4ca6e2a29599e1ab279e4e3a7caea384907d0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/meta/architecture/test_capsword_auto_off_single_source.lua",
+			"sha256": "d006ff6f6691570fb4126758b8da8fec4a4cd04d7c990f4d6f7710b6b847fc7c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "macos",
+			"receipt": "macos/source-hashes.json",
+			"path": "static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_capsword_lock_release.lua",
+			"sha256": "364c35cac818b9d59c5bee97ba7836717d4787609a3196662dd25f757ac6cfa1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/event_loop.lua",
+			"sha256": "d9583f9e74735bf287b46da5c74f3359e15d30c87d1daf78d044d69737ecd5f2",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/input_event.lua",
+			"sha256": "ed7f21f545f682607bde2626c9c327935bb5996910b2b813f259cbe830b2fbe7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/evdev_codes.lua",
+			"sha256": "0ccc74128959cf544abc809f35fd763eebf9aac0e3369669b926f0943ccb63b8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/monotonic.lua",
+			"sha256": "4adacad769b9958666143fe8519b09da000778fd594539c9a401b6d59b9ed767",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/hotstring_preferences.lua",
+			"sha256": "d15fbe1e2a5af2ca23023e097625b4dff5266bd3012dda7ab57e58879e6b332d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/manifest_reader.lua",
+			"sha256": "90a161f14bf6056bf8255a85338f6310864fd3d25801c496384586d18adfc85e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/manifest_menu.lua",
+			"sha256": "e5dfdc5a694b1dc8b7d49dc8460b6fe62e71443f3842638aecac8e0a53cc3849",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+			"sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/device_finder.lua",
+			"sha256": "a5d0c4830dd56868f0f5881f988e60b066106cea30d9e95cbf5d5e4bf3150931",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
+			"sha256": "6f1be4b49903f625aef71919bcd595ca9e1c9c132716545d3d0973c2ce741db9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+			"sha256": "1d28167df7eabbc1be798067269c03706cc41c8e1abd812102977784006404f7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/linux/ui/menu/builder.lua",
+			"sha256": "a64d1140a9f5c1371cffab6303644e5b4921c9a77b085e9a94b07a5ca47b2fa3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux",
+			"receipt": "linux/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+			"sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "docs/memory/linux-web-release.md",
+			"sha256": "eec06e1f26814576e0e0e71bc517abb556dc36794d5f9021754462d7a9f4c5ef",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "src/routes/ergopti-plus/feature-inventory.json",
+			"sha256": "5edb4101f1523786323fba71a5c2f40ab26eb329b7f4183da1ca121dc5d0241f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/core/domain/Terminators.spec.js",
+			"sha256": "fecbe89672d0d8bee62813658faa7cdab131815efe49a437e2750de8246dac8a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"sha256": "8fad378966bd4980f4e4982ff10b3284a36a920a1e80d82e21170ae1256c2e72",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"sha256": "a3e2dd8782d71ed1b4a70a960e77fe3633a2af6ae4f25cd1b64ebea10b0bfcfd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"sha256": "6f7d53870f42dfe0de3157835c9360120936823ff9a345afc3898daf40ecee49",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"sha256": "9f9461f5a0851ed10c9dfadeab90a48e3739692e8d3a25b1cb5c3535177bafbc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"sha256": "9df0c3b132d4158475f865283f30ce65aa6a9d9b5a439ba3c63099d0d587c8d0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"sha256": "a2be5769ea4a97a358ca6c60e2334c4b9be5d92f2932cc6d7709f030fe2a150a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"sha256": "0e1b74543eab765748aef1c86929e7b63d7df8edc8aef85a7121217d545e828b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"sha256": "2e261f8206cfa17923d045b01f899acc8550aa437494e7783d3c53b391915b23",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"sha256": "355dfa41cfd31bc7c6d2cf71c4deb302ea687c03f2bafc700368aecd262b3bca",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"sha256": "24339ab31789883b12e5246e284b0ca4c9b567f2f7080b2298f4b73c6c900d2c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"sha256": "e85a6df6ef0978aee9f61261482c57304028790859ff29397110ea60c979bb08",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"sha256": "4bfaa6b7c70ce7bd876659ebe5c728c26e559a3bbc4c7ebb89f703ee04ecfc54",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"sha256": "ebc07222f88986e62c0129156788951622723e15ec0860c23e201eb72bd730d3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"sha256": "be7570add9ce0aaa06f0c4bbbccac96ab5e1e7b55ee95a1ce3249e9eaf3ddf78",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"sha256": "7f12011d58218a2dc4b486c92aa64685e85ca5f1ec32193d6520cfd5d92967e9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"sha256": "8d445586e1653f68abd565dc56cf33b96f9586787bee37cdb56b837789d1fff1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"sha256": "0ec292589efb5a9914d3d6918aacd25fb8009b06432f3d7fe798739776600607",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"sha256": "758a6934543171e6a500acb77fc362a00ec266a28b89a95ce823817dfc2c6bb0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"sha256": "02465bcaefe1a5b973de62137347aee898e69e33d7f0b6fdfb517fdce08e75b1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"sha256": "0d11ca3f442a3ae34994cbc2043a348f2dcc726be774730968f1dfe9c2823c50",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/test/caps_word_auto_off_contract.lua",
+			"sha256": "41a802394a6f4fa32b6dfabc1cdcbe7092e49d037b6aca61fedfaa020f56ffb9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/actions/README.md",
+			"sha256": "8df4d0a1f4d2241e73be8f2977e6d05568369f6c8e928f4cd24ccb589ae1fb79",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+			"sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json",
+			"sha256": "544782751c80291ac36158a1e3b07b5507d42a1fde349c73859a2097427741d3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json",
+			"sha256": "eb7f557528eea55eff84f819979f5d2731de30f833235070acb0bd82482b892e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+			"sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"sha256": "d353c6688da5fef97792e07a433defff19ff21408094eb985a8f0a1e904a0331",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/macos/ui/menu/menu_caps_word.lua",
+			"sha256": "b4fe09cac794a6677881488f6687814e64b25a84960b19807afabe209103ec7e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+			"sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+			"sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+			"sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "tools/build/build-features-manifest.js",
+			"sha256": "102d3db701ca3a55a46addf9f5e3c98394d68d3a2c0bb76cdce3bee5e9edd03a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "shared",
+			"receipt": "shared/source-receipt.json",
+			"path": "tools/test/test-caps-word-auto-off-single-source.cjs",
+			"sha256": "32b9eeb429c596a072d9a49cc4b35d7f60c69e64be5ed7354b6ca10d2c2fd092",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+			"sha256": "17e0e4b8c29663c8e85acf0a0a7a5c95ef1bdfff477447d960ae645309670f7b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/action_handlers.lua",
+			"sha256": "e218a293d0c52a9b5162cd31f83c44b41435d31d73aaa94e4d329e82bfde563d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+			"sha256": "b83f459977dd92b208fc13ce8ffcb16a37286226bf4660ebed8a56d835194e88",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+			"sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/gestures/combo_emitter.lua",
+			"sha256": "729f390c6d84f9b88050dc885c2f9f93ac1f621d2081349aad60f7911a06edee",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_engine.lua",
+			"sha256": "b856fe543eece29449c3c736af6fed9f524e70466d812d5d5567c8ab52be97e7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
+			"sha256": "e3d8970dd41e7e1239b370ecbc9e0d04edf2f8a1f2c4a4fbfb5a0ed6d3b1522b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/keyboard_layout.lua",
+			"sha256": "a1114103fbfc238572c562e5b9842fc51207b866997774e630c63979d8fbb15b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/uinput_writer.lua",
+			"sha256": "d5cd2ebaba30e1f27bffbf3c215ffeea8173c3d31e824c923a2c86c3c4532ba4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/infra/input_event.lua",
+			"sha256": "ed7f21f545f682607bde2626c9c327935bb5996910b2b813f259cbe830b2fbe7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+			"sha256": "449c91fa83af61d76d781dc76e84ca1eb9fcd8c82dbe627d2a47d5dd04f36120",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/linux/_generated/gesture_emit_actions.lua",
+			"sha256": "aaff68b8707131cc7271f371dc02885f7ff55a97be36868f29eee7d07ee96822",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"role": "linux-followup",
+			"receipt": "linux-synthetic-followup/source-receipt.json",
+			"path": "docs/audits/platform-parity/2026-11-05-word-reset/linux/findings.json",
+			"sha256": "4cb550f57c6934f0fd04cc1f30b4967302d9e4c75712b3d9241105fd337277d8",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	]
+}

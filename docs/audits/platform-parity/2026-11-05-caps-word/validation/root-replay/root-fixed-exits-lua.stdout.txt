@@ -1,0 +1,1 @@
+ROOT_FIXED_EXITS={"observations":[{"active":true,"key":"escape","observed_control":true},{"active":true,"key":"left","observed_control":true}],"qualification":"Actual Linux hook and manager over recorded XKB/uinput ports; no native application receiving. The macOS comparison comes from its separately executed actual generator tests, not this fixture."}

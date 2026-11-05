@@ -1,0 +1,431 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "windows",
+	"qualification": "Artifact custody and exact Git/current source authentication; actual independent Python lexical-source replay only. No AutoHotkey or native keyboard execution.",
+	"handoff_sha256": "6ffe9f21a83c354556a21b6b066fe2289d825af4d6a57fbeaa03d2884f9463c1",
+	"listed_artifacts": [
+		{
+			"path": "report.md",
+			"sha256": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "findings.json",
+			"sha256": "d19d1c51d5fc097bf875a3781271dca490db09a76eb288cdd89cac6cb3f8e626",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "b8592a36417b6f085f49545bc33bb71119bd650335d28daa09f0279a91bbee0d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-contract.py",
+			"sha256": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-contract.json",
+			"sha256": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A.json",
+			"sha256": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B.json",
+			"sha256": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-sweeps.json",
+			"sha256": "74376bda07160285d80759d8becfdb8bed596f6c9ba2036f0f14d55dd9e7790a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "reader-controls.json",
+			"sha256": "ee9dc128ed3f322a8cd74ae67ac580cfd53e3fdc12e004b22299e8f63d000744",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "prior-search.json",
+			"sha256": "d1e716100a5041e7537044bc3d48dc323e4da584e61c31f1d1461087ec6eee17",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "false-green-scan.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "format.txt",
+			"sha256": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "format-dry.txt",
+			"sha256": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98",
+			"scratch_matches": true,
+			"archive_matches": true
+		}
+	],
+	"additional_archive": ["handoff.json"],
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword.ahk",
+			"sha256": "431f4a6b0d715a6a3672fbcf4ed84d60552a2adfe5d4f4874dd3cc2ea7b25954",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/shortcuts/capsword_auto_off.ahk",
+			"sha256": "90512aa92d5f2fbe3048acec3de911ceb75ecb5d48c182c7249f9f99dcd989c1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/capsword_state.ahk",
+			"sha256": "f11ecbdeb90cd33812d0821bc366a9127b979731232dc30f4e446430958d49d5",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hook_dispatcher.ahk",
+			"sha256": "815b776cfa26935041130add0447994adacef4685be9f1670891de302112e79c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/error_net.ahk",
+			"sha256": "247476b9bc6f58912ffc8d97e0065891e811dbe94b1efcd45c2102c3ad928bf7",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_buffer_effects.ahk",
+			"sha256": "334ef8e027b2e1691166e7dd838053e286dbddb0eb57e485ef34589d62d2af3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/space.ahk",
+			"sha256": "6dca1d47a45e3812937615aaea3ba7d3765e01ecb106b0e1b22c340983426dae",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/tab.ahk",
+			"sha256": "50564663982a6b9652577dda003269230702d89df10e818dca6e5d28df5f7cca",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/altgr.ahk",
+			"sha256": "012721c98190cc52d5b0ae57736db28d7cf55baadd7a783c1b9d254bf7cf2ddb",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/capslock.ahk",
+			"sha256": "db29014b9c4cc2d9ecbbfeaa11009c4fd77a40ef5e5dab044b42544ecba275e9",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/one_shot_shift.ahk",
+			"sha256": "458c21c994de1d2794b62d1f70dabd6f8b26305c174c6641429cb8c07a994b5b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/tap_hold_loader.ahk",
+			"sha256": "76d475638cc48a101e8d18cff17cf02ee7ebb87536fde78e47abc9dd23bf285c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/text_sender.ahk",
+			"sha256": "0721bdeb5445797f3ca698428278dfd598964bd2ba5cea63d34e6bc7b93132ad",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/editor_replace.ahk",
+			"sha256": "39532999a1909117fae6be31f92acbbe45e8ca146ab7a8c9b8a56a1a80490cf3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/key_state.ahk",
+			"sha256": "5f9426ebd47a57fd3c66066e77bed1399fa5c47021d94a031c819ee2c8291050",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off.ahk",
+			"sha256": "4e10b85d4b3656724994723c154c3e784983c629bd46f267837195dc8ff61347",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_auto_off_ownership.ahk",
+			"sha256": "8f47fb993bbaf59a36168702fc567985c6bea577c271abc37cc477c3191ad6ee",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_capsword_state.ahk",
+			"sha256": "6da6684053ac87eccbd50acedb68fbe379e0476a5828c87936851fef54facc83",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk",
+			"sha256": "96fb9a789e87aee64d3e24afc4c5603adb308d92ecdcbfa579f9611eba7263bc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/windows/tests/meta/modules/shortcuts/test_capsword_auto_off_single_source.ahk",
+			"sha256": "ae7b52d3e2e7bb67f53360c6ed8536ef84aa4e5df5aeb7eedf339c4bc2818258",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk",
+			"sha256": "9c61753db5c6d0113667e6938f1cf4e0b2040b98b09740a20191f4c61cde85ba",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tap_hold/defaults.toml",
+			"sha256": "c4f4a6678703dada0e58179124c0c956770ca35c6129d18d62179730d9952799",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"coverage_rows": 37,
+		"distinct_coverage_aspects": 37,
+		"findings": 2,
+		"finding_ids": ["CW-W001", "CW-W002"],
+		"source_files": 32,
+		"lexical_checks": 39,
+		"runtime_cases": 0,
+		"final_dry_sweeps": 2
+	},
+	"independent_source_replay": {
+		"exit_code": 0,
+		"parsed_matches_worker_source_receipt": true,
+		"stderr_bytes": 0
+	},
+	"dry_source_receipts": [
+		{
+			"label": "A",
+			"same_program_source_claims_and_checks": true,
+			"qualification": "Repeated source sweep; not additional unique runtime or aspect coverage."
+		},
+		{
+			"label": "B",
+			"same_program_source_claims_and_checks": true,
+			"qualification": "Repeated source sweep; not additional unique runtime or aspect coverage."
+		}
+	],
+	"final_worker_hash_resolutions": [
+		{
+			"path": "windows/report.md",
+			"expected": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276",
+			"current": "34da36eba075240b2e6c241eac891327fef4639f8b47aeeaa5edbe2966027276",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/findings.json",
+			"expected": "d19d1c51d5fc097bf875a3781271dca490db09a76eb288cdd89cac6cb3f8e626",
+			"current": "62fd77c4df0dad036a1be4edb824fd614da3d1a2f49ad02c221fd932ad71d4f5",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/findings.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/coverage.json",
+			"expected": "b8592a36417b6f085f49545bc33bb71119bd650335d28daa09f0279a91bbee0d",
+			"current": "6f5535783e085a5803fab085fc9abb58c2c122da6af752b690b2475c6597c7ce",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/coverage.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/source-contract.py",
+			"expected": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"current": "56aca858f306bec79a9d5666b910af08a7fe1637a3b55dafe50edc27be815c36",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/source-contract.json",
+			"expected": "7a1671cad69f7dbf6d1e3c5eef454c0bf3682b02473d1da5ab8a8940d6d72ccd",
+			"current": "b4e77e6cfcbb0507021f163fbabfe0ac16349bedccbca3c663e853637a548b10",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/source-contract.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-A.json",
+			"expected": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"current": "66f9aefc315b72f57041347c823b9d8360745e7bcb7d4f0d9200cfedb5b99522",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-B.json",
+			"expected": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"current": "05aac30a3bf0a5ea162c9009caa6e4cca3adf5492e0bdf5e383d7bafb038b141",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-sweeps.json",
+			"expected": "74376bda07160285d80759d8becfdb8bed596f6c9ba2036f0f14d55dd9e7790a",
+			"current": "13ff238a7265d58c7772b8a0efbb5112cbf21e3953233dfa76ead9ec5bd6e3a5",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-sweeps.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/reader-controls.json",
+			"expected": "ee9dc128ed3f322a8cd74ae67ac580cfd53e3fdc12e004b22299e8f63d000744",
+			"current": "d7ffaef8ecccf6c90350ae9ac80cb214d89bb41237c0ef1497cbf40ba94cfad2",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/reader-controls.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/prior-search.json",
+			"expected": "d1e716100a5041e7537044bc3d48dc323e4da584e61c31f1d1461087ec6eee17",
+			"current": "77600dc0889dcdf61ad53b4dedc7f95ebaf3bf4d136c61534ee81aa94b38b03e",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/prior-search.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/false-green-scan.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/format.txt",
+			"expected": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a",
+			"current": "697c6fb789b8d9f2590070cb56f2da2add97184a2fd9b9c6813fe12755fffb6a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "windows/format-dry.txt",
+			"expected": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98",
+			"current": "02fe1c9d9ba9e24a0ce7e6038735071b7b80caa4608c2c107941d0a14c4c8c98",
+			"resolution": "current_archive"
+		}
+	],
+	"handoff_byte_resolution": {
+		"path": "windows/handoff.json",
+		"expected": "6ffe9f21a83c354556a21b6b066fe2289d825af4d6a57fbeaa03d2884f9463c1",
+		"current": "305fa35a1e4d9bf4fb66107d2e3406fbf7fb810ae4293667ab9ed6daaac8098f",
+		"resolution": "exact_original_copy",
+		"original_bytes": "validation/original-submissions/windows/handoff.json.txt",
+		"json_values_equal": true
+	},
+	"nested_worker_hash_resolutions": [
+		{
+			"path": "windows/dry-A.json",
+			"expected": "55905310338eb0ddc99cc386e247ee1788144535e193bafe246b56e5351dc790",
+			"current": "66f9aefc315b72f57041347c823b9d8360745e7bcb7d4f0d9200cfedb5b99522",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"json_values_equal": true
+		},
+		{
+			"path": "windows/dry-B.json",
+			"expected": "640cbf78d5e78867987b7c4837e22042f7ef34f798ca200b1dff9bf26fcaead1",
+			"current": "05aac30a3bf0a5ea162c9009caa6e4cca3adf5492e0bdf5e383d7bafb038b141",
+			"resolution": "exact_original_copy",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"json_values_equal": true
+		}
+	],
+	"final_format_qualification": "Nine JSON files changed only presentation; eight handoff-listed artifact hashes and the handoff custody hash resolve to exact original copies. Worker hash values remain unchanged. Markdown and Python were already unchanged under the pinned repository formatters."
+}

@@ -1,0 +1,1079 @@
+{
+	"audited_sha": "f2a7dba5fc580aad61e6a0ed16ede84406aed2b0",
+	"role": "macos",
+	"qualification": "Exact artifact/source custody plus genuine Lua5.4 archived public owner replays; activation graph/model and lexical controls remain qualified, with no native keyboard receiving.",
+	"handoff_sha256": "459669a2a50b73692ce6ac8ba7f1ec35335e5facab3056ca683b74432204c2b3",
+	"listed_artifacts": [
+		{
+			"path": "activation-graph.lua",
+			"sha256": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "activation-graph.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "coverage.json",
+			"sha256": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/activation-graph.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/activation-graph.lua.stdout.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-admission.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-admission.lua.stdout.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-idle.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-idle.lua.stdout.txt",
+			"sha256": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-magic-menu.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-magic-menu.lua.stdout.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-payload.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/public-payload.lua.stdout.txt",
+			"sha256": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-A/receipt.json",
+			"sha256": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/activation-graph.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/activation-graph.lua.stdout.txt",
+			"sha256": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-admission.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-admission.lua.stdout.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-idle.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-idle.lua.stdout.txt",
+			"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-magic-menu.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-magic-menu.lua.stdout.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-payload.lua.stderr.txt",
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/public-payload.lua.stdout.txt",
+			"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "dry-B/receipt.json",
+			"sha256": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "false-greens.txt",
+			"sha256": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "findings.json",
+			"sha256": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-admission.lua",
+			"sha256": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-admission.txt",
+			"sha256": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-idle.lua",
+			"sha256": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-idle.txt",
+			"sha256": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-magic-menu.lua",
+			"sha256": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-magic-menu.txt",
+			"sha256": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-payload.lua",
+			"sha256": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "public-payload.txt",
+			"sha256": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "replay.py",
+			"sha256": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "report.md",
+			"sha256": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "run-module.lua",
+			"sha256": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "run-tests.py",
+			"sha256": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "source-hashes.json",
+			"sha256": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "test-results.json",
+			"sha256": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/meta_architecture_test_capsword_auto_off_single_source.txt",
+			"sha256": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/meta_architecture_test_karabiner_capsword_lock_release.txt",
+			"sha256": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_adapters_synthetic_input_test_text_sender_capsword_output.txt",
+			"sha256": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_infra_config_test_capsword_auto_off_settings.txt",
+			"sha256": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_modules_gestures_actions_test_karabiner_actions_reachable.txt",
+			"sha256": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_generator_test_generator_capsword_setting_exits.txt",
+			"sha256": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"sha256": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_caps_word_auto_off_policy.txt",
+			"sha256": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_capsword_control_signal.txt",
+			"sha256": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword.txt",
+			"sha256": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"sha256": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_capsword_release_race.txt",
+			"sha256": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"sha256": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"scratch_matches": true,
+			"archive_matches": true
+		},
+		{
+			"path": "tests/unit_ui_menu_shortcuts_test_menu_caps_word.txt",
+			"sha256": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"scratch_matches": true,
+			"archive_matches": true
+		}
+	],
+	"additional_archive": ["handoff.json"],
+	"source_claims": [
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+			"sha256": "9a5cec016f0ac91d0f57e360f97d3b40291be473c83caca33951f8cfb75f4763",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/capsword_auto_off.lua",
+			"sha256": "e0d6a7b0d9feeceb22d344d9bf2dd376485b5798efd0faeecff3541f6a00ab6d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/capsword_output.lua",
+			"sha256": "eaff5c5baa507b2190cbd550aa4fc2201ff2a499130b2f21fbd16193054a6f22",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/ke_variables.lua",
+			"sha256": "5a581a712d07c493dcfad4d09d4d3dfa46a576a7f7d7e9635f2d3da33bd469fa",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/generator.lua",
+			"sha256": "b59c65a4754519dadeb59d2ae1b7b6a6a2c4427caae1b8b273ffc3ec483f69c8",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/data/capsword.json",
+			"sha256": "682fe4582ac995fc5746397626ada12effc135ef835d736992479b31007bb1bc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/data/actions.json",
+			"sha256": "d353c6688da5fef97792e07a433defff19ff21408094eb985a8f0a1e904a0331",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_caps_word.lua",
+			"sha256": "b4fe09cac794a6677881488f6687814e64b25a84960b19807afabe209103ec7e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/shortcuts_scope.lua",
+			"sha256": "1e49c23402159d24a2c013b7d38db740a20fb072bf8e94afd82649d4d94d991d",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/control_sentinels.lua",
+			"sha256": "902a03f908e3825a47e6b44f683917001e6cfab3493e59c96a82fd49201ff527",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/text_sender.lua",
+			"sha256": "b8b8a4f5c2b672874feab51192185f1100b67495f1a3071470c06ffd83caef9f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/key_state.lua",
+			"sha256": "dd1aef831dca054289302230699fd40b6ba8eb372fe492031c4c2dc9ffb83205",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/lease_controller.lua",
+			"sha256": "fdf9ad188c0feacc37be2b3aaf9f82fced2c9cb0ac68366de4d5b0d6d4463a86",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/lease_contract.lua",
+			"sha256": "055b2eee9707fba34378d49ed9ce2bcb71d7d549aec14f22442546ad3e711ef6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/stubs/hs.lua",
+			"sha256": "c1702704058115f7573ef4da2dc2924a72c45b0229c00e5ea932c89f27f3b8f6",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/source_file.lua",
+			"sha256": "0ce4d907e8e08fd028bb44a798f612631cc23c3f18edc5b427c98f35863d037a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/karabiner_model.lua",
+			"sha256": "4fe3a0b0000cb7a08c8ed45094289a2210d5909601ac56f32edc9ce0184bef98",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+			"sha256": "5de39128197d584604dae2afa4fcc2afaf17c7ced7c37b34c492c91649f03acc",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua",
+			"sha256": "20defcf3f766d45dbbacf21d90a4237a8edcc0f904867b750256b01e198c8a0c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keymap/terminators.lua",
+			"sha256": "a45d8d0107d88573d3056b7a802e8fd5dc936813fa0e6b8e754897cc0eaa2d3f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/domain/Terminators.spec.js",
+			"sha256": "fecbe89672d0d8bee62813658faa7cdab131815efe49a437e2750de8246dac8a",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword.lua",
+			"sha256": "629d5beea6d5fe6052f24f562ac6e9fe6c99013e7297d25464f6d96e4cf925ec",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword_auto_off.lua",
+			"sha256": "ad9c29746e8e263ac0a312e197a345cb2852abfd4b6e1032bc7af28ab4aacc05",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_capsword_release_race.lua",
+			"sha256": "212d5e2a27a8a90a524b72e55884bbabd319c9d1bc890d6719b3ec58d821006f",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_capsword_control_signal.lua",
+			"sha256": "b3dff4972bdbf6811c0a7c4e4725e1bb162c5c26d0fdff080d0dd013c6c093bd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_caps_word_auto_off_policy.lua",
+			"sha256": "e8043175f30dd3596bd01c40dfd5a85b8ba5414607daa1fd3e8d90a1e07413b3",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/watchers/test_watchers_teardown_retry.lua",
+			"sha256": "6af8ede7e804867d6223d5709e12569aad0370f902b21fba600e549058523c20",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/generator/test_generator_capsword_setting_exits.lua",
+			"sha256": "e548971af6c447b96dbede1ca893f71ccbcccce7397bcc120f0a2b0e9ed13fbf",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/infra/config/test_capsword_auto_off_settings.lua",
+			"sha256": "74e79e690e0c39041d7e2083e938f2ed2dfd5449f444c997eae9607d425a9e71",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/shortcuts/test_menu_caps_word.lua",
+			"sha256": "fc5a0f0846560f1f104d355aaf84ea76daf65a998158440516813608856b4a2e",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/adapters/synthetic_input/test_text_sender_capsword_output.lua",
+			"sha256": "f48be21ee2b4aaeba0331db52d56cf38ddfefb3b1890310c4a9e31f1069380bd",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/modules/gestures/actions/test_karabiner_actions_reachable.lua",
+			"sha256": "e2a0abee8d2eb2174978a01845da70b84effc6e83addb47ae9c61f40f5a562b4",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/platform/remap/ke_lifecycle/test_ke_variables_serialized_batches.lua",
+			"sha256": "c4f5b3bdef7392d97a585171abc4ca6e2a29599e1ab279e4e3a7caea384907d0",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/meta/architecture/test_capsword_auto_off_single_source.lua",
+			"sha256": "d006ff6f6691570fb4126758b8da8fec4a4cd04d7c990f4d6f7710b6b847fc7c",
+			"pinned_matches": true,
+			"current_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_capsword_lock_release.lua",
+			"sha256": "364c35cac818b9d59c5bee97ba7836717d4787609a3196662dd25f757ac6cfa1",
+			"pinned_matches": true,
+			"current_matches": true
+		}
+	],
+	"counts": {
+		"coverage_rows": 42,
+		"distinct_aspects": 42,
+		"findings": 3,
+		"finding_ids": ["CW-M001", "CW-M002", "CW-M003"],
+		"source_files": 46,
+		"registered_modules": 14,
+		"registered_cases": 148,
+		"final_decisive_processes": 10
+	},
+	"final_dry_processes": [
+		{
+			"sweep": "A",
+			"program": "public-idle.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"program": "public-admission.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"program": "public-payload.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"program": "public-magic-menu.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "A",
+			"program": "activation-graph.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"program": "public-idle.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"program": "public-admission.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"program": "public-payload.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"program": "public-magic-menu.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		},
+		{
+			"sweep": "B",
+			"program": "activation-graph.lua",
+			"exit_code": 0,
+			"program_stdout_stderr_hashes_match": true
+		}
+	],
+	"independent_decisive_replays": [
+		{
+			"program": "public-idle.lua",
+			"exit_code": 0,
+			"observations_match_archived_worker": true,
+			"stdout_bytes_equal": false,
+			"comparison": "parsed JSON values; Lua table key order is not stable",
+			"stderr_bytes": 0,
+			"process_private_tmpdir": true
+		},
+		{
+			"program": "public-admission.lua",
+			"exit_code": 0,
+			"observations_match_archived_worker": true,
+			"stdout_bytes_equal": true,
+			"comparison": "exact bytes",
+			"stderr_bytes": 0,
+			"process_private_tmpdir": true
+		},
+		{
+			"program": "public-payload.lua",
+			"exit_code": 0,
+			"observations_match_archived_worker": true,
+			"stdout_bytes_equal": false,
+			"comparison": "parsed JSON values; Lua table key order is not stable",
+			"stderr_bytes": 0,
+			"process_private_tmpdir": true
+		},
+		{
+			"program": "public-magic-menu.lua",
+			"exit_code": 0,
+			"observations_match_archived_worker": true,
+			"stdout_bytes_equal": true,
+			"comparison": "exact bytes",
+			"stderr_bytes": 0,
+			"process_private_tmpdir": true
+		},
+		{
+			"program": "activation-graph.lua",
+			"exit_code": 0,
+			"observations_match_archived_worker": true,
+			"stdout_bytes_equal": true,
+			"comparison": "exact bytes",
+			"stderr_bytes": 0,
+			"process_private_tmpdir": true
+		}
+	],
+	"diagnostics_not_credited": [
+		"public-idle-initial.txt: early audit fixture selected wrong menu-title spelling; no production finding derives from that failure.",
+		"public-admission-luajit.txt: optional LuaJIT fixture attempt lacks table.pack in macOS test helpers; LuaJIT is not the macOS production runtime."
+	],
+	"final_worker_hash_resolutions": [
+		{
+			"path": "macos/activation-graph.lua",
+			"expected": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"current": "c77c851812240d83dfef6c5bf7a455aa392734de61927ef347b36a2710f4bda0",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/activation-graph.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/coverage.json",
+			"expected": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa",
+			"current": "2e25b98c404aee8a9b1e9fcad35bd0e225fd7f8c27fcf1673e7bdcaf1f3f91fa",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-idle.lua.stdout.txt",
+			"expected": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"current": "ee5d98307dc412a24518ae30bfd7382b4e3904ac8bfee3ae279425c009ada00d",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/public-payload.lua.stdout.txt",
+			"expected": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"current": "0bc46a3444c7f35d2e67a93e3903a9c038994bd71f785f3651d60f8ad6920a22",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-A/receipt.json",
+			"expected": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62",
+			"current": "08f81fc0e1aa832d496774742bde4370bac41f2b7da2194ff9204b2730577e62",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/activation-graph.lua.stdout.txt",
+			"expected": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"current": "9428168cd137c4ad05811b92db67661a9cb5aefec2e6de72764a20ffb0a88314",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-admission.lua.stdout.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-idle.lua.stdout.txt",
+			"expected": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"current": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-magic-menu.lua.stdout.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stderr.txt",
+			"expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"current": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/public-payload.lua.stdout.txt",
+			"expected": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"current": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/dry-B/receipt.json",
+			"expected": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1",
+			"current": "eb559a5c2b5ce9cd9cb2bcf069416482b9808338135c3c9b4f5bb88926e3adc1",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/false-greens.txt",
+			"expected": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"current": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/findings.json",
+			"expected": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87",
+			"current": "c0bbb392263e8191602836111eb032291ab23363f1aa3008b20d74fb447e8d87",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.lua",
+			"expected": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"current": "5f3cf50a5ace190fb6f76805347d04ed951fbab304bb6725c06f04aafb62eec4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-admission.txt",
+			"expected": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"current": "55c45b74b4e20cca62f6e3f6227c9e91af9edf384c31efb640444885d8bdf927",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-idle.lua",
+			"expected": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"current": "aab48159ff81b48b2574e0d2ece6f38d4d46f4f48ef953906280fb0b12e7be92",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-idle.txt",
+			"expected": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"current": "8a4dd49302664bd61288b4857a27a38cfbb3eb647059d73d49c9c7fcdc43a978",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.lua",
+			"expected": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"current": "d0c0e45567325400fced7045d75413cf22099a63b788d78181ffe0e4943b2429",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-magic-menu.txt",
+			"expected": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"current": "1133411e12188e0a1268c93f64525cf69d473be0bdaacddb3f70096ec38b9689",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.lua",
+			"expected": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"current": "359a223dda1ba16dde70b591ba53efbd0036577f435ca090e48ed1b912e7737a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/public-payload.txt",
+			"expected": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"current": "5ac14522e1b1840752f8c0ba33a77f7485e3be80b3b26661778521e5cc87f230",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/replay.py",
+			"expected": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59",
+			"current": "7f71ea3d02070536ffd13282a4d199ca0dd6aeaded0d7152b0cf3151caf70a59",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/report.md",
+			"expected": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce",
+			"current": "a4fec436757d44e196e9be389329bb8265ac5ea3b45bd7c0d177d9180ac0b0ce",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/run-module.lua",
+			"expected": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"current": "dab3c2a25dd2400347b3676a3cfeca02316175237da07f3af9fabbfba681a9ab",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/run-tests.py",
+			"expected": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58",
+			"current": "ce210604408dc2937c643a99dd9e0629682c6daf9c79b5176c12db5a78654b58",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/source-hashes.json",
+			"expected": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86",
+			"current": "84ea5146f217cd6191b0d567e5b402ab136fe79efeb3cb1f5dc99c0634c5bb86",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/test-results.json",
+			"expected": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b",
+			"current": "ba76fa930edeb4cc1508b800cf0668d8a2ca3887da9eb24035535f0d7d5fa22b",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/meta_architecture_test_capsword_auto_off_single_source.txt",
+			"expected": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"current": "46d88426486f89419bbcf2743190a20b57083def5e18edac93f87a5b5b88ffeb",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/meta_architecture_test_karabiner_capsword_lock_release.txt",
+			"expected": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"current": "0c8805b9b221ec7f76caf04a7916c00e5aaad662c838369e0fc62be74156d45c",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_adapters_synthetic_input_test_text_sender_capsword_output.txt",
+			"expected": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"current": "0100a39c0c19d35c2ec3c310387c290e51bc1725693d9ab3d575dad5fd7c4f61",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_infra_config_test_capsword_auto_off_settings.txt",
+			"expected": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"current": "cb8b9b07a90cc6d8f4dbc5923af6920b5ec83e2940378841ce183847d9b6aa6a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_modules_gestures_actions_test_karabiner_actions_reachable.txt",
+			"expected": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"current": "9dcd3dff8e4fb47d44306ab8d3ffe2f2a7f94cd2cf01fbc58526ffdda7b6fcb4",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_generator_test_generator_capsword_setting_exits.txt",
+			"expected": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"current": "4bebc4b31373df1237b98fb03059dd17898d00b04e1dfa2a4055d31cb187f52a",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_ke_lifecycle_test_ke_variables_serialized_batches.txt",
+			"expected": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"current": "35c9bd365d7efc87f1b0f9dc6ebc1cf9f34ef2bc33e41aeea2583aaa179f6f93",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_caps_word_auto_off_policy.txt",
+			"expected": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"current": "18726e480113e4cbfc9e88d040ec754ab302643c1116c8635341582d73b6ec71",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_capsword_control_signal.txt",
+			"expected": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"current": "86a040e48eb469f911d77e3f879f86476d6fc0d09109a85e79567b0fe74c4dee",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword.txt",
+			"expected": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"current": "3e3eed9e196d80a836419fcd593b27d76eb695e21ae06b515afcc6d64cc1ea31",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword_auto_off.txt",
+			"expected": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"current": "11b2f52d48dc7b5a8bc3f72e03a102808c5970904f04e34d20ba06acf4486b80",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_capsword_release_race.txt",
+			"expected": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"current": "42648aed25fa24834aa7c95f0ffda2a4ba071a57d51f76907e79bdc6aa94d801",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_platform_remap_watchers_test_watchers_teardown_retry.txt",
+			"expected": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"current": "227cc495f08c87f2b8867b1b81e791a47f5607b19ff4dd4f0c162bf69a316c87",
+			"resolution": "current_archive"
+		},
+		{
+			"path": "macos/tests/unit_ui_menu_shortcuts_test_menu_caps_word.txt",
+			"expected": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"current": "b31220758435ef1bd66ccf63aceea5bd09bfc589c5f8715dfe0a7fdd346d8a05",
+			"resolution": "current_archive"
+		}
+	],
+	"handoff_byte_resolution": {
+		"path": "macos/handoff.json",
+		"expected": "459669a2a50b73692ce6ac8ba7f1ec35335e5facab3056ca683b74432204c2b3",
+		"current": "459669a2a50b73692ce6ac8ba7f1ec35335e5facab3056ca683b74432204c2b3",
+		"resolution": "current_archive"
+	},
+	"final_format_qualification": "All55 frozen artifacts and the handoff were already formatted under repository config; archive formatting changed no bytes. JSON observation comparisons retain full parsed values because table key order may vary; textual observations compare exact bytes."
+}
