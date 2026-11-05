@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **134 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **138 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1987,3 +1987,11 @@ Independent native WinHTTP controls establish direct success, absent-scheme DIRE
 ### AHK-134: Authenticated plaintext HTTP uses the wrong proxy protocol
 
 A private authenticated forward proxy serves the independent native absolute-form HTTP request with200/bodyOK. The genuine resolver/owned-hop request instead sends CONNECT to port80 and receives502. Native engine retirement and private proxy joining are confirmed in both orders. Commitd8575215 forwards plaintext HTTP using absolute form, keeps its own credential header and preserves secure/SOCKS tunnels. Native postfix qualification remains pending.
+
+### Native audit: replay32
+
+Replay42082616671 atf712b710 passes16/32 selected cases in each order, with production parsing green and all E2E flags unselected. Six native64 age failures and two cached Backspace failures extend046 and128. Three current-clock and three Backspace policy controls pass. Source91b73c31 andbb42f3c8 address these scopes; native postfix qualification remains pending.
+
+Four distinct admitted defects raise the register to138: supplementary InputHook event characters become FFFD at the actual JSON/UTF-8 boundary (135); deep typing inventory disappears during a composed live frontend update despite real SQL counts2 (136); the actual detached app worker omits an ongoing interval visible in its parent (137); and provider discovery refuses two native exact-case-distinct scripts after independently qualified executions (138). The corresponding BMP, character, parent and ordinary-name controls pass. Provider source067cbec1 preserves exact duplicate refusal; the other three corrections remain in progress.
+
+Prompt and model-Web subscription probes also expose native host destruction before the subscription call returns, extending109. The HCW destruction case instead has a technical error before its successor witness and needs that error explained. The third model visibility probe now proves its intended later Close was never invoked; it is an unadmitted test cutpoint rather than product failure evidence. Neither result adds a finding. Native hook input is software supplied, the frontend DOM is controlled, and none of these results qualifies physical hardware or a complete suite.
