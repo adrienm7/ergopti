@@ -1,0 +1,9 @@
+com.ergoptiplus.runtime.core: launchctl print exit=113
+com.ergoptiplus.runtime.vhid: launchctl print exit=113
+absent: /Library/Application Support/ErgoptiPlus/Runtime
+absent: /Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist
+absent: /Library/LaunchDaemons/com.ergoptiplus.runtime.vhid.plist
+*	*	G43BCU2T37	org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)	org.pqrs.Karabiner-DriverKit-VirtualHIDDevice	[activated enabled]
+Authority=ErgoptiPlus Self-Signed
+TeamIdentifier=not set
+console parent: no owned Console running
