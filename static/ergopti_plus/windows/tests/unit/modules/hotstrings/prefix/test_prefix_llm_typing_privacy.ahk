@@ -28,6 +28,7 @@ _LTPP_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 		AssertTrue(LLM_Bridge_FeedCharForPrefix("source_private_canary_07", Schedule, Focus, (*) => true))
 		SFD_FIELD_CACHE_TTL_MS := VerdictTtl
 		Owner := _LLM_Bridge_PrefixObserver
+		OwnerCallback := Owner.Timer
 		AssertTrue(Owner.CapturedSecure, "the original unknown/secure receipt must be captured before deferred work")
 		AssertEqual("", _LLM_Bridge_Buffer)
 		AssertEqual("", _LLM_Bridge_AgentBuffer, "private input must never enter either canonical LLM buffer")
@@ -41,9 +42,11 @@ _LTPP_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 			AssertEqual("b", _LLM_Bridge_Buffer)
 			AssertTrue(_LLM_Bridge_BufferAgentSafe, "discarded input must not taint future normal context")
 			Newer := _LLM_Bridge_PrefixObserver
-			Newer.Timer.Call()
+			NewerCallback := Newer.Timer
+			NewerCallback.Call()
+			AssertEqual(0, Newer.Timer, "completion must detach the exact finished callback")
 			AssertTrue(IsObject(_LLM_Agent_Auto["timer"]), "the actual agent pause must resume on admitted normal input")
-			Owner.Timer.Call()
+			OwnerCallback.Call()
 			AssertEqual("b", _LLM_Bridge_Buffer)
 			AssertTrue(IsObject(_LLM_Agent_Auto["timer"]), "the retired private classifier must not cancel the fresh normal pause")
 			AssertEqual(0, Fx.Remote.Length), AssertEqual(0, Fx.Ollama.Length)
@@ -51,7 +54,7 @@ _LTPP_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 				AssertFalse(InStr(Line, "source_private_canary_07"))
 			return
 		}
-		Owner.Timer.Call()
+		OwnerCallback.Call()
 		AssertEqual("", _LLM_Bridge_Buffer)
 		AssertEqual("", _LLM_Bridge_AgentBuffer)
 		AssertFalse(_LLM_Engine["timer_active"])
@@ -67,12 +70,18 @@ _LTPP_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 	} else if Mode == "field-generation" || Mode == "field-element" {
 		LLM_Bridge_FeedCharForPrefix("a", Schedule, Focus)
 		Old := _LLM_Bridge_PrefixObserver
+		OldCallback := Old.Timer
 		AssertEqual("a", _LLM_Bridge_Buffer)
 		_LTPP_Verdict(State, false, "fixture:second-field", Mode == "field-generation")
 		AssertFalse(_LLM_Bridge_PrefixObserverStillCurrent(Old), "same-HWND fields must not share an input owner")
 		LLM_Bridge_FeedCharForPrefix("b", Schedule, Focus)
 		AssertEqual("b", _LLM_Bridge_Buffer, "a new field cannot inherit A's context")
-		Old.Timer.Call()
+		Newer := _LLM_Bridge_PrefixObserver
+		NewerCallback := Newer.Timer
+		AssertEqual(0, Old.Timer, "cancellation must detach the retired owner callback")
+		OldCallback.Call()
+		AssertTrue(_LLM_Bridge_PrefixObserver == Newer, "a retired callback cannot withdraw its successor")
+		AssertTrue(Newer.Timer == NewerCallback, "a retired finally cannot detach the successor callback")
 		AssertEqual("b", _LLM_Bridge_Buffer)
 		AssertFalse(_LLM_Engine["timer_active"])
 	} else if Mode == "agent-strict" {
@@ -91,8 +100,9 @@ _LTPP_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 		LLM_Bridge_FeedKeyDownIfActive(0x08)
 		AssertEqual("", _LLM_Bridge_Buffer, "Backspace in B cannot edit or publish A's private local buffer")
 		Owner := _LLM_Bridge_PrefixObserver
+		OwnerCallback := Owner.Timer
 		AssertEqual(State.Focus["control"], Owner.Source["control"])
-		Owner.Timer.Call()
+		OwnerCallback.Call()
 		AssertEqual("", _LLM_Bridge_Buffer)
 		AssertEqual(0, Fx.Remote.Length)
 		AssertEqual(0, Fx.Ollama.Length)
