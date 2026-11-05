@@ -1170,6 +1170,17 @@
 			"root_cause": "The recursive Loop Files iterator silently omits FindFirstFile failures; unblock_file_selection receives no completeness receipt and logs ordinary success.",
 			"silent_failure": "The same native run records error5/open_stream0/blocked_stream1/error_log0/success_log1; the accessible file is unblocked but the denied subtree is silently skipped. Inverse repeats.",
 			"regression_test": "Use a Windows-only action-specific native iterator with explicit completion failures and reparse-point exclusion; preserve the generic FilesUnder contract. Genuine junction, ACL and native entry/path-budget tests cover confinement and partial-failure feedback. The bounded cooperative pathname traversal does not prove identity against concurrent component replacement. Native FindClose failure is reported but native handle-retirement refusal is unmeasured; no zero-leak claim is made. Post-fix native qualification pending."
+		},
+		{
+			"id": "AHK-107",
+			"title": "Accepted carriage returns escape calendar and mail newline encoding",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Decode actual model JSON with a lone carriage return, or mixed CRLF/CR/LF, in an accepted calendar notes or mail body field; validate through LLM_Agent_ValidateAction and render the public connector payload.",
+			"root_cause": "_LLM_Agent_IcsText and _LLM_Agent_MailtoEncode normalize CRLF and LF but leave standalone CR untreated. The former emits a bare physical carriage return in an iCalendar TEXT record; the latter encodes a lone %0D rather than the required mail body CRLF pair.",
+			"silent_failure": "Native run41971633136 at7a7e1e8ec8d4aeb252a8d2456b12c115ca190abb fails all4 carriage/mixed cases in both orders after the real schema admits them. Calendar reports exact_record0/lone_break1; mail contains first%0Dsecond. All6 LF/CRLF/literal-backslash controls pass. Payload conformance is measured, not an external calendar or mail application import.",
+			"regression_test": "Normalize CRLF to LF and then standalone CR to LF before each existing destination encoding. Ten actual JSON/schema/payload cases retain their native fail-before receipts. The shared Lua homologues have the same unsupported standalone-CR edge and remain explicit parity debt outside this Windows-only campaign. Native postfix qualification pending."
 		}
 	]
 }

@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **106 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **107 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1753,3 +1753,13 @@ Severity: medium. Confidence: high. Evidence: native Windows fail-before.
 The generic recursive loop silently omits a real ACL-denied subtree. The same native run proves Win32 error5, removal of the accessible stream and preservation of the inaccessible stream, yet the action records `error_log=0 success_log=1`. The required partial-failure assertion fails in both orders.
 
 The action-specific iterator now reports native FindFirst/FindNext/FindClose failures and entry/path-budget exhaustion, while retaining already enumerated ordinary files. The caller logs incomplete processing as an error. Existing genuine junction/ACL tests and a native bounds control await post-fix qualification. A native FindClose refusal is reported but its handle retirement has not been measured; no zero-leak guarantee is asserted.
+
+## AHK-107: Accepted carriage returns escape calendar and mail newline encoding
+
+Severity: low. Confidence: high. Evidence: native Windows fail-before.
+
+The real model JSON and action schema admit standalone carriage returns. Both connector encoders normalize CRLF and LF while leaving a lone CR unchanged. Calendar TEXT then contains an unescaped physical carriage return; mail bodies contain `%0D` without the `%0A` required for their canonical CRLF line ending ([RFC5545 section3.3.11](https://www.rfc-editor.org/rfc/rfc5545#section-3.3.11), [RFC6068 section5](https://www.rfc-editor.org/rfc/rfc6068#section-5)).
+
+Run41971633136 at7a7e1e8ec8d4aeb252a8d2456b12c115ca190abb fails all four carriage/mixed calendar/mail cases in both orders. Calendar records `exact_record=0 lone_break=1`; mail emits `first%0Dsecond`. The six LF, CRLF and literal-backslash controls pass. These receipts qualify payload conformance, not an external application import.
+
+The Windows correction normalizes CRLF and then standalone CR to LF before the existing destination encoding. All ten original tests remain. The shared Lua homologues retain this edge and are explicit parity debt outside the requested Windows scope. Post-fix native qualification is pending.
