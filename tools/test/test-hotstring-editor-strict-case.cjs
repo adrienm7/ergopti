@@ -177,4 +177,76 @@ test('unchecking the case box clears an existing strict entry', () => {
 	assert.strictEqual(result.entry.is_case_sensitive_strict, false);
 });
 
+test('saved trigger ordering keeps Unicode letters and digits', () => {
+	const result = runModel(
+		{
+			sections: [
+				{
+					name: 'strict',
+					description: 'Strict',
+					entries: [
+						{ trigger: 'éclair', output: 'one' },
+						{ trigger: '漢字', output: 'two' }
+					]
+				}
+			]
+		},
+		null
+	);
+	assert.deepStrictEqual(
+		Array.from(result.payload.sections.strict.entries, (entry) => entry.trigger),
+		['New', 'éclair', '漢字']
+	);
+});
+
+test('ASCII keys keep their old order and equivalent Unicode stays unchanged', () => {
+	const original = ['!Zoo', 'e\u0301clair', 'éclair', 'a-b', 'Ab', '_bar'];
+	const result = runModel(
+		{
+			sections: [
+				{
+					name: 'strict',
+					description: 'Strict',
+					entries: original.map((trigger) => ({ trigger, output: 'value' }))
+				}
+			]
+		},
+		null
+	);
+	assert.deepStrictEqual(
+		Array.from(result.payload.sections.strict.entries, (entry) => entry.trigger),
+		['_bar', 'a-b', 'Ab', 'New', '!Zoo', 'e\u0301clair', 'éclair']
+	);
+});
+
+test('moving entries sorts Unicode triggers without stripping their letters', () => {
+	const selector = { value: '1' };
+	const context = vm.createContext({
+		console,
+		document: {
+			getElementById: () => selector,
+			querySelectorAll: () => [{ dataset: { si: '0', ei: '0' } }]
+		},
+		makeHostBridge: () => function () {},
+		setTimeout: () => 1,
+		clearTimeout() {}
+	});
+	context.window = context;
+	vm.runInContext(modelSource, context, { filename: SCRIPT });
+	vm.runInContext(
+		`
+		D = { sections: [
+			{ name: 'from', entries: [{trigger: 'New', output: 'n'}] },
+			{ name: 'to', entries: [{trigger: 'éclair', output: 'e'}, {trigger: '漢字', output: 'h'}] }
+		] };
+		window.clearBulk = function () {};
+		persist = function () {};
+		window.bulkMove();
+		__result = D.sections[1].entries.map((entry) => entry.trigger);
+	`,
+		context
+	);
+	assert.deepStrictEqual(Array.from(context.__result), ['New', 'éclair', '漢字']);
+});
+
 console.log(`\nResults: ${passed} passed, 0 failed.`);

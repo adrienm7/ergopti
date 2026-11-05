@@ -1213,6 +1213,19 @@ function showEditEntry(si, ei, focusField) {
 	}, 80);
 }
 
+// Sorting uses the same normalized key for single edits and bulk moves. The
+// original trigger is never changed, and ASCII punctuation keeps its old order.
+function compareTriggers(a, b) {
+	const key = (entry) =>
+		(entry.trigger || '')
+			.toLowerCase()
+			.normalize('NFC')
+			.replace(/[^\p{L}\p{M}\p{N}_]/gu, '');
+	const left = key(a);
+	const right = key(b);
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function saveEntry(andNew) {
 	clearEntryErrors();
 	const trig = serializeTrigEditor(document.getElementById('e-trig'));
@@ -1268,11 +1281,7 @@ function saveEntry(andNew) {
 		if (edEntry.ei === null) D.sections[si].entries.push(entry);
 		else D.sections[si].entries[edEntry.ei] = entry;
 
-		D.sections[si].entries.sort((a, b) => {
-			const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-			return ta < tb ? -1 : ta > tb ? 1 : 0;
-		});
+		D.sections[si].entries.sort(compareTriggers);
 
 		persist();
 
@@ -1397,11 +1406,7 @@ window.bulkMove = function () {
 		D.sections[destSi].entries.push(entry);
 	});
 
-	D.sections[destSi].entries.sort((a, b) => {
-		const ta = (a.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		const tb = (b.trigger || '').toLowerCase().replace(/[^\w]/g, '');
-		return ta < tb ? -1 : ta > tb ? 1 : 0;
-	});
+	D.sections[destSi].entries.sort(compareTriggers);
 
 	sel.value = '';
 	window.clearBulk();
