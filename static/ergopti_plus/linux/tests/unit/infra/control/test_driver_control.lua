@@ -60,6 +60,19 @@ local function request(files, token, id)
 end
 
 helpers.describe("Linux local driver control", function()
+	for _, mode in ipairs({ "write", "rename" }) do
+		helpers.it("linux-control-reload-receipt: refuses restart when requested record cannot " .. mode, function()
+			local session, files, calls = world(function() return true end)
+			session:start()
+			local original = session.ports[mode]
+			session.ports[mode] = function(...) return false end
+			request(files, TOKEN, "receipt-failure")
+			local handled = session:handle()
+			session.ports[mode] = original
+			helpers.assert_eq(handled, false)
+			helpers.assert_eq(#calls, 0, "a successor cannot claim a requested result that was not published")
+		end)
+	end
 	helpers.it("publishes its session and writes a pending record for an authenticated reload", function()
 		local session, files, calls = world(function() return true end)
 		session:start()
