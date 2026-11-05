@@ -229,6 +229,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	--- Installs scripted seams and returns their records.
 	local raw_bridge, document_fixture = Bridge, nil
 	local native_push = Bridge._push
+	local native_get = Bridge._http_get
 	local function install()
 		if document_fixture then document_fixture.close() end
 		Bridge = raw_bridge
@@ -259,6 +260,38 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		package.loaded["modules.updater.manager"] = previous
 		if not ok then error(err, 0) end
 	end
+
+	helpers.it("(changelog-http-refusal) reports failed HTTP admission", function()
+		local _, pushed = install()
+		local client = require("adapters.http_client")
+		local previous, count = client.get, 0
+		client.get = function() count = count + 1; return false end
+		raw_bridge._http_get = native_get
+		local ok, err = pcall(function() Bridge.start_fetch("main") end)
+		client.get = previous
+		assert(ok, err)
+		helpers.assert_eq(count, 2)
+		helpers.assert_eq(#pushed, 1)
+		helpers.assert_eq(pushed[1].action, "releases_error")
+	end)
+
+	helpers.it("(changelog-http-refusal) keeps an inline HTTP result despite refusal receipt", function()
+		local _, pushed = install()
+		local client = require("adapters.http_client")
+		local previous, count = client.get, 0
+		client.get = function(_, _, _, callback)
+			count = count + 1
+			callback({ ok = true, status = 200, body = "[]" })
+			return false
+		end
+		raw_bridge._http_get = native_get
+		local ok, err = pcall(function() Bridge.start_fetch("main") end)
+		client.get = previous
+		assert(ok, err)
+		helpers.assert_eq(count, 1)
+		helpers.assert_eq(#pushed, 1)
+		helpers.assert_eq(pushed[1].action, "releases")
+	end)
 
 	helpers.it("changelog refuses a FIFO release configuration without blocking", function()
 		local uv, Paths = require("luv"), require("infra.paths")
