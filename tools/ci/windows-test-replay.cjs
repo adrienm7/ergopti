@@ -18,6 +18,42 @@ const demand = (condition, message) => {
 const writeJson = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 const digest = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
+function failureDiagnostic(file, limit = 16384) {
+	const descriptor = fs.openSync(file, 'r');
+	try {
+		const bytes = fs.fstatSync(descriptor).size;
+		const head = Buffer.alloc(Math.min(bytes, limit / 2));
+		fs.readSync(descriptor, head, 0, head.length, 0);
+		const tailOffset = Math.max(head.length, bytes - limit / 2);
+		const tail = Buffer.alloc(bytes - tailOffset);
+		fs.readSync(descriptor, tail, 0, tail.length, tailOffset);
+		return {
+			bytes,
+			omitted_bytes: tailOffset - head.length,
+			head: head.toString('utf8'),
+			tail: tail.toString('utf8')
+		};
+	} finally {
+		fs.closeSync(descriptor);
+	}
+}
+
+function reportFailure(directory, label) {
+	for (const kind of ['tap', 'stdout', 'stderr']) {
+		const file = path.join(directory, `${label}.${kind}.txt`);
+		try {
+			if (fs.existsSync(file))
+				console.log(
+					`Native failure diagnostic: ${JSON.stringify({ label, kind, ...failureDiagnostic(file) })}`
+				);
+		} catch (error) {
+			console.log(
+				`Native diagnostic unavailable: ${JSON.stringify({ label, kind, error: error.message })}`
+			);
+		}
+	}
+}
+
 function repositoryFile(relative) {
 	demand(
 		typeof relative === 'string' && !path.isAbsolute(relative) && !path.win32.isAbsolute(relative),
@@ -268,6 +304,7 @@ async function replay(options) {
 			try {
 				await run(`case-${index + 1}`, [`--list=${list}`], [selected[index]]);
 			} catch (error) {
+				reportFailure(directory, `case-${index + 1}`);
 				failures.push(`case-${index + 1}: ${error.message}`);
 			}
 		}
@@ -276,6 +313,7 @@ async function replay(options) {
 		try {
 			await run('reverse', [`--list=${list}`, '--reverse'], [...selected].reverse());
 		} catch (error) {
+			reportFailure(directory, 'reverse');
 			failures.push(`reverse: ${error.message}`);
 		}
 		summary.failures = failures;
@@ -367,6 +405,21 @@ async function selfTest() {
 		assert.throws(() => validateExecution(source, expected));
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ahk-replay-selftest-'));
 	try {
+		const diagnosticFile = path.join(directory, 'diagnostic.txt');
+		const diagnosticText = '::error::inert\n\u001b[31m' + 'x'.repeat(40000) + 'final assertion';
+		fs.writeFileSync(diagnosticFile, diagnosticText);
+		const diagnostic = failureDiagnostic(diagnosticFile);
+		assert.equal(diagnostic.bytes, Buffer.byteLength(diagnosticText));
+		assert.equal(diagnostic.omitted_bytes, diagnostic.bytes - 16384);
+		assert.equal(diagnostic.head, diagnosticText.slice(0, 8192));
+		assert.equal(diagnostic.tail, diagnosticText.slice(-8192));
+		assert(!/[\n\r\u001b]/.test(JSON.stringify(diagnostic)));
+		for (const text of ['', 'short receipt', 'a'.repeat(10000)]) {
+			fs.writeFileSync(diagnosticFile, text);
+			const complete = failureDiagnostic(diagnosticFile);
+			assert.equal(complete.omitted_bytes, 0);
+			assert.equal(complete.head + complete.tail, text);
+		}
 		const fake = (mode) => async (_, args, context) => {
 			fs.writeFileSync(context.stdout, '');
 			fs.writeFileSync(context.stderr, '');
