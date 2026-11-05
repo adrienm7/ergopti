@@ -416,15 +416,30 @@ _LLM_ModelBrowser_NativeCurrent(Owner) {
 
 _LLM_ModelBrowser_OnClose(Params*) {
 	global _LLM_ModelBrowser_Gui
+	EventWindow := 0
+	if Params.Length {
+		if Params[1] is Gui
+			EventWindow := Params[1]
+		else if Params[1] is Gui.Control
+			EventWindow := Params[1].Gui
+	}
 	if !IsSet(_LLM_ModelBrowser_Gui)
 		return false
-	Window := _LLM_ModelBrowser_Gui
+	; Gui/GuiControl event arguments identify their original host. A late
+	; event from A must not borrow a replacement B from the singleton cache.
+	Window := EventWindow is Gui ? EventWindow : _LLM_ModelBrowser_Gui
+	if _LLM_ModelBrowser_Gui != Window
+		return false
 	Owner := Params.Length && IsObject(Params[1]) && Params[1].HasOwnProp("lifecycle") ? Params[1] : 0
 	Ticket := _LLM_ModelBrowser_VisibilityClaim(Window, false, Owner)
 	if !(Ticket is Object)
-		return false
-	try return _LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
-	return false
+		return EventWindow is Gui
+	Completed := false
+	try Completed := _LLM_ModelBrowser_VisibilityPerform(Window, Ticket)
+	; Gui Close applies its own default Cancel/Hide after a false result.
+	; Matching native events are fully handled even if a newer Show supersedes
+	; this Hide. Direct callers still receive the actual operation result.
+	return EventWindow is Gui ? true : Completed
 }
 
 ; Claim only fixed-size RAM under Critical; native visibility and timer calls
