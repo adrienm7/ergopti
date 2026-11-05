@@ -17,7 +17,7 @@
 ; =================================
 
 OneShotShift() {
-		global OneShotShiftEnabled
+		global OneShotShiftEnabled, _ALTGR_KANA_FIXUP
 		; Capture ownership ends before activation/output; the gesture epoch must
 		; remain current through those later effects as well.
 		GestureOwner := TapHoldNewOwner()
@@ -35,27 +35,35 @@ OneShotShift() {
 		NamedKeys := "{BackSpace}{Enter}{Delete}{Escape}{Tab}"
 		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
 		ihvText.KeyOpt(NamedKeys, "ES") ; Own only ending controls; other nontext keys remain native.
-		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
-		; Refusing a second exclusive capture must leave the admitted capture's
-		; latch alone, including an explicit OneShotShiftFix from a chord.
-		if !OwnerToken
-				return
-		; Start may pump teardown before returning. Publish only while this exact
-		; token/hook still owns capture, atomically with the suspension check.
-		PreviousCritical := Critical("On")
-		try {
-				Admitted := SIHO_IsOwned(OwnerToken, ihvText) && TapHoldOwnerCurrent(GestureOwner) && !A_IsSuspended
-				if Admitted
-						OneShotShiftEnabled := True
-		} finally Critical(PreviousCritical)
-		if !Admitted {
-				SIHO_StopOwned(OwnerToken, ihvText)
-				return
+		Custom := 0
+		if IsSet(_ALTGR_KANA_FIXUP) && _ALTGR_KANA_FIXUP {
+				Custom := _SIHO_CustomModifierCapture(ihvText, KS_AltGrKeyName(), KS_AltGrSendKey())
+				if !IsObject(Custom)
+						return
 		}
 		try {
-				ihvText.Wait()
+				OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
+				; Refusing a second exclusive capture leaves the admitted latch alone.
+				if !OwnerToken
+						return
+				try {
+						; Start may pump teardown. Publish only the exact admitted frame.
+						PreviousCritical := Critical("On")
+						try {
+								Admitted := SIHO_IsOwned(OwnerToken, ihvText) && TapHoldOwnerCurrent(GestureOwner) && !A_IsSuspended
+								if Admitted
+										OneShotShiftEnabled := True
+						} finally Critical(PreviousCritical)
+						if !Admitted
+								return
+						ihvText.Wait()
+						if IsObject(Custom) && (ihvText.EndReason == "EndKey" || ihvText.EndReason == "Max")
+								if !_SIHO_CustomModifierSettle(Custom, ihvText, OwnerToken)
+										return
+				} finally CaptureSettled := SIHO_StopOwned(OwnerToken, ihvText)
 		} finally {
-				CaptureSettled := SIHO_StopOwned(OwnerToken, ihvText)
+				if IsObject(Custom)
+						_SIHO_CustomModifierRelease(Custom, ihvText)
 		}
 		; Pause can finish and resume before this older Wait unwinds. Its exact
 		; owner acknowledgement remains revoked even when Suspend is false again.
@@ -78,7 +86,21 @@ OneShotShift() {
 						if InStr(ihvText.EndMods, Symbol)
 								CapturedPrefix .= Symbol
 				}
-				SendNewResult(CapturedPrefix . "{" . Capture.Name . "}", False, False)
+				Restore := false
+				if IsObject(Custom)
+						if !_SIHO_CustomModifierReplay(Custom, KS_AltGrKeyName(), KS_AltGrSendKey(), &Restore)
+								return
+				; Own only a modifier the endpoint held but has since released.
+				; The captured VK is retained through Up even if the HKL changes.
+				try {
+						if Restore && !TapHoldSyntheticKeyDown(Custom.send_key, GestureOwner)
+								return
+						if TapHoldOwnerCurrent(GestureOwner) && !A_IsSuspended
+								SendNewResult(CapturedPrefix . "{" . Capture.Name . "}", False, False)
+				} finally {
+						if Restore
+								TapHoldSyntheticKeyUp(Custom.send_key, GestureOwner)
+				}
 				return
 		}
 		Scalar := Capture.Text
