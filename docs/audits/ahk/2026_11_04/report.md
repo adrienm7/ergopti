@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **132 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **134 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1973,3 +1973,17 @@ Seven failures remain admitted: generic and display-sleep jobs execute after a f
 Both real display-buffer query stages can yield to native Suspend. The current action still applies one recorded topology and remembers it with suspended1. The private effect port protects the runner's screens; unchanged controls prove the ordinary action, and both orders repeat. This discovery-to-effect omission differs from126 stale deferred work after resume.
 
 Source64e3c737 revalidates suspension and the original canonical lifecycle after each native read, before the first apply. It leaves bookkeeping after acknowledged application intact. Selected native postfix qualification is pending. Other actions interrupted during discovery are new probes, not additional confirmed variants or counts.
+
+### Native qualification: replay107
+
+Replay42077733273 at9db29fb4 passes88/107 selected cases in each order. Production parsing and90 native hotstring E2E cases pass; HTTP and relay-owner E2E were unselected. It qualifies the selected queued system, Backspace, display discovery, model durable-writer and original Show/Hide corrections. Unicode ledger-hole probes and ordinary/locked/foreign stage controls also pass.
+
+Nineteen failures require separate treatment. Three privacy-gap cases, three in-flight system discovery cases, two selected reparse-entry cases, two native64 stage cases, one actual WM_CLOSE case and both proxy cases have admitted business evidence. Five model constructor/visibility probes fail setup or timeout, and one managed timing case has a different transport outcome under investigation; those six are not new product findings. The corresponding targeted corrections are integrated for a follow-up replay, without claiming postfix native success yet.
+
+### AHK-133: An absent static proxy protocol is refused
+
+Independent native WinHTTP controls establish direct success, absent-scheme DIRECT success and refusal through the unreachable matching proxy. The actual PS resolver and strict AHK selector still refuse a valid map containing only the other HTTP protocol. Commit3ab3785c permits that absence only after validating the map, retaining refusal for malformed endpoints and unsupported maps. This counts the two sibling selectors once.
+
+### AHK-134: Authenticated plaintext HTTP uses the wrong proxy protocol
+
+A private authenticated forward proxy serves the independent native absolute-form HTTP request with200/bodyOK. The genuine resolver/owned-hop request instead sends CONNECT to port80 and receives502. Native engine retirement and private proxy joining are confirmed in both orders. Commitd8575215 forwards plaintext HTTP using absolute form, keeps its own credential header and preserves secure/SOCKS tunnels. Native postfix qualification remains pending.
