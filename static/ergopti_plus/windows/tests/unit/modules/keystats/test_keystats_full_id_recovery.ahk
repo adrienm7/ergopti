@@ -498,6 +498,8 @@ _KFID_DomainCase(Mode) {
 			. " counter_after=" . Keystats.next_event_id . " inserted=" . Inserted)
 		AssertEqual(BeforeLedger, FileRead(Path, "UTF-8"), "Recovery cannot rewrite the authoritative source")
 		AssertEqual(BeforeState, FileRead(Keystats.state_json_path, "UTF-8"))
+		if Refused
+			AssertEqual(PersistedNext, Keystats.next_event_id, "a capacity refusal cannot publish a rewound or wrapped counter")
 		AssertEqual(2 + Inserted, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse;")[1]["n"])
 		if Mode == "ordinary" {
 			AssertTrue(Accepted && !Refused)
