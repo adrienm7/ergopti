@@ -16,9 +16,9 @@ _TBA_RequireUnique(Code, Pattern, Message) {
 	return Found
 }
 _TBA_HeldCallPattern() {
-	return "i)\bPublished\s*:=\s*FSWriteReplaceOwned\s*\(\s*Path\s*,\s*FinalCandidate\s*,\s*Suffix\s*,\s*&StageDetail\s*,"
+	return "i)\bPublished\s*:=\s*FSWriteReplaceOwned\s*\(\s*SourcePath\s*,\s*FinalCandidate\s*,\s*Suffix\s*,\s*&StageDetail\s*,"
 		. "\s*_TOML_CreateHeldStage\.Bind\s*\(\s*Stage\s*\)\s*,"
-		. "\s*_TOML_AdmitHeldStage\.Bind\s*\(\s*Stage\s*,\s*Path\s*,\s*SourcePresent\s*,\s*SourceBytes\s*,\s*FinalCandidate\s*\)\s*,"
+		. "\s*_TOML_AdmitHeldStage\.Bind\s*\(\s*Stage\s*,\s*SourcePath\s*,\s*SourcePresent\s*,\s*SourceBytes\s*,\s*FinalCandidate\s*\)\s*,"
 		. "\s*FinalAdmission\s*,\s*SourcePresent\s*,\s*&Publication\s*,\s*HeldFlushFn\s*\)"
 }
 _TBA_AssertPublication(Seg) {
@@ -71,7 +71,10 @@ _TBA_AssertNativeDelegation() {
 	NativeCreate := _DriverFuncBody("_FSCreateHeldStage")
 	NativeCreateCode := _DriverMaskNonCode(&NativeCreate)
 	Assert(RegExMatch(NativeCreateCode, "i)\bFILE_CREATE\s*:=\s*2\b") > 0)
-	Assert(RegExMatch(NativeCreateCode, "i)\bFILE_WRITE_THROUGH\s*:=\s*2\b") > 0)
+	NativeWriteFlag := _TBA_RequireUnique(NativeCreateCode,
+		"i)\bFILE_WRITE_THROUGH\s*:=\s*(0x[0-9a-f]+|[0-9]+)\b",
+		"the actual held stage must declare its native write-through flag")
+	AssertEqual(2, Integer(NativeWriteFlag[1]), "the native write-through flag must retain its exact Win32 value")
 	Read := _DriverFuncBody("_TOML_ReadHeldStage")
 	ReadCode := _DriverMaskNonCode(&Read)
 	Rewind := _TBA_RequireUnique(ReadCode, "i)\b_FSRewind\s*\(\s*State\.handle\s*\)", "the actual readback must rewind its retained handle")
