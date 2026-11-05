@@ -692,8 +692,13 @@ TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 
 /** Encodes contents for a TOML basic string without surrounding quotes. */
 TOML_EscapeBasicStringContents(s) {
+	; Preserve legacy coercion for non-String callers, while native Strings
+	; must be admitted before any helper can truncate their original units.
+	if !(s is String)
+		s := String(s)
+	SourceTextRequireUnicodeScalars(StrPtr(s), 0, StrLen(s))
 	Result := ""
-	Loop Parse, String(s) {
+	Loop Parse, s {
 		Char := A_LoopField
 		Code := Ord(Char)
 		switch Code {

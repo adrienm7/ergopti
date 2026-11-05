@@ -714,3 +714,110 @@ _TBUI_ConfigInlineCanonicalReader() {
 }
 Test("toml config inline source spans: semantic reader reuses the actual canonical multiline lexer",
 	_TBUI_ConfigInlineCanonicalReader)
+
+_TWSC_Units(Value) {
+	Result := "length=" . StrLen(Value) . ":"
+	Loop StrLen(Value)
+		Result .= Format("{:04X}", NumGet(StrPtr(Value), (A_Index - 1) * 2, "UShort")) . ","
+	return Result
+}
+_TWSC_Equal(Expected, Actual) {
+	AssertTrue(Actual is String)
+	AssertEqual(StrLen(Expected), StrLen(Actual), "roundtrip retains every original UTF-16 unit")
+	Loop StrLen(Expected)
+		AssertEqual(NumGet(StrPtr(Expected), (A_Index - 1) * 2, "UShort"),
+			NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort"))
+}
+_TWSC_Value(Kind) {
+	Encoded := Kind == "nul" ? 'A\u0000B' : Kind == "control" ? 'A\u0001B' : 'A\\u0000B'
+	Payload := JsonParse('{"value":"' . Encoded . '"}')
+	Value := Payload["value"]
+	AssertTrue(Value is String)
+	if Kind != "literal" {
+		AssertEqual(3, StrLen(Value))
+		AssertEqual(65, NumGet(StrPtr(Value), 0, "UShort"))
+		AssertEqual(Kind == "nul" ? 0 : 1, NumGet(StrPtr(Value), 2, "UShort"))
+		AssertEqual(66, NumGet(StrPtr(Value), 4, "UShort"))
+	} else
+		AssertEqual('A\u0000B', Value)
+	return Value
+}
+_TWSC_Render(Kind) {
+	Value := _TWSC_Value(Kind)
+	Rendered := "", RenderError := 0, Accepted := false, Actual := ""
+	try Rendered := TOML_RenderValue(Value)
+	catch as Err
+		RenderError := Err
+	if !IsObject(RenderError) {
+		try {
+			Actual := TOML_ParseDocument("value = " . Rendered)["value"]
+			Accepted := true
+		}
+	}
+	_TestPrint("# toml-scalar-render kind=" . Kind . " requested=" . _TWSC_Units(Value)
+		. " render-error=" . (IsObject(RenderError) ? Type(RenderError) : "none")
+		. " decoded=" . Accepted . " actual=" . (Accepted ? _TWSC_Units(Actual) : "<refused>"))
+	if Kind == "nul"
+		AssertTrue(RenderError is ValueError, "the real public renderer must refuse a native unsupported scalar before producing another value")
+	else {
+		if IsObject(RenderError)
+			throw RenderError
+		AssertTrue(Accepted)
+		_TWSC_Equal(Value, Actual)
+	}
+}
+_TWSC_Write(Kind) {
+	Value := _TWSC_Value(Kind)
+	Root := A_Temp . "\ergopti_toml_scalar_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\values.toml", Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, '[owned]`nvalue = "Original"`n'))
+		Before := FSReadBytesStrict(Path)
+		Result := 0, WriteError := 0
+		try Result := TOML_BatchWrite(Path, [{Section: "owned", Key: "value", Value: Value}])
+		catch as Err
+			WriteError := Err
+		After := FSReadBytesStrict(Path)
+		Accepted := false, Actual := ""
+		try {
+			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))["owned"]["value"]
+			Accepted := true
+		}
+		_TestPrint("# toml-scalar-write kind=" . Kind . " result=" . Result . " requested=" . _TWSC_Units(Value)
+			. " decoded=" . Accepted . " actual=" . (Accepted ? _TWSC_Units(Actual) : "<refused>")
+			. " write-error=" . (IsObject(WriteError) ? Type(WriteError) : "none")
+			. " before-bytes=" . Before.Size . " after-bytes=" . After.Size)
+		if Kind == "nul" {
+			if IsObject(WriteError)
+				AssertTrue(WriteError is ValueError, "invalid scalar validation may raise only its established ValueError contract")
+			else
+				AssertTrue(Result is Integer && Result == 0, "unsupported values cannot receive a malformed or successful native ACK")
+			AssertEqual(Before.Size, After.Size)
+			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
+				"Ptr", After, "UPtr", Before.Size, "UPtr"), "an unsupported value must preserve the complete original source")
+			AssertTrue(Accepted)
+			AssertEqual("Original", Actual)
+		} else {
+			if IsObject(WriteError)
+				throw WriteError
+			AssertTrue(Result)
+			AssertTrue(Accepted)
+			_TWSC_Equal(Value, Actual)
+		}
+	} finally {
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _TWSC_Kind in ["nul", "control", "literal"] {
+	Test("TOML actual scalar render: " . _TWSC_Kind . " (toml-write-scalar)", _TWSC_Render.Bind(_TWSC_Kind))
+	Test("TOML actual ordinary scalar write: " . _TWSC_Kind . " (toml-write-scalar)", _TWSC_Write.Bind(_TWSC_Kind))
+}

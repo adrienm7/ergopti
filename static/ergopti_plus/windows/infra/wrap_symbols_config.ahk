@@ -840,7 +840,11 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		return false
 	}
 
-	Content := _WS_SerializeCandidate(DisabledCandidate, CustomCandidate)
+	try Content := _WS_SerializeCandidate(DisabledCandidate, CustomCandidate)
+	catch ValueError as Err {
+		try LoggerError("WrapSymbols", "Refusing to serialize a wrap-symbol candidate outside the native text domain.")
+		return false
+	}
 	if !(Content is String) {
 		try LoggerError("WrapSymbols", "Refusing to serialize malformed wrap-symbol state.")
 		return false
