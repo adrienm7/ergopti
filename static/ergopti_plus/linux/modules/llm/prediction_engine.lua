@@ -2515,7 +2515,7 @@ end
 --- @return table|nil actions Nil when the answer holds no readable block.
 --- @return table rejected
 local function read_actions(config, tools, full_text)
-	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode,
+	local actions, rejected = Agent.parse_actions(config, Parser.strip_thinking(full_text or ""), Json.decode_lossless,
 		{ tools = tools, is_null = Json.is_null })
 	-- The reasons name fields and rules, never the user's text.
 	for _, reason in ipairs(rejected) do Logger.info(LOG, "Agent action refused: %s.", tostring(reason)) end
