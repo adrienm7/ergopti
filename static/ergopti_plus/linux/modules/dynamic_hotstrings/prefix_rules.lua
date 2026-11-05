@@ -146,7 +146,8 @@ function M.build(info, is_section_enabled, magic_key)
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")
 	-- A national trunk zero is not dialled after the French country code.
-	local international_phone = FRANCE_DIAL_PREFIX .. (phone:sub(1, 1) == "0" and phone:sub(2) or phone)
+	local national_number = phone:sub(1, 1) == "0" and phone:sub(2) or phone
+	local international_phone = FRANCE_DIAL_PREFIX .. national_number
 	local ssn    = field(info, "social_security_number")
 	local iban   = field(info, "iban")
 
@@ -167,7 +168,7 @@ function M.build(info, is_section_enabled, magic_key)
 		if #phone >= PHONE_MIN_FOR_PLAIN then
 			add(out, seen, "phoneprefixes", phone:sub(1, PHONE_MIN_FOR_PLAIN), phone, true, "phone_number")
 			add(out, seen, "phoneprefixes",
-				FRANCE_DIAL_PREFIX .. phone:sub(2, PHONE_MIN_FOR_PLAIN),
+				FRANCE_DIAL_PREFIX .. national_number:sub(1, PHONE_MIN_FOR_PLAIN - (phone:sub(1, 1) == "0" and 1 or 0)),
 				international_phone, true, "phone_number")
 		end
 		if #phone >= PHONE_MIN_FOR_INNER then

@@ -112,6 +112,14 @@ helpers.describe("prefix expansions: what is built", function()
 		end
 	end)
 
+	helpers.it("keeps the first digit of an international phone without a trunk zero", function()
+		local mappings = Prefix.build({ phone_number = "750399576" }, nil, "*")
+		local triggers = {}
+		for _, mapping in ipairs(mappings) do triggers[mapping.trigger] = mapping.replacement end
+		helpers.assert_eq(triggers["+337503"], "+33750399576")
+		helpers.assert_nil(triggers["+33503"], "an unrelated international number must not expand")
+	end)
+
 	helpers.it("gives back the form the user started typing", function()
 		-- The shortest prefix holding five non-space characters, which for
 		-- "1 99 99 99…" runs to the seventh byte. Taken from the shared helper
