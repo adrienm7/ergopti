@@ -48,9 +48,11 @@ function parseDynamic(output) {
 	const needed = [];
 	let soname = null;
 	for (const line of output.split('\n')) {
-		const need = line.match(/\(NEEDED\)\s+Shared library: \[([^\]]+)\]/);
+		const need = line.match(/\(NEEDED\)\s+Shared library: \[(.+)\]\s*$/);
+		if (!need && /\(NEEDED\)/.test(line)) throw new Error('unreadable ELF needed library');
 		if (need) needed.push(need[1]);
-		const own = line.match(/\(SONAME\)\s+Library soname: \[([^\]]+)\]/);
+		const own = line.match(/\(SONAME\)\s+Library soname: \[(.+)\]\s*$/);
+		if (!own && /\(SONAME\)/.test(line)) throw new Error('unreadable ELF soname');
 		if (own) soname = own[1];
 	}
 	return { needed, soname };

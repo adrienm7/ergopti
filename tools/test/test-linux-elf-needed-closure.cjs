@@ -50,6 +50,10 @@ assert.deepEqual(Closure.parseDynamic(DYNAMIC), {
 	needed: ['libayatana-indicator3.so.7', 'libc.so.6'],
 	soname: 'libayatana-appindicator3.so.1'
 });
+assert.deepEqual(Closure.parseDynamic(' (NEEDED) Shared library: [libc.so.6]bad]'), {
+	needed: ['libc.so.6]bad'], soname: null
+});
+assert.throws(() => Closure.parseDynamic(' (NEEDED) Shared library: [broken'), /unreadable/);
 passed++;
 
 // 2. The recipient list.
@@ -205,6 +209,13 @@ if (gcc.status === 0 && readelf.status === 0) {
 			encoding: 'utf8',
 			env: { ...process.env, LC_ALL: 'C' }
 		});
+	const bracketLibrary = path.join(work, 'libbracket.so');
+	execFileSync('gcc', ['-shared', '-fPIC', '-Wl,-soname,libc.so.6]bad', '-o', bracketLibrary, path.join(work, 'lib.c')]);
+	execFileSync('gcc', ['-o', path.join(work, 'bracket-main'), path.join(work, 'main.c'), '-L' + work, '-l:libbracket.so']);
+	const bracketImage = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-needed-bracket-'));
+	fs.copyFileSync(path.join(work, 'bracket-main'), path.join(bracketImage, 'program'));
+	assert.deepEqual(Closure.checkClosure([bracketImage], readDynamic, recipient).violations.map((entry) => entry.needed),
+		['libc.so.6]bad'], 'a real ELF dependency is not truncated into a recipient library');
 	let real = Closure.checkClosure([image], readDynamic, recipient);
 	assert.deepEqual(real.violations, [], 'a bundled library resolves in a real executable');
 	fs.renameSync(path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(image, 'usr/lib/renamed.so'));
