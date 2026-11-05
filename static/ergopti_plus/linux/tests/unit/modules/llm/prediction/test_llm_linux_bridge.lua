@@ -173,6 +173,11 @@ helpers.describe("infra.llm_bridge", function()
   -- ==========================================================================
 
   helpers.describe("build_payload()", function()
+    helpers.it("interpolates percent characters in context literally", function()
+      local payload = LB.build_payload("100% ready, %1", { system_prompt = "Context: {context}" })
+      helpers.assert_eq(payload.messages[1].content, "Context: 100% ready, %1")
+      helpers.assert_eq(payload.messages[2].content, "100% ready, %1")
+    end)
     helpers.it("builds minimal payload with defaults", function()
       local payload = LB.build_payload("test buffer")
       helpers.assert_eq(payload.model, "llama3.2")
