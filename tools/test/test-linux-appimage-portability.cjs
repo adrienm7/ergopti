@@ -742,6 +742,15 @@ assert.ok(!Update.globMatches('ErgoptiPlus-*x86_64.AppImage.zsync', 'ErgoptiPlus
 assert.throws(() => Update.parseUpdateInformation('zsync|a|b|c|d'), /gh-releases-zsync/);
 const image = elfWith(Update.UPDATE_INFORMATION);
 assert.equal(Update.readEmbeddedUpdateInformation(image), Update.UPDATE_INFORMATION);
+const truncatedNames = Buffer.from(image);
+const sectionTable = Number(truncatedNames.readBigUInt64LE(0x28));
+truncatedNames.writeBigUInt64LE(1n, sectionTable + 2 * 64 + 0x20);
+assert.throws(() => Update.readEmbeddedUpdateInformation(truncatedNames), /section.*name|name.*section/i);
+const unterminatedNames = Buffer.from(image);
+unterminatedNames.writeBigUInt64LE(BigInt(1 + Update.UPDATE_SECTION.length), sectionTable + 2 * 64 + 0x20);
+assert.throws(() => Update.readEmbeddedUpdateInformation(unterminatedNames), /section.*name/i);
+
+
 assert.deepEqual(Update.verify(image, zsyncFor(image.length)), []);
 for (const [what, badImage, badZsync, expected] of [
 	['an AppImage built without -u', elfWith(''), zsyncFor(image.length), /differs from/],
