@@ -2,7 +2,10 @@
 # Independent owned protocol peers qualify real RelayHop CONNECT and SOCKS paths.
 param(
     [Parameter(Mandatory=$true)][string]$RoutesPath,
-    [Parameter(Mandatory=$true)][string]$PolicyPath
+    [Parameter(Mandatory=$true)][string]$PolicyPath,
+    [switch]$Ipv6Upstream,
+    [string]$TransportPath='',
+    [string]$UpdaterDefaultsPath=''
 )
 $ErrorActionPreference='Stop'
 . $RoutesPath
@@ -18,7 +21,7 @@ public sealed class RelayBranchPeer : IDisposable {
  const string Host="hop-component.invalid";
  const string Ipv4Authority="192.0.2.123:18080";
  const string Auth="Proxy-Authorization: Basic b3duZWQ6Zml4dHVyZQ==";
- readonly TcpListener listener=new TcpListener(IPAddress.Loopback,0);
+ readonly TcpListener listener;
  readonly Thread worker;
  readonly object gate=new object();
  readonly bool socks;
@@ -27,8 +30,12 @@ public sealed class RelayBranchPeer : IDisposable {
  public int Connections, Authenticated, Requests, Failures, DomainFrames, Ipv4Frames;
  public bool Joined;
  public int Port {get{return ((IPEndPoint)listener.LocalEndpoint).Port;}}
- public RelayBranchPeer(bool socks) {
-  this.socks=socks;listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();
+ public bool StrictIpv6 {get{return listener.Server.AddressFamily==AddressFamily.InterNetworkV6&&!listener.Server.DualMode&&((IPEndPoint)listener.LocalEndpoint).Address.Equals(IPAddress.IPv6Loopback);}}
+ public RelayBranchPeer(bool socks) : this(socks,false) { }
+ public RelayBranchPeer(bool socks,bool ipv6) {
+  this.socks=socks;listener=new TcpListener(ipv6?IPAddress.IPv6Loopback:IPAddress.Loopback,0);
+  try{if(ipv6)listener.Server.DualMode=false;listener.Start();worker=new Thread(Serve);worker.IsBackground=true;worker.Start();}
+  catch{listener.Stop();throw;}
  }
  static void Require(bool value){if(!value)throw new InvalidDataException("Owned protocol control refused");}
  static void Write(Stream stream,string value){byte[] bytes=Encoding.ASCII.GetBytes(value);stream.Write(bytes,0,bytes.Length);}
@@ -61,7 +68,8 @@ public sealed class RelayBranchPeer : IDisposable {
  void Serve(){while(!stopped){try{using(TcpClient client=listener.AcceptTcpClient()){lock(gate){active=client;}client.ReceiveTimeout=3000;client.SendTimeout=3000;using(NetworkStream stream=client.GetStream()){
   string expectedHost=Host;if(socks)expectedHost=SocksServer(stream);else HttpServer(stream);string request=Head(stream);Require(request.StartsWith("GET /control HTTP/1.1\r\n",StringComparison.Ordinal));Require(request.Contains("\r\nHost: "+expectedHost+"\r\n"));Interlocked.Increment(ref Requests);Reply(stream,socks?"SC":"HC");
  }lock(gate){active=null;}}}catch(Exception){if(!stopped)Interlocked.Increment(ref Failures);}}}
- public static void Oracle(int port,bool socks,bool ipv4){using(TcpClient client=new TcpClient(AddressFamily.InterNetwork)){client.Connect(IPAddress.Loopback,port);client.ReceiveTimeout=5000;client.SendTimeout=5000;using(NetworkStream stream=client.GetStream()){
+ public static void Oracle(int port,bool socks,bool ipv4){Oracle(port,socks,ipv4,false);}
+ public static void Oracle(int port,bool socks,bool ipv4,bool ipv6Proxy){using(TcpClient client=new TcpClient(ipv6Proxy?AddressFamily.InterNetworkV6:AddressFamily.InterNetwork)){client.Connect(ipv6Proxy?IPAddress.IPv6Loopback:IPAddress.Loopback,port);client.ReceiveTimeout=5000;client.SendTimeout=5000;using(NetworkStream stream=client.GetStream()){
   if(socks)SocksClient(stream,ipv4);else{Write(stream,"CONNECT "+Host+":443 HTTP/1.1\r\nHost: "+Host+":443\r\n"+Auth+"\r\n\r\n");Require(Head(stream).StartsWith("HTTP/1.1 200 ",StringComparison.Ordinal));}Write(stream,Request(ipv4));CheckReply(stream,socks?"SC":"HC");
  }}}
  public static void ThroughHop(string endpoint,bool connect,bool ipv4){Uri hop=new Uri(endpoint);using(TcpClient client=new TcpClient(AddressFamily.InterNetwork)){client.Connect(IPAddress.Loopback,hop.Port);client.ReceiveTimeout=5000;client.SendTimeout=5000;using(NetworkStream stream=client.GetStream()){
@@ -72,6 +80,73 @@ public sealed class RelayBranchPeer : IDisposable {
  public void Dispose(){stopped=true;listener.Stop();lock(gate){if(active!=null)active.Close();}if(!worker.Join(5000))throw new InvalidOperationException("Owned branch peer did not join");Joined=true;}
 }
 '@
+# This alternate mode reuses the canonical protocol peer; only its upstream
+# listener family changes. Both real routes still use native HTTP to a DNS URL.
+function Invoke-Ipv6RelayUpstreamControl {
+    if($TransportPath -ceq '' -or $UpdaterDefaultsPath -ceq ''){throw 'The native upstream probe requires explicit transport and defaults sources.'}
+    . $TransportPath
+    $Directory=Join-Path ([IO.Path]::GetTempPath()) ('ergopti-ipv6-upstream-'+[Guid]::NewGuid().ToString('N'))
+    $Created=$false;$Ipv4Peer=$null;$Ipv6Peer=$null;$Ipv4Oracle=$false;$Ipv6Oracle=$false
+    $Ipv6Strict=$false;$Witness=$null;$Subject=$null;$SetupFailure=@{};$script:RelayIpv6NativeDebt=$false
+    function Invoke-UpstreamNative($Override,$BodyPath,$HeaderPath) {
+        $ReadEnvironment={param($Name) if($Name -ceq 'ERGOPTI_PROXY_OVERRIDE'){return $Override};return ''}.GetNewClosure()
+        $Destination=[Uri]'http://hop-component.invalid/control'
+        $Selection=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Destination.AbsoluteUri -BudgetMs 20000 `
+            -ReadEnvironment $ReadEnvironment -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+        if(-not $Selection.Ok -or $Selection.Routes.Count -ne 1 -or $Selection.Routes[0].Kind -cne 'proxy') {
+            throw 'The actual IPv6 upstream probe route was not admitted.'
+        }
+        $InputValue=[pscustomobject]@{started_tick=[ErgoptiWinHttpTransport]::CurrentTick();deadline_ms=20000;connect_timeout_ms=2000
+            max_response_bytes=16;max_header_bytes=2048;response_path=$BodyPath;header_path=$HeaderPath
+            revocation_best_effort=$false;headers=@();body=''}
+        $Answer=@{child_quiesced=$true};$Engine=New-ErgoptiWinHttpAttemptEngine $InputValue $Answer
+        $Metrics=$Engine.InvokeRoute($Destination,$Selection.Routes[0],'GET',$false,$true)
+        $Exact=$Metrics.completed -and $Metrics.status -eq 200 -and $Metrics.delivered -eq 2 -and [IO.File]::ReadAllText($BodyPath) -ceq 'SC'
+        $Retired=[bool]$Metrics.child_quiesced -and [bool]$Engine.ChildQuiesced()
+        if(-not $Retired){$script:RelayIpv6NativeDebt=$true}
+        return @{route_admitted=$true;completed=$Metrics.completed;status=$Metrics.status;body_exact=[bool]$Exact
+            native_error=$Metrics.native_error;stage=$Metrics.stage;failure=$Metrics.failure;diagnostic=$Metrics.diagnostic;retired=$Retired}
+    }
+    function Get-UpstreamPeerObservation($Peer) {
+        if($null -eq $Peer){return @{created=$false}}
+        return @{created=$true;connections=$Peer.Connections;authenticated=$Peer.Authenticated
+            requests=$Peer.Requests;domain_frames=$Peer.DomainFrames;ipv4_frames=$Peer.Ipv4Frames;failures=$Peer.Failures;joined=$Peer.Joined}
+    }
+    try {
+        New-Item -ItemType Directory -Path $Directory -ErrorAction Stop | Out-Null
+        $Created=$true;$BodyPath=Join-Path $Directory 'body.bin';$HeaderPath=Join-Path $Directory 'headers.bin'
+        $Ipv4Peer=[RelayBranchPeer]::new($true)
+        [RelayBranchPeer]::Oracle($Ipv4Peer.Port,$true,$false)
+        $Ipv4Oracle=$true
+        $Witness=Invoke-UpstreamNative ('socks5h://owned:fixture@127.0.0.1:'+$Ipv4Peer.Port) $BodyPath $HeaderPath
+        if(-not $Witness.retired){throw 'The IPv4 witness retained native callback debt.'}
+        $Ipv6Peer=[RelayBranchPeer]::new($true,$true)
+        $Ipv6Strict=$Ipv6Peer.StrictIpv6
+        [RelayBranchPeer]::Oracle($Ipv6Peer.Port,$true,$false,$true)
+        $Ipv6Oracle=$true
+        $Subject=Invoke-UpstreamNative ('socks5h://owned:fixture@[::1]:'+$Ipv6Peer.Port) $BodyPath $HeaderPath
+    } catch {
+        $Cause=$_.Exception.GetBaseException()
+        $SetupFailure=@{type=$Cause.GetType().Name}
+        if($Cause -is [Net.Sockets.SocketException]){$SetupFailure.socket_error=$Cause.NativeErrorCode}
+    } finally {
+        if($null -ne $Ipv4Peer){$Ipv4Peer.Dispose()}
+        if($null -ne $Ipv6Peer){$Ipv6Peer.Dispose()}
+        if($Created -and -not $script:RelayIpv6NativeDebt) {
+            foreach($Path in @($BodyPath,$HeaderPath)){if([IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}
+            [IO.Directory]::Delete($Directory,$false)
+        }
+    }
+    $Receipt=@{schema_version=1;ipv4_oracle=$Ipv4Oracle;ipv6_oracle=$Ipv6Oracle;ipv6_listener_strict=$Ipv6Strict
+        setup_failure=$SetupFailure;witness=$Witness;subject=$Subject
+        ipv4_peer=(Get-UpstreamPeerObservation $Ipv4Peer);ipv6_peer=(Get-UpstreamPeerObservation $Ipv6Peer)}
+    [Console]::WriteLine('IPV6_RELAY_UPSTREAM_RECEIPT:'+($Receipt|ConvertTo-Json -Compress -Depth 5))
+    return $null -ne $Subject -and $Subject.completed -and $Subject.status -eq 200 -and $Subject.body_exact -and $Subject.retired
+}
+if($Ipv6Upstream) {
+    if(-not (Invoke-Ipv6RelayUpstreamControl)){exit 1}
+    exit 0
+}
 $Http=$null;$Socks=$null;$Receipt=$null
 try {
     $Http=[RelayBranchPeer]::new($false)
