@@ -517,8 +517,11 @@ function _builders.typing(e, id)
 	-- `text` and `events_json` are the only columns holding what the user
 	-- literally typed, so they are the only ones encrypted. The aggregates the
 	-- dashboard computes over stay in clear, which is what keeps reads fast.
-	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
-	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _json_text(e.events))
+	local text_id = Migration.iv_event_id(id, "text")
+	local json_id = Migration.iv_event_id(id, "events_json")
+	if not text_id or not json_id then return nil end
+	local enc_text = TextCipher.encrypt(_device_id, text_id, e.text or "")
+	local enc_json = TextCipher.encrypt(_device_id, json_id, _json_text(e.events))
 	if enc_text == nil or enc_json == nil then
 		-- Encryption is on but could not run. Storing the plaintext would defeat
 		-- the setting the user turned on, so this row is not written at all.
@@ -787,7 +790,9 @@ function M.fetch_typing_batch(device_id, after_id, limit)
 		for _, spec in ipairs(Migration.COLUMNS) do
 			values[spec.name] = row[spec.name] or ""
 		end
-		rows[#rows + 1] = { id = tonumber(row.id) or 0, values = values }
+		local id = Migration.exact_id(row.id)
+		if id == nil then return nil end
+		rows[#rows + 1] = { id = id, values = values }
 	end
 	return rows
 end
