@@ -497,10 +497,12 @@ _MBPO_NativeBackendPick() {
 		_MBPO_Require(!IsObject(_MBPO.Failure) && _MBPO.BackendPickReturns == 1 && _MBPO.NativeCommands == BeforeCommands + 1,
 			"Exactly one genuine BM_CLICK must return from the real production Pick handler")
 		Parsed := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		; The native sparse writer removes the selected backend at its genuine default.
+		DurableBackend := Parsed["llm"]["models"].Get("selected", ManifestDefaultFor("llm.models.selected"))
 		Caption := _LLM_Menu_ModelDisplayText()
 		FileAppend("RECEIPT native-model-backend mode=" . _MBPO.Mode . " before=" . _MBPO.InitialBackend
 			. " live_backend=" . _LLM_Menu["backend"] . " feature_backend=" . Features["llm"]["models"]["selected"]
-			. " durable_backend=" . Parsed["llm"]["models"]["selected"]
+			. " durable_backend=" . DurableBackend
 			. " model_b=" . (_LLM_Menu["model"] == _MBPO.ModelB) . " caption_b=" . (Caption == _MBPO.ModelB)
 			. " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int")
 			. " writers=" . _MBPO.WriterConfirmed . " mutation_returns=" . _MBPO.MutationReturns
@@ -512,7 +514,7 @@ _MBPO_NativeBackendPick() {
 			&& Parsed["llm"]["models"]["ollama"] == _MBPO.ModelB,
 			"The chosen row must actually publish model B in the real menu, features and durable file")
 		_MBPO_Require(_LLM_Menu["backend"] == "ollama" && Features["llm"]["models"]["selected"] == "ollama"
-			&& Parsed["llm"]["models"]["selected"] == "ollama" && Caption == _MBPO.ModelB,
+			&& DurableBackend == "ollama" && Caption == _MBPO.ModelB,
 			"Selecting a catalogue Ollama model through the sole model-selector must activate it, including from API backend")
 		_MBPO_Require(!DllCall("User32\IsWindowVisible", "Ptr", _MBPO.Hwnd, "Int"),
 			"Only the acknowledged actual active selection may hide its native selector")
