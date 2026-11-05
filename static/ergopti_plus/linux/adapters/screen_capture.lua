@@ -177,7 +177,7 @@ function M.capture(mode, max_edge, on_done)
 	local dir = private_dir()
 	if not dir then return nil, "no private directory could be created" end
 	local path = dir .. "/screen.png"
-	local called, run, reason = pcall(ShellRunner.run_async, "sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
+	local called, run, reason, cleanup = pcall(ShellRunner.run_async, "sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
 		{ timeout_ms = mode == "region" and REGION_TIMEOUT_MS or FULL_TIMEOUT_MS }, function(result)
 			local failure = result.error
 			if result.code == 0 and result.ok ~= true and failure == nil then failure = "capture completion was not acknowledged" end
@@ -188,7 +188,13 @@ function M.capture(mode, max_edge, on_done)
 			on_done(outcome)
 		end)
 	if not called or not run then
-		os.remove(dir)
+		local function remove_staging()
+			os.remove(path)
+			os.remove(dir)
+		end
+		-- A screenshot can already exist when a post-spawn pipe fails. Retire
+		-- it only once that exact child cannot write another image.
+		if cleanup then pcall(cleanup.on_settled, remove_staging) else remove_staging() end
 		return nil, "the capture could not start: " .. tostring(called and reason or run)
 	end
 	Logger.debug(LOG, "Screen capture started (mode=%s).", mode)
