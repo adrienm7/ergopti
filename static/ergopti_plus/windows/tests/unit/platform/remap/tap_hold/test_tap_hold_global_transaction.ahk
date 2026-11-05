@@ -473,3 +473,75 @@ _THGT_InheritedCriticalIsDefused() {
 Test("tap-hold transaction: inherited Critical is defused and restored "
 	. "(tap-hold-global-transaction)",
 	_THGT_InheritedCriticalIsDefused)
+
+
+; These public setters own one leaf, while their ordinary writer serializes RAM.
+; A later physical edit to another key must survive or cause an unchanged refusal.
+_THSO_Source(OtherAction) {
+	return "[_meta]`n" . "schema_version = " . TapHoldMigrationRegistry()["current"] . "`n"
+		. "[tap_hold]`ninherit_defaults = false`n"
+		. '[tap_hold.keys.caps_lock]`ntap_action = "escape"`nhold_modifier = "ctrl"`n'
+		. '[tap_hold.keys.tab]`ntap_action = "' . OtherAction . '"`nhold_modifier = "alt"`n'
+}
+
+_THSO_ActualSourceOwned(Mode, ReloadCurrent, TargetPath) {
+	global TapHold, _TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots
+	SplitPath(TargetPath, , &Root)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	Assert((Created is Integer) && Created == 1, "the fixture exclusively owns its private directory")
+	try {
+		SourceA := _THSO_Source("copy")
+		SourceB := _THSO_Source("enter")
+		AssertEqual(1, FSWriteCreateDurable(TargetPath, SourceA))
+		TapHold := LoadTapHoldToml(TargetPath)
+		AssertEqual("copy", TapHold["keys"]["tab"]["tap_action"], "the real loader admits source A")
+		AssertEqual(1, FSWriteDurable(TargetPath, SourceB))
+		Assert(FSUtf8ExactMatches(TargetPath, SourceB), "the independent external edit B is durable before the public setter")
+		if ReloadCurrent {
+			for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+				if Cache.Has(TargetPath)
+					Cache.Delete(TargetPath)
+			TapHold := LoadTapHoldToml(TargetPath)
+			AssertEqual("enter", TapHold["keys"]["tab"]["tap_action"], "the control really reloads B through the owner")
+		}
+		Before := TapHold
+		Result := Mode == "tap" ? WriteTapHoldTap("caps_lock", "enter")
+			: WriteTapHoldGlobalDuration(0.425)
+		Actual := FSReadUtf8Exact(TargetPath)
+		Document := TOML_ParseDocument(Actual)
+		Other := Document["tap_hold"]["keys"]["tab"]["tap_action"]
+		try FileAppend("# tap-hold source: mode=" . Mode . ", reload=" . ReloadCurrent
+			. ", result=" . Result . ", other=" . Other . ", same_ram=" . (Before == TapHold) . "`n", "*")
+		if (Result is Integer) && Result == 1 {
+			AssertEqual("enter", Other, "saving one leaf cannot erase the other key's durable external update")
+			AssertEqual("enter", TapHold["keys"]["tab"]["tap_action"], "the acknowledged runtime projection agrees with the retained other key")
+			if Mode == "tap"
+				AssertEqual("enter", Document["tap_hold"]["keys"]["caps_lock"]["tap_action"])
+			else
+				AssertEqual(0.425, Document["tap_hold"]["time_activation_seconds"])
+		} else {
+			Assert(!ReloadCurrent, "an explicitly reloaded current source remains writable")
+			Assert((Result is Integer) && Result == 0, "a stale owner may refuse strictly")
+			Assert(FSUtf8ExactMatches(TargetPath, SourceB), "refusal retains all physical bytes of B")
+			Assert(Before == TapHold, "refusal cannot publish a candidate")
+		}
+	} finally {
+		for Cache in [_TomlFileCache, _ParseTomlCache, _ConfigTomlSnapshots]
+			if Cache.Has(TargetPath)
+				Cache.Delete(TargetPath)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+
+_THSO_ActualSource(Mode, ReloadCurrent) {
+	return _THHS_WithNativeFixture(_THSO_ActualSourceOwned.Bind(Mode, ReloadCurrent))
+}
+Test("tap-hold source: public tap preserves another externally edited key (tap-hold-external-source)",
+	() => _THSO_ActualSource("tap", false))
+Test("tap-hold source: public global delay preserves another externally edited key (tap-hold-external-source)",
+	() => _THSO_ActualSource("global", false))
+Test("tap-hold source: genuinely reloaded tap control stays writable (tap-hold-external-source)",
+	() => _THSO_ActualSource("tap", true))
+Test("tap-hold source: genuinely reloaded global delay control stays writable (tap-hold-external-source)",
+	() => _THSO_ActualSource("global", true))
