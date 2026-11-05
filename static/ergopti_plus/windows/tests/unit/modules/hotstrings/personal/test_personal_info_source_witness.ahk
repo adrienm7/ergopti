@@ -330,15 +330,22 @@ _PIENC_Case(Kind) {
 		_ReadPersonalInfoTomlCache := false
 		ScriptInformation["PersonalInfoTomlPath"] := Path
 		Invalid := Kind == "invalid-utf8" || Kind == "odd-utf16"
-		First := Kind == "invalid-utf8" ? "A?B" : "Zoë😀"
+			|| Kind == "embedded-nul-utf8" || Kind == "lone-surrogate-utf16"
+		First := (Kind == "invalid-utf8" || Kind == "embedded-nul-utf8" || Kind == "lone-surrogate-utf16") ? "A?B" : "Zoë😀"
 		Source := _PISW_Image(First, "Initial")
-		Utf16 := Kind == "utf16-control" || Kind == "odd-utf16"
+		Utf16 := Kind == "utf16-control" || Kind == "odd-utf16" || Kind == "lone-surrogate-utf16"
 		Input := _PIENC_Bytes(Source, Utf16, Kind == "utf8-bom-control")
-		if Kind == "invalid-utf8" {
+		if Kind == "invalid-utf8" || Kind == "embedded-nul-utf8" {
 			AssertEqual(StrLen(Source), Input.Size, "the injected marker subject is genuinely ASCII before corruption")
 			Marker := InStr(Source, "?", true)
 			AssertTrue(Marker > 0)
-			NumPut("UChar", 0xFF, Input, Marker - 1)
+			NumPut("UChar", Kind == "invalid-utf8" ? 0xFF : 0, Input, Marker - 1)
+		} else if Kind == "lone-surrogate-utf16" {
+			Marker := InStr(Source, "?", true)
+			AssertTrue(Marker > 0)
+			MarkerOffset := 2 + (Marker - 1) * 2
+			AssertEqual(Ord("?"), NumGet(Input, MarkerOffset, "UShort"))
+			NumPut("UShort", 0xD800, Input, MarkerOffset)
 		} else if Kind == "odd-utf16" {
 			Odd := Buffer(Input.Size + 1, 0)
 			DllCall("ntdll\RtlMoveMemory", "Ptr", Odd, "Ptr", Input, "UPtr", Input.Size)
@@ -354,9 +361,18 @@ _PIENC_Case(Kind) {
 		if Kind == "invalid-utf8" {
 			AssertEqual(0xFF, NumGet(Before, Marker - 1, "UChar"), "the real source contains a byte forbidden in UTF-8")
 			AssertFalse(FSReadUtf8Exact(Path) is String, "the genuine strict native decoder must independently reject this UTF-8 image")
+		} else if Kind == "embedded-nul-utf8" {
+			AssertEqual(Ord("A"), NumGet(Before, Marker - 2, "UChar"))
+			AssertEqual(0, NumGet(Before, Marker - 1, "UChar"), "the native UTF-8 source physically contains NUL inside its quoted field")
+			AssertEqual(Ord("B"), NumGet(Before, Marker, "UChar"))
 		} else if Utf16 {
 			AssertEqual(0xFEFF, NumGet(Before, 0, "UShort"))
 			AssertEqual(Kind == "odd-utf16" ? 1 : 0, Mod(Before.Size, 2))
+			if Kind == "lone-surrogate-utf16" {
+				AssertEqual(Ord("A"), NumGet(Before, MarkerOffset - 2, "UShort"))
+				AssertEqual(0xD800, NumGet(Before, MarkerOffset, "UShort"), "the actual source contains an unmatched high surrogate")
+				AssertEqual(Ord("B"), NumGet(Before, MarkerOffset + 2, "UShort"), "the next actual unit is not a low surrogate")
+			}
 		}
 		if !Invalid {
 			NativeDecoded := FileRead(Path, "UTF-8")
@@ -401,3 +417,6 @@ _PIENC_Case(Kind) {
 }
 for _PIENC_Kind in ["invalid-utf8", "odd-utf16", "utf8-control", "utf8-bom-control", "utf16-control"]
 	Test("personal info encoding admission: " . _PIENC_Kind . " (personal-info-encoding)", _PIENC_Case.Bind(_PIENC_Kind))
+
+for _PIENC_ExtraKind in ["lone-surrogate-utf16", "embedded-nul-utf8"]
+	Test("personal info encoding admission: " . _PIENC_ExtraKind . " (personal-info-encoding)", _PIENC_Case.Bind(_PIENC_ExtraKind))
