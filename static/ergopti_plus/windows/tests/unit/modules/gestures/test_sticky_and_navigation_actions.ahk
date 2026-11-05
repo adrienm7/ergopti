@@ -65,11 +65,12 @@ _SNA_NativeChildSource() {
 	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
 	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
 	Code .= "#Include " . Owner . "`n"
-	for Name in ["StickyModifierNames", "StickyModifier"] {
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
 		Code .= Body . "`n"
 	}
+	Code .= 'global _ALTGR_KANA_FIXUP := false, _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0)' . "`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_nontext_probe_body.ahk")
 }
 _SNA_NativeCase(Mode) {
@@ -142,7 +143,7 @@ _SSM_ChildSource() {
 		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["StickyModifierNames", "StickyModifier", "TextPressKey", "_TextSenderNormalizeModifierKey",
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
 		"_TextSenderModifierPrefix", "_TextSenderKeystroke", "_TextSenderModifierWords", "_TextSenderSustainedKey",
 		"_TextSenderSendInput", "_TextSenderAtSendLevel", "_SendVerdictSucceeded", "HSE_WordResetFlagCurrent",
 		"_PrefixHasIncompleteFragment", "TapHoldOwnsShortcut", "TapHoldTapInDispatch",
@@ -151,6 +152,7 @@ _SSM_ChildSource() {
 		AssertTrue(Body != "", "The complete unchanged native producer must exist: " . Name)
 		Code .= Body . "`n"
 	}
+	Code .= 'global _ALTGR_KANA_FIXUP := false, _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0)' . "`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\sticky_modifier_flags_body.ahk")
 }
 _SSM_Case(Mode) {
@@ -213,3 +215,45 @@ _SSM_Case(Mode) {
 for _SSM_Mode in ["plain", "shift"]
 	Test("Sticky native modifier flags: " . _SSM_Mode . " preserves captured modifiers through the real synthetic transaction (sticky-native-modifier-flags)",
 		_SSM_Case.Bind(_SSM_Mode))
+
+; The configuration trace exercises the genuine layout helpers without an
+; installed Kana layout or native injection. Native receivers test delivery.
+class _SKC_HookTrace {
+	__New() {
+		this.VisibleNonText := true
+		this.Options := []
+	}
+	KeyOpt(Keys, Options) {
+		this.Options.Push({Keys: Keys, Options: Options})
+	}
+}
+_SKC_Configure() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	SavedKana := _ALTGR_KANA_FIXUP, SavedProbe := _ALTGR_LAYOUT_PROBE
+	PreviousCritical := Critical("On")
+	try {
+		for Row in [{Kana: false, Vk: 0, Keys: []}, {Kana: false, Vk: 0xDF, Keys: []},
+			{Kana: true, Vk: 0xDF, Keys: ["{SC138}", "{vkDF}"]},
+			{Kana: true, Vk: 0x15, Keys: ["{SC138}", "{vk15}"]},
+			{Kana: true, Vk: 0, Keys: ["{SC138}"]}] {
+			_ALTGR_KANA_FIXUP := Row.Kana
+			_ALTGR_LAYOUT_PROBE := Map("altgr_vk", Row.Vk)
+			Hook := _SKC_HookTrace()
+			StickyModifierConfigureHook(Hook)
+			AssertFalse(Hook.VisibleNonText, "ordinary endpoints must suppress their original key")
+			AssertEqual(2 + Row.Keys.Length, Hook.Options.Length)
+			AssertEqual("{All}", Hook.Options[1].Keys)
+			AssertEqual("E", Hook.Options[1].Options)
+			AssertEqual("{LCtrl}{RCtrl}{LAlt}{RAlt}{LShift}{RShift}{LWin}{RWin}", Hook.Options[2].Keys)
+			AssertEqual("-E+V", Hook.Options[2].Options, "every standard modifier stays visible and does not end capture")
+			for Index, Key in Row.Keys {
+				AssertEqual(Key, Hook.Options[Index + 2].Keys, "both native Kana option tables must be updated")
+				AssertEqual("-E+V", Hook.Options[Index + 2].Options, "Kana must pass through and leave the following key to consume sticky state")
+			}
+		}
+	} finally {
+		_ALTGR_KANA_FIXUP := SavedKana, _ALTGR_LAYOUT_PROBE := SavedProbe
+		Critical(PreviousCritical)
+	}
+}
+Test("Sticky Kana configuration: both native identities pass without consuming capture (sticky-kana-capture-options)", _SKC_Configure)

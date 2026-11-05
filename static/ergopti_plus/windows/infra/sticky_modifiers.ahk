@@ -26,6 +26,20 @@ StickyModifierNames(ActionId) {
 	return Held
 }
 
+; Configures the next non-modifier key as the capture endpoint. Kana AltGr
+; has both a scan-code identity and a distinct virtual key; InputHook combines
+; both option tables, so either residual EndKey flag would consume the modifier.
+; @param {InputHook} Hook The private capture before it is started.
+StickyModifierConfigureHook(Hook) {
+	Hook.VisibleNonText := false
+	Hook.KeyOpt("{All}", "E")
+	Hook.KeyOpt("{LCtrl}{RCtrl}{LAlt}{RAlt}{LShift}{RShift}{LWin}{RWin}", "-E+V")
+	for Key in [KS_AltGrKeyName(), KS_AltGrSendKey()] {
+		if Key != "" && Key != "RAlt"
+			Hook.KeyOpt("{" . Key . "}", "-E+V")
+	}
+}
+
 ; Presses the next key with the sticky action's modifiers, once. The key itself is
 ; withheld until then; intervening modifiers pass through and their captured
 ; flags accompany the replay. The one-shot Shift timeout ends the wait.
@@ -37,9 +51,7 @@ StickyModifier(ActionId) {
 	Held := StickyModifierNames(ActionId)
 	TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
 	Hook := InputHook("L0 T" . TimeoutSec)
-	Hook.VisibleNonText := false
-	Hook.KeyOpt("{All}", "E")
-	Hook.KeyOpt("{LCtrl}{RCtrl}{LAlt}{RAlt}{LShift}{RShift}{LWin}{RWin}", "-E")
+	StickyModifierConfigureHook(Hook)
 	OwnerToken := SIHO_StartOwned(Hook, "sticky-modifier", true)
 	if !OwnerToken
 		return false
