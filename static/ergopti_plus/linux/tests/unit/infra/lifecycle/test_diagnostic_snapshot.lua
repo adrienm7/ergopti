@@ -177,6 +177,24 @@ end)
 
 describe("Diagnostic snapshot: Linux collector", function()
 	local Collector = require("infra.diagnostic_snapshot")
+	it("linux-system-locale-precedence: respects LC_MESSAGES between LC_ALL and LANG", function()
+		local original = os.getenv
+		local env = { LC_ALL = "", LC_MESSAGES = "fr_FR.UTF-8", LANG = "en_US.UTF-8" }
+		os.getenv = function(key) if env[key] ~= nil then return env[key] end return original(key) end
+		local ok, facts = pcall(function()
+			local read = { read = function() return nil end }
+			local messages = Collector.system_facts(read).locale
+			env.LC_ALL = "de_DE.UTF-8"
+			local all = Collector.system_facts(read).locale
+			env.LC_ALL, env.LC_MESSAGES = "", ""
+			return { messages = messages, all = all, lang = Collector.system_facts(read).locale }
+		end)
+		os.getenv = original
+		assert_true(ok)
+		assert_eq(facts.messages, "fr_FR.UTF-8")
+		assert_eq(facts.all, "de_DE.UTF-8")
+		assert_eq(facts.lang, "en_US.UTF-8")
+	end)
 	it("linux-os-release-duplicates: uses the last assignment", function()
 		local facts = Collector.system_facts({ read = function(path)
 			if path == "/etc/os-release" then return 'NAME="Old"\nNAME="Current"\nVERSION_ID=1\nVERSION_ID=2\n' end
