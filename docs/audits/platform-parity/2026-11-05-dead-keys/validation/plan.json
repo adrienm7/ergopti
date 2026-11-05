@@ -1,0 +1,19 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"module": "dead-keys",
+	"roles": ["windows", "macos", "linux", "shared"],
+	"scope": [
+		"activation and pending composition ownership",
+		"successful, unmapped and chained composition",
+		"controls, modifier chords, shortcuts and synthetic input",
+		"pause, reload, layout changes, stale events and failures",
+		"native constraints, deliberate differences, missing exposure and unknown intent"
+	],
+	"method": [
+		"Pin all workers to same source",
+		"Original-owner executions and genuine native components where available; Windows source-only without native host",
+		"Deduplicate OSW-001 named-control replay and existing converter fixes",
+		"Two bounded dry sweeps after last new root; independent root replays",
+		"Generate reviewed matrix/TODO; targeted and required checks; commit and push dev; recoverably retire owned worktrees"
+	]
+}

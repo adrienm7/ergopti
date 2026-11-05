@@ -1,0 +1,82 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"verification": "Each file compared byte-for-byte to git show audited_sha:path and current checkout.",
+	"files": [
+		{
+			"path": "AGENTS.md",
+			"sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/xkb_capture.lua",
+			"sha256": "cb6b98f7a76e7b47d8ddfacc546a058c3c83961050ff4d8716d04aaa2b028de6"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+			"sha256": "fe64d1d6985da694281e21d3b09614fc7f346947dbfb24a2a136a05e98c455b7"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/event_loop.lua",
+			"sha256": "d9583f9e74735bf287b46da5c74f3359e15d30c87d1daf78d044d69737ecd5f2"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/evdev_reader.lua",
+			"sha256": "114af1d0ff1daa21df141a8e006f10e19cdc3e30a1de32a5f18f718f06b891bb"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/modifier_broker.lua",
+			"sha256": "71d6384cf91985d7c404022f053017db0fb85a04ca9775848a5d7209a86bf736"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
+			"sha256": "bc1f4d7e600cff4b4743152a5e62783635ee6c81c273812dd4146a03fe38b911"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+			"sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/config_paths.lua",
+			"sha256": "2363e9b8cf88dd7a7d55bdcb47f0fcb1e4226d94987961839eb8f76b30deddcc"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/helpers.lua",
+			"sha256": "8b8279bfc809a843fd8af6b218f17e7e97cb4ac255844dc13d74d8c4794b6698"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/run.lua",
+			"sha256": "9e1884ac4c38513d94f4c66f735eebe4fde54bf133c29f417d956db172e104ab"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/support/module_groups.lua",
+			"sha256": "c307f99664cdb2e153db744641280568fee7dcb1d97b17d2d1b36626bc2818f5"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/layout/test_xkb_capture_exact_evdev_event.lua",
+			"sha256": "d5c64e68537cf95db0128a6bd829fee1864d30a0c9289ea127ed2a40891fd83e"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/layout/test_xkb_capture_semantic_controls.lua",
+			"sha256": "fbf6fc0de9b320ef6b892f5ea8cd879bd60728a90aba495b5ce764b48ea512e9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/layout/test_xkb_capture_direct_sources_retain.lua",
+			"sha256": "359b90287fca7aa4c52fac2e9ad928709a0abac8273a69507654dae7b8b232f4"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/keyboard_hook/test_keyboard_hook_xkb_capture_live_stream.lua",
+			"sha256": "05dada14ef59502bc35f5a1a4fb9d4409f835a7d6f3627bab47b39d831940da9"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/adapters/keyboard_hook/test_keyboard_hook_xkb_capture_position_native_effect.lua",
+			"sha256": "6358145331fa1f30b3b6260940998c930822552e2b238ccb8acf278f73be91a5"
+		},
+		{
+			"path": "static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua",
+			"sha256": "f091d78aca2d4667f8a61d5e91ccf3b46beea180d4285b737f9570ae89050c03"
+		}
+	]
+}

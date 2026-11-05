@@ -4078,5 +4078,16 @@
 	"inventory.behavior.backspace_other": "No automatic trigger restoration with Backspace; the application’s Undo is separate.",
 	"inventory.behavior.repeat_activation_window": "Magic-key repeat activation window",
 	"inventory.behavior.repeat_window_untimed": "No separate activation window for fallback repetition; idle word reset is independent.",
-	"inventory.behavior.repeat_window_macos": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent."
+	"inventory.behavior.repeat_window_macos": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent.",
+	"inventory.behavior.dead_composition": "Dead-key composition",
+	"inventory.behavior.dead_fallback": "Unmapped dead-key continuation",
+	"inventory.behavior.dead_lifetime": "Pending dead-key lifetime",
+	"inventory.behavior.dead_windows_composition": "Builtin dead-key maps and registry layout emulation.",
+	"inventory.behavior.dead_macos_composition": "The native keyboard layout owns composition; physical payload grouping is unverified.",
+	"inventory.behavior.dead_linux_composition": "Native XKB/Compose with independent text capture; consumed continuations can diverge.",
+	"inventory.behavior.dead_windows_fallback": "An unmapped continuation emits the accent terminator followed by the current character.",
+	"inventory.behavior.dead_macos_fallback": "Fallback belongs to the native layout; its physical payload and application output are unverified.",
+	"inventory.behavior.dead_linux_fallback": "Cancelled capture keeps the current character and discards the previous accent; native output can differ.",
+	"inventory.behavior.dead_windows_lifetime": "Builtin maps wait up to 2 seconds; registry dead-key state has no timeout.",
+	"inventory.behavior.dead_native_lifetime": "The native OS owns pending composition; capture and reset rules are separate from a shared driver timeout."
 }

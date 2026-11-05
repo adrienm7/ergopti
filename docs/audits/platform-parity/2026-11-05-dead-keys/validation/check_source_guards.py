@@ -1,0 +1,204 @@
+"""Exercise source authentication guards using private files and real Git objects."""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+def digest(content):
+    """Return the SHA-256 identity of actual bytes."""
+    return hashlib.sha256(content).hexdigest()
+
+
+def require(condition, message):
+    """Keep fixture acceptance checks enabled under optimized Python."""
+    if not condition:
+        raise ValueError(message)
+
+
+def git(repository, *arguments):
+    """Run actual Git, including reads through the fixture's object alternate."""
+    return subprocess.check_output(["git", *arguments], cwd=repository).strip()
+
+
+def main():
+    """Require positive authentication and five distinct negative guard failures."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("repository", type=Path)
+    parser.add_argument("output_directory", type=Path, nargs="?")
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    repository = args.repository.resolve()
+    campaign = Path(__file__).resolve().parents[1]
+    checker = campaign / "check_sources.py"
+    output_directory = (args.output_directory or campaign / "validation").resolve()
+    output = args.output or output_directory / "source-guards.json"
+    require(not output.is_symlink(), "receipt output symlink")
+    require(output.resolve() != Path(__file__).resolve(), "receipt would overwrite program")
+    require(output.resolve() != checker, "receipt would overwrite checker")
+    spec = importlib.util.spec_from_file_location("dead_keys_source_guard_target", checker)
+    target = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(target)
+    claims = target.claims(campaign)
+    distinct = {entry["path"] for entry in claims}
+    claim_count, distinct_count = len(claims), len(distinct)
+    require(claim_count > 0 and distinct_count > 0, "empty audited claim scope")
+    results = []
+
+    with tempfile.TemporaryDirectory(prefix="ergopti-dead-keys-source-guards-") as temporary:
+        private = Path(temporary)
+        mirror = private / "repository"
+        receipts = private / "receipts"
+        mirror.mkdir()
+        receipts.mkdir()
+        for relative in distinct:
+            destination = mirror / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(target.regular_file(repository, relative), destination)
+        for _, relative, _, _ in target.ROLE_RECEIPTS:
+            destination = receipts / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(target.regular_file(campaign, relative), destination)
+        git(mirror, "init", "--quiet")
+        objects = Path(git(repository, "rev-parse", "--git-path", "objects").decode())
+        if not objects.is_absolute():
+            objects = repository / objects
+        alternate = mirror / ".git/objects/info/alternates"
+        alternate.write_text(str(objects.resolve()) + "\n", encoding="utf-8")
+        git(mirror, "symbolic-ref", "HEAD", "refs/heads/audited-fixture")
+        git(mirror, "update-ref", "refs/heads/audited-fixture", target.AUDITED_SHA)
+        require(git(mirror, "rev-parse", "HEAD").decode() == target.AUDITED_SHA, "fixture HEAD")
+        require(
+            sum(1 for path in mirror.rglob("*") if path.is_file() and ".git" not in path.parts)
+            == distinct_count,
+            "fixture must contain only named source files",
+        )
+
+        def run(name, repo, directory, marker, positive=False):
+            """Retain actual subprocess outputs; require intended acceptance or guard."""
+            result_file = private / f"{name}.json"
+            process = subprocess.run(
+                [
+                    sys.executable,
+                    str(checker),
+                    str(repo),
+                    "--directory",
+                    str(directory),
+                    "--output",
+                    str(result_file),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            combined = process.stdout.decode() + process.stderr.decode()
+            require(marker in combined, f"{name}: expected failure/success marker missing")
+            require((process.returncode == 0) == positive, f"{name}: wrong exit outcome")
+            require(result_file.exists() == positive, f"{name}: unexpected output receipt")
+            row = {
+                "case": name,
+                "expected": "accept" if positive else "reject",
+                "expected_marker": marker,
+                "exit_code": process.returncode,
+                "stdout": process.stdout.decode(),
+                "stderr": process.stderr.decode(),
+                "stdout_sha256": digest(process.stdout),
+                "stderr_sha256": digest(process.stderr),
+            }
+            if positive:
+                document = json.loads(result_file.read_text())
+                require(document["claims"] == claim_count, f"{name}: claim count")
+                require(
+                    document["distinct_paths"] == distinct_count, f"{name}: distinct source count"
+                )
+                row["result_sha256"] = digest(result_file.read_bytes())
+                row["claims"] = document["claims"]
+                row["distinct_paths"] = document["distinct_paths"]
+            results.append(row)
+
+        success = (
+            f"Authenticated {claim_count} role claims over {distinct_count} distinct source paths."
+        )
+        run("original-main", repository, campaign, success, positive=True)
+        run("private-mirror-baseline", mirror, receipts, success, positive=True)
+        receipt_path = receipts / "windows/source-receipts.json"
+        original = receipt_path.read_bytes()
+        document = json.loads(original)
+        document["audited_sha"] = "0" * 40
+        receipt_path.write_text(json.dumps(document))
+        run("wrong-receipt-pin", mirror, receipts, "wrong source pin:")
+        receipt_path.write_bytes(original)
+        document = json.loads(original)
+        document["files"][0]["sha256"] = "0" * 64
+        receipt_path.write_text(json.dumps(document))
+        run("wrong-receipt-digest", mirror, receipts, "pinned claim mismatch:")
+        receipt_path.write_bytes(original)
+        document = json.loads(original)
+        document["files"][0]["path"] = "../outside-source"
+        receipt_path.write_text(json.dumps(document))
+        run("unsafe-parent-path", mirror, receipts, "noncanonical source path:")
+        receipt_path.write_bytes(original)
+        outside = private / "symlink-target.json"
+        outside.write_bytes(original)
+        receipt_path.unlink()
+        receipt_path.symlink_to(outside)
+        run("symlink-receipt", mirror, receipts, "symlink source or receipt:")
+        receipt_path.unlink()
+        receipt_path.write_bytes(original)
+        relative = json.loads(original)["files"][0]["path"]
+        source = mirror / relative
+        before = source.read_bytes()
+        pinned_before = subprocess.check_output(
+            ["git", "show", f"{target.AUDITED_SHA}:{relative}"], cwd=mirror
+        )
+        source.write_bytes(before + b"\n; private source drift negative control\n")
+        pinned_after = subprocess.check_output(
+            ["git", "show", f"{target.AUDITED_SHA}:{relative}"], cwd=mirror
+        )
+        require(pinned_before == pinned_after, "pinned Git bytes unexpectedly changed")
+        require(digest(before) != digest(source.read_bytes()), "current source did not drift")
+        run("real-current-byte-drift", mirror, receipts, "current claimed source drift:")
+        drift = {
+            "path": relative,
+            "current_before_sha256": digest(before),
+            "current_drifted_sha256": digest(source.read_bytes()),
+            "pinned_before_sha256": digest(pinned_before),
+            "pinned_after_sha256": digest(pinned_after),
+            "qualification": "Hashes use complete original Git blob bytes before and after the private current-file mutation; the pinned blob remains unchanged.",
+        }
+        source.write_bytes(before)
+        require(
+            digest(target.regular_file(repository, relative).read_bytes()) == digest(before),
+            "original source changed",
+        )
+
+    document = {
+        "audited_sha": target.AUDITED_SHA,
+        "program": {
+            "path": "validation/check_source_guards.py",
+            "sha256": digest(Path(__file__).read_bytes()),
+        },
+        "checker": {"path": "check_sources.py", "sha256": digest(checker.read_bytes())},
+        "source_receipts": [
+            {"path": relative, "sha256": digest((campaign / relative).read_bytes())}
+            for _, relative, _, _ in target.ROLE_RECEIPTS
+        ],
+        "positive_controls": 2,
+        "negative_controls": 5,
+        "rationale": f"A private {distinct_count}-source/4-receipt skeleton uses real Git init and an object alternate pointing to the repository object database, with a real audited HEAD ref. No full checkout, fake Git executable, production mutation or frozen receipt mutation. Each negative must fail with its specific guard marker and produce no acceptance receipt. These controls test authentication refusal, not semantic parity or native delivery.",
+        "current_drift": drift,
+        "results": results,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(document, indent="\t") + "\n", encoding="utf-8")
+    print("Source authentication guards: 2 positive controls; 5 negative controls rejected.")
+
+
+if __name__ == "__main__":
+    main()

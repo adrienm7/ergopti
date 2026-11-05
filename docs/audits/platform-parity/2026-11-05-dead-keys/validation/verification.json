@@ -1,0 +1,59 @@
+{
+	"tested_head": "c3f261cdaa8fbc3f3c880f87e335aa5db5aed62d",
+	"js_tested_index_tree": "800468d14f248c37d5223776984647854ba13f73",
+	"initial_selected_command": "node tools/test/verify-change.cjs",
+	"initial_selected_exit": 1,
+	"js": {
+		"checks_passed": 572,
+		"native_AHK_cases": "Explicitly not executed on this host; never passed as native cases"
+	},
+	"initial_failure": "Formatting only: seven raw JSON outputs and seven exact original Python programs did not match repository formatting.",
+	"resolution": "Exact original worker bytes retained through declared lossless JSON formatting and gzip storage. Replay reconstructs exact originals in private scratch. Worker handoffs and source receipts remain unchanged.",
+	"format_recheck": {
+		"command": "npm run format:check",
+		"exit": 0,
+		"python_files_already_formatted": 657
+	},
+	"post_archive_replays": {
+		"owners_commands": 11,
+		"shared_programs": 2,
+		"shared_negative_controls": 4,
+		"all_exit": 0
+	},
+	"source_authentication": {
+		"role_claims": 101,
+		"distinct_paths": 97
+	},
+	"custody": {
+		"roles": 4,
+		"payload_hashes": 86,
+		"json_format_aliases": 9,
+		"gzip_members": 11
+	},
+	"full_run_log": {
+		"path": "validation/full-gate.log.gz",
+		"decoded_sha256": "c989f031b128c8d4291c895fad4fc75544b46a74cbd40bec577580c2876484ee",
+		"decoded_bytes": 142415
+	},
+	"js_not_repeated_after_archive_changes": "Later edits only change evidence storage, replay isolation, formatting and CI status documentation. Production, localized feature declarations and site inventory bytes are unchanged from the passing full JS run; exact-owner replays and targeted guards are rerun.",
+	"native_receiving": "Windows AHK/HKL, macOS dead-state payload grouping and actual Linux desktop/application receiving remain unqualified.",
+	"final_targeted_gates": {
+		"format": 0,
+		"strict_conventions": 0,
+		"metadata_controls": {
+			"exit": 0,
+			"positive": 2,
+			"negative": 22
+		},
+		"source_guards": {
+			"positive": 2,
+			"negative": 5
+		},
+		"custody_controls": {
+			"exit": 0,
+			"positive": 3,
+			"negative": 14
+		}
+	},
+	"production_and_site_declarations_unchanged_since_full_js": true
+}

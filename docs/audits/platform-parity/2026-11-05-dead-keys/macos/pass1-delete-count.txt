@@ -1,0 +1,22 @@
+Selecting exact test module: "tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity
+
+=== expander: the erase count is sane and the suppression window is named ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity","name":"never asks for a negative number of deletes","status":"pass","elapsed_ms":204.093407,"timing_error":""}
+  ok   never asks for a negative number of deletes
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity","name":"the final-result suppression window is a named constant, not a literal","status":"pass","elapsed_ms":1.224673,"timing_error":""}
+  ok   the final-result suppression window is a named constant, not a literal
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity","name":"that window is deliberately double the module default","status":"pass","elapsed_ms":0.003175,"timing_error":""}
+  ok   that window is deliberately double the module default
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity","name":"tests.unit.modules.keymap.expansion.test_expander_delete_count_sanity","status":"pass","elapsed_ms":205.663761,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

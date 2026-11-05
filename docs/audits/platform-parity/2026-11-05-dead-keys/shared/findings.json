@@ -1,0 +1,28 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"findings": [
+		{
+			"id": "DKS001",
+			"title": "Inherited Compose descendants prevent explicit Bépo terminal from completing",
+			"os": "linux",
+			"module": "shared keylayout-to-XKB conversion",
+			"priority": "medium",
+			"confidence": "high for fingerprinted genuine native component and locale; desktop/application unmeasured",
+			"expected": "Bépo cedille in monnaie state completes ₢ after dead_currency/dead_cedilla",
+			"observed": "Generated rule exists/conflicts0; actual native status remains COMPOSING after pair; following c yields inherited ₵",
+			"root": "Standard trigger reuse plus unconditional locale include imports longer descendants that shadow explicit shorter terminal; both converter implementations share construction.",
+			"source_refs": [
+				"static/ergopti/linux/xkb_generation/keylayout_to_xkb.py:725",
+				"static/ergopti/linux/xkb_generation/keylayout_to_xkb.py:838",
+				"static/ergopti/linux/xkb_generation/keylayout_to_xkb.py:877",
+				"static/ergopti_plus/_shared/lua/layouts/xkb_converter.lua:420",
+				"static/ergopti_plus/_shared/lua/layouts/xkb_converter.lua:614"
+			],
+			"evidence": ["prefix.json", "prefix_probe.py", "enumeration.json", "sweeps.json"],
+			"silent_failure": "Both converters report zero conflicts and generated text includes expected rule; native parser accepts table, but expected output never completes at pair.",
+			"regression": "Actual native Compose with inherited locale descendants: assert COMPOSED and ₢ after pair; preserve ordinary locale and no-include/private-trigger positive controls.",
+			"deduplication": "One root across Python/Lua and two inherited C/c descendants; excludes eight known magic contexts and DKL001 runtime consumption root.",
+			"qualification": "Original converters and genuine installed libxkbcommon table state only; no evdev/desktop/nativeMac/AHK/receiving app."
+		}
+	]
+}

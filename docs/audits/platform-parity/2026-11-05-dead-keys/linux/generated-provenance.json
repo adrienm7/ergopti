@@ -1,0 +1,19 @@
+{
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"origin": "Copied unchanged from Shared agent original converter output; Shared owns CLI invocation evidence.",
+	"source_directory": "/workspace/scratch/parity-dead-keys-2026-11-05/shared/generated",
+	"files": [
+		{
+			"path": "generated/ergopti_plus.XCompose",
+			"sha256": "a3dc8d99daf1405bea4fa56466cf1df9e7593266cf35284c5aeae3342496c6a2"
+		},
+		{
+			"path": "generated/ergopti_plus.xkb",
+			"sha256": "95903b79dcf36d855099d8f3265b166b2d72e47db040902c667162113d5d807a"
+		},
+		{
+			"path": "generated/xkb_types.txt",
+			"sha256": "29cbb5abfb43ce134a1fc452df8ee3e6ff0c6645d15a6d678d9f3a5f1083e037"
+		}
+	]
+}

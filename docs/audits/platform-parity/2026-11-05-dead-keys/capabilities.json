@@ -1,0 +1,495 @@
+{
+	"schema_version": 1,
+	"audited_sha": "f2c3ea43542c985fb20e5f0887976f1c02525341",
+	"created_at": "2026-11-05",
+	"module": "dead-keys",
+	"capabilities": [
+		{
+			"id": "composition-owner",
+			"contract": "Driver owns dead-state transition at different boundaries",
+			"windows": "Legacy synchronous capture or registry pending state",
+			"macos": "Native macOS composition supplies character payload to keymap",
+			"linux": "XKB/Compose semantic capture plus separate native row output",
+			"availability": {
+				"windows": "present",
+				"macos": "native-alternative",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "native_alternative",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "canonical-registry",
+			"contract": "Six shipped XML registries share parsed state/output data",
+			"windows": "Registry emulation consumes canonical actions",
+			"macos": "Native keylayout used; no replacement registry composition owner",
+			"linux": "Python/Lua converter bytes and parsed relations compared on all six layouts",
+			"availability": {
+				"windows": "present",
+				"macos": "native-alternative",
+				"linux": "present"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "raw_parity",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "row-policy",
+			"contract": "Pending composition respects physical row switches",
+			"windows": "Pending route bypasses disabled continuation row",
+			"macos": "Native composition boundary; Windows row scenario not applicable",
+			"linux": "Separate row-commit route source-traced",
+			"availability": {
+				"windows": "partial",
+				"macos": "native-alternative",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"finding_ids": ["DKW-001"]
+		},
+		{
+			"id": "grouped-ascii",
+			"contract": "Grouped two-ASCII character payload reaches automatic suffix lookup",
+			"windows": "UTF-16 scalar capture; grouped Lua event contract not assumed",
+			"macos": "Whole two-byte ASCII payload incorrectly used as one tail bucket",
+			"linux": "Capture emits semantic scalars; grouped Mac callback not equivalent",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"finding_ids": ["DKM-001"]
+		},
+		{
+			"id": "held-prefix",
+			"contract": "Consumed grouped event preserves unmatched prefix in constructed output",
+			"windows": "Legacy capture has distinct native-delivery compensation",
+			"macos": "Prefix remains in buffer but disappears from constructed event output",
+			"linux": "Output writer and capture boundary differ; no identical grouped-event claim",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"finding_ids": ["DKM-002"]
+		},
+		{
+			"id": "consumed-history",
+			"contract": "Semantic Compose follows acknowledged raw history",
+			"windows": "Separate pending/capture architecture",
+			"macos": "Native composition belongs to OS event source",
+			"linux": "Consuming continuation resets previously forwarded prefix",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_defect",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"finding_ids": ["DKL-001"]
+		},
+		{
+			"id": "inherited-compose",
+			"contract": "Generated explicit terminal completes despite inherited locale descendants",
+			"windows": "Not an XCompose owner",
+			"macos": "Native keylayout is not tested by Linux Compose oracle",
+			"linux": "Bépo monnaie+cedille waits for longer inherited prefix instead of ₢",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "native"
+			},
+			"classification": "observed_defect",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"finding_ids": ["DKS-001"]
+		},
+		{
+			"id": "native-fallback",
+			"contract": "Unmapped/cancelled continuation policy",
+			"windows": "Legacy mapping fallback and terminator replay; registry native fallback traced",
+			"macos": "OS dead-key/IME result supplied to callback; native cancelled state unmeasured",
+			"linux": "CANCELLED keeps current ordinary text without terminator; native Compose policy",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "unknown_intent",
+			"basis": "Linux CANCELLED current-character behavior is explicit local policy; a uniform cross-driver fallback/terminator contract is unknown, not a demonstrated unavoidable native constraint.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "expiry-policy",
+			"contract": "Pending state lifetime and suspension",
+			"windows": "Legacy bounded wait; registry pending state has different retirement policy",
+			"macos": "Native dead-state lifetime not owned by keymap",
+			"linux": "Compose capture reset/reacquisition policy; no shared timeout contract",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "unknown_intent",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "modified-control-replay",
+			"contract": "Named control replay retains modifier attribution",
+			"windows": "Known OSW-001 conditional modifier replay issue also affects legacy DeadKey",
+			"macos": "Native composition/control ordering not established",
+			"linux": "ACK/capture control cancellation inspected; real desktop unmeasured",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_limit",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			],
+			"known_external_ids": ["OSW-001"]
+		},
+		{
+			"id": "magic-state-context",
+			"contract": "Magic substitution inside pending dead-key states at level 1",
+			"windows": "Registry/legacy definitions differ by driver route",
+			"macos": "Native keylayout special action contexts unmeasured",
+			"linux": "Eight known Plus/PlusANSI pending-state Magic deviations remain",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_limit",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "registry-chain",
+			"contract": "Chained states and literal continuation",
+			"windows": "Legacy chain literal and registry chain state reviewed",
+			"macos": "Original callback empty/grouped payload handling measured, native chain execution not",
+			"linux": "Six layout registries140states4391reachable converter expectations; fallback outside explicit relations unmeasured",
+			"availability": {
+				"windows": "partial",
+				"macos": "partial",
+				"linux": "partial"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "observed_limit",
+			"basis": "Registry state chains are supported; the legacy Windows scalar capture API has a different continuation boundary. Native macOS chains and unspecified fallback sequences remain unverified; no new chain defect is inferred.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		},
+		{
+			"id": "native-receiving",
+			"contract": "Actual application receives intended committed text",
+			"windows": "AHK and native HKL not executed",
+			"macos": "NSEvent dead-state grouping and receiving application unmeasured",
+			"linux": "Genuine native component tested; actual desktop/app absent",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "actual-owner",
+				"linux": "actual-owner"
+			},
+			"classification": "unknown_intent",
+			"basis": "Bounded source/owner comparison; native receiving remains unverified. See role qualifications and immutable reports.",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7b4fb26bcd4c6d595d095557652ac828b9d8df0a397568130010909e286a3185"
+				},
+				{
+					"path": "macos/report.md",
+					"sha256": "fc54f32b4bb81f050ce109701e3ed93d0389dc9ec244c6edfcceb93f16d95ed8"
+				},
+				{
+					"path": "linux/report.md",
+					"sha256": "30bc641fb0aa7e04017609f274a44c128a2a392eafd707011320aea80d3394ee"
+				},
+				{
+					"path": "shared/report.md",
+					"sha256": "f2d19d70d2347431d8037b2d4b790fed9b3f3d0d866b32c111c67fad2aee6db0"
+				}
+			]
+		}
+	]
+}

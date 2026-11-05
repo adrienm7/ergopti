@@ -1,0 +1,7 @@
+lint-conventions: scanning…
+  AHK files : 2508
+  Lua files : 4908
+  TOML files: 515
+
+
+lint-conventions: OK — no violations found.

@@ -1,0 +1,68 @@
+partial alphanumeric_keys
+xkb_symbols "bepo" {
+
+	name[Group1] = "Dead-key audit";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [space, space, U202F, U202F, space, underscore, nobreakspace] }; //           _  
+
+        // Digits
+        key <TLDE> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [dollar, dollar, numbersign, numbersign, dollar, endash, paragraph] }; // $ $ # # $ – ¶
+        key <AE01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [quotedbl, 1, 1, quotedbl, quotedbl, emdash, doublelowquotemark] }; // " 1 1 " " — „
+        key <AE02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [guillemotleft, 2, 2, guillemotleft, guillemotleft, less, leftdoublequotemark] }; // « 2 2 « « < “
+        key <AE03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [guillemotright, 3, 3, guillemotright, guillemotright, greater, rightdoublequotemark] }; // » 3 3 » » > ”
+        key <AE04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [parenleft, 4, 4, parenleft, parenleft, bracketleft, U2A7D] }; // ( 4 4 ( ( [ ⩽
+        key <AE05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [parenright, 5, 5, parenright, parenright, bracketright, U2A7E] }; // ) 5 5 ) ) ] ⩾
+        key <AE06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [at, 6, 6, at, at, asciicircum, U26A0] }; // @ 6 6 @ @ ^ ⚠
+        key <AE07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [plus, 7, 7, plus, plus, plusminus, notsign] }; // + 7 7 + + ± ¬
+        key <AE08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [minus, 8, 8, minus, minus, U2212, onequarter] }; // - 8 8 - - − ¼
+        key <AE09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [slash, 9, 9, slash, slash, division, onehalf] }; // / 9 9 / / ÷ ½
+        key <AE10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [asterisk, 0, 0, asterisk, asterisk, multiply, threequarters] }; // * 0 0 * * × ¾
+        key <AE11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [equal, equal, degree, degree, equal, notequal, minutes] }; // = = ° ° = ≠ ′
+        key <AE12> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [percent, percent, grave, grave, percent, U2030, seconds] }; // % % ` ` % ‰ ″
+
+        // Letters — Row 1/3
+        key <AD01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [b, B, B, b, b, bar, underscore] }; // b B B b b | _
+        key <AD02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [eacute, Eacute, Eacute, eacute, eacute, dead_acute, heart] }; // é É É é é ´ ♥
+        key <AD03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [p, P, P, p, p, ampersand, section] }; // p P P p p & §
+        key <AD04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [o, O, O, o, o, oe, OE] }; // o O O o o œ Œ
+        key <AD05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [egrave, Egrave, Egrave, egrave, egrave, dead_grave, grave] }; // è È È è è ` `
+        key <AD06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [dead_circumflex, dead_circumflex, exclam, exclam, dead_circumflex, exclamdown, U2620] }; // ^ ^ ! ! ^ ¡ ☠
+        key <AD07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [v, V, V, v, v, dead_caron, U2622] }; // v V V v v ˇ ☢
+        key <AD08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [d, D, D, d, d, infinity, U2623] }; // d D D d d ∞ ☣
+        key <AD09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [l, L, L, l, l, fiveeighths, sterling] }; // l L L l l / £
+        key <AD10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [j, J, J, j, j, U262E, U262F] }; // j J J j j ☮ ☯
+        key <AD11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [z, Z, Z, z, z, onesixth, U2619] }; // z Z Z z z – ☙
+        key <AD12> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [w, W, W, w, w, U269C, U267F] }; // w W W w w ⚜ ♿
+
+        // Letters — Row 2/3
+        key <AC01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [a, A, A, a, a, ae, AE] }; // a A A a a æ Æ
+        key <AC02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [u, U, U, u, u, ugrave, Ugrave] }; // u U U u u ù Ù
+        key <AC03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [i, I, I, i, i, dead_diaeresis, dead_abovedot] }; // i I I i i ¨ ˙
+        key <AC04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [e, E, E, e, e, EuroSign, dead_currency] }; // e E E e e € ¤
+        key <AC05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [comma, comma, semicolon, semicolon, comma, apostrophe, seveneighths] }; // , , ; ; , ' ,
+        key <AC06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [c, C, C, c, c, dead_cedilla, copyright] }; // c C C c c ¸ ©
+        key <AC07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [t, T, T, t, t, oneeighth, trademark] }; // t T T t t ᵉ ™
+        key <AC08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [s, S, S, s, s, ssharp, U017F] }; // s S S s s ß ſ
+        key <AC09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [r, R, R, r, r, dead_breve, registered] }; // r R R r r ˘ ®
+        key <AC10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [n, N, N, n, n, dead_tilde, U2693] }; // n N N n n ~ ⚓
+        key <AC11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [m, M, M, m, m, dead_macron, U26FD] }; // m M M m m ¯ ⛽
+        key <BKSL> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [ccedilla, Ccedilla, Ccedilla, ccedilla, ccedilla, U2708, U1F12F] }; // ç Ç Ç ç ç ✈ 🄯
+
+        // Letters — Row 3/3
+        key <LSGT> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [ecircumflex, Ecircumflex, Ecircumflex, ecircumflex, ecircumflex, slash, asciicircum] }; // ê Ê Ê ê ê / ^
+        key <AB01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [agrave, Agrave, Agrave, agrave, agrave, backslash, singlelowquotemark] }; // à À À à à \ ‚
+        key <AB02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [y, Y, Y, y, y, braceleft, leftsinglequotemark] }; // y Y Y y y { ‘
+        key <AB03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [x, X, X, x, x, braceright, rightsinglequotemark] }; // x X X x x } ’
+        key <AB04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [period, period, colon, colon, period, ellipsis, periodcentered] }; // . . : : . … ·
+        key <AB05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [k, K, K, k, k, asciitilde, U2011] }; // k K K k k ~ ‑
+        key <AB06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [rightsinglequotemark, rightsinglequotemark, question, question, rightsinglequotemark, questiondown, fourfifths] }; // ’ ’ ? ? ’ ¿ ̉
+        key <AB07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [q, Q, Q, q, q, onethird, fivesixths] }; // q Q Q q q ° ̛
+        key <AB08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [g, G, G, g, g, dead_greek, dagger] }; // g G G g g µ †
+        key <AB09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [h, H, H, h, h, onefifth, doubledagger] }; // h H H h h . ‡
+        key <AB10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [f, F, F, f, f, dead_ogonek, U26C4] }; // f F F f f ˛ ⛄
+
+	include "level3(ralt_switch)"
+};
