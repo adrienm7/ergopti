@@ -567,7 +567,8 @@ _KCSENABLED_Read(Mode, Cache) {
 	if Mode == "number-zero"
 		AssertTrue(Authored is Integer && Authored == 0, "signed zero keeps its native integer shape but is not an old writer bare0 spelling")
 	else if InStr(Mode, "legacy-") == 1
-		AssertTrue(Authored is Integer && Authored == Expected, "the exact bare0/1 old writer spellings preserve legacy intent")	else
+		AssertTrue(Authored is Integer && Authored == Expected, "the exact bare0/1 old writer spellings preserve legacy intent")
+	else
 		AssertTrue(Authored is TOML_Bool, "valid controls retain their actual authored Boolean type")
 	KeyCombinationChordsReadConfig(Cache)
 	AssertEqual(Expected, IsObject(_KeyCombinationChordPolicy), "an outdated numeric zero must not disable the admitted default chord policy")
