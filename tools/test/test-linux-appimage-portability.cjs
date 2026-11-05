@@ -817,10 +817,13 @@ function zsyncFor(length, overrides = {}) {
 		.map(([key, value]) => `${key}: ${value}`)
 		.join('\n');
 	const sizes = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$/.exec(fields['Hash-Lengths'] ?? '1,4,16');
-	const [weak, strong] = sizes ? [Number(sizes[2]), Number(sizes[3])] : [2, 4];
+	const weak = sizes && Number(sizes[2]) >= 1 && Number(sizes[2]) <= 4 ? Number(sizes[2]) : 2;
+	const strong = sizes && Number(sizes[3]) >= 3 && Number(sizes[3]) <= 16 ? Number(sizes[3]) : 4;
 	const blocksize = Number(fields.Blocksize) > 0 ? Number(fields.Blocksize) : 2048;
-	const count = Math.ceil(length / blocksize) * (weak + strong);
-	return Buffer.concat([Buffer.from(`${text}\n\n`, 'latin1'), Buffer.alloc(count, 1)]);
+	return Buffer.concat([
+		Buffer.from(`${text}\n\n`, 'latin1'),
+		Update.zsyncBlockSums(image, blocksize, weak, strong)
+	]);
 }
 
 assert.equal(
@@ -828,6 +831,8 @@ assert.equal(
 	'gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync'
 );
 assert.equal(Update.APPIMAGE_ASSET, APPIMAGE_ASSET);
+// zsyncmake 0.6.2 -b 512 on the three bytes "abc", including final-block padding.
+assert.equal(Update.zsyncBlockSums(Buffer.from('abc'), 512, 2, 3).toString('hex'), '4ad8259805');
 assert.ok(
 	Update.globMatches(
 		Update.parseUpdateInformation(Update.UPDATE_INFORMATION).pattern,
@@ -853,6 +858,33 @@ unterminatedNames.writeBigUInt64LE(
 assert.throws(() => Update.readEmbeddedUpdateInformation(unterminatedNames), /section.*name/i);
 
 assert.deepEqual(Update.verify(image, zsyncFor(image.length)), []);
+const corruptBlocks = zsyncFor(image.length);
+corruptBlocks[corruptBlocks.length - 1] ^= 1;
+assert.ok(
+	Update.verify(image, corruptBlocks).some((problem) =>
+		/block checksums do not match/.test(problem)
+	)
+);
+const largeImage = Buffer.concat([image, Buffer.alloc(4 * 1024 * 1024)]);
+const tinyTruncated = Buffer.from(
+	[
+		'zsync: 0.6.2',
+		`Filename: ${Update.APPIMAGE_ASSET}`,
+		`URL: ${Update.APPIMAGE_ASSET}`,
+		`Length: ${largeImage.length}`,
+		'Blocksize: 1',
+		'Hash-Lengths: 2,2,4',
+		`SHA-1: ${require('node:crypto').createHash('sha1').update(largeImage).digest('hex')}`,
+		'',
+		'x'
+	].join('\n')
+);
+assert.ok(
+	Update.verify(largeImage, tinyTruncated).some((problem) =>
+		/truncated block checksums/.test(problem)
+	),
+	'truncated tiny blocks are rejected before constructing millions of records'
+);
 const wrongArch = Buffer.from(image);
 wrongArch.writeUInt16LE(183, 0x12); // EM_AARCH64
 const wrongArchHash = require('node:crypto').createHash('sha1').update(wrongArch).digest('hex');

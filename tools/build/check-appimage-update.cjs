@@ -32,6 +32,7 @@
 const fs = require('node:fs');
 const { createHash } = require('node:crypto');
 const path = require('node:path');
+const { md4 } = require('../lib/md4.cjs');
 
 /** The release asset names, shared with the release assembly and the site. */
 const APPIMAGE_ASSET = 'ErgoptiPlus-x86_64.AppImage';
@@ -42,6 +43,9 @@ const UPDATE_INFORMATION =
 
 /** Name of the ELF section appimagetool writes the update information into. */
 const UPDATE_SECTION = '.upd_info';
+// zsyncmake uses 2 or 4 KiB for release images; cap untrusted metadata before
+// allocating the padded final block, while allowing much larger real blocks.
+const MAX_BLOCK_SIZE = 16 * 1024 * 1024;
 
 /**
  * Splits and validates an update information string.
@@ -141,6 +145,31 @@ function parseZsyncHeader(file) {
 	return fields;
 }
 
+/** Compute the zsync rolling and MD4 checksums of the padded image blocks. */
+function* zsyncBlockRecords(image, blocksize, weakLength, strongLength) {
+	for (let offset = 0; offset < image.length; offset += blocksize) {
+		const chunk = image.subarray(offset, Math.min(offset + blocksize, image.length));
+		const block =
+			chunk.length === blocksize
+				? chunk
+				: Buffer.concat([chunk, Buffer.alloc(blocksize - chunk.length)]);
+		let a = 0,
+			b = 0;
+		for (let index = 0; index < block.length; index++) {
+			a = (a + block[index]) & 0xffff;
+			b = (b + (block.length - index) * block[index]) & 0xffff;
+		}
+		const weak = Buffer.alloc(4);
+		weak.writeUInt16BE(a, 0);
+		weak.writeUInt16BE(b, 2);
+		yield Buffer.concat([weak.subarray(4 - weakLength), md4(block).subarray(0, strongLength)]);
+	}
+}
+
+function zsyncBlockSums(image, blocksize, weakLength, strongLength) {
+	return Buffer.concat([...zsyncBlockRecords(image, blocksize, weakLength, strongLength)]);
+}
+
 /**
  * Verifies an AppImage and its .zsync against the published update contract.
  * @param {Buffer} image The AppImage.
@@ -185,15 +214,25 @@ function verify(image, zsync) {
 	// It then reads one weak and one strong checksum for each target block.
 	const blocksizeText = header.get('Blocksize') ?? '';
 	const blocksize = Number(blocksizeText);
-	const validBlocksize = /^[0-9]+$/.test(blocksizeText) && Number.isSafeInteger(blocksize) &&
-		blocksize > 0 && (BigInt(blocksize) & (BigInt(blocksize) - 1n)) === 0n;
+	const validBlocksize =
+		/^[0-9]+$/.test(blocksizeText) &&
+		Number.isSafeInteger(blocksize) &&
+		blocksize > 0 &&
+		blocksize <= MAX_BLOCK_SIZE &&
+		(BigInt(blocksize) & (BigInt(blocksize) - 1n)) === 0n;
 	if (!validBlocksize) problems.push('zsync Blocksize is missing or invalid');
 	const lengthsText = header.get('Hash-Lengths') ?? '1,4,16';
 	const lengthsMatch = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$/.exec(lengthsText);
 	const lengths = lengthsMatch?.slice(1).map(Number);
-	const validLengths = lengths && lengths.every(Number.isSafeInteger) &&
-		lengths[0] >= 1 && lengths[0] <= 2 && lengths[1] >= 1 && lengths[1] <= 4 &&
-		lengths[2] >= 3 && lengths[2] <= 16;
+	const validLengths =
+		lengths &&
+		lengths.every(Number.isSafeInteger) &&
+		lengths[0] >= 1 &&
+		lengths[0] <= 2 &&
+		lengths[1] >= 1 &&
+		lengths[1] <= 4 &&
+		lengths[2] >= 3 &&
+		lengths[2] <= 16;
 	if (!validLengths) problems.push('zsync Hash-Lengths is malformed or out of range');
 	const sha1 = header.get('SHA-1') ?? '';
 	if (!/^[0-9a-f]{40}$/.test(sha1)) problems.push('zsync SHA-1 is missing or malformed');
@@ -201,9 +240,24 @@ function verify(image, zsync) {
 		problems.push('zsync SHA-1 does not match the AppImage');
 	const checksumBytes = Number(header.get('__blocks'));
 	if (checksumBytes <= 0) problems.push('the .zsync file carries no block checksums');
-	else if (validBlocksize && validLengths &&
-		checksumBytes < Math.ceil(image.length / blocksize) * (lengths[1] + lengths[2]))
-		problems.push('the .zsync file has truncated block checksums');
+	else if (validBlocksize && validLengths) {
+		const actual = zsync.subarray(zsync.indexOf('\n\n') + 2);
+		const expectedLength = Math.ceil(image.length / blocksize) * (lengths[1] + lengths[2]);
+		if (actual.length < expectedLength)
+			problems.push('the .zsync file has truncated block checksums');
+		else if (actual.length !== expectedLength)
+			problems.push('the .zsync file has unexpected extra block checksums');
+		else {
+			let offset = 0;
+			for (const expected of zsyncBlockRecords(image, blocksize, lengths[1], lengths[2])) {
+				if (!actual.subarray(offset, offset + expected.length).equals(expected)) {
+					problems.push('the .zsync block checksums do not match the AppImage');
+					break;
+				}
+				offset += expected.length;
+			}
+		}
+	}
 	if (!globMatches(parseUpdateInformation(UPDATE_INFORMATION).pattern, ZSYNC_ASSET)) {
 		problems.push(`the update pattern does not match the published asset ${ZSYNC_ASSET}`);
 	}
@@ -245,6 +299,7 @@ module.exports = {
 	globMatches,
 	parseUpdateInformation,
 	parseZsyncHeader,
+	zsyncBlockSums,
 	readEmbeddedUpdateInformation,
 	verify
 };
