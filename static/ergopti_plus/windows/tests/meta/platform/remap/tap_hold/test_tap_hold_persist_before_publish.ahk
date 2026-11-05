@@ -14,7 +14,7 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
 	}
 	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
 	WritePos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)")
-	ReplacePos := InStr(WriterBody, "FSAtomicMoveReplace(StagePath, BoundPath)")
+	ReplacePos := InStr(WriterBody, "FSConfigAtomicMoveReplace(StagePath, BoundPath,")
 	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
 	Assert(WritePos > 0 && ReplacePos > WritePos && PublishPos > ReplacePos,
 		"the shared writer must durably stage and atomically replace before publishing TapHold")
