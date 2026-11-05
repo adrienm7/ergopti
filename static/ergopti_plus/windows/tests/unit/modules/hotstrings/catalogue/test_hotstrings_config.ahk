@@ -1741,3 +1741,70 @@ for _HOLACK_Mode in ["base-lease-refusal", "base-refusal-color", "seam-base-refu
 	Test("HotstringsConfig legacy default durable ACK: " . _HOLACK_Mode,
 		_HTBS_Run.Bind("legacy-default-ack-" . _HOLACK_Mode,
 			"[hotstrings]`nexpansion_delay = 0.750`n", _HOLACK_DefaultNeedsDurableAck.Bind(_HOLACK_Mode)))
+
+_HOUP_PublicBaseKeepsEffectiveDuration(Mode) {
+	global Features, ConfigurationFile, TICK_MAX_DURATION_MS, LastSentCharacterKeyTime
+	global _HotstringsOverrides, _HotstringsOverridesPath, _HotstringsLegacyDelimiters
+	global _HotstringsCommonOverrideAdmitted, HotstringGroupConfig
+	Gates := MasterGateState()
+	Saved := {features: Features, overrides: _HotstringsOverrides, path: _HotstringsOverridesPath,
+		legacy: _HotstringsLegacyDelimiters, common: HotstringsCommonOverrideAdmitted(),
+		groups: HotstringGroupConfig, initialized: Gates["initialized"], times: LastSentCharacterKeyTime}
+	Root := A_Temp . "\ergopti_delay_upper_domain_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml"
+	Created := false
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created, "the fixture must affirmatively acquire its exclusive root before any write")
+		Features := Features.Clone(), Features["hotstrings"] := Features["hotstrings"].Clone()
+		Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := 0.75
+		Gates["initialized"] := false
+		HotstringGroupConfig := HotstringGroupConfig.Clone()
+		LastSentCharacterKeyTime := LastSentCharacterKeyTime.Clone()
+		HotstringsConfigInit(Path)
+		AssertTrue(HotstringsOverridesBoot())
+		InitialDelay := Mode == "unlimited-control" ? 0 : Mode == "zero-offset-control" ? 0.75 : 1.0
+		AssertTrue(HotstringsSetOverride("magickey", "", "delay", InitialDelay), "the real public category writer must produce the initial offset")
+		AssertTrue(HotstringsSetOverride("magickey", "text_expansion_symbols", "delay", InitialDelay), "the real public section writer must produce the initial offset")
+		Source := FSReadUtf8Exact(Path)
+		Before := FSReadUtf8Exact(ConfigurationFile)
+		Maximum := TICK_MAX_DURATION_MS / 1000
+		Base := Mode == "below-cap-control" ? Maximum - 1.0 : Maximum
+		AssertTrue(TickTryDurationMsFromSeconds(Base, &BaseMs), "the exact UI-bound public setter input must be valid")
+		Committed := HotstringsSetBaseDelay(Base)
+		if !Committed {
+			AssertEqual("overflow", Mode, "valid controls must not be rejected conservatively")
+			AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile), "a safe refusal cannot persist only the invalid base transition")
+			AssertEqual(0.75, HotstringsBaseDelay())
+			AssertEqual(Source, FSReadUtf8Exact(Path))
+			return
+		}
+		AssertEqual(Base, TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))["hotstrings"]["expansion_delay"], "the real config writer acknowledged the base")
+		for Section in ["", "text_expansion_symbols"] {
+			Resolved := HotstringsResolve("magickey", Section)
+			AssertTrue(TickTryDurationMsFromSeconds(Resolved.Delay, &EffectiveMs), "an acknowledged valid base cannot make an existing override permanently expire outside the engine duration domain")
+			Now := A_TickCount
+			LastSentCharacterKeyTime["x"] := Now
+			AssertFalse(IsTimeActivationExpired("x", Resolved.Delay, Now), "the actual engine time gate must accept a previous scalar sent now")
+		}
+		AssertEqual(Source, FSReadUtf8Exact(Path), "a base rebase must not destroy the stored relative intention")
+		AssertTrue(HotstringsSetBaseDelay(0.75))
+		Expected := Mode == "unlimited-control" ? 0 : Mode == "zero-offset-control" ? 0.75 : 1.0
+		AssertEqual(Expected, HotstringsResolve("magickey", "").Delay, "returning the base restores the original offset rather than persisting an upper clamp")
+		AssertEqual(Expected, HotstringsResolve("magickey", "text_expansion_symbols").Delay)
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+	} finally {
+		Features := Saved.features, _HotstringsOverrides := Saved.overrides, _HotstringsOverridesPath := Saved.path
+		_HotstringsLegacyDelimiters := Saved.legacy, _HotstringsCommonOverrideAdmitted := Saved.common
+		HotstringGroupConfig := Saved.groups, Gates["initialized"] := Saved.initialized
+		LastSentCharacterKeyTime := Saved.times
+		HotstringsResolveBumpGen()
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _HOUP_Mode in ["overflow", "below-cap-control", "zero-offset-control", "unlimited-control"]
+	Test("HotstringsConfig public base upper duration: " . _HOUP_Mode,
+		_HTBS_Run.Bind("upper-duration-" . _HOUP_Mode, "[hotstrings]`nexpansion_delay = 0.750`n",
+			_HOUP_PublicBaseKeepsEffectiveDuration.Bind(_HOUP_Mode)))

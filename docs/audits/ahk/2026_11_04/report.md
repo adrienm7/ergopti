@@ -1232,7 +1232,7 @@ Run41926489533 executes75 cases:64 pass,10 assertions fail and one constructor-s
 
 Run41927538467 at09e8ea2 executes58 cases in each order:55 pass and3 fail. All selected AHK-068 business cases pass; one empty-file fixture fails before the reader and is corrected separately. Screenshot pre-write failure deletes an independently owned file; its no-stage control passes. The proposed zero-access metadata lease is experimentally rejected because it does not block native deletion. All4 bounded PCRE cases pass; no Windows PCRE resource defect is established at the measured sizes. Both runs compile the complete production entry and pass90/90 native hotstring E2E; HTTP E2E is not selected.
 
-The register now contains74 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 remains confirmed and uncorrected. The requested1,000 target remains unmet.
+The register now contains74 distinct findings. AHK-071, AHK-072 and AHK-073 have integrated corrections awaiting native post-fix qualification. AHK-074 has an integrated original-event correction awaiting native post-fix qualification. The requested1,000 target remains unmet.
 
 ## AHK-072: Override saves overwrite a source changed after the loaded snapshot
 
@@ -1268,7 +1268,7 @@ Reproduction: Native run41930158432 at5d857ae: the +SC010 variant is selected, S
 
 Consequence: A captured modified key can reach the application as an unmodified key and invoke a different action.
 
-Regression: Three genuine native handler/receiver probes establish the defect. Additional thread-state diagnostics are integrated. No production correction is integrated yet: wildcard modifier combinations and external receiver semantics still require a sound solution. This confirmed finding is not counted as fixed.
+Regression: Native run41939048652 at46019fb confirms the same released-Shift failure across distinct process/input queues; plain and held controls pass individually and reversed, and all callback queue/logical/async Shift flags are0. The integrated correction keeps the same240/five-prefix identities and exact I2/I3 levels but uses tilde to admit the original event without synthetic replay. Chosen plain magic remains protected after marker normalization. Local/external probes retain exact modifier/key-count oracles and now require original event provenance, one real I1 keydown/host character and exact Edit text. Priority and emulated-output controls remain strict. Post-fix native qualification pending.
 
 ## Native qualification at 5d857ae
 

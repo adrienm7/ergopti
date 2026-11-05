@@ -1,11 +1,55 @@
 {
-	"expected_count": 3,
-	"native_http_client_e2e": false,
+	"expected_count": 68,
 	"native_hotstring_e2e": false,
+	"native_http_client_e2e": false,
 	"filters": [
+		{
+			"contains": "layout-row-send-level",
+			"expected_count": 6
+		},
+		{
+			"contains": "layout-row-chosen-magic-scope",
+			"expected_count": 4
+		},
+		{
+			"contains": "builtin-number-row-magic-owner",
+			"expected_count": 16
+		},
+		{
+			"contains": "layout-row-control-admission",
+			"expected_count": 10
+		},
+		{
+			"contains": "layout-row-scopes",
+			"expected_count": 4
+		},
+		{
+			"contains": "layout-row-native-flags",
+			"expected_count": 3
+		},
 		{
 			"contains": "layout-row-external-native-flags",
 			"expected_count": 3
+		},
+		{
+			"contains": "capsword-idle-domain",
+			"expected_count": 3
+		},
+		{
+			"contains": "HotstringsConfig public base upper duration:",
+			"expected_count": 4
+		},
+		{
+			"contains": "new-file-document-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "config-candidate-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "layout-zoom-host-precedence",
+			"expected_count": 10
 		}
 	]
 }
