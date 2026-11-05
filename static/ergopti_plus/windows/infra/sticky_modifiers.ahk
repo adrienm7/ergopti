@@ -40,6 +40,73 @@ StickyModifierConfigureHook(Hook) {
 	}
 }
 
+; Custom AltGr is not in InputHook.EndMods. Its notifications precede the
+; terminating OnEnd in the native queue; no later Up is collected after EndKey.
+_StickyModifierCustomCapture(Hook, KeyName, SendKey) {
+	if SendKey == ""
+		return 0
+	Vk := GetKeyVK(SendKey), Sc := GetKeySC(KeyName)
+	if !Vk || !Sc
+		return 0
+	Receipt := {hook: Hook, key_name: KeyName, send_key: SendKey, vk: Vk, sc: Sc,
+		active: true, down: !!GetKeyState(SendKey), ended: false, held: false}
+	try {
+		Hook.OnKeyDown := _StickyModifierCustomKey.Bind(Receipt, true)
+		Hook.OnKeyUp := _StickyModifierCustomKey.Bind(Receipt, false)
+		Hook.OnEnd := _StickyModifierCustomEnd.Bind(Receipt)
+		Hook.KeyOpt("{" . KeyName . "}{" . SendKey . "}", "+N")
+		return Receipt
+	} catch {
+		_StickyModifierCustomRelease(Receipt, Hook)
+		throw
+	}
+}
+
+_StickyModifierCustomKey(Receipt, Down, Hook, Vk, Sc) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook
+			&& (Vk == Receipt.vk || Sc == Receipt.sc)
+			Receipt.down := Down
+	} finally Critical(PreviousCritical)
+}
+
+_StickyModifierCustomEnd(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try {
+		if Receipt.active && !Receipt.ended && Receipt.hook == Hook {
+			Receipt.held := Receipt.down
+			Receipt.ended := true
+		}
+	} finally Critical(PreviousCritical)
+}
+
+; Wait reports native termination, not necessarily delivery of its queued End
+; callback. Keep the same suppressive owner until that exact receipt settles.
+_StickyModifierCustomSettle(Receipt, Hook, OwnerToken) {
+	PreviousCritical := Critical("Off")
+	try {
+		Started := A_TickCount
+		while !Receipt.ended {
+			if A_IsSuspended || !SIHO_IsOwned(OwnerToken, Hook) || A_TickCount - Started >= 100
+				return false
+			Sleep(-1)
+			if !Receipt.ended
+				Sleep(1)
+		}
+		return !A_IsSuspended && SIHO_IsOwned(OwnerToken, Hook)
+	} finally Critical(PreviousCritical)
+}
+
+_StickyModifierCustomRelease(Receipt, Hook) {
+	PreviousCritical := Critical("On")
+	try Receipt.active := false, Receipt.hook := 0
+	finally Critical(PreviousCritical)
+	Hook.OnKeyDown := ""
+	Hook.OnKeyUp := ""
+	Hook.OnEnd := ""
+}
+
 ; Presses the next key with the sticky action's modifiers, once. The key itself is
 ; withheld until then; intervening modifiers pass through and their captured
 ; flags accompany the replay. The one-shot Shift timeout ends the wait.
@@ -52,16 +119,41 @@ StickyModifier(ActionId) {
 	TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
 	Hook := InputHook("L0 T" . TimeoutSec)
 	StickyModifierConfigureHook(Hook)
-	OwnerToken := SIHO_StartOwned(Hook, "sticky-modifier", true)
-	if !OwnerToken
-		return false
-	try Hook.Wait()
-	finally CaptureSettled := SIHO_StopOwned(OwnerToken, Hook)
+	Custom := 0
+	KeyName := KS_AltGrKeyName(), SendKey := KS_AltGrSendKey()
+	if KeyName != "RAlt" {
+		Custom := _StickyModifierCustomCapture(Hook, KeyName, SendKey)
+		if !IsObject(Custom)
+			return false
+	}
+	try {
+		OwnerToken := SIHO_StartOwned(Hook, "sticky-modifier", true)
+		if !OwnerToken
+			return false
+		try {
+			Hook.Wait()
+			if IsObject(Custom) && Hook.EndReason == "EndKey"
+				if !_StickyModifierCustomSettle(Custom, Hook, OwnerToken)
+					return false
+		} finally CaptureSettled := SIHO_StopOwned(OwnerToken, Hook)
+	} finally {
+		if IsObject(Custom)
+			_StickyModifierCustomRelease(Custom, Hook)
+	}
 	if !CaptureSettled || A_IsSuspended || Hook.EndReason != "EndKey"
 		return false
 	; Native input can release a modifier before Wait unwinds. EndMods owns the
 	; flags of the captured key; current keyboard state or Blind would lose them.
 	CapturedMods := Hook.EndMods
+	if IsObject(Custom) {
+		; The receipt may never borrow a different layout's native key identity.
+		if !Custom.ended || KS_AltGrKeyName() != Custom.key_name || KS_AltGrSendKey() != Custom.send_key
+			return false
+		; Preserve an original hold still down; only restore an endpoint modifier
+		; that was released before replay. TextPressKey retains its normal ABI.
+		if Custom.held && !GetKeyState(Custom.send_key)
+			Held.Push("AltGr")
+	}
 	Seen := Map()
 	for Name in Held
 		Seen[Name] := true

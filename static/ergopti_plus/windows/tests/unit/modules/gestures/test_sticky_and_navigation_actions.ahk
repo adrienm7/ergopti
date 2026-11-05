@@ -65,7 +65,7 @@ _SNA_NativeChildSource() {
 	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
 	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
 	Code .= "#Include " . Owner . "`n"
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "_StickyModifierCustomCapture", "_StickyModifierCustomKey", "_StickyModifierCustomEnd", "_StickyModifierCustomSettle", "_StickyModifierCustomRelease", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
 		Code .= Body . "`n"
@@ -143,7 +143,7 @@ _SSM_ChildSource() {
 		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "_StickyModifierCustomCapture", "_StickyModifierCustomKey", "_StickyModifierCustomEnd", "_StickyModifierCustomSettle", "_StickyModifierCustomRelease", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
 		"_TextSenderModifierPrefix", "_TextSenderKeystroke", "_TextSenderModifierWords", "_TextSenderSustainedKey",
 		"_TextSenderSendInput", "_TextSenderAtSendLevel", "_SendVerdictSucceeded", "HSE_WordResetFlagCurrent",
 		"_PrefixHasIncompleteFragment", "TapHoldOwnsShortcut", "TapHoldTapInDispatch",
@@ -257,3 +257,55 @@ _SKC_Configure() {
 	}
 }
 Test("Sticky Kana configuration: both native identities pass without consuming capture (sticky-kana-capture-options)", _SKC_Configure)
+
+; These are state-machine units using actual InputHook callback registrations;
+; they do not claim native event delivery (the owned Edit cases cover that).
+_SKER_Case(Mode) {
+	Hook := InputHook("L0"), Other := InputHook("L0"), Receipt := 0
+	try {
+		if Mode == "invalid-send" {
+			AssertFalse(_StickyModifierCustomCapture(Hook, "SC138", ""))
+			AssertEqual("", Hook.OnKeyDown)
+			AssertEqual("", Hook.OnKeyUp)
+			AssertEqual("", Hook.OnEnd)
+			return
+		}
+		Receipt := _StickyModifierCustomCapture(Hook, "SC138", "vkDF")
+		AssertTrue(IsObject(Receipt) && Receipt.hook == Hook)
+		AssertTrue(HasMethod(Hook.OnKeyDown, "Call") && HasMethod(Hook.OnKeyUp, "Call") && HasMethod(Hook.OnEnd, "Call"))
+		if Mode == "foreign-hook" {
+			Before := Receipt.down
+			_StickyModifierCustomKey(Receipt, !Before, Other, 0xDF, 0x138)
+			_StickyModifierCustomEnd(Receipt, Other)
+			AssertEqual(Before, Receipt.down)
+			AssertFalse(Receipt.ended, "A different native object cannot settle this private capture")
+		} else {
+			Hook.OnKeyDown.Call(Hook, 0xDF, 0x138)
+			if Mode == "up-before-end"
+				Hook.OnKeyUp.Call(Hook, 0xDF, 0x138)
+			Hook.OnEnd.Call(Hook)
+			Expected := Mode != "up-before-end"
+			AssertTrue(Receipt.ended)
+			AssertEqual(Expected, Receipt.held)
+			; Neither a late Up nor a late Down may change endpoint evidence.
+			Hook.OnKeyUp.Call(Hook, 0xDF, 0x138)
+			Hook.OnKeyDown.Call(Hook, 0xDF, 0x138)
+			AssertEqual(Expected, Receipt.held)
+			if Mode == "retired-ack"
+				AssertFalse(_StickyModifierCustomSettle(Receipt, Hook, 0),
+					"Callback completion alone cannot admit replay without the exact SIHO owner")
+		}
+	} finally {
+		if IsObject(Receipt) {
+			_StickyModifierCustomRelease(Receipt, Hook)
+			AssertFalse(Receipt.active)
+			AssertEqual(0, Receipt.hook)
+			AssertEqual("", Hook.OnKeyDown)
+			AssertEqual("", Hook.OnKeyUp)
+			AssertEqual("", Hook.OnEnd)
+		}
+	}
+}
+for _SKER_Mode in ["held-end", "up-before-end", "foreign-hook", "retired-ack", "invalid-send"]
+	Test("Sticky custom endpoint receipt: " . _SKER_Mode . " retains exact callback ownership (sticky-custom-endpoint-receipt)",
+		_SKER_Case.Bind(_SKER_Mode))
