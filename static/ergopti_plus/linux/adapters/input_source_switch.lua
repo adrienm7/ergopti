@@ -211,16 +211,17 @@ function M.new(port)
 	local switcher = {}
 	local choices = {}
 	local busy, queued = false, nil
-	local listeners = {}
+	local listeners, delivering = {}, false
 
 	local function settle_listeners()
-		if busy or queued ~= nil then return end
-		local captured = listeners
-		listeners = {}
-		for _, listener in ipairs(captured) do
+		if delivering then return end
+		delivering = true
+		while not busy and queued == nil and #listeners > 0 do
+			local listener = table.remove(listeners, 1)
 			local ok, err = pcall(listener)
 			if not ok then Logger.error(LOG, "A switch settlement listener failed: %s.", tostring(err)) end
 		end
+		delivering = false
 	end
 
 	--- Runs one command and hands its stdout, or nil and the reason, to on_done.

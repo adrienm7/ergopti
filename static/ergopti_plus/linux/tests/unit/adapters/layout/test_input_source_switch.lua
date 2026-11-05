@@ -180,6 +180,23 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
 	end)
 
+	helpers.it("waits for a switch started by an earlier settlement listener", function()
+		local port, _, flush = fake_port(Switch.GNOME, gnome_answers(), true)
+		local switcher = Switch.new(port)
+		local second_saw_idle, second_calls = nil, 0
+		switcher.select("xkb:fr", function() end)
+		switcher.when_settled(function()
+			switcher.select("ibus:mozc-jp", function() end)
+		end)
+		switcher.when_settled(function()
+			second_calls = second_calls + 1
+			second_saw_idle = switcher.is_settled()
+		end)
+		flush()
+		helpers.assert_eq(second_calls, 1)
+		helpers.assert_true(second_saw_idle, "settlement must not be reported while another switch runs")
+	end)
+
 	helpers.it("serializes a selection made by a completion callback and supersedes the older queue", function()
 		local port, calls, flush = fake_port(Switch.GNOME, gnome_answers(), true)
 		local switcher = Switch.new(port)
