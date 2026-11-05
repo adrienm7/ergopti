@@ -147,17 +147,18 @@ _GestureScheduleConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
 ; before invoking its action, or contains an exception from native validation.
 _GestureRunConfirmedSystemAction(ActionId, ActionFn, Target, Sys, Transition) {
 	try return _GestureRunSystemAction(ActionId,
-		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys), Transition)
+		_GestureInvokeConfirmedSystemAction.Bind(ActionId, ActionFn, Target, Sys, Transition), Transition)
 	finally _GestureReleaseProcessTarget(Target, Sys)
 }
 
-_GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys) {
+_GestureInvokeConfirmedSystemAction(ActionId, ActionFn, Target, Sys, Transition) {
+	global _LifecycleLatestTransition
 	if !_GestureConfirmedTargetIsLive(Target, Sys) {
 		LoggerWarn("gestures", "Confirmed system action '{1}' was refused before execution: its original window target is no longer owned.", ActionId)
 		return false
 	}
-	if A_IsSuspended {
-		LoggerInfo("gestures", "Confirmed system action '{1}' was cancelled after ownership validation: the script is suspended.", ActionId)
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "Confirmed system action '{1}' was cancelled after ownership validation: suspended or original lifecycle transition retired.", ActionId)
 		return false
 	}
 	return ActionFn.Call(Sys, Target)
@@ -429,6 +430,8 @@ GestureSysForceQuitTarget(Active, Sys) {
 ; @param {Object|Integer} ConfirmedTarget The approved window and TargetPid, or
 ;   0 for direct execution against the current foreground window.
 GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	if IsObject(ConfirmedTarget) && (!ConfirmedTarget.HasOwnProp("TargetPid") || !ConfirmedTarget.HasOwnProp("ProcessLease")) {
 		LoggerWarn("gestures", "force_quit_frontmost refused: a confirmed target requires its already-owned process lease.")
@@ -454,8 +457,8 @@ GestureSysForceQuitFrontmost(Sys := 0, ConfirmedTarget := 0) {
 			LoggerWarn("gestures", "force_quit_frontmost refused before termination: its original process target is no longer owned.")
 			return false
 		}
-		if A_IsSuspended {
-			LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "force_quit_frontmost was cancelled before termination: suspended or original lifecycle transition retired.")
 			return false
 		}
 		; The native handle remains bound to the acquired process object after exit;
@@ -604,6 +607,8 @@ _GestureSysActiveFolder(Sys) {
 ; files, and from every file inside a selected folder. Confirmed by
 ; GestureInvokeAction.
 GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
 		LoggerWarn("gestures", "unblock_file_selection refused: its original window target is no longer owned.")
@@ -611,13 +616,18 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 	}
 	Window := _GestureSysActiveExplorer(Sys, IsObject(ConfirmedTarget) ? ConfirmedTarget : Sys.ActiveWindow())
 	Paths := IsObject(Window) ? GestureSysExplorerSelectedPaths(Window) : ""
-	if A_IsSuspended {
-		LoggerInfo("gestures", "unblock_file_selection was cancelled after selection inspection: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "unblock_file_selection was cancelled after selection inspection: suspended or original lifecycle transition retired.")
 		return false
 	}
 	if !(Paths is Array) || (Paths.Length = 0) {
 		LoggerInfo("gestures", "unblock_file_selection: no file is selected in Explorer.")
-		Sys.Notify(t("system_actions.no_file_selected"))
+		Notice := t("system_actions.no_file_selected")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "unblock_file_selection was cancelled before its selection notice: suspended or original lifecycle transition retired.")
+			return false
+		}
+		Sys.Notify(Notice)
 		return
 	}
 	if IsObject(ConfirmedTarget) && !_GestureConfirmedTargetIsLive(ConfirmedTarget, Sys) {
@@ -633,8 +643,8 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 			Failed += Scan.Failed
 		}
 		for Target in Targets {
-			if A_IsSuspended {
-				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: the script is suspended.")
+			if A_IsSuspended || Transition != _LifecycleLatestTransition {
+				LoggerInfo("gestures", "unblock_file_selection was cancelled before file mutation: suspended or original lifecycle transition retired.")
 				return false
 			}
 			Result := Sys.DeleteZoneIdentifier(Target)
