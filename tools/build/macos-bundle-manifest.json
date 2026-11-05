@@ -84,8 +84,9 @@
 		},
 		{
 			"group": "developer-tooling",
-			"reason": "Maintainer scripts that regenerate or validate committed data, and installer scripts no driver invokes.",
+			"reason": "Maintainer scripts and source-review declarations consumed by code generators, and installer scripts no driver invokes.",
 			"patterns": [
+				"ergopti_plus/_shared/modules/features/behaviors.json",
 				"ergopti_plus/macos/data/generate_models.py",
 				"ergopti_plus/_shared/modules/llm/validate_*.py",
 				"ergopti_plus/_shared/native/**",

@@ -1,0 +1,48 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"classification": "qualified timing-policy difference; no new canonical finding proposed",
+	"new_findings": [],
+	"source_file_claims": 14,
+	"program_sha256": "19493d24ec8d630a4831cd6b32501e87a5ff98b19cf15b75c91a3dddfd16cd88",
+	"native_receiving": false,
+	"actual_clock_sleep": false,
+	"actual_live_owners": true,
+	"sweeps": [
+		{
+			"label": "A",
+			"started_at": "2026-11-05T15:44:55.191325+00:00",
+			"completed_at": "2026-11-05T15:44:55.376947+00:00",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/macos/public-timing.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"timing_cases": 12,
+			"explicit_mapping_controls": 1,
+			"new_roots": 0,
+			"manual_review_basis": "Source review and intent qualification were performed separately before these executable loops; success does not mechanically establish absence of additional roots.",
+			"stdout": "dry-A.txt",
+			"stdout_sha256": "a4125bb01d828a45701949e193ff7f726538736a63e82e987810707399144b13",
+			"kind": "Executable dry replay after bounded manual source review"
+		},
+		{
+			"label": "B",
+			"started_at": "2026-11-05T15:44:55.377705+00:00",
+			"completed_at": "2026-11-05T15:44:55.534352+00:00",
+			"command": [
+				"lua",
+				"/workspace/scratch/parity-repeat-timing-2026-11-05/macos/public-timing.lua",
+				"/workspace/worktrees/parity-undo-repeat-2026-11-05/macos"
+			],
+			"exit_code": 0,
+			"timing_cases": 12,
+			"explicit_mapping_controls": 1,
+			"new_roots": 0,
+			"manual_review_basis": "Source review and intent qualification were performed separately before these executable loops; success does not mechanically establish absence of additional roots.",
+			"stdout": "dry-B.txt",
+			"stdout_sha256": "a4125bb01d828a45701949e193ff7f726538736a63e82e987810707399144b13",
+			"kind": "Executable dry replay after bounded manual source review"
+		}
+	]
+}

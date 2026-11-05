@@ -1,0 +1,39 @@
+{
+	"schema_version": 1,
+	"scope": "undo-repeat-windows",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-undo-repeat/windows/report.md",
+	"findings": [
+		{
+			"id": "URW-001",
+			"title": "Repeat declassifies the last scalar of a private programmable expansion",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["private_derived_output"],
+			"reproduction": "SOURCE-ONLY: enable repeat and one genuine programmable audit suffix with callback returning SYNTHETIC_CANARY_Z. After its accepted private nonfinal output and suppression release, type the magic key before idle expiry, with unchanged focus and no registered/programmed competing suffix. Repeat derives Z<magic> -> ZZ without IsPrivate; successful dispatch can feed ZZ to AI context and unredacted metrics trigger/replacement/tag.",
+			"root_cause": "The actual programmable commit labels output private but leaves it nonfinal in HSE_Buffer. The repeat transient Spec derives text from that retained buffer but carries no inherited privacy bit; canonical effect, synthetic marker and fire-log queue default false.",
+			"silent_failure": "Every operation can succeed. Privacy redaction and AI-context clearing trust only the current Spec/effect bit. No refusal or exception identifies the programmatically derived scalar as private. Direct shipped personal fields are blocked by final-output forgetting and are not the reproducer.",
+			"regression_test": "Genuine AHK actual programmable commit, repeat fallback, dispatcher and real analytics/AI sinks with faithful recording native ports: no previously classified private scalar becomes public fire/tag/synthetic output or AI context. Positive public-repeat and final-private controls, Unicode, physical new text, reset/pause/focus/rebuild and host completion/refusal controls.",
+			"evidence": ["report.md", "source-contract.py", "source-contract-result.json"],
+			"basis": "Exact-source deduction; no AutoHotkey execution, native receiving or persistence/network measurement",
+			"source_report": "docs/audits/platform-parity/2026-11-05-undo-repeat/windows/report.md"
+		},
+		{
+			"id": "URW-002",
+			"title": "Deferred repeat output acquires magic-key WPM coloring",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["truthful_live_repeat_classification"],
+			"reproduction": "SOURCE-ONLY: identical unmatched mid-word repeat in atomic host versus admitted Notepad/native-literal or paced terminal host with active metrics and visible WPM. Atomic caller normalizes repeat to repeat_key; deferred owners preserve magickey/repeat_corrections and WPM treats it as colored hotstring.",
+			"root_cause": "Repeat transient Spec stores magickey/repeat_corrections; IsRepeat category normalization exists only in synchronous _OnPrefixChar caller. Both deferred owner constructors copy raw Spec metadata and completion queues it unchanged.",
+			"silent_failure": "All values are valid. Shared neutral_sources includes repeat_key and excludes magickey; successful analytics forwarding therefore mutates different WPM category/section/ring classification without throwing. Canonical JSONL has no category/section fields, so no durable category corruption is claimed.",
+			"regression_test": "Execute real transient repeat Spec through atomic/Notepad/terminal success and actual fire/WPM sinks. Require equivalent neutral repeat classification and preserve colored real repeat-correction mappings; cover pending/exactly-once/refusal/stale/pause.",
+			"evidence": ["report.md", "source-contract.py", "source-contract-result.json"],
+			"basis": "Exact-source deduction; no AutoHotkey or native widget execution",
+			"source_report": "docs/audits/platform-parity/2026-11-05-undo-repeat/windows/report.md"
+		}
+	]
+}

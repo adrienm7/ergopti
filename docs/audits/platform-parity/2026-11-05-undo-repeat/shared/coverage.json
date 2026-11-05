@@ -1,0 +1,131 @@
+{
+	"module": "undo-repeat",
+	"role": "shared",
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"rows": [
+		{
+			"aspect": "repeat setting/default/recommended",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S01",
+			"status": "present",
+			"detail": "One shared repeat toggle: neutral false, recommended true, all three OS declared; Linux evdev/uinput requirements.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "fallback entry and registry priority",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S02",
+			"status": "present-with-gap",
+			"detail": "Real matcher wins before fallback; Linux fallback post-commit context issue belongs URL001, not a second shared root.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "Unicode/custom terminators/unknown boundaries",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S03",
+			"status": "present",
+			"detail": "Shared word-character predicate, custom terminators, unknown leading boundary and Unicode scalars covered by 19 vectors; Windows source-only.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "physical magic-event carrier normalization",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": true,
+			"id": "S04",
+			"status": "intentional-difference",
+			"detail": "macOS accepts exact French NBSP/NNBSP carrier events via shared matcher; do not assume the Linux normalized buffer accepts identical raw payloads.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "consecutive repeat and correction context",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S05",
+			"status": "gap",
+			"detail": "Windows/Mac retain repeat context by source and Mac fixture; Linux actual Main final_result resets it after the first repeat.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "extension-bound correction catalogue",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S06",
+			"status": "present-with-gap",
+			"detail": "The same 14 shipped extension-bound correction rows exist; Linux caller state retirement suppresses immediate post-repeat correction.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "intentional repeat preview exclusion",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": true,
+			"id": "S07",
+			"status": "intentional-difference",
+			"detail": "Maintainer explicitly excludes ubiquitous repeat doubling from preview; correction rules remain separate mappings.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "automatic Backspace restoration vs app Undo",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S08",
+			"status": "different",
+			"detail": "Linux alone has scoped automatic next-Backspace trigger receipt; Ctrl/Cmd+Z remains a separate app-native shortcut on all OS.",
+			"intent": "Observed scoped implementation difference; no product decision establishing intentional OS exclusivity was located."
+		},
+		{
+			"aspect": "restore eligibility/lifecycle/privacy/destination",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S09",
+			"status": "qualified",
+			"detail": "Linux immediate unmodified eligible literal nonempty-output restoration uses committed destination/privacy; native grapheme/text-field behavior unmeasured.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "public inventory declarations and generated scope",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S10",
+			"status": "gap",
+			"detail": "Audited generator has no independent behavioral input; supplementary metadata implementation addresses scope gap without fake setting.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "actual English dictionary exports",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S11",
+			"status": "gap",
+			"detail": "Actual JS import shows inventory header and legend undefined because mappings occur inside JSDoc; positive unrelated key resolves English.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		},
+		{
+			"aspect": "native receiving/performance/memory gaps",
+			"basis": "actual-Lua/JS where explicitly stated in report; otherwise authenticated source",
+			"evidence": ["report.md", "source-observation.json"],
+			"intentional_difference": false,
+			"id": "S12",
+			"status": "unmeasured",
+			"detail": "No native AHK/macOS desktop/evdev receiving, app Undo grouping, performance or memory sampling.",
+			"intent": "Explicit policy or scoped native mechanism only; see report for precise source references"
+		}
+	],
+	"dry_receipts": "dry-receipts.json",
+	"native_receiving_executed": false,
+	"schema_version": 1,
+	"platform": "shared"
+}

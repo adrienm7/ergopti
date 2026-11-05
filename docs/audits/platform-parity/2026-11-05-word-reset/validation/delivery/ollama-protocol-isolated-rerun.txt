@@ -1,0 +1,310 @@
+CLOCK_WORKFLOW live_steps=2 native=false official=false
+WINDOWS-FILE-FIXTURES generated=16 byte_exact=true native=false
+PASS complete fixed independently modeled closure preserves explicit limits
+PASS duplicate escaped and nested JSON keys refuse
+PASS JSON malformed nonfinite and excessive depth refuse
+PASS all interior samples are checked independently
+PASS exact sixteen original cap and frame boundary refuse
+PASS missing one original source denies closure
+PASS changed staged runtime is not regenerated into acceptance
+PASS forged original receipt with equivalent object changes byte binding
+PASS different actual receiver source refuses
+PASS changed signed image bytes refuses
+PASS foreign architecture refuses
+PASS foreign attempt refuses
+PASS absent official context stays unbound
+PASS failed strict signature command refuses
+PASS false settlement cannot be inferred from closed handles
+PASS remaining group debt denies observation
+PASS uncertain capture closure denies observation
+PASS missing observed command denies complete payload
+PASS same-name aliases are never read
+PASS official metadata consistency never authenticates caller JSON
+PASS actual fresh Git HEAD clean closure receives fixed nineteen inputs
+PASS missing tracked builder cannot enroll new role
+PASS foreign HEAD refuses clean identical source inputs
+PASS whole tracked cleanliness includes files outside native roots
+PASS unchanged-content hardlinked owner is refused independently of Git diff
+PASS untracked support Python shadow loader refuses
+PASS original exact-ten source inventory is still mandatory
+PASS new-role context refuses overlong run attempt and unknown CLI selector
+PASS actual owning selectors refuse omission wrong count and no-op child
+PASS frozen proposed disposition keeps deferred skip full missing evidence and capture statuses
+PASS genuine preceding CPython cache creation is bracketed before clock source begin
+PASS actual after and final snapshots remain when later payload is refused
+CLOCK_RECEIVER controls=32 native=false official=false
+NATIVE_HTTP_CLOCK refused; native acceptance and factory remain unqualified.
+NATIVE_HTTP_CLOCK refused; native acceptance and factory remain unqualified.
+PORTABLE_FAILURE_OUTPUT controls=6 native=false
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.019s
+
+OK
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.016s
+
+OK
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.892s
+
+OK
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 1.004s
+
+OK
+# native_http_fixture_closure {"active": 0, "closed": 1, "version": 1}
+# native_http_fixture_closure {"active": 0, "closed": 1, "version": 1}
+# native_http_fixture_closure {"active": 0, "closed": 1, "version": 1}
+....................................................................................................
+----------------------------------------------------------------------
+Ran 100 tests in 9.926s
+
+OK
+test_absent_observer_acquires_no_receipt_or_optional_export (__main__.PassiveCommandControls.test_absent_observer_acquires_no_receipt_or_optional_export) ... ok
+test_actual_fixture_signal_handlers_preserve_fresh_cancellation (__main__.PassiveCommandControls.test_actual_fixture_signal_handlers_preserve_fresh_cancellation) ... ok
+test_closed_same_owner_observation_keeps_original_result_and_single_settlement (__main__.PassiveCommandControls.test_closed_same_owner_observation_keeps_original_result_and_single_settlement) ... ok
+test_false_ack_never_exports_or_retries_settlement (__main__.PassiveCommandControls.test_false_ack_never_exports_or_retries_settlement) ... ok
+test_keyboard_interrupt_and_system_exit_preserve_control_plane (__main__.PassiveCommandControls.test_keyboard_interrupt_and_system_exit_preserve_control_plane) ... ok
+test_original_primary_remains_authoritative_when_callback_is_cancelled (__main__.PassiveCommandControls.test_original_primary_remains_authoritative_when_callback_is_cancelled) ... ok
+test_preexisting_group_debt_denies_new_child_and_export (__main__.PassiveCommandControls.test_preexisting_group_debt_denies_new_child_and_export) ... ok
+test_technical_sink_refusal_preserves_success (__main__.PassiveCommandControls.test_technical_sink_refusal_preserves_success) ... ok
+test_truthy_nonliteral_ack_never_exports (__main__.PassiveCommandControls.test_truthy_nonliteral_ack_never_exports) ... ok
+test_uncertain_original_capture_closure_never_exports (__main__.PassiveCommandControls.test_uncertain_original_capture_closure_never_exports) ... ok
+test_command_collection_performs_no_io_or_new_clock (__main__.PassiveExportControls.test_command_collection_performs_no_io_or_new_clock) ... ok
+test_default_loader_or_other_prefix_stays_unqualified (__main__.PassiveExportControls.test_default_loader_or_other_prefix_stays_unqualified) ... ok
+test_duplicate_or_unbounded_frame_leaves_export_refused (__main__.PassiveExportControls.test_duplicate_or_unbounded_frame_leaves_export_refused) ... ok
+test_exclusive_evidence_does_not_overwrite_existing_or_follow_alias (__main__.PassiveExportControls.test_exclusive_evidence_does_not_overwrite_existing_or_follow_alias) ... ok
+test_explicit_private_cache_receives_actual_directory_identity (__main__.PassiveExportControls.test_explicit_private_cache_receives_actual_directory_identity) ... ok
+test_foreign_same_name_root_is_not_written_or_removed (__main__.PassiveExportControls.test_foreign_same_name_root_is_not_written_or_removed) ... ok
+test_missing_command_record_never_exports_image_or_receipt (__main__.PassiveExportControls.test_missing_command_record_never_exports_image_or_receipt) ... ok
+test_no_environment_means_no_new_export_owner (__main__.PassiveExportControls.test_no_environment_means_no_new_export_owner) ... ok
+test_nonempty_private_prefix_never_claims_uncached_execution (__main__.PassiveExportControls.test_nonempty_private_prefix_never_claims_uncached_execution) ... ok
+test_optional_publication_failure_does_not_suppress_actual_client_cancellation (__main__.PassiveExportControls.test_optional_publication_failure_does_not_suppress_actual_client_cancellation) ... ok
+test_same_name_private_cache_replacement_is_refused_without_deletion (__main__.PassiveExportControls.test_same_name_private_cache_replacement_is_refused_without_deletion) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 2.566s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 4.073s
+
+OK
+.......native model receiving refused: {"cleanup_failure": {"code": "permission", "family": "os"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+..native model receiving refused: {"cleanup_failure": {"code": "cleanup", "family": "qualification"}, "failed_stage": "prepare", "prepare_phase": "outgoing_compile", "primary_failure": {"code": "actual_native_command", "family": "receiver"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+.native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "outgoing_compile", "primary_failure": {"code": "compatibility_source_copy", "family": "receiver"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+.native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unknown", "family": "unknown"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "deadline", "family": "command"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "refused", "family": "command"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unknown", "family": "receiver"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unknown", "family": "receiver"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unknown", "family": "qualification"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+..native model receiving refused: {"cleanup_failure": {"code": "interrupted", "family": "cancellation"}, "failed_stage": "prepare", "prepare_phase": "outgoing_compile", "primary_failure": {"code": "operation", "family": "qualification", "operation_cleanup": {"code": "unknown", "family": "os"}, "operation_primary": {"code": "actual_native_command", "family": "receiver"}}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+.........................native model receiving refused: {"cleanup_failure": {"code": null, "exception_class": "unknown"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+.native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "api_load", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "archive_admission", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "asset_peer", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "complete", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "environment", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "listener_copy", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "listener_sign", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "listener_verify", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "outgoing_qualification", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "outgoing_sources", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "payload_copy", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "peer_acquisition", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "peer_load", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "peer_registry", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "receiver_admission", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "runtime_install", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+native model receiving refused: {"cleanup_failure": {"code": "actual_source_close_debt", "exception_class": "RuntimeError"}, "failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "unavailable", "exception_class": "RuntimeRefusal"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+.native model receiving refused: {"cleanup_failure": {"code": null, "exception_class": "OSError"}, "failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": "actual_archive_name", "exception_class": "RuntimeError"}, "profile": "pac-inline", "reason": "native_receiving_cleanup_failed"}
+.native model receiving refused: {"failed_stage": "prepare", "prepare_phase": "unknown", "primary_failure": {"code": null, "exception_class": "FileNotFoundError"}, "profile": "pac-inline", "reason": "native_receiving_failed"}
+.
+----------------------------------------------------------------------
+Ran 42 tests in 1.376s
+
+OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.011s
+
+OK
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.057s
+
+OK
+...................
+----------------------------------------------------------------------
+Ran 19 tests in 0.152s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.311s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.330s
+
+OK
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 0.032s
+
+OK
+.....................................
+----------------------------------------------------------------------
+Ran 37 tests in 0.164s
+
+OK
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.023s
+
+OK
+............................
+----------------------------------------------------------------------
+Ran 28 tests in 0.841s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.157s
+
+OK
+...................
+----------------------------------------------------------------------
+Ran 19 tests in 0.043s
+
+OK
+............
+----------------------------------------------------------------------
+Ran 12 tests in 0.059s
+
+OK
+test_already_session_leader_remains_refused_without_parent_group_rejoin (__main__.PrivateSessionReceiving.test_already_session_leader_remains_refused_without_parent_group_rejoin) ... ok
+test_original_group_leader_guard_fails_the_same_real_posix_spawn (__main__.PrivateSessionReceiving.test_original_group_leader_guard_fails_the_same_real_posix_spawn) ... ok
+test_real_foundation_equivalent_group_leader_becomes_own_session (__main__.PrivateSessionReceiving.test_real_foundation_equivalent_group_leader_becomes_own_session) ... ok
+test_real_inherited_group_becomes_own_session_without_rejoining (__main__.PrivateSessionReceiving.test_real_inherited_group_becomes_own_session_without_rejoining) ... ok
+test_ten_independent_exact_parent_session_and_final_isolation_refusals (__main__.PrivateSessionReceiving.test_ten_independent_exact_parent_session_and_final_isolation_refusals) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.159s
+
+OK
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.230s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.920s
+
+OK
+.......................................
+----------------------------------------------------------------------
+Ran 39 tests in 0.694s
+
+OK
+........................
+----------------------------------------------------------------------
+Ran 24 tests in 0.264s
+
+OK
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.173s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.245s
+
+OK
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.050s
+
+OK
+...............................................
+----------------------------------------------------------------------
+Ran 47 tests in 5.852s
+
+OK
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.136s
+
+OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.360s
+
+OK
+................................................
+----------------------------------------------------------------------
+Ran 48 tests in 4.187s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 1.523s
+
+OK
+............[macos-dev-go] Downloading go1.26.8 for this clone...
+.[macos-dev-go] Downloading go1.26.8 for this clone...
+..[macos-dev-go] Downloading go1.26.8 for this clone...
+...[macos-dev-go] Downloading go1.26.8 for this clone...
+/workspace/ergopti/tools/dev/macos_dev_go.py:87: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.
+  bundle.extractall(destination, **options)
+.[macos-dev-go] Downloading go1.26.8 for this clone...
+.[macos-dev-go] Downloading go1.26.8 for this clone...
+...
+----------------------------------------------------------------------
+Ran 23 tests in 0.830s
+
+OK
+Managed Ollama pull receipt controls passed: 41
+Managed Ollama injected adapter controls passed: 60
+Managed native Python injected policy controls passed: 8
+Managed Ollama explicit cleanup receipt controls passed: 102
+Managed Ollama explicit cleanup owner controls passed: 58 cases / 780 assertions
+Managed Ollama legacy physical cleanup controls passed: 8 cases / 45 assertions
+Native Python exact preflight controls passed: 45 cases / 331 assertions
+PASS 5 cases / 83 assertions
+PASS 7 cases / 50 assertions
+PASS 6 cases / 47 assertions
+PASS 29 cases / 361 assertions
+
+=== Managed Ollama original pull activation ===
+  ok   uses direct native Python arguments and binds input before one original start mark
+  ok   cancels a pull whose request input cannot be closed
+  ok   preserves the stock opaque shell pull without managed preparation
+  ok   (ollama-foreign-daemon-pull) asks a stock PATH daemon through the static settings
+  ok   refuses unavailable native Python without constructing a task or falling back
+  ok   retains partial preparation debt in the original admission slot until exact rollback
+  ok   registers partial preparation debt with the original requirement pause owner
+  ok   fences reentrant preparation rollback without releasing a pending owner
+  ok   retains preparation when native task construction raises
+  ok   retains exact undispatched task on input refusal: bind_ready
+  ok   retains exact undispatched task on input refusal: bind_throw
+  ok   passes the actual original callback status to retirement and retains missing ACK
+  ok   downloads the catalogue registry tag while retaining the different presentation name
+  ok   keeps the canonical pathname on the stock route without its installed native hint kind
+  ok   retains unattempted preparation through actual native constructor refusal: construct_nil
+  ok   retains unattempted preparation through actual native constructor refusal: construct_throw
+  ok   retains the exact acquired native task until physical receipt after dispatch refusal: start_false
+  ok   retains the exact acquired native task until physical receipt after dispatch refusal: start_throw
+Managed pull activation controls passed: 18
+Native Go/macOS build, signing, model exchange and SDK admission were not executed.

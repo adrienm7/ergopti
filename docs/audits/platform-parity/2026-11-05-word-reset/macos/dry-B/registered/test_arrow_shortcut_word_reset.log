@@ -1,0 +1,98 @@
+Selecting exact test module: "tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset
+
+=== word-start fixture control ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"ships both options on, from the manifest","status":"pass","elapsed_ms":49.662291,"timing_error":""}
+  ok   ships both options on, from the manifest
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"ar types ar: the word-start entry does not fire mid-word","status":"pass","elapsed_ms":22.369500,"timing_error":""}
+  ok   ar types ar: the word-start entry does not fire mid-word
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"refuses non-boolean values and keeps the current one","status":"pass","elapsed_ms":24.364693,"timing_error":""}
+  ok   refuses non-boolean values and keeps the current one
+
+=== hotstrings.arrow_resets_word ===
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"a physical Left arrow starts a new word when on: a, arrow, r gives aR","status":"pass","elapsed_ms":23.376176,"timing_error":""}
+  ok   a physical Left arrow starts a new word when on: a, arrow, r gives aR
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"a physical Left arrow continues the word when off: a, arrow, r gives ar","status":"pass","elapsed_ms":23.829267,"timing_error":""}
+  ok   a physical Left arrow continues the word when off: a, arrow, r gives ar
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"a Karabiner-emitted Up arrow (foreign event) starts a new word when on: a, arrow, r gives aR","status":"pass","elapsed_ms":34.866771,"timing_error":""}
+  ok   a Karabiner-emitted Up arrow (foreign event) starts a new word when on: a, arrow, r gives aR
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"a Karabiner-emitted Up arrow (foreign event) continues the word when off: a, arrow, r gives ar","status":"pass","elapsed_ms":22.941300,"timing_error":""}
+  ok   a Karabiner-emitted Up arrow (foreign event) continues the word when off: a, arrow, r gives ar
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Shift+Left starts a new word when on: a, arrow, r gives aR","status":"pass","elapsed_ms":23.559371,"timing_error":""}
+  ok   Shift+Left starts a new word when on: a, arrow, r gives aR
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Shift+Left continues the word when off: a, arrow, r gives ar","status":"pass","elapsed_ms":23.461444,"timing_error":""}
+  ok   Shift+Left continues the word when off: a, arrow, r gives ar
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Left starts a new word when on: a, arrow, r gives aR","status":"pass","elapsed_ms":20.149469,"timing_error":""}
+  ok   Cmd+Left starts a new word when on: a, arrow, r gives aR
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Left continues the word when off: a, arrow, r gives ar","status":"pass","elapsed_ms":30.628532,"timing_error":""}
+  ok   Cmd+Left continues the word when off: a, arrow, r gives ar
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"the unflagged entry fires either way","status":"pass","elapsed_ms":45.825666,"timing_error":""}
+  ok   the unflagged entry fires either way
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"still withdraws predictions when off","status":"pass","elapsed_ms":24.509982,"timing_error":""}
+  ok   still withdraws predictions when off
+
+=== hotstrings.shortcut_resets_word ===
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+V starts a new word when on: gives aR","status":"pass","elapsed_ms":26.053411,"timing_error":""}
+  ok   Cmd+V starts a new word when on: gives aR
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+V continues the word when off: gives ar","status":"pass","elapsed_ms":24.968440,"timing_error":""}
+  ok   Cmd+V continues the word when off: gives ar
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Shift+Z starts a new word when on: gives aR","status":"pass","elapsed_ms":51.655247,"timing_error":""}
+  ok   Cmd+Shift+Z starts a new word when on: gives aR
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Shift+Z continues the word when off: gives ar","status":"pass","elapsed_ms":61.142010,"timing_error":""}
+  ok   Cmd+Shift+Z continues the word when off: gives ar
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Ctrl+Cmd+V starts a new word when on: gives aR","status":"pass","elapsed_ms":32.853843,"timing_error":""}
+  ok   Ctrl+Cmd+V starts a new word when on: gives aR
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Ctrl+Cmd+V continues the word when off: gives ar","status":"pass","elapsed_ms":24.875641,"timing_error":""}
+  ok   Ctrl+Cmd+V continues the word when off: gives ar
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Option+V starts a new word when on: gives aR","status":"pass","elapsed_ms":23.714882,"timing_error":""}
+  ok   Cmd+Option+V starts a new word when on: gives aR
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Option+V continues the word when off: gives ar","status":"pass","elapsed_ms":24.785695,"timing_error":""}
+  ok   Cmd+Option+V continues the word when off: gives ar
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Ctrl+V starts a new word when on: gives aR","status":"pass","elapsed_ms":24.744092,"timing_error":""}
+  ok   Ctrl+V starts a new word when on: gives aR
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Ctrl+V continues the word when off: gives ar","status":"pass","elapsed_ms":24.472603,"timing_error":""}
+  ok   Ctrl+V continues the word when off: gives ar
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"an arrow with Cmd follows the arrow option, not the shortcut one","status":"pass","elapsed_ms":24.654617,"timing_error":""}
+  ok   an arrow with Cmd follows the arrow option, not the shortcut one
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"the unflagged entry fires either way","status":"pass","elapsed_ms":49.425870,"timing_error":""}
+  ok   the unflagged entry fires either way
+
+=== typing chords and deletions are not governed ===
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Option+letter is typing, never a shortcut","status":"pass","elapsed_ms":24.871294,"timing_error":""}
+  ok   Option+letter is typing, never a shortcut
+# lua_timing {"schema":1,"driver":"macos","id":28,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Shift+letter is typing, never a shortcut","status":"pass","elapsed_ms":24.591402,"timing_error":""}
+  ok   Shift+letter is typing, never a shortcut
+# lua_timing {"schema":1,"driver":"macos","id":29,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Cmd+Backspace empties the buffer with both options off","status":"pass","elapsed_ms":66.855925,"timing_error":""}
+  ok   Cmd+Backspace empties the buffer with both options off
+# lua_timing {"schema":1,"driver":"macos","id":30,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Option+Backspace empties the buffer with both options off","status":"pass","elapsed_ms":25.455894,"timing_error":""}
+  ok   Option+Backspace empties the buffer with both options off
+# lua_timing {"schema":1,"driver":"macos","id":31,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"Ctrl+Backspace empties the buffer with both options off","status":"pass","elapsed_ms":23.906150,"timing_error":""}
+  ok   Ctrl+Backspace empties the buffer with both options off
+
+=== erasing what was typed (bs-word-start) ===
+# lua_timing {"schema":1,"driver":"macos","id":32,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: the Backspace that erases every typed letter starts a word","status":"pass","elapsed_ms":23.832129,"timing_error":""}
+  ok   bs-word-start: the Backspace that erases every typed letter starts a word
+# lua_timing {"schema":1,"driver":"macos","id":33,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: a correction keeps the word open","status":"pass","elapsed_ms":27.312441,"timing_error":""}
+  ok   bs-word-start: a correction keeps the word open
+# lua_timing {"schema":1,"driver":"macos","id":34,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: a Backspace past the typed letters leaves an unknown start","status":"pass","elapsed_ms":24.419793,"timing_error":""}
+  ok   bs-word-start: a Backspace past the typed letters leaves an unknown start
+# lua_timing {"schema":1,"driver":"macos","id":35,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: a pause before the Backspaces keeps the word they erase","status":"pass","elapsed_ms":28.086177,"timing_error":""}
+  ok   bs-word-start: a pause before the Backspaces keeps the word they erase
+# lua_timing {"schema":1,"driver":"macos","id":36,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: Option+Backspace starts a word","status":"pass","elapsed_ms":25.545519,"timing_error":""}
+  ok   bs-word-start: Option+Backspace starts a word
+# lua_timing {"schema":1,"driver":"macos","id":37,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: a terminal prompt after Return keeps its word start","status":"pass","elapsed_ms":50.395386,"timing_error":""}
+  ok   bs-word-start: a terminal prompt after Return keeps its word start
+# lua_timing {"schema":1,"driver":"macos","id":38,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"bs-word-start: Cmd+A and a browser's Cmd+L leave an empty field","status":"pass","elapsed_ms":101.534462,"timing_error":""}
+  ok   bs-word-start: Cmd+A and a browser's Cmd+L leave an empty field
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","name":"tests.unit.modules.keymap.terminators.test_arrow_shortcut_word_reset","status":"pass","elapsed_ms":1212.203410,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  37
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

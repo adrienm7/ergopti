@@ -1,0 +1,152 @@
+[
+	{
+		"path": "hotstrings.repeat_fallback",
+		"labels": {
+			"fr": "La touche ★ répète la dernière frappe",
+			"en": "★ key repeats last keystroke"
+		},
+		"platforms": { "windows": true, "macos": true, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Répète un caractère au milieu d’un mot si aucune expansion ne correspond et si la répétition par touche magique est activée.",
+				"en": "Repeats a mid-word character when no expansion matches and magic-key repeat is enabled."
+			},
+			"macos": {
+				"fr": "Répète un caractère au milieu d’un mot si aucune expansion ne correspond et si la répétition par touche magique est activée.",
+				"en": "Repeats a mid-word character when no expansion matches and magic-key repeat is enabled."
+			},
+			"linux": {
+				"fr": "La répétition par touche magique existe, mais les répétitions consécutives perdent actuellement leur contexte après la première expansion. Les corrections suivant une répétition sont aussi affectées.",
+				"en": "Magic-key repeat exists, but consecutive repeats currently lose their context after the first expansion. Following repeat-correction mappings are also affected."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+					"symbol": "HSE_TryRepeatKey(MagicKey)",
+					"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+					"symbol": "function M.try_repeat_feature",
+					"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+					"symbol": "function M.resolve",
+					"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+				},
+				{
+					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+					"symbol": "local undo = _undoable",
+					"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+				}
+			]
+		}
+	},
+	{
+		"path": "hotstrings.backspace_restore",
+		"labels": {
+			"fr": "Restaurer une expansion avec Retour arrière",
+			"en": "Restore an expansion with Backspace"
+		},
+		"platforms": { "windows": false, "macos": false, "linux": true },
+		"notes": {
+			"windows": {
+				"fr": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
+				"en": "No automatic trigger restoration with Backspace; the application’s Undo is separate."
+			},
+			"macos": {
+				"fr": "Pas de restauration automatique du déclencheur avec Retour arrière ; l’annulation de l’application est distincte.",
+				"en": "No automatic trigger restoration with Backspace; the application’s Undo is separate."
+			},
+			"linux": {
+				"fr": "Un Retour arrière immédiat sans modificateur peut restaurer une expansion en texte simple éligible ; le comportement des champs natifs reste à vérifier.",
+				"en": "An immediate unmodified Backspace can restore an eligible plain-text expansion; native text-field behavior remains unqualified."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+					"symbol": "_OnPrefixKeyDown",
+					"sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "hotstrings.shortcut_resets_word",
+					"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+					"symbol": "local undo = _undoable",
+					"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+				}
+			]
+		}
+	},
+	{
+		"path": "hotstrings.repeat_activation_window",
+		"labels": {
+			"fr": "Délai d’activation de la répétition par touche magique",
+			"en": "Magic-key repeat activation window"
+		},
+		"platforms": { "windows": false, "macos": true, "linux": false },
+		"notes": {
+			"windows": {
+				"fr": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant.",
+				"en": "No separate activation window for fallback repetition; idle word reset is independent."
+			},
+			"macos": {
+				"fr": "Utilise le délai effectif de la touche magique, avec les règles de temporisation des modificateurs ; zéro désactive ce délai. Le début d’un nouveau mot après une pause est indépendant.",
+				"en": "Uses the effective magic-key activation window, including modifier timing rules; zero disables this window. Idle word reset is independent."
+			},
+			"linux": {
+				"fr": "Aucun délai d’activation propre à la répétition de secours ; le début d’un nouveau mot après une pause est indépendant.",
+				"en": "No separate activation window for fallback repetition; idle word reset is independent."
+			}
+		},
+		"evidence": {
+			"windows": [
+				{
+					"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+					"symbol": "HSE_TryRepeatKey(MagicKey)",
+					"sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70"
+				}
+			],
+			"macos": [
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+					"symbol": "function M.try_repeat_feature",
+					"sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+				},
+				{
+					"file": "static/ergopti_plus/macos/modules/keymap/init.lua",
+					"symbol": "hotstrings.shortcut_resets_word",
+					"sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56"
+				}
+			],
+			"linux": [
+				{
+					"file": "static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
+					"symbol": "function M.resolve",
+					"sha256": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13"
+				},
+				{
+					"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+					"symbol": "local undo = _undoable",
+					"sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9"
+				}
+			]
+		}
+	}
+]

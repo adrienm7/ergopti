@@ -1,0 +1,8 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"scope": "hotstring repeat fallback, repeat corrections and expansion Backspace/native-undo distinctions",
+	"strategy": "Four reviewers on one module; independent root adjudication and replays; two dry bounded sweeps after last root",
+	"worktrees": "/workspace/worktrees/parity-undo-repeat-2026-11-05",
+	"modules": ["undo-repeat"],
+	"production_edits": false
+}

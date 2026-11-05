@@ -1,0 +1,83 @@
+Selecting exact test module: "tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted
+
+=== a private expansion never reaches an AI prompt (private-ai-context) ===
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:09:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"a request right after the expansion carries nothing of it","status":"pass","elapsed_ms":205.954843,"timing_error":""}
+  ok   a request right after the expansion carries nothing of it
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:09:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"a request after more typing carries only the typed text, to a remote provider","status":"pass","elapsed_ms":207.112811,"timing_error":""}
+  ok   a request after more typing carries only the typed text, to a remote provider
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:09:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"deleting into the secret and typing on never shows its remains","status":"pass","elapsed_ms":209.633033,"timing_error":""}
+  ok   deleting into the secret and typing on never shows its remains
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:09:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"an ordinary expansion still feeds the context","status":"pass","elapsed_ms":225.560496,"timing_error":""}
+  ok   an ordinary expansion still feeds the context
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:09:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:09:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"the AI context holds only what was typed after the expansion","status":"pass","elapsed_ms":208.753178,"timing_error":""}
+  ok   the AI context holds only what was typed after the expansion
+
+=== the other doors of the AI context stay shut too (private-ai-context) ===
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:10:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"the automatic agent watches the typing without the secret","status":"pass","elapsed_ms":257.956776,"timing_error":""}
+  ok   the automatic agent watches the typing without the secret
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"accepting a prediction after the expansion keeps the secret out of the context","status":"pass","elapsed_ms":21.724193,"timing_error":""}
+  ok   accepting a prediction after the expansion keeps the secret out of the context
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='td' section='date'.
+[logger] unified log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_2026-11-05.log: No such file or directory
+[logger] topical log write refused: /tmp/lua_Rg6C8I_ergopti_home/Library/Logs/Ergopti/ErgoptiPlus_hotstrings.log: No such file or directory
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='dt' section='datefr'.
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Rule registered: suffix='date' section='datelongfr'.
+2026-11-05 14:04:10:000 [INFO] [dynamic_hotstrings.shared] Date rules registered (trigger='★').
+2026-11-05 14:04:10:000 [DEBUG] [dynamic_hotstrings.shared] Resolver error reporter: installed.
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"a head cut of the hotstring buffer keeps describing it","status":"pass","elapsed_ms":204.325177,"timing_error":""}
+  ok   a head cut of the hotstring buffer keeps describing it
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","name":"tests.unit.modules.keymap.llm_bridge.test_private_expansion_never_prompted","status":"pass","elapsed_ms":1542.272031,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  8
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

@@ -1,0 +1,39 @@
+
+=== AI typing context: fed by the typed text ===
+  ok   (ai-context) accumulates what is typed and follows Backspace
+  ok   (ai-context) holds the expansion that replaced the trigger, not the trigger
+  ok   (ai-context) forgets a private expansion whose text is a secret
+  ok   (private-ai-context) a private mapping fired by the engine never reaches the context
+  ok   (ai-context) keeps an accepted prediction in the context
+
+=== AI typing context: forgets what it cannot describe ===
+  ok   (ai-context) a plain reset (focus change, failed output, paste) forgets it
+  ok   (ai-context) a pause longer than the idle setting forgets it, as on macOS
+  ok   (ai-context) a word deletion (Ctrl+Backspace) removes text by an unknown amount
+  ok   (ai-context) switching the AI off forgets it and keeps nothing while it stays off
+  ok   (ai-context) rejects a second context on one engine
+
+=== AI typing context: llm.generation.reset_on_nav ===
+  ok   (ai-context) clears the context on left when the preference is on (the default)
+  ok   (ai-context) keeps the context on left when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on up when the preference is on (the default)
+  ok   (ai-context) keeps the context on up when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on home when the preference is on (the default)
+  ok   (ai-context) keeps the context on home when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on enter when the preference is on (the default)
+  ok   (ai-context) keeps the context on enter when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on escape when the preference is on (the default)
+  ok   (ai-context) keeps the context on escape when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on delete when the preference is on (the default)
+  ok   (ai-context) keeps the context on delete when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) clears the context on shortcut when the preference is on (the default)
+  ok   (ai-context) keeps the context on shortcut when the preference is off, whatever the hotstring buffer does
+  ok   (ai-context) treats a word buffer that an arrow did not reset the same way
+  ok   (ai-context) keeps the context across the hotstring word reset an arrow causes
+  ok   (ai-context) applies the preference to a tap-hold command and to a terminal's submitted line
+  ok   (ai-context) reads the preference live, so the menu takes effect at the next move
+
+=== AI typing context: the generation setting ===
+  ok   (ai-context) ships on, like the other drivers, from the one manifest declaration
+  ok   (ai-context) stores only a change and refuses a non-boolean
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":30}

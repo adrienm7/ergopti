@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Linux पर कोई टॉगल नहीं: GNOME और KDE अपने Super+P डिस्प्ले स्विचर में Duplicate चुनते हैं; उस कुंजी को कुंजी संयोजन के रूप में बाँधें।",
 	"platform_reason.action_sticky_keys_are_the_systems": "इस सिस्टम की सुलभता सेटिंग्स में Sticky Keys हैं, जो हर मॉडिफ़ायर को एक बार के लिए लागू करती हैं; उन्हें वहीं चालू करें।",
 	"platform_reason.action_take_note_uses_notepad": "केवल Windows: यह क्रिया दिन की नोट्स फ़ाइल Notepad में खोलती है, जो हर Windows के साथ आता है। macOS का अपना Quick Note (Fn+Q) है, और Linux में ऐसा कोई संपादक नहीं जो हर डेस्कटॉप के साथ आए।",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS पर Live Text किसी भी कैप्चर या चित्र का टेक्स्ट पढ़ लेता है: समकक्ष क्रिया से एक कैप्चर लें, फिर उसका टेक्स्ट चुनें।"
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "macOS पर Live Text किसी भी कैप्चर या चित्र का टेक्स्ट पढ़ लेता है: समकक्ष क्रिया से एक कैप्चर लें, फिर उसका टेक्स्ट चुनें।",
+	"inventory.behavior.backspace_restore": "Backspace से विस्तार से पहले का पाठ बहाल करें",
+	"inventory.behavior.repeat_condition": "मैजिक कुंजी से दोहराव चालू होने पर और कोई विस्तार न मिलने पर शब्द के बीच के अक्षर को दोहराता है।",
+	"inventory.behavior.repeat_linux": "मैजिक कुंजी से दोहराव मौजूद है, लेकिन लगातार दोहराव अभी पहले विस्तार के बाद अपना संदर्भ खो देते हैं। दोहराव के बाद के सुधार नियम भी प्रभावित होते हैं।",
+	"inventory.behavior.backspace_linux": "बिना संशोधक कुंजी के तुरंत दबाया गया Backspace किसी पात्र सादा पाठ विस्तार को बहाल कर सकता है; मूल टेक्स्ट फ़ील्ड में व्यवहार अभी सत्यापित नहीं है।",
+	"inventory.behavior.backspace_other": "Backspace से ट्रिगर अपने आप बहाल नहीं होता; अनुप्रयोग का पूर्ववत करना अलग सुविधा है।",
+	"inventory.behavior.repeat_activation_window": "मैजिक कुंजी दोहराव की सक्रियण समय-सीमा",
+	"inventory.behavior.repeat_window_untimed": "वैकल्पिक दोहराव की अलग सक्रियण समय-सीमा नहीं है; निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।",
+	"inventory.behavior.repeat_window_macos": "संशोधक कुंजियों के समय नियमों सहित मैजिक कुंजी की प्रभावी सक्रियण समय-सीमा का उपयोग करता है; शून्य इस सीमा को बंद करता है। निष्क्रियता के बाद नया शब्द शुरू करने का नियम स्वतंत्र है।"
 }

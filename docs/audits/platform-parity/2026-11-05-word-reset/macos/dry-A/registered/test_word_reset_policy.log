@@ -1,0 +1,74 @@
+Selecting exact test module: "tests.unit.modules.keymap.terminators.test_word_reset_policy"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.terminators.test_word_reset_policy
+
+=== hotstrings.idle_reset_seconds: a pause starts a new word ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"ships 3 s and a click that starts a word, from the manifest","status":"pass","elapsed_ms":60.473868,"timing_error":""}
+  ok   ships 3 s and a click that starts a word, from the manifest
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"a pause of the configured length restarts the buffer at a word start","status":"pass","elapsed_ms":27.754387,"timing_error":""}
+  ok   a pause of the configured length restarts the buffer at a word start
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"a shorter pause keeps the word in progress","status":"pass","elapsed_ms":19.395617,"timing_error":""}
+  ok   a shorter pause keeps the word in progress
+# lua_timing {"schema":1,"driver":"macos","id":5,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"0 disables the reset whatever the pause","status":"pass","elapsed_ms":20.110348,"timing_error":""}
+  ok   0 disables the reset whatever the pause
+# lua_timing {"schema":1,"driver":"macos","id":6,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"a custom delay is applied live","status":"pass","elapsed_ms":19.297229,"timing_error":""}
+  ok   a custom delay is applied live
+# lua_timing {"schema":1,"driver":"macos","id":7,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"the first key ever is never a pause","status":"pass","elapsed_ms":30.374275,"timing_error":""}
+  ok   the first key ever is never a pause
+# lua_timing {"schema":1,"driver":"macos","id":8,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the idle value -1","status":"pass","elapsed_ms":20.454294,"timing_error":""}
+  ok   refuses the idle value -1
+# lua_timing {"schema":1,"driver":"macos","id":9,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the idle value -nan","status":"pass","elapsed_ms":19.669146,"timing_error":""}
+  ok   refuses the idle value -nan
+# lua_timing {"schema":1,"driver":"macos","id":10,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the idle value inf","status":"pass","elapsed_ms":20.171760,"timing_error":""}
+  ok   refuses the idle value inf
+# lua_timing {"schema":1,"driver":"macos","id":11,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the idle value 3","status":"pass","elapsed_ms":22.069515,"timing_error":""}
+  ok   refuses the idle value 3
+# lua_timing {"schema":1,"driver":"macos","id":12,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the idle value true","status":"pass","elapsed_ms":19.557289,"timing_error":""}
+  ok   refuses the idle value true
+
+=== hotstrings.cascade_max_arrows: how many expansions a chain may hold ===
+# lua_timing {"schema":1,"driver":"macos","id":13,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"ships at three arrows, the manifest default","status":"pass","elapsed_ms":37.007489,"timing_error":""}
+  ok   ships at three arrows, the manifest default
+# lua_timing {"schema":1,"driver":"macos","id":14,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"is applied live and read back","status":"pass","elapsed_ms":15.623272,"timing_error":""}
+  ok   is applied live and read back
+# lua_timing {"schema":1,"driver":"macos","id":15,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count 0","status":"pass","elapsed_ms":16.088809,"timing_error":""}
+  ok   refuses the cascade arrow count 0
+# lua_timing {"schema":1,"driver":"macos","id":16,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count 11","status":"pass","elapsed_ms":14.720317,"timing_error":""}
+  ok   refuses the cascade arrow count 11
+# lua_timing {"schema":1,"driver":"macos","id":17,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count -1","status":"pass","elapsed_ms":15.200527,"timing_error":""}
+  ok   refuses the cascade arrow count -1
+# lua_timing {"schema":1,"driver":"macos","id":18,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count 1.5","status":"pass","elapsed_ms":16.127752,"timing_error":""}
+  ok   refuses the cascade arrow count 1.5
+# lua_timing {"schema":1,"driver":"macos","id":19,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count -nan","status":"pass","elapsed_ms":15.209160,"timing_error":""}
+  ok   refuses the cascade arrow count -nan
+# lua_timing {"schema":1,"driver":"macos","id":20,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count inf","status":"pass","elapsed_ms":15.240308,"timing_error":""}
+  ok   refuses the cascade arrow count inf
+# lua_timing {"schema":1,"driver":"macos","id":21,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count 2","status":"pass","elapsed_ms":16.001458,"timing_error":""}
+  ok   refuses the cascade arrow count 2
+# lua_timing {"schema":1,"driver":"macos","id":22,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses the cascade arrow count true","status":"pass","elapsed_ms":38.149175,"timing_error":""}
+  ok   refuses the cascade arrow count true
+
+=== hotstrings.click_resets_word: a click starts a new word ===
+# lua_timing {"schema":1,"driver":"macos","id":23,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"on, the run after a click starts a word","status":"pass","elapsed_ms":15.181719,"timing_error":""}
+  ok   on, the run after a click starts a word
+# lua_timing {"schema":1,"driver":"macos","id":24,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"off, the click still empties the buffer but the run is mid-word","status":"pass","elapsed_ms":15.198084,"timing_error":""}
+  ok   off, the click still empties the buffer but the run is mid-word
+# lua_timing {"schema":1,"driver":"macos","id":25,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"refuses a non-boolean","status":"pass","elapsed_ms":15.236993,"timing_error":""}
+  ok   refuses a non-boolean
+
+=== shared idle-reset rule as the macOS driver uses it ===
+# lua_timing {"schema":1,"driver":"macos","id":26,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"resets at the delay, not before, and never when disabled","status":"pass","elapsed_ms":0.004677,"timing_error":""}
+  ok   resets at the delay, not before, and never when disabled
+# lua_timing {"schema":1,"driver":"macos","id":27,"kind":"case","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"validates the stored value","status":"pass","elapsed_ms":0.008372,"timing_error":""}
+  ok   validates the stored value
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.terminators.test_word_reset_policy","name":"tests.unit.modules.keymap.terminators.test_word_reset_policy","status":"pass","elapsed_ms":538.919659,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  26
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

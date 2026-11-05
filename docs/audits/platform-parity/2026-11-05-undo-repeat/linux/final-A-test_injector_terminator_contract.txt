@@ -1,0 +1,15 @@
+
+=== linux injector: non-consumed terminator replay ===
+  ok   replays Space and punctuation after the replacement (lnx-001)
+  ok   replays Enter and Tab as control keystrokes after text (lnx-002)
+  ok   the daemon owns the output stream, which is what makes the above safe
+
+=== linux daemon: output is the logical commit boundary ===
+  ok   publishes metrics, undo and engine state only after delivery.ok
+
+=== linux injector: erase and text must not collide ===
+  ok   a non-zero inter-phase delay separates the erase from the text
+  ok   the erase spawns no process at all
+  ok   no key delay is needed, because nothing is being rate-limited
+  ok   the two phases are ordered erase-then-type inside inject()
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":8}

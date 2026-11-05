@@ -1,0 +1,22 @@
+Selecting exact test module: "tests.unit.modules.keymap.expansion.test_hotstring_chaining"
+Focused discovery: 1 of 2148 module(s) selected before require
+
+>>> Loading tests.unit.modules.keymap.expansion.test_hotstring_chaining
+
+=== keymap: an expansion's output joins the next match ===
+# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_hotstring_chaining","name":"ab gives cd and cde gives xyz, so abe gives xyz","status":"pass","elapsed_ms":28.388361,"timing_error":""}
+  ok   ab gives cd and cde gives xyz, so abe gives xyz
+# lua_timing {"schema":1,"driver":"macos","id":3,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_hotstring_chaining","name":"at, att and attention chain through three magic keys","status":"pass","elapsed_ms":7.760826,"timing_error":""}
+  ok   at, att and attention chain through three magic keys
+# lua_timing {"schema":1,"driver":"macos","id":4,"kind":"case","module":"tests.unit.modules.keymap.expansion.test_hotstring_chaining","name":"an output that holds a whole trigger fires nothing alone","status":"pass","elapsed_ms":7.105661,"timing_error":""}
+  ok   an output that holds a whole trigger fires nothing alone
+# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"tests.unit.modules.keymap.expansion.test_hotstring_chaining","name":"tests.unit.modules.keymap.expansion.test_hotstring_chaining","status":"pass","elapsed_ms":50.115258,"timing_error":""}
+
+========================================
+OVERALL RESULTS:
+Total modules: 1
+Passed tests:  3
+Failed tests:  0
+========================================
+
+[OK] All Lua unit tests passed.

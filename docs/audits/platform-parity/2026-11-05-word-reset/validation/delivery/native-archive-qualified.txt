@@ -1,0 +1,5 @@
+
+> svelte-static@3.0.0 test:linux:updater-archive-native
+> node ./tools/test/run-linux-updater-archive-native.cjs
+
+[OK] Linux updater archive pipeline: 3 actual native cases; 15 checks; 0 skipped; closure complete.

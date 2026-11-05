@@ -384,7 +384,9 @@ const GENERATORS = [
 			'src/routes/ergopti-plus/feature-inventory.json',
 			'src/routes/ergopti-plus/action-inventory.json',
 			'src/routes/ergopti-plus/menu-gaps.json',
-			'src/routes/ergopti-plus/input-inventory.json'
+			'src/routes/ergopti-plus/input-inventory.json',
+			'src/routes/ergopti-plus/behavior-inventory.json',
+			'docs/behavior-inventory.md'
 		]
 	},
 	{

@@ -1,0 +1,147 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "undo-repeat",
+	"roles": {
+		"windows": {
+			"report": "windows.md",
+			"evidence": [
+				{
+					"path": "proof.txt",
+					"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+				}
+			],
+			"findings": [
+				{
+					"id": "TEST-001",
+					"title": "Synthetic defect",
+					"severity": "medium",
+					"confidence": "high",
+					"guarantees": ["G2"],
+					"reproduction": "Synthetic action",
+					"root_cause": "Synthetic mechanism",
+					"silent_failure": "Synthetic visibility",
+					"regression_test": "Synthetic behavior",
+					"basis": "source",
+					"qualification": "Not a real finding",
+					"evidence": [
+						{
+							"path": "proof.txt",
+							"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+						}
+					]
+				}
+			],
+			"coverage": [
+				{
+					"aspect": "Synthetic aspect",
+					"basis": "source",
+					"qualification": "No runtime observation",
+					"evidence": [
+						{
+							"path": "proof.txt",
+							"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+						}
+					]
+				}
+			]
+		},
+		"macos": {
+			"report": "macos.md",
+			"evidence": [
+				{
+					"path": "proof.txt",
+					"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+				}
+			],
+			"findings": [],
+			"coverage": [
+				{
+					"aspect": "Synthetic aspect",
+					"basis": "source",
+					"qualification": "No runtime observation",
+					"evidence": [
+						{
+							"path": "proof.txt",
+							"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+						}
+					]
+				}
+			]
+		},
+		"linux": {
+			"report": "linux.md",
+			"evidence": [
+				{
+					"path": "proof.txt",
+					"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+				}
+			],
+			"findings": [],
+			"coverage": [
+				{
+					"aspect": "Synthetic aspect",
+					"basis": "source",
+					"qualification": "No runtime observation",
+					"evidence": [
+						{
+							"path": "proof.txt",
+							"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+						}
+					]
+				}
+			]
+		},
+		"shared": {
+			"report": "shared.md",
+			"evidence": [
+				{
+					"path": "proof.txt",
+					"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+				}
+			],
+			"findings": [],
+			"coverage": [
+				{
+					"aspect": "Synthetic aspect",
+					"basis": "source",
+					"qualification": "No runtime observation",
+					"evidence": [
+						{
+							"path": "proof.txt",
+							"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+						}
+					]
+				}
+			]
+		}
+	},
+	"capabilities": [
+		{
+			"id": "repeat-contract",
+			"contract": "Synthetic bounded contract",
+			"windows": "Synthetic owner only",
+			"macos": "Synthetic owner only",
+			"linux": "Synthetic owner only",
+			"availability": {
+				"windows": "unverified",
+				"macos": "unverified",
+				"linux": "unverified"
+			},
+			"observation_basis": {
+				"windows": "source",
+				"macos": "source",
+				"linux": "source"
+			},
+			"classification": "unknown_intent",
+			"basis": "Synthetic evidence only",
+			"evidence": [
+				{
+					"path": "proof.txt",
+					"sha256": "7f344bb1a5f55f5bd9a9b556a8983f14db20fc4c219c2038e533a3c11a16b6e2"
+				}
+			]
+		}
+	]
+}

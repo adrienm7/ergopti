@@ -1,0 +1,90 @@
+[
+	{
+		"pass": "A",
+		"finished_at": "2026-11-05T13:59:39.100515+00:00",
+		"review_axes": [
+			"public repeat and Backspace owners",
+			"shared toggle/defaults/delimiters",
+			"registry fallback priority and repeat corrections",
+			"plain-text/cascade/key-output eligibility",
+			"source/focus/privacy/pause retirement",
+			"preview exclusion and native undo distinction",
+			"configuration/action/menu/site projection boundary",
+			"canonical prior-report deduplication",
+			"source receipt and native/performance limits"
+		],
+		"new_roots": 0,
+		"replays": [
+			{
+				"role": "source",
+				"argv": [
+					"python3",
+					"/workspace/scratch/parity-undo-repeat-2026-11-05/shared/source_probe.py",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0
+			},
+			{
+				"role": "macos",
+				"argv": [
+					"lua",
+					"tests/run.lua",
+					"--only=tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared/static/ergopti_plus/macos",
+				"exit_code": 0
+			},
+			{
+				"role": "linux",
+				"argv": ["luajit", "tests/run.lua", "--only=repeat-key-corpus"],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared/static/ergopti_plus/linux",
+				"exit_code": 0
+			}
+		]
+	},
+	{
+		"pass": "B",
+		"finished_at": "2026-11-05T13:59:42.223774+00:00",
+		"review_axes": [
+			"public repeat and Backspace owners",
+			"shared toggle/defaults/delimiters",
+			"registry fallback priority and repeat corrections",
+			"plain-text/cascade/key-output eligibility",
+			"source/focus/privacy/pause retirement",
+			"preview exclusion and native undo distinction",
+			"configuration/action/menu/site projection boundary",
+			"canonical prior-report deduplication",
+			"source receipt and native/performance limits"
+		],
+		"new_roots": 0,
+		"replays": [
+			{
+				"role": "source",
+				"argv": [
+					"python3",
+					"/workspace/scratch/parity-undo-repeat-2026-11-05/shared/source_probe.py",
+					"/workspace/worktrees/parity-undo-repeat-2026-11-05/shared"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared",
+				"exit_code": 0
+			},
+			{
+				"role": "macos",
+				"argv": [
+					"lua",
+					"tests/run.lua",
+					"--only=tests.unit.modules.keymap.repeat.test_repeat_feature_arm_time"
+				],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared/static/ergopti_plus/macos",
+				"exit_code": 0
+			},
+			{
+				"role": "linux",
+				"argv": ["luajit", "tests/run.lua", "--only=repeat-key-corpus"],
+				"cwd": "/workspace/worktrees/parity-undo-repeat-2026-11-05/shared/static/ergopti_plus/linux",
+				"exit_code": 0
+			}
+		]
+	}
+]

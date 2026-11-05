@@ -10,6 +10,14 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Word-reset and AI-context continuation
+
+The [November 5 word-reset audit](audits/platform-parity/2026-11-05-word-reset/report.md) follows the repeat/recovery closure at the same `b17e47e` source. Four reviewers compare independent word/AI lifetimes through the following key, synthetic action origins, edited controls, terminal receipts and lifecycle retirement: 98 coverage rows and five qualified findings. The [generated comparison](audits/platform-parity/2026-11-05-word-reset/capabilities.md) retains explicit macOS tap-hold-origin limits, idle architectures, conditional keypad-Enter receiving and unresolved modifier policy. Root replays include a matched-default physical/action Linux arrow control; no native desktop or AHK receiving is claimed.
+
+## Repeat and recovery continuation
+
+The [November 5 repeat/recovery audit](audits/platform-parity/2026-11-05-undo-repeat/report.md) keeps four OS/shared reviewers on one bounded module at source `b17e47ed3bb92c106703d3e3482b3c2973f5bc1e`. Its 85 aspect rows follow repeat through actual caller publication, following corrections, word boundaries, private ancestry and immediate Backspace recovery. The [generated comparison](audits/platform-parity/2026-11-05-undo-repeat/capabilities.md) separates explicit preview policy, application Undo, unestablished intent and native receiving gaps. A [supplementary live behavior catalogue](behavior-inventory.md) now reaches the site and documentation, with reviewed-owner drift checks; it does not infer semantic exhaustiveness.
+
 ## Sequential WPM, wrap and personal-information continuation
 
 The [sequential November 5 audit](audits/platform-parity/2026-11-05-sequential/report.md) keeps four OS/shared reviewers on the same module before advancing: WPM, wrap symbols, then personal information, at `7aecd9a25b35efdcff68898919506dc2f6fd02d0`. It adds independently replayed owner evidence, qualified Windows source projections and a [generated capability/intent comparison](audits/platform-parity/2026-11-05-sequential/capabilities.md). Canonical findings, shared mechanisms, known duplicates, policy questions and native receiving gaps remain distinct. The root TODO tracks the open findings; dated validators check evidence and projection drift without claiming automated semantic parity.

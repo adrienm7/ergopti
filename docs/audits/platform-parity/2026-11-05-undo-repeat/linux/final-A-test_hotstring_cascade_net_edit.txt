@@ -1,0 +1,11 @@
+
+=== hotstring cascade net edit (shared contract) ===
+  ok   returns nil when the first step has no successor
+  ok   keeps the untouched prefix and reports one net edit
+  ok   reaches left of the first trigger when a step does
+  ok   carries the end character through every step and returns it
+  ok   stops at the arrow bound
+  ok   stops when the same spec would fire again
+  ok   consults admit after the same-spec guard and honours its refusal
+  ok   ends the chain after a final_result link
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":8}

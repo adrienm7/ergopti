@@ -1,0 +1,32 @@
+{
+	"created_utc": "2026-11-05T16:36:12.410983+00:00",
+	"qualification": "Actual final JavaScript dictionary export after root repair of URS-002; original pinned finding and pre-repair current-dictionary.json remain historical. No browser/native receiving.",
+	"source_sha256": "a38ec05eb3602477e6056abfea4db27cbd81834608724bdc3054dfee56a2131e",
+	"consumer_sha256": "ddd352dff1758ddabda233bf02e1ff560ecf6e27911d1051f40b1093ee181fd4",
+	"required_inventory_mappings": 13,
+	"actual_module_observation": {
+		"observed": {
+			"Options de menu propres à certains systèmes": "Platform-specific menu options",
+			"Option": "Option",
+			"Touches tap-hold par système": "Tap-hold keys by system",
+			"Inventaire des actions configurables": "Bindable actions inventory",
+			"Action": "Action",
+			"Trois systèmes, un projet.": "Three systems, one project.",
+			"Les entrées ci-dessous proviennent du manifeste partagé. Une entrée absente peut avoir un équivalent sous un autre nom ; sa présence ne garantit pas son fonctionnement en conditions réelles.": "The entries below come from the shared manifest. An absent entry may have an equivalent under another name; its presence does not guarantee real-world operation.",
+			"Inventaire des réglages et fonctionnalités": "Settings and features inventory",
+			"Fonctionnalité ou réglage": "Feature or setting",
+			"✓ déclaré pour ce système": "✓ declared for this system",
+			"— entrée non déclarée pour ce système": "— entry not declared for this system",
+			"Comportements examinés dans le code": "Behaviors reviewed in the source",
+			"Ce catalogue complémentaire couvre les comportements examinés. Il ne constitue pas un inventaire exhaustif ni une garantie de fonctionnement dans chaque application.": "This supplementary catalogue covers reviewed behaviors. It is not an exhaustive inventory or a guarantee of operation in every application."
+		},
+		"control": "Who for?"
+	},
+	"exit_code": 0,
+	"command": [
+		"/workspace/scratch/parity-toolchain/ci-bin/node",
+		"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/validation/final-dictionary-check.mjs",
+		"/workspace/ergopti"
+	],
+	"program_sha256": "d44dc38216421dd5ede587ef3b9e12941023f86cb5ed513413de447374f060e1"
+}

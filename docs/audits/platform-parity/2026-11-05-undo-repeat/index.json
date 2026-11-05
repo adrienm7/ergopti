@@ -1,0 +1,1728 @@
+{
+	"schema_version": 1,
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"created_at": "2026-11-05",
+	"module": "undo-repeat",
+	"roles": [
+		{
+			"role": "windows",
+			"report": "windows/report.md",
+			"evidence": [
+				{
+					"path": "windows/report.md",
+					"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+				},
+				{
+					"path": "windows/coverage.json",
+					"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"ids": ["URW-001", "URW-002"],
+			"coverage": [
+				{
+					"aspect": "public-repeat-entry",
+					"status": "available",
+					"observation": "_OnPrefixChar: registry, personal combo, user-code, repeat precedence; deferred publication distinguished from success",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1559",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "repeat-feature-default",
+					"status": "available",
+					"observation": "Shared default false/recommended true; live runtime flag; missing config returns manifest default",
+					"source": "static/ergopti_plus/windows/infra/feature_state.ahk:246",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "repeat-toggle-publication",
+					"status": "available",
+					"observation": "Persist-before-publish, decision generation advance, projection invalidation; no reload required",
+					"source": "static/ergopti_plus/windows/ui/editors.ahk:560",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "repeat-corrections-independent",
+					"status": "available",
+					"observation": "Separate default-off section, two-second delay; fourteen layout mappings, ordinary registry metadata",
+					"source": "static/ergopti_plus/_shared/modules/features/manifest.toml:1101",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "midword-boundary",
+					"status": "available",
+					"observation": "Both complete scalars must be word chars, custom terminators excluded; first letter blocked",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1193",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "unknown-buffer-start",
+					"status": "available",
+					"observation": "Unknown first predecessor cannot license doubling; additional known predecessor required",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1248",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "unicode-scalar",
+					"status": "available",
+					"observation": "Complete-tail scalar guards; UTF16 length separated from codepoint erasure",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1218",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "grapheme-native-delete",
+					"status": "unmeasured",
+					"observation": "Application backspace semantics for combining/emoji clusters need receiving; no scalar==grapheme claim",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1265",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "magic-source-and-double-magic",
+					"status": "available",
+					"observation": "Configured exact suffix, no regex interpolation in fallback; repeated magic excluded",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1207",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "repeat-delay",
+					"status": "available",
+					"observation": "Fallback has no TimeActivationSeconds; registered corrections have independent gate; idle context still applies",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1142",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "withheld-bubble",
+					"status": "intentional",
+					"observation": "Explicit no-repeat-preview decision, oracle still describes next real action; no lower fallback promotion",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2711",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "cascade-exclusion",
+					"status": "intentional",
+					"observation": "IsRepeat and private outputs explicitly excluded from chain links",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_cascade.ahk:99",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "pause-rebuild-transition",
+					"status": "available",
+					"observation": "Public pause guard, registry rebuild/transition and suppression checks retained",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk:1194",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "original-destination",
+					"status": "available",
+					"observation": "Normal owner preflight + deferred original source/destination generations; native receiving not certified",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1291",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "output-refusal",
+					"status": "available",
+					"observation": "Sender verdict precedes state/analytics commit; deferred schedule not fire; no native injection performed",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1510",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "private-derived-repeat",
+					"status": "partial",
+					"observation": "URW-001: supported private nonfinal user-code output can donate its last scalar to a public repeat",
+					"source": "static/ergopti_plus/windows/modules/dynamic_hotstrings/user_code.ahk:424",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "personal-final-private-controls",
+					"status": "available",
+					"observation": "Real shipped personal @/prefix mappings final; multi-field key output clears model; direct personal-field sequence refuted",
+					"source": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk:168",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "cross-host-live-classification",
+					"status": "partial",
+					"observation": "URW-002: normalized repeat_key atomically, raw magickey/repeat_corrections on deferred host; canonical row has no category field",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:624",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "plain-backspace-scalar-tracking",
+					"status": "available",
+					"observation": "Actual keydown calls commit/decrement/preview rerender; no trigger restoration on this path",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1995",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "immediate-backspace-trigger-restoration",
+					"status": "missing",
+					"observation": "Not implemented on inspected Windows owner; Linux owns explicit undo receipt. No policy authorizing permanent exclusion found",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1822",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "modified-backspace-and-native-undo",
+					"status": "available",
+					"observation": "Ctrl word delete vs Alt/Win unknown-context reset; Ctrl+Z/Y app owned; no native grouping promise",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:1791",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "idle-forgotten-word",
+					"status": "available",
+					"observation": "Backspace restores last forgotten word only if input/content generations and empty matcher still current",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk:2026",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "test-trust",
+					"status": "limited",
+					"observation": "Read genuine repeat/fence/corpus, scalar and no-bubble tests; none executed in AHK. Source checks are not runtime cases",
+					"source": "static/ergopti_plus/windows/tests/unit/modules/hotstrings/engine/test_repeat_key_honours_rebuild_fence.ahk:129",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				},
+				{
+					"aspect": "performance-and-memory",
+					"status": "unmeasured",
+					"observation": "No G4 or leak assertion; native hot path and real owner lifetimes need receiving",
+					"source": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk:1291",
+					"basis": "source",
+					"qualification": "Authenticated exact-source chain only; no AHK runtime or native Windows editor execution. Submitted observation: exact-source review; no AHK or native desktop execution",
+					"evidence": [
+						{
+							"path": "windows/report.md",
+							"sha256": "7c3c7b396209284a2d092b1e25a01b60a3605515623655fa693aa12423ddeff0"
+						},
+						{
+							"path": "windows/coverage.json",
+							"sha256": "05303f5f844ae5af3b90d2d7bc3ece9a984b6e6f3ee0bb4590124ac632fb7bd3"
+						}
+					]
+				}
+			]
+		},
+		{
+			"role": "macos",
+			"report": "macos/report.md",
+			"evidence": [
+				{
+					"path": "macos/report.md",
+					"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+				},
+				{
+					"path": "macos/coverage.json",
+					"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"ids": ["URM-001"],
+			"coverage": [
+				{
+					"id": "MAC-UR-01",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Opt-in repeat feature",
+					"status": "available",
+					"description": "Manifest neutral default false, explicit enable gate; disabling removes sparse persisted leaf.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual registry/preferences owner"
+				},
+				{
+					"id": "MAC-UR-02",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Menu repeat toggle",
+					"status": "available",
+					"description": "Shared checkbox command invokes actual keymap setter, checks exact true, saves sparse preferences and reloads. Save refusal remains loud but native menu receiving unmeasured.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: source review"
+				},
+				{
+					"id": "MAC-UR-03",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Midword literal repeat",
+					"status": "available",
+					"description": "Public po★ produces poo and one repeated scalar.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual public Keymap/SyntheticInput owner"
+				},
+				{
+					"id": "MAC-UR-04",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "First-letter and unknown-boundary refusal",
+					"status": "available",
+					"description": "Shared word-character corpus refuses isolated first letter and unknown buffer start; guards apply to predecessor and repeated scalar.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered corpus plus source review"
+				},
+				{
+					"id": "MAC-UR-05",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Unicode word policy",
+					"status": "available",
+					"description": "Uses codepoints, accepts shared non-ASCII word-character rule; no grapheme promise is inferred.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered corpus plus source review"
+				},
+				{
+					"id": "MAC-UR-06",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Whitespace/punctuation and custom delimiter refusal",
+					"status": "available",
+					"description": "Whitespace/double magic refused; custom digit terminator refuses itself and the following word-start letter.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered controls"
+				},
+				{
+					"id": "MAC-UR-07",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Composite physical magic events",
+					"status": "available",
+					"description": "NBSP/NNBSP plus configured punctuation recognized; physical-codepoint deletion count belongs to actual payload in explicit ignored-output helper fixture.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered owner controls"
+				},
+				{
+					"id": "MAC-UR-08",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Mapping precedence",
+					"status": "available",
+					"description": "Eligible true magic and end-char mappings resolve before fallback; final no-op wins without an edit.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered eventtap timing and source review"
+				},
+				{
+					"id": "MAC-UR-09",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Repeat timing",
+					"status": "available",
+					"description": "Explicit mappings bypass ordinary delay; fallback retains STAR_TRIGGER timing gate and complex-key multiplier.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered real-eventtap controls plus source review"
+				},
+				{
+					"id": "MAC-UR-10",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Changed-key literal provenance",
+					"status": "available",
+					"description": "Literal mappings ending configured magic retain timing and original ownership across subsequent key changes; true stars follow renamed magic.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered public eventtap controls"
+				},
+				{
+					"id": "MAC-UR-11",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "No repeat tooltip row",
+					"status": "intentional_difference",
+					"description": "Doubling withheld as constant midword noise; repeat still fires. Correction entries are not doublings.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": "Explicit maintainer decision: project-the-bubble-never-offers-a-doubling",
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: explicit policy plus executed registered control"
+				},
+				{
+					"id": "MAC-UR-12",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Repeat correction catalogue",
+					"status": "available",
+					"description": "Shipped ccê→ccu actual row works after public ac★→acc: ê→accu.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual public owners and shared TOML catalogue"
+				},
+				{
+					"id": "MAC-UR-13",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Section/extension ownership",
+					"status": "available",
+					"description": "Repeat corrections retain bound section and extension source; not synthesized as repeat fallback entries.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual registry bound-section controls plus source review"
+				},
+				{
+					"id": "MAC-UR-14",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Continuation after repeat",
+					"status": "available",
+					"description": "Retained poo allows public next★ to resolve separately registered poo★→NEXT_MAGIC. Actual word-only x→z rule leaves both po★x and manual poox unchanged as poox; standalone x→z proves positive rule reachability.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual public owner"
+				},
+				{
+					"id": "MAC-UR-15",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Immutable native event ownership",
+					"status": "available",
+					"description": "Consecutive repeats in same clock tick receive different immutable generations; deletion and insertion share transaction.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual SyntheticInput owner with recording native events"
+				},
+				{
+					"id": "MAC-UR-16",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Output refusal cleanup",
+					"status": "available",
+					"description": "Refused text emitter leaves buffer unchanged, zero callback events, zero synthetic metrics and preview writes.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed registered actual replacement owner"
+				},
+				{
+					"id": "MAC-UR-17",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Preview and metrics after successful output",
+					"status": "available",
+					"description": "Actual repeat replacement publishes synthetic notification, buffer and post-completion preview only after successful construction.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual registered owner"
+				},
+				{
+					"id": "MAC-UR-18",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Private-derived repeat propagation",
+					"status": "partial",
+					"description": "URM-001: private SSN output repeated scalar6 becomes nonprivate, literal DEBUG boundary and actual recorded-value function return6.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual public SSN/Keymap/Expander/metrics value owners"
+				},
+				{
+					"id": "MAC-UR-19",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Private-derived AI context",
+					"status": "partial",
+					"description": "URM-001: old private prefix remains protected, newly repeated scalar6 appears in actual bridge context and actual request serialized into fake HTTP port.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual Bridge/PredictionEngine owners; fake network port"
+				},
+				{
+					"id": "MAC-UR-20",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Fresh typing after private output",
+					"status": "available",
+					"description": "Fresh user text after private span is intentionally available; full existing private prefix remains withheld.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": "Bridge documents separate hotstring cursor buffer and visible AI context; private prefix excluded, fresh suffix allowed",
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: explicit bridge policy and executed actual private-context controls"
+				},
+				{
+					"id": "MAC-UR-21",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Bare Backspace after expansion",
+					"status": "available",
+					"description": "Public expand★→EXPANDED then bare Backspace passes through, tracked buffer EXPANDE, no new synthetic output.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: executed actual public Keymap tap"
+				},
+				{
+					"id": "MAC-UR-22",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Expansion-specific Backspace undo",
+					"status": "unavailable",
+					"description": "No Linux-style custom undo receipt found in bounded Mac Keymap/Expander owners; bare Backspace edits emitted text instead of restoring original trigger.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": "Intent for absence not located; implementation difference only",
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: bounded source census corroborated public control"
+				},
+				{
+					"id": "MAC-UR-23",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Application Cmd+Z",
+					"status": "native_unmeasured",
+					"description": "Public Cmd+Z passes through with configured shortcut reset; no synthetic custom undo. Native editor effect/grouping not executed.",
+					"basis": "actual-owner",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": "Host owns native undo; no editor receipt inferred",
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: actual Keymap passthrough, native editor gap"
+				},
+				{
+					"id": "MAC-UR-24",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Pause/focus/security admission",
+					"status": "source_review",
+					"description": "Early keymap guards reconcile generation and reject ignored/secure fields before trigger/repeat dispatch. Public probe fixes native classification to normal; does not execute real focus/device transitions.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: source-only on these native transitions"
+				},
+				{
+					"id": "MAC-UR-25",
+					"os": "macos",
+					"module": "undo-repeat",
+					"aspect": "Latency and long-run memory",
+					"status": "unmeasured",
+					"description": "No actual macOS timing or memory soak; no G4 claim or inferred leak from short Lua fixture.",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "macos/report.md",
+							"sha256": "b20d3580af8bab490ac115fdb201c17f57583be7d772805c9b39ae662ea26e49"
+						},
+						{
+							"path": "macos/coverage.json",
+							"sha256": "99e0bef6ca76cd449a33344a0ae32d450a0d12dff46d753774df95b6a074026a"
+						}
+					],
+					"intent": null,
+					"qualification": "Actual public Lua owners over recorded native ports; real persistence-value selection and fake HTTP body capture; no native desktop, disk delivery or network request. Submitted observation: explicit coverage gap"
+				}
+			]
+		},
+		{
+			"role": "linux",
+			"report": "linux/report.md",
+			"evidence": [
+				{
+					"path": "linux/report.md",
+					"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+				},
+				{
+					"path": "linux/coverage.json",
+					"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"ids": ["URL-001", "URL-002"],
+			"coverage": [
+				{
+					"id": "L01",
+					"aspect": "Feature declaration and native requirements",
+					"status": "present",
+					"basis": "source",
+					"detail": "Repeat is default false, recommended true; allOS declared, Linux evdev/uinput prerequisites.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Explicit manifest policy",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source"
+				},
+				{
+					"id": "L02",
+					"aspect": "Runtime toggle/menu/state projection",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Menu calls real RepeatKey.toggle/is_enabled. Setter publishes conditional sparse canonical write before runtime state.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source+registered runtime"
+				},
+				{
+					"id": "L03",
+					"aspect": "Malformed/outdated config and native publication refusal",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Invalid reads are cached neutral; malformed explicit refresh retains last runtime. Failed/external writes preserve runtime and canonical bytes.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: registered runtime"
+				},
+				{
+					"id": "L04",
+					"aspect": "Cached input-path configuration",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "is_enabled performs no repeated disk reads after first resolution; acquired settings scope refuses competing setter.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source+registered runtime"
+				},
+				{
+					"id": "L05",
+					"aspect": "Mid-word, punctuation, whitespace, custom delimiter predicates",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Actual pure owner and shared corpus exercise word-start/unknown boundary/refusal plus custom delimiter write/remove.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: registered runtime"
+				},
+				{
+					"id": "L06",
+					"aspect": "Custom magic key and scalar Unicode",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Configured magic-key argument works in corpus; actual caller/injector cases repeat nonBMP and combining scalar.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Codepoint word-character contract; not grapheme certification",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner+registered runtime"
+				},
+				{
+					"id": "L07",
+					"aspect": "Registered-match precedence",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Actual ordinary mapping wins before fallback.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L08",
+					"aspect": "After-repeat matcher continuity and second repeat",
+					"status": "defect URL001",
+					"basis": "actual-owner",
+					"detail": "Matcher empties after first ACK; second magic remains literal.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L09",
+					"aspect": "Shipped repeat-correction integration",
+					"status": "defect URL001",
+					"basis": "actual-owner",
+					"detail": "All14rows load; generated doubling loses prefix so ac★ê does not correct, manual accê positive does.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L10",
+					"aspect": "After-repeat word-start truth",
+					"status": "defect URL001",
+					"basis": "actual-owner",
+					"detail": "Word-only x→z fires after repeat inside poo; manually doubled control refuses.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L11",
+					"aspect": "Repeat derived from real private prefix",
+					"status": "defect URL002",
+					"basis": "actual-owner",
+					"detail": "Actual Prefix.build private SSN result yields a later public scalar9 to injector and telemetry interface. Probe enables TRACE explicitly for payload-bearing log observation; no default-level emission or real SQLite persistence measured.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L12",
+					"aspect": "Delivery ACK, Undo and metrics publication",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "First native DOWN refusal produces loud error, emergency-stop once and no Undo or telemetry publication.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner+registered runtime"
+				},
+				{
+					"id": "L13",
+					"aspect": "Immediate Backspace restores expansion trigger",
+					"status": "present with limits",
+					"basis": "actual-owner",
+					"detail": "Actual Main/injector restores po★ after repeat; existing cases restore native/clipboard routes and classify private trigger.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Driver compensates physical Backspace already forwarded; single-use immediate window",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner+registered runtime"
+				},
+				{
+					"id": "L14",
+					"aspect": "Terminator and cascade net trigger restoration",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Nonconsumed tail included in remaining count; actual terminator case restores original trigger. Existing cascade net-edit cases cover typed net trigger.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner+registered runtime"
+				},
+				{
+					"id": "L15",
+					"aspect": "Empty literal output without replay tail",
+					"status": "behavior limit",
+					"basis": "actual-owner",
+					"detail": "Valid empty replacement arms receipt, but zero remaining skips restoration; physical Backspace acts on preceding text. No extra synthetic erasure.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Not attributed intentional; current guarded exception, obligation unresolved",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L16",
+					"aspect": "Empty output with replayed tail",
+					"status": "present",
+					"basis": "actual-owner",
+					"detail": "Physical Backspace removes Space; remaining count1 permits zero-erase trigger restoration.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner"
+				},
+				{
+					"id": "L17",
+					"aspect": "Typed key, arrow and modified Backspace retirement",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Any subsequent text retires Undo; arrow does so even with arrow reset disabled; CtrlBackspace does not invoke expansion restoration.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "One-character Backspace only; Ctrl/Alt/Super controls have independent navigation semantics",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: actual owner+registered runtime"
+				},
+				{
+					"id": "L18",
+					"aspect": "Original destination and private Undo authority",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Existing Main+injector+focusguard cases refuse successor field at logger/read/write/settle boundaries and retain private trigger classification.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: registered actual-owner runtime"
+				},
+				{
+					"id": "L19",
+					"aspect": "Pause and resume ownership",
+					"status": "guarded",
+					"basis": "actual-owner",
+					"detail": "Paused character callback emits no repeat. Real pause reset clears Undo and engine before later input; resume does not rearm old receipt.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source+actual owner"
+				},
+				{
+					"id": "L20",
+					"aspect": "Pointer/focus/capture/desync retirement",
+					"status": "guarded",
+					"basis": "source",
+					"detail": "on_click invalidates real guard; guard reset_text clears Undo. Focus/capture blocking and desync also retire state.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source"
+				},
+				{
+					"id": "L21",
+					"aspect": "Registry rebuild/source publication",
+					"status": "guarded within bounded source review",
+					"basis": "actual-owner",
+					"detail": "Catalogue publication requires acknowledged complete engine load before source state swap; source snapshots retained on refused parse. No asynchronous input-reentry claim made.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source+registered runtime"
+				},
+				{
+					"id": "L22",
+					"aspect": "Preview and repeat-correction visibility",
+					"status": "intentional distinction",
+					"basis": "source",
+					"detail": "Doubling excluded from candidate index; normal registry correction rows remain eligible. Pure repeat result never added as preview row.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Explicit maintainer policy, not missing preview parity",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source"
+				},
+				{
+					"id": "L23",
+					"aspect": "Key-token outputs and Undo availability",
+					"status": "intentional restriction",
+					"basis": "actual-owner",
+					"detail": "Parsed key outputs publish no Undo and reset text position because caret may move.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"intent": "Explicit source rationale unknown caret",
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: source+registered runtime"
+				},
+				{
+					"id": "L24",
+					"aspect": "Native application Ctrl+Z, grapheme/newline/selection receiving, latency and memory",
+					"status": "unmeasured",
+					"basis": "source",
+					"detail": "No live desktop/device/appNativeUndo, IME/deadkey, rich clipboard, end-to-end selection or performance/memory measurement. Scalar model is not native receiving.",
+					"evidence": [
+						{
+							"path": "linux/report.md",
+							"sha256": "26d876ac748e6bdb66f912fc85deae8e0140c9fb1ee6e25e066a3bc6cf231a5f"
+						},
+						{
+							"path": "linux/coverage.json",
+							"sha256": "ccf995649728e3910b377213edfffc1d216956aff57a3754507fd369ba320799"
+						}
+					],
+					"qualification": "Actual Main callbacks and production engine/prefix/loader/injector/focus guard; recording native keyboard scalar model, not application receiving or SQLite persistence. Submitted observation: coverage gap"
+				}
+			]
+		},
+		{
+			"role": "shared",
+			"report": "shared/report.md",
+			"evidence": [
+				{
+					"path": "shared/report.md",
+					"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+				},
+				{
+					"path": "shared/coverage.json",
+					"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+				},
+				{
+					"path": "validation/root-replay/receipts.json",
+					"sha256": "3a00425bd0cc05003afd747e6bec0688e5510014c463197463d16f4708216c21"
+				}
+			],
+			"ids": ["URS-001", "URS-002"],
+			"coverage": [
+				{
+					"aspect": "repeat setting/default/recommended",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S01",
+					"status": "present",
+					"detail": "One shared repeat toggle: neutral false, recommended true, all three OS declared; Linux evdev/uinput requirements.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "fallback entry and registry priority",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S02",
+					"status": "present-with-gap",
+					"detail": "Real matcher wins before fallback; Linux fallback post-commit context issue belongs URL001, not a second shared root.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "Unicode/custom terminators/unknown boundaries",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S03",
+					"status": "present",
+					"detail": "Shared word-character predicate, custom terminators, unknown leading boundary and Unicode scalars covered by 19 vectors; Windows source-only.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "physical magic-event carrier normalization",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": true,
+					"id": "S04",
+					"status": "intentional-difference",
+					"detail": "macOS accepts exact French NBSP/NNBSP carrier events via shared matcher; do not assume the Linux normalized buffer accepts identical raw payloads.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "consecutive repeat and correction context",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S05",
+					"status": "gap",
+					"detail": "Windows/Mac retain repeat context by source and Mac fixture; Linux actual Main final_result resets it after the first repeat.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "extension-bound correction catalogue",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S06",
+					"status": "present-with-gap",
+					"detail": "The same 14 shipped extension-bound correction rows exist; Linux caller state retirement suppresses immediate post-repeat correction.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "intentional repeat preview exclusion",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": true,
+					"id": "S07",
+					"status": "intentional-difference",
+					"detail": "Maintainer explicitly excludes ubiquitous repeat doubling from preview; correction rules remain separate mappings.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "automatic Backspace restoration vs app Undo",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S08",
+					"status": "different",
+					"detail": "Linux alone has scoped automatic next-Backspace trigger receipt; Ctrl/Cmd+Z remains a separate app-native shortcut on all OS.",
+					"intent": "Observed scoped implementation difference; no product decision establishing intentional OS exclusivity was located.",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "restore eligibility/lifecycle/privacy/destination",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S09",
+					"status": "qualified",
+					"detail": "Linux immediate unmodified eligible literal nonempty-output restoration uses committed destination/privacy; native grapheme/text-field behavior unmeasured.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "public inventory declarations and generated scope",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S10",
+					"status": "gap",
+					"detail": "Audited generator has no independent behavioral input; supplementary metadata implementation addresses scope gap without fake setting.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "actual English dictionary exports",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S11",
+					"status": "gap",
+					"detail": "Actual JS import shows inventory header and legend undefined because mappings occur inside JSDoc; positive unrelated key resolves English.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				},
+				{
+					"aspect": "native receiving/performance/memory gaps",
+					"basis": "source",
+					"evidence": [
+						{
+							"path": "shared/report.md",
+							"sha256": "6816e320bb0b95c4092ae7cb146d8bf65b13ee58079f075762b27539367470f4"
+						},
+						{
+							"path": "shared/coverage.json",
+							"sha256": "e57adc65c1187d64330d6e7c8017b1d659f5518670342910ed8e22c29554a177"
+						}
+					],
+					"intentional_difference": false,
+					"id": "S12",
+					"status": "unmeasured",
+					"detail": "No native AHK/macOS desktop/evdev receiving, app Undo grouping, performance or memory sampling.",
+					"intent": "Explicit policy or scoped native mechanism only; see report for precise source references",
+					"qualification": "Authenticated pinned source plus actual JS dictionary import; registered common repeat decisions are not post-commit or native receiving proof. Submitted observation: actual-Lua/JS where explicitly stated in report; otherwise authenticated source"
+				}
+			]
+		}
+	]
+}

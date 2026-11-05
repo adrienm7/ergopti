@@ -1,0 +1,6 @@
+PASS package-argument-admission-deb
+PASS package-argument-admission-rpm
+PASS package-manual-recipe-literal-argv-deb
+PASS package-manual-recipe-literal-argv-rpm
+PASS package-argument-admission refused=12 real-valid-staging=2 manual-argv-replays=2
+

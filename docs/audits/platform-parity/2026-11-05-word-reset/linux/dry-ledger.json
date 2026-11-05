@@ -1,0 +1,34 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"last_new_root": "WRSL-001",
+	"submechanisms": [
+		"catalogue action missing notification",
+		"own tap arrow generic-owner override"
+	],
+	"pass_order": ["final-A", "final-B"],
+	"sweeps": [
+		{
+			"pass": "final-A",
+			"axes": [
+				"defaults/canonical publication/cache/refusal/scope",
+				"all bounded input routes and native action semantic owner",
+				"idle/control/emptyline/Backspace predicates",
+				"nextkey and exact predictor-context argument"
+			],
+			"new_distinct_roots": 0,
+			"receipt": "final-A-receipt.json"
+		},
+		{
+			"pass": "final-B",
+			"axes": [
+				"native writerACK vs semantic publication",
+				"all bounded native/physical/tap origins",
+				"pause/focus/Tab/click privacyoverride",
+				"terminal/multiline policy and discarded hypotheses",
+				"priorroot deduplication and coveragegaps"
+			],
+			"new_distinct_roots": 0,
+			"receipt": "final-B-receipt.json"
+		}
+	]
+}

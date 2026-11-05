@@ -4070,5 +4070,13 @@
 	"platform_reason.action_mirroring_is_the_systems_projection_menu": "Sin interruptor en Linux: GNOME y KDE eligen Duplicar en su propio selector de pantallas Super+P; asigne esa tecla como combinación de teclas.",
 	"platform_reason.action_sticky_keys_are_the_systems": "Este sistema tiene Teclas especiales en sus ajustes de accesibilidad, que hacen que cada modificador actúe una sola vez; actívelas allí.",
 	"platform_reason.action_take_note_uses_notepad": "Solo Windows: esta acción abre el archivo de notas del día en el Bloc de notas, el editor que trae todo Windows. macOS tiene su propia Nota rápida (Fn+Q) y Linux no tiene un editor que traigan todos los escritorios.",
-	"platform_reason.action_text_recognition_is_live_text_on_macos": "En macOS, Texto en vivo lee el texto de cualquier captura o imagen: tome una con la acción equivalente y luego seleccione su texto."
+	"platform_reason.action_text_recognition_is_live_text_on_macos": "En macOS, Texto en vivo lee el texto de cualquier captura o imagen: tome una con la acción equivalente y luego seleccione su texto.",
+	"inventory.behavior.backspace_restore": "Restaurar una expansión con Retroceso",
+	"inventory.behavior.repeat_condition": "Repite un carácter dentro de una palabra si no coincide ninguna expansión y está activada la repetición con la tecla mágica.",
+	"inventory.behavior.repeat_linux": "Existe la repetición con la tecla mágica, pero las repeticiones consecutivas pierden actualmente su contexto tras la primera expansión. También se ven afectadas las correcciones que siguen a una repetición.",
+	"inventory.behavior.backspace_linux": "Un Retroceso inmediato sin modificadores puede restaurar una expansión de texto simple apta; el comportamiento en campos nativos sigue sin verificarse.",
+	"inventory.behavior.backspace_other": "Retroceso no restaura automáticamente el activador; Deshacer en la aplicación es una función distinta.",
+	"inventory.behavior.repeat_activation_window": "Ventana de activación de la repetición con la tecla mágica",
+	"inventory.behavior.repeat_window_untimed": "La repetición de respaldo no tiene una ventana de activación propia; el reinicio de palabra por inactividad es independiente.",
+	"inventory.behavior.repeat_window_macos": "Usa la ventana efectiva de la tecla mágica, incluidas las reglas de tiempo de los modificadores; cero desactiva esta ventana. El reinicio de palabra por inactividad es independiente."
 }

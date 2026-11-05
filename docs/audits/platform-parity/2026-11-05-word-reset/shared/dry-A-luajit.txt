@@ -1,0 +1,1 @@
+{"checks":1388,"context_vectors":13,"idle_vectors":7,"native_receiving":false,"policy_scenarios":208,"private_vectors":9,"result":"pass","scope":"actual shared Engine, Linux WordReset/Engine/AIContext/Settings cache restore; logger port only"}

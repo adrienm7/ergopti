@@ -1,0 +1,120 @@
+{
+	"created_utc": "2026-11-05T16:36:12.415610+00:00",
+	"aggregate_status": "not_passed",
+	"full_verify": {
+		"evidence": "full-verify-before-final-metadata.txt",
+		"qualification": "Original aggregate run before final English dictionary/memory/timing-provenance edits; not a final aggregate pass.",
+		"selected_js_checks": 572,
+		"failed_js_checks": 2,
+		"timeouts": [
+			{
+				"check": "App Cloner generated literals survive hostile values",
+				"primitive": "spawnSync Python physical CLI fixture",
+				"failure": "ETIMEDOUT"
+			},
+			{
+				"check": "managed Ollama portable admission and operation retirement",
+				"primitive": "spawnSync independent native-http-clock receiver controls",
+				"failure": "ETIMEDOUT"
+			}
+		],
+		"unexecuted_native_ahk_cases": 1,
+		"native_archive_admission": "also refused prerequisites in this aggregate run; retained explicitly",
+		"format_gate": {
+			"outcome": "failed_in_original_aggregate",
+			"files": [
+				"docs/audits/platform-parity/2026-11-05-word-reset/validation/custody-review.md",
+				"docs/audits/platform-parity/2026-11-05-word-reset/validation/scan.json"
+			],
+			"followup": "Both files subsequently formatted with the repository pinned Prettier; aggregate run is not rewritten."
+		}
+	},
+	"isolated_reruns": {
+		"evidence": "isolated-rerun-receipts.json",
+		"qualification": "Exact App Cloner and managed Ollama commands subsequently returned exit0 in isolation; this does not replace a full aggregate rerun. No deadlines/thresholds/assertions changed.",
+		"commands": [
+			{
+				"command": ["npm", "run", "test:app-cloner-generated-literals"],
+				"exit_code": 0
+			},
+			{
+				"command": ["node", "tools/test/test-managed-ollama-protocol.cjs"],
+				"exit_code": 0
+			}
+		]
+	},
+	"native_archive": {
+		"evidence": "native-archive-qualified.txt",
+		"result": "native-archive-qualified-result.json",
+		"environment": "native-archive-qualified-environment.json",
+		"actual_cases": 3,
+		"checks": 15,
+		"skipped": 0,
+		"exit_code": 0,
+		"qualification": "Actual Linux native archive pipeline over the earlier frozen staged snapshot after supplying genuine native prerequisites; precedes late metadata/documentation edits. Not physical keyboard/editor receiving. Earlier admission refusal remains retained.",
+		"final_source_rerun": false
+	},
+	"audit_runtime_limits": [
+		"Windows audit controls remain authenticated source/lexical relationships; no genuine AHK/editor execution.",
+		"Lua production owners execute over controlled immediate native ports; no physical desktop/input/editor receiving is certified.",
+		"No whole-repository exhaustiveness, aggregate green, G4 latency, or measured memory-growth assertion."
+	],
+	"retained_files": [
+		{
+			"path": "app-cloner-isolated-rerun.txt",
+			"sha256": "c696459fa730d38dcfe9790cf5c8fb5046a62b0c0e144176502ee6c395605034"
+		},
+		{
+			"path": "final-targeted-receipts.json",
+			"sha256": "ae47b88ce5467ee9403a99728e5ec8f81860bfc6ebfaacbe1114cf57b863b526"
+		},
+		{
+			"path": "full-verify-before-final-metadata.txt",
+			"sha256": "29ba66509c28ee0980b43211c5f022d58033010a5b7cdce66fd227e48615cf9e"
+		},
+		{
+			"path": "isolated-rerun-receipts.json",
+			"sha256": "050c23ab2143a77268efc0a20956ad4169f9ec5cdb52808eea4faabcdeb24d3f"
+		},
+		{
+			"path": "native-archive-first-admission.txt",
+			"sha256": "97ac467d746ac0799cfac19e56f3d6853033c2189580b6eb4dda7b69990b40be"
+		},
+		{
+			"path": "native-archive-first-result.json",
+			"sha256": "ec3db42d8aa27f9c1133406d69a247d6394e8662b4118c05d64192e651cd9452"
+		},
+		{
+			"path": "native-archive-qualified-environment.json",
+			"sha256": "903d51e6fe7e611b52e05605cd5b781ca340247d51ce79d411e3b94de0de6d1c"
+		},
+		{
+			"path": "native-archive-qualified-result.json",
+			"sha256": "9183482fa5df57150560a258939415c210d8aff11948381a1f099d970f6be1c4"
+		},
+		{
+			"path": "native-archive-qualified.txt",
+			"sha256": "b0bedc4cbcade3a39f1de57c43fb90812b539734ea31facb5f6b772fed1e0edb"
+		},
+		{
+			"path": "ollama-protocol-isolated-rerun.txt",
+			"sha256": "28671492ae262a3a24181185bb30677a13d04a65e245751c22432124768c5dce"
+		},
+		{
+			"path": "site-build-tail.txt",
+			"sha256": "014aaa015d469b8ca6119d0810e75381051f05267e0d74e392799f06e8c59d0e"
+		}
+	],
+	"final_targeted": {
+		"evidence": "final-targeted-receipts.json",
+		"commands": 7,
+		"exit_code": 0,
+		"qualification": "Seven selected gates after final production changes; not an aggregate test pass."
+	},
+	"production_site_build": {
+		"command": ["npm", "run", "build"],
+		"exit_code": 0,
+		"evidence": "site-build-tail.txt",
+		"qualification": "Root observed the complete production build exit0; retained compact real terminal tail includes static output and completed compression. Full stdout remains in original root scratch evidence."
+	}
+}

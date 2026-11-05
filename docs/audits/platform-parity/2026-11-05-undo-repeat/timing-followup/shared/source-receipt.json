@@ -1,0 +1,32 @@
+{
+	"audited_sha": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"basis": "source comparison plus actual shared Lua helpers; no native receiving",
+	"sources": {
+		"static/ergopti_plus/macos/modules/keymap/init.lua": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+		"static/ergopti_plus/macos/modules/keymap/state.lua": "e565599088ffc788cdd93b8133b013c931183dde93690d0d8d551d29beb9897e",
+		"static/ergopti_plus/macos/modules/hotstrings/hotstrings_config.lua": "e1b453d1e1cbdb0d1b1c2e61dad0769c3cc5d8b7d73c9980e4136092592c9d2a",
+		"static/ergopti_plus/macos/ui/menu/menu_state.lua": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+		"static/ergopti_plus/_shared/modules/timings/constants.toml": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+		"static/ergopti_plus/_shared/lua/hotstrings/delay_resolver.lua": "37e8073e2434d343a881d5201b1a3890da076802d11da4357e08b13c55e07f7a",
+		"static/ergopti_plus/_shared/lua/hotstring_engine/init.lua": "be675a01bcdd3d4dfbd55b2c061ebca82c160f82f7fd8a6bc2f1c0fe91e2a0de",
+		"static/ergopti_plus/_shared/modules/features/manifest.toml": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+		"static/ergopti_plus/_shared/modules/hotstrings/magickey.toml": "440f5c11c53e8f9b26b46b660d54e00bd0e80ae28a9344c43a59e85b3c32bc26",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+		"static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+		"static/ergopti_plus/linux/ergopti_hotstrings.lua": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+		"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua": "b479068f12b908edd9034442313848c7bd4363031141e07ee9c32418d8a35d13",
+		"static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua": "30d9710fe4eead073f4682f9375a5f4091d7bbda64ec0e8e68af4f4265e6c4f3",
+		"docs/memory/text-input-and-config.md": "4bacef0f3b010cc89eb5e85c4802b6cc75498f1b5729774af5c70b4c26a230cf",
+		"docs/memory/maintainer-decisions.md": "20f028ed75ea62d31398e02a648f27db35782053b5b75577410ffb75355674a5",
+		"static/ergopti_plus/_shared/tests/corpus/hotstrings/repeat_key_vectors.json": "e7a777c6c3390aba9392d2077c964343405811e9c9001554bd3fbe93347358a0",
+		"static/ergopti_plus/macos/modules/keymap/expander.lua": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887"
+	},
+	"repeat_timing_intent": "unresolved across OS",
+	"source_claims": {
+		"windows": "ungated transient repeat; expired registered winner masks fallback before timing preflight",
+		"macos": "repeat uses STAR_TRIGGER times complex multiplier; true validated star mapping intentionally bypasses regular gate",
+		"linux": "repeat constructed after expired static winner removed, with no repeat gate"
+	},
+	"helper_assertions_per_runtime": 21
+}

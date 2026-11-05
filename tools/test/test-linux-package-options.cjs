@@ -36,6 +36,11 @@ function run(script, args = []) {
 const built = run('build-linux-driver.sh');
 const stagingArgs = (format) => [`--skip-${format}`];
 assert.equal(built.status, 0, built.stderr || built.stdout || built.error?.message);
+assert.equal(
+	fs.existsSync(path.join(BUILD, '_shared/modules/features/behaviors.json')),
+	false,
+	'the shared review catalogue belongs to website generation, not the Linux runtime bundle'
+);
 // Both packagers carry the AppImage's private runtime; its native content is
 // the oldest-LTS stager's to prove, so an existence fixture stands in here.
 stageAppDir(BUILD);

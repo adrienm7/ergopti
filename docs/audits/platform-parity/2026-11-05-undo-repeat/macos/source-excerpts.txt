@@ -1,0 +1,328 @@
+static/ergopti_plus/macos/modules/keymap/expander.lua [1276-1350]
+1276: --- Fires the magic-key "repeat last character" feature when the user types
+1277: --- the trigger char twice: the first occurrence of the trigger is replaced by
+1278: --- the character that immediately preceded it.
+1279: ---
+1280: --- Example: the user types "a★" → "aa".
+1281: ---
+1282: --- @param chars string The latest typed character(s) (potential magic key).
+1283: --- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+1284: --- @return boolean True when the repeat fired.
+1285: function M.try_repeat_feature(chars, is_ignored)
+1286: 	if not require_state("try_repeat_feature") then return false end
+1287: 	if not _state.is_repeat_feature_enabled() then return false end
+1288: 	if not Terminators.matches_magic_event(chars, _state.magic_key) then return false end
+1289: 
+1290: 	local char_len = text_utils.utf8_len(chars)
+1291: 	local buf_len  = text_utils.utf8_len(_state.buffer)
+1292: 	if buf_len <= char_len then return false end
+1293: 
+1294: 	-- Find the offset of the magic-key in the buffer and isolate the text before it.
+1295: 	local ok_magic, magic_offset = pcall(utf8.offset, _state.buffer, -char_len)
+1296: 	if not ok_magic then magic_offset = nil end
+1297: 	if not magic_offset then
+1298: 		Logger.warn(LOG, "try_repeat_feature: utf8.offset returned nil — skipping.")
+1299: 		return false
+1300: 	end
+1301: 	local before = _state.buffer:sub(1, magic_offset - 1)
+1302: 
+1303: 	-- Read the last character before the magic key.
+1304: 	local ok_last, last_char_offset = pcall(utf8.offset, before, -1)
+1305: 	if not ok_last then last_char_offset = nil end
+1306: 	if not last_char_offset then return false end
+1307: 	local last_char = before:sub(last_char_offset)
+1308: 
+1309: 	-- Refuse to repeat whitespace — repeating a space or newline is never useful.
+1310: 	if last_char == "" or last_char:match("^%s$") then return false end
+1311: 	-- Two magic keys in a row are a second trigger, not a repeat.
+1312: 	if last_char == _state.magic_key then return false end
+1313: 
+1314: 	-- Refuse to repeat the first letter of a word: the char before last_char
+1315: 	-- must itself be a non-whitespace letter. Without this guard "c★" would
+1316: 	-- fire at the start of a word (buffer = "c★"), where the user most likely
+1317: 	-- intended a text-expansion, not a repeat.
+1318: 	local before_last = last_char_offset > 1 and before:sub(1, last_char_offset - 1) or ""
+1319: 	local pred_offset
+1320: 	if before_last ~= "" then
+1321: 		local ok_pred, off_pred = pcall(utf8.offset, before_last, -1)
+1322: 		-- Malformed UTF-8 before the last char: treat predecessor as absent, block repeat
+1323: 		pred_offset = ok_pred and off_pred or nil
+1324: 	end
+1325: 	local pred_char   = pred_offset and before_last:sub(pred_offset) or ""
+1326: 	-- The shared word-character rule (Windows HSE_IsWordChar, Linux repeat_key)
+1327: 	-- on both characters: a digit or "_" counts, "(" or "-" does not.
+1328: 	if pred_char == "" or not text_utils.is_hotstring_word_char(pred_char)
+1329: 		or not text_utils.is_hotstring_word_char(last_char) then
+1330: 		return false
+1331: 	end
+1332: 	-- Minus any delimiter the user added: it ends a word, as on Windows.
+1333: 	if Terminators.is_terminator(pred_char) or Terminators.is_terminator(last_char) then return false end
+1334: 	-- The predecessor is the buffer's first character and its start is not known
+1335: 	-- to be a word start: it may be the tail of an older word.
+1336: 	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
+1337: 
+1338: 	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
+1339: 	local replaced = M.perform_text_replacement(
+1340: 		is_ignored and char_len or 0,
+1341: 		function() return km_utils.emit_text(last_char) end,
+1342: 		function() _state.buffer = next_buffer end,
+1343: 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
+1344: 	if replaced ~= true then return false end
+1345: 
+1346: 	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)
+1347: 	return true
+1348: end
+1349: 
+1350: 
+static/ergopti_plus/macos/modules/keymap/init.lua [1344-1365]
+1344: 					-- Both true star mappings and ordinary autos whose literal suffix
+1345: 					-- became the configured magic key commit through the auto emitter.
+1346: 					-- Its explicit match buffer avoids mutating shared state while the
+1347: 					-- physical NBSP/NNBSP payload is still needed by fallbacks/errors.
+1348: 					fired = Expander.try_auto_expand(
+1349: 						action.mapping, logical_char_len, false, logical_buffer)
+1350: 				end
+1351: 				if fired then return true end
+1352: 				-- A final no-op wins without an edit: returning immediately keeps it
+1353: 				-- masking the repeat fallback.
+1354: 				if action.is_noop and action.mapping.final_result then return false end
+1355: 			end
+1356: 		end
+1357: 
+1358: 		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
+1359: 		if (star_allowed == 0 or _tc_dt <= star_allowed)
+1360: 			and Expander.try_repeat_feature(chars, false) then
+1361: 			return true
+1362: 		end
+1363: 		return false
+1364: 	end
+1365: 
+static/ergopti_plus/macos/modules/keymap/init.lua [1680-1707]
+1680: 	-- classification may arm its off-tap AX refresh.
+1681: 	local now = hs.timer.secondsSinceEpoch()
+1682: 
+1683: 	local is_ignored, window_generation = km_utils.is_ignored_window(
+1684: 		CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
+1685: 	if type(window_generation) == "number"
+1686: 		and window_generation ~= _last_window_context_generation
+1687: 	then
+1688: 		_last_window_context_generation = window_generation
+1689: 		-- A focus/title transition severs every relationship between the rolling
+1690: 		-- buffer and the new cursor. Keep a held physical terminator untouched here:
+1691: 		-- replaying it after focus moved would inject the old app's key into the new.
+1692: 		invalidate_window_context()
+1693: 	end
+1694: 	if is_ignored ~= false then
+1695: 		return internal_loopback == true
+1696: 	end
+1697: 	local is_secure = km_utils.is_secure_field(now)
+1698: 	if is_secure ~= false then
+1699: 		return internal_loopback == true
+1700: 	end
+1701: 	if _window_context_reconcile_pending then
+1702: 		_window_context_reconcile_pending = false
+1703: 		arm_observed_context_reconcile(true)
+1704: 	end
+1705: 
+1706: 	local dt  = now - CoreState.last_key_time
+1707: 	_user_hotstring_elapsed = dt
+static/ergopti_plus/macos/modules/keymap/init.lua [1802-1865]
+1802: 	-- Cmd/Ctrl + Backspace / Forward Delete delete an unknown amount of text and
+1803: 	-- Cmd/Ctrl + Home/End/PgUp/PgDn jump somewhere unobserved: they keep the
+1804: 	-- unconditional reset to an unknown boundary. Every other chord (cut, paste,
+1805: 	-- undo, select-all, app shortcuts, …) follows hotstrings.shortcut_resets_word:
+1806: 	-- on, the next run starts a new word; off, the buffer and the word-start
+1807: 	-- state are left exactly as they were and the word continues. The prediction
+1808: 	-- side is the same either way: a shortcut still withdraws a visible
+1809: 	-- prediction.
+1810: 	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
+1811: 	-- the field: once a Backspace or a character replaces it the field is empty,
+1812: 	-- and a further Backspace deletes nothing (start_is_line_start).
+1813: 	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
+1814: 		if keyCode == Keycodes.BACKSPACE or UNOBSERVED_JUMP_KEYCODES[keyCode] then
+1815: 			CoreState.buffer = ""
+1816: 			CoreState.start_is_word_boundary = false
+1817: 			CoreState.start_is_line_start = false
+1818: 		elseif CoreState.shortcut_resets_word == true then
+1819: 			CoreState.buffer = ""
+1820: 			CoreState.start_is_word_boundary = true
+1821: 			CoreState.start_is_line_start = flags.cmd == true and not flags.ctrl and not flags.alt
+1822: 				and selects_whole_field(chars)
+1823: 		end
+1824: 		cancel_action_preview_recovery()
+1825: 		LLMBridge.check_nav_reset()
+1826: 		return false
+1827: 	end
+1828: 
+1829: 	-- 6. Handle Backspace.
+1830: 	if keyCode == Keycodes.BACKSPACE then
+1831: 		-- Option+Backspace deletes the previous word: the caret now sits where
+1832: 		-- that word began, so the next character starts a word. (Cmd and Ctrl
+1833: 		-- with Backspace were handled above, at an unknown position.)
+1834: 		if flags.alt then
+1835: 			CoreState.buffer = ""
+1836: 			CoreState.start_is_word_boundary = true
+1837: 			CoreState.start_is_line_start = false
+1838: 			cancel_action_preview_recovery()
+1839: 			LLMBridge.check_nav_reset()
+1840: 			return false
+1841: 		end
+1842: 		if #CoreState.buffer > 0 then
+1843: 			-- Remove the last UTF-8 character from the buffer safely.
+1844: 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
+1845: 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
+1846: 			-- The Backspace that erases the last character typed since the
+1847: 			-- buffer started puts the caret back where that typing began: the
+1848: 			-- next character starts a word, as on Windows and Linux.
+1849: 			if CoreState.buffer == "" then CoreState.start_is_word_boundary = true end
+1850: 			update_preview_with_action_recovery(CoreState.buffer)
+1851: 		elseif CoreState.start_is_line_start and CoreState.start_is_word_boundary then
+1852: 			-- The start of an empty line: the Backspace deleted nothing.
+1853: 			cancel_action_preview_recovery()
+1854: 		else
+1855: 			-- Backspace pressed against an already-empty buffer: the user
+1856: 			-- has just deleted a character that lived to the LEFT of where
+1857: 			-- the buffer ever started, into territory we never observed.
+1858: 			-- Flip the boundary flag so subsequent word-boundary-required
+1859: 			-- triggers refuse to fire until a real terminator is observed.
+1860: 			CoreState.start_is_word_boundary = false
+1861: 			CoreState.start_is_line_start = false
+1862: 			cancel_action_preview_recovery()
+1863: 		end
+1864: 		return false
+1865: 	end
+static/ergopti_plus/macos/modules/keymap/llm_bridge.lua [707-733]
+707: ---
+708: --- The AI context mirrors the hotstring buffer, which holds the replacement of
+709: --- a private (personal-information) expansion like any other text. That text
+710: --- must never reach a prompt, local or remote, so everything up to the last
+711: --- private expansion is withheld (the shared rule, see
+712: --- ContextBuffer.after_private; Linux clears its context object instead).
+713: --- @param text string The hotstring buffer.
+714: --- @return string visible
+715: local function ai_context_of(text)
+716: 	local visible, mark = ContextBuffer.after_private(text, _state.llm_private_mark or "")
+717: 	_state.llm_private_mark = mark
+718: 	return visible
+719: end
+720: 
+721: --- Declares that a private expansion just landed: the AI forgets the buffer.
+722: ---
+723: --- Called by the expander once the replacement is committed, with the buffer
+724: --- the engine now holds, so the secret (and the trigger, a fragment of it)
+725: --- stays out of every later prompt.
+726: --- @param buffer string The hotstring buffer after the private replacement.
+727: function M.mark_private_context(buffer)
+728: 	if not require_state("mark_private_context") then error("keymap LLM bridge is not initialised", 2) end
+729: 	if type(buffer) ~= "string" then error("private context buffer must be a string", 2) end
+730: 	_state.llm_private_mark = buffer
+731: 	_state.llm_buffer = ""
+732: 	Logger.debug(LOG, "Private expansion — AI typing context forgotten.")
+733: end
+static/ergopti_plus/macos/modules/keystats/init.lua [1450-1470]
+1450: --- unrecoverable from the metrics database or from a cross-device export.
+1451: local PRIVATE_PLACEHOLDER_CHAR = string.char(0xE2, 0x80, 0xA2) -- U+2022 BULLET
+1452: 
+1453: --- What is actually PERSISTED for one synthetic character.
+1454: ---
+1455: --- Pure and exported so the privacy invariant can be asserted directly: the
+1456: --- alternative is reloading the whole keystats to reach its private CoreState,
+1457: --- which drags the event tap, watchers and context tracker into the test run.
+1458: ---
+1459: --- Backspace markers are never redacted — they carry no content, and rewriting
+1460: --- them would desynchronise the deletion count the buffer replays.
+1461: --- @param char string       The character about to be recorded.
+1462: --- @param is_private boolean|nil  True for a private mapping's replacement.
+1463: --- @return string           The value to persist.
+1464: function M.recorded_char(char, is_private)
+1465: 	if is_private and char ~= "[BS]" then
+1466: 		return PRIVATE_PLACEHOLDER_CHAR
+1467: 	end
+1468: 	return char
+1469: end
+1470: 
+static/ergopti_plus/macos/modules/keystats/init.lua [1560-1600]
+1560: 
+1561: --- @param is_private boolean|nil When true, the content is replaced by a
+1562: ---        redacted placeholder in every persisted field. Physical echoes are
+1563: ---        excluded independently by immutable event provenance; this function
+1564: ---        records only the logical replacement.
+1565: function M.notify_synthetic(text, source_type, deletes, source_variant, physical_echo, is_private)
+1566: 	-- Expander notifies unconditionally, but an opt-in keystats that is currently
+1567: 	-- disabled or paused must not accumulate logical events or WPM samples for later.
+1568: 	if not M.may_persist() then return end
+1569: 	if text ~= nil and type(text) ~= "string" then
+1570: 		Logger.error(LOG, "notify_synthetic(): text must be a string or nil.")
+1571: 		return false
+1572: 	end
+1573: 	if deletes ~= nil and type(deletes) ~= "number" then
+1574: 		Logger.error(LOG, "notify_synthetic(): deletes must be a number or nil.")
+1575: 		return false
+1576: 	end
+1577: 
+1578: 	local timestamp_ms = hs.timer.absoluteTime() / 1000000
+1579: 	local operation = {
+1580: 		text = text or "",
+1581: 		source_type = source_type,
+1582: 		deletes = deletes and math.max(0, math.floor(deletes)) or 0,
+1583: 		is_private = is_private == true,
+1584: 		timestamp_ms = timestamp_ms,
+1585: 	}
+1586: 
+1587: 	-- `physical_echo` remains in the public signature for compatibility; immutable
+1588: 	-- provenance tags, not that payload, identify the later OS echoes.
+1589: 	if not LogManager.defer_flush_buffer() then
+1590: 		Logger.error(LOG, "notify_synthetic(): prior typing was not accepted by the outbox.")
+1591: 		return false
+1592: 	end
+1593: 	if operation.deletes > 0 or operation.text ~= "" then
+1594: 		local accepted = LogManager.defer_typing_builder(function()
+1595: 			return build_deferred_synthetic_snapshot(operation)
+1596: 		end)
+1597: 		if not accepted then
+1598: 			Logger.error(LOG, "notify_synthetic(): synthetic typing was not accepted by the outbox.")
+1599: 			return false
+1600: 		end
+static/ergopti_plus/macos/modules/keymap/registry_index.lua [220-247]
+220: 
+221: --- Returns true when the magic-key repeat engine is enabled.
+222: --- The repeat feature is now handled by the hotstring engine directly (not by a
+223: --- TOML section), so the gate is a standalone hs.settings key. Defaults to true
+224: --- when the setting has never been written (opt-out, not opt-in).
+225: --- @return boolean
+226: function M.is_repeat_feature_enabled()
+227: 	return _repeat_enabled
+228: end
+229: 
+230: --- Enable or disable the magic-key repeat engine and persist the choice.
+231: --- @param enabled boolean
+232: function M.set_repeat_feature_enabled(enabled)
+233: 	if type(enabled) ~= "boolean" then
+234: 		Logger.error(LOG, "Magic-key repeat state must be a boolean.")
+235: 		return false
+236: 	end
+237: 	Groups.note_registry_mutation()
+238: 	_repeat_enabled = enabled
+239: 	-- A user-facing feature toggle with no log line leaves the repeat engine's
+240: 	-- state unrecoverable from the logs, which is where every other setting's
+241: 	-- applied value can be read back.
+242: 	Logger.debug(LOG, "Magic-key repeat engine: %s.", enabled and "on" or "off")
+243: 	return true
+244: end
+245: 
+246: --- Builds the persistent settings key for one section.
+247: --- @param group_name string
+docs/memory/text-input-and-config.md [365-377]
+365: 
+366: ### project-the-bubble-never-offers-a-doubling
+367: 
+368: The maintainer ruled that no driver previews the magic key's doubling (the
+369: repeat fallback, `x★` → `xx`): it is available after almost every mid-word
+370: letter, so its row was constant noise. It still fires. Windows keeps it in
+371: `HSE_PreviewNextDecision`, so no lower candidate is promoted in its place, and
+372: `_PrefixCollectCandidates` withholds any decision whose Spec carries
+373: `IsRepeat`. macOS and Linux preview only registry mappings, and the doubling
+374: is an engine fallback outside the registry: never fold it into their preview.
+375: `repeat_corrections` entries (ê → u after a doubled letter) are not doublings.
+376: 
+377: ### project-the-windows-time-gate-times-every-observed-key

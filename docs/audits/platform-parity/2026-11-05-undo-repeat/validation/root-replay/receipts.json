@@ -1,0 +1,189 @@
+{
+	"source_head": "b17e47ed3bb92c106703d3e3482b3c2973f5bc1e",
+	"logname": "agent",
+	"qualification": "Actual Lua owners over recorded native ports; Windows lexical only with runtime equality required and explicitly historical documentation read from pinned Git blobs; shared source probe reads pinned Git blobs; shared timing programs execute actual shared owners; metadata controls are not driver tests.",
+	"processes": [
+		{
+			"name": "windows-source",
+			"program": "windows/source-contract.py",
+			"program_sha256": "1bc40d4452ac2fbac74c990b24815c3de7a51b439f360d043de19fe4e74162c5",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/windows/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-public",
+			"program": "macos/public-repeat.lua",
+			"program_sha256": "b68f4e664b8c71324eea3aaf2fcad2e09abc4de54c5ab55861c236100d347fdc",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/macos/public-repeat.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "3f6df2d57404f6ee325c016e48f72a4de3d0c2580e56d992d403035b1ceb84fd",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "macos-request",
+			"program": "macos/private-repeat.lua",
+			"program_sha256": "0aa7f4177d9883b74da8a53761e8eca38a8d939d1228782ee5728f269d312018",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/macos/private-repeat.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "068004eff13f614d5ad0b85aa78ff6b68b1dc41b997e5422354ca7e55b1a8711",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-luajit",
+			"program": "linux/owner-probe.lua",
+			"program_sha256": "a62dfd621d343a454718823d705f6d3ba968c6edd2cf150dfa25811cd23ddeb9",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/linux/owner-probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "a36d54487096941cbccb3f488dfe19b2cc7b067c6b5688be420210631181a2f5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "linux-lua54",
+			"program": "linux/owner-probe.lua",
+			"program_sha256": "a62dfd621d343a454718823d705f6d3ba968c6edd2cf150dfa25811cd23ddeb9",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/linux/owner-probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "a36d54487096941cbccb3f488dfe19b2cc7b067c6b5688be420210631181a2f5",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "shared-pinned-source",
+			"program": "shared/source_probe.py",
+			"program_sha256": "c70ed681a5f241f67e0aa553ef051b9a8d090aad340a0effe34a4157c0317f1a",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/shared/source_probe.py",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "3a4f7b6602fbb970fd9abf31f6941ad0bf5652acbde09e5de81c33d2b602f9a0",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "metadata-controls",
+			"program": "check_project.py",
+			"program_sha256": "19aa74e36d2b46194558b6e93b4180d1efd4c885f641e986e2c0e4f9aa567133",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/check_project.py",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "b4adb90622bb6ef54a0b44c51b25e7354d30d4f1b85d5314fa1a9ba1aa17619b",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-windows-source",
+			"program": "timing-followup/windows/source-contract.py",
+			"program_sha256": "d95193f9268545f400face83487fa1f4e642af46bdf857ce3950470a2ecf4ab9",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/windows/source-contract.py",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "93201be87d695e2b32a1e3f04b329128585637ccf9b0f10751592659bc4b0f4d",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-macos-public",
+			"program": "timing-followup/macos/public-timing.lua",
+			"program_sha256": "19493d24ec8d630a4831cd6b32501e87a5ff98b19cf15b75c91a3dddfd16cd88",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/macos/public-timing.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "a4125bb01d828a45701949e193ff7f726538736a63e82e987810707399144b13",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-linux-luajit",
+			"program": "timing-followup/linux/probe.lua",
+			"program_sha256": "4b1aafe3ddb40616c26ec9591ecdf506b20c88bc3fd47860d6ade710436030a8",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/linux/probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-linux-lua54",
+			"program": "timing-followup/linux/probe.lua",
+			"program_sha256": "4b1aafe3ddb40616c26ec9591ecdf506b20c88bc3fd47860d6ade710436030a8",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/linux/probe.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "8a2f00f89c9309056eae77abbfffb6bc7d74384d6f2b04631749245f36c6e523",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-shared-luajit",
+			"program": "timing-followup/shared/timing-model.lua",
+			"program_sha256": "bf3f00862bb53020a9e539b77045ace868f3f4e3b563883d489c7787f80cd5ef",
+			"command": [
+				"luajit",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/shared/timing-model.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "c8b8d3f160ab8e2e29b25bc4eb403cda9fed6211d9e382dc7aebc35a2a45e5f3",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"name": "timing-shared-lua54",
+			"program": "timing-followup/shared/timing-model.lua",
+			"program_sha256": "bf3f00862bb53020a9e539b77045ace868f3f4e3b563883d489c7787f80cd5ef",
+			"command": [
+				"lua",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-undo-repeat/timing-followup/shared/timing-model.lua",
+				"/workspace/ergopti"
+			],
+			"cwd": "/workspace/ergopti",
+			"exit_code": 0,
+			"stdout_sha256": "c8b8d3f160ab8e2e29b25bc4eb403cda9fed6211d9e382dc7aebc35a2a45e5f3",
+			"stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		}
+	]
+}

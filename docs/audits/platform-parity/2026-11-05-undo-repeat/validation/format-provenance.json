@@ -1,0 +1,58 @@
+{
+	"qualification": "Worker hashes describe original submission bytes; pinned Prettier changes JSON presentation only. Original bytes are retained as .txt; current canonical evidence hashes use formatted archive bytes. No worker receipt was rewritten.",
+	"rows": [
+		{
+			"worker_receipt": "windows/dry-sweeps.json",
+			"worker_pointer": "/sweeps/0",
+			"worker_expected_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"original_bytes": "validation/original-submissions/windows/dry-A.json.txt",
+			"original_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"formatted_archive": "windows/dry-A.json",
+			"formatted_sha256": "ad00f1f0592425397a6ec4ed9a5082849154591f372428318a6fb75c57664dac",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "windows/dry-sweeps.json",
+			"worker_pointer": "/sweeps/1",
+			"worker_expected_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"original_bytes": "validation/original-submissions/windows/dry-B.json.txt",
+			"original_sha256": "59e361daefa6f29ce89c4bc0533e0fd14b590dac2eafde8269225088c881de03",
+			"formatted_archive": "windows/dry-B.json",
+			"formatted_sha256": "ad00f1f0592425397a6ec4ed9a5082849154591f372428318a6fb75c57664dac",
+			"json_values_equal": true
+		},
+		{
+			"worker_receipt": "timing-followup/shared/handoff.json",
+			"worker_pointer": "/files/0",
+			"worker_expected_sha256": "0c6fde34b37572a92bc2749fdc8448d38ac860dee4ffba4318dd93872308a6ca",
+			"original_bytes": "validation/original-submissions/timing-followup/shared/source-receipt.json.txt",
+			"original_sha256": "0c6fde34b37572a92bc2749fdc8448d38ac860dee4ffba4318dd93872308a6ca",
+			"formatted_archive": "timing-followup/shared/source-receipt.json",
+			"formatted_sha256": "a139d46ad75dcfe1cb36dc9a50c27f0babe39d295904200a1c0ae4b6f546289c",
+			"json_values_equal": true
+		}
+	],
+	"root_followup_json_formatting": [
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-files.json.txt",
+			"original_sha256": "9d8bec398d85edb8743fac7acf048e69d307fd4660b9fa6cb2f8766fa413434f",
+			"formatted_archive": "timing-followup/shared/implementation-followup-files.json",
+			"formatted_sha256": "705b1e7c3ebdd7eb424f1484e97d628e75b3493d6a45b6b8f8019d9e9ca7453a",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-json-diff.json.txt",
+			"original_sha256": "822b12dba34ba38806ba6a51556504baa00c25fe5f6d8ed6f88584c2ca588fcc",
+			"formatted_archive": "timing-followup/shared/implementation-followup-json-diff.json",
+			"formatted_sha256": "d317273f9ac5cd4168d198e450c89304fb8aefb4cc7ef269bb81a1625e17f2cc",
+			"json_values_equal": true
+		},
+		{
+			"original_bytes": "validation/original-submissions/timing-followup/shared/implementation-followup-validation.json.txt",
+			"original_sha256": "c58c03099fd0c1aca124bdd278051e2afb205f80ee23b88143a891a3918761c8",
+			"formatted_archive": "timing-followup/shared/implementation-followup-validation.json",
+			"formatted_sha256": "f8f9109d35d619b51585318968c92c831bb82660b00c9ffd534ff6d27b60c8da",
+			"json_values_equal": true
+		}
+	]
+}

@@ -1,0 +1,55 @@
+
+=== llm settings: where the default comes from ===
+  ok   takes every consumed generation value from the shared manifest
+  ok   stores nothing while both are at their shipped values
+
+=== llm settings: changing them ===
+  ok   stores a value the user chose
+  ok   reads a stored value back
+  ok   keeps word limits coherent and persists automatic diversity
+  ok   refuses a fractional context length
+  ok   clears the entry when it returns to the shipped value
+  ok   keeps the durable value active when a write or delete fails
+
+=== llm settings: the bounds ===
+  ok   refuses a value outside the declared range
+  ok   ignores a stored value outside the range rather than clipping it
+  ok   offers only presets inside the range
+
+=== LLM reset-on-navigation check ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   (ai-context) is a Linux row, checked by default, that persists a change sparsely
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   (ai-context) is greyed and refuses a click while the AI is off
+
+=== LLM shared automatic temperature control ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   replays the bool by prediction-count matrix through real owners (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   uses the changed shared label and order before numeric providers (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   refuses a delayed callback after the real count owner changes (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   refuses stale callbacks after pause or the live AI gate closes (shared-auto-raise)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+  ok   preserves live and durable values with no optimistic redraw on writer refusal (shared-auto-raise)
+AUDIT_RESULTS={"failed":0,"failures":{},"passed":18}

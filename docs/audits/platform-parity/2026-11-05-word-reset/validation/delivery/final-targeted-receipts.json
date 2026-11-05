@@ -1,0 +1,30 @@
+[
+	{
+		"program": "test-linux-feature-parity.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-locale-catalogue-complete.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-generator-output-ownership.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-features-manifest-no-drift.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-windows-bundle-manifest.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-macos-bundle-payload.cjs",
+		"exit_code": 0
+	},
+	{
+		"program": "test-linux-package-options.cjs",
+		"exit_code": 0
+	}
+]
