@@ -1485,8 +1485,11 @@ function M.refresh_capabilities(entry)
 						provider_id, tostring(type(result) == "table" and result.status or nil))
 					return finish(nil)
 				end
-				local decoded_ok, decoded = pcall(Json.decode, type(result.body) == "string" and result.body or "")
-				local records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil)
+				local decoded_ok, decoded = pcall(Json.decode_lossless, type(result.body) == "string" and result.body or "")
+				local list = type(decoded) == "table" and decoded[ModelCapabilities.LISTINGS[listing]] or nil
+				local records, reason
+				if Json.is_null(list) then reason = "unreadable"
+				else records, reason = ModelCapabilities.parse(listing, decoded_ok and decoded or nil) end
 				if not records then
 					Logger.warn(LOG, "Capability listing of provider %s could not be read (%s).", provider_id, tostring(reason))
 					return finish(nil)
