@@ -114,6 +114,34 @@ _HNRC_Worker() {
 	return false
 }
 
+_HNRC_DestroyProc(Hwnd, Message, WParam, LParam, Id, Data) {
+	global _HNRC, _HCWGui, _HCWWidgets
+	_HNRC.DestroyActive += 1
+	try {
+		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
+		if !_HNRC.Running || _HNRC.DestroySeen || Hwnd != _HNRC.AHwnd || Message != 0x2
+			return Result
+		_HNRC.DestroySeen := true
+		if _HNRC.Mode == "destroy-reopen" {
+			_HNRC.ReopenCalls += 1
+			try {
+				OpenHotstringsConfigWindow()
+				_HNRC.B := _HCWGui
+				if _HNRC.B is Gui {
+					_HNRC.BHwnd := _HNRC.B.Hwnd, _HNRC.BWidgets := _HCWWidgets
+					_HNRC.BeforeB := _HNRC.B != _HNRC.A && _HNRC_Visible(_HNRC.BHwnd)
+						&& IsObject(_HCWWidgets) && _HCWWidgets.Gui == _HNRC.B
+				}
+			} catch Any as Failure
+				_HNRC.ReopenFailure := Failure
+		}
+		return Result
+	} catch Any as Failure {
+		_HNRC_Fail(Failure)
+		return 0
+	} finally _HNRC.DestroyActive -= 1
+}
+
 _HNRC_Run() {
 	global _HNRC, ConfigurationFile, ScriptInformation, _VendorDir, _ExtensionsDir
 	global _HCWGui, _HCWWidgets, _HCW_PendingNumericWrites, _HCW_NumericDrainActive
@@ -151,6 +179,13 @@ _HNRC_Run() {
 		}
 	}
 	_HNRC_Require(Found == 1, "The actual native reset button must be uniquely identified")
+	if InStr(_HNRC.Mode, "destroy-") == 1 {
+		_HNRC_Require(WinGetPID("ahk_id " . _HNRC.AHwnd) == ProcessExist(), "The native destruction witness must target this exact child")
+		_HNRC.DestroyProc := CallbackCreate(_HNRC_DestroyProc, , 6)
+		_HNRC_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", _HNRC.AHwnd, "Ptr", _HNRC.DestroyProc,
+			"UPtr", 0x484E5244, "UPtr", 0, "Int"), "The actual current GUI must admit its exact destruction witness")
+		_HNRC.DestroyInstalled := true
+	}
 	_HNRC.Button.OnEvent("Click", _HNRC_Entry, -1)
 	_HNRC.Running := true
 	Result := RebuildHotstringsLive(_HNRC_Worker)
@@ -159,12 +194,13 @@ _HNRC_Run() {
 		throw _HNRC.Failure
 	_HNRC_Require((Result is Integer) && Result == false && !_HSLR_Active && !HSE_RebuildInProgress,
 		"The real coordinator must finish with the external worker refused and its ownership released")
-	_HNRC_Require(_HNRC.ClickSends == 1 && _HNRC.ClickEntries == 1 && _HNRC.ClearLogs > 0 && _HNRC.Errors.Length == 0,
+	_HNRC_Require(_HNRC.ClickSends == 1 && _HNRC.ClickEntries == 1 && _HNRC.ClearLogs > 0
+		&& (InStr(_HNRC.Mode, "destroy-") == 1 || _HNRC.Errors.Length == 0),
 		"The native event and genuine durable clear logs must be reached without contained prerequisites")
 	Final := TOML_ParseDocument(FSReadUtf8Exact(_HNRC.OverridePath))
 	FinalHash := CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath))
 	Cleared := !Final.Has("magickey") || !Final["magickey"].Has("delay_offset")
-	AfterB := _HNRC.Mode == "reopen" && _HCWGui == _HNRC.B && _HNRC_Visible(_HNRC.BHwnd)
+	AfterB := (_HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-reopen") && _HCWGui == _HNRC.B && _HNRC_Visible(_HNRC.BHwnd)
 		&& IsObject(_HCWWidgets) && _HCWWidgets.Gui == _HNRC.B
 		&& DllCall("User32\IsWindow", "Ptr", _HCWWidgets.DelayEdit.Hwnd, "Int")
 	FileAppend("RECEIPT hcw-native-reset-owner mode=" . _HNRC.Mode . " click_sends=" . _HNRC.ClickSends
@@ -176,7 +212,23 @@ _HNRC_Run() {
 		. " registry_worker=Refused tray_render=Absent browser=Absent`n", "*", "UTF-8-RAW")
 	_HNRC_Require(Cleared && FinalHash != _HNRC.SeedHash && !IsObject(_ConfigWriteLeaseCurrent(_HNRC.OverridePath))
 		&& !_ConfigPublicationHasRecoveryDebt(_HNRC.OverridePath), "The real reset must durably clear the source and release its exact writer")
-	if _HNRC.Mode == "current" {
+	if InStr(_HNRC.Mode, "destroy-") == 1 {
+		FileAppend("OBSERVATION hcw-native-destroy mode=" . _HNRC.Mode . " destroy_seen=" . _HNRC.DestroySeen
+			. " reopen_calls=" . _HNRC.ReopenCalls . " before_b=" . _HNRC.BeforeB . " after_b=" . AfterB
+			. " reopen_threw=" . IsObject(_HNRC.ReopenFailure) . " errors=" . _HNRC.Errors.Length
+			. " old_alive=" . DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int") . "`n", "*", "UTF-8-RAW")
+		if IsObject(_HNRC.ReopenFailure)
+			FileAppend("DIAGNOSTIC hcw-native-destroy reopen_type=" . Type(_HNRC.ReopenFailure)
+				. " reopen_message=" . JsonStringLiteral(_HNRC.ReopenFailure.Message) . "`n", "*", "UTF-8-RAW")
+		_HNRC_Require(_HNRC.DestroySeen && _HNRC.Errors.Length == 0 && !DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int"),
+			"The actual reset completion must destroy A without technical errors")
+		if _HNRC.Mode == "destroy-reopen"
+			_HNRC_Require(_HNRC.ReopenCalls == 1 && !IsObject(_HNRC.ReopenFailure) && _HNRC.BeforeB && AfterB,
+				"The actual public reopen during native Destroy must create and preserve usable B and its widgets")
+		else
+			_HNRC_Require(_HCWGui == 0 && _HCWWidgets == 0 && _HNRC.ReopenCalls == 0,
+				"The unopposed reset destruction must still retire the exact native window and controls")
+	} else if _HNRC.Mode == "current" {
 		_HNRC_Require(_HSLR_RequestedGeneration >= 2 && _HNRC.WorkerCalls >= 2,
 			"The affirmative current reset must really coalesce its default rebuild request")
 		_HNRC_Require(_HCWGui == 0 && _HCWWidgets == 0 && !DllCall("User32\IsWindow", "Ptr", _HNRC.AHwnd, "Int"),
@@ -192,8 +244,9 @@ _HNRC_Main() {
 	global _HNRC
 	_HNRC := {Mode: A_Args[1], A: 0, AHwnd: 0, B: 0, BHwnd: 0, BWidgets: 0, Button: 0,
 		Running: false, ClickEntries: 0, ClickSends: 0, WorkerCalls: 0, ClearLogs: 0, ActorCalls: 0,
-		ActorArmed: false, ActorDone: false, AClosed: false, BeforeB: false, Errors: [], Failure: 0}
-	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen"), "The private mode and root must be explicit")
+		ActorArmed: false, ActorDone: false, AClosed: false, BeforeB: false, Errors: [], Failure: 0,
+		DestroyProc: 0, DestroyInstalled: false, DestroyActive: 0, DestroySeen: false, ReopenCalls: 0, ReopenFailure: 0}
+	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen"), "The private mode and root must be explicit")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_HNRC_OnError)
 	LoggerSetTestSink(_HNRC_Log)
@@ -209,6 +262,15 @@ _HNRC_Main() {
 		Primary := IsObject(_HNRC.Failure) ? _HNRC.Failure : Failure
 	} finally {
 		_HNRC.Running := false
+		Removed := !_HNRC.DestroyInstalled || !DllCall("IsWindow", "Ptr", _HNRC.AHwnd, "Int")
+		if !Removed
+			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", _HNRC.AHwnd, "Ptr", _HNRC.DestroyProc, "UPtr", 0x484E5244, "Int")
+		if Removed && !_HNRC.DestroyActive {
+			if _HNRC.DestroyProc
+				CallbackFree(_HNRC.DestroyProc)
+			_HNRC.DestroyProc := 0
+		} else if !IsObject(Cleanup)
+			Cleanup := Error("The exact native destruction callback must quiesce before callback memory is released")
 		for Callback in [_HNRC_Click, _HNRC_Actor] {
 			try SetTimer(Callback, 0)
 			catch Any as Failure {

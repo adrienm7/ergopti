@@ -81,13 +81,13 @@ _PRST_Case(Mode) {
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier prompt editor child must retire first")
 	Directory := A_Temp . "\ergopti_prompt_startup_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
-	FSCreateDirectoryExclusiveStrict(Directory)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The exact child root must be exclusively acquired before cleanup authority exists")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
+		AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory . "\64bit"), "The private browser marker directory must be exclusively acquired")
 		; Availability must take its genuine filesystem branch. This inert marker
 		; is never loaded: the browser factory is explicitly passive in the child.
 		AssertTrue(FSWriteCreateDurable(Directory . "\64bit\WebView2Loader.dll", "private availability marker") != 0)
@@ -162,3 +162,7 @@ for _PRST_Mode in ["current", "close-create", "reopen-create"]
 		_PRST_Case.Bind(_PRST_Mode))
 
 #Include test_prompt_navigation_custody.ahk
+
+for _PRST_SubscriptionMode in ["subscription-current", "subscription-close"]
+	Test("Prompt editor add-event retirement: " . _PRST_SubscriptionMode . " owns the real HWND (prompt-native-subscription-retirement-owner)",
+		_PRST_Case.Bind(_PRST_SubscriptionMode))

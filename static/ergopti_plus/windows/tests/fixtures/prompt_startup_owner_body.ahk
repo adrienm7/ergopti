@@ -51,11 +51,17 @@ class _PRSO_View {
 		this.Settings := {}, this.Subscriptions := 0, this.Navigations := 0
 	}
 	WebMessageReceived(Callback) {
+		global _PRSO
 		this.Subscriptions += 1
+		if InStr(_PRSO.Mode, "subscription-") == 1
+			return _PRSO_Subscribe(this, Callback)
 		return { Callback: Callback }
 	}
 	NavigationCompleted(Callback) {
+		global _PRSO
 		this.Subscriptions += 1
+		if InStr(_PRSO.Mode, "subscription-") == 1
+			return _PRSO_Subscription(Callback)
 		return { Callback: Callback }
 	}
 	SetVirtualHostNameToFolderMapping(*) => 0
@@ -70,6 +76,12 @@ class _PRSO_Controller {
 		this.CoreWebView2 := _PRSO_View(), this.Closed := 0, this.Fills := 0
 	}
 	Close() {
+		global _PRSO
+		if InStr(_PRSO.Mode, "subscription-") == 1 {
+			_PRSO.SubscriptionCloseCalls += 1
+			_PRSO.SubscriptionsAtClose := _PRSO.ActiveSubscriptions
+			_PRSO.NativeAliveAtClose := !!DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int")
+		}
 		this.Closed += 1
 	}
 	Fill() {
@@ -108,7 +120,7 @@ _PRSO_Create(Hwnd) {
 		"The public edit must capture its real boot-admitted private file, not a fabricated READY receipt.")
 	Controller := _PRSO_Controller()
 	_PRSO.Controllers.Push(Controller)
-	if _PRSO.Controllers.Length > 1 || _PRSO.Mode == "current"
+	if _PRSO.Controllers.Length > 1 || _PRSO.Mode == "current" || InStr(_PRSO.Mode, "subscription-") == 1
 		return Controller
 	_PRSO.Pending := Promise.withResolvers()
 	; An independent observer prevents the vendor task's unobserved-report path.
@@ -186,6 +198,10 @@ _PRSO_Check() {
 		"No admission or runtime diagnostic may qualify as prompt cancellation.")
 	_PRSO_Require(FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
 		"Opening and cancellation cannot rewrite the genuine private profile source.")
+	if InStr(_PRSO.Mode, "subscription-") == 1 {
+		_PRSO_CheckSubscription()
+		return
+	}
 	if _PRSO.Mode == "current" {
 		_PRSO_Require(_PRSO.Controllers.Length == 1 && _PRSO.Windows.Length == 1
 			&& _PromptEdWeb_Gui == _PRSO.Windows[1] && _PromptEdWeb_ContextEpoch > 0,
@@ -234,7 +250,10 @@ _PRSO_Main() {
 	Persistent(true)
 	_PRSO := { Mode: A_Args[1], Windows: [], Hwnds: [], Controllers: [], Profiles: [], Source: "",
 		Pending: 0, Boundary: 0, Failure: 0, Errors: [], PublicCalls: 0, CloseSent: 0,
-		OldEpoch: 0, SuccessorEpoch: 0, FallbackInputs: 0, Environments: 0 }
+		OldEpoch: 0, SuccessorEpoch: 0, FallbackInputs: 0, Environments: 0,
+		ActiveSubscriptions: 0, CreatedSubscriptions: 0, ReleasedSubscriptions: 0, SubscriptionCalls: 0,
+		SubscriptionCloseCalls: 0, NativeAliveAtReturn: false, NativeAliveAtClose: false, SubscriptionsAtClose: -1,
+		SubscriptionInFlight: false, ReleasedInFlight: false, NativeCloseObserved: false }
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_PRSO_OnError)
 	LoggerSetTestSink(_PRSO_Log)
@@ -304,6 +323,82 @@ _PRSO_Main() {
 	}
 	FileAppend("PASS prompt-startup " . _PRSO.Mode . "`n", "*", "UTF-8")
 	ExitApp(0)
+}
+
+
+; This passive subscription stands only for the binding's retained add-event
+; handle. Native WM_CLOSE, source/epoch revocation and HWND lifetime stay real.
+class _PRSO_Subscription {
+	__New(Callback) {
+		global _PRSO
+		this.Callback := Callback
+		_PRSO.ActiveSubscriptions += 1, _PRSO.CreatedSubscriptions += 1
+	}
+	__Delete() {
+		global _PRSO
+		_PRSO.ReleasedInFlight := _PRSO.ReleasedInFlight || _PRSO.SubscriptionInFlight
+		_PRSO.ActiveSubscriptions -= 1, _PRSO.ReleasedSubscriptions += 1
+	}
+}
+_PRSO_Subscribe(View, Callback) {
+	global _PRSO, _PromptEdWeb_ContextEpoch, _PromptEdWeb_OpeningSource
+	_PRSO.SubscriptionCalls += 1
+	_PRSO.SubscriptionInFlight := true
+	try {
+		if _PRSO.Mode == "subscription-close" {
+			Hwnd := _PRSO.Hwnds[1], Epoch := _PromptEdWeb_ContextEpoch
+			_PRSO_Require(_PRSO.SubscriptionCalls == 1 && Epoch > 0
+				&& WinGetPID("ahk_id " . Hwnd) == ProcessExist()
+				&& DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"),
+				"The subscription callout must close its exact current visible native context")
+			_PRSO.CloseSent += 1
+			_PRSO_Require(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
+				"The owned prompt HWND must admit the actual WM_CLOSE")
+			Started := A_TickCount
+			while _PromptEdWeb_ContextEpoch == Epoch && TickElapsed(Started) < 1000
+				Sleep(10)
+			_PRSO.NativeCloseObserved := _PromptEdWeb_ContextEpoch == 0 && _PromptEdWeb_OpeningSource == 0
+			_PRSO_Require(_PRSO.NativeCloseObserved, "The genuine handler must revoke context and source before the add-event call returns")
+		}
+		_PRSO.NativeAliveAtReturn := !!DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int")
+		return _PRSO_Subscription(Callback)
+	} finally _PRSO.SubscriptionInFlight := false
+}
+_PRSO_CheckSubscription() {
+	global _PRSO, _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
+	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ContextEpoch
+	if _PRSO.Mode == "subscription-current" {
+		PositiveReady := _PRSO.SubscriptionCalls == 1 && _PRSO.ActiveSubscriptions == 2
+			&& _PRSO.Windows.Length == 1 && _PRSO.Controllers.Length == 1
+			&& _PromptEdWeb_Gui == _PRSO.Windows[1] && _PromptEdWeb_ContextEpoch > 0
+			&& _PromptEdWeb_Controller == _PRSO.Controllers[1]
+			&& _PromptEdWeb_WebView == _PRSO.Controllers[1].CoreWebView2
+			&& IsSet(_PromptEdWeb_MsgSub) && IsSet(_PromptEdWeb_NavSub)
+			&& _PRSO.Controllers[1].CoreWebView2.Navigations == 1 && _PRSO.Controllers[1].Fills >= 1
+		_PRSO_NativeClose(_PRSO.Hwnds[1])
+	}
+	FileAppend("OBSERVATION prompt-subscription mode=" . _PRSO.Mode . " calls=" . _PRSO.SubscriptionCalls
+		. " close_observed=" . _PRSO.NativeCloseObserved . " native_alive_at_return=" . _PRSO.NativeAliveAtReturn
+		. " native_alive_at_close=" . _PRSO.NativeAliveAtClose . " active_at_close=" . _PRSO.SubscriptionsAtClose
+		. " created=" . _PRSO.CreatedSubscriptions . " released=" . _PRSO.ReleasedSubscriptions
+		. " released_in_flight=" . _PRSO.ReleasedInFlight . " controller_closed=" . _PRSO.Controllers[1].Closed . "`n", "*", "UTF-8")
+	if _PRSO.Mode == "subscription-current"
+		_PRSO_Require(PositiveReady, "The unopposed real public editor must retain its browser, both subscriptions and context")
+	else {
+		_PRSO_Require(_PRSO.CloseSent == 1 && _PRSO.NativeCloseObserved && _PRSO.SubscriptionCalls == 1,
+			"The refused startup must reach one genuine add-event call and one exact native context retirement")
+		_PRSO_Require(_PRSO.Controllers[1].CoreWebView2.Subscriptions == 1
+			&& _PRSO.Controllers[1].CoreWebView2.Navigations == 0 && _PRSO.Controllers[1].Fills == 0,
+			"A retired add-event may not continue to the second subscription, navigation or Fill")
+	}
+	_PRSO_Require(_PRSO.NativeAliveAtReturn && _PRSO.NativeAliveAtClose && _PRSO.SubscriptionsAtClose == 0
+		&& _PRSO.ActiveSubscriptions == 0 && _PRSO.CreatedSubscriptions == _PRSO.ReleasedSubscriptions
+		&& !_PRSO.ReleasedInFlight && _PRSO.Controllers[1].Closed == 1 && _PRSO.SubscriptionCloseCalls == 1,
+		"The exact HWND must survive add-event return and unsubscribe before its controller closes once")
+	_PRSO_Require(!DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int") && !IsObject(_PromptEdWeb_Gui)
+		&& !IsSet(_PromptEdWeb_Controller) && !IsSet(_PromptEdWeb_WebView)
+		&& !IsSet(_PromptEdWeb_MsgSub) && !IsSet(_PromptEdWeb_NavSub),
+		"Physical retirement must finish after the ordered subscription/controller cleanup")
 }
 
 _PRSO_Main()

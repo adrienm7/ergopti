@@ -10,7 +10,7 @@
 
 #Requires AutoHotkey v2.0
 
-global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false}
+global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false, NativeAliveAtSubscriptionReturn: false, NativeAliveAtControllerClose: false}
 global _VendorDir := A_Args[2]
 global _SharedDir := A_Args[3]
 global _I18nLocale := "fr"
@@ -117,6 +117,8 @@ class _MBSW_PassiveController {
 	Close() {
 		global _MBSW
 		_MBSW.Closed += 1
+		if InStr(_MBSW.Mode, "subscription-owner-") == 1
+			_MBSW.NativeAliveAtControllerClose := !!DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int")
 		if _MBSW.Subscriptions {
 			_MBSW.CloseWhileSubscribed := true
 			throw Error("The actual subscription must retire before its controller closes")
@@ -136,8 +138,13 @@ class _MBSW_PassiveView {
 		}
 	}
 	WebMessageReceived(Callback) {
+		global _MBSW
 		Subscription := _MBSW_PassiveSubscription()
 		_MBSW_Withdraw("subscription")
+		if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
+			_MBSW_Withdraw("subscription-owner-close")
+			_MBSW.NativeAliveAtSubscriptionReturn := !!DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int")
+		}
 		return Subscription
 	}
 	SetVirtualHostNameToFolderMapping(*) => _MBSW_Withdraw("mapping")
@@ -172,7 +179,29 @@ try {
 	FileAppend("receipt mode=" . _MBSW.Mode . " native_close=" . _MBSW.NativeClose . " close_events=" . _MBSW.CloseEvents . " constructors=" . _MBSW.Created . " exists=" . Exists . " visible=" . DllCall("User32\IsWindowVisible", "Ptr", _MBSW.Hwnd, "Int") . " epoch=" . _LLM_MBW_SessionEpoch . "`n", "*", "UTF-8")
 	if (_MBSW.Mode == "close" || _MBSW.Mode == "reopen") && !_MBSW.EarlyClose
 		throw Error("Unqualified: the native Show close must precede every browser callout/public return")
-	if _MBSW.Mode == "teardown-reopen" {
+	if InStr(_MBSW.Mode, "subscription-owner-") == 1 {
+		CurrentReady := true
+		if _MBSW.Mode == "subscription-owner-current" {
+			CurrentReady := Exists && _MBSW.Created == 1 && _MBSW.Subscriptions == 1
+				&& _MBSW.Navigated == 1 && _MBSW.Filled == 1 && _MBSW.Closed == 0
+			_MBSW_Withdraw("subscription-owner-current")
+		}
+		FileAppend("OBSERVATION model-web-subscription mode=" . _MBSW.Mode . " native_close=" . _MBSW.NativeClose
+			. " close_events=" . _MBSW.CloseEvents . " native_alive_at_return=" . _MBSW.NativeAliveAtSubscriptionReturn
+			. " native_alive_at_close=" . _MBSW.NativeAliveAtControllerClose . " closed=" . _MBSW.Closed
+			. " subscriptions=" . _MBSW.Subscriptions . " close_while_subscribed=" . _MBSW.CloseWhileSubscribed
+			. " navigated=" . _MBSW.Navigated . " filled=" . _MBSW.Filled . " current_ready=" . CurrentReady . "`n", "*", "UTF-8")
+		if !CurrentReady || _MBSW.NativeClose != 1 || _MBSW.CloseEvents != 1 || _MBSW.Created != 1
+			throw Error("Unqualified: one actual browser and one exact native Close must be observed")
+		if !_MBSW.NativeAliveAtSubscriptionReturn || !_MBSW.NativeAliveAtControllerClose
+			|| _MBSW.Closed != 1 || _MBSW.Subscriptions != 0 || _MBSW.CloseWhileSubscribed
+			throw Error("The exact native host must survive add-event return and unsubscribe before Controller.Close")
+		if _MBSW.Mode == "subscription-owner-close" && (_MBSW.Navigated != 0 || _MBSW.Filled != 0)
+			throw Error("A subscription retired during add-event cannot navigate or Fill afterward")
+		if DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int") || IsSet(_LLM_MBW_Gui)
+			|| IsSet(_LLM_MBW_Controller) || IsSet(_LLM_MBW_WebView) || IsSet(_LLM_MBW_MsgSub)
+			throw Error("The exact retired browser must release native and global resources after its controller closes")
+	} else if _MBSW.Mode == "teardown-reopen" {
 		_MBSW_Withdraw("teardown-reopen")
 		FileAppend("after-teardown native_close=" . _MBSW.NativeClose . " close_events=" . _MBSW.CloseEvents . " windows=" . _MBSW.Windows.Length . " constructors=" . _MBSW.Created . " closed=" . _MBSW.Closed . " subscriptions=" . _MBSW.Subscriptions . " epoch=" . _LLM_MBW_SessionEpoch . "`n", "*", "UTF-8")
 		if _MBSW.Windows.Length != 2 || _MBSW.Created != 2 || _MBSW.Closed != 1 || _MBSW.Subscriptions != 1
