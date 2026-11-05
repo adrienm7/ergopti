@@ -50,6 +50,14 @@ _SFPN_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 		AssertEqual("a", Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer)
 		OldSource := Active ? _LLM_Bridge_BufferSource : _LLM_Bridge_AgentBufferSource
 		OldPrivateFlag := OldSource.Get("NativeSecure", "absent")
+		NormalOwner := _LLM_Bridge_PrefixObserver
+		NormalCallback := NormalOwner.Timer
+		if Active && Mode != "gateway-nonce" && Mode != "optout-agent-strict" {
+			; These are owned engine-state witnesses, not a fake transport admission.
+			; The rejection must retire retained context/signature as well as chars.
+			_LLM_Engine["last_buffer"] := "a"
+			_LLM_Engine["active_request_signature"] := "owned-normal-signature"
+		}
 		if Mode == "gateway-nonce" {
 			Probe.Revoke := true
 			Invoke() => LLM_Bridge_FeedCharForPrefix("s", Schedule, _LLM_Bridge_ReadFocusReceipt)
@@ -69,6 +77,10 @@ _SFPN_Sequence(Mode, Fx, Lines, Sent, State, Schedule, Focus) {
 		PrivateOwner := _LLM_Bridge_PrefixObserver
 		PrivateCallback := PrivateOwner.Timer
 		AssertTrue(PrivateOwner.CapturedSecure, "privacy belongs to this input frame, not its later current style")
+		AssertEqual(0, NormalOwner.Timer, "the old normal observer must lose its cancellation capability")
+		NormalCallback.Call()
+		AssertTrue(_LLM_Bridge_PrefixObserver == PrivateOwner,
+			"the old normal callback cannot revive its context or retire the private frame")
 		if Mode == "optout-agent-strict" {
 			AssertEqual("as", _LLM_Bridge_Buffer, "the explicit prediction opt-out keeps its allowed raw context")
 			AssertFalse(_LLM_Bridge_BufferAgentSafe)
