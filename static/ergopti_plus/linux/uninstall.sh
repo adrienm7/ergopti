@@ -388,7 +388,7 @@ if [ -n "$checkout_marker" ]; then
 fi
 ancestor="$LIBRARY"
 while [ "$ancestor" != / ]; do
-	if [ -e "$ancestor/.git" ]; then
+	if [ -e "$ancestor/.git" ] || [ -L "$ancestor/.git" ]; then
 		ergopti_msg uninstall.inside_source_checkout >&2
 		exit 1
 	fi

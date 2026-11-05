@@ -325,6 +325,13 @@ try {
 	assert.notEqual(run('--yes').status, 0, 'a registered checkout ancestor prevents removal');
 	assert.ok(fs.existsSync(wrapper));
 	fs.unlinkSync(gitMarker);
+	if (process.platform === 'linux') {
+		fs.symlinkSync(path.join(sandbox, 'missing-git-dir'), gitMarker);
+		const refused = run('--check');
+		assert.notEqual(refused.status, 0, 'a dangling checkout marker prevents removal');
+		assert.ok(fs.existsSync(wrapper));
+		fs.unlinkSync(gitMarker);
+	}
 	{
 		const checkout = path.join(sandbox, 'checkout\n');
 		const nestedPrefix = path.join(checkout, 'prefix');
