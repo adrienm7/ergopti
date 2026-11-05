@@ -68,13 +68,6 @@ local STDERR_TO_STDOUT = "2>&1"
 -- returning no rows.
 local STDERR_DISCARDED = "2>/dev/null"
 
--- Replaces the SQL fragment sqlite3 quotes back at us in an error message.
-local REDACTED_SQL_TOKEN = '"[redacted]"'
-
--- Upper bound on a logged diagnostic. Long enough to identify the failure,
--- short enough that a runaway message cannot flood the log.
-local ERROR_LOG_MAX_CHARS = 200
-
 -- stdout is otherwise empty on the write path. The shell emits this terminal
 -- receipt after sqlite3; LuaJIT's pclose result can conceal a nonzero exit.
 local EXIT_STATUS_PREFIX = "ERGOPTI_SQL_EXIT_STATUS="
@@ -196,16 +189,19 @@ end
 -- ==============================
 
 --- Makes a sqlite3 diagnostic safe to log.
---- sqlite3 reports syntax problems as `near "<token>": syntax error`, and for
---- the keystats that token is a slice of what the user typed. Dropping the
---- quoted span keeps the diagnostic useful while keeping typed text out of the
---- log file.
+--- sqlite3 can echo arbitrary SQL, including unquoted and single-quoted user
+--- data. Return only fixed diagnostic categories, never native output bytes.
 --- @param text string|nil Raw CLI output.
 --- @return string A single-line, bounded, payload-free message.
 function M.sanitise_error(text)
 	if type(text) ~= "string" or text == "" then return "" end
-	local redacted = (text:gsub('"[^"]*"', REDACTED_SQL_TOKEN))
-	return (redacted:gsub("%s+", " "):sub(1, ERROR_LOG_MAX_CHARS))
+	local lower = text:lower()
+	for _, category in ipairs({ "syntax error", "database is locked", "database or disk is full",
+		"attempt to write a readonly database", "unable to open database file", "database disk image is malformed",
+		"disk i/o error", "out of memory", "constraint failed" }) do
+		if lower:find(category, 1, true) then return category end
+	end
+	return "SQLite command failed"
 end
 
 return M
