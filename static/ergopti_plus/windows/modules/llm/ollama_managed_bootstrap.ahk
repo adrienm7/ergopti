@@ -1130,6 +1130,10 @@ class OllamaManagedBootstrap {
 			if !this.Cancelled || this.Files.HasOwner() || this.Runtime.HasOwner()
 					|| IsObject(this.PullTask) || this.Debts.Count
 				return false
+			if this.Files is OllamaInstallFilesPort && !this.Files.RetireCallbacks(&FileObservers)
+				return false
+			if this.Runtime is OllamaRuntimeOwner && !this.Runtime.RetireCallbacks(&RuntimeObservers)
+				return false
 			this.Timer := 0
 			return true
 		} finally Critical(PreviousCritical)
