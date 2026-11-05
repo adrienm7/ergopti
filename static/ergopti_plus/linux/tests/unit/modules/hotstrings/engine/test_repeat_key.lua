@@ -56,6 +56,18 @@ helpers.describe("magic-key repeat: the rule", function()
 			"the whole codepoint, not its trailing byte")
 	end)
 
+	helpers.it("preserves three- and four-byte characters and word boundaries", function()
+		for _, char in ipairs({ "漢", "𐐀" }) do
+			local out = RepeatKey.resolve("a" .. char .. STAR, STAR)
+			helpers.assert_true(out ~= nil)
+			helpers.assert_eq(out.replacement, char)
+			helpers.assert_eq(out.backspace_count, 1)
+			helpers.assert_nil(RepeatKey.resolve(char .. STAR, STAR), "a word's first character is not repeated")
+			helpers.assert_nil(RepeatKey.resolve("a" .. char .. STAR, STAR, false),
+				"an unknown buffer boundary must not authorize repetition")
+		end
+	end)
+
 	helpers.it("a delimiter the user added ends a word, as on Windows (PAR-8)", function()
 		local Terminators = require("keymap.terminators")
 		helpers.assert_true(RepeatKey.resolve("ab1" .. STAR, STAR) ~= nil, "before: a digit is a word character")
