@@ -78,9 +78,14 @@ function recipientLibraries(data) {
 				`recipient library group ${group.id}: an id and a reason (40+ characters) are required`
 			);
 		for (const key of ['sonames', 'prefixes']) {
-			if (group[key] !== undefined &&
-				(!Array.isArray(group[key]) || group[key].some((value) => typeof value !== 'string' || value.length === 0)))
-				throw new Error(`recipient library group ${group.id}: ${key} must contain nonempty strings`);
+			if (
+				group[key] !== undefined &&
+				(!Array.isArray(group[key]) ||
+					group[key].some((value) => typeof value !== 'string' || value.length === 0))
+			)
+				throw new Error(
+					`recipient library group ${group.id}: ${key} must contain nonempty strings`
+				);
 		}
 		for (const name of group.sonames || []) {
 			if (sonames.has(name)) throw new Error(`recipient library ${name} is listed twice`);
@@ -125,9 +130,11 @@ function checkClosure(roots, readDynamic, recipient) {
 	const elfFiles = files.filter(isElf);
 	const outputs = new Map(elfFiles.map((file) => [file, readDynamic(file)]));
 	// PIE executables also use ET_DYN, but cannot be loaded as libraries.
-	const sharedFiles = new Set(elfFiles.filter((file) =>
-		isSharedObject(file) && !/\(FLAGS_1\)[^\n]*\bPIE\b/.test(outputs.get(file))
-	));
+	const sharedFiles = new Set(
+		elfFiles.filter(
+			(file) => isSharedObject(file) && !/\(FLAGS_1\)[^\n]*\bPIE\b/.test(outputs.get(file))
+		)
+	);
 	const bundledElfPaths = new Set([...sharedFiles].map((file) => fs.realpathSync(file)));
 	for (const root of roots) {
 		// Symbolic links count as provided names: libfoo.so.1 is usually a link.

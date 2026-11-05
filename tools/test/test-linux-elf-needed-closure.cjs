@@ -51,7 +51,8 @@ assert.deepEqual(Closure.parseDynamic(DYNAMIC), {
 	soname: 'libayatana-appindicator3.so.1'
 });
 assert.deepEqual(Closure.parseDynamic(' (NEEDED) Shared library: [libc.so.6]bad]'), {
-	needed: ['libc.so.6]bad'], soname: null
+	needed: ['libc.so.6]bad'],
+	soname: null
 });
 assert.throws(() => Closure.parseDynamic(' (NEEDED) Shared library: [broken'), /unreadable/);
 passed++;
@@ -90,7 +91,14 @@ for (const invalid of [
 	{ sonames: [null] },
 	{ sonames: 'libx.so' }
 ]) {
-	assert.throws(() => Closure.recipientLibraries({ version: 1, groups: [{ id: 'invalid', reason: 'r'.repeat(50), ...invalid }] }), /recipient library/);
+	assert.throws(
+		() =>
+			Closure.recipientLibraries({
+				version: 1,
+				groups: [{ id: 'invalid', reason: 'r'.repeat(50), ...invalid }]
+			}),
+		/recipient library/
+	);
 }
 passed++;
 
@@ -120,8 +128,11 @@ const good = tree({
 const injected = (file) => dynamics[path.relative(good, file).split(path.sep).join('/')];
 let result = Closure.checkClosure([good], injected, recipient);
 assert.equal(result.checked.length, 2);
-assert.deepEqual(result.violations.map((entry) => entry.needed), ['libluv.so.1'],
-	'an internal SONAME does not create a filesystem entry');
+assert.deepEqual(
+	result.violations.map((entry) => entry.needed),
+	['libluv.so.1'],
+	'an internal SONAME does not create a filesystem entry'
+);
 fs.symlinkSync('libluv.so.1.0', path.join(good, 'usr/lib/libluv.so.1'));
 result = Closure.checkClosure([good], injected, recipient);
 assert.deepEqual(result.violations, [], 'a real bundled SONAME symlink resolves');
@@ -144,12 +155,25 @@ if (process.platform === 'linux') {
 			const foreign = tree({ 'outside.so': ELF });
 			fs.symlinkSync(path.join(foreign, 'outside.so'), lib);
 		}
-		const checked = Closure.checkClosure([image], () => ' (NEEDED) Shared library: [libprivate.so.1]', recipient);
-		assert.deepEqual(checked.violations.map((entry) => entry.needed), ['libprivate.so.1'], `${kind} does not provide a bundled library`);
+		const checked = Closure.checkClosure(
+			[image],
+			() => ' (NEEDED) Shared library: [libprivate.so.1]',
+			recipient
+		);
+		assert.deepEqual(
+			checked.violations.map((entry) => entry.needed),
+			['libprivate.so.1'],
+			`${kind} does not provide a bundled library`
+		);
 	}
 	const image = tree({ 'usr/bin/program': ELF, 'usr/lib/actual.so': ELF });
 	fs.symlinkSync('actual.so', path.join(image, 'usr/lib/libprivate.so.1'));
-	const checked = Closure.checkClosure([image], (file) => path.basename(file) === 'program' ? ' (NEEDED) Shared library: [libprivate.so.1]' : '', recipient);
+	const checked = Closure.checkClosure(
+		[image],
+		(file) =>
+			path.basename(file) === 'program' ? ' (NEEDED) Shared library: [libprivate.so.1]' : '',
+		recipient
+	);
 	assert.deepEqual(checked.violations, [], 'a bundled symlink to a bundled ELF remains valid');
 }
 
@@ -210,18 +234,42 @@ if (gcc.status === 0 && readelf.status === 0) {
 			env: { ...process.env, LC_ALL: 'C' }
 		});
 	const bracketLibrary = path.join(work, 'libbracket.so');
-	execFileSync('gcc', ['-shared', '-fPIC', '-Wl,-soname,libc.so.6]bad', '-o', bracketLibrary, path.join(work, 'lib.c')]);
-	execFileSync('gcc', ['-o', path.join(work, 'bracket-main'), path.join(work, 'main.c'), '-L' + work, '-l:libbracket.so']);
+	execFileSync('gcc', [
+		'-shared',
+		'-fPIC',
+		'-Wl,-soname,libc.so.6]bad',
+		'-o',
+		bracketLibrary,
+		path.join(work, 'lib.c')
+	]);
+	execFileSync('gcc', [
+		'-o',
+		path.join(work, 'bracket-main'),
+		path.join(work, 'main.c'),
+		'-L' + work,
+		'-l:libbracket.so'
+	]);
 	const bracketImage = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-needed-bracket-'));
 	fs.copyFileSync(path.join(work, 'bracket-main'), path.join(bracketImage, 'program'));
-	assert.deepEqual(Closure.checkClosure([bracketImage], readDynamic, recipient).violations.map((entry) => entry.needed),
-		['libc.so.6]bad'], 'a real ELF dependency is not truncated into a recipient library');
+	assert.deepEqual(
+		Closure.checkClosure([bracketImage], readDynamic, recipient).violations.map(
+			(entry) => entry.needed
+		),
+		['libc.so.6]bad'],
+		'a real ELF dependency is not truncated into a recipient library'
+	);
 	let real = Closure.checkClosure([image], readDynamic, recipient);
 	assert.deepEqual(real.violations, [], 'a bundled library resolves in a real executable');
-	fs.renameSync(path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(image, 'usr/lib/renamed.so'));
+	fs.renameSync(
+		path.join(image, 'usr/lib/libergoptifixture.so.7'),
+		path.join(image, 'usr/lib/renamed.so')
+	);
 	real = Closure.checkClosure([image], readDynamic, recipient);
-	assert.deepEqual(real.violations.map((entry) => entry.needed), ['libergoptifixture.so.7'],
-		'a real ELF SONAME alone cannot stand in for the library pathname');
+	assert.deepEqual(
+		real.violations.map((entry) => entry.needed),
+		['libergoptifixture.so.7'],
+		'a real ELF SONAME alone cannot stand in for the library pathname'
+	);
 	fs.symlinkSync('renamed.so', path.join(image, 'usr/lib/libergoptifixture.so.7'));
 	real = Closure.checkClosure([image], readDynamic, recipient);
 	assert.deepEqual(real.violations, [], 'the actual alias supplies the required pathname');
@@ -234,13 +282,30 @@ if (gcc.status === 0 && readelf.status === 0) {
 	);
 	// An ELF executable with the needed filename is not a loadable library.
 	source('pretend.c', 'int main(void) { return 0; }\n');
-	execFileSync('gcc', ['-no-pie', '-o', path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(work, 'pretend.c')]);
+	execFileSync('gcc', [
+		'-no-pie',
+		'-o',
+		path.join(image, 'usr/lib/libergoptifixture.so.7'),
+		path.join(work, 'pretend.c')
+	]);
 	real = Closure.checkClosure([image], readDynamic, recipient);
-	assert.ok(real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'), 'an ET_EXEC binary cannot provide a shared library');
+	assert.ok(
+		real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'),
+		'an ET_EXEC binary cannot provide a shared library'
+	);
 	fs.unlinkSync(path.join(image, 'usr/lib/libergoptifixture.so.7'));
-	execFileSync('gcc', ['-fPIE', '-pie', '-o', path.join(image, 'usr/lib/libergoptifixture.so.7'), path.join(work, 'pretend.c')]);
+	execFileSync('gcc', [
+		'-fPIE',
+		'-pie',
+		'-o',
+		path.join(image, 'usr/lib/libergoptifixture.so.7'),
+		path.join(work, 'pretend.c')
+	]);
 	real = Closure.checkClosure([image], readDynamic, recipient);
-	assert.ok(real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'), 'a PIE executable cannot provide a shared library');
+	assert.ok(
+		real.violations.some((entry) => entry.needed === 'libergoptifixture.so.7'),
+		'a PIE executable cannot provide a shared library'
+	);
 	fs.unlinkSync(path.join(image, 'usr/lib/libergoptifixture.so.7'));
 	const cli = spawnSync(
 		process.execPath,

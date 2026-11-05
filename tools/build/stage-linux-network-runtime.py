@@ -556,8 +556,14 @@ def destination_directory(path):
 def copy_signature(info):
     """Identity and change evidence for one already acquired regular file."""
     return (
-        info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
-        info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_uid,
+        info.st_gid,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
     )
 
 
