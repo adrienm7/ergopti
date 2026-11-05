@@ -256,7 +256,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 		with_stubs(nil, {
 			HAS_ASYNC = has_async ~= false,
 			after = function(seconds, fn)
-				local handle = { seconds = seconds, fn = fn }
+				local handle = { seconds = seconds, fn = fn, armed = true }
 				timers[#timers + 1] = handle
 				return handle
 			end,

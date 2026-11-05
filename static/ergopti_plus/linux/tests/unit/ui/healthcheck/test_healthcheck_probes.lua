@@ -43,7 +43,7 @@ local function with_probes(async, body, absent)
 	package.loaded["adapters.timer_scheduler"] = {
 		HAS_ASYNC = async,
 		after = function(delay, fn)
-			local handle = { delay = delay, fn = fn }
+			local handle = { delay = delay, fn = fn, armed = true }
 			world.timers[#world.timers + 1] = handle
 			return handle
 		end,
@@ -126,6 +126,21 @@ local function gsettings_children(world)
 end
 
 helpers.describe("diagnostics probes (linux)", function()
+	helpers.it("(healthcheck-timer-refusal) reports failed starts and retains cancellation owners", function()
+		with_probes(true, function(Probes, world)
+			package.loaded["adapters.timer_scheduler"].after = function()
+				local handle = { armed = false, fired = true, timer = {} }
+				world.timers[#world.timers + 1] = handle
+				return handle
+			end
+			local run, answers = start(Probes)
+			helpers.assert_eq(answers.configuration.result.state, "error")
+			helpers.assert_eq(answers.cpu_load.result.state, "error")
+			run.cancel()
+			helpers.assert_eq(world.cancelled_timers, 2)
+		end)
+	end)
+
 	helpers.it("(healthcheck-http-refusal) preserves an inline completion despite a false dispatch receipt", function()
 		with_probes(true, function(Probes)
 			package.loaded["adapters.http_client"].get = function(_, _, _, done)
