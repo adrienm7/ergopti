@@ -149,17 +149,27 @@ local function manager(options)
 		bundle_names = function() return options.bundle_names or {} end,
 	}
 	deps.inspect_file = function(path)
-		if state.files[path] == nil then return nil, "absent" end
+		if not deps.exists(path) then return nil, "absent" end
 		return { mode = "file" }, "ok"
 	end
 	deps.read_status = function(path)
-		if state.files[path] == nil then return nil, "absent" end
-		return state.files[path], "ok"
+		local content = deps.read(path)
+		if content == nil then return nil, "absent" end
+		return content, "ok"
 	end
 	deps.digest = function(text)
 		local digest
 		deps.transport.sha256(text, function(value) digest = value end)
 		return digest
+	end
+	deps.replace_exact = function(path, content, expected)
+		local current, status = deps.read_status(path)
+		if expected.status == "absent" then
+			if status ~= "absent" then return false, "source changed" end
+		elseif status ~= "ok" or current ~= expected.content then
+			return false, "source changed"
+		end
+		return deps.write(path, content)
 	end
 	deps.remove_exact = function(path, expected)
 		if state.files[path] ~= expected.content then return false, "source changed" end
@@ -199,6 +209,323 @@ local function record(state)
 end
 
 helpers.describe("layout manager (macOS): installing", function()
+	helpers.it("refuses update after an installed copy is edited", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local path = LAYOUTS_DIR .. "ergol.keylayout"
+		state.files[path] = "personal edit"
+		local result = run(function(done) registry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(state.files[path], "personal edit")
+	end)
+
+	helpers.it("rolls back an update after the second copy or record refuses, then retries", function()
+		for _, failure in ipairs({ "second", "record", "missing_local", "throw" }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local local_path, installed_path = LOCAL_DIR .. "ergol.keylayout", LAYOUTS_DIR .. "ergol.keylayout"
+			local record_path = LOCAL_DIR .. "installed.json"
+			local old_local, old_installed, old_record = state.files[local_path], state.files[installed_path], state.files[record_path]
+			if failure == "missing_local" then state.files[local_path] = nil; old_local = nil end
+			local entry = Json.decode(Json.encode(entry_of("ergol")))
+			local candidate = "verified replacement layout"
+			entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+			local replace, fail_once = deps.replace_exact, true
+			deps.replace_exact = function(path, content, expected)
+				if fail_once and ((failure ~= "record" and path == installed_path) or (failure == "record" and path == record_path)) then
+					fail_once = false
+					if failure == "throw" then error("simulated native refusal") end
+					return false, "simulated publication refusal"
+				end
+				return replace(path, content, expected)
+			end
+			local first = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_eq(first.ok, false)
+			helpers.assert_eq(state.files[local_path], old_local)
+			helpers.assert_eq(state.files[installed_path], old_installed)
+			helpers.assert_eq(state.files[record_path], old_record)
+			local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_true(retried.ok, tostring(retried.extra))
+			helpers.assert_eq(state.files[local_path], candidate)
+			helpers.assert_eq(state.files[installed_path], candidate)
+			helpers.assert_eq(record(state).layouts.ergol.sha256, entry.sha256)
+		end
+	end)
+
+	helpers.it("repairs a candidate copy left before a restart, but refuses a different candidate", function()
+		for _, both in ipairs({ false, true }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local entry = Json.decode(Json.encode(entry_of("ergol")))
+			local candidate = "verified replacement layout"
+			local other = "another verified layout"
+			local sha256 = deps.transport.sha256
+			deps.transport.sha256 = function(value, done)
+				if value == candidate then done(string.rep("a", 64), nil)
+				elseif value == other then done(string.rep("b", 64), nil)
+				else sha256(value, done) end
+			end
+			entry.size, entry.sha256, entry.version = #candidate, string.rep("a", 64), "replacement"
+			local local_path, installed_path = LOCAL_DIR .. "ergol.keylayout", LAYOUTS_DIR .. "ergol.keylayout"
+			state.files[local_path] = candidate
+			if both then state.files[installed_path] = candidate end
+			registry = helpers.load_with_stubs("modules.keymap.layout_registry") -- no in-memory transaction survives a restart
+			local newer = Json.decode(Json.encode(entry))
+			newer.size, newer.sha256 = #other, string.rep("b", 64)
+			local refused = run(function(done) registry.install_local(newer, other, done, deps) end)
+			helpers.assert_eq(refused.ok, false, "a different later candidate cannot authorize the earlier bytes")
+			helpers.assert_eq(state.files[local_path], candidate)
+			local repaired = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_true(repaired.ok, tostring(repaired.extra))
+			helpers.assert_eq(state.files[local_path], candidate)
+			helpers.assert_eq(state.files[installed_path], candidate)
+		end
+	end)
+
+	helpers.it("restores real files after a refused second update and then retries", function()
+		require("tests.support.file_system_transaction_fixture").with_fixture(function(host)
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local root = os.tmpname(); os.remove(root)
+			assert(os.execute("mkdir -p '" .. root .. "/local' '" .. root .. "/installed'"))
+			local function write(path, value)
+				local handle = assert(io.open(path, "wb")); assert(handle:write(value)); assert(handle:close())
+			end
+			local function read(path)
+				local handle = assert(io.open(path, "rb")); local value = handle:read("*a"); assert(handle:close()); return value
+			end
+			local ok, err = xpcall(function()
+				local local_dir, installed_dir = root .. "/local/", root .. "/installed/"
+				local local_path, installed_path = local_dir .. "ergol.keylayout", installed_dir .. "ergol.keylayout"
+				local record_path = local_dir .. "installed.json"
+				local old_local, old_installed, old_record = state.files[LOCAL_DIR .. "ergol.keylayout"],
+					state.files[LAYOUTS_DIR .. "ergol.keylayout"], state.files[LOCAL_DIR .. "installed.json"]
+				write(local_path, old_local); write(installed_path, old_installed); write(record_path, old_record)
+				local original_read, original_exists = deps.read, deps.exists
+				deps.local_dir, deps.layouts_dir = local_dir, installed_dir
+				deps.read = function(path) if path == record_path then return read(path) end; return original_read(path) end
+				deps.exists = function(path)
+					if path == record_path or path == local_path or path == installed_path then
+						local handle = io.open(path, "rb"); if not handle then return false end; handle:close(); return true
+					end
+					return original_exists(path)
+				end
+				local adapter, refuse = host.make_adapter(), true
+				deps.inspect_file, deps.read_status = adapter.classify_no_follow, adapter.read_with_status
+				deps.remove_exact = adapter.remove_if_unchanged
+				deps.replace_exact = function(path, value, expected)
+					if refuse and path == installed_path then refuse = false; return false, "second copy refused" end
+					return adapter.write_if_unchanged(path, value, expected)
+				end
+				local entry = Json.decode(Json.encode(entry_of("ergol")))
+				local candidate = "verified replacement layout"
+				entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+				helpers.assert_eq(run(function(done) registry.install_local(entry, candidate, done, deps) end).ok, false)
+				helpers.assert_eq(read(local_path), old_local)
+				helpers.assert_eq(read(installed_path), old_installed)
+				helpers.assert_eq(read(record_path), old_record)
+				local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+				helpers.assert_true(retried.ok, tostring(retried.extra))
+				helpers.assert_eq(read(local_path), candidate)
+				helpers.assert_eq(read(installed_path), candidate)
+			end, debug.traceback)
+			os.execute("rm -rf '" .. root .. "'")
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("retains update cleanup until the publication effect is known", function()
+		for _, scenario in ipairs({ { "second", false }, { "second", true }, { "record", false }, { "record", true } }) do
+			local failure, published = scenario[1], scenario[2]
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local entry = Json.decode(Json.encode(entry_of("ergol")))
+			local candidate = "verified replacement layout"
+			entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+			local path, record_path = LAYOUTS_DIR .. "ergol.keylayout", LOCAL_DIR .. "installed.json"
+			local old_record, replace, allow, once = state.files[record_path], deps.replace_exact, false, true
+			local restored_before_retry = false
+			deps.replace_exact = function(target, content, expected)
+				if not once and allow and target == LOCAL_DIR .. "ergol.keylayout" and content == candidate then
+					restored_before_retry = state.files[record_path] == old_record
+				end
+				if once and target == (failure == "record" and record_path or path) then
+					once = false
+					if published then state.files[target] = content end
+					return false, "release refused", function() return allow, nil, published end
+				end
+				return replace(target, content, expected)
+			end
+			helpers.assert_eq(run(function(done) registry.install_local(entry, candidate, done, deps) end).ok, false)
+			if failure ~= "record" or not published then helpers.assert_eq(state.files[record_path], old_record) end
+			helpers.assert_eq(run(function(done) registry.install_local(entry, candidate, done, deps) end).ok, false)
+			allow = true
+			local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_true(retried.ok, tostring(retried.extra))
+			helpers.assert_true(restored_before_retry, "record compensation must finish before the retry")
+			helpers.assert_eq(state.files[path], candidate)
+		end
+	end)
+
+	helpers.it("retries the inverse after an exception during rollback", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local local_path, installed_path = LOCAL_DIR .. "ergol.keylayout", LAYOUTS_DIR .. "ergol.keylayout"
+		local original, replace, failed, threw = state.files[local_path], deps.replace_exact, false, false
+		deps.replace_exact = function(path, value, expected)
+			if path == installed_path and not failed then failed = true; return false, "second copy refused" end
+			if path == local_path and value == original and not threw then threw = true; error("inverse raised") end
+			return replace(path, value, expected)
+		end
+		local first = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_eq(first.ok, false)
+		helpers.assert_eq(state.files[local_path], candidate, "failed inverse retains its exact debt")
+		local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_true(retried.ok, tostring(retried.extra))
+	end)
+
+	helpers.it("retains an unacknowledged candidate after a throwing publisher", function()
+		for _, failed in ipairs({ "copy", "record" }) do
+			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+			helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+			local entry = Json.decode(Json.encode(entry_of("ergol")))
+			local candidate = "verified replacement layout"
+			entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+			local path = failed == "record" and (LOCAL_DIR .. "installed.json") or (LAYOUTS_DIR .. "ergol.keylayout")
+			local replace, once = deps.replace_exact, true
+			deps.replace_exact = function(target, value, expected)
+				if target == path and once then
+					once = false
+					state.files[target] = value
+					error("publisher stopped after mutation")
+				end
+				return replace(target, value, expected)
+			end
+			local first = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_eq(first.ok, false)
+			helpers.assert_contains(first.extra, "publication was not confirmed at " .. path)
+			helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], candidate)
+			local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_true(retried.ok, tostring(retried.extra))
+		end
+	end)
+
+	helpers.it("retains a competing edit rather than overwriting it during rollback", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local local_path, installed_path = LOCAL_DIR .. "ergol.keylayout", LAYOUTS_DIR .. "ergol.keylayout"
+		local replace, once = deps.replace_exact, true
+		deps.replace_exact = function(path, content, expected)
+			if once and path == installed_path then
+				once = false
+				state.files[local_path] = "competing edit"
+				return false, "publication refused"
+			end
+			return replace(path, content, expected)
+		end
+		helpers.assert_eq(run(function(done) registry.install_local(entry, candidate, done, deps) end).ok, false)
+		helpers.assert_eq(state.files[local_path], "competing edit")
+		helpers.assert_eq(run(function(done) registry.install_local(entry, candidate, done, deps) end).ok, false)
+		helpers.assert_eq(state.files[local_path], "competing edit")
+		state.files[local_path] = candidate -- explicit repair of the retained precondition
+		local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_true(retried.ok, tostring(retried.extra))
+	end)
+
+	helpers.it("preserves a competing record edit and retains unconfirmed copies", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local local_path, installed_path, record_path = LOCAL_DIR .. "ergol.keylayout",
+			LAYOUTS_DIR .. "ergol.keylayout", LOCAL_DIR .. "installed.json"
+		local replace, once = deps.replace_exact, true
+		deps.replace_exact = function(path, content, expected)
+			if once and path == record_path then
+				once = false
+				state.files[record_path] = '{"foreign":true}'
+			end
+			return replace(path, content, expected)
+		end
+		local result = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(state.files[record_path], '{"foreign":true}')
+		helpers.assert_eq(state.files[local_path], candidate)
+		helpers.assert_eq(state.files[installed_path], candidate)
+	end)
+
+	helpers.it("refuses a link observed after the update preflight", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local path, inspect, count = LOCAL_DIR .. "ergol.keylayout", deps.inspect_file, 0
+		local original = state.files[path]
+		deps.inspect_file = function(target)
+			if target == path then
+				count = count + 1
+				if count >= 2 then return { mode = "link" }, "ok" end
+			end
+			return inspect(target)
+		end
+		local result = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(state.files[path], original)
+		helpers.assert_eq(record(state).layouts.ergol.sha256, entry_of("ergol").sha256)
+	end)
+
+	helpers.it("retains rollback when the conditional writer owner changes", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local original, changed = deps.replace_exact, false
+		local owned
+		owned = function(path, value, expected)
+			local ok, detail = original(path, value, expected)
+			if ok and not changed then changed = true; deps.replace_exact = function() error("foreign writer") end end
+			return ok, detail
+		end
+		deps.replace_exact = owned
+		local before = state.files[LOCAL_DIR .. "installed.json"]
+		local refused = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_eq(refused.ok, false)
+		helpers.assert_eq(state.files[LOCAL_DIR .. "installed.json"], before)
+		local blocked = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_eq(blocked.ok, false)
+		deps.replace_exact = owned
+		local retried = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+		helpers.assert_true(retried.ok, tostring(retried.extra))
+		helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], candidate)
+	end)
+
+	helpers.it("refuses an update when the inverse owner cannot be constructed", function()
+		local registry, deps, state = manager({ served = "offline", files = shipped_files() })
+		helpers.assert_true(run(function(done) registry.install("ergol", done, deps) end).ok)
+		local entry = Json.decode(Json.encode(entry_of("ergol")))
+		local candidate = "verified replacement layout"
+		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
+		local before = state.files[LOCAL_DIR .. "ergol.keylayout"]
+		local original = package.loaded["config_file_inverse"]
+		package.loaded["config_file_inverse"] = { for_current_writer = function() error("owner unavailable") end }
+		local ok, err = xpcall(function()
+			local refused = run(function(done) registry.install_local(entry, candidate, done, deps) end)
+			helpers.assert_eq(refused.ok, false)
+			helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], before)
+			helpers.assert_nil(registry.snapshot(deps).busy)
+		end, debug.traceback)
+		package.loaded["config_file_inverse"] = original
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("preserves a real edited layout during uninstall", function()
 		require("tests.support.file_system_transaction_fixture").with_fixture(function(host)
 			local registry, deps, state = manager({ served = "offline", files = shipped_files() })
@@ -433,6 +760,8 @@ helpers.describe("layout manager (macOS): installing", function()
 				[LAYOUTS_DIR .. "ergol.keylayout"] = "old bytes",
 			},
 		})
+		local digest = deps.digest
+		deps.digest = function(text) return text == "old bytes" and string.rep("1", 64) or digest(text) end
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
 		helpers.assert_eq(record(state).layouts.ergol.version, entry_of("ergol").version)
