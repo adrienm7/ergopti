@@ -5,7 +5,7 @@
 ; This is injected input, not a physical-key witness.
 if A_Args.Length != 2 || A_Args[1] != "--allow-owned-native-kana-sticky"
 	throw Error("Explicit native modifier injection opt-in is required.")
-if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held")
+if A_PtrSize != 8 || !(A_Args[2] == "plain" || A_Args[2] == "kana-held" || A_Args[2] == "kana-released")
 	throw Error("The exact 64-bit INPUT40 probe and known case are required.")
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2, TEXT_SENDER_SEND_LEVEL := 0
 ; A valid production policy keeps shortcut words open. Its actual complete-scalar
@@ -14,8 +14,8 @@ global HSE_ArrowResetsWord := false, HSE_ShortcutResetsWord := false, HSE_TapHol
 global HSE_Buffer := "seed", _PrefixBuffer := "seed"
 global _TH_OwnedModifiers := Map(), LayerEnabled := false, _TapHoldTapInDispatch := ""
 global _SKN := {Mode: A_Args[2], Window: 0, Edit: 0, Hook: 0, Received: [], Payloads: [], Errors: [],
-	Injected: 0, OemOwed: false, F6Owed: false, Observer: 0, NativeEvents: [], Failure: 0, TransactionCritical: false, Finishes: []}
-global _ALTGR_KANA_FIXUP := _SKN.Mode == "kana-held"
+	Injected: 0, OemOwed: false, F6Owed: false, Observer: 0, NativeEvents: [], ReleasedAtReplay: false, Failure: 0, TransactionCritical: false, Finishes: []}
+global _ALTGR_KANA_FIXUP := _SKN.Mode != "plain"
 global _ALTGR_LAYOUT_PROBE := Map("altgr_vk", 0xDF)
 global _TextSenderKeyIsDown := (Name) => GetKeyState(Name)
 global _AHK_SendInput := _SKN_Replay
@@ -58,6 +58,7 @@ _SKN_Receiver(WParam, LParam, Message, Hwnd) {
 _SKN_Replay(Keys) {
 	global _SKN
 	_SKN_Target()
+	_SKN.ReleasedAtReplay := !GetKeyState("vkDF") && !(DllCall("GetAsyncKeyState", "Int", 0xDF, "Short") & 0x8000)
 	_SKN.Payloads.Push(Keys)
 	_SKN.TransactionCritical := !!A_IsCritical
 	_SKN_Require(_SKN.TransactionCritical, "Native replay must be admitted inside the actual HS transaction.")
@@ -97,14 +98,16 @@ _SKN_Inject() {
 		_SKN_Require(_SKN.Observer.InProgress, "The passive native ABI observer must be admitted before injection.")
 		; The native OEM8/extended-SC138 pair matches Kana AltGr's event ABI.
 		; Family identity is explicitly simulated; no installed Kana HKL is claimed.
-		; Keep OEM8 down until the actual F6 receiver receipt, isolating admission
-		; from the separate historical captured-modifier replay contract.
+		; Held mode isolates capture admission; released mode adds the exact OEM8
+		; Up in the original native batch before Wait can unwind and replay.
 		Rows := _SKN.Mode == "kana-held" ? [[0xDF, 0x38, 1], [0x75, 0x40, 0], [0x75, 0x40, 2]]
 			: [[0x75, 0x40, 0], [0x75, 0x40, 2]]
+		if _SKN.Mode == "kana-released"
+			Rows := [[0xDF, 0x38, 1], [0x75, 0x40, 0], [0x75, 0x40, 2], [0xDF, 0x38, 3]]
 		Packets := _SKN_Packets(Rows)
 		_SKN.Injected := DllCall("SendInput", "UInt", Rows.Length, "Ptr", Packets, "Int", 40, "UInt")
-		_SKN.OemOwed := _SKN.Mode == "kana-held" && _SKN.Injected >= 1
-		_SKN.F6Owed := _SKN.Mode == "kana-held" ? _SKN.Injected == 2 : _SKN.Injected == 1
+		_SKN.OemOwed := _SKN.Mode != "plain" && _SKN.Injected >= 1 && (_SKN.Mode != "kana-released" || _SKN.Injected < 4)
+		_SKN.F6Owed := _SKN.Mode != "plain" ? _SKN.Injected == 2 : _SKN.Injected == 1
 		_SKN_Require(_SKN.Injected == Rows.Length, "The complete exact native INPUT40 vector must be admitted.")
 	} catch as Err {
 		_SKN.Failure := Err
@@ -136,21 +139,21 @@ _SKN_Main() {
 		if IsObject(_SKN.Failure)
 			throw _SKN.Failure
 		Started := A_TickCount
-		while (!_SKN_HasF6() || _SKN.NativeEvents.Length < (_SKN.Mode == "kana-held" ? 2 : 1))
+		while (!_SKN_HasF6() || _SKN.NativeEvents.Length < (_SKN.Mode != "plain" ? 2 : 1))
 			&& A_TickCount - Started < 1500
 			Sleep(5)
 		_SKN_Require(_SKN_HasF6(), "The actual original or replayed F6 must reach the owned receiver before sampling.")
 		_SKN.Observer.Stop()
 		_SKN_Require(!_SKN.Observer.InProgress, "The exact passive native observer must stop before the ABI receipt is sampled.")
-		ExpectedEvents := _SKN.Mode == "kana-held" ? 2 : 1
-		NativeOem := _SKN.Mode == "kana-held" && _SKN.NativeEvents.Length >= 1
+		ExpectedEvents := _SKN.Mode != "plain" ? 2 : 1
+		NativeOem := _SKN.Mode != "plain" && _SKN.NativeEvents.Length >= 1
 			&& _SKN.NativeEvents[1].Vk == 0xDF && _SKN.NativeEvents[1].Sc == 0x138
 		NativeF6 := _SKN.NativeEvents.Length == ExpectedEvents
 			&& _SKN.NativeEvents[ExpectedEvents].Vk == 0x75 && _SKN.NativeEvents[ExpectedEvents].Sc == 0x40
 		FileAppend("OBSERVATION sticky-kana-native-abi mode=" . _SKN.Mode . " keydowns=" . _SKN.NativeEvents.Length
 			. " oem_df_sc138=" . NativeOem . " f6_75_sc40=" . NativeF6
 			. " observer_level=" . _SKN.Observer.MinSendLevel . "`n", "*")
-		_SKN_Require(NativeF6 && (_SKN.Mode != "kana-held" || NativeOem),
+		_SKN_Require(NativeF6 && (_SKN.Mode == "plain" || NativeOem),
 			"The native original VK/SC ABI must be observed independently before any business verdict.")
 		F6 := [], OriginalOem := 0, OriginalF6 := 0
 		for Event in _SKN.Received {
@@ -165,12 +168,15 @@ _SKN_Main() {
 			. " end_key=" . _SKN.Hook.EndKey . " end_mods=" . CapturedMods
 			. " f6_received=" . F6.Length . " original_f6=" . OriginalF6 . " original_oem=" . OriginalOem
 			. " f6_ctrl=" . (F6.Length ? F6[1].Ctrl : -1) . " f6_oem=" . (F6.Length ? F6[1].Oem : -1)
+			. " released_before_replay=" . _SKN.ReleasedAtReplay
 			. " payload=" . (_SKN.Payloads.Length ? _SKN.Payloads[1] : "") . "`n", "*")
+		if _SKN.Mode == "kana-released"
+			_SKN_Require(_SKN.ReleasedAtReplay, "The actual OEM8 logical and asynchronous states must be released before the genuine replay port is called.")
 		_SKN_Require(Accepted && _SKN.Errors.Length == 0 && _SKN.Payloads.Length == 1,
 			"The real sticky capture and real TextPressKey must emit one native replay without errors.")
 		_SKN_Require(F6.Length == 1 && F6[1].Ctrl && OriginalF6 == 0,
 			"Kana AltGr must remain an intervening modifier so the following F6, not OEM8, consumes the requested sticky Ctrl.")
-		_SKN_Require(OriginalOem == (_SKN.Mode == "kana-held") && F6[1].Oem == (_SKN.Mode == "kana-held"),
+		_SKN_Require(OriginalOem == (_SKN.Mode != "plain") && F6[1].Oem == (_SKN.Mode != "plain"),
 			"The receiver must retain the original native Kana modifier through the actual modified F6.")
 		_SKN_Require(_SKN.TransactionCritical && _SKN.Finishes.Length == 1 && !_SKN.Finishes[1]
 			&& HSE_Buffer == "seed" && _PrefixBuffer == "seed" && SIHO_Count() == 0,
@@ -198,6 +204,12 @@ _SKN_Main() {
 					Sleep(5)
 				_SKN_Require(!GetKeyState("vkDF"), "The acknowledged OEM8 Up must settle logically before retirement.")
 				_SKN.OemOwed := false
+			}
+			if _SKN.Mode == "kana-released" && _SKN.Injected == 4 {
+				Started := A_TickCount
+				while GetKeyState("vkDF") && A_TickCount - Started < 1000
+					Sleep(5)
+				_SKN_Require(!GetKeyState("vkDF"), "The acknowledged original OEM8 Up must settle logically before the receiver retires.")
 			}
 			OnMessage(0x100, _SKN_Receiver, 0)
 			_SKN.Window.Destroy()

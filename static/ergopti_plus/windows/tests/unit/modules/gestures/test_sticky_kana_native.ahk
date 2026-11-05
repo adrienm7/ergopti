@@ -59,3 +59,6 @@ _SKN_Case(Mode) {
 for _SKN_Mode in ["plain", "kana-held"]
 	Test("sticky native Kana admission: " . _SKN_Mode . " retains the following modified F6 (sticky-kana-native)",
 		_SKN_Case.Bind(_SKN_Mode))
+
+Test("sticky native Kana release: captured original flags survive native modifier release before replay (sticky-kana-native-released)",
+	_SKN_Case.Bind("kana-released"))
