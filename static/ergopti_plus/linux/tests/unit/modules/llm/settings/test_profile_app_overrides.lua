@@ -40,6 +40,25 @@ end
 local USER = { id = "user_fixture_1", label = "Fixture", system_single = "Continue {context}", batch = false }
 
 helpers.describe("LLM profile settings: per-application overrides", function()
+	helpers.it("preserves historical profile keys and refuses ambiguous Unicode fallback (unicode-app-identity)", function()
+		local settings, storage = load_settings()
+		helpers.assert_true(settings.save_user_profile(USER, false, false))
+		helpers.assert_true(settings.set_app_override("Éditeur", "advanced"))
+		local before = storage.get("llm.app_profile_overrides")
+		helpers.assert_eq(settings.resolve_for_app("éditeur").id, "advanced")
+		helpers.assert_eq(storage.get("llm.app_profile_overrides"), before, "lookup does not migrate the v1 envelope")
+		helpers.assert_true(settings.set_app_override("Ǆ", "advanced"))
+		helpers.assert_true(settings.set_app_override("ǅ", USER.id))
+		helpers.assert_eq(settings.resolve_for_app("Ǆ").id, "advanced")
+		helpers.assert_eq(settings.resolve_for_app("ǅ").id, USER.id)
+		helpers.assert_nil(settings.resolve_for_app("ǆ"), "contradictory historical profiles have no fallback")
+		for _, invalid in ipairs({ string.char(0x80), string.char(0xc3), string.char(0xc0, 0xaf) }) do
+			local stored = { ["É" .. invalid] = "advanced" }
+			helpers.assert_eq(Overrides.resolve(stored, "É" .. invalid), "advanced")
+			helpers.assert_nil(Overrides.resolve(stored, "é" .. invalid))
+		end
+		restore()
+	end)
 	helpers.it("app-profile: no override means the menu's profile", function()
 		local settings, storage = load_settings()
 		helpers.assert_nil(settings.resolve_for_app("firefox"))

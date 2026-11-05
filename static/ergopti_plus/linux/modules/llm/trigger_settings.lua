@@ -192,13 +192,15 @@ end
 --- Whether the trigger is switched off in an application.
 --- @param app any The identifier the session reports for the focused application.
 --- @return boolean disabled
+local indexed_owner, disabled_index = setmetatable({}, { __mode = "v" }), nil
 function M.is_app_disabled(app)
-	local key = AppIdentity.normalize(app)
-	if not key then return false end
-	for _, disabled in ipairs(M.get(LEAF.DISABLED_APPS) or {}) do
-		if disabled == key then return true end
+	if _values[LEAF.DISABLED_APPS] == nil then M.get(LEAF.DISABLED_APPS) end
+	local apps = _values[LEAF.DISABLED_APPS]
+	if type(apps) ~= "table" then return false end
+	if apps ~= indexed_owner[1] then
+		indexed_owner[1], disabled_index = apps, AppIdentity.exclusion_index(apps)
 	end
-	return false
+	return AppIdentity.exclusion_contains(disabled_index, app, apps)
 end
 
 --- Replaces the list of applications the trigger never runs in.

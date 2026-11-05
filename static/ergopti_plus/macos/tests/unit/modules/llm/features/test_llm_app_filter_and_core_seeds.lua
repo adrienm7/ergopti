@@ -84,6 +84,27 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 			"is_blocked must still return true for an app whose name matches the exclusion")
 	end)
 
+	helpers.it("matches Unicode name exclusions without changing bundle or path identity (unicode-app-macos)", function()
+		local AF = load_filter(false)
+		set_front(make_named_front("éditeur"))
+		local state = { is_url_bar_focused = false }
+		local exclusions = { { name = "Éditeur" } }
+		helpers.assert_true(AF.is_blocked(state, exclusions, false, false))
+		exclusions[1].name = "Autre"
+		helpers.assert_eq(AF.is_blocked(state, exclusions, false, false), false, "mutated rows must not retain an old index")
+		exclusions[1].name = "Édit"
+		helpers.assert_true(AF.is_blocked(state, exclusions, false, false), "the existing substring rule remains active")
+		local invalid = string.char(0x80)
+		set_front(make_named_front("éditeur" .. invalid))
+		exclusions[1].name = "Éditeur" .. invalid
+		helpers.assert_eq(AF.is_blocked(state, exclusions, false, false), false, "invalid UTF-8 uses only historical matching")
+		set_front(make_named_front("éditeur"))
+		exclusions[1] = { name = "Éditeur", bundleID = "com.other" }
+		helpers.assert_eq(AF.is_blocked(state, exclusions, false, false), false, "bundle IDs retain exact ownership")
+		exclusions[1] = { name = "Éditeur", appPath = "/Other.app" }
+		helpers.assert_eq(AF.is_blocked(state, exclusions, false, false), false, "paths retain exact ownership")
+	end)
+
 	helpers.it("does NOT block a non-matching named app", function()
 		local AF = load_filter(false)
 		set_front(make_named_front("Terminal"))
