@@ -280,6 +280,6 @@ _KLWF_Case(Mode) {
 	AssertTrue(Retired, "The actual parent and descendant workers must retire before root deletion")
 }
 
-for _KLWF_Mode in ["parent-control", "worker"]
+for _KLWF_Mode in ["parent-control", "worker", "worker-switch-ingest", "worker-typing-ingest"]
 	Test("Metrics live foreground: " . _KLWF_Mode . " through the actual native producer (metrics-live-foreground-worker)",
 		_KLWF_Case.Bind(_KLWF_Mode))
