@@ -346,7 +346,7 @@ ProgramProviderClean(Value) {
 
 ProgramProviderAbsolute(Value) {
 	return ProgramProviderClean(Value) && StrPut(Value, "UTF-8") - 1 <= ProgramProviderSession.MAX_PATH_BYTES
-		&& (RegExMatch(Value, "^[A-Za-z]:[/\\]") || RegExMatch(Value, "^\\\\[^\\/]+\\[^\\/]+\\."))
+		&& (RegExMatch(Value, "^[A-Za-z]:[/\\]") || RegExMatch(Value, "^\\\\[^\\/]+\\[^\\/]+(?:\\.*)?\z"))
 		&& !RegExMatch(Value, "^\\\\[?.]\\")
 }
 
