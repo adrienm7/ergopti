@@ -301,16 +301,21 @@ function M.new(config)
 				prev_synth_type = is_synthetic and synth_type or "none"
 
 				if char == BACKSPACE then
-					flag_erased(batch, ctx, date_str, app, synth_type)
-					ctx.cur_word = Utils.pop_utf8(ctx.cur_word)
-					ctx.word_err = true
+					-- Windows can consume an unrecorded UTF-16 unit: count the key,
+					-- but retain the admitted text/history on every importing driver.
+					local erases_admitted = not (meta.erase == 0 or meta.erase == false)
+					if erases_admitted then
+						flag_erased(batch, ctx, date_str, app, synth_type)
+						ctx.cur_word = Utils.pop_utf8(ctx.cur_word)
+						ctx.word_err = true
+					end
 					local hr, m5 = time_rows(index, ev)
 
 					if is_synthetic then
 						-- The driver erasing its own trigger: not the user's mistake.
 						if hr then hr.es = hr.es + 1; m5.es = m5.es + 1 end
-						local trigger = table.remove(ctx.recent_typing)
-						if synth_type == "hotstring" or synth_type == "llm" then
+						local trigger = erases_admitted and table.remove(ctx.recent_typing) or nil
+						if erases_admitted and (synth_type == "hotstring" or synth_type == "llm") then
 							local prefix = synth_type == "hotstring" and "hs" or "llm"
 							-- Gross output stays gross: the page subtracts the trigger
 							-- input recorded here exactly once to obtain the net gain.
@@ -332,7 +337,7 @@ function M.new(config)
 						else
 							Helpers.bump_app_day(batch, date_str, app, "time_ms", delay)
 						end
-						table.remove(ctx.recent_typing)
+						if erases_admitted then table.remove(ctx.recent_typing) end
 						ctx.bs_run_len = ctx.bs_run_len + 1
 						ctx.last_was_bs = true
 						er.bs_total = er.bs_total + 1
@@ -351,7 +356,7 @@ function M.new(config)
 						marks.tg = ctx.p2 .. ctx.p1 .. BACKSPACE
 						Helpers.push_ngram(batch, "ngram_trigrams", date_str, app, marks.tg, delay, false, synth_type)
 					end
-					remember(ctx, marks)
+					if erases_admitted then remember(ctx, marks) end
 					ctx.p6, ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1 = ctx.p5, ctx.p4, ctx.p3, ctx.p2, ctx.p1, BACKSPACE
 				else
 					-- The bounded delay belongs to the last keystroke of each token; a

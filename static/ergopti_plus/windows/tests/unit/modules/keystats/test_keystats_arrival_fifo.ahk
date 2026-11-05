@@ -21,11 +21,11 @@ _KLF_WithState(Body) {
 	global _Stub_AppendLogHook, _Stub_WpmPushCalls
 	Owners := [Keystats, KLHook, KLWatch, KLPasswordCache, MetricsFocusCache, MetricsFilters]
 	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
-		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
+		"synth_owners", "synth_active", "synth_type", "synth_private", "health_privacy_hits", "scalar_fragment", "scalar_history", "scalar_epoch"],
 		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping", "control_char_echo", "context_transition", "context_stop", "context_observations", "context_observation_head"],
 		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
 		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
-		["generation", "focus_generation"], ["generation", "state"],
+		["generation", "focus_generation", "current_element_id"], ["generation", "state"],
 		["disabled_apps", "private_browsing", "secure_field", "system_auth"]]
 	Saved := []
 	for Index, Owner in Owners {
@@ -45,10 +45,14 @@ _KLF_WithState(Body) {
 		Keystats.lifecycle_generation := 100
 		Keystats.buffer_events := []
 		Keystats.buffer_text := ""
+		Keystats.synth_owners := []
 		Keystats.synth_active := 0
 		Keystats.synth_type := "none"
 		Keystats.synth_private := false
 		Keystats.health_privacy_hits := 0
+		Keystats.scalar_fragment := false
+		Keystats.scalar_history := false
+		Keystats.scalar_epoch := 100
 		KLHook.last_tick := 100
 		KLHook.last_vk := 0x41
 		KLHook.last_sc := 0x1E
@@ -77,6 +81,7 @@ _KLF_WithState(Body) {
 		KLWatch.system_failure_reported := false
 		KLPasswordCache.generation := 100
 		KLPasswordCache.focus_generation := 100
+		KLPasswordCache.current_element_id := ""
 		MetricsFocusCache.generation := 100
 		MetricsFocusCache.state := {valid: true, process_name: "owned-fifo.exe", title: "Owned FIFO",
 			class: "OwnedFifo", hwnd: 1, last_at: 100, failure_reason: "", timed_out: false}
@@ -527,8 +532,9 @@ _KID_ChildSource() {
 	for Symbol in ["KL_Hook_NoteActivity", "KL_Hook_HasPendingInput", "_KL_Hook_CaptureInput",
 		"_KL_Hook_InputLifecycleCurrent", "_KL_Hook_PrepareInput", "_KL_Hook_InputCurrent",
 		"_KL_Hook_InvalidateTabInput", "_KL_Hook_FinishInput", "_KL_Hook_CompleteInput",
-		"_KL_Hook_DrainInput", "_KL_Hook_CommitInput", "KL_Hook_OnChar", "KL_Hook_OnKeyDown",
-		"KL_Hook_OnKeyUp", "KL_Hook_RecordedChar", "_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent",
+		"_KL_Hook_DrainInput", "_KL_Hook_ScalarOwnerCurrent", "_KL_Hook_ScalarHistory",
+		"_KL_Hook_ScalarOmit", "_KL_Hook_ScalarPublished", "_KL_Hook_ScalarConsume", "_KL_Hook_ScalarBackspace", "_KL_Hook_ScalarDelay", "_KL_Hook_FrameCharacters", "_KL_Hook_CommitInput", "KL_Hook_OnChar", "KL_Hook_OnKeyDown",
+		"KL_Hook_OnKeyUp", "KL_Hook_InvalidateCapture", "KL_Hook_RecordedChar", "KL_MarkSynthetic", "KL_ClearSynthetic", "_KL_CaptureLlmJournalPrivacy", "_KL_LlmJournalPrivacyStillCurrent",
 		"KL_InvalidatePasswordFocus", "KLW_PopLast"] {
 		Body := _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "The actual callback graph requires its genuine definition: " . Symbol)
@@ -761,16 +767,27 @@ _KSP_ChildSource() {
 		"The existing native fixture has one exact exercise boundary")
 	; Retain its real native SendInput/WM_CHAR/receiver observer and wrappers
 	; delegating the genuine production callbacks, without the old test entry.
-	Source .= SubStr(Fixture, 1, Start - 1)
+	Wrapper := SubStr(Fixture, 1, Start - 1)
+	Wrapper := StrReplace(Wrapper, "KL_Hook_OnChar(Ih, Text, , , KL_Ergo_OnKeystroke)",
+		"KL_Hook_OnChar(Ih, Text, _KSP_Filter, , KL_Ergo_OnKeystroke)", true, &FilterPorts)
+	AssertEqual(1, FilterPorts, "Only the new subject's real OnChar privacy-classifier port may be observed.")
+	Wrapper := StrReplace(Wrapper,
+		'KL_Watchers_OnPrivateKeystroke(*) {`n	throw Error("The verified public receiver must not become a private activity sample.")`n}',
+		'KL_Watchers_OnPrivateKeystroke(*) {`n	return true`n}', true, &PrivateObservers)
+	AssertEqual(1, PrivateObservers, "The explicit session-only observer must stay passive in the new privacy boundary mode.")
+	Source .= Wrapper
 	for Symbol in ["JsonStringLiteral", "KL_JsonEncode", "FSWriteCreateDurable"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "" && _DriverIsProductionSource(Owner), "The actual codec/I/O owner must exist: " . Symbol)
 		Source .= "#Include " . Owner . "`n"
 	}
+	for Symbol in ["_KL_PublishBufferSnapshot", "_KL_RestoreBufferSnapshot"]
+		Source .= _DriverFuncBody(Symbol) . "`n"
+	Source .= "#Include " . _KID_ClassOwner("KeystatsConst") . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\keystats_utf16_packet_body.ahk`n"
 }
 
-for _KSP_Mode in ["packet-bmp", "packet-astral"]
+for _KSP_Mode in ["packet-bmp", "packet-astral", "packet-io-flush", "packet-io-detach", "packet-gap-synth", "packet-gap-context", "packet-gap-stop", "packet-gap-private", "packet-gap-inflight"]
 	Test("Keystats native Unicode record: " . _KSP_Mode . " preserves accepted output across JSON/UTF-8 (keystats-native-utf16-packet-roundtrip)",
 		_KPU_Case.Bind(_KSP_Mode, _KSP_ChildSource))
 
@@ -810,3 +827,236 @@ _KSX_ChildSource() {
 for _KSX_Mode in ["synth-revoked", "focus-invalidated", "two-highs"]
 	Test("Keystats native omitted-unit history: " . _KSX_Mode . " preserves both successive Backspaces (keystats-native-revoked-high-backspace)",
 		_KPU_Case.Bind(_KSX_Mode, _KSX_ChildSource))
+
+; A legal OnChar chunk can contain complete text and one trailing high unit.
+_KSC_PrefixTail() {
+	Hook := {}
+	KL_Hook_OnChar(Hook, "A" . Chr(0xD83D), _KLF_Allow, 1000, (*) => true)
+	AssertEqual("A", Keystats.buffer_text)
+	AssertEqual(1, Keystats.buffer_events.Length)
+	AssertTrue(IsObject(Keystats.scalar_fragment))
+	AssertEqual(0, Keystats.scalar_history.carry_delay, "The complete prefix already owns this callback delay.")
+	AssertEqual(900, Keystats.buffer_events[1][2])
+	KL_Hook_OnKeyUp(Hook, 0xE7, 0)
+	KL_Hook_OnKeyDown(Hook, 0xE7, 0, _KLF_Allow, 1001, _KLF_NoShortcut, (*) => true)
+	KL_Hook_OnChar(Hook, Chr(0xDE00), _KLF_Allow, 1002, (*) => true)
+	AssertEqual("A" . Chr(0x1F600), Keystats.buffer_text)
+	AssertEqual(2, Keystats.buffer_events.Length)
+	AssertEqual(Chr(0x1F600), Keystats.buffer_events[2][1])
+	AssertEqual(0, Keystats.buffer_events[2][2], "The delay already published with the complete prefix must not be duplicated for its trailing pair.")
+	AssertFalse(IsObject(Keystats.scalar_fragment))
+}
+Test("Keystats scalar frame: complete prefix plus split tail preserves one original delay (keystats-scalar-prefix-tail)",
+	_KSC_PrefixTailCase)
+_KSC_PrefixTailCase() {
+	PreviousCritical := Critical("On")
+	try _KLF_WithState(_KSC_PrefixTail)
+	finally Critical(PreviousCritical)
+}
+_KSC_RefusePrepare(Self, Intent) {
+	return false
+}
+_KSC_Cancelled(Mode) {
+	Hook := {}
+	if Mode == "stale" {
+		Old := _KL_Hook_CaptureInput("char", "x", 0, 0, _KLF_Allow, 900, , Hook)
+		KL_Hook_InvalidateCapture()
+		_KL_Hook_CompleteInput(Old)
+	}
+	KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, 1000, (*) => true)
+	Pending := Keystats.scalar_fragment
+	AssertTrue(IsObject(Pending))
+	if Mode == "stale" {
+		_KL_Hook_CommitInput(Old)
+		AssertTrue(Keystats.scalar_fragment == Pending, "A stale cancelled receipt cannot retire the new owner's fragment.")
+	} else {
+		_AAG_WithFn(_KL_Hook_PrepareInput, _KSC_RefusePrepare,
+			() => KL_Hook_OnChar(Hook, "x", _KLF_Allow, 1001, (*) => true))
+		AssertFalse(IsObject(Keystats.scalar_fragment), "A current character refused by preparation is a scalar boundary.")
+	}
+	KL_Hook_OnChar(Hook, Chr(0xDE00), _KLF_Allow, 1002, (*) => true)
+	AssertEqual(Mode == "stale" ? Chr(0x1F600) : "", Keystats.buffer_text)
+	AssertFalse(IsObject(Keystats.scalar_fragment))
+}
+_KSC_CancelledCase(Mode) {
+	PreviousCritical := Critical("On")
+	try _KLF_WithState(_KSC_Cancelled.Bind(Mode))
+	finally Critical(PreviousCritical)
+}
+for _KSC_Mode in ["current", "stale"]
+	Test("Keystats scalar cancellation: " . _KSC_Mode . " preserves the exact pending owner (keystats-scalar-cancelled-owner)",
+		_KSC_CancelledCase.Bind(_KSC_Mode))
+_KSC_PendingBackspace() {
+	ErgoCalls := []
+	Ergo(Delay, Vk, Sc, IsBs := false) => ErgoCalls.Push({Delay: Delay, IsBs: IsBs})
+	Hook := {}
+	KL_Hook_OnChar(Hook, "a", _KLF_Allow, 900, Ergo)
+	KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, 1000, Ergo)
+	AssertEqual("a", Keystats.buffer_text)
+	AssertTrue(IsObject(Keystats.scalar_fragment))
+	KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, 1100, _KLF_NoShortcut, Ergo)
+	AssertEqual("a", Keystats.buffer_text, "Native BS consumes only the pending unit, not its admitted predecessor.")
+	AssertEqual(2, Keystats.buffer_events.Length)
+	Marker := Keystats.buffer_events[2]
+	AssertEqual("[BS]", Marker[1], "The physical correction must remain in the event ledger.")
+	AssertEqual(0, Marker[3]["erase"])
+	AssertEqual(200, Marker[2], "The ledger must retain the omitted unit's delay before the correction.")
+	AssertEqual(2, ErgoCalls.Length)
+	AssertTrue(ErgoCalls[2].IsBs, "The genuine analytics dispatch still observes the physical Backspace.")
+	AssertFalse(IsObject(Keystats.scalar_fragment))
+	SavedBatch := KLW.batch, SavedContext := KLW.ctx
+	try {
+		KLW_ResetBatch(), KLW.ctx := Map()
+		KLW_WalkTypingEntry(Map("app", "ScalarOwner", "timestamp", "2024-06-01 10:00:00.000", "events", Keystats.buffer_events))
+		AssertEqual(1, KLW_GetErrorRow("2024-06-01", "ScalarOwner")["bs_total"])
+		AssertEqual(0, KLW.batch["ngram"]["ngram_chars"][KLW_Key("2024-06-01", "ScalarOwner", "a")]["e"],
+			"Replaying actual produced events cannot attribute the fragment's deletion to the public prefix.")
+		Context := KLW_GetAppCtx("ScalarOwner")
+		AssertEqual("a", Context["cur_word"])
+		AssertFalse(Context["word_err"])
+	} finally {
+		KLW.batch := SavedBatch
+		KLW.ctx := SavedContext
+	}
+}
+_KSC_PendingBackspaceCase() {
+	PreviousCritical := Critical("On")
+	try _KLF_WithState(_KSC_PendingBackspace)
+	finally Critical(PreviousCritical)
+}
+Test("Keystats pending-unit Backspace preserves actual ledger counters and admitted text (keystats-scalar-pending-backspace)",
+	_KSC_PendingBackspaceCase)
+
+; Compactness and ordering are checked through public callbacks, not direct gap
+; edits. These are deterministic protocol tests, not native caret simulations.
+_KSC_GapHistory(Mode) {
+	Hook := {}
+	Tick := 1000
+	KL_Hook_OnChar(Hook, "a", _KLF_Allow, Tick++, (*) => true)
+	if Mode == "coalesced" {
+		loop 64
+			KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, Tick++, (*) => true)
+		History := Keystats.scalar_history
+		AssertEqual(1, History.gaps.Length)
+		AssertEqual(64, History.gaps[1].units, "An unpublished-only burst needs one numeric run, not one retained object per unit.")
+		KL_Hook_OnChar(Hook, Chr(0xDE00), _KLF_Allow, Tick++, (*) => true)
+		AssertEqual("a" . Chr(0x1F600), Keystats.buffer_text)
+		AssertEqual(63, History.gaps[1].units)
+		AssertEqual(1, History.position)
+		KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+		AssertEqual("a", Keystats.buffer_text)
+		AssertFalse(Keystats.buffer_events[-1][3].Has("erase"))
+		loop 63 {
+			KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+			AssertEqual("a", Keystats.buffer_text)
+			AssertEqual(0, Keystats.buffer_events[-1][3]["erase"])
+		}
+	} else if Mode == "sparse" {
+		loop 32 {
+			KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, Tick++, (*) => true)
+			KL_Hook_OnChar(Hook, "b", _KLF_Allow, Tick++, (*) => true)
+		}
+		History := Keystats.scalar_history
+		AssertEqual(32, History.gaps.Length)
+		AssertEqual(32, History.position)
+		for Index, Gap in History.gaps {
+			AssertEqual(Index - 1, Gap.position, "Publications use absolute positions; older gaps are never shifted per character.")
+			AssertEqual(1, Gap.units)
+		}
+		loop 32 {
+			KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+			AssertFalse(Keystats.buffer_events[-1][3].Has("erase"))
+			AfterPublicPop := Keystats.buffer_text
+			KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+			AssertEqual(AfterPublicPop, Keystats.buffer_text)
+			AssertEqual(0, Keystats.buffer_events[-1][3]["erase"])
+		}
+		AssertEqual("a", Keystats.buffer_text)
+	} else {
+		KLPasswordCache.current_element_id := "owned-field-a"
+		KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, Tick++, (*) => true)
+		KL_InvalidatePasswordFocus()
+		AssertFalse(IsObject(Keystats.scalar_fragment))
+		if Mode == "different-field" {
+			KLPasswordCache.current_element_id := "owned-field-b"
+			KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+			AssertEqual("", Keystats.buffer_text)
+			AssertFalse(Keystats.buffer_events[-1][3].Has("erase"), "A newly attested different field cannot spend the previous field's omitted-unit history.")
+			AssertEqual(0, Keystats.scalar_history.gaps.Length)
+			return
+		}
+		KLPasswordCache.current_element_id := "owned-field-a"
+		KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+		AssertEqual("a", Keystats.buffer_text)
+		AssertEqual(0, Keystats.buffer_events[-1][3]["erase"])
+		History := Keystats.scalar_history
+	}
+	AssertEqual(0, History.gaps.Length)
+	AssertEqual(0, History.position)
+	KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, Tick++, _KLF_NoShortcut, (*) => true)
+	AssertEqual("", Keystats.buffer_text, "The following ordinary Backspace must still erase the public prefix.")
+	AssertFalse(Keystats.buffer_events[-1][3].Has("erase"))
+	AssertFalse(IsObject(Keystats.scalar_fragment))
+}
+_KSC_GapHistoryCase(Mode) {
+	PreviousCritical := Critical("On")
+	try _KLF_WithState(_KSC_GapHistory.Bind(Mode))
+	finally Critical(PreviousCritical)
+}
+for _KSC_GapMode in ["coalesced", "sparse", "cache-only", "different-field"]
+	Test("Keystats omission history: " . _KSC_GapMode . " preserves ordered scalar corrections (keystats-scalar-gap-history)",
+		_KSC_GapHistoryCase.Bind(_KSC_GapMode))
+
+_KSC_GapDelay(Mode) {
+	Hook := {}
+	KL_Hook_OnChar(Hook, "a", _KLF_Allow, 900, (*) => true)
+	KL_Hook_OnChar(Hook, Chr(0xD83D), _KLF_Allow, 1000, (*) => true)
+	AssertEqual(100, Keystats.scalar_history.carry_delay)
+	if Mode == "pair" {
+		KL_Hook_OnChar(Hook, Chr(0xDE00), _KLF_Allow, 1100, (*) => true)
+		AssertEqual("a" . Chr(0x1F600), Keystats.buffer_text)
+		AssertEqual(100, Keystats.buffer_events[-1][2], "The low transport endpoint must not add a second key delay to its original high.")
+		AssertEqual(0, Keystats.scalar_history.carry_delay)
+		return
+	}
+	if Mode == "cache-bs"
+		KL_InvalidatePasswordFocus()
+	else {
+		Owner := KL_MarkSynthetic("owned-gap-delay")
+		AssertTrue(KL_ClearSynthetic(Owner))
+	}
+	AssertFalse(IsObject(Keystats.scalar_fragment))
+	AssertEqual(100, Keystats.scalar_history.carry_delay, "Retiring assembly cannot lose numeric omitted time.")
+	if Mode == "synth-char" {
+		KL_Hook_OnChar(Hook, "b", _KLF_Allow, 1100, (*) => true)
+		AssertEqual("ab", Keystats.buffer_text)
+		AssertEqual(200, Keystats.buffer_events[-1][2])
+		AssertEqual(0, Keystats.scalar_history.carry_delay)
+		KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, 1200, _KLF_NoShortcut, (*) => true)
+		AssertEqual("a", Keystats.buffer_text)
+		AssertEqual(100, Keystats.buffer_events[-1][2], "A later correction cannot charge the carry already published with b.")
+		AssertFalse(Keystats.buffer_events[-1][3].Has("erase"))
+		KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, 1300, _KLF_NoShortcut, (*) => true)
+		AssertEqual("a", Keystats.buffer_text)
+		AssertEqual(100, Keystats.buffer_events[-1][2])
+		AssertEqual(0, Keystats.buffer_events[-1][3]["erase"])
+		return
+	}
+	KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, 1100, _KLF_NoShortcut, (*) => true)
+	AssertEqual("a", Keystats.buffer_text)
+	AssertEqual(200, Keystats.buffer_events[-1][2], "Revoked high100 plus actual BS100 must produce exactly200.")
+	AssertEqual(0, Keystats.buffer_events[-1][3]["erase"])
+	AssertEqual(0, Keystats.scalar_history.carry_delay)
+	KL_Hook_OnKeyDown(Hook, 0x08, 0x0E, _KLF_Allow, 1200, _KLF_NoShortcut, (*) => true)
+	AssertEqual("", Keystats.buffer_text)
+	AssertEqual(100, Keystats.buffer_events[-1][2])
+	AssertFalse(Keystats.buffer_events[-1][3].Has("erase"))
+}
+_KSC_GapDelayCase(Mode) {
+	PreviousCritical := Critical("On")
+	try _KLF_WithState(_KSC_GapDelay.Bind(Mode))
+	finally Critical(PreviousCritical)
+}
+for _KSC_DelayMode in ["synth-bs", "cache-bs", "synth-char", "pair"]
+	Test("Keystats omitted-unit delay: " . _KSC_DelayMode . " transfers time once (keystats-scalar-gap-delay)",
+		_KSC_GapDelayCase.Bind(_KSC_DelayMode))

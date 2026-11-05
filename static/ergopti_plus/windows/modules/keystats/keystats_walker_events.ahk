@@ -241,7 +241,10 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 						prev_synth_type := is_synthetic ? synth_type : "none"
 
 						if is_backspace {
-								if (backtrack.Length > 0) {
+								; erase=0 counts the key but cannot erase an unpublished UTF-16 fragment's predecessor.
+								Erase := KLW_GetMap(meta, "erase", 1)
+								ErasesAdmitted := !(Erase is Number && Erase = 0)
+								if (ErasesAdmitted && backtrack.Length > 0) {
 										last_entry := backtrack.Pop()
 										if (KLW_GetMap(last_entry, "c", "") != "[BS]") {
 												if last_entry.Has("c")  && last_entry["c"]  != ""
@@ -260,23 +263,25 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 														KLW_PushNgram("ngram_heptagrams", date_str, app, last_entry["hp"], 0, true, synth_type)
 										}
 								}
-								cur_word := KLW_PopLast(cur_word)
-								word_err := true
+								if ErasesAdmitted {
+									cur_word := KLW_PopLast(cur_word)
+									word_err := true
+								}
 
 								if is_synthetic {
 										hr["es"] += 1
 										m5["es"] += 1
 										trigger_evt := ""
-										if (Activity["recent_typing"].Length > 0)
+										if (ErasesAdmitted && Activity["recent_typing"].Length > 0)
 												trigger_evt := Activity["recent_typing"].Pop()
-										if (synth_type = "hotstring") {
+										if (ErasesAdmitted && synth_type = "hotstring") {
 												; hs_chars is gross generated output. The UI subtracts
 												; hs_input_chars once, so decreasing both double-counts
 												; each deleted trigger character in live projections.
 												KLW_BumpAppDay(date_str, app, "hs_input_chars", 1)
 												if (trigger_evt is Map)
 														KLW_BumpInputBuckets(date_str, app, trigger_evt["delay"], "hs", app_day_key)
-										} else if (synth_type = "llm") {
+										} else if (ErasesAdmitted && synth_type = "llm") {
 												; Keep the gross-output contract aligned with macOS,
 												; Linux and the Windows events_* database rebuild.
 												KLW_BumpAppDay(date_str, app, "llm_input_chars", 1)
@@ -296,7 +301,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										}
 										KLW_BucketAdd(hr["e_buckets"], delay, 1)
 										KLW_BucketAdd(m5["e_buckets"], delay, 1)
-										if (Activity["recent_typing"].Length > 0)
+										if (ErasesAdmitted && Activity["recent_typing"].Length > 0)
 												Activity["recent_typing"].Pop()
 										Activity["bs_run_len"] += 1
 										Activity["last_was_bs"] := true
@@ -318,9 +323,11 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										KLW_PushNgram("ngram_trigrams", date_str, app, p2 . p1 . "[BS]", delay, false, synth_type)
 										bs_entry["tg"] := p2 . p1 . "[BS]"
 								}
-								backtrack.Push(bs_entry)
-								if (backtrack.Length > KLWConst.HIST_CAP)
+								if ErasesAdmitted {
+									backtrack.Push(bs_entry)
+									if (backtrack.Length > KLWConst.HIST_CAP)
 										backtrack.RemoveAt(1)
+								}
 								p6 := p5, p5 := p4, p4 := p3, p3 := p2, p2 := p1, p1 := "[BS]"
 						} else {
 								k_c  := KLW_EventToken(char)

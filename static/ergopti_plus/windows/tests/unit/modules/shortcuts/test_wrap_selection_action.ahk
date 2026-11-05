@@ -290,7 +290,7 @@ _GTRF_ChildSource() {
 		AssertTrue(RegExMatch(Source, Pattern, &Value), "The native child requires the production constant " . Name)
 		Code .= "global " . Name . " := " . Value[1] . "`n"
 	}
-	Code .= 'global Keystats := {synth_owners: [], synth_active: 0, synth_type: "none", synth_private: false}' . "`n"
+	Code .= 'global Keystats := {synth_owners: [], synth_active: 0, synth_type: "none", synth_private: false, scalar_fragment: false, scalar_history: false, scalar_epoch: 1}' . "`n"
 	Code .= 'global _TimingsCache := Map("gestures", Map("synthetic_clear_ms", ' . TimingsGet("gestures", "synthetic_clear_ms") . "))`n"
 	return Code . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
 }

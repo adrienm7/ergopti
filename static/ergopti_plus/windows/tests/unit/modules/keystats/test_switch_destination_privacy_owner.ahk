@@ -13,7 +13,7 @@
 _KSD_ChildSource(Network := false) {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["_KL_ContextProject", "MF_ShouldFilter", "HotPath_Now", "WICaptureBoundedFocusSnapshot", "WallClockTimestamp", "TickElapsed64"] {
+	for Symbol in ["_KL_ContextProject", "MF_ShouldFilter", "HotPath_Now", "WICaptureBoundedFocusSnapshot", "WallClockTimestamp", "TickElapsed64", "_TextCodepointWidth"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "Every actual whole owner must resolve: " . Symbol)
 		Source .= "#Include " . Owner . "`n"
