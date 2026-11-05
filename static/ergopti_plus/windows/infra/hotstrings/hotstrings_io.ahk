@@ -151,17 +151,43 @@ _HotstringsOverrideSourceFor(Owner, Path) {
 	return Receipt
 }
 
-_HotstringsOverrideCommitSourceCurrent(Origin, Receipt, Path, AuthorizeFn, HasAuthorizer, RequiresLive) {
+_HotstringsOverrideCommitMemoryCurrent(Origin, Receipt, Path, RequiresLive, NativeOwnerToken := 0) {
 	global _HotstringsOverrides
 	if _HotstringsOverrideSourceFor(Origin, Path) != Receipt || (RequiresLive && Origin != _HotstringsOverrides)
 		return false
-	; Admission may yield/reenter. Its effects precede the final physical source
-	; comparison, never grant permission to replace a newly read source image.
-	if HasAuthorizer && !_FSNativeAdmissionAccepted(AuthorizeFn)
-		return false
+	; Only the actual lease-table producer may supply this internal token.
+	; No arbitrary authorization callback executes in this pure final predicate.
+	if !((NativeOwnerToken is Integer) && NativeOwnerToken == 0)
+		if !(NativeOwnerToken is Object) || !_HotstringsAuthorizeOverrideCommit(NativeOwnerToken, Path)
+			return false
 	return _HotstringsOverrideSourceFor(Origin, Path) == Receipt
 		&& (!RequiresLive || Origin == _HotstringsOverrides)
-		&& _FSSourceIsUnchanged(Path, Receipt.Source)
+}
+
+_HotstringsOverrideCommitSourceCurrent(Origin, Receipt, Path, AuthorizeFn, HasAuthorizer, RequiresLive, ReadPath := unset) {
+	if !_HotstringsOverrideCommitMemoryCurrent(Origin, Receipt, Path, RequiresLive)
+		return false
+	if HasAuthorizer && !_FSNativeAdmissionAccepted(AuthorizeFn)
+		return false
+	return _HotstringsOverrideCommitMemoryCurrent(Origin, Receipt, Path, RequiresLive)
+		&& _FSSourceIsUnchanged(IsSet(ReadPath) ? ReadPath : Path, Receipt.Source)
+}
+
+_HotstringsOverrideCreateHeldStage(State, Folder, Name, Attributes) {
+	State.handle := _FSCreateHeldStage(Folder, Name, Attributes)
+	return State.handle
+}
+
+_HotstringsOverrideHeldPreflight(State, PhysicalPath, Content, ExpectedSource, MemoryAdmission) {
+	if !MemoryAdmission.Call()
+		return false
+	_FSRewind(State.handle)
+	Readback := _FSReadUtf8ExactHandle(State.handle, 0, false)
+	if !(Readback is String) || !(Readback == Content)
+		return false
+	; Source I/O precedes the final pure memory predicate and native rename.
+	; This does not claim a kernel CAS against another process's source edits.
+	return _FSSourceIsUnchanged(PhysicalPath, ExpectedSource.Source)
 }
 
 ; A decoded replacement character is not proof of the source bytes it replaces.
@@ -514,7 +540,7 @@ _HotstringsDelayLine(Record, Base) {
 ; swap; omitting it retains compatibility for internal full-state saves.
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
-		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0, RetiredLegacy := 0, ExpectedSource := 0) {
+		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0, RetiredLegacy := 0, ExpectedSource := 0, NativeOwnerToken := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath
 		InheritedCritical := A_IsCritical
 		if InheritedCritical
@@ -524,6 +550,15 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		if !(Path is String) || Path == "" {
 				try LoggerError("HotstringsConfig", "Cannot write overrides before HotstringsConfigInit has provided a target path. The change is NOT persisted.")
 				return false
+		}
+		NativeAdapters := (WriterFn is Integer) && WriterFn == 0
+				&& (ReplaceFn is Integer) && ReplaceFn == 0
+		if NativeAdapters {
+				try PhysicalPath := FSResolveAbsolutePath(Path)
+				catch as Err {
+						try LoggerError("HotstringsConfig", "Cannot capture the override publication target: {1}.", Err.Message)
+						return false
+				}
 		}
 		HasAuthorizer := !((AuthorizeFn is Integer) && AuthorizeFn == 0)
 		HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
@@ -547,9 +582,20 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				try LoggerError("HotstringsConfig", "Cannot write overrides without the source receipt captured with the candidate. Reload is required.")
 				return false
 		}
+		if !((NativeOwnerToken is Integer) && NativeOwnerToken == 0) && !(NativeOwnerToken is Object)
+				return false
+		HasNativeOwner := NativeOwnerToken is Object
 		FinalAdmission := _HotstringsOverrideCommitSourceCurrent.Bind(Origin, ExpectedSource, Path,
-				AuthorizeFn, HasAuthorizer, HasPublisher)
-		if !FinalAdmission.Call() {
+				AuthorizeFn, HasAuthorizer, HasPublisher, NativeAdapters ? PhysicalPath : Path)
+		MemoryAdmission := _HotstringsOverrideCommitMemoryCurrent.Bind(Origin, ExpectedSource, Path,
+				HasPublisher, NativeOwnerToken)
+		; Runtime Set/Clear/boot gateways supply a real owned lease and therefore
+		; use the pure final predicate. Legacy direct custom authorizers retain
+		; their existing callback-then-source-check ordering at the native gate.
+		NativeAdmission := HasNativeOwner || !HasAuthorizer ? MemoryAdmission : FinalAdmission
+		; An optional arbitrary authorizer still runs before the source witness.
+		; Real runtime lease authority is separately resampled without callbacks.
+		if !FinalAdmission.Call() || !MemoryAdmission.Call() {
 				try LoggerError("HotstringsConfig", "Cannot write overrides because their admitted source changed. Reload is required.")
 				return false
 		}
@@ -562,7 +608,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				return false
 		}
 
-		if !_HotstringsOverrideSourceIsRepresentable(Path, &SourceDetail, RetiredLegacy) {
+		if !_HotstringsOverrideSourceIsRepresentable(NativeAdapters ? PhysicalPath : Path, &SourceDetail, RetiredLegacy) {
 				try LoggerError("HotstringsConfig",
 						"Cannot rewrite overrides without losing source data: {1}. The existing file and live state are unchanged.", SourceDetail)
 				return false
@@ -638,6 +684,23 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		static WriteSeq := 0
 		LocalSeq := ++WriteSeq
 		StagePath := Path . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
+		if NativeAdapters {
+				_TOML_ReapStaleTemps(PhysicalPath, StaleTempAgeMs())
+				Stage := {handle: -1}
+				Suffix := "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
+				Preflight := _HotstringsOverrideHeldPreflight.Bind(Stage, PhysicalPath, Out, ExpectedSource, MemoryAdmission)
+				Published := FSWriteReplaceOwned(PhysicalPath, Out, Suffix, &StageDetail,
+						_HotstringsOverrideCreateHeldStage.Bind(Stage), Preflight, NativeAdmission,
+						ExpectedSource.Source["status"] == FS_STATUS_OK, &Publication)
+				if !((Published is Integer) && Published == 1) {
+						if Publication.renamed && !Publication.durable
+								return ConfigReportPersistenceFailure("hotstring override publication", 0,
+										"A native replacement occurred without complete durable acknowledgement. Verify the saved image and reload if the live source is stale. " . StageDetail, false)
+						try LoggerError("HotstringsConfig", "Owned override publication was refused: {1}. No target was replaced.", StageDetail)
+						return false
+				}
+				Authorized := true, ReplaceError := "", MoveError := 0
+		} else {
 		_TOML_ReapStaleTemps(Path, StaleTempAgeMs())
 
 		Written := false
@@ -705,8 +768,13 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 						MoveError := A_LastError
 		}
 
-		if Published && !FSUtf8ExactMatches(Path, Out) {
-				_HotstringsRemoveOverrideStage(StagePath)
+		}
+		if Published && !FSUtf8ExactMatches(NativeAdapters ? PhysicalPath : Path, Out) {
+				if !NativeAdapters
+						_HotstringsRemoveOverrideStage(StagePath)
+				if NativeAdapters
+						return ConfigReportPersistenceFailure("hotstring override publication", 0,
+								"Native replacement was acknowledged, but later readback could not confirm the candidate. Verify the current file and reload.", false)
 				try LoggerError("HotstringsConfig", "The published override image is not the staged candidate. Reload is required.")
 				return false
 		}
@@ -719,7 +787,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				PreviousCritical := Critical("On")
 				try {
 						try {
-								LivePublished := PublishFn.Call()
+								LivePublished := MemoryAdmission.Call() ? PublishFn.Call() : false
 								if (LivePublished is Integer) && LivePublished == 1
 										_HotstringsOverrideBindSource(Source, Path, Map("status", FS_STATUS_OK, "content", Out))
 						} catch as Err {
@@ -760,6 +828,9 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				return false
 		}
 		if !LivePublished {
+				if NativeAdapters
+						return ConfigReportPersistenceFailure("hotstring override publication", 0,
+								"Native replacement occurred, but the live projection was not acknowledged. Verify the current file and reload. " . PublishError, false)
 				if (PublishError != "") {
 						try LoggerError("HotstringsConfig",
 								"Override file '{1}' was replaced but live publication raised: {2}. Reload is required.",

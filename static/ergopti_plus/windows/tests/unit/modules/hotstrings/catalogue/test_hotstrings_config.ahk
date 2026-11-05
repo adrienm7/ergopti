@@ -1855,3 +1855,63 @@ for _HOLACK_PendingMode in ["explicit-after-base-refusal", "explicit-after-overr
 	Test("HotstringsConfig legacy default durable ACK: " . _HOLACK_PendingMode,
 		_HTBS_Run.Bind("legacy-default-ack-" . _HOLACK_PendingMode, "[hotstrings]`nexpansion_delay = 0.750`n",
 			_HOLACK_DefaultNeedsDurableAck.Bind(_HOLACK_PendingMode)))
+
+_HSAC_LastAuthorizer(ChangeSource) {
+	Root := A_Temp . "\ergopti_override_authorizer_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\overrides.toml", Created := false
+	A := '[magickey]`ncolor = "#111111"`npriority = 10`n'
+	B := ChangeSource ? '[magickey]`ncolor = "#444444"`npriority = 45`n' : A
+	State := {calls: 0, criticalEdits: 0, observedStage: 0, nativeWriteAck: 0}
+	Admit() {
+		State.calls += 1
+		if A_IsCritical {
+			Count := 0
+			loop files Path . "." . A_ScriptHwnd . "-*.tmp", "F"
+				Count += 1
+			if Count {
+				State.observedStage += Count
+				State.nativeWriteAck := FSWriteDurable(Path, B)
+				if State.nativeWriteAck == 1
+					State.criticalEdits += 1
+			}
+		}
+		return 1
+	}
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		AssertEqual(1, FSWriteCreateDurable(Path, A))
+		Candidate := _ParseOverrides(Path)
+		Candidate["magickey"].ShowTooltip := false
+		Result := _SaveOverrides(Candidate, 0, 0, Path, Admit)
+		Actual := FSReadUtf8Exact(Path), Disk := TOML_ParseDocument(Actual)
+		_TestPrint("# override-last-authorizer change_source=" . ChangeSource . " result=" . Result
+			. " calls=" . State.calls . " critical_edits=" . State.criticalEdits
+			. " observed_stage=" . State.observedStage . " native_write_ack=" . State.nativeWriteAck
+			. " disk_color=" . Disk["magickey"]["color"] . " disk_priority=" . Disk["magickey"]["priority"])
+		AssertTrue(State.observedStage > 0, "the real default writer must already own its native candidate stage")
+		AssertTrue(State.criticalEdits > 0, "the arbitrary authorizer must reach its actual final Critical callback")
+		AssertEqual(1, State.nativeWriteAck, "the competing source image must actually be durably written")
+		AssertEqual(ChangeSource ? 45 : 10, Disk["magickey"]["priority"])
+		AssertEqual(ChangeSource ? "#444444" : "#111111", Disk["magickey"]["color"])
+		if ChangeSource {
+			AssertFalse(Result, "an arbitrary final authorizer cannot lend its ACK to an older source image")
+			AssertEqual(B, Actual, "the complete image written by the real callback remains authoritative")
+		} else {
+			AssertTrue(Result, "legacy custom authorization still permits unchanged-source default publication")
+			AssertFalse(Disk["magickey"]["show_tooltip"].Value)
+		}
+	} finally {
+		if Created {
+			_TOML_InvalidateParseCache(Path)
+			Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+			if Refusals.Has(Key)
+				Refusals.Delete(Key)
+			DirDelete(Root, true)
+		}
+	}
+}
+for _HSAC_Change in [true, false]
+	Test("hotstring override authorization: last arbitrary callback source edit=" . _HSAC_Change
+		. " (override-last-authorizer-source)", _HSAC_LastAuthorizer.Bind(_HSAC_Change))
