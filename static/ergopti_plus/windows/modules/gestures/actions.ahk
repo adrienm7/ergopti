@@ -692,13 +692,23 @@ global _GestureMirrorPriorTopology := 0
 GestureDisplayMirrorToggle(Sys := 0) {
 		global _GestureMirrorPriorTopology, GESTURE_DISPLAY_TOPOLOGY_INTERNAL, GESTURE_DISPLAY_TOPOLOGY_CLONE
 		global GESTURE_DISPLAY_TOPOLOGY_EXTEND, GESTURE_DISPLAY_TOPOLOGY_EXTERNAL
+		global _LifecycleLatestTransition
+		Transition := _LifecycleLatestTransition
+		if A_IsSuspended
+				return false
 		Sys := _GestureSys(Sys)
-		if (Sys.ConnectedDisplayCount() < 2) {
+		Count := Sys.ConnectedDisplayCount()
+		if A_IsSuspended || Transition != _LifecycleLatestTransition
+				return false
+		if (Count < 2) {
 				LoggerInfo("gestures", "display_mirror_toggle: one display is connected, nothing to mirror.")
 				Sys.Notify(t("shortcuts.no_other_monitor"))
 				return false
 		}
 		Current := Sys.DisplayTopology()
+		; Both native reads can yield to a complete suspend/resume transition.
+		if A_IsSuspended || Transition != _LifecycleLatestTransition
+				return false
 		if (Current = GESTURE_DISPLAY_TOPOLOGY_CLONE)
 				Target := _GestureMirrorPriorTopology ? _GestureMirrorPriorTopology : GESTURE_DISPLAY_TOPOLOGY_EXTEND
 		else if (Current = GESTURE_DISPLAY_TOPOLOGY_INTERNAL || Current = GESTURE_DISPLAY_TOPOLOGY_EXTEND
