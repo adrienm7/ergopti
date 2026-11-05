@@ -962,7 +962,17 @@ local function main()
 	if committed ~= true then
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
-		Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
+		local personal_unavailable = false
+		if type(receipt) == "table" and type(receipt.unavailable) == "table" then
+			for _, source in ipairs(receipt.unavailable) do
+				if source == "personal-sources" then personal_unavailable = true end
+			end
+		end
+		if personal_unavailable then
+			Logger.warn(LOG, "Some hotstring sources are unavailable; %d available mapping(s) loaded.", mapping_count)
+		else
+			Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
+		end
 	else
 		Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
 			mapping_count, hotstrings_config.parse_error_count())
