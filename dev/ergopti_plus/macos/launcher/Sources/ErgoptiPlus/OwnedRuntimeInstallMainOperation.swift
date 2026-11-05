@@ -7,7 +7,7 @@ import Security
 
 /// Started only by the Lua install port after the user confirmed it (Tap-Holds row), never at startup. The helper
 /// comes from the verified download only (OwnedRuntimeDownloadedHelper), must carry this launcher's own
-/// certificate leaf and two code hashes, and the administrator shell copies it root-owned and proves that
+/// certificate leaf and its code hashes, and the administrator shell copies it root-owned and proves that
 /// requirement and its digest again before its one `--owned-install-first` transaction runs.
 ///
 /// One stdout line answers, for platform/remap/runtime_install.lua:
@@ -24,6 +24,17 @@ enum OwnedRuntimeInstallMainOperation {
 	private static let userCancelled = -128
 
 	static func handles(arguments: [String]) -> Bool { arguments.count == 2 && arguments[1] == flag }
+
+	/// The helper's code directory hashes: one per hash type, distinct, SHA-1 (20 bytes) or SHA-256 (32 bytes, as
+	/// signing information reports it). codesign writes only the SHA-256 directory for a macOS 11+ target, so the
+	/// published runtime carries one hash per slice; demanding two refused every install (field report 2026-11-05).
+	/// - Parameter fields: Signing information of the helper.
+	/// - Returns: The hashes, or nil when absent, duplicated, over two or of another length.
+	static func codeDirectoryHashes(_ fields: [String: Any]) -> [Data]? {
+		guard let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], (1...2).contains(hashes.count),
+			Set(hashes).count == hashes.count, hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else { return nil }
+		return hashes
+	}
 
 	/// Writes the one answer line, then returns the exit status.
 	private static func answer(_ line: String, _ status: Int32) -> Int32 {
@@ -85,8 +96,7 @@ enum OwnedRuntimeInstallMainOperation {
 				let fields = OwnedRuntimePublisherSignature.information(code, role: .installer),
 				let certificates = fields[kSecCodeInfoCertificates as String] as? [SecCertificate], let certificate = certificates.first,
 				SecCertificateCopyData(certificate) as Data == publisher.leaf,
-				let hashes = fields[kSecCodeInfoCdHashes as String] as? [Data], hashes.count == 2, Set(hashes).count == 2,
-				hashes.allSatisfy({ $0.count == 20 || $0.count == 32 }) else {
+				let hashes = codeDirectoryHashes(fields) else {
 				return refuse("helper_signature", "the downloaded installer helper is not signed with this launcher's certificate")
 			}
 			let bytes = try Data(contentsOf: helper.appendingPathComponent(installerExecutable))

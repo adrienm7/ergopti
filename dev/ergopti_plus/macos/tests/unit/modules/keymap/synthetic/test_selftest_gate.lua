@@ -4,7 +4,7 @@
 --- MODULE: Keymap Selftest Gate Tests
 --- DESCRIPTION:
 --- A field-run selftest key is decoded as typing only when all of these hold:
---- the process is a developer runtime, the field run published its scratch
+--- a field run is running, the field run published its scratch
 --- window, that window is the focused one, and the delivery is not a duplicate.
 --- Each failing gate refuses with its own token, a read that raises refuses
 --- too, and only the first refusal of a publication is logged, deferred off
@@ -39,9 +39,9 @@ local function with_gate(world, body)
 		local Publisher = require("infra.field_run_selftest")
 		local Gate = require("modules.keymap.selftest_gate")
 		Gate._ports = {
-			dev_source_active = function()
-				if world.dev == "raise" then error("dev source unreadable") end
-				return world.dev
+			field_run_running = function()
+				if world.running == "raise" then error("field run unreadable") end
+				return world.running
 			end,
 			focused_own_window_id = function() return world.focused end,
 		}
@@ -57,8 +57,8 @@ local function selftest_key(duplicate)
 end
 
 helpers.describe("keymap selftest gate", function()
-	helpers.it("admits a key while dev mode, the published window and the focus all hold", function()
-		with_gate({ dev = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher, log)
+	helpers.it("admits a key while a field run, the published window and the focus all hold", function()
+		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher, log)
 			Publisher.publish(SCRATCH_WINDOW)
 			local admitted, reason = Gate.admits(selftest_key())
 			helpers.assert_true(admitted)
@@ -67,17 +67,17 @@ helpers.describe("keymap selftest gate", function()
 		end)
 	end)
 
-	helpers.it("refuses outside a developer runtime", function()
-		with_gate({ dev = false, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
+	helpers.it("refuses while no field run is running", function()
+		with_gate({ running = false, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Publisher.publish(SCRATCH_WINDOW)
 			local admitted, reason = Gate.admits(selftest_key())
 			helpers.assert_true(admitted == false)
-			helpers.assert_eq(reason, "no_dev_source")
+			helpers.assert_eq(reason, "no_field_run")
 		end)
 	end)
 
 	helpers.it("refuses while no typing step published its window", function()
-		with_gate({ dev = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
+		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			local admitted, reason = Gate.admits(selftest_key())
 			helpers.assert_true(admitted == false)
 			helpers.assert_eq(reason, "no_active_step")
@@ -91,25 +91,25 @@ helpers.describe("keymap selftest gate", function()
 	end)
 
 	helpers.it("refuses while another window has the focus", function()
-		with_gate({ dev = true, focused = 7 }, function(Gate, Publisher)
+		with_gate({ running = true, focused = 7 }, function(Gate, Publisher)
 			Publisher.publish(SCRATCH_WINDOW)
 			local admitted, reason = Gate.admits(selftest_key())
 			helpers.assert_true(admitted == false)
 			helpers.assert_eq(reason, "other_window")
 		end)
 		-- Another application in front reads as no focused window of this process.
-		with_gate({ dev = true, focused = nil }, function(Gate, Publisher)
+		with_gate({ running = true, focused = nil }, function(Gate, Publisher)
 			Publisher.publish(SCRATCH_WINDOW)
 			helpers.assert_eq(select(2, Gate.admits(selftest_key())), "other_window")
 		end)
 	end)
 
 	helpers.it("refuses a duplicate delivery and a read that raises", function()
-		with_gate({ dev = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
+		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Publisher.publish(SCRATCH_WINDOW)
 			helpers.assert_eq(select(2, Gate.admits(selftest_key(true))), "duplicate")
 		end)
-		with_gate({ dev = "raise", focused = SCRATCH_WINDOW }, function(Gate, Publisher)
+		with_gate({ running = "raise", focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Publisher.publish(SCRATCH_WINDOW)
 			local admitted, reason = Gate.admits(selftest_key())
 			helpers.assert_true(admitted == false)
@@ -118,7 +118,7 @@ helpers.describe("keymap selftest gate", function()
 	end)
 
 	helpers.it("logs the first refusal of each publication once, off the eventtap", function()
-		with_gate({ dev = true, focused = 7 }, function(Gate, Publisher, log)
+		with_gate({ running = true, focused = 7 }, function(Gate, Publisher, log)
 			local generation = Publisher.publish(SCRATCH_WINDOW)
 			Gate.admits(selftest_key())
 			Gate.admits(selftest_key())
@@ -135,7 +135,7 @@ helpers.describe("keymap selftest gate", function()
 	end)
 
 	helpers.it("the publisher keeps one owner and refuses a stale retraction", function()
-		with_gate({ dev = true, focused = SCRATCH_WINDOW }, function(_, Publisher)
+		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(_, Publisher)
 			helpers.assert_throws(function() Publisher.publish(0) end)
 			helpers.assert_throws(function() Publisher.publish("4242") end)
 			local first = Publisher.publish(SCRATCH_WINDOW)
@@ -149,6 +149,31 @@ helpers.describe("keymap selftest gate", function()
 			helpers.assert_eq(Publisher.window_id(), SCRATCH_WINDOW + 1)
 			Publisher.retract(second)
 			helpers.assert_nil(Publisher.window_id())
+		end)
+	end)
+
+	-- Field report 2026-11-05: the installed app's field run has no developer
+	-- source, and the gate swallowed every key while it waited for one.
+	helpers.it("the production read admits the installed app's running field run", function()
+		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
+			Gate._ports = nil
+			local saved_run, saved_window, saved_dev = package.loaded["infra.field_run"],
+				package.loaded["adapters.own_window"], package.loaded["infra.dev_source"]
+			local running = true
+			package.loaded["infra.field_run"] = { holds_reload = function() return running end }
+			package.loaded["adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
+			package.loaded["infra.dev_source"] = { is_active = function() return false end }
+			local ok, err = pcall(function()
+				Publisher.publish(SCRATCH_WINDOW)
+				helpers.assert_true(Gate.admits(selftest_key()), "no developer source is needed")
+				running = false
+				local admitted, reason = Gate.admits(selftest_key())
+				helpers.assert_true(admitted == false)
+				helpers.assert_eq(reason, "no_field_run")
+			end)
+			package.loaded["infra.field_run"], package.loaded["adapters.own_window"],
+				package.loaded["infra.dev_source"] = saved_run, saved_window, saved_dev
+			assert(ok, err)
 		end)
 	end)
 end)
