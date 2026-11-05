@@ -412,3 +412,79 @@ _TSFD_EffectBeforeRefusal(Mode) {
 for _TSFD_Mode in ["first", "combo", "preheld", "preheld-combo", "other-owner", "other-owner-combo", "new-user", "suppressed-own", "no-payload"]
 	Test("synthetic failed Down: " . _TSFD_Mode . " preserves actual release ownership (synthetic-down-effect-refusal)",
 		_TSFD_EffectBeforeRefusal.Bind(_TSFD_Mode))
+
+
+; A rejected scalar restoration can already have changed the keyboard. These
+; deterministic ports model custody and effect separately; no hardware claim.
+_TSLR_ScalarRestore(Mode) {
+	global _AHK_SendInput, _TSUH_Sent, _TSUH_Logical, _TSUH_Physical
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	User := Mode != "owned"
+	_TSUH_Begin(User ? Map("LCtrl", true) : Map(), User ? Map("LCtrl", true) : Map())
+	State := {armed: false, downs: 0, ups: 0, throws: 0, released: false}
+	Emit(Keys) {
+		_TSUH_Sent.Push(Keys)
+		if Keys == "{LCtrl Down}" {
+			State.downs += 1
+			_TSUH_Logical["LCtrl"] := true
+			if State.armed {
+				if Mode == "user-released" {
+					_TSUH_Physical.Delete("LCtrl")
+					State.released := true
+				}
+				State.throws += 1
+				throw Error("Scalar restoration port refused AFTER modeled Down delivery")
+			}
+		} else if Keys == "{LCtrl Up}" {
+			State.ups += 1
+			if _TSUH_Logical.Has("LCtrl")
+				_TSUH_Logical.Delete("LCtrl")
+		}
+		return 0
+	}
+	try {
+		_AHK_SendInput := Emit
+		if !User {
+			Owner := TapHoldNewOwner()
+			AssertTrue(TapHoldSyntheticKeyDown("LCtrl", Owner), "the owned control begins with a genuine counted acquisition")
+			AssertEqual(1, _TH_SyntheticHeldKeys["LCtrl"])
+		}
+		UserHeld := _TH_UserHoldsDeliveredKey("LCtrl")
+		AssertEqual(User, UserHeld, "custody must be captured before the lift")
+		AssertTrue(TapHoldLiftKey("LCtrl"), "the actual producer must acknowledge its preceding lift")
+		AssertFalse(_TSUH_Logical.Has("LCtrl"), "the modeled key really is up before restoration")
+		State.armed := true
+		Result := TapHoldRestoreLiftedKey("LCtrl", UserHeld)
+		_TestPrint("# scalar restore mode=" . Mode . " result=" . Result . " downs=" . State.downs
+			. " ups=" . State.ups . " throws=" . State.throws . " released=" . State.released
+			. " logical=" . _TSUH_Logical.Has("LCtrl") . " held=" . _TH_SyntheticHeldKeys.Count
+			. " pending=" . _TH_SyntheticReleasePendingKeys.Count)
+		AssertEqual(User ? 1 : 2, State.downs, "the scalar restoration must reach its actual lower sender")
+		AssertEqual(1, State.throws, "the port must refuse only after its modeled native effect")
+		AssertFalse(Result, "no restoration ACK may be invented after the port exception")
+		if Mode == "owned" {
+			AssertTrue(Owner.Held && _TH_SyntheticHeldKeys["LCtrl"] == 1,
+				"a refused restoration cannot steal the existing owner's active count")
+			AssertEqual(1, State.ups, "the restore failure itself must not Up the still-owned modifier")
+		} else if Mode == "user-still-held" {
+			AssertTrue(_TSUH_Physical.Has("LCtrl") && _TSUH_Logical.Has("LCtrl"),
+				"the original delivered user hold remains theirs")
+			AssertEqual(1, State.ups, "the restore failure cannot inject an extra Up under the user")
+		} else
+			AssertTrue(State.released && !_TSUH_Physical.Has("LCtrl"),
+				"a separate physical release must really win during the rejected restoration")
+		AssertTrue(TapHoldReleaseSyntheticKeys(), "the actual lifecycle must reconcile any retained release debt")
+		if Mode == "user-still-held" {
+			AssertTrue(_TSUH_Logical.Has("LCtrl"))
+			AssertEqual(1, State.ups, "lifecycle also preserves the user's current hold")
+		} else {
+			AssertFalse(_TSUH_Logical.Has("LCtrl"), "a refused restored Down cannot remain stuck after its owner/user no longer holds it")
+			AssertEqual(2, State.ups, "the original lift and one acknowledged balancing Up are the only releases")
+		}
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count)
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count)
+	} finally _TSUH_End()
+}
+for _TSLR_Mode in ["owned", "user-still-held", "user-released"]
+	Test("scalar lifted restoration: " . _TSLR_Mode . " retains exact release custody (synthetic-lifted-down-refusal)",
+		_TSLR_ScalarRestore.Bind(_TSLR_Mode))
