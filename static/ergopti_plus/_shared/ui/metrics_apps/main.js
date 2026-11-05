@@ -723,7 +723,7 @@ function renderDashboard() {
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.chars || 0) >= 200) {
 				const p = ((a.bs_total || 0) / a.chars) * 100;
-				if (p > wErrPct) {
+				if (wErrApp === null || p > wErrPct) {
 					wErrPct = p;
 					wErrApp = name;
 				}
@@ -741,7 +741,7 @@ function renderDashboard() {
 		Object.entries(aggData.apps || {}).forEach(([name, a]) => {
 			if ((a.recovery_count || 0) >= 5) {
 				const m = a.recovery_sum_ms / a.recovery_count;
-				if (m > wRecMs) {
+				if (wRecApp === null || m > wRecMs) {
 					wRecMs = m;
 					wRecApp = name;
 				}
