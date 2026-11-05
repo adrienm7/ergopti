@@ -212,13 +212,16 @@ function M.new(port)
 	local choices = {}
 	local listing_epoch = 0
 	local refreshing = 0
+	local refresh_waiters = {}
+	local draining_refreshes = 0
 	local busy, queued = false, nil
 	local listeners, delivering = {}, false
 
 	local function settle_listeners()
 		if delivering then return end
 		delivering = true
-		while not busy and queued == nil and refreshing == 0 and #listeners > 0 do
+		while not busy and queued == nil and refreshing == 0 and draining_refreshes == 0
+			and #refresh_waiters == 0 and #listeners > 0 do
 			local listener = table.remove(listeners, 1)
 			local ok, err = pcall(listener)
 			if not ok then Logger.error(LOG, "A switch settlement listener failed: %s.", tostring(err)) end
@@ -295,6 +298,12 @@ function M.new(port)
 	--- a refused reading keeps the previous list and reports changed = false.
 	--- @param on_done function|nil
 	function switcher.refresh(on_done)
+		-- A menu repaint must not supersede a pause/quit switch already reading
+		-- the desktop. Read the choices after the queued switches have finished.
+		if busy then
+			refresh_waiters[#refresh_waiters + 1] = type(on_done) == "function" and on_done or false
+			return
+		end
 		listing_epoch = listing_epoch + 1
 		local epoch = listing_epoch
 		refreshing = refreshing + 1
@@ -338,6 +347,11 @@ function M.new(port)
 					queued = nil
 					return start(next_request.id, next_request.on_done)
 				end
+				local waiting = refresh_waiters
+				refresh_waiters = {}
+				draining_refreshes = draining_refreshes + 1
+				for _, callback in ipairs(waiting) do switcher.refresh(callback or nil) end
+				draining_refreshes = draining_refreshes - 1
 				settle_listeners()
 			end
 			if listing == nil then return done(false, reason) end
@@ -370,7 +384,9 @@ function M.new(port)
 
 	--- Whether no switch or layout-listing operation remains in flight.
 	--- @return boolean
-	function switcher.is_settled() return not busy and queued == nil and refreshing == 0 end
+	function switcher.is_settled()
+		return not busy and queued == nil and refreshing == 0 and draining_refreshes == 0 and #refresh_waiters == 0
+	end
 
 	--- Calls listener once switches and layout listings have settled.
 	--- @param listener function
