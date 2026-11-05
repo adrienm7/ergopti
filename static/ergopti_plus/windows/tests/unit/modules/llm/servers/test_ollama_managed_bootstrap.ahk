@@ -921,3 +921,36 @@ Test("managed bootstrap: actual enable admission preserves exact READY successor
 #Include test_ollama_runtime_terminal_delivery.ahk
 
 #Include test_ollama_failure_epoch_publication.ahk
+
+
+; This scope owns no file task, daemon or external callback. The native timer
+; identity is the real bound production method, not the fixture scheduler.
+_G4L_Deleted(Counter, This) {
+	Counter.Deleted += 1
+}
+_G4L_CancelLifetime() {
+	Counter := {Deleted: 0}, Control := {Deleted: 0}
+	Acyclic := {}
+	Acyclic.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Control)})
+	Acyclic := 0
+	AssertEqual(1, Control.Deleted, "the runtime synchronously destroys an acyclic owned object")
+	Port := Map("plan", Map(), "files", {HasOwner: (*) => false},
+		"runtime", {Stop: (*) => true, HasOwner: (*) => false})
+	Flow := OllamaManagedBootstrap("", 0, 0, 0, Port)
+	Flow.DefineProp("__Delete", {Call: _G4L_Deleted.Bind(Counter)})
+	Callback := Flow.Timer
+	try {
+		AssertTrue(TimerSetCallback(Callback, -60000), "the real scheduler owns the captured production timer")
+		AssertTrue(Flow.Cancel(), "no external file or runtime owner prevents cancellation")
+		AssertTrue(Flow.Cancelled)
+		AssertTrue(Flow.CanReplace(), "the canceled flow has no retained native debt")
+	} finally {
+		AssertTrue(TimerSetCallback(Callback, 0), "the exact native callback is retired before local references are released")
+	}
+	Callback := 0
+	Flow := 0
+	_TestPrint("# MANAGED_BOOTSTRAP_LIFETIME " . KL_JsonEncode(Map(
+		"acyclic_deleted", Control.Deleted, "owner_deleted", Counter.Deleted)))
+	AssertEqual(1, Counter.Deleted, "a canceled replaceable bootstrap must release its bound polling callback")
+}
+Test("managed bootstrap: canceled replaceable owner releases its actual timer (managed-bootstrap-lifetime)", _G4L_CancelLifetime)
