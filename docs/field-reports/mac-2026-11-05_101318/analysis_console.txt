@@ -1,0 +1,4 @@
+[field-report]   ⚠️ check privacy_pane_urls: info
+[field-report]   ✅ check system_bash: pass
+[field-report] Check verdicts summary: ✅ 1 pass, ❌ 0 fail, ⏭️ 0 skip, ⌨️ 0 needs_typing, ⚠️ 1 other.
+[field-report] Log analysis: 0 error group(s), 0 warning group(s), 0 measure(s) over budget; see analysis.md.
