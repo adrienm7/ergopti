@@ -92,7 +92,7 @@ try {
 			bashExecutable(),
 			[
 				'-c',
-				'export PATH="$TEST_STUBS:/usr/bin:/bin"; exec bash "$1" "$2"',
+				'export PATH="${TEST_PATH:-$TEST_STUBS:/usr/bin:/bin}"; exec bash "$1" "$2"',
 				'startup-test',
 				posix(script),
 				action
@@ -179,8 +179,22 @@ try {
 				run('status', { TEST_ACCOUNT_HOME: accountHome, TEST_LOOKUP_FAIL: '1' }).stdout.trim(),
 				'other'
 			);
-			fs.unlinkSync(path.join(stubs, 'id'));
+			const minimal = path.join(sandbox, 'startup-minimal-path');
+			fs.mkdirSync(minimal);
+			for (const command of ['bash', 'dirname'])
+				fs.symlinkSync(`/usr/bin/${command}`, path.join(minimal, command));
 			fs.unlinkSync(path.join(stubs, 'getent'));
+			const missingGetent = run('status', {
+				TEST_ACCOUNT_HOME: accountHome,
+				TEST_PATH: `${stubs}:${minimal}`
+			});
+			assert.equal(missingGetent.status, 0, missingGetent.stderr);
+			assert.equal(
+				missingGetent.stdout.trim(),
+				'other',
+				'without getent the manual unit is not claimed'
+			);
+			fs.unlinkSync(path.join(stubs, 'id'));
 		}
 		fs.unlinkSync(unit);
 	}

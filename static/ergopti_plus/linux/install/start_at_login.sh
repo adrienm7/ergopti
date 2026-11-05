@@ -36,6 +36,7 @@ startup_manual_unit_matches() {
 	"$receipt_allowed" || return 1
 	local uid entry name password account_uid group_id comment account_home shell prefix
 	uid="$(id -u)" || return 1
+	command -v getent >/dev/null 2>&1 || return 1
 	entry="$(getent passwd "$uid")" || return 1
 	case "$entry" in *$'\n'*) return 1 ;; esac
 	IFS=: read -r name password account_uid group_id comment account_home shell <<< "$entry"
