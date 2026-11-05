@@ -727,3 +727,133 @@ _LAGNN_Run(Position) {
 for _LAGNN_Position in ["head", "middle", "tail", "legal"]
 	Test("LLM agent: " . _LAGNN_Position . " native shortcut input survives JSON and obeys argv admission (agent-native-nul-input)",
 		_LAGNN_Run.Bind(_LAGNN_Position))
+
+
+_LAGICS_Done(State, ExitCode, Stdout, Stderr) {
+	State["done"] := true, State["exit"] := ExitCode, State["stdout"] := Stdout, State["stderr"] := Stderr
+}
+
+; Model a registered handler which starts asynchronously but has not opened yet.
+_LAGICS_Open(State, Target) {
+	if InStr(Target, "mailto:") == 1
+		return true
+	State["target"] := Target
+	Task := ShellRunner_SpawnTreeOwned(A_AhkPath,
+		["/ErrorStdOut", State["fixture"], State["root"], Target], _LAGICS_Done.Bind(State))
+	State["task"] := Task
+	if !Task.start()
+		throw Error("SETUP: the delayed native reader could not start")
+	State["pid"] := Task.processId()
+	return true
+}
+
+_LAGICS_Wait(Path, Milliseconds := 10000) {
+	Start := A_TickCount
+	while !FileExist(Path) && TickElapsed(Start) < Milliseconds {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	return FileExist(Path) != ""
+}
+
+_LAGICS_Run(DoSecond) {
+	global _LLM_Ollama_InstanceNonce, _LLM_AgentConnector_ComFn, _LLM_AgentConnector_OpenFn
+	global _LLM_AgentConnector_WriteFn, _LLM_AgentConnector_DeleteFn, _LLM_AgentConnector_IdFn
+	global _LLM_AgentConnector_TempFiles, _DriverDir
+	static Debt := 0
+	AssertFalse(IsObject(Debt), "SETUP: a previous native reader still owns retirement debt")
+	Saved := {Nonce: _LLM_Ollama_InstanceNonce, Com: _LLM_AgentConnector_ComFn, Open: _LLM_AgentConnector_OpenFn,
+		Write: _LLM_AgentConnector_WriteFn, Delete: _LLM_AgentConnector_DeleteFn,
+		Id: _LLM_AgentConnector_IdFn, Temp: _LLM_AgentConnector_TempFiles, Critical: A_IsCritical, Suspended: A_IsSuspended}
+	Guid := Buffer(16, 0)
+	AssertEqual(0, PLC_CreateGuid(Guid), "SETUP: unique private directory identity")
+	Nonce := ""
+	loop Guid.Size
+		Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+	Root := _LLM_Ollama_BuildTempDir(A_Temp, ProcessExist(), Nonce)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	AssertTrue((Created is Integer) && Created == 1, "SETUP: exact private directory acquired")
+	State := Map("root", Root, "fixture", _DriverDir . "\tests\fixtures\agent_delayed_ics_reader.ahk",
+		"target", "", "task", 0, "pid", 0, "done", false, "exit", -1, "stdout", "", "stderr", "")
+	Primary := 0, Joined := true, Passed := false
+	try {
+		Critical("Off"), Suspend(false)
+		_LLM_Ollama_InstanceNonce := Nonce
+		_LLM_AgentConnector_ComFn := (*) => ""
+		_LLM_AgentConnector_WriteFn := 0, _LLM_AgentConnector_DeleteFn := 0
+		_LLM_AgentConnector_IdFn := () => Map("uid", Nonce . "@ergopti", "stamp", "20260929T120500Z")
+		_LLM_AgentConnector_OpenFn := _LAGICS_Open.Bind(State)
+		_LLM_AgentConnector_TempFiles := []
+		Config := LLM_Agent_Config()
+		Calendar := _LAG_Action('{"type":"calendar","title":"Devis","start":"2026-10-01T14:00"}')
+		First := LLM_AgentConnector_Execute(Calendar, Config)
+		AssertTrue(First["ok"] && First["path"] == "ics", "SETUP: real calendar connector accepted the file")
+		AssertTrue(State["pid"] > 0, "SETUP: real owned reader started")
+		Joined := false
+		AssertTrue(_LAGICS_Wait(Root . "\ready"), "SETUP: reader reaches its pre-open barrier")
+		AssertEqual(State["pid"], Integer(FSReadUtf8Exact(Root . "\ready")), "SETUP: ready belongs to the owned reader")
+		Expected := FSReadUtf8Exact(State["target"])
+		AssertTrue(Expected is String && InStr(Expected, "BEGIN:VCALENDAR"), "SETUP: exact real ICS exists before second action")
+		if DoSecond {
+			Mail := _LAG_Action('{"type":"mail","to":["paul@example.com"],"body":"Bonjour"}')
+			Second := LLM_AgentConnector_Execute(Mail, Config)
+			AssertTrue(Second["ok"] && Second["path"] == "mailto", "SETUP: second real connector accepted")
+		}
+		ExistsBeforeRelease := FileExist(State["target"]) != ""
+		AssertTrue(FSWriteCreateDurable(Root . "\release", "release"), "SETUP: release only the owned reader")
+		AssertTrue(_LAGICS_Wait(Root . "\result"), "SETUP: reader publishes its exact file result")
+		Outcome := FSReadUtf8Exact(Root . "\result")
+		Start := A_TickCount
+		while !State["done"] && TickElapsed(Start) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		Joined := State["done"]
+		_TestPrint("# agent-ics-delayed second=" . DoSecond . " exists_before_release=" . ExistsBeforeRelease
+			. " reader=" . Outcome . " joined=" . Joined . " exit=" . State["exit"])
+		AssertTrue(Joined && State["exit"] == 0, "RETIREMENT: exact reader exited successfully")
+		AssertEqual("", State["stderr"], "RETIREMENT: the shell runner reports no capture errors")
+		AssertEqual("", State["stdout"], "RETIREMENT: merged child output contains no warnings or errors")
+		AssertEqual("READ", Outcome, "BUSINESS: accepted calendar remains readable by its delayed handler")
+		AssertEqual(Expected, FSReadUtf8Exact(Root . "\received.ics"), "BUSINESS: delayed reader sees exact accepted ICS")
+		Passed := true
+	} catch Any as Err {
+		Primary := Err
+	} finally {
+		if IsObject(State["task"]) && !State["done"] {
+			Joined := false
+			if !FileExist(Root . "\release")
+				try FSWriteCreateDurable(Root . "\release", "release")
+			; A request alone is not a quiescence receipt. Retire the exact Job,
+			; or accept only its dispatched completion after accounting reached zero.
+			try State["task"].requestTerminate()
+			RetireStart := A_TickCount
+			while !State["done"] && TickElapsed(RetireStart) < 5000 {
+				Retired := false
+				try Retired := State["task"].terminate()
+				if (Retired is Integer) && Retired == 1 {
+					Joined := true
+					break
+				}
+				_SR_TreePoll()
+				Sleep(10)
+			}
+			if State["done"]
+				Joined := true
+		}
+		if !Joined
+			Debt := {State: State, Root: Root}
+		_LLM_Ollama_InstanceNonce := Saved.Nonce, _LLM_AgentConnector_ComFn := Saved.Com
+		_LLM_AgentConnector_OpenFn := Saved.Open, _LLM_AgentConnector_WriteFn := Saved.Write
+		_LLM_AgentConnector_DeleteFn := Saved.Delete, _LLM_AgentConnector_IdFn := Saved.Id
+		_LLM_AgentConnector_TempFiles := Saved.Temp
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+		if Joined && DirExist(Root)
+			DirDelete(Root, true)
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Passed && Joined, "the exact native reader and private directory retired")
+}
+Test("LLM agent: delayed native calendar handler reads without a second action (agent-ics-delayed)", _LAGICS_Run.Bind(false))
+Test("LLM agent: delayed native calendar handler survives the next action (agent-ics-delayed)", _LAGICS_Run.Bind(true))
