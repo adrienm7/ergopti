@@ -240,8 +240,10 @@ it("isolates throwing callbacks and delivers all settlement listeners", function
 	helpers.assert_true(ok, "a callback exception must not escape into the native loop")
 	helpers.assert_true(child.is_settled())
 	helpers.assert_eq(notified, 1, "one listener must not suppress another")
-	local immediate = pcall(child.on_settled, function() error("controlled late failure") end)
+	local late = 0
+	local immediate = pcall(child.on_settled, function() late = late + 1; error("controlled late failure") end)
 	helpers.assert_true(immediate, "late listeners use the same exception isolation")
+	helpers.assert_eq(late, 1, "a settled child invokes late listeners immediately")
 end)
 
 it("a cancel answers nothing and still settles the child", function()
