@@ -10,6 +10,106 @@ entry is not the same thing as a user-facing capability: an OS can provide the
 same capability through a different path. A declaration is not a runtime or
 hardware test.
 
+## Review status at pause — November 5, 2026
+
+The maintainer requested a pause after the dead-key campaign delivered in
+`04ebe1089bf387ccbfef43bbfd3b2f3e9b1cd6d9`. This register describes the work
+already recorded in the repository; it starts no additional audit. Each dated
+report owns its audited revision, exact coverage, rejected hypotheses and proof
+limits. **Deeply reviewed does not mean fixed, bug-free or native-certified.**
+Later corrections and adjudicated findings take precedence over raw submissions.
+
+### Focused cross-platform investigations already recorded
+
+These campaigns follow named flows through their owners, callers and settlement
+boundaries. Their scope includes Windows, macOS and Linux, with shared review
+where the linked campaign records it. The links retain the per-OS detail;
+a row is not a claim that every function or every physical scenario was tested.
+
+| Area                           | Reviewed in depth                                                                                                                                                                                             | Evidence                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Dead keys and composition      | Pending-state ownership, disabled rows, grouped character payloads, consumed continuations, chains and converter/locale collisions; six shipped layouts, 140 states and 4,391 explicit converter expectations | [Dead-key campaign](audits/platform-parity/2026-11-05-dead-keys/report.md)                                               |
+| One-shot Shift                 | Public activation, next-key consumption, modifier context, repeated presses, timeout and retirement                                                                                                           | [One-shot campaign](audits/platform-parity/2026-11-05-one-shot-shift/report.md)                                          |
+| CapsWord                       | Activation, accepted output, delimiter exits, timers, pointer identity, configuration publication and synthetic-key counterchecks                                                                             | [CapsWord campaign](audits/platform-parity/2026-11-05-caps-word/report.md)                                               |
+| Word reset and AI context      | Independent word/context lifetimes, following keys, edited controls, synthetic origins and lifecycle retirement                                                                                               | [Word-reset campaign](audits/platform-parity/2026-11-05-word-reset/report.md)                                            |
+| Repeat and immediate recovery  | Magic-key repetition, corrections after repeat, word boundaries, private ancestry and eligible immediate Backspace restoration                                                                                | [Repeat/recovery campaign](audits/platform-parity/2026-11-05-undo-repeat/report.md)                                      |
+| WPM                            | Widget publication, native draw/resize refusal, placement, pointer handling, idle behavior and configuration precedence                                                                                       | [Sequential campaign: WPM](audits/platform-parity/2026-11-05-sequential/report.md#wpm)                                   |
+| Wrap symbols                   | Pair catalogue, custom pairs, spaced delimiters, selection completeness, clipboard restoration and endpoint aliases                                                                                           | [Sequential campaign: wrap](audits/platform-parity/2026-11-05-sequential/report.md#wrap-symbols)                         |
+| Personal information           | Field/alias generation, literal values, command-token boundaries, source location, first creation, destination authority and preview/privacy rules                                                            | [Sequential campaign: personal information](audits/platform-parity/2026-11-05-sequential/report.md#personal-information) |
+| Managed local runtime          | Provisioning, deadlines, refusal, repair authority, source identity, native settings and completion/retirement boundaries                                                                                     | [Runtime/editor/diagnostics campaign](audits/platform-parity/2026-11-05-native-ui/report.md)                             |
+| WebView editors                | Shared frontend and host joins, zero-valued delays, save/reload/close refusals, draft preservation and configuration serializers                                                                              | [Runtime/editor/diagnostics campaign](audits/platform-parity/2026-11-05-native-ui/report.md)                             |
+| Diagnostics                    | Collection/export/page joins, backend and disabled-state reporting, partial output, timer refusal and local versus shared privacy                                                                             | [Runtime/editor/diagnostics campaign](audits/platform-parity/2026-11-05-native-ui/report.md)                             |
+| Folder/configuration migration | Destination collisions, physical aliases, locators, alternate roots, refusal, retry and next-start adoption                                                                                                   | [Migration/update campaign](audits/platform-parity/2026-11-04-recovery/report.md)                                        |
+| Update/reload handoff          | Chosen-release transactions, leases, armed installation, restart receipts, native alternatives and package-manager ownership                                                                                  | [Migration/update campaign](audits/platform-parity/2026-11-04-recovery/report.md)                                        |
+| Clipboard and selection        | Borrow/restore ownership, concurrent clipboard changes, target focus/range and cross-owner transformations                                                                                                    | [Action/persistence flows](audits/platform-parity/2026-11-04-flows/report.md)                                            |
+| Credentials and cipher storage | Typed ingress, persistence markers, SQL/storage joins, credential publication and cryptographic native-component controls                                                                                     | [Action/persistence flows](audits/platform-parity/2026-11-04-flows/report.md)                                            |
+| Configuration persistence      | Save/publication refusal, authoritative next-start values, durable ownership and truthful saved/applied/restarted reporting                                                                                   | [Action/persistence flows](audits/platform-parity/2026-11-04-flows/report.md)                                            |
+| Fixed desktop actions          | Actual dispatch, acknowledgment/refusal and overlapping native setting changes through bounded worker controls                                                                                                | [Action/persistence flows](audits/platform-parity/2026-11-04-flows/report.md)                                            |
+
+### Broader module reviews already recorded
+
+The [18 OS × module review](audits/platform-parity/2026-11-04-deep/report.md)
+already inspected hotstrings, input/remapping, AI, metrics, lifecycle and
+gestures separately on all three OSes. The [earlier module review](#independent-module-review-2026-11-04)
+also records their declarations, implementations and corrected false gaps.
+These areas are **not untouched**. Their broad reviews do not replace a focused
+end-to-end campaign for every submodule listed below. The later focused
+campaigns above extend particular parts of that coverage.
+
+### Remaining investigation, implementation and qualification
+
+The root [TODO](../TODO.md) remains the only implementation checklist and the
+owner of individual finding IDs, policy questions and physical acceptance.
+This section records investigation boundaries, not a duplicate checklist.
+No new investigation is being launched at this pause.
+
+| Remaining work                                    | Starting point and boundary                                                                                                                                                                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reconcile coverage with current source            | Generate a fresh source-area census and match its areas to the dated coverage registers. Classify unmatched or changed areas as requiring review; file presence alone never establishes review or feature parity.                                                              |
+| Next focused module: tap-holds, chords and layers | Deepen the existing input review: activation/rollover arbitration, held modifiers, repeats, remapped versus native ownership, simultaneous devices, pause/reload/source change and actual action settlement. Keep all OS/shared reviewers on this one module before advancing. |
+| Hotstring cascade and trigger arbitration         | Deepen the broad hotstrings review beyond the separately covered repeat, CapsWord and personal-data routes: automatic/terminator cascades, precedence, delay admission, Unicode/word boundaries, preview/output agreement and interrupted output.                              |
+| Gestures and touchpad event ownership             | Deepen the existing gestures review with complete slot-to-action flows, axis/threshold/repeat handling, device/session capability, disconnection and retirement. Real hardware acceptance remains separate.                                                                    |
+| Metrics beyond the WPM widget                     | Follow each producer through collection/privacy, persistence/ledger, aggregation, export and dashboard display. The broad metrics findings already exist; verify units, missing producers and cross-device behavior without recounting them.                                   |
+| AI request-to-output flows                        | Deepen the broad AI review for prediction/streaming, cancellation/successors, retry/refill, model/profile changes and deferred agent/connectors. Managed-runtime provisioning is already a separate focused campaign; live-provider interoperability is still distinct.        |
+| Remaining input/layout engine joins               | Extend the existing input and dead-key work to full shortcut/layout/number-row/replay ordering, modifier/source currency and multidevice state. Do not count an emulation path as equivalent to native layout receiving without proof.                                         |
+| Fix and regress existing findings                 | Reconfirm each issue against current code before implementing its TODO entry. Audit probes preserve observations; they are not fixes or wired regression tests. Deduplicate overlapping reports and retain intentional differences.                                            |
+| Resolve product policy                            | Keep existing behavior until a common contract is decided for unresolved fallback, expiry, pause, modifier attribution, privacy or preview questions. Source-visible differences are not automatically intended differences.                                                   |
+| Windows receiving                                 | Qualify the relevant original callbacks, installed HKLs, AHK/InputHook/SendEvent, UIA/WebView2 and target applications on Windows. Portable source projections and Linux PowerShell are not these native receipts.                                                             |
+| macOS receiving                                   | Qualify NSEvent/dead-key/IME payload grouping, event consumption/output, Hammerspoon/WebKit and lifecycle/service boundaries on a Mac. Controlled Lua ports and dependency-source contracts do not certify a receiver.                                                         |
+| Linux receiving                                   | Qualify the active X11/Wayland session, compositor, evdev/uinput/device lifecycle and receiving application. Genuine libxkbcommon/Compose, filesystem and libuv controls cover components, not the entire desktop.                                                             |
+| Timing, memory and failure durability             | Measure real typing latency, long-session retention, native races, power-loss recovery, signing/provisioning and relevant provider/network failures. No global G4/RSS guarantee follows from the source audits.                                                                |
+| Maintain automatic inventories                    | Keep the normal catalogue generators, reason/localization checks and drift guards current. Add reviewed behavior declarations for newly identified semantics; automatic catalogue discovery does not discover every behavior or prove native equivalence.                      |
+
+The source-area navigation tool can create a fresh **external** snapshot without
+rewriting historical audit evidence:
+
+```sh
+python3 -B tools/audit/source-areas.py --ref HEAD --output /tmp/ergopti-source-areas-current.json
+```
+
+When work resumes, read the relevant report's coverage and source receipts,
+verify source drift, then choose one bounded module from the table. Reuse the
+original-owner probes through their documented safe replay mechanism. Some
+historical helpers write sibling receipts or embed retired checkout paths;
+never run them in place in immutable evidence. Do not infer completeness from
+two dry sweeps, a source-file count, declaration coverage or a green generic CI.
+
+### Verification status retained at the pause
+
+The dead-key delivery records 572 passing JS checks, successful final formatting,
+source/custody checks and independent replays in its
+[qualified local receipt](audits/platform-parity/2026-11-05-dead-keys/validation/verification.json).
+Its initial archive-format failure and correction are preserved there.
+
+[Preflight 42121216727](https://github.com/adrienm7/ergopti/actions/runs/42121216727)
+on `04ebe1089bf387ccbfef43bbfd3b2f3e9b1cd6d9` finished with failure.
+The originating failed job was **Common / Install and launch (Stable site)**,
+at **Install production site browsers**; Common's verdict and the final lane
+verification consequently failed. That step is not a successful browser/render
+receipt. The root TODO retains the final-source CI checkpoint and the separate
+native/physical qualification work. No CI workflow is cancelled or relaunched
+as part of this documentation checkpoint.
+
 ## Dead-key composition continuation
 
 The [November 5 dead-key audit](audits/platform-parity/2026-11-05-dead-keys/report.md) follows four OS/shared owners at `f2c3ea43542c985fb20e5f0887976f1c02525341`. Five roots cover disabled-row continuation routing, grouped macOS payload lookup/output, consumed Linux Compose history and inherited Bépo Compose prefixes. The [generated 13-contract comparison](audits/platform-parity/2026-11-05-dead-keys/capabilities.md) preserves intentional architecture, native policy, known limits and unresolved lifecycle questions. Six registry layouts, 140 states and 4,391 explicit converter expectations are checked; 97 distinct named source paths are authenticated. Genuine native component tests and original owners over controlled ports do not establish actual application receiving. Reproduction/check commands and immutable worker custody are retained in the campaign README; implementation and policy work remains in the root TODO.
