@@ -374,7 +374,7 @@ _UAFP_Work() {
 		Started := A_TickCount
 		Actual := UserActionFirstLine(Input, Maximum)
 		Elapsed := TickElapsed64(Started)
-		_TestPrint("# user-command-firstline-work input_bytes=" . Limit . " notice_bytes=" . Maximum
+		_TestPrint("# OBSERVATION user-command-firstline-work input_bytes=" . Limit . " notice_bytes=" . Maximum
 			. " encoding_calls=" . State.Calls . " encoded_utf16_units=" . State.Units
 			. " elapsed_ms=" . Elapsed . " result_units=" . StrLen(Actual))
 		AssertTrue(State.Calls > 0, "The actual first-line owner must invoke the byte boundary being measured")
