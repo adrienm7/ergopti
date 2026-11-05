@@ -244,6 +244,8 @@ MenuSectionTitle(Text) {
 ; @returns {Map} SecName -> disambiguated description string.
 _HS_BuildDisambiguatedSectionLabels(TomlData) {
 		Seen := Map(), Used := Map()
+		; AHK Menu.Add matches labels without regard to case.
+		Used.CaseSense := false
 		Out := Map()
 		for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-" or !TomlData["sections"].Has(SecName))

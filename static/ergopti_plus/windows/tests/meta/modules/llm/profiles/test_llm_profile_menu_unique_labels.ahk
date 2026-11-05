@@ -321,7 +321,9 @@ _LPUL_ActualFrameSuffixCollision(Order) {
 		loop LLM_PROFILE_HOTKEY_LIMIT
 			_LLM_Menu["user_profiles"].Push(Map("id", "lpul_suffix_filler_" . A_Index, "label", "LPUL suffix filler " . A_Index))
 		Labels := Order == "generated-first" ? ["LPUL collision", "LPUL collision", "LPUL collision #2"]
-			: ["LPUL collision #2", "LPUL collision", "LPUL collision"]
+			: Order == "literal-first" ? ["LPUL collision #2", "LPUL collision", "LPUL collision"]
+			: Order == "case-generated-first" ? ["LPUL collision", "lpul collision", "LPUL COLLISION #2"]
+			: ["LPUL COLLISION #2", "LPUL collision", "lpul collision"]
 		for Index, Label in Labels {
 			Id := "lpul_suffix_case_" . Index
 			_LLM_Menu["user_profiles"].Push(Map("id", Id, "label", Label))
@@ -333,6 +335,7 @@ _LPUL_ActualFrameSuffixCollision(Order) {
 		Built := LLM_Menu_BuildProfileMenu()
 		NativeCount := DllCall("GetMenuItemCount", "ptr", Built.Handle, "int")
 		Collisions := 0, Seen := Map()
+		Seen.CaseSense := false
 		for Row in Rows {
 			if !Row.Has("label") || Row["label"] == ""
 				continue
@@ -356,6 +359,6 @@ _LPUL_ActualFrameSuffixCollision(Order) {
 		}
 	}
 }
-for _LPUL_Order in ["generated-first", "literal-first"]
+for _LPUL_Order in ["generated-first", "literal-first", "case-generated-first", "case-literal-first"]
 	Test("menu_profiles: " . _LPUL_Order . " preserves literal suffix labels (profile-suffix-menu-owner)",
 		_LPUL_ActualFrameSuffixCollision.Bind(_LPUL_Order))

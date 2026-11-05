@@ -107,8 +107,12 @@ LLM_Menu_PromptChoicesText() {
 _LLM_Menu_UniqueMenuLabel(Seen, Label) {
 	; Reserve actual outputs too: a free-text name may already equal a suffix.
 	static UsedKey := {}
-	if !Seen.Has(UsedKey)
-		Seen[UsedKey] := Map()
+	if !Seen.Has(UsedKey) {
+		Used := Map()
+		; AHK Menu.Add matches labels without regard to case.
+		Used.CaseSense := false
+		Seen[UsedKey] := Used
+	}
 	Used := Seen[UsedKey]
 	Number := (Seen.Has(Label) ? Seen[Label] : 0) + 1
 	Candidate := Number > 1 ? Label . " #" . Number : Label
