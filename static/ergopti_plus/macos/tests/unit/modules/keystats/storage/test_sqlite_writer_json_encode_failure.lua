@@ -5,16 +5,8 @@
 --- DESCRIPTION:
 --- Regression guard for the JSON metadata column of the keystats SQLite writer.
 ---
---- ROOT CAUSE ENCODED:
---- _sql_json() encodes event metadata into the metadata_json / events_json
---- columns. A json.encode failure used to be swallowed and stored as '{}' with
---- NO log, silently corrupting the stored metadata/predictions and leaving no
---- trace to diagnose. The writer must instead log a Logger.warn while still
---- falling back to a valid '{}' literal so the INSERT stays syntactically valid.
----
---- The test forces hs.json.encode to raise for a sentinel metadata value and
---- asserts (a) build_inserts does not propagate the failure, (b) the SQL still
---- carries a '{}' literal, and (c) a warn was emitted.
+--- A failed metadata encoding must refuse the raw event so ingestion keeps
+--- the journal cursor and retries, rather than persisting an empty object.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,8 +17,8 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 local DEVICE_ID = "deadbeef-cafe-1234-5678-aabbccddeeff"
 
-helpers.describe("sqlite_writer — json.encode failure is surfaced, not swallowed", function()
-	helpers.it("logs a warn and stores '{}' when json.encode raises on metadata", function()
+helpers.describe("sqlite_writer — system metadata encoding failure", function()
+	helpers.it("refuses the system event when json.encode raises on metadata", function()
 		local sw = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 		sw.init({
 			paths      = { sqlite_path = "/tmp/test_sw_json.sqlite" },
@@ -52,35 +44,17 @@ helpers.describe("sqlite_writer — json.encode failure is surfaced, not swallow
 			return orig_encode(v)
 		end
 
-		-- Spy the warn channel on the logger the writer already holds.
-		local logger    = require("infra.logger")
-		helpers.admit_logger_privacy(logger)
-		local orig_warn = logger.warn
-		local warns     = {}
-		logger.warn = function(_tag, fmt, ...)
-			warns[#warns + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
-		end
 
-		local ok, stmts = pcall(sw.build_inserts, {
+		local ok, failure = pcall(sw.build_inserts, {
 			type      = "system_event",
 			timestamp = "2024-01-01 12:00:00.000",
 			action    = "wake",
 			sentinel  = "BOOM",
 		})
 
-		-- Restore BEFORE asserting so nothing leaks into later test files.
+		-- Restore before asserting so nothing leaks into later test files.
 		hsjson.encode = orig_encode
-		logger.warn   = orig_warn
-
-		helpers.assert_true(ok, "build_inserts must not propagate the json.encode failure")
-		helpers.assert_eq(#stmts, 1)
-		helpers.assert_true(stmts[1]:find("'{}'", 1, true) ~= nil,
-			"the metadata column must fall back to a valid '{}' literal")
-		local warned = false
-		for _, m in ipairs(warns) do
-			if m:find("json.encode failed", 1, true) then warned = true end
-		end
-		helpers.assert_true(warned,
-			"a failed json.encode must be surfaced via Logger.warn, not swallowed")
+		helpers.assert_eq(ok, false, "a failed encoding must not produce a raw event")
+		helpers.assert_eq(failure, "system event JSON encoding failed")
 	end)
 end)

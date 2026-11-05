@@ -13,6 +13,33 @@ local helpers = require("tests.helpers")
 local with_sender = require("tests.support.text_sender_fixture")
 
 helpers.describe("text sender retains paste payload through native handoff", function()
+	helpers.it("preserves a user copy made while the snapshot is read", function()
+		with_sender(function(f)
+			local board = f.hs_overrides.pasteboard
+			local read = board.readAllData
+			board.readAllData = function()
+				board.setContents("NEW USER COPY")
+				return read()
+			end
+			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.key_posts, 0)
+			helpers.assert_eq(f.restore_calls, 0)
+		end)
+	end)
+
+	helpers.it("does not borrow the clipboard when an advertised type is unreadable", function()
+		with_sender(function(f)
+			f.hs_overrides.pasteboard.allContentTypes = function()
+				return { { "public.utf8-plain-text", "public.html", "public.png" } }
+			end
+			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
+			helpers.assert_eq(f.change_count, 0)
+			helpers.assert_eq(f.clipboard(), f.initial)
+			helpers.assert_eq(f.key_posts, 0)
+		end)
+	end)
+
 	helpers.it("keeps payload while Cmd+V is queued (text-sender-paste-handoff)", function()
 		with_sender(function(f)
 			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), true)
@@ -253,7 +280,7 @@ end)
 helpers.describe("native clipboard ownership metadata", function()
 	helpers.it("retains an unproven post-write owner until another observed clipboard change", function()
 		with_sender(function(f)
-			f.count_failure_on_read = 4
+			f.count_failure_on_read = 6
 			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
 			helpers.assert_eq(#f.producers, 0)
 			helpers.assert_eq(f.restore_calls, 0)

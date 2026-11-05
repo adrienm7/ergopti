@@ -103,6 +103,10 @@ helpers.describe("copy_or_open_path opens the selection (open-target-ip-address)
 		{ "10.0.0.1:8080/admin", "http://10.0.0.1:8080/admin" },
 		{ "localhost:3000", "http://localhost:3000" },
 		{ "[::1]:8080", "http://[::1]:8080" },
+		{ "::ffff:192.0.2.1", "http://[::ffff:192.0.2.1]" },
+		{ "[::ffff:192.0.2.1]:8080/status", "http://[::ffff:192.0.2.1]:8080/status" },
+		{ "1:2:3:4:5:6:7::", "http://[1:2:3:4:5:6:7::]" },
+		{ "[::1:2:3:4:5:6:7]:8080", "http://[::1:2:3:4:5:6:7]:8080" },
 		{ "ada@example.com", "mailto:ada@example.com" },
 	}) do
 		helpers.it("open-target: opens '" .. case[1] .. "' as " .. case[2] .. ", not a web search", function()
