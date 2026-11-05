@@ -449,7 +449,15 @@ function detect(driver, src) {
 	// Overlay adapters are topmost by default: every file that loads one is a
 	// caller the allowlist must name.
 	if (driver === 'macos' || driver === 'linux') {
-		scan('overlay.adapter', /["']adapters[./](?:graphics_renderer|wpm_surface)["']/g);
+		scan('overlay.adapter', /["']adapters[./](?:graphics_renderer|wpm_surface)["']/g, (m) => {
+			// Comparing a cached owner does not load or invoke another overlay.
+			const before = src.slice(0, m.index);
+			const after = src.slice(m.index + m[0].length);
+			return !(
+				/\brawequal\s*\(\s*package\s*\.\s*loaded\s*\[\s*$/.test(before) &&
+				/^\s*\]\s*,\s*[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*\s*\)/.test(after)
+			);
+		});
 	}
 	if (driver === 'macos') {
 		// hs.webview / hs.drawing / hs.canvas bringToFront SETS the window level
@@ -754,7 +762,8 @@ const FIXTURES = [
 	['linux', 'local w = Gtk.Window({ type = 1 })', 'linux.popup'],
 	['linux', 'local w = Gtk.Window({ type = "POPUP" })', 'linux.popup'],
 	['linux', 'local w = C.gtk_window_new(1)', 'linux.popup'],
-	['linux', 'local s = require("adapters.wpm_surface")', 'overlay.adapter']
+	['linux', 'local s = require("adapters.wpm_surface")', 'overlay.adapter'],
+	['linux', 'package.loaded["adapters.graphics_renderer"].show()', 'overlay.adapter']
 ];
 for (const [driver, snippet, kind] of FIXTURES) {
 	const kinds = detect(driver, stripFor(driver, snippet)).map((f) => f.kind);
@@ -765,7 +774,17 @@ for (const [driver, snippet, kind] of FIXTURES) {
 	);
 }
 
+const rendererImport = 'local R = require("adapters.graphics_renderer")';
+const rendererOwnerCheck = 'rawequal(package.loaded["adapters.graphics_renderer"], debt.renderer)';
+record(
+	'overlay inventory ignores only the ownership comparison, while counting each import',
+	detect('linux', rendererImport + '\n' + rendererOwnerCheck + '\n' + rendererImport).filter(
+		(f) => f.kind === 'overlay.adapter'
+	).length === 2
+);
+
 const CLEAN_FIXTURES = [
+	['linux', 'rawequal(package.loaded["adapters.graphics_renderer"], debt.renderer)'],
 	['macos', 'wv:level(hs.drawing.windowLevels.normal)'],
 	['macos', 'local level = wv:level()'],
 	['macos', '-- wv:bringToFront(true) used to pin the window'],
