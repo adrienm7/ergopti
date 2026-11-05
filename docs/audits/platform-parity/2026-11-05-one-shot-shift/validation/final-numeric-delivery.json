@@ -1,0 +1,48 @@
+{
+	"archive_copy_claims_checked": 24,
+	"current_main_runner_replays": [
+		{
+			"runner": "validation/check_menu_domain.py",
+			"runner_sha256": "0c9953fcbe3f11b9e947cb15a1da9a22349994cc136e974394285ce5ea843c24",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_menu_domain.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/artifacts/final-numeric-supplement-replays/check_menu_domain"
+			],
+			"receipt_path": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/final-numeric-supplement-replays/check_menu_domain/source-and-replay-receipt.json",
+			"receipt_sha256": "235ded80b383b46d916d0f8482db084efbe3830bbe660392a7d1bcef11d3d513",
+			"processes": 2,
+			"all_exit_zero": true,
+			"asserted_rows_each": 10
+		},
+		{
+			"runner": "validation/check_real_config.py",
+			"runner_sha256": "36485c08098690d8bcaf2676b324644b9f793e41b4c7386826a2246d5501d066",
+			"command": [
+				"python3",
+				"/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/validation/check_real_config.py",
+				"/workspace/ergopti",
+				"/workspace/scratch/parity-one-shot-2026-11-05/artifacts/final-numeric-supplement-replays/check_real_config"
+			],
+			"receipt_path": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/final-numeric-supplement-replays/check_real_config/source-and-replay-receipt.json",
+			"receipt_sha256": "d6f1f8234419008ed7510b6979d44e9b6082fd0001a8662048f0cd0320f5c572",
+			"processes": 4,
+			"all_exit_zero": true,
+			"asserted_rows_each": 10
+		}
+	],
+	"combined_source_authentication": {
+		"path": "/workspace/scratch/parity-one-shot-2026-11-05/artifacts/final-numeric-source-authentication.json",
+		"sha256": "8fbb4a02183c7e1ac030d1b56af30bc17e1be4c5671987104d82bf97eda72b44",
+		"receipt_claims": 218,
+		"distinct_paths": 135
+	},
+	"metadata_controls": {
+		"positive": 2,
+		"negative": 22
+	},
+	"coverage_summaries": 90,
+	"capability_rows": 20,
+	"findings": 5
+}

@@ -32,10 +32,13 @@ rows, nine macOS area summaries, eight Linux subject summaries and 26 shared
 rows. These units differ in granularity and basis. They are not 90 native
 scenarios, and repeated sweeps do not increase unique coverage.
 
-The later Linux admission and macOS numeric-domain supplements add six distinct
-source paths, giving113 distinct authenticated paths across the combined
-receipts. They extend the same findings without inflating the original90
-summary records or the five-finding count.
+Later Linux admission and macOS numeric-domain, menu and real-persistence
+supplements bring the combined authenticated source union to **135 distinct
+paths**: the initial 107 plus four Linux admission paths, two logger paths,
+four UI paths and 18 real-codec/persistence paths. These supplements extend
+existing roots. The campaign still has five findings, 90 initial heterogeneous
+summary records and 20 capability-comparison rows; these counts are not
+additional native scenarios.
 
 - Windows: 40 lexical source checks over 31 authenticated files, with nonempty
   unique function bodies and reader positive/negative controls. No AutoHotkey
@@ -118,39 +121,74 @@ result, while preserving physical flag and release ownership. Do not simply
 strip the user's Caps Lock state. CapsWord may hold the same lock, but an actual
 CapsWord activation-to-output experiment was not performed.
 
-### OSM-002 — Programmatic timeout validation publishes values rejected by arming
+### OSM-002 — Timeout validation admits values that break arming or reopening its editor
 
-**macOS; low; original public setter and public arm executed separately.**
-`Remap.set_sticky_timeout` accepts positivity before `math.floor`. A programmatic
-`0.1` or `0.9` ms transaction therefore commits zero, publishes zero through the
-live getter and sends zero to the acknowledged persistence port. Public
-`Keymap.arm_one_shot_shift` requires a positive timeout and raises
-`invalid one-shot Shift timeout` for that value.
+**macOS; low; original public setter, arming and menu owners, with separately
+qualified persistence evidence.** `Remap.set_sticky_timeout` checks positivity
+before `math.floor`. Programmatic `0.1` or `0.9` ms therefore becomes zero;
+public `Keymap.arm_one_shot_shift` rejects that value with
+`invalid one-shot Shift timeout`. The initial setter and public-arm probes
+execute the original owners separately, linked by their real getter/setter
+contract. They are not one simultaneous full application instance.
 
-The configuration probe runs the original setter and transaction with remapping
-initially disabled. A separate public probe executes original arming with the
-same zero value; the real getter/setter source contract links the two. These
-are not one simultaneous full application instance. Real disk persistence and
-native application failure are not claimed. Controls include 0, 1, 2.5 and
-2000 ms. The ordinary menu floors first, so its zero is rejected before commit;
-this finding is the public programmatic API invariant.
+The [numeric-domain supplement](macos/validation/config-domain-report.md)
+extends that same root: numeric NaN bypasses `value <= 0`, reaches the live
+getter and acknowledged save payload, and is rejected by separate public
+arming. **NaN remains an acknowledged-save-port observation; no actual NaN
+file publication is claimed.** Positive infinity is accepted by setter and
+arming, remaining active at a recorded clock of 1e12 while a 1 ms control
+expires. The original protected shared logger formatter handles these
+nonfinite values; full native logger transport is not measured.
 
-The later [numeric-domain supplement](macos/validation/config-domain-report.md)
-also executes numeric NaN: the setter returns true and publishes NaN through
-its live getter and acknowledged save payload; separate public arming rejects
-the same value. NaN bypasses the `value <= 0` guard. Positive infinity is
-accepted by both owners and remains active at a recorded clock of1e12, whereas
-a1ms control expires. That characterizes programmatic behavior, not a supported
-unlimited menu choice or actual persistence. The setter fixture uses a no-op
-logger; a separate original shared formatter execution confirms its protected
-format fallback handles these nonfinite numbers without raising. Full native
-logger transport is unexecuted.
+The [public-menu supplement](macos/ui-domain/report.md) closes the earlier
+API-only scope. The actual public menu action accepts recorded AppleScript
+string `1e309` as positive infinity and string `1e20` as a large finite value,
+then calls the original setter. The first rebuilt captions are respectively
+`Sticky modifier delay: inf s` and `Sticky modifier delay: 1e+17 s`. The
+**second action raises before its second AppleScript call**: original
+`delay_dialog_script` supplies the stored default to `%d` in original
+`text_utils.applescript_format`, and shared `text_utils/init.lua:716` raises
+`number has no integer representation`. This is an original public callback
+formatting failure, not proof of a native menu renderer crash or actual dialog
+execution. Both initially disabled and initially enabled Remap states execute;
+the enabled-state original lifecycle gate runs over declared native lease
+ports.
 
-Regression direction: validate the final positive integer domain before
-mutation, including NaN and fractions, and validate numeric configuration
-leaves on load. Define the infinity policy explicitly rather than assuming
-that positive means finite. These observations extend the same timing-domain
-root and do not increase the finding count.
+The [original-persistence supplement](macos/real-config-domain/report.md)
+then executes original Remap, original Config, TOML codec and FileSystem with
+the registered real-write option, on actual private Linux files. Original Config
+reload confirms that direct API positive infinity publishes `+inf`, finite
+`1e20` publishes `1e+20`, and `0.1` publishes zero. Direct zero is refused with
+the source unchanged. The accepted 2000 ms control is canonically sparse: its
+timing leaf is omitted and original Config reloads the default 2000 ms.
+
+A linked menu-to-original-persistence scenario runs the frozen public-menu
+probe with that real-write option and private file path. In each enabled state,
+menu strings `1e309` and `1e20` really publish and reload the same values, rebuild
+the first caption, and fail on the second action before another dialog call.
+String `2000` can be edited again; menu string `0.9` is floored to zero and
+refused without a write; `invalid` never calls the setter. Thus the menu's
+fractional-input guard does not prevent the separate large-finite/infinite
+editor failure. The original persister does **not** prevent these tested values
+on the measured private filesystem path.
+
+Actual private file publication and readback replace the earlier acknowledged-
+persistence limitation for these tested values. They do not certify macOS
+native filesystem metadata, locking or crash safety. AppleScript dialogs,
+native leases, generator construction, menu regeneration requests and logging
+remain fixture ports. Generator build/deploy counters are zero. No native
+osascript process, Karabiner deployment, application failure or outer native
+UI exception handling is claimed. Earlier worker reports remain historical
+records of their narrower evidence, rather than assertions that later
+persistence/UI experiments did not run.
+
+Regression direction: validate the complete final timing domain before
+mutation and on configuration load, including fractions, NaN, nonfinite values
+and finite values outside the editor's integer-formatting range. Define an
+explicit infinity policy that the setter, arming, serializer and editor can
+all represent. Retain transaction refusal, canonical-default round trips,
+both enabled states, editable controls and real private-file tests. These
+observations extend OSM-002; they do not add another finding.
 
 ### OSL-001 — Caps Lock plus physical Shift defeats the title optimization
 
@@ -239,14 +277,14 @@ contract. Windows uses AHK titlecasing, whose complete Unicode equivalence was
 not measured. Abstract magic-priority overlap controls are not reachable new
 user ASCII magic settings under the rare-symbol validator.
 
-macOS explicitly exposes a positive user timeout. An earlier root
+macOS exposes a user timeout editor. The earlier root
 [programmatic boundary control](validation/infinity-qualification.lua) executes
-the original state owner's `arm`: zero is rejected, while `math.huge` is
-accepted. Positive does not imply finite. That earlier state-only control does
-not execute the setter with infinity. The later numeric-domain supplement does,
-under its acknowledged persistence port; neither establishes a supported
-unlimited UI choice or actual persistence contract. Old TODO prose is not
-proof of those features.
+only original state arming; later supplements also execute the actual setter,
+public menu and original persistence. Free-text `1e309` reaches positive
+infinity and is persisted on the measured private path, but the next editor
+action fails. This is observed acceptance of a value that the editor cannot
+reopen, not a supported unlimited preset or certification of an intentional
+infinite-timeout design. Old TODO prose does not establish that policy.
 Windows/Linux do not expose the same editable timeout leaf in this source
 scope. This records configuration availability without asserting an intentional
 permanent product exclusion. Similarly, magic snapshot-versus-live lookup is
@@ -305,6 +343,8 @@ commands and seam qualifications:
 [Windows](windows/report.md), [macOS](macos/report.md),
 [Linux](linux/report.md), and [shared](shared/report.md).
 Their findings and coverage JSON remain the detailed machine-readable evidence.
+Later linked supplements refine the initial reports without rewriting the
+original frozen observations.
 Custody manifests authenticate archived artifacts and identify formatting
 provenance. Run the source checker and projection workflow described in the
 [campaign README](README.md); a source or inventory check cannot substitute for
@@ -314,7 +354,9 @@ Each reviewer completed two final bounded sweeps after its last new root. Final
 Windows sweeps repeat source checks; macOS reruns public/config probes and six
 registered modules; Linux repeats 19 fresh processes per sweep across genuine
 Lua 5.4/LuaJIT; shared repeats its policy/model/source controls. No sweep adds a
-new independent root. Mechanical false-green scans stay within their zero
+new independent root. Passing audit replays reproduce the dated bad
+observations with their controls; they do not mean the defects are fixed or
+that parity has been achieved. Mechanical false-green scans stay within their zero
 baseline, but do not establish semantic adequacy. Earlier diagnostic fixture
 attempts are not acceptance evidence and no production body was changed to make
 a probe pass.

@@ -1,0 +1,68 @@
+{
+	"source_commit": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+			"sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/unit/ui/menu/keyboard_layout/test_karabiner_timeout_regenerates.lua",
+			"sha256": "7ba60e5c1ef7d091c47881c56442572bd7787c007701997d4786e550995e9694",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/helpers/init.lua",
+			"sha256": "03e75d07bb6759fbdf665652fdeb805ef39253b5ed60df4286adbcdd2b7048ce",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+			"sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/init.lua",
+			"sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/platform/remap/config.lua",
+			"sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/text_utils.lua",
+			"sha256": "5fae92ac44b056a320998c9ff7f6079a3294522f9c1524e67e70f73051e84197",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/text_utils/init.lua",
+			"sha256": "91fa72430bf0375aa1d464804a0c19e55ddde9e934344834953c0f257dff6592",
+			"pinned_matches": true
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "750425bc132f156baa8e7fbc2db1e4ccb331a47c565972822955c0547c47c196",
+			"pinned_matches": true
+		}
+	],
+	"runs": [
+		{
+			"sweep": 1,
+			"exit": 0,
+			"asserted_rows": 10,
+			"log": "sweep-1-menu-domain.log",
+			"sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006"
+		},
+		{
+			"sweep": 2,
+			"exit": 0,
+			"asserted_rows": 10,
+			"log": "sweep-2-menu-domain.log",
+			"sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006"
+		}
+	],
+	"program_sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190",
+	"qualification": "Original menu build/callback and original Remap setter in both disabled and enabled fixture states; acknowledged save and regeneration ports; recorded valid AppleScript dialog strings; no native UI, disk, lease regeneration, or application proof."
+}

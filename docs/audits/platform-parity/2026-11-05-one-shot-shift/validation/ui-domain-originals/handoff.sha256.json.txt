@@ -1,0 +1,40 @@
+{
+  "formatter": "Prettier --config /workspace/ergopti/.prettierrc (cwd /workspace/ergopti), Ruff format/check for Python",
+  "files": [
+    {
+      "file": "check_menu_domain.py",
+      "sha256": "d3a2c2ad99f741bc96d12f5abec746028ec8dc0495a484b248ced4c9be7e25fe",
+      "bytes": 6624
+    },
+    {
+      "file": "menu-infinity-probe.log",
+      "sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006",
+      "bytes": 13480
+    },
+    {
+      "file": "menu-infinity-probe.lua",
+      "sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190",
+      "bytes": 4881
+    },
+    {
+      "file": "report.md",
+      "sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f",
+      "bytes": 4718
+    },
+    {
+      "file": "source-and-replay-receipt.json",
+      "sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b",
+      "bytes": 2501
+    },
+    {
+      "file": "sweep-1-menu-domain.log",
+      "sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006",
+      "bytes": 13480
+    },
+    {
+      "file": "sweep-2-menu-domain.log",
+      "sha256": "e51e46193161980b32af7cdf9ac593247e3dae427eb6ca25a130ce31e4606006",
+      "bytes": 13480
+    }
+  ]
+}

@@ -19,19 +19,21 @@ python3 validation/replay.py /path/to/ergopti /tmp/one-shot-replay
 python3 validation/check_source_guards.py /path/to/ergopti /tmp/one-shot-guards
 python3 validation/check_public_channel_admission.py /path/to/ergopti /tmp/one-shot-channel
 python3 validation/check_config_domain.py /path/to/ergopti /tmp/one-shot-domain
+python3 validation/check_menu_domain.py /path/to/ergopti /tmp/one-shot-ui
+python3 validation/check_real_config.py /path/to/ergopti /tmp/one-shot-real
 ```
 
 The generator validates the input before producing `index.json`,
 `findings.json`, `capabilities.json` and `capabilities.md`. `--directory` selects
 another campaign root. The check mode rejects missing or changed projections.
 
-The source checker authenticates132 role claims across107 distinct files against
+The source checker authenticates 132 role claims across 107 distinct files against
 both pinned Git content and current bytes; changed files require a new review,
 not automatic receipt updates. It works on descendants of the audit commit.
 The frozen Linux worker source checker additionally requires the original HEAD,
 so its execution is historical; the aggregate checker owns descendant checks.
 
-The replay runner requires genuine Lua5.4, LuaJIT, Node22, Python and
+The replay runner requires genuine Lua 5.4, LuaJIT, Node 22, Python and
 libxkbcommon with standard XKB data on a Linux host. The other drivers run
 through the qualified source/recorded-port checks described in their reports.
 Put those tools on PATH; set
@@ -45,14 +47,32 @@ retained separately from final acceptance receipts.
 Canonical IDs use `OSW-001`, `OSM-001`, `OSL-001` and `OSS-001` where applicable;
 any normalization preserves `submitted_id` and is not another finding.
 
-The three supplemental commands likewise accept an output directory so future
-runs can leave canonical evidence intact. They exercise two positive/five
-negative source-authentication controls, two Linux enabled-preset channel
-processes, and three macOS numeric-domain/formatter processes respectively.
-The initial132/107 source register and these supplementary source receipts
-jointly authenticate113 distinct paths; overlapping claims are not additional
-features. Original runner versions remain available where a later CLI-only
-adaptation follows an earlier receipt.
+The supplemental commands accept explicit output directories so future runs
+leave canonical evidence intact. They cover source-authentication controls,
+Linux enabled-preset channel admission, macOS timing/formatter boundaries,
+public-menu input and reopening, and original Config/TOML/FileSystem round
+trips. Use these portable campaign wrappers. Frozen worker helpers retain
+historical invocation paths and may write their own evidence directories;
+they are not the recommended future replay entry points.
+
+The initial source register contains 132 role claims across 107 distinct paths.
+With the Linux admission, logger, UI and real-codec/persistence supplements,
+the combined source union is **135 distinct authenticated paths**. The five
+findings, 90 initial heterogeneous coverage summaries and 20 capability rows
+remain unchanged. Overlapping receipts and repeated execution are not new
+features or native scenarios. Original runner versions remain available where
+a later CLI-only adaptation follows an earlier receipt.
+
+The OSM-002 supplements execute the original public menu, setter, Config, TOML
+codec and FileSystem on actual private Linux files in both enabled states.
+Infinity and finite 1e20 persist/reload, but reopening the editor raises at its
+original integer formatter before a second dialog call. API 0.1 persists zero;
+NaN remains a separately qualified acknowledged-save-port observation. Native
+macOS metadata, dialogs, leases, generation/deployment and receiving remain
+unmeasured. See the [root report](report.md) and
+[real-persistence qualification](macos/real-config-domain/report.md).
+A passing replay reproduces the recorded counterexamples and their controls;
+it does not mean the defects are fixed or semantic parity is established.
 
 Every coverage/finding needs observation basis and qualification, and every
 capability has an independent availability and observation basis for each OS.

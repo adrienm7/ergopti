@@ -815,6 +815,42 @@
 				{
 					"path": "validation/config-domain-receipt.json",
 					"sha256": "dedb692ffcc5e449cbdb5fc8c16925651f1c0bb5a4e3490ef25817bcfc8cb852"
+				},
+				{
+					"path": "macos/ui-domain/report.md",
+					"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+				},
+				{
+					"path": "macos/ui-domain/menu-infinity-probe.lua",
+					"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+				},
+				{
+					"path": "macos/ui-domain/source-and-replay-receipt.json",
+					"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+				},
+				{
+					"path": "validation/custody-ui-domain.json",
+					"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+				},
+				{
+					"path": "macos/real-config-domain/report.md",
+					"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+				},
+				{
+					"path": "macos/real-config-domain/real-config-domain.lua",
+					"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+				},
+				{
+					"path": "macos/real-config-domain/real-menu-persistence.lua",
+					"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+				},
+				{
+					"path": "macos/real-config-domain/source-and-replay-receipt.json",
+					"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+				},
+				{
+					"path": "validation/custody-real-config-domain.json",
+					"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 				}
 			],
 			"ids": ["OSM-001", "OSM-002"],
@@ -867,7 +903,7 @@
 				{
 					"aspect": "Settings",
 					"basis": "actual-owner",
-					"qualification": "actual Remap transaction setter + actual public arm separately. OSM-002; acknowledged persistence, not real disk; ordinary menu rejects zero",
+					"qualification": "Original setter/public arm numeric-domain observations plus original public menu and same-process original Config/TOML/FileSystem private Linux save/reload; enabled and disabled controls. Ten direct and ten linked UI rows per sweep, repeated twice, supplement the existing Settings area. Fractional menu values reject zero; overflow 1e309 and finite 1e20 persist and second menu callback raises at %d. Native filesystem metadata, lease/dialog/regeneration/logging remain ports; no native UI/app crash/deployment/receiving proof.",
 					"evidence": [
 						{
 							"path": "macos/coverage.json",
@@ -876,6 +912,42 @@
 						{
 							"path": "macos/report.md",
 							"sha256": "5d573d9f665e338ffe346faaa1e2ee00b256f877e009a92f710fdc4d9e150b6f"
+						},
+						{
+							"path": "macos/ui-domain/report.md",
+							"sha256": "a6c8601dd3f50590d132f64f73fd2d3322d232861e79f5113273a29c72852b3f"
+						},
+						{
+							"path": "macos/ui-domain/menu-infinity-probe.lua",
+							"sha256": "8587a5e49b479c8d588aa04a68f4f8e32885adb4204a1d6e8f85a3b500311190"
+						},
+						{
+							"path": "macos/ui-domain/source-and-replay-receipt.json",
+							"sha256": "eac6674bb835632b5082c6daff75274179b2ab40a7020a27c490cfd3321f222b"
+						},
+						{
+							"path": "validation/custody-ui-domain.json",
+							"sha256": "9fc7efcc0f1905f836a1725b2236f6059bde88bf2272d3f86856a80b9d0b4649"
+						},
+						{
+							"path": "macos/real-config-domain/report.md",
+							"sha256": "28217f3b440af17e1649db174ec861f2cb27ebe765ef85da572732d884eeb17e"
+						},
+						{
+							"path": "macos/real-config-domain/real-config-domain.lua",
+							"sha256": "e6335f4cac6ed417a8178e09387b1d9fde669f4550fce11d5a64caf6f1665c4b"
+						},
+						{
+							"path": "macos/real-config-domain/real-menu-persistence.lua",
+							"sha256": "fdcc5410e56bc7a1c9f8da2d8d4acf2889bca308baed64bc3ef857e25d9adfee"
+						},
+						{
+							"path": "macos/real-config-domain/source-and-replay-receipt.json",
+							"sha256": "b329d140eaeea4b04c07aafc5ae39d9cb12a799c32b473781a20083fce5d7105"
+						},
+						{
+							"path": "validation/custody-real-config-domain.json",
+							"sha256": "738b9e6f4812d2bafe32502fdc62803f9878b284c5dd89f1aceff8df224a3050"
 						}
 					]
 				},
