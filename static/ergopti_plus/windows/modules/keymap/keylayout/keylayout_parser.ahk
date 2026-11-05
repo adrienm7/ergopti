@@ -27,6 +27,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include %A_LineFile%\..\..\..\..\infra\number.ahk
 
 
 
@@ -159,9 +160,9 @@ _Keylayout_ParseModifierKeys(Keys) {
 ; A required integer attribute, or a refusal naming the element that lacks it.
 _Keylayout_IntegerAttribute(Attrs, Name, Element) {
 	Value := Attrs.Get(Name, "")
-	if !IsInteger(Value)
+	if !NumberTryParseInputInteger(Value, &Parsed)
 		throw ValueError("A .keylayout " . Element . " has no valid " . Name . ".", -1, Value)
-	return Integer(Value)
+	return Parsed
 }
 
 ; A required text attribute, or a refusal naming the element that lacks it.
