@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **112 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **113 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1815,3 +1815,5 @@ The correction reads one raw Buffer and decodes it strictly through a pure early
 Native replay41974178449 (26b1ecd81954794d09806e746265724e60332bc1) qualifies the ten calendar/mail newline cases (AHK-107), five public/direct scalar writer cases (AHK-068), ten Anthropic/Gemini cases (AHK-091), and both initial native changelog Show/Close cases (AHK-109), individually and reversed. The full45-case cohort remains red (36 pass,9 fail); these are selected-case qualifications. Production-entry compile passes; neither E2E flag was enabled.
 
 The ordinary TOML foreign-stage failure in that same replay extends AHK-071 rather than the distinct-finding count. Commit a5b3687b retains exclusive stage ownership through exact readback and publication, and preserves truthful session feedback after an unacknowledged native rename. Five additional native-I/O regressions and the nine adapted atomic contracts await Windows replay.
+
+AHK-113 is a source-confirmed field-run timestamp defect: date and time were formatted from separate UTC reads, allowing a midnight crossing to produce a timestamp one day behind. The helper now captures one instant; deterministic formatting and single-read source contracts await native qualification. No system clock change or measured midnight race is claimed.
