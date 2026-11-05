@@ -820,7 +820,18 @@ local function _manifest_hotstring_rows(ctx, config)
 					if consume == nil then return false end
 
 					local saved = snapshot()
-					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then return false end
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then
+						local _, reason = Terminators.validate_custom_terminator("custom_" .. char, char, char, consume)
+						if reason == "character_collision" or reason == "key_collision" then
+							local message = string.format(i18n_safe("editor.hotstrings.err_id_exists"), char)
+							show_error(require("ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
+						elseif reason == "invalid_character" then
+							show_error(i18n_safe("dialog.hotstrings.invalid_body"), i18n_safe("dialog.hotstrings.invalid_title"))
+						else
+							SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
+						end
+						return false
+					end
 					return commit(saved) == true
 				end,
 			}, { ["word_expanders_ready"] = word_expanders_ready })
