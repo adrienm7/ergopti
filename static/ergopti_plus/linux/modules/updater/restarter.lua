@@ -58,6 +58,17 @@ function M.process_start_time(pid, stat)
 	return nil
 end
 
+--- Linux boot identity prevents start ticks reused across reboot from sharing a marker.
+--- @param text string|nil Kernel boot ID, read when absent.
+--- @return string|nil
+function M.boot_id(text)
+	text = text or read_file("/proc/sys/kernel/random/boot_id")
+	if type(text) ~= "string" then return nil end
+	local id = text:match("^([%da-fA-F%-]+)%s*$")
+	if not id or not id:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then return nil end
+	return id:lower()
+end
+
 --- Whether this process runs inside the daemon's systemd user unit.
 --- @param cgroup string|nil The text of /proc/self/cgroup (read when nil).
 --- @return boolean|nil in_unit nil when the native cgroup cannot be read.
@@ -121,16 +132,26 @@ end
 --- already owns for its restart handoffs (infra/restart_pause.lua), so it never depends on
 --- XDG_RUNTIME_DIR.
 --- @param pid integer The relay's target process.
---- @return string path
-function M.cancel_path(pid)
-	return require("adapters.storage").path() .. ".relay-cancel-" .. tostring(pid)
+--- @param start_tick string|nil Captured process start tick, read when absent.
+--- @param boot_id string|nil Captured Linux boot identity, read when absent.
+--- @return string|nil path Qualified marker, nil when identity is unreadable.
+function M.cancel_path(pid, start_tick, boot_id)
+	if type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then return nil end
+	start_tick = start_tick or M.process_start_time(pid)
+	boot_id = M.boot_id(boot_id)
+	if type(start_tick) ~= "string" or not start_tick:match("^%d+$") or not boot_id then return nil end
+	return require("adapters.storage").path() .. ".relay-cancel-" .. string.format("%.0f", pid)
+		.. "-" .. start_tick .. "-" .. boot_id
 end
+
+-- Pin the exact dispatched marker so a transient /proc failure cannot defeat Quit.
+local relay_marker, relay_pid
 
 --- Cancels the restart that restart() requested, for a Quit that wins over a reload.
 --- Under the unit, a stop job replaces the queued restart job; with a relay, the marker
 --- tells the relay not to start the launcher once this process has exited.
 --- @param how string "systemd" or "relay", as restart() returned.
---- @param opts table|nil { run?, pid? }
+--- @param opts table|nil { run?, pid?, start_tick?, boot_id? }
 --- @return boolean cancelled
 --- @return string|nil detail Why the restart could not be cancelled.
 function M.cancel(how, opts)
@@ -144,9 +165,13 @@ function M.cancel(how, opts)
 		return false, "systemctl refused the stop"
 	end
 	if how == "relay" then
-		local pid = opts.pid or M.own_pid()
+		local pid = opts.pid or relay_pid or M.own_pid()
 		if not pid then return false, "own process id unreadable" end
-		local path = M.cancel_path(pid)
+		local path
+		if opts.start_tick ~= nil or opts.boot_id ~= nil then
+			path = M.cancel_path(pid, opts.start_tick, opts.boot_id)
+		elseif relay_pid == pid then path = relay_marker end
+		if not path then return false, "the relay process identity is unreadable" end
 		if not run("touch " .. ShellRunner.quote(path)) then
 			return false, "the relay cancellation marker could not be written"
 		end
@@ -157,7 +182,7 @@ function M.cancel(how, opts)
 end
 
 --- Starts the installed version in place of this process.
---- @param opts table { wrapper, args, paused?, run?, cgroup?, pid?, start_tick? }
+--- @param opts table { wrapper, args, paused?, run?, cgroup?, pid?, start_tick?, boot_id? }
 --- @return string|nil "systemd" (systemd stops and restarts this process) or
 ---   "relay" (the caller must now exit), nil when nothing could be started.
 function M.restart(opts)
@@ -201,10 +226,16 @@ function M.restart(opts)
 			Logger.error(LOG, "Own process identity unreadable — the update applies at the next start.")
 			return nil
 		end
-		if not run(M.relay_command(pid, opts.wrapper, opts.args, M.cancel_path(pid), start_tick)) then
+		local marker = M.cancel_path(pid, start_tick, opts.boot_id)
+		if not marker then
+			Logger.error(LOG, "Own boot identity unreadable — the update applies at the next start.")
+			return nil
+		end
+		if not run(M.relay_command(pid, opts.wrapper, opts.args, marker, start_tick)) then
 			Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")
 			return nil
 		end
+		relay_marker, relay_pid = marker, pid
 		Logger.info(LOG, "Restart relay armed: %s starts once process %d exits.", opts.wrapper, pid)
 		return "relay"
 	end
