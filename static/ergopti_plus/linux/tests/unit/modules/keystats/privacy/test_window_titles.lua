@@ -74,6 +74,58 @@ end
 -- =================================================================
 
 helpers.describe("window titles: what is counted", function()
+	it("attributes typing to the admitted window already foreground at startup", function()
+		local writer = with_writer(function(keystats)
+			local source_file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+			local source = assert(source_file:read("*a")); assert(source_file:close())
+			local helper_start = assert(source:find("\tlocal function publish_admitted_focus()", 1, true))
+			local helper_end = assert(source:find("\n\tlocal function refresh_admitted_focus", helper_start, true))
+			local first = assert(source:find("\t\tlocal foreground = process_lifecycle.getForegroundApp()", 1, true))
+			local last = assert(source:find("\n\t\tprocess_lifecycle.start()", first, true))
+			local code = source:sub(helper_start, helper_end - 1) .. "\nreturn function()\n"
+				.. source:sub(first, last + #"\n\t\tprocess_lifecycle.start()" - 1) .. "\nend"
+			local env = setmetatable({
+				process_lifecycle = { getForegroundApp = function() return { appId = "code", windowTitle = "Startup document" } end,
+					start = function() return true end },
+				privacy_owners = { startup_checkpoint = function() return true end },
+				secure_focus_guard = { prime = function() return true end, blocks_text = function() return false end,
+					current_context = function() return { app_id = "code", title = "Startup document" } end },
+				Monotonic = { now_ms = function() return 1000 end },
+				keystats = keystats,
+			}, { __index = _G })
+			local chunk
+			if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+			else chunk = assert(load(code, "daemon startup focus", "t", env)) end
+			chunk()()
+			keystats.on_keydown("a", 1100, "code")
+			keystats.flush()
+		end)
+		helpers.assert_eq(written_titles(writer)["Startup document"].c, 1)
+	end)
+
+	it("does not persist a tentative title when secure-field admission is denied", function()
+		local writer = with_writer(function(keystats)
+			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+			local source = assert(file:read("*a")); assert(file:close())
+			local first = assert(source:find("\t\tprocess_lifecycle.onFocusChange(function(appName, windowTitle)", 1, true))
+			local last = assert(source:find("\n\t\tend)", first, true))
+			local code = "return function()\n" .. source:sub(first, last + #"\n\t\tend)" - 1) .. "\nend"
+			local env = setmetatable({
+				process_lifecycle = { onFocusChange = function(callback) callback("code", "Protected field title") end },
+				wrap_on_type = { end_selection_window = function() end },
+				engine = { reset = function() end }, keystats = keystats,
+				secure_focus_guard = { prime = function() keystats.set_secure_field(true); return false end },
+				Monotonic = { now_ms = function() return 1000 end },
+			}, { __index = _G })
+			local chunk
+			if loadstring then chunk = assert(loadstring(code)); setfenv(chunk, env)
+			else chunk = assert(load(code, "daemon focus callback", "t", env)) end
+			chunk()()
+			keystats.set_secure_field(false)
+			keystats.flush()
+		end)
+		helpers.assert_nil(written_titles(writer)["Protected field title"])
+	end)
 
 	it("counts a keystroke against the window it was typed into", function()
 		local writer = with_writer(function(keystats)

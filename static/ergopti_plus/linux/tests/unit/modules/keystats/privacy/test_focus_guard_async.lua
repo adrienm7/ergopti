@@ -224,6 +224,9 @@ helpers.describe("asynchronous native privacy context", function()
 		local source = file:read("*a"); file:close()
 		local bridge = source:match('(privacy_owners%.watch%.pump%(%)%s*.-)if not RuntimeGuard%.call%("keyboard pump"')
 		assert(type(bridge) == "string" and #bridge > 0, "the actual idle bridge must exist")
+		local helper_start = assert(source:find("\tlocal function publish_admitted_focus()", 1, true))
+		local helper_end = assert(source:find("\n\t-- Close the input path", helper_start, true))
+		bridge = source:sub(helper_start, helper_end - 1) .. "\n" .. bridge
 		local retained, calls, pumps = false, 0, 0
 		local metrics_pumps, guarded_calls = 0, 0
 		local function pump_metrics()
