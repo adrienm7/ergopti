@@ -228,7 +228,7 @@ _MBPT_Case(Mode) {
 	AssertTrue((Creation is Integer) && Creation == 1, "Only an exclusively acquired child root may be recursively removed")
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
-	AtDeadline := 0, ExportFailure := 0
+	AtDeadline := 0, ExportFailure := 0, VisibilityTrace := ""
 	PreviousCritical := Critical("Off")
 	try {
 		_MBPT_StageAssets(Directory)
@@ -254,8 +254,17 @@ _MBPT_Case(Mode) {
 				Handle.requestTerminate()
 			Receipt := IsObject(Handle) ? Handle.terminate() : 1
 			Retired := (Receipt is Integer) && Receipt == 1
-			if Retired
+			if Retired {
+				PhasePath := Directory . "\visibility-phases.txt"
+				if Mode == "native-hide-reopen-close" && FileExist(PhasePath) {
+					try VisibilityTrace := FSReadStrict(PhasePath)
+					catch as TraceFailure {
+						if !IsObject(ExportFailure)
+							ExportFailure := TraceFailure
+					}
+				}
 				DirDelete(Directory, true)
+			}
 		} catch as Failure {
 			if !IsObject(Primary)
 				Primary := Failure
@@ -269,6 +278,13 @@ _MBPT_Case(Mode) {
 	; is a completion diagnostic, not an independently measured stderr stream.
 	try {
 		if Retired {
+			if Mode == "native-hide-reopen-close" {
+				for Line in StrSplit(VisibilityTrace, "`n", "`r")
+					if Line != ""
+						_TestPrint("# model-browser-third-order-phase " . Line)
+				if VisibilityTrace == ""
+					_TestPrint("# model-browser-third-order-phase UNKNOWN")
+			}
 			_TestPrint("# model-browser-close-pause-owner terminal calls=" . State.Calls . " code=" . State.Code
 				. " deadline_calls=" . (IsObject(AtDeadline) ? AtDeadline.Calls : -1)
 				. " capture_delivered=" . (State.Calls == 1))
