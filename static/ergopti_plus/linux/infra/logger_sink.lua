@@ -331,11 +331,15 @@ end
 --- Whether a basename is a generated daily log for this prefix.
 --- @param name string Basename.
 --- @param prefix string Literal prefix (no glob character).
---- @return boolean
+--- @return string|nil date Admitted calendar date, or nil for an unrelated name.
 local function rolled_name(name, prefix)
-	if name:sub(1, #prefix) ~= prefix or name:sub(-#LOG_EXT) ~= LOG_EXT then return false end
+	if name:sub(1, #prefix) ~= prefix or name:sub(-#LOG_EXT) ~= LOG_EXT then return nil end
 	local date = name:sub(#prefix + 1, #name - #LOG_EXT)
-	return date:match("^%d%d%d%d%-%d%d%-%d%d$") ~= nil
+	if not date:match("^%d%d%d%d%-%d%d%-%d%d$") then return nil end
+	local year, month, day = date:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+	local ok, stamp = pcall(os.time, { year = tonumber(year), month = tonumber(month), day = tonumber(day), hour = 12 })
+	if not ok or not stamp or os.date("%Y-%m-%d", stamp) ~= date then return nil end
+	return date
 end
 
 local function topical_name(name)
@@ -366,14 +370,11 @@ end
 --- of two constants that are free to change independently, and relying on it
 --- would make renaming one silently stop purging the other.
 ---
---- Ages come from the modification time rather than the date in each name: the
---- daemon may have been off for a month, and a purge that only understands
---- "yesterday" leaves everything older untouched.
+--- Daily logs age by their date; topical views have no date and age by mtime.
 ---
---- The sweep runs in this process: a regular file directly in the folder
---- (never a link, never a folder), with a daily name or declared topical name, last modified
---- more than N + 1 whole days before the current second (-mtime +N drops the
---- fraction of the age).
+--- The sweep selects regular files directly in the folder (never a link or
+--- folder). Daily dates older than the calendar cutoff expire; declared topical
+--- names retain the historical mtime cutoff of N + 1 whole days.
 --- A refusal the purge used to discard is now reported, and never fatal.
 local function purge_old()
 	local days = retention_days()
@@ -391,10 +392,16 @@ local function purge_old()
 		if code ~= "ENOENT" then report_purge_refusal("list", _dir, message) end
 		return
 	end
-	local cutoff = os.time() - (math.floor(days) + 1) * DAY_SECONDS
+	local now = os.time()
+	local cutoff = now - (math.floor(days) + 1) * DAY_SECONDS
+	local cutoff_calendar = os.date("*t", now)
+	cutoff_calendar.day = cutoff_calendar.day - math.floor(days)
+	cutoff_calendar.hour, cutoff_calendar.min, cutoff_calendar.sec, cutoff_calendar.isdst = 12, 0, 0, nil
+	local cutoff_date = os.date("%Y-%m-%d", os.time(cutoff_calendar))
 	for _, entry in ipairs(entries) do
 		local name = entry.name
-		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX) or topical_name(name)) then
+		local date = rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)
+		if entry.kind == "file" and (date or topical_name(name)) then
 			local path = NativeDirectory.join(_dir, name)
 			local inspected, stat, stat_message, stat_code = pcall(NativeDirectory.stat, path)
 			if not inspected then
@@ -404,7 +411,8 @@ local function purge_old()
 				report_purge_refusal("inspect", path, stat_message)
 			end
 			-- lstat again: the entry may have been replaced since the listing.
-			if stat and stat.kind == "file" and stat.modified and stat.modified < cutoff then
+			local expired = (date and date < cutoff_date) or (not date and stat and stat.modified and stat.modified < cutoff)
+			if stat and stat.kind == "file" and expired then
 				local called, removed, remove_error = pcall(os.remove, path)
 				if not called or not removed then report_purge_refusal("delete", path, called and remove_error or removed) end
 			end
