@@ -198,3 +198,72 @@ _STEA_ActualClear(Mode) {
 }
 for _STEA_Mode in ["denied", "accessible-control", "empty-control", "absent-control", "long-name-control"]
 	Test("storage native enumeration receipt: " . _STEA_Mode, _STEA_ActualClear.Bind(_STEA_Mode))
+
+_STNN_ActualName(Mode) {
+	global STORAGE_REG_BASE
+	SavedBase := STORAGE_REG_BASE
+	Subkey := "Software\Ergopti_StorageNameAudit_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := "HKCU\" . Subkey, Owned := false, Handle := 0
+	Payload := JsonParse('{"name":"owned\u0000foreign"}')
+	Name := Payload["name"]
+	AssertEqual(13, StrLen(Name), "the name is a real JSON String value with complete native UTF-16 metadata")
+	AssertEqual(0, NumGet(StrPtr(Name), 10, "UShort"))
+	AssertEqual(Ord("f"), NumGet(StrPtr(Name), 12, "UShort"))
+	try {
+		Disposition := 0
+		Status := DllCall("Advapi32\RegCreateKeyExW", "Ptr", -2147483647,
+			"Str", Subkey, "UInt", 0, "Ptr", 0, "UInt", 0, "UInt", 0xF003F,
+			"Ptr", 0, "Ptr*", &Handle, "UInt*", &Disposition, "UInt")
+		Owned := Status == 0 && Disposition == 1
+		AssertTrue(Owned, "only a genuinely new unrelated HKCU child may become the private storage fixture")
+		AssertTrue(Handle != 0)
+		STORAGE_REG_BASE := Path
+		AssertTrue(ST_Set("owned", "Original"))
+		AssertEqual("Original", ST_Get("owned", "missing"), "the distinct short native neighbor must really exist before the operation")
+		Result := "unset", Roundtrip := "unused", Present := "unused"
+		switch Mode {
+			case "set":
+				Result := ST_Set(Name, "Edited")
+				Roundtrip := ST_Get(Name, "missing")
+			case "get": Result := ST_Get(Name, "missing")
+			case "has": Result := ST_Has(Name)
+			case "delete": Result := ST_Delete(Name)
+			case "unicode-control", "default-control":
+				Name := Mode == "unicode-control" ? "é😀" : ""
+				Result := ST_Set(Name, "Independent")
+				Roundtrip := ST_Get(Name, "missing")
+				Present := ST_Has(Name)
+		}
+		ActualNeighbor := ST_Get("owned", "missing")
+		_TestPrint("# storage-native-name mode=" . Mode . " disposition=" . Disposition
+			. " requested_units=" . StrLen(Name) . " result=" . Result
+			. " neighbor=" . ActualNeighbor . " roundtrip=" . Roundtrip . " present=" . Present)
+		AssertEqual("Original", ActualNeighbor, "an unsupported full name cannot mutate or delete the distinct shorter native neighbor")
+		switch Mode {
+			case "set":
+				AssertTrue((Result is Integer) && (Result == 0 || Result == 1))
+				if Result == 1
+					AssertEqual("Edited", Roundtrip, "a backend may ACK a fully encoded distinct name only when that full logical name roundtrips")
+			case "get": AssertEqual("missing", Result, "the uncreated logical name must not read the existing shorter neighbor")
+			case "has": AssertFalse(Result, "the uncreated logical name must not borrow another native value's membership")
+			case "delete":
+				AssertTrue((Result is Integer) && (Result == 0 || Result == 1), "refusal or a safe idempotent delete is allowed, never deletion of another name")
+			case "unicode-control", "default-control":
+				AssertTrue(Result)
+				AssertEqual("Independent", Roundtrip)
+				AssertTrue(Present)
+		}
+	} finally {
+		STORAGE_REG_BASE := SavedBase
+		try {
+			if Owned
+				AssertEqual(0, DllCall("Advapi32\RegDeleteKeyW", "Ptr", -2147483647,
+					"Str", Subkey, "UInt"), "delete only this exclusively created native child")
+		} finally {
+			if Handle
+				DllCall("Advapi32\RegCloseKey", "Ptr", Handle, "UInt")
+		}
+	}
+}
+for _STNN_Mode in ["set", "get", "has", "delete", "unicode-control", "default-control"]
+	Test("storage native name identity: " . _STNN_Mode . " (storage-native-name-nul)", _STNN_ActualName.Bind(_STNN_Mode))
