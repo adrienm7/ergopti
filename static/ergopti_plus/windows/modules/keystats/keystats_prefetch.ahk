@@ -377,6 +377,94 @@ KLPF_ReloadKeepsWorkersOut() {
 		return ReloadTerminalHandoffActive()
 }
 
+; Capture only the resident store's admitted open interval. Durable file receipts
+; are observed outside Critical; a partially acknowledged context cannot lend its
+; old origin to a ledger which may already contain that interval's closing row.
+KLPF_CaptureForegroundProjection(MetricsDir) {
+	; The standalone scheduler also owns valid jobs without resident telemetry.
+	if !IsSet(Keystats) || !Keystats.initialized
+		return 0
+	Store := ConfigTransitionNormalizeConfigDir(MetricsDir)
+	ResidentStore := ConfigTransitionNormalizeConfigDir(Keystats.metrics_dir)
+	if !(Store is String) || !(ResidentStore is String) || !(Store == ResidentStore)
+		return 0
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || KL_CaptureHeld() || KLHook.capture_stopping
+				|| IsObject(KLHook.context_transition) || IsObject(KLHook.context_stop)
+				|| KLHook.context_observation_head <= KLHook.context_observations.Length
+				|| KLHook.prev_app == "" || KLHook.app_entered_at == 0
+			return 0
+		Journal := _KL_JournalOwnerFor()
+		if IsObject(Journal._Token) || Journal.HasDebt()
+			return 0
+		Activity := KLHook.last_tick
+		if Activity == 0 && KLWatch.is_session_active
+			Activity := KLWatch.last_authorized_tick
+		Wire := Map("app", KLHook.prev_app, "origin", KLHook.app_entered_at,
+			"activity", Activity, "day", FormatTime(A_Now, "yyyy-MM-dd"),
+			"now", A_TickCount, "timeout", KLWatchConst.SESSION_TIMEOUT_MS)
+		Receipt := {Wire: Wire, Store: Store, ResidentRoute: Keystats.metrics_dir,
+			Path: Keystats.data_sql_path, Generation: KLHook.capture_generation,
+			Title: KLHook.prev_title, Privacy: _KL_ContextPrivacyStamp(),
+			Journal: Journal,
+			Offset: Keystats.today_log_offset}
+	} finally Critical(PreviousCritical)
+	if !KLR_ForegroundSnapshotValid(Wire)
+		return 0
+	; Classification may refresh native privacy caches. It must not mutate any
+	; journal clock; its resulting epoch is checked against the captured owner.
+	Filtered := true
+	try Filtered := MF_ShouldFilter()
+	if Filtered || !KLPF_ForegroundProjectionCurrent(Receipt)
+		return 0
+	try Source := KLR_LedgerSnapshot(Receipt.Path)
+	catch
+		return 0
+	if !Source.Get("ok", false) || !KLPF_ForegroundProjectionCurrent(Receipt)
+		return 0
+	Receipt.Source := Source
+	return Receipt
+}
+
+; Memory-only validation: no focus refresh, repair, logger or filesystem call.
+KLPF_ForegroundProjectionCurrent(Receipt) {
+	if !IsObject(Receipt)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		return Keystats.initialized && !A_IsSuspended && !KL_CaptureHeld()
+			&& !KLHook.capture_stopping && KLHook.capture_generation == Receipt.Generation
+			&& !IsObject(KLHook.context_transition) && !IsObject(KLHook.context_stop)
+			&& KLHook.context_observation_head > KLHook.context_observations.Length
+			&& KLHook.prev_app == Receipt.Wire["app"] && KLHook.app_entered_at == Receipt.Wire["origin"]
+			&& KLHook.prev_title == Receipt.Title && _KL_ContextPrivacyCurrent(Receipt.Privacy)
+			&& MetricsFocusCache.state.valid && MetricsFocusCache.state.process_name == Receipt.Wire["app"]
+			&& MetricsFocusCache.state.title == Receipt.Title
+			&& Keystats.metrics_dir == Receipt.ResidentRoute && Keystats.data_sql_path == Receipt.Path
+			&& Keystats.today_log_offset >= Receipt.Offset
+			&& FormatTime(A_Now, "yyyy-MM-dd") == Receipt.Wire["day"]
+	} finally Critical(PreviousCritical)
+}
+
+; This is a cooperative before-publication source check, not cross-process CAS.
+; A switch or ingest after the worker finished cannot enter that finished DB;
+; a switch/ingest during its build must reject the captured overlay entirely.
+KLPF_ForegroundProjectionSourceCurrent(Receipt) {
+	if !KLPF_ForegroundProjectionCurrent(Receipt)
+		return false
+	try Current := KLR_LedgerSnapshot(Receipt.Path)
+	catch
+		return false
+	; The append-only ledger may advance for typing while this same foreground
+	; interval remains open. Existing reader provenance permits such growth;
+	; replacements, truncation and detectable same-size rewrites still refuse.
+	Compatible := KLR_LedgerFileIsSame(Receipt.Source, Current)
+		&& (Current["size"] > Receipt.Source["size"]
+			|| KLR_LedgerSnapshotIsSame(Receipt.Source, Current))
+	return Compatible && KLPF_ForegroundProjectionCurrent(Receipt)
+}
+
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true,
 		HistorySeed := unset) {
 		global _ConfigDir
@@ -415,6 +503,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		; and coalesce rather than start a sibling worker in that window.
 		job := Map(
 				"generation", generation,
+				"foreground", 0,
 				"epoch", epoch,
 				"stage", stage,
 				"request", "",
@@ -427,6 +516,14 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				"started_at", A_Now
 		)
 		KLPFWorker.jobs[which] := job
+		try Foreground := KLPF_CaptureForegroundProjection(metrics_dir)
+		catch {
+				KLPF_CompleteJob(which, generation, "failed")
+				return false
+		}
+		if !KLPFWorker.jobs.Has(which) || KLPFWorker.jobs[which] != job
+				return false
+		job["foreground"] := Foreground
 		try FileDelete(stage)
 		if IsSet(HistorySeed) {
 				job["request"] := stage . ".request"
@@ -452,8 +549,15 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keystats-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
 		for TimingArg in KLPF_WorkerTimingArgs()
 				args.Push(TimingArg)
-		if job["request"] != ""
+		if job["request"] != "" || IsObject(Foreground)
 				args.Push(job["request"])
+		if IsObject(Foreground) {
+				try args.Push(KL_JsonEncode(Foreground.Wire))
+				catch {
+						KLPF_CompleteJob(which, generation, "failed")
+						return false
+				}
+		}
 		done := KLPF_OnWorkerDone.Bind(which, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn)
 				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
@@ -691,6 +795,10 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 						&& ((stage = "") || (stage != owned_stage) || !FSExists(owned_stage))
 				status := "failed"
 
+		if (status = "ok" || status = "incomplete") && IsObject(job.Get("foreground", 0))
+				&& !KLPF_ForegroundProjectionSourceCurrent(job["foreground"])
+				status := "canceled"
+
 		delivery_stage := ""
 		if (status = "incomplete") {
 				; A partial read is shown by the window that asked for it, never
@@ -915,6 +1023,12 @@ KLPF_WorkerMain() {
 				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
 				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
 						KLPF_WorkerRefuse("unsupported dashboard/mode pair")
+				if mode != "range" && A_Args.Length >= flag + 13 {
+						Snapshot := JsonParse(A_Args[flag + 13])
+						if !KLR_ForegroundSnapshotValid(Snapshot)
+								throw ValueError("Detached foreground snapshot is invalid.")
+						CapturedForeground := Snapshot
+				}
 				if (mode = "range") {
 						phase := "range projection"
 						if (A_Args.Length < flag + 14)
@@ -947,7 +1061,7 @@ KLPF_WorkerMain() {
 						Publisher := KLPFRebuildPublisher(metrics_dir)
 						KLRRebuild.observer := Publisher
 						KLRRebuild.index_observer := Publisher
-						if A_Args.Length >= flag + 12 {
+						if A_Args.Length >= flag + 12 && A_Args[flag + 12] != "" {
 								RequestFile := FileOpen(A_Args[flag + 12], "r", "UTF-8")
 								if !IsObject(RequestFile)
 										throw Error("Metrics history request could not be opened.")
@@ -956,9 +1070,9 @@ KLPF_WorkerMain() {
 								if StrLen(RequestJson) > KLPFWorker.MAX_SEED_HEADER_CHARS
 										throw Error("Metrics history request exceeds the size limit.")
 								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode,
-										JsonParse(RequestJson), &Refused)
+										JsonParse(RequestJson), &Refused, CapturedForeground?)
 						} else {
-								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode, , &Refused)
+								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode, , &Refused, CapturedForeground?)
 						}
 						if (Outcome is String) && Outcome = "full_required"
 								ExitApp(KLPFWorker.FULL_REQUIRED_EXIT_CODE)
@@ -1007,7 +1121,7 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
 ; this delta.
 ; @param Refused {VarRef} Receives the refused queries of the read, empty when complete.
 KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset,
-		&Refused := unset) {
+		&Refused := unset, CapturedForeground := unset) {
 		Refused := []
 		if (dbg = "") {
 				try DirCreate(LoggerLogsDir())
@@ -1031,8 +1145,12 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		FullRequired := false
 		; A refused query leaves its rows out and marks its dashboard part; every
 		; other query keeps its exact counts (see keystats_reader_partial.ahk).
+		PreviousProjection := KLRForegroundProjection.worker_snapshot
 		KLR_BeginPartialRead()
 		try {
+				; Rebuild previews precede this scope and never receive an unfenced live interval.
+				if IsSet(CapturedForeground)
+						KLRForegroundProjection.worker_snapshot := CapturedForeground
 				; Cheap sanity probe — count agg_app_day rows so we know the data
 				; actually landed. SQLite_Query returns Array<Map>.
 				rows := KLR_ProjectionQuery(db, "SELECT COUNT(*) AS n FROM agg_app_day", "manifest", "probe")
@@ -1048,7 +1166,10 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 				} else if (which = "apps") {
 						blob := KLPF_BuildApps(db, true, KL_AppCat_StoreDir())
 				}
-		} finally Refused := KLR_EndPartialRead()
+		} finally {
+				try Refused := KLR_EndPartialRead()
+				finally KLRForegroundProjection.worker_snapshot := PreviousProjection
+		}
 		if FullRequired {
 				; Nothing was read: the image itself is sound and serves the full build.
 				KLPF_SettleReaderCache(true)

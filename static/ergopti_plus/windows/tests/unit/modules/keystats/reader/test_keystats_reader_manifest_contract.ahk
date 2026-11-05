@@ -1650,3 +1650,28 @@ _KLDL_Case(Kind) {
 for _KLDL_Kind in ["chars", "deep"]
 	Test("Keystats live projection: " . _KLDL_Kind . " retains visible same-day typing inventory through the genuine frontend (klr-live-deep-inventory)",
 		_KLRDC_CheckTeardown.Bind(_KLDL_Case.Bind(_KLDL_Kind)))
+
+_KLRManifest_DetachedForeground(Mode) {
+	Saved := KLRForegroundProjection.worker_snapshot
+	HookBefore := [KLHook.prev_app, KLHook.app_entered_at, KLHook.last_tick, KLWatch.last_authorized_tick]
+	Day := "2026-11-05", App := "owned-detached-editor.exe"
+	Wire := Map("app", App, "origin", 0x100000000 + 50, "now", 0x100000000 + 150,
+		"activity", 0x100000000 + 100, "day", Day, "timeout", 1000)
+	if Mode == "expired"
+		Wire["now"] := Wire["activity"] + Wire["timeout"]
+	Manifest := Map(), Cell := KLR_GetCell(Manifest, Day, App)
+	Cell["app_time_ms"] := 17
+	try {
+		KLRForegroundProjection.worker_snapshot := Wire
+		KLR_AddLiveForegroundTime(Manifest, Mode == "bounds" ? "2026-11-06" : Day, Day)
+		AssertEqual(Mode == "live" ? 117 : 17, Cell["app_time_ms"],
+			"a detached projection must use the captured native64 clock, exact date bounds and captured abandonment authority")
+		AssertEqual(1, Manifest.Count)
+		AssertEqual(1, Manifest[Day].Count)
+		for Index, Actual in [KLHook.prev_app, KLHook.app_entered_at, KLHook.last_tick, KLWatch.last_authorized_tick]
+			AssertEqual(HookBefore[Index], Actual, "projecting transported context cannot fabricate or advance resident hook/session state")
+	} finally KLRForegroundProjection.worker_snapshot := Saved
+}
+for _KLRManifest_DetachedMode in ["live", "expired", "bounds"]
+	Test("Keystats detached foreground: " . _KLRManifest_DetachedMode . " preserves pure projection (klr-detached-foreground)",
+		_KLRManifest_DetachedForeground.Bind(_KLRManifest_DetachedMode))
