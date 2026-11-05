@@ -504,7 +504,10 @@ HotstringsSerialiseDelay(Value) {
 		global HOTSTRINGS_DELAY_DECIMALS
 		if !TickTryDurationMsFromSeconds(Value, &DelayMs)
 				throw ValueError("Hotstring delay must fit the elapsed-tick domain.")
-		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Value)
+		; Zero alone means unlimited. Preserve a positive finite intention even
+		; when its sub-millisecond precision rounds below the storage grid.
+		FiniteValue := Value > 0 ? Max(Value, 10 ** -HOTSTRINGS_DELAY_DECIMALS) : Value
+		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", FiniteValue)
 }
 
 ; The signed number of seconds a delay override adds to the base expansion
