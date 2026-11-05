@@ -83,8 +83,12 @@ local function physical_identity(path)
 	local ok, uv = pcall(require, "luv")
 	if not ok or type(uv.fs_stat) ~= "function" then return nil end
 	local stat = uv.fs_stat(path)
-	if type(stat) ~= "table" or stat.type ~= "file" or stat.dev == nil or stat.ino == nil then return nil end
-	return tostring(stat.dev) .. ":" .. tostring(stat.ino)
+	if type(stat) ~= "table" or stat.type ~= "file" then return nil end
+	local function exact(value)
+		return type(value) == "number" and value >= 0 and value < 2 ^ 53 and value % 1 == 0
+	end
+	if not exact(stat.dev) or not exact(stat.ino) then return nil end
+	return string.format("%.0f:%.0f", stat.dev, stat.ino)
 end
 
 --- Captures a category model and physical source receipt for an interactive edit.
