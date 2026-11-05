@@ -2733,26 +2733,20 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10b) Let a magic-key change actually reach the engine.
 	--
-	-- MagicKey.set() has always fired an _on_change callback after persisting, and
-	-- until 2026-08-05 nobody registered one — so changing the key from the menu
-	-- relabelled the row, relabelled the 21 locales through the provider above,
-	-- and left every expansion listening for the old character. That is worse than
-	-- the feature being absent: the interface reports success and the product
-	-- silently disagrees with it.
-	--
-	-- The dynamic rules bake the character into their triggers at registration
-	-- time, so they have to be rebuilt; the catalogue reload covers the rest.
-	MagicKey.init(function(new_char)
-		Logger.info(LOG, "Magic key changed to '%s' — re-registering.", tostring(new_char))
-		if hotstrings_config.set_magic_key(new_char, MagicKey.default()) ~= true then
-			Logger.error(LOG, "Magic-key change refused by the catalogue — mappings remain unchanged.")
-			return
-		end
-		if dyn_hotstrings then
-			dyn_hotstrings.init({ trigger_char = new_char })
-		end
-		reload_hotstrings("the magic key")
-		if rebuild_tray_menu then rebuild_tray_menu() end
+	-- The scope publishes the preference only after both matchers accept it,
+	-- retaining a refused inverse under the same ownership as other hotstrings.
+	MagicKey.init(nil, function(new_char)
+		local committed = require("infra.hotstrings_scope").apply_magic(new_char, {
+			config = hotstrings_config, preferences = require("infra.hotstring_preferences"),
+			dynamic = dyn_hotstrings, magic_key = MagicKey,
+			reload = function() return reload_hotstrings("the magic key") end,
+			after_restore = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+				return true
+			end,
+		})
+		if committed and rebuild_tray_menu then rebuild_tray_menu() end
+		return committed == true
 	end)
 
 	if not privacy_owners.startup_checkpoint() then return end

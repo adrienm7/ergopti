@@ -45,7 +45,7 @@ local MANIFEST_PATH = ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR
 
 -- Set by M.init, so a change can rebuild the menu and re-register the dynamic
 -- rules that bake the character into their triggers.
-local _on_change = nil
+local _on_change, _publisher = nil, nil
 
 
 
@@ -132,6 +132,10 @@ function M.set(candidate)
 		return false, reason
 	end
 
+	if _publisher then
+		if _publisher(candidate) ~= true then return false, "dialog.magic_key.error_persist" end
+		return true, nil
+	end
 	if not Preferences.set(MANIFEST_PATH, candidate) then
 		Logger.error(LOG, "Could not persist the magic key — the change would be lost at restart.")
 		return false, "dialog.magic_key.error_persist"
@@ -145,6 +149,7 @@ end
 --- Restores the shipped default by removing the stored override.
 --- @return boolean
 function M.reset()
+	if _publisher then return _publisher(M.default()) == true end
 	if not Preferences.set(MANIFEST_PATH, M.default()) then
 		Logger.error(LOG, "Could not remove the stored magic key — the active key was not changed.")
 		return false
@@ -169,13 +174,14 @@ end
 --- registration time, so changing it has to re-register them; the menu has to
 --- redraw for the same reason. Both are the daemon's business, not this module's.
 --- @param on_change function Called with the new character.
-function M.init(on_change)
+function M.init(on_change, publisher)
 	Logger.start(LOG, "Initializing…")
 	if on_change ~= nil and type(on_change) ~= "function" then
 		Logger.error(LOG, "M.init(): on_change must be a function — change notifications disabled.")
 		on_change = nil
 	end
 	_on_change = on_change
+	_publisher = type(publisher) == "function" and publisher or nil
 	Logger.success(LOG, "Initialized (magic key '%s'%s).",
 		M.get(), M.is_customised() and ", user-chosen" or ", shipped default")
 end

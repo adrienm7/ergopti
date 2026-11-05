@@ -871,7 +871,10 @@ local function _manifest_hotstring_rows(ctx, config)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end
 			local reset = function()
-						MagicKey.reset()
+						if not MagicKey.reset() then
+							show_error(i18n_safe("dialog.magic_key.error_persist"))
+							return
+						end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end
 			local rows = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = change, magic_key_reset = reset },
