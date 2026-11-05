@@ -1001,4 +1001,4 @@ _PPNT_Case(Mode) {
  AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
 }
 for _PPNT_Mode in ["add-invalid", "save-invalid", "add-current", "save-current"]
- Test("Personal native priority: " . _PPNT_Mode . " handles actual pasted text (personal-native-priority-paste-domain)", _PPNT_Case.Bind(_PPNT_Mode))
+ Test("Personal native priority: " . _PPNT_Mode . " checks integer admission and accepted actions (personal-native-priority-paste-domain)", _PPNT_Case.Bind(_PPNT_Mode))
