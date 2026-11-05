@@ -118,10 +118,15 @@ local function list_executables(dir)
 		return nil, "the tools folder could not be created"
 	end
 	local ok, output, err = ShellRunner.exec_checked("find " .. ShellRunner.quote(dir)
-		.. " -mindepth 1 -maxdepth 1 -type f -perm -u+x -printf '%f\\n' 2>/dev/null")
+		.. " -mindepth 1 -maxdepth 1 -type f -perm -u+x -printf '%f\\0' 2>/dev/null")
 	if not ok then return nil, tostring(err) end
-	local names = {}
-	for line in output:gmatch("[^\n]+") do names[#names + 1] = line end
+	local names, at = {}, 1
+	while at <= #output do
+		local finish = output:find("\0", at, true)
+		if not finish then return nil, "the tools listing is incomplete" end
+		names[#names + 1] = output:sub(at, finish - 1)
+		at = finish + 1
+	end
 	return names, nil
 end
 

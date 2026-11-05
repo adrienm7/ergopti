@@ -193,6 +193,27 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 		end)
 	end)
 
+	helpers.it("does not split a newline in an executable filename into phantom tools", function()
+		local uv = require("luv")
+		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-tools-XXXXXX"))
+		local strange, valid = dir .. "/phantom\nsecond", dir .. "/valid"
+		for _, path in ipairs({ strange, valid }) do
+			local file = assert(io.open(path, "wb")); assert(file:write("#!/bin/sh\n")); assert(file:close())
+			assert(uv.fs_chmod(path, 448))
+		end
+		local previous = package.loaded["modules.llm.agent_connectors"]
+		package.loaded["modules.llm.agent_connectors"] = nil
+		local connectors = require("modules.llm.agent_connectors")
+		connectors._set_deps_for_test({ tools_dir = function() return dir end })
+		local ok, err = pcall(function()
+			helpers.assert_eq(connectors.tools(config()), { "valid" })
+		end)
+		connectors._set_deps_for_test(nil)
+		package.loaded["modules.llm.agent_connectors"] = previous
+		assert(uv.fs_unlink(strange)); assert(uv.fs_unlink(valid)); assert(uv.fs_rmdir(dir))
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("the tools list is capped, and read again after ten minutes or a refresh", function()
 		local names = {}
 		for index = 1, 60 do names[index] = string.format("tool%02d", index) end
