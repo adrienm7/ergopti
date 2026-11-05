@@ -5,7 +5,7 @@
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "personal-native-priority-paste-domain",
+			"contains": "locale-cache-stage-custody",
 			"expected_count": 4
 		}
 	]
