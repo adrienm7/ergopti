@@ -108,6 +108,10 @@ class Keystats {
     ; Per-flush typing buffer.
     static buffer_events    := []          ; Array of [char, delay_ms, meta_obj]
     static buffer_text      := ""
+	; Only complete Unicode scalars may enter text/events and the UTF-8 codec.
+	static scalar_fragment := false
+	static scalar_history := false
+	static scalar_epoch := 1
     static rich_chunks      := []
     static last_time        := 0
     static last_flush_time  := 0
@@ -207,6 +211,8 @@ KL_MarkSynthetic(source, is_private := false) {
     try {
         if IsSet(KL_Roi_DiscardWord)
             KL_Roi_DiscardWord()
+        Keystats.scalar_fragment := false
+        Keystats.scalar_epoch += 1
         Keystats.synth_owners.Push(Owner)
         Keystats.synth_active := Keystats.synth_owners.Length
         Keystats.synth_type := source
@@ -234,6 +240,8 @@ KL_ClearSynthetic(Owner, *) {
         }
         if !OwnerIndex
             return false
+        Keystats.scalar_fragment := false
+        Keystats.scalar_epoch += 1
         Keystats.synth_owners.RemoveAt(OwnerIndex)
         Keystats.synth_active := Keystats.synth_owners.Length
         ; Only reset the type label once every held level is released. The

@@ -95,6 +95,9 @@ _STRP_WithCleanBuffer(Body) {
 	PrevInit    := Keystats.initialized
 	PrevEvents  := Keystats.buffer_events
 	PrevText    := Keystats.buffer_text
+	PrevScalarFragment := Keystats.scalar_fragment
+	PrevScalarHistory := Keystats.scalar_history
+	PrevScalarEpoch := Keystats.scalar_epoch
 	PrevDepth   := Keystats.synth_active
 	PrevType    := Keystats.synth_type
 	PrevOwners  := Keystats.synth_owners
@@ -112,6 +115,9 @@ _STRP_WithCleanBuffer(Body) {
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
+	Keystats.scalar_fragment := false
+	Keystats.scalar_history := false
+	Keystats.scalar_epoch += 1
 	Keystats.synth_active  := 0
 	Keystats.synth_type    := "none"
 	Keystats.synth_owners  := []
@@ -142,6 +148,9 @@ _STRP_WithCleanBuffer(Body) {
 		Keystats.initialized   := PrevInit
 		Keystats.buffer_events := PrevEvents
 		Keystats.buffer_text   := PrevText
+		Keystats.scalar_fragment := PrevScalarFragment
+		Keystats.scalar_history := PrevScalarHistory
+		Keystats.scalar_epoch := PrevScalarEpoch
 		Keystats.synth_active  := PrevDepth
 		Keystats.synth_type    := PrevType
 		Keystats.synth_owners  := PrevOwners

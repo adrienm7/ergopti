@@ -31,6 +31,9 @@ _KCT_WithKeystats(Body) {
 	PrevInit    := Keystats.initialized
 	PrevEvents  := Keystats.buffer_events
 	PrevText    := Keystats.buffer_text
+	PrevScalarFragment := Keystats.scalar_fragment
+	PrevScalarHistory := Keystats.scalar_history
+	PrevScalarEpoch := Keystats.scalar_epoch
 	PrevFocus   := MetricsFocusCache.state
 	PrevDisabledApps := MetricsFilters.disabled_apps
 	PrevPrivateBrowsing := MetricsFilters.private_browsing
@@ -41,6 +44,9 @@ _KCT_WithKeystats(Body) {
 	Keystats.initialized   := true
 	Keystats.buffer_events := []
 	Keystats.buffer_text   := ""
+	Keystats.scalar_fragment := false
+	Keystats.scalar_history := false
+	Keystats.scalar_epoch += 1
 	MetricsFocusCache.state := {
 		valid: true,
 		last_at: A_TickCount,
@@ -63,6 +69,9 @@ _KCT_WithKeystats(Body) {
 		Keystats.initialized   := PrevInit
 		Keystats.buffer_events := PrevEvents
 		Keystats.buffer_text   := PrevText
+		Keystats.scalar_fragment := PrevScalarFragment
+		Keystats.scalar_history := PrevScalarHistory
+		Keystats.scalar_epoch := PrevScalarEpoch
 		MetricsFocusCache.state := PrevFocus
 		MetricsFilters.disabled_apps := PrevDisabledApps
 		MetricsFilters.private_browsing := PrevPrivateBrowsing

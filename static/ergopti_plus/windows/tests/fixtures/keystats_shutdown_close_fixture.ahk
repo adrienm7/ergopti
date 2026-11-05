@@ -8,6 +8,9 @@
 #Requires AutoHotkey v2.0
 
 class Keystats {
+	static scalar_fragment := false
+	static scalar_history := false
+	static scalar_epoch := 1
 	static initialized := true
 	static _shutting_down := false
 	static lifecycle_generation := 1

@@ -372,6 +372,9 @@ KL_Hook_HasPendingInput() {
 KL_Hook_InvalidateCapture(Stopping := false) {
 	PreviousCritical := Critical("On")
 	try {
+		Keystats.scalar_fragment := false
+		Keystats.scalar_history := false
+		Keystats.scalar_epoch += 1
 		KLHook.capture_generation += 1
 		if IsSet(KL_Roi_DiscardWord)
 			KL_Roi_DiscardWord()
@@ -412,7 +415,8 @@ _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := uns
 			synth_active: Keystats.synth_active, synth_type: Keystats.synth_type,
 			synth_private: Keystats.synth_private,
 			lifecycle: Keystats.lifecycle_generation,
-			generation: KLHook.capture_generation,
+			generation: KLHook.capture_generation, scalar_epoch: Keystats.scalar_epoch,
+			scalar_backspace: false,
 			entry_privacy: _KL_CaptureLlmJournalPrivacy(),
 			entry_focus: KLPasswordCache.focus_generation,
 			privacy: false, ready: false, cancelled: true, filtered: true,
@@ -549,9 +553,165 @@ _KL_Hook_DrainInput() {
 	}
 }
 
-_KL_Hook_CommitInput(Intent) {
-	if Intent.cancelled || !_KL_Hook_InputLifecycleCurrent(Intent) || !Intent.activity
+; The pending unit never authorizes another target, source hook or epoch.
+_KL_Hook_ScalarOwnerCurrent(Pending, Intent) {
+	return IsObject(Pending) && _KL_Hook_InputCurrent(Pending)
+		&& Pending.scalar_epoch = Intent.scalar_epoch && Intent.scalar_epoch = Keystats.scalar_epoch
+		&& Pending.source_hook == Intent.source_hook && Pending.entry_focus = Intent.entry_focus
+		&& Pending.synth_active = Intent.synth_active && Pending.synth_private = Intent.synth_private
+		&& Pending.synth_type == Intent.synth_type
+		&& Pending.app == Keystats.session_app && Pending.title == Keystats.session_title
+}
+
+; This is the observed chronological stream, not a model of unobserved caret
+; or document changes. Cache/synthetic invalidation revokes assembly only. A
+; real hook/context/lifecycle change or an attested different field retires the
+; numeric omissions as well. No omitted text is retained in this history.
+_KL_Hook_ScalarHistory(Intent) {
+	History := Keystats.scalar_history
+	Field := KLPasswordCache.current_element_id
+	if !IsObject(History) || History.lifecycle != Intent.lifecycle
+		|| History.generation != Intent.generation || History.hook != Intent.source_hook
+		|| !(History.app == Keystats.session_app) || !(History.title == Keystats.session_title)
+		|| (History.field != "" && Field != "" && !(History.field == Field)) {
+		History := {position: 0, gaps: [], carry_delay: 0, lifecycle: Intent.lifecycle,
+			generation: Intent.generation, hook: Intent.source_hook,
+			app: Keystats.session_app, title: Keystats.session_title, field: Field}
+		Keystats.scalar_history := History
+	} else if Field != ""
+		History.field := Field
+	return History
+}
+
+; Adjacent omitted units occupy one run. Publications change one absolute
+; position, not every retained gap; storage grows only with interleaved output.
+_KL_Hook_ScalarOmit(History) {
+	if History.gaps.Length && History.gaps[-1].position = History.position {
+		Gap := History.gaps[-1]
+		if Gap.units = 0x7FFFFFFFFFFFFFFF
+			throw Error("Keystats omitted-unit count exhausted the native integer range.")
+		Gap.units += 1
+	} else {
+		Gap := {position: History.position, units: 1}
+		History.gaps.Push(Gap)
+	}
+	return Gap
+}
+
+_KL_Hook_ScalarPublished(History) {
+	if !History.gaps.Length {
+		History.position := 0
+		return
+	}
+	if History.position = 0x7FFFFFFFFFFFFFFF
+		throw Error("Keystats omitted-unit position exhausted the native integer range.")
+	History.position += 1
+}
+
+_KL_Hook_ScalarConsume(History) {
+	Gap := History.gaps[-1]
+	if Gap.position != History.position || Gap.units <= 0
+		throw Error("Keystats omitted-unit history is out of order.")
+	Gap.units -= 1
+	if !Gap.units
+		History.gaps.Pop()
+	if !History.gaps.Length
+		History.position := 0
+}
+
+; Keep the original [BS] and counters, but never attribute deletion of a
+; published scalar to a Backspace which consumed one omitted UTF-16 unit.
+_KL_Hook_ScalarBackspace(History) {
+	if !History.gaps.Length
 		return false
+	if History.gaps[-1].position = History.position {
+		_KL_Hook_ScalarConsume(History)
+		return true
+	}
+	if History.position < History.gaps[-1].position
+		throw Error("Keystats omitted-unit position moved before its newest gap.")
+	History.position -= 1
+	return false
+}
+
+_KL_Hook_ScalarDelay(History, Delay) {
+	if Delay > 0x7FFFFFFFFFFFFFFF - History.carry_delay
+		throw Error("Keystats omitted-unit delay exhausted the native integer range.")
+	return Delay + History.carry_delay
+}
+
+; Hold a trailing high outside serializable state under its original receipt.
+; Its numeric omission survives loss of assembly permission, until observed
+; editing consumes it or a real context/privacy/capture boundary retires it.
+_KL_Hook_FrameCharacters(Intent, Token, &Delay) {
+	History := _KL_Hook_ScalarHistory(Intent)
+	Pending := Keystats.scalar_fragment
+	Keystats.scalar_fragment := false
+	Paired := false
+	if Token != "" && _KL_Hook_ScalarOwnerCurrent(Pending, Intent)
+		&& History.gaps.Length && History.gaps[-1] == Pending.gap
+		&& Pending.gap.position = History.position {
+		First := NumGet(StrPtr(Token), 0, "UShort")
+		if First >= 0xDC00 && First <= 0xDFFF {
+			_KL_Hook_ScalarConsume(History)
+			Token := Pending.text . Token
+			; The carry includes the original high delay and earlier omitted
+			; arrivals. Low's transport endpoint never adds another key delay.
+			Delay := History.carry_delay
+			Paired := true
+		}
+	}
+	Complete := ""
+	Characters := _TextCodepoints(Token)
+	for Index, Character in Characters {
+		if _TextCompleteTailScalar(Character) != "" {
+			Complete .= Character
+			_KL_Hook_ScalarPublished(History)
+			continue
+		}
+		Gap := _KL_Hook_ScalarOmit(History)
+		Unit := NumGet(StrPtr(Character), 0, "UShort")
+		if Index = Characters.Length && Unit >= 0xD800 && Unit <= 0xDBFF
+			&& Intent.scalar_epoch = Keystats.scalar_epoch {
+			Keystats.scalar_fragment := {
+				text: Character, gap: Gap,
+				lifecycle: Intent.lifecycle, generation: Intent.generation,
+				cancelled: false, filtered: false, privacy: Intent.privacy,
+				source_hook: Intent.source_hook, entry_focus: Intent.entry_focus,
+				scalar_epoch: Intent.scalar_epoch, synth_active: Intent.synth_active,
+				synth_private: Intent.synth_private, synth_type: Intent.synth_type,
+				app: Keystats.session_app, title: Keystats.session_title
+			}
+		}
+	}
+	if Complete != "" {
+		if !Paired
+			Delay := _KL_Hook_ScalarDelay(History, Delay)
+		History.carry_delay := 0
+	} else
+		History.carry_delay := _KL_Hook_ScalarDelay(History, Delay)
+	return Complete
+}
+
+_KL_Hook_CommitInput(Intent) {
+	EntryCritical := Critical("On")
+	try {
+		if !_KL_Hook_InputLifecycleCurrent(Intent)
+			return false
+		; VK_PACKET and its Up are transport edges between two UTF-16 units.
+		; Every other keydown breaks the pending scalar, even without a token.
+		BoundaryCurrent := Intent.scalar_epoch = Keystats.scalar_epoch
+			&& Intent.entry_focus = KLPasswordCache.focus_generation
+			&& _KL_LlmJournalPrivacyStillCurrent(Intent.entry_privacy)
+		if Intent.kind = "key" && Intent.vk != 0xE7 && BoundaryCurrent {
+			Keystats.scalar_fragment := false
+		}
+		if Intent.cancelled || !Intent.activity {
+			if Intent.kind = "char" && BoundaryCurrent
+				Keystats.scalar_fragment := false
+			return false
+		}
+	} finally Critical(EntryCritical)
 	; FIFO commits the named predecessor first. Only its actual canonical
 	; publication can consume the matching native control-character echo.
 	if Intent.kind = "char" && IsObject(Intent.echo_of) && Intent.echo_of.recorded
@@ -572,6 +732,17 @@ _KL_Hook_CommitInput(Intent) {
 			return false
 	}
 	if Intent.filtered {
+		PrivacyCritical := Critical("On")
+		try {
+			PendingScalar := Keystats.scalar_fragment
+			if Intent.scalar_epoch = Keystats.scalar_epoch
+				&& Intent.entry_focus = KLPasswordCache.focus_generation
+				&& _KL_LlmJournalPrivacyStillCurrent(Intent.entry_privacy) {
+				Keystats.scalar_fragment := false
+				Keystats.scalar_history := false
+			} else if IsObject(PendingScalar) && !_KL_Hook_InputCurrent(PendingScalar)
+				Keystats.scalar_fragment := false
+		} finally Critical(PrivacyCritical)
 		if IsSet(KL_Roi_DiscardWord)
 			KL_Roi_DiscardWord()
 		KL_RecordPrivacyHit()
@@ -603,6 +774,25 @@ _KL_Hook_CommitInput(Intent) {
 			meta["s"] := 1
 			meta["st"] := Intent.synth_type
 		}
+		if Intent.kind = "char" {
+			Recorded := _KL_Hook_FrameCharacters(Intent, Recorded, &delay)
+			if Recorded == ""
+				return true
+		}
+		if Intent.kind = "key" {
+			History := _KL_Hook_ScalarHistory(Intent)
+			if Intent.vk = 0x08
+				Intent.scalar_backspace := _KL_Hook_ScalarBackspace(History)
+			else if Intent.vk = 0x0D || Intent.vk = 0x09
+				_KL_Hook_ScalarPublished(History)
+			; Transfer omitted callback time once, independently of which gap
+			; a later correction consumes. Cache/synthetic revocation cannot
+			; lose this numeric receipt or charge it to multiple publications.
+			delay := _KL_Hook_ScalarDelay(History, delay)
+			History.carry_delay := 0
+		}
+		if Intent.scalar_backspace
+			meta["erase"] := 0
 		Keystats.buffer_events.Push([Recorded, delay, meta])
 		Intent.recorded := true
 		if Intent.kind = "char"
@@ -610,7 +800,8 @@ _KL_Hook_CommitInput(Intent) {
 		else {
 			switch Intent.vk {
 				case 0x08:
-					Keystats.buffer_text := KLW_PopLast(Keystats.buffer_text)
+					if !Intent.scalar_backspace
+						Keystats.buffer_text := KLW_PopLast(Keystats.buffer_text)
 				case 0x0D: Keystats.buffer_text .= Chr(10)
 				case 0x09: Keystats.buffer_text .= Chr(9)
 			}
@@ -635,11 +826,11 @@ _KL_Hook_CommitInput(Intent) {
 			return false
 		}
 		if Intent.kind = "char" {
-			try KL_Roi_OnChar(Intent.character)
+			try KL_Roi_OnChar(Recorded)
 			if !GuardFn.Call()
 				return false
 			try WPMWidget_Push(false, false)
-		} else
+		} else if !Intent.scalar_backspace
 			try KL_Roi_OnKey(Intent.vk)
 	}
 	return true
@@ -816,6 +1007,9 @@ KL_Hook_Start() {
 		; Seed before subscription: an admitted callback must not be overwritten by Start.
 		PreviousCritical := Critical("On")
 		try {
+			Keystats.scalar_fragment := false
+			Keystats.scalar_history := false
+			Keystats.scalar_epoch += 1
 			KLHook.capture_generation += 1
 			KLHook.capture_stopping := false
 			KLHook.last_vk := 0

@@ -937,6 +937,9 @@ class Keystats {
     ; "text" and "events" — KL_FlushBuffer snapshots them into the entry without
     ; transforming either — so a test that drives the real KL_Hook_OnChar can
     ; read back exactly what would reach today.log.
+	static scalar_fragment := false
+	static scalar_history := false
+	static scalar_epoch := 1
     static buffer_events  := []
     static buffer_text    := ""
     static rich_chunks    := []
@@ -982,6 +985,8 @@ class Keystats {
 ; can verify the refcounting behaviour.
 KL_MarkSynthetic(source, is_private := false) {
     Owner := Map("source", source, "private", is_private ? true : false)
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.Push(Owner)
     Keystats.synth_active := Keystats.synth_owners.Length
     Keystats.synth_type := source
@@ -1005,6 +1010,8 @@ KL_ClearSynthetic(Owner, *) {
     }
     if !OwnerIndex
         return false
+    Keystats.scalar_fragment := false
+    Keystats.scalar_epoch += 1
     Keystats.synth_owners.RemoveAt(OwnerIndex)
     Keystats.synth_active := Keystats.synth_owners.Length
     if Keystats.synth_active {

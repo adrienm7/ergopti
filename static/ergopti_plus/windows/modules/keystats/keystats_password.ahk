@@ -147,6 +147,8 @@ KL_PasswordFocusSnapshot() {
 KL_InvalidatePasswordFocus(*) {
 		PreviousCritical := Critical("On")
 		try {
+				Keystats.scalar_fragment := false
+				Keystats.scalar_epoch += 1
 				KLPasswordCache.focus_generation += 1
 				KLPasswordCache.current_element_id := ""
 				KLPasswordCache.generation += 1
