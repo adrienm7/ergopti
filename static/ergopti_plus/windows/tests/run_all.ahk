@@ -1215,6 +1215,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
 #Include unit/modules/keystats/test_context_nonempty_prepare_owner.ahk
+#Include unit/modules/keystats/test_context_roi_stale_owner.ahk
 #Include unit/modules/keystats/reader/test_keystats_query_catalogue.ahk
 #Include unit/modules/keystats/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keystats/test_keystats_llm_accepted_metrics.ahk
