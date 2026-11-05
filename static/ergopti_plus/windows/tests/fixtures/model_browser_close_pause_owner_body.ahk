@@ -384,6 +384,10 @@ _MBPO_NativeSort() {
 _MBPO_Run() {
 	global _MBPO, ConfigurationFile, _LLM_Menu, Features, _LLM_MBW_SessionEpoch
 	_MBPO_Prepare()
+	if _MBPO.Mode == "native-ctor-retire-pre" || _MBPO.Mode == "native-ctor-retire-post" {
+		_MBPO_CtorRetirement()
+		return
+	}
 	if _MBPO.Mode == "native-show-current" || _MBPO.Mode == "native-show-close" || _MBPO.Mode == "native-hide-reopen-close" {
 		_MBPO_VisibilityReentry()
 		return
@@ -471,7 +475,8 @@ _MBPO_Main() {
 		|| _MBPO.Mode == "native-hide-current" || _MBPO.Mode == "native-hide-reopen"
 		|| _MBPO.Mode == "native-hide-native-current" || _MBPO.Mode == "native-hide-native-reopen"
 		|| _MBPO.Mode == "native-show-current" || _MBPO.Mode == "native-show-close" || _MBPO.Mode == "native-hide-reopen-close"
-		|| _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed",
+		|| _MBPO.Mode == "native-ctor-current" || _MBPO.Mode == "native-ctor-malformed"
+		|| _MBPO.Mode == "native-ctor-retire-pre" || _MBPO.Mode == "native-ctor-retire-post",
 		"The model browser mode must be explicit.")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_MBPO_OnError)
@@ -1161,4 +1166,195 @@ _MBPO_VisibilityReentry() {
 		Critical(PreviousCritical)
 	}
 	_MBPO_Require(!State.Debt, "The exact visibility subclass must retire before its callback code is freed")
+}
+
+; These are postfix cleanup controls, not a claimed pre-fix native failure.
+; One temporary catalogue metadata input makes the actual renderer throw its
+; own TypeError; the input is restored before any retirement callback runs.
+_MBPO_CtorRetireRender(This, Params*) {
+	global _MBPO
+	State := _MBPO.RetirementState
+	if State.Injected
+		return Func.Prototype.Call.Call(This, Params*)
+	Index := LLM_GetModelIndex(), Selected := 0
+	for Name, Info in Index {
+		if Info is Map && Info.Has("speed_tok_s") && Info["speed_tok_s"] is Number {
+			Selected := Info
+			break
+		}
+	}
+	_MBPO_Require(Selected is Map, "The renderer fault requires an actual numeric shipped metadata field")
+	Original := Selected["speed_tok_s"]
+	State.Injected := true
+	try {
+		Selected["speed_tok_s"] := JsonParse('{"unexpected":"object-speed"}')
+		return Func.Prototype.Call.Call(This, Params*)
+	} catch Any as Primary {
+		State.Primary := Primary
+		throw Primary
+	} finally Selected["speed_tok_s"] := Original
+}
+_MBPO_CtorRetireDestroy(Window, Params*) {
+	global _MBPO
+	State := _MBPO.RetirementState
+	Target := ObjPtr(Window) == State.GuiPtr
+	if Target {
+		State.DestroyCalls += 1
+		if !State.Faulted && State.Mode == "native-ctor-retire-pre" {
+			State.Faulted := true
+			State.AliveAtRefusal := !!DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+			throw State.DestroyFailure
+		}
+	}
+	State.DestroyReal.Call(Window, Params*)
+	if Target {
+		State.NativeDestroyReturns += 1
+		if !State.Faulted && State.Mode == "native-ctor-retire-post" {
+			State.Faulted := true
+			State.GoneBeforeThrow := !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+			throw State.DestroyFailure
+		}
+	}
+}
+_MBPO_CtorRetireProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
+	global _LLM_ModelBrowser_Gui
+	State.Active += 1
+	try {
+		Result := DllCall("Comctl32\DefSubclassProc", "Ptr", Hwnd, "UInt", Message, "Ptr", WParam, "Ptr", LParam, "Ptr")
+		if State.Armed && Hwnd == State.Hwnd && Message == 0x2 && !State.Reopened {
+			State.Reopened := true, State.ReopenCalls += 1
+			State.Successor := LLM_ModelBrowser_Show()
+			State.BeforeSuccessor := State.Successor is Gui && _LLM_ModelBrowser_Gui == State.Successor
+				&& State.Successor.Hwnd != State.Hwnd && DllCall("IsWindowVisible", "Ptr", State.Successor.Hwnd, "Int")
+		}
+		return Result
+	} catch Any as Failure {
+		State.ActorFailure := Failure
+		return 0
+	} finally State.Active -= 1
+}
+_MBPO_CtorRetireCreate(This, Params*) {
+	global _MBPO
+	Window := Func.Prototype.Call.Call(This, Params*)
+	State := _MBPO.RetirementState
+	if State.Armed {
+		State.Created += 1
+		if State.Created == 1 {
+			State.Hwnd := Window.Hwnd, State.GuiPtr := ObjPtr(Window)
+			_MBPO_Require(_MBPO_NativeWindowPid(State.Hwnd) == ProcessExist(), "The exact failed constructor must belong to this child")
+			Window.CtorWitness := _MBPC_Finalizer(State)
+			State.Proc := CallbackCreate(_MBPO_CtorRetireProc.Bind(State), , 6)
+			_MBPO_Require(DllCall("Comctl32\SetWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc,
+				"UPtr", 0x4D424652, "UPtr", 0, "Int"), "The original private native HWND must admit its destruction witness")
+			State.Installed := true
+		}
+	}
+	return Window
+}
+_MBPO_CtorRetirement() {
+	global _MBPO, _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_FailedNativeWindows
+	global _LLM_ModelBrowser_RetryFailedNativeWindows, _VendorDir, _DriverDir, ConfigurationFile
+	_MBPO_Require(IsSet(_LLM_ModelBrowser_FailedNativeWindows)
+		&& _LLM_ModelBrowser_FailedNativeWindows is Array && _LLM_ModelBrowser_FailedNativeWindows.Length == 0
+		&& IsSet(_LLM_ModelBrowser_RetryFailedNativeWindows),
+		"Postfix-only controls require the genuine failed-constructor retirement protocol, not a pre-fix red verdict")
+	HadVendor := IsSet(_VendorDir)
+	if HadVendor
+		OriginalVendor := _VendorDir
+	else
+		_VendorDir := _DriverDir . "\vendor"
+	State := {Mode: _MBPO.Mode, Armed: false, Injected: false, Primary: 0, Created: 0,
+		Hwnd: 0, GuiPtr: 0, Proc: 0, Installed: false, Active: 0, Disposed: 0,
+		DestroyCalls: 0, NativeDestroyReturns: 0, Faulted: false, AliveAtRefusal: false, GoneBeforeThrow: false,
+		DestroyFailure: Error("Explicit observer refusal at the native Destroy boundary"),
+		Reopened: false, ReopenCalls: 0, Successor: 0, BeforeSuccessor: false, ActorFailure: 0}
+	_MBPO.RetirementState := State
+	Factory := Gui_Create, Renderer := _LLM_ModelBrowser_RefreshRows
+	HadFactory := Factory.HasOwnProp("Call"), HadRenderer := Renderer.HasOwnProp("Call")
+	if HadFactory
+		OriginalFactory := Factory.GetOwnPropDesc("Call")
+	if HadRenderer
+		OriginalRenderer := Renderer.GetOwnPropDesc("Call")
+	OriginalDestroy := Gui.Prototype.GetOwnPropDesc("Destroy"), State.DestroyReal := OriginalDestroy.Call
+	Installed := false, Caught := 0, RetryResult := 0, Removed := false
+	PreviousCritical := Critical("Off")
+	try {
+		_MBPO_Require(!IsSet(_LLM_ModelBrowser_Gui) && !_LLM_MBW_WebView2Available(), "The genuine native constructor must start cold")
+		Factory.DefineProp("Call", {Call: _MBPO_CtorRetireCreate})
+		Renderer.DefineProp("Call", {Call: _MBPO_CtorRetireRender})
+		Gui.Prototype.DefineProp("Destroy", {Call: _MBPO_CtorRetireDestroy})
+		Installed := true, State.Armed := true
+		try LLM_ModelBrowser_Show()
+		catch Any as Primary
+			Caught := Primary
+		_MBPO_Require(State.Injected && State.Created >= 1 && State.Primary is TypeError
+			&& Caught == State.Primary && State.Faulted && State.DestroyCalls == 1,
+			"The exact real renderer TypeError must survive the separately injected native Destroy refusal")
+		_MBPO_Require(_LLM_ModelBrowser_FailedNativeWindows.Length == 1,
+			"The refused exact old native cleanup must keep one explicit retirement record")
+		Record := _LLM_ModelBrowser_FailedNativeWindows[1]
+		_MBPO_Require(ObjPtr(Record.window) == State.GuiPtr && IsObject(Record.timer) && State.Disposed == 0,
+			"The pending record must retain the original GUI and callback graph, not a newer presentation")
+		if State.Mode == "native-ctor-retire-pre"
+			_MBPO_Require(State.AliveAtRefusal && DllCall("IsWindow", "Ptr", State.Hwnd, "Int") && State.NativeDestroyReturns == 0,
+				"The pre-native refusal must leave the actual original HWND owned and live")
+		else
+			_MBPO_Require(State.GoneBeforeThrow && !DllCall("IsWindow", "Ptr", State.Hwnd, "Int") && State.NativeDestroyReturns == 1,
+				"The post-native observer exception must follow genuine destruction, not a fabricated Win32 failure")
+		RetryResult := LLM_ModelBrowser_Show()
+		_MBPO_Observe()
+		FileAppend("OBSERVATION native-constructor-retirement mode=" . State.Mode . " created=" . State.Created
+			. " primary_preserved=" . (Caught == State.Primary) . " destroy_calls=" . State.DestroyCalls
+			. " native_destroy_returns=" . State.NativeDestroyReturns . " old_alive=" . DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+			. " marker_disposed=" . State.Disposed . " pending=" . _LLM_ModelBrowser_FailedNativeWindows.Length
+			. " reopen_calls=" . State.ReopenCalls . " before_successor=" . State.BeforeSuccessor . "`n", "*", "UTF-8-RAW")
+		if IsObject(State.ActorFailure)
+			throw State.ActorFailure
+		_MBPO_Require(State.Created == 2 && State.DestroyCalls == 2 && State.ReopenCalls == 1 && State.BeforeSuccessor
+			&& RetryResult == State.Successor && _LLM_ModelBrowser_Gui == State.Successor
+			&& DllCall("IsWindowVisible", "Ptr", State.Successor.Hwnd, "Int"),
+			"The actual next Show must retry only old custody and preserve the native successor admitted during Destroy")
+		_MBPO_Require(_LLM_ModelBrowser_FailedNativeWindows.Length == 0 && Record.window == 0 && Record.timer == 0
+			&& State.Disposed == 1 && !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+			&& State.NativeDestroyReturns == (State.Mode == "native-ctor-retire-pre" ? 1 : 2),
+			"An already destroyed native Gui must settle on genuine retry without dropping the original callback debt")
+		_MBPO_Require(_MBPO.Errors.Length == 0 && _MBPO.WriterEntries == 0
+			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
+			"Constructor retirement must not mutate configuration or claim technical-error success")
+	} finally {
+		State.Armed := false
+		if Installed {
+			Gui.Prototype.DefineProp("Destroy", OriginalDestroy)
+			if HadFactory
+				Factory.DefineProp("Call", OriginalFactory)
+			else
+				Factory.DeleteProp("Call")
+			if HadRenderer
+				Renderer.DefineProp("Call", OriginalRenderer)
+			else
+				Renderer.DeleteProp("Call")
+		}
+		try _LLM_ModelBrowser_RetryFailedNativeWindows()
+		Removed := !State.Installed || !DllCall("IsWindow", "Ptr", State.Hwnd, "Int")
+		if !Removed
+			Removed := !!DllCall("Comctl32\RemoveWindowSubclass", "Ptr", State.Hwnd, "Ptr", State.Proc, "UPtr", 0x4D424652, "Int")
+		if Removed && !State.Active {
+			if State.Proc
+				CallbackFree(State.Proc)
+			State.Proc := 0
+		}
+		if State.Successor is Gui {
+			if State.Successor.HasOwnProp("FilterDebounce") {
+				try SetTimer(State.Successor.FilterDebounce, 0)
+				State.Successor.FilterDebounce := 0
+			}
+			try State.Successor.Destroy()
+		}
+		if HadVendor
+			_VendorDir := OriginalVendor
+		else
+			_VendorDir := unset
+		Critical(PreviousCritical)
+	}
+	_MBPO_Require(Removed && !State.Active, "The exact native retirement callback must be quiescent before its code is freed")
 }
