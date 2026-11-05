@@ -53,7 +53,10 @@ function M.load(occupied)
 	local cloud_path = Paths.shared("modules/llm/api_providers.json")
 	local cloud_raw = read_source(cloud_path)
 	local cloud = type(cloud_raw) == "string" and Json.decode(cloud_raw) or nil
-	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then return {}, {}, false, {}, {}, {}, {} end
+	if type(cloud) ~= "table" or type(cloud.providers) ~= "table" then
+		Logger.error("llm.local_server_catalogue", "The cloud API catalogue is unavailable; local server identities cannot be admitted.")
+		return {}, {}, false, {}, {}, {}, {}
+	end
 	local claimed = {}
 	for id in pairs(cloud.providers) do claimed[id] = true end
 	for id in pairs(occupied or {}) do claimed[id] = true end
