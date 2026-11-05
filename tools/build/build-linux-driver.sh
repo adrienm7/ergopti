@@ -430,21 +430,28 @@ else
 	# Keep the path outside Lua source: quotes, backslashes and newlines are
 	# valid Linux filename bytes, not Lua lexical syntax.
 	_lua_with_path() {
-		local lua_code="$1"
-		ERGOPTI_LINUX_BUILD_ROOT="$BUILD_DIR_FWD" "$LUA_BIN" -e "
-			local build_dir = assert(os.getenv('ERGOPTI_LINUX_BUILD_ROOT'))
-			-- Normalize to the OS path separator (Lua package.config).
-			local sep = package.config:sub(1,1)
-			if sep == '\\\\' then build_dir = build_dir:gsub('/', '\\\\') end
-			local driver_root = build_dir .. sep .. 'linux'
-			local shared_lua  = build_dir .. sep .. '_shared' .. sep .. 'lua'
-			package.path = driver_root .. sep .. '?.lua;' ..
-			               driver_root .. sep .. '?' .. sep .. 'init.lua;' ..
-			               shared_lua  .. sep .. '?.lua;' ..
-			               shared_lua  .. sep .. '?' .. sep .. 'init.lua;' ..
-			               (package.path or '')
-			${lua_code}
-		" 2>&1
+		local lua_code="$1" lua_command
+		lua_command="$(command -v "$LUA_BIN")" || return 1
+		case "$lua_command" in
+			/*) ;;
+			*/*) lua_command="$PWD/$lua_command" ;;
+		esac
+		# Lua treats ; and ? as search-path syntax, including in absolute paths.
+		# Resolve relative templates after entering the staged build directory.
+		(
+			cd -- "$BUILD_DIR_FWD" || exit 1
+			"$lua_command" -e "
+				local sep = package.config:sub(1,1)
+				local driver_root = 'linux'
+				local shared_lua = '_shared' .. sep .. 'lua'
+				package.path = driver_root .. sep .. '?.lua;' ..
+				               driver_root .. sep .. '?' .. sep .. 'init.lua;' ..
+				               shared_lua .. sep .. '?.lua;' ..
+				               shared_lua .. sep .. '?' .. sep .. 'init.lua;' ..
+				               (package.path or '')
+				${lua_code}
+			"
+		) 2>&1
 	}
 
 	# Test 1: --help must exit 0
