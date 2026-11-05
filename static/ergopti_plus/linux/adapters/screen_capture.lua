@@ -114,6 +114,9 @@ M.SCRIPT = table.concat({
 --- @return table { status = "ok"|"cancelled"|"failed", scaled = boolean, reason = string|nil (an adapter_errors id), detail = any|nil (the exit code or the runner's error) }
 function M.classify(mode, code, stdout, err)
 	if code == 0 then
+		if err ~= nil then
+			return { status = "failed", scaled = false, reason = Errors.SCREEN_CAPTURE_TOOL_FAILED, detail = err }
+		end
 		local unscaled = type(stdout) == "string" and stdout:find(M.UNSCALED_MARKER, 1, true) ~= nil
 		return { status = "ok", scaled = not unscaled }
 	end
@@ -176,7 +179,9 @@ function M.capture(mode, max_edge, on_done)
 	local path = dir .. "/screen.png"
 	local called, run, reason = pcall(ShellRunner.run_async, "sh", { "-c", M.SCRIPT, "sh", path, tostring(max_edge), mode },
 		{ timeout_ms = mode == "region" and REGION_TIMEOUT_MS or FULL_TIMEOUT_MS }, function(result)
-			local outcome = M.classify(mode, result.code, result.stdout, result.error)
+			local failure = result.error
+			if result.code == 0 and result.ok ~= true and failure == nil then failure = "capture completion was not acknowledged" end
+			local outcome = M.classify(mode, result.code, result.stdout, failure)
 			if outcome.status == "failed" and type(result.stderr) == "string" and result.stderr ~= "" then
 				Logger.debug(LOG, "Capture tool said: %s", result.stderr:sub(1, 200))
 			end

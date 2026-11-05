@@ -42,6 +42,22 @@ local function with_staging_receipt(receipt, body)
 end
 
 helpers.describe("linux-screen-path-receipts", function()
+	helpers.it("refuses a successful exit after native output reading failed", function()
+		with_staging_receipt({ ok = true, output = "/owned/ergopti-screen.ABCDEFGH\n" }, function(state)
+			local outcome
+			assert(ScreenCapture.capture("full", EDGE, function(value) outcome = value end))
+			state.callback({ ok = false, code = 0, stdout = "", error = "native output read failed" })
+			helpers.assert_eq(outcome.status, "failed", "a later successful exit cannot erase the read failure")
+		end)
+	end)
+	helpers.it("requires an acknowledged successful capture", function()
+		with_staging_receipt({ ok = true, output = "/owned/ergopti-screen.ABCDEFGH\n" }, function(state)
+			local outcome
+			assert(ScreenCapture.capture("full", EDGE, function(value) outcome = value end))
+			state.callback({ ok = false, code = 0, stdout = "" })
+			helpers.assert_eq(outcome.status, "failed")
+		end)
+	end)
 	for index, path in ipairs({
 		"/owned/plain/ergopti-screen.ABCDEFGH", "/owned/line\npart/ergopti-screen.ABCDEFGH",
 		"/owned/carriage\rpart/ergopti-screen.ABCDEFGH", "/owned/quote-é'漢\npart/ergopti-screen.ABCDEFGH",
