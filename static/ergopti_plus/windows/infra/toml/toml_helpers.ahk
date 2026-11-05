@@ -34,6 +34,7 @@
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
+#Include ../source_text_codec.ahk
 #Include toml_inline_tables.ahk
 #Include toml_document.ahk
 #Include config_snapshot.ahk
@@ -1513,7 +1514,9 @@ ReadPathsToml(FilePath) {
 		; hazard of the kind the config readers have.
 		Content := ""
 		try {
-				Content := FileRead(FilePath, "UTF-8")
+				; Retain one exact source image; lossy decoding can name another profile.
+				Bytes := FileRead(FilePath, "RAW")
+				Content := SourceTextDecodeExact(Bytes)
 		} catch as Err {
 				try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
 				return Result

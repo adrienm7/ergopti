@@ -18,6 +18,7 @@
 
 
 #Include personal_toml_preservation.ahk
+#Include ../source_text_codec.ahk
 
 
 
@@ -1182,60 +1183,12 @@ global _ReadPersonalInfoTomlCache := false
 ; existing UTF-8/UTF-16LE BOM protocols, but never bless decoder replacements,
 ; truncated code units or unsupported NUL/surrogates as the original identity.
 _PersonalInfoDecodeSourceBytes(Bytes) {
-	if !(Bytes is Buffer)
-		throw TypeError("A personal-information source must be raw bytes.")
-	if Bytes.Size == 0
-		return ""
-	if Bytes.Size >= 2 && NumGet(Bytes, 0, "UChar") == 0xFF && NumGet(Bytes, 1, "UChar") == 0xFE {
-		if Mod(Bytes.Size - 2, 2)
-			throw ValueError("The personal-information UTF-16 source has an incomplete code unit.")
-		Units := (Bytes.Size - 2) // 2
-		_PersonalInfoRequireUnicodeScalars(Bytes, 2, Units)
-		return Units ? StrGet(Bytes.Ptr + 2, -Units, "UTF-16") : ""
-	}
-	Offset := Bytes.Size >= 3 && NumGet(Bytes, 0, "UChar") == 0xEF
-		&& NumGet(Bytes, 1, "UChar") == 0xBB && NumGet(Bytes, 2, "UChar") == 0xBF ? 3 : 0
-	Length := Bytes.Size - Offset
-	if Length == 0
-		return ""
-	if Length > 0x7FFFFFFF
-		throw ValueError("The personal-information UTF-8 source exceeds the native decoder domain.")
-	; MB_ERR_INVALID_CHARS refuses invalid, overlong and non-scalar UTF-8;
-	; neither pass reads the path again or modifies the original source Buffer.
-	Units := DllCall("Kernel32\MultiByteToWideChar", "UInt", 65001, "UInt", 8,
-		"Ptr", Bytes.Ptr + Offset, "Int", Length, "Ptr", 0, "Int", 0, "Int")
-	if Units <= 0
-		throw ValueError("The personal-information UTF-8 source is malformed.")
-	Wide := Buffer((Units + 1) * 2, 0)
-	Written := DllCall("Kernel32\MultiByteToWideChar", "UInt", 65001, "UInt", 8,
-		"Ptr", Bytes.Ptr + Offset, "Int", Length, "Ptr", Wide, "Int", Units, "Int")
-	if Written != Units
-		throw ValueError("The personal-information UTF-8 source could not be decoded completely.")
-	_PersonalInfoRequireUnicodeScalars(Wide, 0, Units)
-	return StrGet(Wide, -Units, "UTF-16")
+	return SourceTextDecodeExact(Bytes)
 }
 
-; NUL matches the existing TOML scalar refusal. UTF-16 must contain complete
-; high/low pairs; valid supplementary scalars retain their original two units.
+; Keep the internal serializer entry point bound to the shared scalar policy.
 _PersonalInfoRequireUnicodeScalars(Bytes, Offset, Units) {
-	Index := 0
-	while Index < Units {
-		Code := NumGet(Bytes, Offset + Index * 2, "UShort")
-		if Code == 0
-			throw ValueError("The personal-information source contains an unsupported Unicode scalar.")
-		if Code >= 0xD800 && Code <= 0xDBFF {
-			if Index + 1 >= Units
-				throw ValueError("The personal-information source contains an unpaired UTF-16 surrogate.")
-			Low := NumGet(Bytes, Offset + (Index + 1) * 2, "UShort")
-			if Low < 0xDC00 || Low > 0xDFFF
-				throw ValueError("The personal-information source contains an unpaired UTF-16 surrogate.")
-			Index += 2
-			continue
-		}
-		if Code >= 0xDC00 && Code <= 0xDFFF
-			throw ValueError("The personal-information source contains an unpaired UTF-16 surrogate.")
-		Index += 1
-	}
+	return SourceTextRequireUnicodeScalars(Bytes, Offset, Units)
 }
 
 ; Read personal_info.toml and atomically populate personal-info Maps.
