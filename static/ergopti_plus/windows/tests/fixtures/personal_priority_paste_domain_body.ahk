@@ -25,6 +25,49 @@ _PPNC_Require(Condition, Message) {
  if !Condition
   throw Error(Message)
 }
+; Read native UTF-16 independently of the getter to identify the actual admission boundary.
+; Only the child-owned Edit is queried; diagnostics never send input.
+_PPNC_RawTextReceipt(Hwnd) {
+ Reported := DllCall("User32\GetWindowTextLengthW", "Ptr", Hwnd, "Int")
+ _PPNC_Require(Reported >= 0 && Reported <= 64, "The private diagnostic text must fit its bounded native receipt")
+ Bytes := Buffer((Reported + 1) * 2, 0)
+ Copied := DllCall("User32\GetWindowTextW", "Ptr", Hwnd, "Ptr", Bytes.Ptr, "Int", Reported + 1, "Int")
+ _PPNC_Require(Copied >= 0 && Copied <= Reported, "The native text receipt cannot exceed its retained allocation")
+ Units := ""
+ loop Copied
+  Units .= (A_Index == 1 ? "" : ",") . Format("{:04X}", NumGet(Bytes, (A_Index - 1) * 2, "UShort"))
+ return {Length: Copied, Reported: Reported, Units: Units}
+}
+_PPNC_StringUnits(Value) {
+ Text := String(Value), Units := ""
+ _PPNC_Require(StrLen(Text) <= 64, "A private diagnostic value must stay bounded")
+ loop StrLen(Text)
+  Units .= (A_Index == 1 ? "" : ",") . Format("{:04X}", NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"))
+ return {Length: StrLen(Text), Units: Units}
+}
+_PPNC_ReadValueReceipt(Edit, Stage, Requested) {
+ Before := _PPNC_RawTextReceipt(Edit.Hwnd)
+ HasValue := false, GetterError := 0
+ try {
+  Value := Edit.Value
+  HasValue := true
+ } catch Any as ReadError
+  GetterError := ReadError
+ After := _PPNC_RawTextReceipt(Edit.Hwnd)
+ RequestedUnits := _PPNC_StringUnits(Requested)
+ ValueType := HasValue ? Type(Value) : "unavailable"
+ ValueUnits := HasValue && (Value is String || Value is Number) ? _PPNC_StringUnits(Value) : {Length: -1, Units: "unavailable"}
+ NumericValue := HasValue && Value is Number ? String(Value) : "not-number"
+ FileAppend("OBSERVATION priority-native-value stage=" . Stage . " requested_units=" . RequestedUnits.Units
+  . " before_reported=" . Before.Reported . " before_len=" . Before.Length . " before_units=" . Before.Units
+  . " value_type=" . ValueType . " value_number=" . NumericValue . " value_len=" . ValueUnits.Length . " value_units=" . ValueUnits.Units
+  . " after_reported=" . After.Reported . " after_len=" . After.Length . " after_units=" . After.Units
+  . " getter_error=" . (IsObject(GetterError) ? Type(GetterError) : "none") . "`n", "*", "UTF-8-RAW")
+ if IsObject(GetterError)
+  throw GetterError
+ return Value
+}
+
 _PPNC_Paste(Edit, Text) {
  global _PPNC_State
  Edit.Value := ""
@@ -41,7 +84,8 @@ _PPNC_Paste(Edit, Text) {
    _PPNC_Require(CB_GetSequenceNumber() == Sequence, "A foreign later copy cannot supply the private paste")
    DllCall("User32\SendMessageW", "Ptr", Edit.Hwnd, "UInt", 0x0302, "Ptr", 0, "Ptr", 0, "Ptr")
    _PPNC_State.PasteCalls += 1
-   _PPNC_Require(Edit.Value == Text, "The genuine ES_NUMBER control must admit this exact native pasted text")
+   PastedValue := _PPNC_ReadValueReceipt(Edit, "post-paste", Text)
+   _PPNC_Require(PastedValue == Text, "The genuine ES_NUMBER control must admit this exact native pasted text")
   } finally Critical(PreviousCritical)
  } finally {
   if Sequence > 0 {
@@ -89,7 +133,8 @@ _PPNC_Run(Mode) {
    Status.Value := "initial"
    _PPNC_Paste(Priority, Vector[1])
    Button.Focus()
-   _PPNC_Require(Priority.Value == Vector[1], "The pasted value must survive leaving the UpDown buddy before the public action")
+   FocusedValue := _PPNC_ReadValueReceipt(Priority, "post-focus", Vector[1])
+   _PPNC_Require(FocusedValue == Vector[1], "The pasted value must survive leaving the UpDown buddy before the public action")
    Failure := 0
    try {
     if Adding
