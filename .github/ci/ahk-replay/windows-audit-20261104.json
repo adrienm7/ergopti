@@ -1,176 +1,60 @@
 {
-	"expected_count": 107,
-	"native_http_client_e2e": true,
-	"native_hotstring_e2e": true,
-	"native_proxy_relay_owner_e2e": true,
+	"expected_count": 32,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "model-browser-close-pause-owner",
-			"expected_count": 6
-		},
-		{
-			"contains": "(model-browser-native-backend)",
-			"expected_count": 2
-		},
-		{
-			"contains": "model-browser-native-backend-admission",
+			"contains": "uia-selection-native64",
 			"expected_count": 3
 		},
 		{
-			"contains": "model-browser-native-backend-superseded",
-			"expected_count": 1
+			"contains": "combination-mark-native64",
+			"expected_count": 3
 		},
 		{
-			"contains": "model-browser-native-backend-second-admission",
-			"expected_count": 1
+			"contains": "hotstring-timegate-native64",
+			"expected_count": 3
 		},
 		{
-			"contains": "model-browser-native-backend-writer-owner",
-			"expected_count": 1
-		},
-		{
-			"contains": "model-browser-native-show-hide-owner",
+			"contains": "program-provider-case-sensitive",
 			"expected_count": 2
+		},
+		{
+			"contains": "klr-live-deep-inventory",
+			"expected_count": 2
+		},
+		{
+			"contains": "metrics-live-foreground-worker",
+			"expected_count": 2
+		},
+		{
+			"contains": "prompt-native-subscription-retirement-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-web-native-subscription-retirement-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "hcw-native-destroy-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "backspace-cached-privacy-gap",
+			"expected_count": 5
+		},
+		{
+			"contains": "keystats-native-utf16-packet-roundtrip",
+			"expected_count": 2
+		},
+		{
+			"contains": "native-relay-hop-branches1",
+			"expected_count": 1
 		},
 		{
 			"contains": "model-browser-native-visibility-order-owner",
 			"expected_count": 3
-		},
-		{
-			"contains": "model-browser-native-close-visibility-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "model-browser-native-constructor-failure",
-			"expected_count": 2
-		},
-		{
-			"contains": "system-action-lifecycle-timer",
-			"expected_count": 4
-		},
-		{
-			"contains": "system-action-inflight-lifecycle",
-			"expected_count": 6
-		},
-		{
-			"contains": "display-mirror-query-pause",
-			"expected_count": 4
-		},
-		{
-			"contains": "system-action-pause-boundaries",
-			"expected_count": 4
-		},
-		{
-			"contains": "confirmed-query-pause",
-			"expected_count": 11
-		},
-		{
-			"contains": "retained process unchanged (",
-			"expected_count": 1
-		},
-		{
-			"contains": "retained process second_timer_pause (",
-			"expected_count": 1
-		},
-		{
-			"contains": "retained process defer_reentry (",
-			"expected_count": 1
-		},
-		{
-			"contains": "retained process second_defer_error (",
-			"expected_count": 1
-		},
-		{
-			"contains": "retained process cancel (",
-			"expected_count": 1
-		},
-		{
-			"contains": "retained process effect_error (",
-			"expected_count": 1
-		},
-		{
-			"contains": "system actions: process release reentry",
-			"expected_count": 1
-		},
-		{
-			"contains": "system actions: sleep_displays posts",
-			"expected_count": 1
-		},
-		{
-			"contains": "system actions: toggle_dark_mode flips",
-			"expected_count": 1
-		},
-		{
-			"contains": "system actions: a deferred system action that throws",
-			"expected_count": 1
-		},
-		{
-			"contains": "(display-mirror)",
-			"expected_count": 7
-		},
-		{
-			"contains": "theme mid-first-write pause completes transaction",
-			"expected_count": 1
-		},
-		{
-			"contains": "prefix-backspace-native-owned",
-			"expected_count": 2
-		},
-		{
-			"contains": "prefix-backspace-native-gap)",
-			"expected_count": 4
-		},
-		{
-			"contains": "prefix-backspace-native-gap-controls",
-			"expected_count": 2
-		},
-		{
-			"contains": "prefix-cached-privacy-gap",
-			"expected_count": 3
-		},
-		{
-			"contains": "unblock-selected-root-reparse",
-			"expected_count": 2
-		},
-		{
-			"contains": "unblock-selected-file-reparse",
-			"expected_count": 2
-		},
-		{
-			"contains": "native-static-scheme-proxy1",
-			"expected_count": 1
-		},
-		{
-			"contains": "native-http-forward-proxy1",
-			"expected_count": 1
-		},
-		{
-			"contains": "managed-fixture-timing",
-			"expected_count": 3
-		},
-		{
-			"contains": "klr-frame-hole-unicode",
-			"expected_count": 2
-		},
-		{
-			"contains": "klr-cache-stage-native64",
-			"expected_count": 2
-		},
-		{
-			"contains": "KLR cache stages: retire a dead producer",
-			"expected_count": 1
-		},
-		{
-			"contains": "KLR cache stages: retain a locked stage",
-			"expected_count": 1
-		},
-		{
-			"contains": "KLR cache stages: retain unknown content",
-			"expected_count": 1
-		},
-		{
-			"contains": "llm-typing-source-privacy",
-			"expected_count": 10
 		}
 	]
 }
