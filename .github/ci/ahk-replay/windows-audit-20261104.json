@@ -1,111 +1,127 @@
 {
-  "expected_count": 69,
-  "native_http_client_e2e": false,
-  "native_hotstring_e2e": false,
-  "filters": [
-    {
-      "contains": "final-context-duration-owner",
-      "expected_count": 2
-    },
-    {
-      "contains": "context-clock-ack-owner",
-      "expected_count": 4
-    },
-    {
-      "contains": "context-tail-retry-owner",
-      "expected_count": 4
-    },
-    {
-      "contains": "context-native64-origin-contract",
-      "expected_count": 1
-    },
-    {
-      "contains": "switch-destination-privacy-owner",
-      "expected_count": 7
-    },
-    {
-      "contains": "window-caption-app-owner",
-      "expected_count": 2
-    },
-    {
-      "contains": "window-caption-case-owner",
-      "expected_count": 1
-    },
-    {
-      "contains": "keystats-session-close-retry",
-      "expected_count": 5
-    },
-    {
-      "contains": "keystats-idle-resume-retry",
-      "expected_count": 6
-    },
-    {
-      "contains": "keystats-shutdown-close-chain",
-      "expected_count": 1
-    },
-    {
-      "contains": "clipboard-provenance-owner",
-      "expected_count": 4
-    },
-    {
-      "contains": "idle-activity-publication-owner",
-      "expected_count": 3
-    },
-    {
-      "contains": "metrics-locale-honesty: the app-time watermark",
-      "expected_count": 1
-    },
-    {
-      "contains": "metrics-locale-honesty: both compensations",
-      "expected_count": 1
-    },
-    {
-      "contains": "(F9)",
-      "expected_count": 3
-    },
-    {
-      "contains": "kl-payload-privacy-filter-scoped",
-      "expected_count": 2
-    },
-    {
-      "contains": "KL_FlushBuffer called before KL_LogWindowSwitch on title change",
-      "expected_count": 1
-    },
-    {
-      "contains": "focus-refresh-bounded-resident",
-      "expected_count": 3
-    },
-    {
-      "contains": "(F-08)",
-      "expected_count": 1
-    },
-    {
-      "contains": "keystats shutdown: timer failure cannot skip durability",
-      "expected_count": 1
-    },
-    {
-      "contains": "context-compensation-atomic-owner",
-      "expected_count": 1
-    },
-    {
-      "contains": "reader-think-pause-corpus",
-      "expected_count": 2
-    },
-    {
-      "contains": "toml-decoded-key-nul",
-      "expected_count": 8
-    },
-    {
-      "contains": "wrap-scalar-admission",
-      "expected_count": 3
-    },
-    {
-      "contains": "open-app-native-folder",
-      "expected_count": 1
-    },
-    {
-      "contains": "paths-valid-replacement-scalar",
-      "expected_count": 1
-    }
-  ]
+	"expected_count": 81,
+	"native_http_client_e2e": false,
+	"native_hotstring_e2e": false,
+	"filters": [
+		{
+			"contains": "final-context-duration-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "context-clock-ack-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "context-tail-retry-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "context-native64-origin-contract",
+			"expected_count": 1
+		},
+		{
+			"contains": "switch-destination-privacy-owner",
+			"expected_count": 7
+		},
+		{
+			"contains": "window-caption-app-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "window-caption-case-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "keystats-session-close-retry",
+			"expected_count": 5
+		},
+		{
+			"contains": "keystats-idle-resume-retry",
+			"expected_count": 6
+		},
+		{
+			"contains": "keystats-shutdown-close-chain",
+			"expected_count": 1
+		},
+		{
+			"contains": "clipboard-provenance-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "idle-activity-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "metrics-locale-honesty: the app-time watermark",
+			"expected_count": 1
+		},
+		{
+			"contains": "metrics-locale-honesty: both compensations",
+			"expected_count": 1
+		},
+		{
+			"contains": "(F9)",
+			"expected_count": 3
+		},
+		{
+			"contains": "kl-payload-privacy-filter-scoped",
+			"expected_count": 2
+		},
+		{
+			"contains": "KL_FlushBuffer called before KL_LogWindowSwitch on title change",
+			"expected_count": 1
+		},
+		{
+			"contains": "focus-refresh-bounded-resident",
+			"expected_count": 9
+		},
+		{
+			"contains": "(F-08)",
+			"expected_count": 1
+		},
+		{
+			"contains": "keystats shutdown: timer failure cannot skip durability",
+			"expected_count": 1
+		},
+		{
+			"contains": "context-compensation-atomic-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "reader-think-pause-corpus",
+			"expected_count": 2
+		},
+		{
+			"contains": "toml-decoded-key-nul",
+			"expected_count": 8
+		},
+		{
+			"contains": "wrap-scalar-admission",
+			"expected_count": 3
+		},
+		{
+			"contains": "open-app-native-folder",
+			"expected_count": 1
+		},
+		{
+			"contains": "paths-valid-replacement-scalar",
+			"expected_count": 1
+		},
+		{
+			"contains": "onboarding-show-native-close",
+			"expected_count": 2
+		},
+		{
+			"contains": "context-nonempty-prepare-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "field-run-utc-snapshot",
+			"expected_count": 1
+		},
+		{
+			"contains": "field-run-utc-boundaries",
+			"expected_count": 1
+		}
+	]
 }
