@@ -350,34 +350,44 @@ _PNOS_Case(Invalid) {
 Test("personal output scalar: JSON NUL cannot disappear during normalization (personal-output-scalar)", _PNOS_Case.Bind(true))
 Test("personal output scalar: newline and tab remain canonical tokens (personal-output-scalar)", _PNOS_Case.Bind(false))
 
-_PSTG_ForeignStage(Collision) {
+_PSTG_ForeignStage(Collision, PersonalInfo := false) {
 	Root := A_Temp . "\ergopti_personal_stage_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
-	Path := Root . "\personal_hotstrings.toml", Created := false
-	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
-	OldCache := _ReadPersonalTomlCache, HadPath := ScriptInformation.Has("PersonalTomlPath")
-	OldPath := ScriptInformation.Get("PersonalTomlPath", "")
-	Owner := FSWriteDurable, HadOwn := Owner.HasOwnProp("Call")
+	Path := Root . (PersonalInfo ? "\personal_info.toml" : "\personal_hotstrings.toml"), Created := false
+	global ScriptInformation, _ReadPersonalTomlCache, _ReadPersonalInfoTomlCache, _TomlUnreadableFiles
+	PathKey := PersonalInfo ? "PersonalInfoTomlPath" : "PersonalTomlPath"
+	OldCache := _ReadPersonalTomlCache, OldInfoCache := _ReadPersonalInfoTomlCache
+	HadPath := ScriptInformation.Has(PathKey), OldPath := ScriptInformation.Get(PathKey, "")
+	Owner := FSWriteReplaceOwned, HadOwn := Owner.HasOwnProp("Call")
 	if HadOwn
 		SavedCall := Owner.GetOwnPropDesc("Call")
 	Installed := false
 	State := {hits: 0, stagePath: "", sentinelBytes: 0, createdSentinel: 0, originalEntered: 0, originalCompleted: 0}
 	Source := '[[words]]`n"hello" = { output = "Original", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
+	if PersonalInfo
+		Source := '[info]`nfirst_name = "Original"`n[letters]`np = "first_name"`n'
 	Sentinel := "Foreign personal stage: é😀 unchanged"
-	Observe(This, StagePath, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
-		Prefix := Path . "." . A_ScriptHwnd . "-"
-		if SubStr(StagePath, 1, StrLen(Prefix)) == Prefix
-				&& RegExMatch(SubStr(StagePath, StrLen(Prefix) + 1), "^\d+\.tmp$") {
+	Observe(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Path, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			SplitPath(Path, &Leaf)
+			AssertEqual(Leaf . Suffix, Name, "the actual factory must name the target's exact stage leaf")
 			State.hits += 1
-			State.stagePath := StagePath
+			State.stagePath := Path . Suffix
 			if Collision {
-				State.createdSentinel := FSWriteCreateDurable(StagePath, Sentinel)
-				AssertEqual(1, State.createdSentinel, "the competing private file must actually be created exclusively")
-				State.sentinelBytes := FSReadBytesStrict(StagePath)
+				State.createdSentinel := FSWriteCreateDurable(State.stagePath, Sentinel)
+				AssertEqual(1, State.createdSentinel, "the foreign stage must actually be acquired with CREATE_NEW")
+				State.sentinelBytes := FSReadBytesStrict(State.stagePath)
 			}
+			return StageFn.Call(Folder, Name, Attributes)
 		}
-		State.originalEntered += 1
-		NativeResult := Func.Prototype.Call.Call(This, StagePath, Content, OpenFn, DeleteFn, FlushFn, WriteFn)
-		State.originalCompleted += 1
+		if Mine
+			State.originalEntered += 1
+		NativeResult := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			State.originalCompleted += 1
 		return NativeResult
 	}
 	try {
@@ -386,20 +396,25 @@ _PSTG_ForeignStage(Collision) {
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
-		ScriptInformation["PersonalTomlPath"] := Path
-		_ReadPersonalTomlCache := false
-		Observed := ReadPersonalToml(true)
-		AssertEqual("Original", Observed["sections"]["words"]["entries"][1]["output"])
-		Candidate := _PersonalTomlCloneDetached(Observed)
-		Candidate["sections"]["words"]["entries"][1]["output"] := "Edited"
+		ScriptInformation[PathKey] := Path
+		if PersonalInfo {
+			_ReadPersonalInfoTomlCache := false
+			Candidate := Map("first_name", "Edited")
+		} else {
+			_ReadPersonalTomlCache := false
+			Observed := ReadPersonalToml(true)
+			AssertEqual("Original", Observed["sections"]["words"]["entries"][1]["output"])
+			Candidate := _PersonalTomlCloneDetached(Observed)
+			Candidate["sections"]["words"]["entries"][1]["output"] := "Edited"
+		}
 		Before := FSReadBytesStrict(Path)
 		Owner.DefineProp("Call", {Call: Observe})
 		Installed := true
-		Result := WritePersonalToml(Candidate)
+		Result := PersonalInfo ? WritePersonalInfoToml(Path, Candidate, Map("p", "first_name")) : WritePersonalToml(Candidate)
 		After := FSReadBytesStrict(Path)
 		StagePresent := State.stagePath != "" && FSStrictExists(State.stagePath)
 		StageBytes := StagePresent ? FSReadBytesStrict(State.stagePath) : Buffer(0)
-		_TestPrint("# personal-stage-ownership collision=" . Collision . " calls=" . State.hits
+		_TestPrint("# personal-stage-ownership info=" . PersonalInfo . " collision=" . Collision . " calls=" . State.hits
 			. " created_sentinel=" . State.createdSentinel . " original_entered=" . State.originalEntered
 			. " original_completed=" . State.originalCompleted
 			. " result=" . Result . " stage_present=" . StagePresent
@@ -421,7 +436,7 @@ _PSTG_ForeignStage(Collision) {
 			AssertTrue(Result)
 			AssertFalse(StagePresent)
 			Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
-			AssertEqual("Edited", Actual["words"][1]["hello"]["output"])
+			AssertEqual("Edited", PersonalInfo ? Actual["info"]["first_name"] : Actual["words"][1]["hello"]["output"])
 		}
 	} finally {
 		if Installed {
@@ -440,11 +455,16 @@ _PSTG_ForeignStage(Collision) {
 			DirDelete(Root, true)
 		}
 		if HadPath
-			ScriptInformation["PersonalTomlPath"] := OldPath
+			ScriptInformation[PathKey] := OldPath
 		else
-			ScriptInformation.Delete("PersonalTomlPath")
+			ScriptInformation.Delete(PathKey)
 		_ReadPersonalTomlCache := OldCache
+		_ReadPersonalInfoTomlCache := OldInfoCache
 	}
 }
 for _PSTG_Collision in [true, false]
 	Test("personal stage: foreign collision=" . _PSTG_Collision . " (personal-stage-ownership)", _PSTG_ForeignStage.Bind(_PSTG_Collision))
+
+for _PSTG_InfoCollision in [true, false]
+	Test("personal information stage: foreign collision=" . _PSTG_InfoCollision . " (personal-info-stage-ownership)",
+		_PSTG_ForeignStage.Bind(_PSTG_InfoCollision, true))
