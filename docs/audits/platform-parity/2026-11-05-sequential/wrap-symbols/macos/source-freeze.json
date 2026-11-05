@@ -1,0 +1,32 @@
+{
+	"frozen_at": "2026-11-05T09:13:59.104358+00:00",
+	"files": {
+		"coverage.json": "bf0a2a95f046034ae7d308c108f9efdd4c62d0f7a7c2dc23f3cec09b2bffa5ed",
+		"findings.json": "b3d8bd225856e9db642625485cf07d5715790dcb24c5186fff314a576f70dcae",
+		"report.md": "f105804f6193ff7e08dad0e1a542e28d027e3f62be320177e361ec734c2d976d",
+		"probes/registered-delivery-alone.log": "88845ca0b985df6aa5d8b488a27d66f770354488f5836931dc0cc9d8529c0a3c",
+		"probes/upstream-pasteboard-1.1.1.lua": "bebf829ac6cdb8b148269c44689b01820cff3993e1bb9742cdf0188729ea19b5",
+		"probes/registered-preferences-alone.log": "78104644720210578223de45bf44408e0d6f4f1936ad97e3fd94ea8d3fd178b8",
+		"probes/menu.log": "5a4bd2fe3e7d16c68157e146cbfceb7f9a5e3eb566c2e4859d77f5445e185aea",
+		"probes/native-event-contract.txt": "5e187bc79db217bb75b2fe3773b56af78240aa2611595ed9c472ba2493c61026",
+		"probes/copied.log": "30873e35e33cce2870a42b603319945a7136f5749838a5331fd539bec4594df3",
+		"probes/multi-item.lua": "88070bd237ead639eff8a8f775af3ee39d543761d5a5aede5b186ef983c899b3",
+		"probes/multi-item.log": "0bda96afeb03e5e674646903e9b38a31af5ed9cb196baf6fcbfe4e7cd49e5423",
+		"probes/layout-guillemet-source.json": "7a3a61e17826ab9bd69b8b98bd8a4d671edb7722ba1968b134db9cc1a3e5b785",
+		"probes/trigger.log": "231ddb15e24d7e84936301423fdf26e982a4cf89986b9d74ea190f483987ed63",
+		"probes/menu.lua": "40f0887722dad7d7afa3db19604942363c5b6d944ddc72abf6670f56fe7dc258",
+		"probes/dry-A.log": "d22b5dfaea075a4490992387edd6ad3cf479a2275f1bd6015eff9680197c86b3",
+		"probes/dry-B.json": "6a2f15cf62658d72d462c44442ced5f3256f15f21d69a171348b191be825b616",
+		"probes/registered-wrap.log": "5410be6e999f3017c5e3078c9a1684da3514ce37999b9df577ebaa2c79e93cba",
+		"probes/false-green-scan.log": "189864a4dc0fdc25ae871df95a0eb91c3df1c0cfee8de0a2c3d31b69384a8e1a",
+		"probes/copied.lua": "b6224d93651136a7f90642aa2df38648e1023eb78f9f767d2c73dcf10a29af8c",
+		"probes/dry-A.json": "6c27556324e8f667dd1907602dabe4266f815e7a189728f101e9aee5c731a87c",
+		"probes/dry-B.log": "d22b5dfaea075a4490992387edd6ad3cf479a2275f1bd6015eff9680197c86b3",
+		"probes/registered-atomic-alone.log": "7aa6e587789431cc19e8bd397b34d6f1a6c786bd668e1486f21726f4aebb88af",
+		"probes/registered-broker-alone.log": "01dac1db1bc8b6817d9f92e14442a53ff6f4c84f40b324e81d4c0eea3969ee0c",
+		"probes/upstream-pasteboard-provenance.txt": "330e0db9821521f9012e90b75c74f462401ffe6f3d02b3df1ae965f6941e9df6",
+		"probes/manifest-validation.txt": "de69821303bb8888098d3f75995972fcff09ca96664e698022e3487979b67e98",
+		"probes/native-pasteboard-contract.txt": "2bcfe24a7d1f3e1027375d0ae860d83dbf7150df9283f5c213ae33e8c646dc7c",
+		"probes/trigger.lua": "aa3d44c7e7497e6648b2f960a594ca6a4cd3fb40ed7e7ce59fa49de951080dbb"
+	}
+}

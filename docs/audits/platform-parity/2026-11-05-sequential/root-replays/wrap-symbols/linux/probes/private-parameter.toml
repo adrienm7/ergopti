@@ -1,0 +1,8 @@
+[gestures]
+enabled = false
+tap_3 = "wrap_selection"
+[private_probe]
+sentinel = "keep"
+
+[gesture_parameters]
+tap_3__wrap_selection = "OPEN|CLOSE"

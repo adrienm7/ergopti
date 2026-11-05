@@ -1,0 +1,11 @@
+Compact substring-selector receipt; full original SHA256 bdc24d67860ec0344ee014966efb7e015a04bd3950c3eac2db0ac29766e79619
+NOT full-module coverage; only6 matching cases.
+# lua_timing {"schema":1,"driver":"macos","id":132,"kind":"case","module":"tests.unit.infra.file_watchers.test_file_watchers","name":"covers personal_info.toml exactly once in the bundle-fallback topology","status":"pass","elapsed_ms":42.860336,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":203,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.personal_info.test_personal_info_trigger_char_sync","name":"fires on the keymap's trigger, not on personal_info.toml's default","status":"pass","elapsed_ms":108.236379,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":207,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.rules_engine.test_rules_engine_trigger_char_sync","name":"interceptor fires on the fake keymap's custom trigger char, not the personal_info.toml default '★'","status":"pass","elapsed_ms":166.124839,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":283,"kind":"case","module":"tests.unit.modules.keymap.preview.test_preview_masks_secrets","name":"leaves a declared-public personal_info field in full","status":"pass","elapsed_ms":152.832437,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":603,"kind":"case","module":"tests.unit.ui.editors.lifecycle.test_native_close_release","name":"ui.personal_info_editor releases native user close before reopening","status":"pass","elapsed_ms":136.920162,"timing_error":""}
+# lua_timing {"schema":1,"driver":"macos","id":604,"kind":"case","module":"tests.unit.ui.editors.lifecycle.test_native_close_release","name":"ui.personal_info_editor keeps explicit deferred deletion bound to the old window","status":"pass","elapsed_ms":123.459040,"timing_error":""}
+Total modules: 866
+Passed tests:  6
+Failed tests:  0

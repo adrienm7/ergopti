@@ -1,0 +1,211 @@
+Contract excerpts; source-only support, not execution proof. All source at pinned7aecd9a.
+
+static/ergopti_plus/_shared/core/config_schema/examples/personal_info.example.toml
+SHA256: ca12b48bab377d26c3b51abc6da4b518dca43735980fa798b82a3850dfd153bf
+21: 
+22: # The ``letters`` table maps a one-letter shortcut to an [info] field name.
+23: # Values MUST be snake_case keys present in [info] above.
+24: # Validation: any unknown reference triggers a warn at boot.
+25: [letters]
+26: a = "street_address"
+27: b = "bic"
+28: c = "credit_card"
+29: d = "date_of_birth"
+30: e = "email_address"
+31: f = "phone_number_clean"
+32: i = "iban"
+33: m = "email_address"
+34: n = "last_name"
+35: p = "first_name"
+36: s = "social_security_number"
+37: t = "phone_number"
+38: w = "work_email_address"
+
+static/ergopti_plus/_shared/core/config_schema/SCHEMA.md
+SHA256: 41f9d5996cc2171f1174b7e7fc7425befc2ac41ae66bff6f32621e227f9389cd
+5: ## Overview
+6: 
+7: ```
+8: <config dir>/                        # Windows/macOS: the user config folder; Linux: $XDG_CONFIG_HOME/ergopti
+9: ├── personal_info.toml               # Universal, read by all three drivers
+10: ├── hotstrings_config.toml           # Universal, delay/colour overrides per group
+11: ├── autohotkey/                      # Windows only
+
+static/ergopti_plus/_shared/modules/personal_info/README.md
+SHA256: 03d002d6843053c1ade5f632db2eaceb42a77d66542f585b33400a60d4f06855
+25: 
+26: ---
+27: 
+28: ## What this file is NOT
+29: 
+30: **It is not a privacy setting.** Nothing here changes what the driver **types**.
+31: A masked value is masked in the preview bubble only; the expansion is always the
+32: full value, and a test at each driver's injection seam pins that.
+33: 
+34: **It is not the `is_private` flag.** `is_private` answers "may this be
+35: persisted", and its answer is always no for anything built from
+36: `personal_info.toml`. This file answers a different question — "may this be
+37: _shown_" — and the two disagree deliberately: the phone number is private
+38: (never logged) and unmasked (shown in full), because a log is read later by
+39: whoever has the file and a bubble is read now by the person who typed it.
+40: 
+41: **It is not a list of "personal data".** Every field in `personal_info.toml` is
+
+static/ergopti_plus/_shared/modules/personal_info/fields.toml
+SHA256: cd4d630eda6de88dde70c4074094060b597b9284c5c9647a4494388f0e01e17c
+44: # ==============================================================================
+45: #
+46: # `masked = true`  — a financial or identity secret. Partially hidden in the
+47: #                    preview bubble; typed in full, always.
+48: # `masked = false` — shown in the bubble as it will be typed.
+49: #
+50: # The distinction is NOT "is this personal data". Every field here is personal.
+51: # It is "does seeing this on screen, over a shoulder or in a screen share, hand
+52: # someone something they can use". A first name does not; an IBAN does.
+53: 
+
+static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua
+SHA256: 6d33555bdb978b3d9604a5c41c70cf99ab58bee098c0f14026f5b7d3d26e7a60
+220: local function parse_toml_section(document, section)
+221: 	local declared = document[section]
+222: 	if declared == nil then declared = {} end
+223: 	if type(declared) ~= "table" then return nil end
+224: 	for key in pairs(declared) do
+225: 		if type(key) ~= "string" then return nil end
+226: 	end
+227: 	local result = {}
+228: 	for key, default in pairs(DEFAULT_CONFIG[section]) do
+229: 		local value = declared[key]
+230: 		if value ~= nil and type(value) ~= "string" then return nil end
+231: 		result[key] = value == nil and default or value
+232: 	end
+233: 	return result
+234: end
+235: 
+274: 		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
+275: 	end
+276: 	lines[#lines + 1] = ""
+277: 	lines[#lines + 1] = "[letters]"
+278: 	for _, key in ipairs(LETTER_KEYS) do
+279: 		local value = _letters[key]
+280: 		if type(value) ~= "string" then
+281: 			Logger.error(LOG, "Personal-info serializer rejected a non-string letter mapping.")
+282: 			return nil
+283: 		end
+284: 		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
+285: 	end
+286: 	lines[#lines + 1] = ""
+287: 	return table.concat(lines, "\n")
+161: local function sorted_schema_keys(schema)
+162: 	return TableUtil.sorted_keys(schema)
+163: end
+164: 
+165: local INFO_FIELD_KEYS = sorted_schema_keys(DEFAULT_CONFIG.info)
+166: local LETTER_KEYS = sorted_schema_keys(DEFAULT_CONFIG.letters)
+167: 
+168: --- Validates one complete editor update against the immutable info schema.
+169: --- Diagnostics deliberately omit rejected keys and values because either can
+
+static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua
+SHA256: 61bcf37b7a5e26145f8b9c0ac40b51ce13899f1c6ebf75ef496329daafafbad6
+198: 
+199: 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).
+200: 	for letter, field in pairs(staged_letters) do
+201: 		local alias_length = strict_codepoint_length(letter)
+202: 		-- Alias keys are exact codepoints. Precomposed aliases such as NFC "é"
+203: 		-- are accepted; decomposed multi-codepoint spellings are rejected rather
+204: 		-- than normalized, which avoids silently merging two user-owned mappings.
+205: 		if alias_length == 1 and staged_info[field] then
+206: 			local value = staged_info[field]
+207: 			Engine.add_rule(
+208: 				"@" .. letter,                      -- suffix: "@p"
+209: 				PERSONAL_SECTION,                    -- section
+210: 				function() return value end          -- resolver
+211: 			)
+212: 		elseif alias_length == nil then
+213: 			Logger.error(LOG, "Personal alias rejected: key is not valid UTF-8.")
+214: 		elseif alias_length ~= 1 then
+215: 			Logger.error(LOG,
+216: 				"Personal alias rejected: key must be exactly one codepoint; normalization is not applied (got %d).",
+217: 				alias_length)
+218: 		end
+219: 	end
+220: 
+
+static/ergopti_plus/windows/infra/personal_info_preview.ahk
+SHA256: c580be723f9431ce71d6a0e318885ba54cdd2180ec420e7582b7375311097893
+80: 
+81: ; Whether a character may appear inside an @-tag.
+82: ;
+83: ; A cased letter, tested by asking whether the character has a distinct upper
+84: ; and lower form. A character class would have to enumerate the accented letters
+85: ; — "@tél" is one of the shipped tags — and would then miss whichever one a user
+86: ; puts in their [letters] aliases next.
+87: ; @param Ch One character.
+88: ; @return true when the character is a letter.
+89: _PIPreviewIsTagChar(Ch) {
+
+static/ergopti_plus/_shared/ui/personal_info_editor/script.js
+SHA256: 0f8d78ab19a293fba1bff3c00a5c1a859d8c9d1990017240ed7e35c536646779
+78: 		const input = document.createElement('input');
+79: 		input.setAttribute('name', f.key);
+80: 		input.setAttribute('autocomplete', 'off');
+81: 		input.value = f.value || '';
+82: 
+83: 		row.appendChild(label);
+84: 		row.appendChild(input);
+85: 		rows.appendChild(row);
+86: 	});
+87: 
+88: 	const first = document.querySelector('#rows input');
+89: 	if (first) first.focus();
+99: 		values[input.getAttribute('name')] = input.value;
+100: 	});
+101: 	return values;
+102: }
+103: 
+104: // =================================
+105: // =================================
+106: // ======= 4/ Event Wiring =========
+107: // =================================
+108: // =================================
+117: 
+118: document.addEventListener('keydown', function (event) {
+119: 	if (event.key === 'Escape') _post({ action: 'cancel' });
+120: });
+121: 
+122: // Best-effort readiness hint; the host also injects initData on navigation
+
+static/ergopti_plus/macos/modules/keymap/registry.lua
+SHA256: 1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1
+827: 	if owns_magic then
+828: 		case_suffix = _state.magic_key
+829: 		case_body = trigger:sub(1, #trigger - #case_suffix)
+830: 	end
+831: 	local lower_body       = text_utils.trig_lower(case_body)
+832: 	local lower_trig       = lower_body .. case_suffix
+833: 	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
+834: 
+835: 	-- ── Case-conform fast path (mirrors AHK CreateCaseSensitiveHotstrings) ──────
+
+static/ergopti_plus/macos/modules/keymap/expander.lua
+SHA256: d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887
+399: end
+400: 
+401: --- Chooses the right emitter for a mapping's replacement: plain_text uses
+402: --- emit_text (fast path, ascii/unicode typing); replacements carrying
+403: --- {Token} directives go through emit_tokens(tokens_from_repl(m.repl)).
+404: --- Extracted so both expansion paths share the exact same dispatch logic.
+405: --- @param m table The mapping entry.
+406: --- @param to_type string The text to emit when the replacement is plain.
+407: --- @return number emit_count The number of codepoints emitted.
+408: --- @return string emitted_str The bytes that will echo as physical key events.
+409: --- @return string logical_text All text inserted, including clipboard output.
+410: local function emit_dispatch(m, to_type)
+411: 	if m.plain_repl == m.repl then
+412: 		return km_utils.emit_text(to_type)
+413: 	end
+414: 	-- Lazy: tokens_from_repl() is only called for replacements that contain
+415: 	-- {Token} directives — most hotstrings are plain text and never reach this.
+416: 	return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
+417: end

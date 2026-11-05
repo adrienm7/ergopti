@@ -1,0 +1,3 @@
+REACHABLE editor control: actual editor/controller/UIBuilder/bridge accepts phone string; actual save commits and closes native-shaped view
+CONTROL @t: emits exact full phone value 0123{Tab}45 as literal data; native Tab count=0
+PREFIX trigger0123 consumed=true logical="0123\00945" native Tab count=1

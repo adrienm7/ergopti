@@ -1,0 +1,48 @@
+{
+	"schema_version": 1,
+	"scope": "wrap-symbols-linux",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md",
+	"findings": [
+		{
+			"id": "WSL-001",
+			"title": "Typed guillemets cannot match their spaced built-in wrap pair",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Enable shortcuts/wrap-on-type, open a pointer or Shift-navigation selection window, change PRIMARY to a nonempty selected string, and type « or ». The genuine manager lookup returns nil; the production controller returns consumed=false with zero output and only the baseline read. The hook normal fallthrough forwards the physical symbol. Parentheses wrap Unicode multiline text in the healthy control. Probe executes production Lua owners with recording native/output ports, not an actual editor.",
+			"root_cause": "linux/modules/shortcuts/manager.lua:219-227 indexes the full catalogue delimiters «<space> and <space>» without normalizing their single-character triggers. get_wrap_pair:247-250 accepts only single-character strings; raw spaced keys are inadmissible and bare glyph keys are missing. Output spacing and trigger identity are conflated.",
+			"silent_failure": "The controller treats missing get_pair as a non-wrap symbol and returns false without warning. Explicit action parameter parsing and the spaced menu pair still work as alternatives; actual application undo was not tested.",
+			"regression_test": "Use the real shipped catalogue/manager and production controller, not a normalized PAIRS stub. Require both bare guillemet glyphs, including AltGr, to consume the typed key and output the full spaced pair around Unicode multiline selected text. Retain unchanged PRIMARY, policy and configuration ABA refusal controls.",
+			"evidence": [
+				"probes/catalogue-owner.lua",
+				"logs/final-a-owner.log",
+				"logs/final-b-owner.log",
+				"logs/source-boundaries.txt"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md",
+			"basis": "Actual business-owner replay over explicit native boundaries; Windows source contract only. See evidence and limitations in source report."
+		},
+		{
+			"id": "WSL-002",
+			"title": "Endpoint alias collision removes the standard curly-double-quote pair from the actual menu",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [],
+			"additional_properties": ["catalogue completeness"],
+			"reproduction": "Build the genuine Linux shortcuts menu with the genuine manager and shipped 43-pair catalogue. The menu has 42 pair rows: “ … ” is absent, while „ … “ and parentheses are present. Explicit parameter parsing still resolves “ to the standard pair. No native panel display is claimed.",
+			"root_cause": "manager.lua:224-227 flattens both endpoints into one lookup, and the later „/“ pair overwrites key “ as a closing alias. ui/menu/menu_shortcuts.lua:239-242 reconstructs canonical pairs from that lossy map by keeping only key==pair.left. The earlier “/” pair remains only under its closing key ” and is dropped.",
+			"silent_failure": "Menu construction logs no refusal or explanation for the omitted catalogue choice. The explicit action parameter remains a workaround. This finding does not choose a policy for the ambiguous typed “ trigger.",
+			"regression_test": "Build the actual menu and assert every ordered catalogue pair is offered exactly once despite endpoint reuse. Keep both “/” and „/“ choices, and test typed alias-priority policy independently.",
+			"evidence": [
+				"probes/menu-owner.lua",
+				"logs/final-a-menu.log",
+				"logs/final-b-menu.log",
+				"logs/source-boundaries.txt"
+			],
+			"source_report": "docs/audits/platform-parity/2026-11-05-sequential/wrap-symbols/linux/report.md",
+			"basis": "Actual business-owner replay over explicit native boundaries; Windows source contract only. See evidence and limitations in source report."
+		}
+	]
+}

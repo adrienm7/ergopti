@@ -1,0 +1,1840 @@
+{
+	"schema_version": 1,
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"modules": [
+		{
+			"module": "wpm",
+			"capabilities": [
+				{
+					"id": "wpm.calculation",
+					"contract": "Effective characters / 5 / elapsed minutes; at least 2 samples; round nearest; 15s rolling window,2s minimum",
+					"windows": "WPMWidget_Calc counts ring samples; ring bounded to 2000",
+					"macos": "get_live_stats uses effective ring and shared metrics",
+					"linux": "live_wpm.stats uses stamps and shared metrics",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.manual-producer",
+					"contract": "Accepted physical text contributes one sample per character; Backspace is not typed output",
+					"windows": "keystats_hook -> Push, excludes non-text physical keys",
+					"macos": "physical buffer -> recent_typing_eff; backspace removes prior sample",
+					"linux": "ingest_keydown -> Live.record(1); backspace does not add",
+					"classification": "unknown_intent",
+					"basis": "source-only: correction treatment may differ; no cross-native desktop proof",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.hotstring-producer",
+					"contract": "Successful replacements count produced characters and carry group",
+					"windows": "KL_LogHotstring Loop StrLen(replacement) -> Push(category,section)",
+					"macos": "notify_synthetic deferred builder -> effective stamps; source_variant group",
+					"linux": "record_hotstring -> Live.record(char_count(replacement)); mark_source group",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.ai-producer",
+					"contract": "Accepted AI output contributes characters and llm source",
+					"windows": "llm_bridge Loop StrLen(Transaction.Text) -> Push(ai)",
+					"macos": "notify_synthetic(text,llm) -> effective stamps",
+					"linux": "record_synthetic_output(text,llm) -> Live.record and mark_source",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.unicode-count",
+					"contract": "Character semantics should be understood per native producer",
+					"windows": "AHK StrLen UTF16 code units for synthetic output",
+					"macos": "synthetic builder codepoint iteration",
+					"linux": "char_count UTF8 codepoints",
+					"classification": "unknown_intent",
+					"basis": "source-only parity risk for non-BMP text; no native receiving executed",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.idle-number-reset",
+					"contract": "Shared keystats timing says zero after >5000ms with no character",
+					"windows": "Calc has no5s reset; hidden normally at3s, preview may expose retained WPM",
+					"macos": "get_live_stats zeroes when session idle>5s",
+					"linux": "live_wpm.stats zeroes when last_active idle>5s",
+					"classification": "unknown_intent",
+					"basis": "Lua tracker boundary executed; Windows source-only discrepancy delegated to OS role",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.source-time",
+					"contract": "Producer time monotonic; active source hold1000ms",
+					"windows": "A_TickCount ms and independent category ticks",
+					"macos": "absoluteTime seconds returned to model",
+					"linux": "timestamp ms stored and divided1000 for model",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.source-order",
+					"contract": "Last producer supplies held colour",
+					"windows": "AI > hotstring > autocorrection precedence among all held timestamps",
+					"macos": "single last_source_type/variant",
+					"linux": "single live tracker source/variant",
+					"classification": "unknown_intent",
+					"basis": "source-only discrepancy; Windows role has source-projection trace, not native AHK execution",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.source-hold-boundary",
+					"contract": "Hold one second",
+					"windows": "strict delta<1000ms",
+					"macos": "model delta<=1s",
+					"linux": "model delta<=1s",
+					"classification": "unknown_intent",
+					"basis": "Lua exact boundary executed, native tick-boundary difference unmeasured",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.source-neutral",
+					"contract": "none/manual/hotstring/repeat_key/rolls use manual blue",
+					"windows": "neutral category removes hotstring flag",
+					"macos": "shared model neutral table",
+					"linux": "shared model neutral table",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.source-colours",
+					"contract": "manual#0055cc AI#7a30b0 invalid group#007aff; user group overrides live",
+					"windows": "CategoryBgColor resolves shared TOML/overrides; section fallback",
+					"macos": "resolve_group_hex -> hotstrings_config.resolve",
+					"linux": "resolve_group_hex -> hotstrings catalogue resolver",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.colours-disabled",
+					"contract": "Blue floating pill; unfilled macOS readout and neutral filled Linux icon",
+					"windows": "ResolveBgColor returns manual",
+					"macos": "compact model manual; menubar source-colour background omitted",
+					"linux": "compact model manual; tray neutral_background fill",
+					"classification": "explicit_intent",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.localized-unit",
+					"contract": "Locale menu.metrics.wpm_unit applied to floating compact/graph and panel title",
+					"windows": "t(unit) in drawing",
+					"macos": "WPMShared.unit_label through i18n",
+					"linux": "widget frame_options through i18n; tray title uses model label",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.compact-style",
+					"contract": "80x68 logical pixels,20pt number,8pt unit,strip40% rounded,radius10,alpha220/255",
+					"windows": "native Gui/GDI+ draws canon constants",
+					"macos": "canvas receives shared compact frame",
+					"linux": "GTK/Cairo receives shared compact frame",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.graph-style",
+					"contract": "216x72,radius10,padding5,scale120,60 samples; last12s at200ms",
+					"windows": "native GDI+ graph,history pushed per tick",
+					"macos": "shared model graph_frame -> canvas",
+					"linux": "shared model graph_frame -> GTK/Cairo",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.graph-colour-history",
+					"contract": "Curve uses current source colour; samples preserve numeric speed",
+					"windows": "numeric history; entire curve current accent",
+					"macos": "history stores wpm/source, graph uses current colour",
+					"linux": "same shared model",
+					"classification": "explicit_intent",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.graph-idle-history",
+					"contract": "Sampling continues per active tick while hidden",
+					"windows": "tick before should_show",
+					"macos": "push_history before show",
+					"linux": "push_history before show",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.startup-hidden",
+					"contract": "Readout should show only on activity/preview",
+					"windows": "Show resets ring/history before hidden native surface; waits new typing",
+					"macos": "existing keystats live buffer may immediately reveal after start",
+					"linux": "existing live tracker may immediately reveal after start",
+					"classification": "unknown_intent",
+					"basis": "source-only enabling-with-existing-typing behavior differs",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.mouse-hide",
+					"contract": "Module declarations say hide when mouse moves after last keystroke",
+					"windows": "native fast MouseWatch hides and Tick mouse gate",
+					"macos": "shared widget_visible allows WPM>0 to bypass mouse gate",
+					"linux": "shared widget_visible allows WPM>0 to bypass mouse gate",
+					"classification": "unknown_intent",
+					"basis": "H-WPMS-001 actual shared-model producer->decision execution disagrees with model comments and Windows implementation; no user-facing spec located; native rendering not claimed",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.idle-hide",
+					"contract": "Declared idle-hide3000ms",
+					"windows": "last actual input time ->3s",
+					"macos": "last_active refreshed by residual WPM, then3s tail",
+					"linux": "same shared model",
+					"classification": "unknown_intent",
+					"basis": "H-WPMS-001 same rule: WPM observation treated as fresh input; no user-facing timing promise located",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.preview-visible",
+					"contract": "Visible preview keeps readout available even WPM0",
+					"windows": "TooltipIsVisible OR LLM_TooltipIsVisible",
+					"macos": "widget/menubar ui.tooltip.is_visible; AI-specific status not checked here",
+					"linux": "widget tooltip_visible checks hotstring and AI owners",
+					"classification": "unknown_intent",
+					"basis": "native macOS role investigates preview ownership; no unproved omission finding here",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.drag",
+					"contract": "Both graph and compact must drag, save compact anchor",
+					"windows": "WM_NCLBUTTONDOWN move loop +position persistence",
+					"macos": "Mouse callback installed without the native element/canvas tracking opt-in; normal drag is never delivered.",
+					"linux": "surface drag signals; forced visible during drag",
+					"classification": "observed_defect",
+					"basis": "Root actual-owner replay and exact bundled Hammerspoon 1.1.1 dispatcher/defaults; native mouse delivery itself unmeasured.",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					],
+					"finding_ids": ["WPMM-001"]
+				},
+				{
+					"id": "wpm.mode-anchor",
+					"contract": "Compact anchor fixed; graph shares bottom-right",
+					"windows": "ShowPos derives graph position",
+					"macos": "Model.frame_origin, anchor_from_origin",
+					"linux": "same model",
+					"classification": "raw_parity",
+					"basis": "model anchor round-trip executed",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.position-store",
+					"contract": "Storage keys wpm_widget.pos_x/y, not config preferences",
+					"windows": "Storage registry",
+					"macos": "hs.settings Storage port",
+					"linux": "storage file port",
+					"classification": "explicit_intent",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.default-monitor-placement",
+					"contract": "Bottom-right inset5, compact anchor",
+					"windows": "MonitorGetWorkArea default primary monitor",
+					"macos": "Default anchor cached across desktop shrink; reset recomputes it.",
+					"linux": "Gdk primary or monitor0 geometry",
+					"classification": "observed_defect",
+					"basis": "Actual owner geometry replay plus independent AppKit constraint documentation; no measured Darwin display hotplug.",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					],
+					"finding_ids": ["WPMM-002"]
+				},
+				{
+					"id": "wpm.saved-position-validation",
+					"contract": "Do not invent cross-platform saved-coordinate parity",
+					"windows": "finite numeric pair +center in any work area",
+					"macos": "finite pair; reused anchor across active screen changes",
+					"linux": "finite pair; reused anchor across active screen changes",
+					"classification": "unknown_intent",
+					"basis": "prior pair-finding duplicate excluded; OS roles own offscreen findings",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.reset-position",
+					"contract": "Menu resets Storage anchor to default and applies next geometry",
+					"windows": "WPMWidget_ResetPosition",
+					"macos": "widget.reset_position",
+					"linux": "widget.reset_position",
+					"classification": "raw_parity",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.menubar-availability",
+					"contract": "Only macOS and Linux declared; Windows alternative known",
+					"windows": "not implemented; grey reason names floating alternative",
+					"macos": "native hs.menubar item",
+					"linux": "separate StatusNotifier tray item",
+					"classification": "explicit_intent",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.menubar-native-style",
+					"contract": "13pt localized padded string,white text,source bg alpha0.5; icon adaptation permitted",
+					"windows": "no panel readout",
+					"macos": "styledtext AppleSystemUIFont13 with NBSP; optional bg",
+					"linux": "44px PNG number only24px max autoshrinks; unit in title; neutral fill required",
+					"classification": "native_constraint",
+					"basis": "source inspected; Linux comments state panels ignore labels and cache icon paths; native OS outputs not executed",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.menubar-visibility",
+					"contract": "WPM>0 or preview or held source; no floating3s tail",
+					"windows": "not implemented",
+					"macos": "equivalent condition in wpm_menubar.lua",
+					"linux": "Model.menubar_visible",
+					"classification": "explicit_intent",
+					"basis": "source traced; model cases executed where noted",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.idle-style-constants",
+					"contract": "bg_idle/text_idle/alpha_idle retained",
+					"windows": "is_idle=false in tick, idle fill not shown",
+					"macos": "model always active text/alpha",
+					"linux": "same shared model",
+					"classification": "unknown_intent",
+					"basis": "shipped currently hide instead of dim; unused declaration not an actionable finding",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.canon-admission",
+					"contract": "Missing required key refuses model canon",
+					"windows": "native loader checks expected keys",
+					"macos": "Model.validate through shared helper",
+					"linux": "Model.validate through constants loader",
+					"classification": "raw_parity",
+					"basis": "model malformed colour/missing scale key cases and producer probe; optional neutral entries omitted from REQUIRED",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.canon-invalid-neutral-entry",
+					"contract": "Comment says every key checked; neutral rolls/repeat_key/hotstring not in REQUIRED",
+					"windows": "NEUTRAL iterates shipped table",
+					"macos": "validate accepts missing rolls and source then fallback_accent",
+					"linux": "same model",
+					"classification": "unknown_intent",
+					"basis": "actual validate mutation characterized; bundled-file corruption only, no reachable ordinary UI edit so no confirmed finding",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.declaration-dependencies",
+					"contract": "WPM feature metadata requires render/input dependencies",
+					"windows": "webview2 despite native GDI+",
+					"macos": "karabiner despite native canvas",
+					"linux": "evdev for metrics source",
+					"classification": "unknown_intent",
+					"basis": "metadata only; no demonstrated readiness/UI refusal, not a confirmed defect",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.pause-lifecycle",
+					"contract": "No readout activity while paused; enable/stop/reload persist and acknowledge",
+					"windows": "Tick pause guards exist, but delayed boot Show survives a later acknowledged disable.",
+					"macos": "is_current fences; pause owner stops/restarts; config scope snapshots",
+					"linux": "daemon controls ticks; preference debt admits/retries; config snapshots",
+					"classification": "observed_defect",
+					"basis": "Nonvacuous source-projected reachable Windows event schedule; no native AHK executed. Lua generation/config guards reviewed separately.",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					],
+					"finding_ids": ["WPMW-001"]
+				},
+				{
+					"id": "wpm.action-catalogue",
+					"contract": "WPM controls are metrics-menu commands",
+					"windows": "4 handlers",
+					"macos": "6 handlers",
+					"linux": "6 handlers",
+					"classification": "explicit_intent",
+					"basis": "no WPM-specific sg_action in actions.toml; open_metrics_typing/apps are dashboard actions, outside WPM readout scope",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					]
+				},
+				{
+					"id": "wpm.bitmap-upload-ack",
+					"contract": "Rendering must propagate native bitmap publication refusal",
+					"windows": "GR_DrawBitmap false ignored by graph renderer; Tick shows stale/blank surface.",
+					"macos": "Actual canvas owner replay has distinct native boundary.",
+					"linux": "Actual GTK surface owner replay has distinct native boundary.",
+					"classification": "observed_defect",
+					"basis": "WPMW-002: complete graphics refusal path read, no logger on selected nonthrowing false branch. Windows source projection only.",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					],
+					"finding_ids": ["WPMW-002"]
+				},
+				{
+					"id": "wpm.failed-redraw-idle-hide",
+					"contract": "An existing visible surface must remain owned after failed redraw",
+					"windows": "Native Windows implementation differs.",
+					"macos": "Native canvas implementation differs.",
+					"linux": "Throwing resize leaves old surface visible but Widget clears shown; subsequent idle tick skips hide.",
+					"classification": "observed_defect",
+					"basis": "Actual Linux Widget/Surface over native-shaped void GTK boundary; explicit stop and healthy idle controls hide.",
+					"evidence": [
+						"wpm/windows/report.md",
+						"wpm/macos/report.md",
+						"wpm/linux/report.md",
+						"wpm/shared/report.md"
+					],
+					"finding_ids": ["WPML-001"]
+				}
+			]
+		},
+		{
+			"module": "wrap-symbols",
+			"capabilities": [
+				{
+					"id": "wrap-symbols.catalogue-source",
+					"contract": "43 pairs,7 ordered groups; source of truth JSON",
+					"windows": "load at startup -> pairs/groups",
+					"macos": "load at require -> WRAP_GROUPS/PAIRS",
+					"linux": "load at require -> lookup+ordered list",
+					"classification": "raw_parity",
+					"basis": "actual shared parser consumes generated complete catalogue fixture; native consumers source traced",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.load-failure",
+					"contract": "Do not silently certify empty catalogue",
+					"windows": "warn+six-pair emergency fallback",
+					"macos": "warn+six-pair emergency fallback",
+					"linux": "error+empty list/lookup",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.group-presentation",
+					"contract": "Labels/group order from catalogue",
+					"windows": "named groups preserve order",
+					"macos": "named groups preserve order",
+					"linux": "flat alphabetically sorted action rows",
+					"classification": "explicit_intent",
+					"basis": "management corpus explicitly says Linux has no management controls; do not infer missing all3 feature from stale README",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.pair-defaults",
+					"contract": "Built-in pairs enabled unless false",
+					"windows": "disabled Map empty",
+					"macos": "state absent/true enables",
+					"linux": "all catalogue pairs active",
+					"classification": "raw_parity",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.enable-defaults",
+					"contract": "Neutral default false, recommended true",
+					"windows": "shortcuts.wrap_text_if_selected",
+					"macos": "shortcuts.keys.wrap_text_if_selected",
+					"linux": "shortcuts.wrap_text_if_selected",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.store-namespace",
+					"contract": "Driver storage intentionally differs",
+					"windows": "wrap_symbols.toml",
+					"macos": "config.toml shortcuts.wrap_symbols states/custom",
+					"linux": "does not read this namespace",
+					"classification": "explicit_intent",
+					"basis": "feature section+reason text explicitly names stores",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.strict-source-projection",
+					"contract": "Typed bool states and scalar custom array; unknown/invalid retained",
+					"windows": "dedicated TOML disabled/custom parser",
+					"macos": "actual shared WrapPreferences.project",
+					"linux": "not applicable",
+					"classification": "native_alternative",
+					"basis": "actual shared project/prepare probes; Windows native writer source only",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.durable-publication",
+					"contract": "Only literal ACK publishes settings",
+					"windows": "durable stage/replace with path+epoch lease",
+					"macos": "WrapMutation candidate +native preferences writer",
+					"linux": "boolean switch persisted before applied",
+					"classification": "raw_parity",
+					"basis": "actual pure mutation ACK/refusal/reentry/successor probes; no durable native write claimed",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.symbol-toggle",
+					"contract": "Opening symbol canonical state key disables its native pair",
+					"windows": "native disabled set",
+					"macos": "map only strict false disables",
+					"linux": "no per-symbol settings",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.global-and-group",
+					"contract": "Enable/disable declared built-ins",
+					"windows": "all/group built-in keys; custom unchanged",
+					"macos": "all/group built-in keys; custom unchanged",
+					"linux": "absent by declared platform restriction",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.restore-recommended",
+					"contract": "Default choices and custom handling",
+					"windows": "clear disabled and custom",
+					"macos": "states/custom become empty",
+					"linux": "no corresponding pair-store control",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.custom-management",
+					"contract": "Ordered Unicode scalar pairs; blank right means mirror",
+					"windows": "Native dialogs accept one UTF-16 unit; supplementary Unicode scalar is rejected.",
+					"macos": "two dialog prompts; exact_unicode_scalar",
+					"linux": "not implemented; action parameter provides alternative",
+					"classification": "observed_limit",
+					"basis": "Windows source StrLen validator vs Mac exact scalar validation; Linux management already absent/tracked. Multi-character explicit action parameters exist on all OSes.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.custom-collision",
+					"contract": "Custom entries overlay built-ins",
+					"windows": "last custom pair wins both endpoints",
+					"macos": "last custom pair wins both endpoints",
+					"linux": "no management custom table",
+					"classification": "unknown_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.custom-multichar",
+					"contract": "Management scalar differs from binding parameter text",
+					"windows": "management rejects multi; action parser allows left|right",
+					"macos": "shared preferences scalar; shared parameter allows multi",
+					"linux": "parameter allows multi",
+					"classification": "explicit_intent",
+					"basis": "actual preferences and parameter probes distinguish intended surfaces",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.parameter-parse",
+					"contract": "Trim outer whitespace; opening precedence; closing aliases; exactly one pipe custom",
+					"windows": "native WrapPairParse",
+					"macos": "shared WrapPair.parse",
+					"linux": "shared WrapPair.parse",
+					"classification": "raw_parity",
+					"basis": "actual shared parser all43x2 endpoints+19 golden vectors; Windows execution owned by OS role",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.parameter-invalid",
+					"contract": "Invalid pair refused before output",
+					"windows": "binding warning",
+					"macos": "binding warning",
+					"linux": "binding warning",
+					"classification": "raw_parity",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.parameter-catalogue-independence",
+					"contract": "Binding parameter uses built-in list even pair disabled in typed wrap",
+					"windows": "full builtin list",
+					"macos": "wrap_pair_list full groups",
+					"linux": "full ordered builtin list",
+					"classification": "explicit_intent",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.pair-reversal",
+					"contract": "Closing symbol resolves original left/right; no direction reversal",
+					"windows": "native parser closing alias",
+					"macos": "shared parser",
+					"linux": "shared parser",
+					"classification": "raw_parity",
+					"basis": "actual shared parser exhaustive endpoint probe",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.quote-overlap",
+					"contract": "“ opens one pair and closes later „ pair",
+					"windows": "last assignment native map maps to „…“; parser opening-first",
+					"macos": "same native last assignment",
+					"linux": "same native last assignment",
+					"classification": "unknown_intent",
+					"basis": "explicit golden parser rule vs source-derived trigger mapping; no forced business finding",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.collision-filtering",
+					"contract": "An enabled opener should remain when only overlapping pair disabled",
+					"windows": "rebuild filters disabled pair before assignment, preserving earlier opener",
+					"macos": "preflatten then filter: disable „ removes enabled “ opener",
+					"linux": "43 declared pairs become 42 actual menu rows after flattened endpoint collision.",
+					"classification": "observed_defect",
+					"basis": "Actual macOS enabled-opener and Linux menu owners replayed; ambiguous default glyph priority remains a separate unknown-intent question.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					],
+					"finding_ids": ["WSM-003", "WSL-002"]
+				},
+				{
+					"id": "wrap-symbols.spaced-guillemets",
+					"contract": "Output delimiters include spaces but typed characters are single",
+					"windows": "Standard prefix route has spaced keys; direct remapped spaced-pair route can succeed.",
+					"macos": "exact spaced trigger keys",
+					"linux": "exact spaced trigger keys and single-character getter",
+					"classification": "observed_defect",
+					"basis": "Actual Mac/Linux trigger owners and healthy bare-symbol explicit-parameter controls. Windows source-only route distinctions; no universal Windows absence claim.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					],
+					"finding_ids": ["WSM-001", "WSL-001"]
+				},
+				{
+					"id": "wrap-symbols.typed-enable",
+					"contract": "Wrap only when feature active and selection exists",
+					"windows": "PrefixWatcher+UIA",
+					"macos": "eventtap+AXSelectedText",
+					"linux": "daemon consumption+PRIMARY controller",
+					"classification": "native_alternative",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.typed-selection-api",
+					"contract": "Selection detection differs by backend",
+					"windows": "UIA selected text/cache",
+					"macos": "AXSelectedText/cache; no Ctrl+C on each typed key",
+					"linux": "PRIMARY baseline changed after selection context",
+					"classification": "native_constraint",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.typed-no-selection",
+					"contract": "Unconsumed raw character proceeds once",
+					"windows": "prefix continuation",
+					"macos": "eventtap returns false",
+					"linux": "controller returns false",
+					"classification": "raw_parity",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.typed-refused-output",
+					"contract": "Only acknowledged output suppresses original key",
+					"windows": "_PrefixTryWrapSelection commit receipt",
+					"macos": "wrap_selection returns literal true required",
+					"linux": "type_text returns literal true required",
+					"classification": "raw_parity",
+					"basis": "native owner seams OS role; source traced here",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.linux-stale-primary",
+					"contract": "Safety over same-text reselect",
+					"windows": "not applicable",
+					"macos": "not applicable",
+					"linux": "unchanged PRIMARY refuses/retypes symbol even if same text reselected",
+					"classification": "explicit_intent",
+					"basis": "controller module explicitly documents safe missed wrap",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.modifier-policy",
+					"contract": "Typing layer vs command modifiers",
+					"windows": "physical admitted characters from canonical input context",
+					"macos": "Cmd/Ctrl passthrough; Alt allowed for AltGr layout",
+					"linux": "Ctrl/Alt/Meta passthrough",
+					"classification": "native_alternative",
+					"basis": "modifier policy differs; no all3 hardware parity claim",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.action-selection-empty",
+					"contract": "wrap_selection binding: empty selection does nothing",
+					"windows": "capture empty skips transform/paste",
+					"macos": "wrap_copied_selection clipboard transform",
+					"linux": "transform_selection; no fallback",
+					"classification": "explicit_intent",
+					"basis": "actions.toml declaration; action owners source traced",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.linux-picker-empty",
+					"contract": "Direct menu selection picker empty behavior differs from binding",
+					"windows": "no direct menu action; checkboxes control typed wrap",
+					"macos": "no direct menu action; checkboxes control typed wrap",
+					"linux": "direct wrap_selection inserts empty left+right when reason=no_selection",
+					"classification": "native_alternative",
+					"basis": "binding path has no such fallback; do not report action contract violation",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.text-content",
+					"contract": "Multiline/Unicode selected bytes wrapped verbatim",
+					"windows": "UIA GetText(8192) prefix is treated as whole selection and can replace a longer selected range.",
+					"macos": "left..sel..right",
+					"linux": "left..selected..right",
+					"classification": "observed_defect",
+					"basis": "Source-projected worker -> parent -> wrapper path, independently checked Microsoft truncation contract; actual editor receiving unmeasured.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					],
+					"finding_ids": ["WSW-002"]
+				},
+				{
+					"id": "wrap-symbols.privacy-and-destination",
+					"contract": "Retain synthetic input destination; preserve privacy guards",
+					"windows": "UIA+input context fences; ClipboardAll for explicit action",
+					"macos": "text owner scope/broker/pasteboard transaction; rich restore",
+					"linux": "retained destination/PRIMARY typed path; text clipboard action",
+					"classification": "native_constraint",
+					"basis": "prior flows own clipboard restoration differences; no expanded privacy conclusion",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.lifecycle",
+					"contract": "Paused/stale/config replacement cannot wrongly consume text",
+					"windows": "suspend/epoch checks in prefix and writer",
+					"macos": "eventtap lifecycle/admission+mutation read view",
+					"linux": "is_active/context_epoch/reentrant generation in controller",
+					"classification": "raw_parity",
+					"basis": "shared mutation stale controls actual; platform lifecycle source-only",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.live-update",
+					"contract": "Preference ACK changes active pairs without reload",
+					"windows": "atomic active map publish",
+					"macos": "getter builds active map from acknowledged Mutation.view",
+					"linux": "only boolean switch changes; catalogue at module require",
+					"classification": "native_alternative",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.preview-label",
+					"contract": "Catalogue sample is pair/ellipsis, binding prompt describes full list",
+					"windows": "symbol pair row labels",
+					"macos": "symbol pair row labels+Pair.describe",
+					"linux": "flat pair/ellipsis row labels+Pair.describe",
+					"classification": "raw_parity",
+					"basis": "pair labels are literal Unicode; group/control labels translated; no G5 visual proof",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.locale-coverage",
+					"contract": "Every declared group/control/reason/action prompt key localized",
+					"windows": "t(key)",
+					"macos": "i18n.get(key)",
+					"linux": "i18n.get for applicable controls",
+					"classification": "raw_parity",
+					"basis": "all21 locale dictionaries enumerated; frontend rendering unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.readme-drift",
+					"contract": "README says both drivers, wrong open/close/label_key shape",
+					"windows": "actual left/right native consumer exists",
+					"macos": "actual left/right consumer exists",
+					"linux": "actual third consumer exists",
+					"classification": "documentation_only",
+					"basis": "source traced; native GUI unrun",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					]
+				},
+				{
+					"id": "wrap-symbols.remapped-custom-override",
+					"contract": "Committed custom pair must reach the public wrapping route",
+					"windows": "Active custom # -> ~ ignored by remapped hashtag route; ordinary prefix route reads current map.",
+					"macos": "Custom active pair is resolved by typed Text owner.",
+					"linux": "Per-pair management absent; parameterized custom delimiters available.",
+					"classification": "observed_defect",
+					"basis": "Windows nonvacuous public call-chain source projection; no AHK/native receiving.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					],
+					"finding_ids": ["WSW-001"]
+				},
+				{
+					"id": "wrap-symbols.pasteboard-items",
+					"contract": "Clipboard restoration must preserve original native items",
+					"windows": "Native all-format clipboard mechanism differs; not certified here.",
+					"macos": "Shipped readAllData/writeAllData preserve first item only; later PNG item lost.",
+					"linux": "Session clipboard mechanism differs; not certified here.",
+					"classification": "observed_defect",
+					"basis": "Actual bundled Hammerspoon Lua helpers + real Text owner over faithful item-aware primitives, single-item healthy control.",
+					"evidence": [
+						"wrap-symbols/windows/report.md",
+						"wrap-symbols/macos/report.md",
+						"wrap-symbols/linux/report.md",
+						"wrap-symbols/shared/report.md"
+					],
+					"finding_ids": ["WSM-002"]
+				}
+			]
+		},
+		{
+			"module": "personal-info",
+			"capabilities": [
+				{
+					"id": "personal-info.classification",
+					"contract": "15 declared fields:4 financial/identity preview secrets,11 public-preview personal fields",
+					"windows": "AHK declaration loader+mask twin",
+					"macos": "shared mask through mac binding",
+					"linux": "shared mask through Linux binding",
+					"classification": "raw_parity",
+					"basis": "actual shared mask field matrix,16 TOML vectors,15JSON vectors and6 invalid policies",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.preview-policy",
+					"contract": "head2/tail4,minimum12 content chars,bulletU2022; spaces/hyphen/NBSP preserved",
+					"windows": "native twin recombines UTF16 surrogate pairs",
+					"macos": "shared codepoint-aware mask",
+					"linux": "shared codepoint-aware mask",
+					"classification": "raw_parity",
+					"basis": "actual shared vectors+supplementary emoji/boundary controls; Windows twin source-only",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.preview-unknown",
+					"contract": "No field provenance/unknown field does not imply public",
+					"windows": "field missing defaults masked",
+					"macos": "shared mask unknown masked",
+					"linux": "shared mask unknown masked",
+					"classification": "explicit_intent",
+					"basis": "actual shared unknown/missing declaration controls",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.invalid-policy",
+					"contract": "Fail closed on malformed policy",
+					"windows": "loader refuses bad policy and mask all",
+					"macos": "binding fallback or shared all-bullet fallback",
+					"linux": "shape-validating binding fallback or all-bullet fallback",
+					"classification": "explicit_intent",
+					"basis": "actual shared invalid-policy controls; native loader failures source-only",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.invalid-field-record",
+					"contract": "Malformed shipped classification should not reveal secret",
+					"windows": "native parser produces checked map flags",
+					"macos": "binding lacks Linux fullshape validation; shared direct entry indexing can throw",
+					"linux": "binding validates fields and sourcebound array kind",
+					"classification": "unknown_intent",
+					"basis": "immutable shipped-file corruption only; no ordinary UI path proved; outside findings",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.full-injection",
+					"contract": "Preview masking never replaces committed output",
+					"windows": "frozen values/spec feed injection; mask only preview",
+					"macos": "Direct @ alias emits literal full value, but automatic prefix tokenizes braces as commands.",
+					"linux": "combo values/full mapping replacement -> injector",
+					"classification": "observed_defect",
+					"basis": "Actual native-shaped editor save -> Personal/Rules/Registry/Expander/Synthetic; accepted phone 0123{Tab}45 emits a Tab only through prefix route. Native desktop acceptance unmeasured.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIM-002"]
+				},
+				{
+					"id": "personal-info.log-redaction",
+					"contract": "Every personal value including unmasked phone/name is private",
+					"windows": "PersonalInfoRedactForLog and IsPrivate flags",
+					"macos": "private opts/metrics payload guard",
+					"linux": "private prefix/combo flags and keystats redact",
+					"classification": "explicit_intent",
+					"basis": "actual shared redact returns one bullet per Unicode scalar including separators; whole persisted pipeline delegated",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.default-fields",
+					"contract": "15 canonical info values in example",
+					"windows": "known-key reader/default seed",
+					"macos": "fixed15 DEFAULT_CONFIG",
+					"linux": "source file arbitrary info keys; absent source empty",
+					"classification": "native_alternative",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.default-aliases",
+					"contract": "13 example aliases,12 distinct target fields; e/m both email",
+					"windows": "known-file aliases or seeded aliases",
+					"macos": "fixed13 DEFAULT_CONFIG alias keys",
+					"linux": "parsed letters rows validated onecodepoint",
+					"classification": "raw_parity",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.alias-customization",
+					"contract": "Example says one-letter field mapping; no universal Unicode alphabet promise",
+					"windows": "writer ASCII A-Z/a-z/0-9/_ aliases; reader known info keys",
+					"macos": "Fixed default alias whitelist drops additional one-letter x=city; normal save deletes it.",
+					"linux": "one Unicode scalar alias accepted; raw mapping stored",
+					"classification": "observed_defect",
+					"basis": "Actual full Keymap/Personal/Rules owner replay; same-source p=city positive control and before/after TOML. No universal Unicode alias promise.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIM-001"]
+				},
+				{
+					"id": "personal-info.alias-case",
+					"contract": "Tag case and stored alias case are separate contracts",
+					"windows": "resolver lowercases tag, stored keys exact; uppercase mismatch candidate",
+					"macos": "tracker lowercases while resolver loops bytes/defaultlowerkeys",
+					"linux": "resolver lowercases input, stored aliases exact",
+					"classification": "unknown_intent",
+					"basis": "source-only; unsupported/custom alphabet not inferred from arbitrary TOML",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.source-override",
+					"contract": "Configured source directory and file owner should stay aligned",
+					"windows": "PersonalInfoTomlPath/config writer path retained",
+					"macos": "explicit init info_toml_path or base_dir fallback",
+					"linux": "init default uses default_config_dir, bypassing configured Paths unless explicit argument",
+					"classification": "observed_defect",
+					"basis": "Actual Linux Paths.set_config_dir + Storage + manager + TOML writer use different personal source; explicit-path control succeeds.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIL-002"]
+				},
+				{
+					"id": "personal-info.missing-source",
+					"contract": "First-use behavior differs",
+					"windows": "bootstrap/read control and native fallback",
+					"macos": "writes DEFAULT_CONFIG via owned path",
+					"linux": "empty info/letters; editor epoch ready may refuse missing source",
+					"classification": "observed_defect",
+					"basis": "Actual Linux manager/bridge with admitted page epoch: absent source gets no init payload or first-create route; existing-file and closed-epoch controls. No native page rendered.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIL-003"]
+				},
+				{
+					"id": "personal-info.custom-info-preservation",
+					"contract": "Unknown source values/aliases should have declared ownership",
+					"windows": "reader ignores unknown info keys; writer snapshot known keys",
+					"macos": "fixed-schema parser+serializer discard unknown info/extra aliases",
+					"linux": "arbitrary [info]/letters loaded; writer patches owned info",
+					"classification": "observed_limit",
+					"basis": "Known-field/alias schema differs; PIM-001 covers demonstrated custom alias loss. No generic unknown-leaf preservation promise is inferred for every personal file.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.empty-values",
+					"contract": "An unresolved/blank part rejects whole combo",
+					"windows": "HSE transient resolver refuses unresolved part",
+					"macos": "resolve_combo explicitly all-or-nothing",
+					"linux": "resolve_combo explicitly all-or-nothing",
+					"classification": "explicit_intent",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.combo-order",
+					"contract": "Field values follow typed alias order without trailingTab",
+					"windows": "Configured pre-generated compound joins raw {Tab} then escapes the whole value; sends literal separator and can skip empty fields.",
+					"macos": "inject each part and Tabonlybetween",
+					"linux": "injected joinedvalues/tab route",
+					"classification": "observed_defect",
+					"basis": "Supported max>=2 source-projected Windows registration/sender chain; default dynamic route and both Lua routes use actual inter-field Tabs. No AHK run.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIW-001"]
+				},
+				{
+					"id": "personal-info.combo-generated",
+					"contract": "Windows preregistered family distinct from transient resolver",
+					"windows": "Generate all combinations up to maxLen; long tags resolved at firetime",
+					"macos": "no exponential preregistration; collect/resolve at use time",
+					"linux": "no multi registration; resolve at use time",
+					"classification": "native_alternative",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.pattern-max",
+					"contract": "Schema integer1..16; default/recommended1; not necessarily max tag length",
+					"windows": "controls pregenerated length; >=2 native literalTab candidate",
+					"macos": "feature metadata supported namespace, tracker not pregeneration",
+					"linux": "configured row retained; combos resolved at use time",
+					"classification": "observed_limit",
+					"basis": "Windows eager alias combinations grow exponentially at supported high settings; no hang experiment performed. Lua resolves combinations dynamically. PIW-001 separately covers literal separators at supported max2.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.single-field-tags",
+					"contract": "Aliases and literal synonym tags are different sets",
+					"windows": "8literal tags bic/cb/cc/iban/rib/ss/tel/tél plus letteraliases",
+					"macos": "letteralias collector; no Windows synonym table",
+					"linux": "letteralias rules/combo; no Windows synonym table",
+					"classification": "native_alternative",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.static-collision",
+					"contract": "Registered/static winner must be reconciled with transient preview",
+					"windows": "registered specs can win before transient fallback; literal tags use sharednative tag map",
+					"macos": "personal tracker and registered static registry boundary",
+					"linux": "match/static owner then combo decision path",
+					"classification": "unknown_intent",
+					"basis": "source-only shared role; OS agents own actual collision controls",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.prefix-families",
+					"contract": "Phone,SSN,IBAN prefix switches separate from @ aliases",
+					"windows": "native prefix registrations",
+					"macos": "rules_engine registry mappings",
+					"linux": "pure Prefix.build mappings consumed by loader",
+					"classification": "raw_parity",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.prefix-thresholds",
+					"contract": "Phone2/4/6/formatted5;SSN5;IBAN6 rawchars",
+					"windows": "native loops and +33 formatting",
+					"macos": "sharedhelper+native mappings",
+					"linux": "purePrefix.build",
+					"classification": "raw_parity",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.prefix-counts",
+					"contract": "Count must equal emitted mappings for source data",
+					"windows": "native mapping registration avoids identical spacedtrigger; counts source different",
+					"macos": "shared compute_prefix_counts advertises2 for unspaced SSN/IBAN despite1mapping",
+					"linux": "same helper count2 vs actual purebuild1",
+					"classification": "observed_defect",
+					"basis": "Actual shared compute_prefix_counts overcounts identical spaced/raw triggers; actual Linux manager offers two mappings but reports four. Other OS analogues are source-qualified.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIS-001"]
+				},
+				{
+					"id": "personal-info.prefix-format",
+					"contract": "Unspaced/spaced triggers return matching output form",
+					"windows": "raw removes ASCIIspaces",
+					"macos": "raw removes%s",
+					"linux": "raw removes%s",
+					"classification": "unknown_intent",
+					"basis": "space/whitespace differences source-only; Unicode format policy not inferred",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.phone-international",
+					"contract": "French+33 prefix behavior is native producer policy",
+					"windows": "drops leading0 in replacement",
+					"macos": "native construction prepends+33 to full storedphone",
+					"linux": "pure prefix replacement prepends+33 to full storedphone",
+					"classification": "observed_defect",
+					"basis": "TODO.md first item and docs/audits/platform-parity/2026-11-04/hotstrings.md already track national0 normalization; no new PIS/PIL root",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.short-phone-trigger",
+					"contract": "Shortest phone prefix should distinguish typing from explicit magic completion",
+					"windows": "first2digits+magic key",
+					"macos": "first2digits+magic key",
+					"linux": "first2digits alone",
+					"classification": "observed_defect",
+					"basis": "TODO.md first item and prior hotstrings audit; existing gap, not new finding",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.metadata-locale",
+					"contract": "Feature description metadata differs from actual menu caption",
+					"windows": "feature description_key absent in all21locale dictionaries; actual shared family caption translated",
+					"macos": "same metadata vs actual caption distinction",
+					"linux": "same metadata vs actual caption distinction",
+					"classification": "unknown_intent",
+					"basis": "actual family i18n is dynamichotstrings.textexpansionpersonalinformation; absent menu.hotstrings.dynamic.text_expansion_personal_information not claimed user-visible",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.feature-defaults",
+					"contract": "Family off by default and recommended off; pattern1",
+					"windows": "manifest/Features",
+					"macos": "manifest/menu preference authority",
+					"linux": "manifest/runtime preferences",
+					"classification": "explicit_intent",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-command",
+					"contract": "Localized GUI editor row distinct from open-file action",
+					"windows": "separate boot-order callback outside shared leaf",
+					"macos": "personal_info_editor_frame native callback",
+					"linux": "same shared frame plus bridge",
+					"classification": "explicit_intent",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.open-file-action",
+					"contract": "open_personal_info means native userfile opener",
+					"windows": "GestureOpenIfExists(path)",
+					"macos": "open_user_file PersonalInfoTomlPath",
+					"linux": "open configured Paths.config file",
+					"classification": "explicit_intent",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-fields",
+					"contract": "Shared page renders host-supplied rows",
+					"windows": "dynamic native map values,rawkeylabels",
+					"macos": "fixed15 localized labels except IBAN/BIC",
+					"linux": "sorted dynamic map rows,rawkeylabels",
+					"classification": "native_alternative",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-alias-editing",
+					"contract": "GUI edits values,not alias mappings",
+					"windows": "source snapshot keeps aliases where owned",
+					"macos": "same GUI noalias controls",
+					"linux": "GUI values only; retained letters owned byhost",
+					"classification": "explicit_intent",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-secret-visibility",
+					"contract": "Editor shows full values intentionally; preview policy is separate",
+					"windows": "plaintext textinputs/native form",
+					"macos": "plaintext textinputs",
+					"linux": "plaintext textinputs",
+					"classification": "explicit_intent",
+					"basis": "page uses input.value; no password/secret editor masking requirement found",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-preservation",
+					"contract": "Host save must preserve owned source and report refusal",
+					"windows": "native candidate/path/source receipt and fallbackdialog",
+					"macos": "owned CAS/reload but fixed schema drops custom aliases/unknown source keys (OS PIM preservation root)",
+					"linux": "bridge + dynamic edit capability and retained page epoch",
+					"classification": "observed_defect",
+					"basis": "Actual macOS normal save removes admitted extra alias; exact before/after files retained. Other OS private-source transactions reviewed, not native-certified.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIM-001"]
+				},
+				{
+					"id": "personal-info.editor-frontend",
+					"contract": "Host fields ->textContent/values; save/cancel/ready messages",
+					"windows": "shared script +WebView2 or nativedialog fallback",
+					"macos": "shared script +WKWebView",
+					"linux": "shared script +WebKit",
+					"classification": "raw_parity",
+					"basis": "shared page source inspected; native GUI unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.editor-save-ack",
+					"contract": "Save failure/close behavior native-owned",
+					"windows": "handler+native dialog state",
+					"macos": "host callback +notify_error",
+					"linux": "bridge +notify_error",
+					"classification": "unknown_intent",
+					"basis": "no generic claim from shared page save message; prior native UI refusal/close roots excluded",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.menu-source-admission",
+					"contract": "Only retained exact declared editor row may open",
+					"windows": "Windows uses distinct boot-order injection",
+					"macos": "shared Source.read +nativefacade",
+					"linux": "shared Source.read +nativefacade",
+					"classification": "explicit_intent",
+					"basis": "actual pure admission healthy/refused/mutated/replaced/metatable probes",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.localization",
+					"contract": "All canonical field labels and relevant actions/prompts translated",
+					"windows": "raw canonical field keys shown in WebView",
+					"macos": "13localized fields+IBAN/BIC literals",
+					"linux": "raw canonical field keys shown",
+					"classification": "native_alternative",
+					"basis": "all21 dictionaries checked; actual displayed labels derive native payload not mere presence of translations",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.storage-confidentiality",
+					"contract": "Do not conflate preview mask with data-at-rest encryption",
+					"windows": "personal_info.toml plaintext private configuration",
+					"macos": "same plaintext source",
+					"linux": "same plaintext source",
+					"classification": "explicit_intent",
+					"basis": "README separates display from persistence privacy; logs/keystats crypto audits separate",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.pause-reload-stale",
+					"contract": "Published data/preview/output respect lifecycle owner",
+					"windows": "paused paths +writer/source lease",
+					"macos": "trackertokens+config snapshot+registry transaction",
+					"linux": "info_generation/editcapability+destination ownership",
+					"classification": "raw_parity",
+					"basis": "platform lifecycle proofs owned by OS roles; no shared semantic certification",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.diagnostic-exclusion",
+					"contract": "Personal source excluded from diagnostics collection",
+					"windows": "shared redaction list",
+					"macos": "shared redaction list",
+					"linux": "shared redaction list",
+					"classification": "raw_parity",
+					"basis": "source declaration only; diagnostic export execution unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.documentation-drift",
+					"contract": "README says Windows notwired and failfast raises",
+					"windows": "actual native preview/mask wired and failclosed",
+					"macos": "actual binding failclosed not mandatoryraise",
+					"linux": "actual binding failclosed not mandatoryraise",
+					"classification": "documentation_only",
+					"basis": "actual OS integration source traced; native receiving unrun",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					]
+				},
+				{
+					"id": "personal-info.windows-reader-toml",
+					"contract": "Supported TOML strings and known fields must not silently become placeholders",
+					"windows": "Literal-string and quoted-key known fields ignored by narrow regex; source still admitted for subsequent save.",
+					"macos": "Genuine shared TOML codec accepts these fixtures.",
+					"linux": "Genuine shared TOML codec accepts these fixtures.",
+					"classification": "observed_defect",
+					"basis": "Nonvacuous Windows source projection and unexecuted native owner fixture; genuine Lua54/JIT codec controls. Authorized displayed-value save can replace ignored source; no unauthorized overwrite claim.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIW-002"]
+				},
+				{
+					"id": "personal-info.compound-destination",
+					"contract": "Retain original private destination through multi-field output",
+					"windows": "Windows sender custody source reviewed; native delivery not exercised.",
+					"macos": "Actual keymap transaction/privacy gates replayed; native receiving unmeasured.",
+					"linux": "Combo fallback discards original publication while single-field route refuses stale destination; records14 events into successor.",
+					"classification": "observed_defect",
+					"basis": "Actual Linux manager+injector+focus guard with native resident receipts; mutation during planning, no native uinput or desktop.",
+					"evidence": [
+						"personal-info/windows/report.md",
+						"personal-info/macos/report.md",
+						"personal-info/linux/report.md",
+						"personal-info/shared/report.md"
+					],
+					"finding_ids": ["PIL-001"]
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,5 @@
+tag=p changed=false publication_stale=false fired=true emits=8 successor=false
+tag=np changed=false publication_stale=false fired=true emits=14 successor=false
+tag=p changed=true publication_stale=true fired=false emits=0 successor=false
+tag=np changed=true publication_stale=true fired=true emits=14 successor=true
+PASS production manager+injector+focus guard; controlled native focus/uinput ports; no native desktop receiving

@@ -1,0 +1,70 @@
+{
+	"sweep": "A",
+	"timestamp": "2026-11-05T08:50:15.080862+00:00",
+	"new_roots": 0,
+	"source_review": "Lifecycle, configuration/menu/pause joins, native mouse admission, graph/source/color/idle, screen topology, cleanup debt, stale callbacks, position reset/persistence rechecked. Native/runtime limits retained.",
+	"actual_owner_exit": 0,
+	"sources": [
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/shared.lua",
+			"sha256": "8da3ce9145eae40348c82bb64cbc9b90104ed9d6288f8cb1c54f484326c8b676",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/wpm_widget.lua",
+			"sha256": "a5835760055c6f2948bee963cf9268de08e01f5da8d8c922c313f442da9985a5",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/wpm_menubar.lua",
+			"sha256": "515af136eb1367343127b41ecedd5e9cf0068705067c7341396dabe049dd1b2a",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+			"sha256": "aeee97b4de6ad25e2492f6d289311633bcf1ea01c00c833a9e77fcf6bedd82b3",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/metrics_scope.lua",
+			"sha256": "3d00a674e21904afeb3d1258779e05c4f9185394265d687e9535f3c511988943",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/script_control.lua",
+			"sha256": "77b175b0dd166a7c8f46e2dc5fb89a7fdbd070a82c2130d02bbf56cc25790803",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"sha256": "04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/storage.lua",
+			"sha256": "05640713281cb0fceaa6fee75288e6105503dd0d267af3ff1434948a88a1b66b",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+			"sha256": "1a2e8ff2aed93652eb656903163a9b431a2015981d10a55178ceeb32710ff3dc",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/graphics_renderer.lua",
+			"sha256": "132c71acbf12b1e7707e1ab977251803d865d310ec4d200858d99db8440c532e",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/wpm_widget/model.lua",
+			"sha256": "539d08be5ae002e70650ebd0f8b48160942bd1c10f7f9901a21995918d5f4f76",
+			"compile": "pass"
+		}
+	],
+	"countercheck": "Native setter implicit admission rejected; native borderless frame + Apple horizontal constraint checked; no new roots"
+}

@@ -1,0 +1,16 @@
+[
+	{
+		"pass": "A",
+		"source_contract_exit_code": 0,
+		"sha256": "5bee1cc9782633d48f7a1b4d44145ea075f8dbc25c977faac52126f44e11876f",
+		"result": "PASS: three nonvacuous source-contract claims; zero Windows execution claims.",
+		"duplicate_output_omitted": "Identical decisive source-contract.log retained once; this is source-contract replay, not native execution."
+	},
+	{
+		"pass": "B",
+		"source_contract_exit_code": 0,
+		"sha256": "5bee1cc9782633d48f7a1b4d44145ea075f8dbc25c977faac52126f44e11876f",
+		"result": "PASS: three nonvacuous source-contract claims; zero Windows execution claims.",
+		"duplicate_output_omitted": "Identical decisive source-contract.log retained once; this is source-contract replay, not native execution."
+	}
+]

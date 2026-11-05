@@ -1,0 +1,78 @@
+{
+	"schema_version": 1,
+	"scope": "macOS wrap symbols",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"confirmed_roots": ["WSM-001", "WSM-002", "WSM-003"],
+	"surfaces": [
+		{
+			"surface": "catalogue, event mapping, native characters, custom pairs and overlap",
+			"basis": "actual Text plus actual System native callback; native source contract and shipped layout data; no physical keyboard"
+		},
+		{
+			"surface": "menu row, native getter and preference mutation",
+			"basis": "actual public menu owner + shared template rows + WrapMutation; provider renderer and literal save ACK seams; registered physical-file preference tests separately"
+		},
+		{
+			"surface": "copied selection/action parameter and Unicode/multichar/newline payloads",
+			"basis": "actual parser, Text, synthetic broker and timer owners; native clipboard/event recording seam"
+		},
+		{
+			"surface": "clipboard all-type/all-item snapshot and restoration",
+			"basis": "actual Text; exact upstream1.1.1 readAllData/writeAllData executed; item-aware primitive seams; native code source; no actual NSPasteboard"
+		},
+		{
+			"surface": "lifecycle, pause, stale/duplicate callbacks, native acknowledgment/refusal",
+			"basis": "actual trigger owner retirement/admission/refused restore/write controls; isolated broker12/0 and atomic15/0; relevant helper/binding/dispatch source review"
+		},
+		{
+			"surface": "configuration startup/load/save/reset/editor integration",
+			"basis": "source-owned WrapPreferences/Preferences/eager getter reviewed; isolated roundtrip17/0; custom UTF8 and menu wrap registered cases in broad selection"
+		},
+		{
+			"surface": "security, ignore, provenance and keymap joins",
+			"basis": "source review, native provenance fixture, nil AX/cmd/paused controls; protected native fields and TCC unavailable"
+		}
+	],
+	"tests": {
+		"broad_wrap": {
+			"pass": 255,
+			"fail": 4,
+			"discovered_modules": 864,
+			"qualification": "Four cached gestures.actions/i18n.format fixture failures; no broad green claimed"
+		},
+		"isolated_delivery": {
+			"pass": 12,
+			"fail": 0
+		},
+		"isolated_broker": {
+			"pass": 12,
+			"fail": 0
+		},
+		"isolated_atomic": {
+			"pass": 15,
+			"fail": 0
+		},
+		"isolated_preferences": {
+			"pass": 17,
+			"fail": 0
+		},
+		"mechanical_false_green_scan": "within baseline0vs0"
+	},
+	"intentional_or_unknown": [
+		"Physical AX path versus copied selection action access",
+		"Default overlapping quote precedence unknown; only disabled-competitor inert opener counted",
+		"Custom per-symbol storage is explicitly macOS scoped",
+		"No general keymap-ignore inheritance assumed for user shortcuts"
+	],
+	"prior_deduplication": [
+		"MCP001 Apps foreign generation overwrite",
+		"MCP002 cross-family borrowed snapshots",
+		"MCP003 delayed transform destination drift"
+	],
+	"limits": [
+		"No native Darwin receiving/AX/pasteboard/TCC proof",
+		"No performance or memory measurement",
+		"No user logs/configuration/clipboard or live services accessed"
+	],
+	"dry_sweeps": ["probes/dry-A.json", "probes/dry-B.json"]
+}

@@ -1,0 +1,35 @@
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/eventtap/libeventtap_event.m
+Ref: 1.1.1
+SHA256 full fetched file: 33105ade3a156f4786dd5591de4db17e52738651ff1b500b7f9de43b11c15243
+This is native source evidence; no Darwin execution.
+
+517: /// hs.eventtap.event:getCharacters([clean]) -> string or nil
+518: /// Method
+519: /// Returns the Unicode character, if any, represented by a keyDown or keyUp event.
+520: ///
+521: /// Parameters:
+522: ///  * clean -- an optional parameter, default `false`, which indicates if key modifiers, other than Shift, should be stripped from the keypress before converting to Unicode.
+523: ///
+524: /// Returns:
+525: ///  * A string containing the Unicode character represented by the keyDown or keyUp event, or nil if the event is not a keyUp or keyDown.
+526: ///
+527: /// Notes:
+528: ///  * This method should only be used on keyboard events
+529: ///  * If `clean` is true, all modifiers except for Shift are stripped from the character before converting to the Unicode character represented by the keypress.
+530: ///  * If the keypress does not correspond to a valid Unicode character, an empty string is returned (e.g. if `clean` is false, then Opt-E will return an empty string, while Opt-Shift-E will return an accent mark).
+531: static int eventtap_event_getCharacters(lua_State* L) {
+532:     CGEventRef  event    = *(CGEventRef*)luaL_checkudata(L, 1, EVENT_USERDATA_TAG);
+533:     BOOL        clean    = lua_isnone(L, 2) ? NO : (BOOL)(lua_toboolean(L, 2)) ;
+534:     CGEventType cgType   = CGEventGetType(event) ;
+535: 
+536:     if ((cgType == kCGEventKeyDown) || (cgType == kCGEventKeyUp)) {
+537:         if (clean)
+538:             lua_pushstring(L, [[[NSEvent eventWithCGEvent:event] charactersIgnoringModifiers] UTF8String]) ;
+539:         else
+540:             lua_pushstring(L, [[[NSEvent eventWithCGEvent:event] characters] UTF8String]) ;
+541:     } else {
+542:         lua_pushnil(L) ;
+543:     }
+544:     return 1;
+545: }
+546: 

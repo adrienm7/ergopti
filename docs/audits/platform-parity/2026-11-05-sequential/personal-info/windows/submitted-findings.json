@@ -1,0 +1,49 @@
+{
+	"schema_version": 1,
+	"scope": "personal-info-windows",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "PIW-001",
+			"title": "Eager registered compounds escape field-navigation separators and admit partial identities",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"additional_properties": ["Form-field integrity"],
+			"reproduction": "SOURCE PROJECTION, no AHK execution: enable personal-info expansion and supported pattern_max_length=2; n=last_name LEFT,p=first_name RIGHT; from fresh boundary type @np+MagicKey. Registered Generate stores LEFT{{}Tab{}}RIGHT with OnlyText=false while preview advertises LEFT \u21e5 RIGHT; max1 transient control stores LEFT{Tab}RIGHT. Clear last_name through editor: eager @np registers RIGHT, while transient and preview decline whole empty-field combo.",
+			"root_cause": "Generate joins raw fields using {Tab}, then SendEscapeLiteral on whole aggregate escapes intended navigation; its only aggregate nonempty check also allows missing/empty parts. Per-value/all-or-nothing transient resolver has correct semantics but registered specs take precedence.",
+			"silent_failure": "Valid registered spec succeeds and private logging works; no error/refusal indicates the wrong literal separator or shifted partial identity. Frozen PreviewFields/Values advertise separate fields rather than the eager Send payload.",
+			"regression_test": "Actual eager registration versus actual transient resolver with max1/max2, first/middle/last empty/missing fields, repeats, Unicode/literal braces/metacharacters. Assert exact escaped values plus unescaped interfield Tab only and whole-combo refusal. Preserve privacy/decision snapshots; verify native form placement separately.",
+			"evidence": [
+				"proofs/source-contract.mjs",
+				"proofs/source-contract.log",
+				"proofs/owner-unexecuted.ahk"
+			]
+		},
+		{
+			"id": "PIW-002",
+			"title": "Valid TOML known personal fields silently load as placeholders",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["Known personal-field configuration integrity"],
+			"reproduction": "SOURCE PROJECTION, no AHK execution: public open_personal_info opens file in Notepad; change known first_name to valid literal-string assignment first_name = 'SYNTHETIC', save/reload. Windows double-quoted-only regex ignores it, retains placeholder, marks exact source admitted, with no diagnostic; double-quoted healthy control loads. Quoted known key likewise omitted. Actual shared Lua codec decodes all3 equally. Subsequent explicit form Save may overwrite source with displayed placeholder; that save is authorized, not a source-consent bypass.",
+			"root_cause": "ReadPersonalInfoToml combines raw-byte source admission with partial line regex requiring bare word keys and double-quoted values. Unsupported valid known-field syntax is treated as missing, inherits opening defaults and is cached as an admitted model/source.",
+			"silent_failure": "No branch diagnoses unmatched valid known fields and no unreadable latch is set. Source receipt guards byte equality and current form/model, not whether known values decoded; insertion can emit placeholder and an authorized form rewrite can lose original literal value.",
+			"regression_test": "Actual reader->editor model->private save/reload/insertion on equivalent basic/literal/quoted-key/Unicode field and alias spellings; preserve values or loudly refuse unsupported source without certifying defaults. Separate bad load from later authorized Save, preserve no-read/no-write/source/path/session/generation safeguards.",
+			"evidence": [
+				"proofs/reader-source-contract.mjs",
+				"proofs/reader-source-contract.log",
+				"proofs/reader-unexecuted.ahk",
+				"proofs/reader-double.toml",
+				"proofs/reader-literal.toml",
+				"proofs/reader-quoted-key.toml",
+				"proofs/literal-toml.lua",
+				"proofs/literal-toml-lua54.log",
+				"proofs/literal-toml-luajit.log"
+			]
+		}
+	]
+}

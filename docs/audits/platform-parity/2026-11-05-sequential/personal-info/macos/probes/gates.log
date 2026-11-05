@@ -1,0 +1,7 @@
+healthy native-classified control: personal expansion accepted
+pause control: pass-through, no personal preview/output
+native secure-field control: pass-through, no personal preview/output
+native unknown-field control: pass-through, no personal preview/output
+native ignored-app control: pass-through, no personal preview/output
+retired personal callback control: pass-through, no personal preview/output
+stopped keymap control: pass-through, no personal preview/output

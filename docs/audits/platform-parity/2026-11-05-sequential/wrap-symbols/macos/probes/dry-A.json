@@ -1,0 +1,112 @@
+{
+	"sweep": "A",
+	"completed_at": "2026-11-05T09:13:58.608500+00:00",
+	"new_roots": 0,
+	"confirmed_roots": ["WSM-001", "WSM-002", "WSM-003"],
+	"probes": ["trigger", "menu", "multi-item", "copied"],
+	"bounded_review": [
+		"Catalogue normalization, actual layout/native trigger keys, both endpoints and overlap filtering",
+		"Menu checkbox/custom edit/source publication/eager boot getter/refusal/reset joins",
+		"Actual AX capture versus copied-selection action/parameter, Unicode/multichar/newline/empty selection",
+		"Full first-item wrappers versus multiple-item snapshot; native true/void arity and changeCount fences",
+		"Synthetic broker handoff/host paste grace/cleanup, pause/parent generation/timer and retired native callback fences",
+		"Prior MCP1\u20133 dedupe, ignored app/security native boundaries, test cache contamination and Darwin limits"
+	],
+	"sources": [
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text.lua",
+			"sha256": "4c3b1eebf359d6eb0cae14941b60f472c2a3425ea1a94d9260893e1748f61120",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/system.lua",
+			"sha256": "92d871db51d5b86cdfb105e9a55dafb31734536f2f523975fb264f382ebea64a",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_dispatch.lua",
+			"sha256": "e1e3fdb65cc1c29d2de96517a533669577fe39512e34936edf3b9537ff40ea7e",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_continuation.lua",
+			"sha256": "bffd32654c2fcdb9706a57e76f4b5e16e523d5283dd3ddeecdbbea8cd26bb539",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_transform_grace.lua",
+			"sha256": "3ee174015866921fac4874d385a444f56c96ec043f6dabc61c1ce8784ca7843a",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+			"sha256": "ee1ec1a912baa6ac561dc76837ebe764a9d3df702bbab70069ac9283ae8131e1",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/init.lua",
+			"sha256": "05d533dfb0dd01344eb58a373127d265b151f74a008b6baaddf4794a55b8c20c",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/script_control.lua",
+			"sha256": "77b175b0dd166a7c8f46e2dc5fb89a7fdbd070a82c2130d02bbf56cc25790803",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+			"sha256": "83fda17f8f9b7b7d20a4756ea79e09e1f72bb40f24e7832686cc68508bc8d027",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/event_provenance.lua",
+			"sha256": "60e2003632b7243e918c32d6fd9f421ef4bc3a75feea9002cf4f00363c232400",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+			"sha256": "1a2e8ff2aed93652eb656903163a9b431a2015981d10a55178ceeb32710ff3dc",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/clipboard.lua",
+			"sha256": "da4534dbe7b0414dda8efc069ee3b55c0ddc4c45b8c04c2fe002ea9311cf67be",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/wrap_preferences.lua",
+			"sha256": "ef9b42f0dbed435becf2a78e814e955e5f2ae89a22af2f55ef3c20d01a0ebdad",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/wrap_mutation.lua",
+			"sha256": "faa5a9d9f781be1e48b60c7f781c0d2b8f2c5de793af5faaaf971b768d6b2193",
+			"compile": "pass"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/wrap_pair/init.lua",
+			"sha256": "91429eb62227a9da696c6c3b75e1d6eb249a97550b014238f67ec944582333a4",
+			"compile": "pass"
+		}
+	]
+}

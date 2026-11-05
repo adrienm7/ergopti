@@ -1,0 +1,495 @@
+
+=== dynamic hotstrings manager ===
+
+=== module structure ===
+# lua_timing {"schema":1,"driver":"linux","id":2,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"exports the expected methods","status":"pass","elapsed_ms":0.002423,"timing_error":""}
+  ok   exports the expected methods
+
+=== init and rule registration ===
+# lua_timing {"schema":1,"driver":"linux","id":3,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"init without personal_info.toml registers at least date rules","status":"pass","elapsed_ms":0.221583,"timing_error":""}
+  ok   init without personal_info.toml registers at least date rules
+# lua_timing {"schema":1,"driver":"linux","id":4,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"is_enabled remains false until explicit activation","status":"pass","elapsed_ms":0.012819,"timing_error":""}
+  ok   is_enabled remains false until explicit activation
+# lua_timing {"schema":1,"driver":"linux","id":5,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"get_trigger_char returns the configured trigger","status":"pass","elapsed_ms":0.000701,"timing_error":""}
+  ok   get_trigger_char returns the configured trigger
+# lua_timing {"schema":1,"driver":"linux","id":6,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"set_enabled toggles the module state","status":"pass","elapsed_ms":1.124982,"timing_error":""}
+  ok   set_enabled toggles the module state
+# lua_timing {"schema":1,"driver":"linux","id":7,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"get_info returns a table (empty if no toml)","status":"pass","elapsed_ms":0.000781,"timing_error":""}
+  ok   get_info returns a table (empty if no toml)
+# lua_timing {"schema":1,"driver":"linux","id":8,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"atomically persists editor values and refreshes live aliases","status":"pass","elapsed_ms":2.992722,"timing_error":""}
+  ok   atomically persists editor values and refreshes live aliases
+
+=== on_trigger contract ===
+# lua_timing {"schema":1,"driver":"linux","id":9,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger with empty buffer returns false","status":"pass","elapsed_ms":26.039803,"timing_error":""}
+  ok   on_trigger with empty buffer returns false
+# lua_timing {"schema":1,"driver":"linux","id":10,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger without trigger char in buffer returns false","status":"pass","elapsed_ms":3.975821,"timing_error":""}
+  ok   on_trigger without trigger char in buffer returns false
+# lua_timing {"schema":1,"driver":"linux","id":11,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger with date rule 'td' matches","status":"pass","elapsed_ms":7.640494,"timing_error":""}
+  ok   on_trigger with date rule 'td' matches
+# lua_timing {"schema":1,"driver":"linux","id":12,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger when disabled returns false","status":"pass","elapsed_ms":3.539395,"timing_error":""}
+  ok   on_trigger when disabled returns false
+# lua_timing {"schema":1,"driver":"linux","id":13,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger with nil buffer is safe","status":"pass","elapsed_ms":1.811525,"timing_error":""}
+  ok   on_trigger with nil buffer is safe
+
+=== preview contract ===
+# lua_timing {"schema":1,"driver":"linux","id":14,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"preview with empty buffer returns nil","status":"pass","elapsed_ms":0.001453,"timing_error":""}
+  ok   preview with empty buffer returns nil
+# lua_timing {"schema":1,"driver":"linux","id":15,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"preview when disabled returns nil","status":"pass","elapsed_ms":1.245754,"timing_error":""}
+  ok   preview when disabled returns nil
+
+=== shared engine integration ===
+# lua_timing {"schema":1,"driver":"linux","id":16,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"shared dynamic_hotstrings engine loads and has expected API","status":"pass","elapsed_ms":0.012679,"timing_error":""}
+  ok   shared dynamic_hotstrings engine loads and has expected API
+# lua_timing {"schema":1,"driver":"linux","id":17,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"date rule 'td' matches in the shared engine","status":"pass","elapsed_ms":0.019349,"timing_error":""}
+  ok   date rule 'td' matches in the shared engine
+
+=== info field count ===
+# lua_timing {"schema":1,"driver":"linux","id":18,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"logs the real [info] field count, not # of a string-keyed table","status":"pass","elapsed_ms":0.112750,"timing_error":""}
+  ok   logs the real [info] field count, not # of a string-keyed table
+
+=== @-tag personal-info concrete expansion ===
+# lua_timing {"schema":1,"driver":"linux","id":19,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"preview expands '@p' to the mapped first_name value","status":"pass","elapsed_ms":0.734906,"timing_error":""}
+  ok   preview expands '@p' to the mapped first_name value
+# lua_timing {"schema":1,"driver":"linux","id":20,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"on_trigger injects the mapped last_name value for '@n'","status":"pass","elapsed_ms":3.535609,"timing_error":""}
+  ok   on_trigger injects the mapped last_name value for '@n'
+# lua_timing {"schema":1,"driver":"linux","id":21,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"keeps NFC aliases codepoint-correct through preview, resolution, and injection","status":"pass","elapsed_ms":4.631137,"timing_error":""}
+  ok   keeps NFC aliases codepoint-correct through preview, resolution, and injection
+
+=== malformed personal_info.toml fail-fast ===
+# lua_timing {"schema":1,"driver":"linux","id":22,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"logs Logger.error when personal_info.toml is malformed","status":"pass","elapsed_ms":0.084597,"timing_error":""}
+  ok   logs Logger.error when personal_info.toml is malformed
+# lua_timing {"schema":1,"driver":"linux","id":23,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"rejects a malformed UTF-8 alias explicitly","status":"pass","elapsed_ms":0.182324,"timing_error":""}
+  ok   rejects a malformed UTF-8 alias explicitly
+# lua_timing {"schema":1,"driver":"linux","id":24,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"rejects a decomposed alias instead of silently normalizing it","status":"pass","elapsed_ms":0.176456,"timing_error":""}
+  ok   rejects a decomposed alias instead of silently normalizing it
+# lua_timing {"schema":1,"driver":"linux","id":1,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager","status":"pass","elapsed_ms":93.424067,"timing_error":""}
+
+=== personal-info @-combo resolver ===
+# lua_timing {"schema":1,"driver":"linux","id":26,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"resolves combos of every length, not just one letter","status":"pass","elapsed_ms":1.340096,"timing_error":""}
+  ok   resolves combos of every length, not just one letter
+# lua_timing {"schema":1,"driver":"linux","id":27,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"letter order decides field order","status":"pass","elapsed_ms":1.237181,"timing_error":""}
+  ok   letter order decides field order
+# lua_timing {"schema":1,"driver":"linux","id":28,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"a repeated letter is a legitimate combo","status":"pass","elapsed_ms":0.964531,"timing_error":""}
+  ok   a repeated letter is a legitimate combo
+# lua_timing {"schema":1,"driver":"linux","id":29,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"one unknown letter declines the whole combo","status":"pass","elapsed_ms":1.221227,"timing_error":""}
+  ok   one unknown letter declines the whole combo
+# lua_timing {"schema":1,"driver":"linux","id":30,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"a field the user left blank declines the whole combo","status":"pass","elapsed_ms":0.296856,"timing_error":""}
+  ok   a field the user left blank declines the whole combo
+# lua_timing {"schema":1,"driver":"linux","id":31,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"reads the tag off the end of the buffer","status":"pass","elapsed_ms":0.757209,"timing_error":""}
+  ok   reads the tag off the end of the buffer
+# lua_timing {"schema":1,"driver":"linux","id":32,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"an email address in the buffer is not read as a tag","status":"pass","elapsed_ms":1.082629,"timing_error":""}
+  ok   an email address in the buffer is not read as a tag
+# lua_timing {"schema":1,"driver":"linux","id":33,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"offers a preview row for a resolvable multi-letter combo","status":"pass","elapsed_ms":0.796178,"timing_error":""}
+  ok   offers a preview row for a resolvable multi-letter combo
+# lua_timing {"schema":1,"driver":"linux","id":34,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"offers nothing the resolver would refuse","status":"pass","elapsed_ms":0.716067,"timing_error":""}
+  ok   offers nothing the resolver would refuse
+# lua_timing {"schema":1,"driver":"linux","id":35,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"preview and fire resolve the same fields","status":"pass","elapsed_ms":0.954776,"timing_error":""}
+  ok   preview and fire resolve the same fields
+
+=== dynamic expansions publish only committed output ===
+# lua_timing {"schema":1,"driver":"linux","id":36,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"declines a registered dynamic rule when injection fails","status":"pass","elapsed_ms":5.009747,"timing_error":""}
+  ok   declines a registered dynamic rule when injection fails
+# lua_timing {"schema":1,"driver":"linux","id":37,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"declines a multi-field combo when injection fails","status":"pass","elapsed_ms":7.516317,"timing_error":""}
+  ok   declines a multi-field combo when injection fails
+
+=== dynamic expansion events carry the privacy verdict ===
+# lua_timing {"schema":1,"driver":"linux","id":38,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"a personal_info rule reports itself private","status":"pass","elapsed_ms":2.898019,"timing_error":""}
+  ok   a personal_info rule reports itself private
+# lua_timing {"schema":1,"driver":"linux","id":39,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"a date rule does not, because a date is not a secret","status":"pass","elapsed_ms":3.472745,"timing_error":""}
+  ok   a date rule does not, because a date is not a secret
+# lua_timing {"schema":1,"driver":"linux","id":40,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"passes section-derived privacy into every injector boundary","status":"pass","elapsed_ms":9.010294,"timing_error":""}
+  ok   passes section-derived privacy into every injector boundary
+# lua_timing {"schema":1,"driver":"linux","id":41,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"the daemon forwards the flag it is given","status":"pass","elapsed_ms":0.199940,"timing_error":""}
+  ok   the daemon forwards the flag it is given
+# lua_timing {"schema":1,"driver":"linux","id":25,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","name":"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver","status":"pass","elapsed_ms":45.708662,"timing_error":""}
+
+=== dynamic rule families: bulk owner dispatch ===
+# lua_timing {"schema":1,"driver":"linux","id":43,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"dynamic bulk: passes an explicit posture, actual manager and ordinary matcher to one owner","status":"pass","elapsed_ms":1.028547,"timing_error":""}
+  ok   dynamic bulk: passes an explicit posture, actual manager and ordinary matcher to one owner
+
+=== dynamic rule families: the switch reaches the engine ===
+# lua_timing {"schema":1,"driver":"linux","id":44,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"previews every family while they are all on","status":"pass","elapsed_ms":0.734646,"timing_error":""}
+  ok   previews every family while they are all on
+# lua_timing {"schema":1,"driver":"linux","id":45,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"stops previewing the family that was switched off","status":"pass","elapsed_ms":0.699713,"timing_error":""}
+  ok   stops previewing the family that was switched off
+# lua_timing {"schema":1,"driver":"linux","id":46,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"stops INJECTING the family that was switched off","status":"pass","elapsed_ms":5.962129,"timing_error":""}
+  ok   stops INJECTING the family that was switched off
+# lua_timing {"schema":1,"driver":"linux","id":47,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"brings a family back when it is switched on again","status":"pass","elapsed_ms":0.814355,"timing_error":""}
+  ok   brings a family back when it is switched on again
+
+=== dynamic rule families: persistence ===
+# lua_timing {"schema":1,"driver":"linux","id":48,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"stores nothing for a family left at its shipped default","status":"pass","elapsed_ms":11.864207,"timing_error":""}
+  ok   stores nothing for a family left at its shipped default
+# lua_timing {"schema":1,"driver":"linux","id":49,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"uses the family's canonical manifest leaf","status":"pass","elapsed_ms":0.661605,"timing_error":""}
+  ok   uses the family's canonical manifest leaf
+# lua_timing {"schema":1,"driver":"linux","id":50,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"clears the key rather than storing the neutral false","status":"pass","elapsed_ms":0.943830,"timing_error":""}
+  ok   clears the key rather than storing the neutral false
+# lua_timing {"schema":1,"driver":"linux","id":51,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"refuses a section that is not a family","status":"pass","elapsed_ms":0.632872,"timing_error":""}
+  ok   refuses a section that is not a family
+# lua_timing {"schema":1,"driver":"linux","id":52,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"reports failed writes and keeps the durable family state","status":"pass","elapsed_ms":0.730269,"timing_error":""}
+  ok   reports failed writes and keeps the durable family state
+
+=== dynamic rule families: the rows ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":53,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"offers one row per family, ticked from storage","status":"pass","elapsed_ms":81.411770,"timing_error":""}
+  ok   offers one row per family, ticked from storage
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":54,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"flips the family the row names when it is clicked","status":"pass","elapsed_ms":51.059356,"timing_error":""}
+  ok   flips the family the row names when it is clicked
+# lua_timing {"schema":1,"driver":"linux","id":55,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"shows today's date in the label, not the placeholder","status":"pass","elapsed_ms":1.068738,"timing_error":""}
+  ok   shows today's date in the label, not the placeholder
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":56,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"greys every family row while the category itself is off","status":"pass","elapsed_ms":46.086170,"timing_error":""}
+  ok   greys every family row while the category itself is off
+
+=== dynamic menu shared family order ===
+# lua_timing {"schema":1,"driver":"linux","id":57,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"keeps the independent published family metadata and returns detached records","status":"pass","elapsed_ms":0.439131,"timing_error":""}
+  ok   keeps the independent published family metadata and returns detached records
+# lua_timing {"schema":1,"driver":"linux","id":58,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"consumes the actual published family order: historical","status":"pass","elapsed_ms":1.037641,"timing_error":""}
+  ok   consumes the actual published family order: historical
+# lua_timing {"schema":1,"driver":"linux","id":59,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"consumes the actual published family order: date-first","status":"pass","elapsed_ms":1.283952,"timing_error":""}
+  ok   consumes the actual published family order: date-first
+# lua_timing {"schema":1,"driver":"linux","id":42,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_families","status":"pass","elapsed_ms":207.833307,"timing_error":""}
+
+=== dynamic expansion log privacy ===
+# lua_timing {"schema":1,"driver":"linux","id":61,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","name":"the shared engine's buffer-match line carries no resolved value","status":"pass","elapsed_ms":0.550558,"timing_error":""}
+  ok   the shared engine's buffer-match line carries no resolved value
+# lua_timing {"schema":1,"driver":"linux","id":62,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","name":"but the length survives, because that is the diagnostic","status":"pass","elapsed_ms":0.577619,"timing_error":""}
+  ok   but the length survives, because that is the diagnostic
+# lua_timing {"schema":1,"driver":"linux","id":63,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","name":"a resolver that returns nothing logs nothing about it","status":"pass","elapsed_ms":0.732131,"timing_error":""}
+  ok   a resolver that returns nothing logs nothing about it
+
+=== dynamic expansion failure-log privacy ===
+# lua_timing {"schema":1,"driver":"linux","id":64,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","name":"keeps diagnostics while withholding failed personal output","status":"pass","elapsed_ms":14.280322,"timing_error":""}
+  ok   keeps diagnostics while withholding failed personal output
+# lua_timing {"schema":1,"driver":"linux","id":60,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy","status":"pass","elapsed_ms":27.149622,"timing_error":""}
+
+=== single-field dynamic expansions retain their original destination ===
+# lua_timing {"schema":1,"driver":"linux","id":66,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal stable","status":"pass","elapsed_ms":91.447257,"timing_error":""}
+  ok   dynamic-destination personal stable
+# lua_timing {"schema":1,"driver":"linux","id":67,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal settle","status":"pass","elapsed_ms":52.661230,"timing_error":""}
+  ok   dynamic-destination personal settle
+# lua_timing {"schema":1,"driver":"linux","id":68,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal metrics","status":"pass","elapsed_ms":63.913769,"timing_error":""}
+  ok   dynamic-destination personal metrics
+# lua_timing {"schema":1,"driver":"linux","id":69,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal prediction","status":"pass","elapsed_ms":72.886912,"timing_error":""}
+  ok   dynamic-destination personal prediction
+# lua_timing {"schema":1,"driver":"linux","id":70,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal absent","status":"pass","elapsed_ms":67.391350,"timing_error":""}
+  ok   dynamic-destination personal absent
+# lua_timing {"schema":1,"driver":"linux","id":71,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination personal deferred","status":"pass","elapsed_ms":44.011178,"timing_error":""}
+  ok   dynamic-destination personal deferred
+# lua_timing {"schema":1,"driver":"linux","id":72,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date stable","status":"pass","elapsed_ms":56.801895,"timing_error":""}
+  ok   dynamic-destination date stable
+# lua_timing {"schema":1,"driver":"linux","id":73,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date settle","status":"pass","elapsed_ms":72.378672,"timing_error":""}
+  ok   dynamic-destination date settle
+# lua_timing {"schema":1,"driver":"linux","id":74,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date metrics","status":"pass","elapsed_ms":87.704147,"timing_error":""}
+  ok   dynamic-destination date metrics
+# lua_timing {"schema":1,"driver":"linux","id":75,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date prediction","status":"pass","elapsed_ms":77.462074,"timing_error":""}
+  ok   dynamic-destination date prediction
+# lua_timing {"schema":1,"driver":"linux","id":76,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date absent","status":"pass","elapsed_ms":52.458597,"timing_error":""}
+  ok   dynamic-destination date absent
+# lua_timing {"schema":1,"driver":"linux","id":77,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination date deferred","status":"pass","elapsed_ms":51.237884,"timing_error":""}
+  ok   dynamic-destination date deferred
+# lua_timing {"schema":1,"driver":"linux","id":78,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination static comparison stable","status":"pass","elapsed_ms":74.340091,"timing_error":""}
+  ok   dynamic-destination static comparison stable
+# lua_timing {"schema":1,"driver":"linux","id":79,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"dynamic-destination static comparison settle","status":"pass","elapsed_ms":73.105149,"timing_error":""}
+  ok   dynamic-destination static comparison settle
+# lua_timing {"schema":1,"driver":"linux","id":65,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination","status":"pass","elapsed_ms":938.744305,"timing_error":""}
+
+=== dynamic hotstrings: multibyte trigger ===
+# lua_timing {"schema":1,"driver":"linux","id":81,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"fires and previews through the shipped star trigger","status":"pass","elapsed_ms":7.306135,"timing_error":""}
+  ok   fires and previews through the shipped star trigger
+# lua_timing {"schema":1,"driver":"linux","id":82,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"rejects a non-magic character passed by the daemon","status":"pass","elapsed_ms":11.333982,"timing_error":""}
+  ok   rejects a non-magic character passed by the daemon
+# lua_timing {"schema":1,"driver":"linux","id":83,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"rejects an explicitly malformed or multi-codepoint trigger","status":"pass","elapsed_ms":2.460345,"timing_error":""}
+  ok   rejects an explicitly malformed or multi-codepoint trigger
+
+=== builtin dynamic word-start contract ===
+# lua_timing {"schema":1,"driver":"linux","id":84,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"never previews or resolves date inside update (dynamic-word-start)","status":"pass","elapsed_ms":0.525552,"timing_error":""}
+  ok   never previews or resolves date inside update (dynamic-word-start)
+# lua_timing {"schema":1,"driver":"linux","id":85,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"preserves known start and ordinary Unicode-aware boundaries","status":"pass","elapsed_ms":1.057152,"timing_error":""}
+  ok   preserves known start and ordinary Unicode-aware boundaries
+# lua_timing {"schema":1,"driver":"linux","id":86,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"keeps custom in-word and explicit at-command contracts","status":"pass","elapsed_ms":0.314023,"timing_error":""}
+  ok   keeps custom in-word and explicit at-command contracts
+
+=== Linux owned unknown-context reset boundaries ===
+# lua_timing {"schema":1,"driver":"linux","id":87,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"four actual reset prefixes cannot donate a beginning-of-word grant","status":"pass","elapsed_ms":25.742153,"timing_error":""}
+  ok   four actual reset prefixes cannot donate a beginning-of-word grant
+
+=== Linux reviewed unknown-context resets (unknown-context-resets) ===
+# lua_timing {"schema":1,"driver":"linux","id":88,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"each reviewed daemon reset leaves the next word start unknown","status":"pass","elapsed_ms":1.095520,"timing_error":""}
+  ok   each reviewed daemon reset leaves the next word start unknown
+# lua_timing {"schema":1,"driver":"linux","id":89,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"every daemon reset names whether a word starts","status":"pass","elapsed_ms":1.275842,"timing_error":""}
+  ok   every daemon reset names whether a word starts
+
+=== Linux builtin dynamic word-start owners ===
+# lua_timing {"schema":1,"driver":"linux","id":90,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"the actual daemon captures boundary with its buffer before prediction callbacks","status":"pass","elapsed_ms":1.644788,"timing_error":""}
+  ok   the actual daemon captures boundary with its buffer before prediction callbacks
+# lua_timing {"schema":1,"driver":"linux","id":91,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"rejects update in the actual manager preview and firing paths","status":"pass","elapsed_ms":3.437207,"timing_error":""}
+  ok   rejects update in the actual manager preview and firing paths
+# lua_timing {"schema":1,"driver":"linux","id":92,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"uses the retained engine boundary through full magic-key buffers","status":"pass","elapsed_ms":5.655218,"timing_error":""}
+  ok   uses the retained engine boundary through full magic-key buffers
+# lua_timing {"schema":1,"driver":"linux","id":93,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"keeps every personal prefix under the genuine ordinary matcher gate","status":"pass","elapsed_ms":0.270968,"timing_error":""}
+  ok   keeps every personal prefix under the genuine ordinary matcher gate
+# lua_timing {"schema":1,"driver":"linux","id":80,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger","status":"pass","elapsed_ms":74.808596,"timing_error":""}
+
+=== dynamic hotstrings: Unicode suffix deletion ===
+# lua_timing {"schema":1,"driver":"linux","id":95,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_unicode_suffix","name":"deletes a non-ASCII suffix by codepoint rather than byte","status":"pass","elapsed_ms":4.644536,"timing_error":""}
+  ok   deletes a non-ASCII suffix by codepoint rather than byte
+# lua_timing {"schema":1,"driver":"linux","id":94,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_unicode_suffix","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_unicode_suffix","status":"pass","elapsed_ms":12.463948,"timing_error":""}
+
+=== dynamic dry-run Main dispatch ===
+# lua_timing {"schema":1,"driver":"linux","id":97,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run personal posture false","status":"pass","elapsed_ms":61.712126,"timing_error":""}
+  ok   dynamic dry-run personal posture false
+# lua_timing {"schema":1,"driver":"linux","id":98,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run personal posture true","status":"pass","elapsed_ms":86.056948,"timing_error":""}
+  ok   dynamic dry-run personal posture true
+# lua_timing {"schema":1,"driver":"linux","id":99,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run date posture false","status":"pass","elapsed_ms":90.699531,"timing_error":""}
+  ok   dynamic dry-run date posture false
+# lua_timing {"schema":1,"driver":"linux","id":100,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run date posture true","status":"pass","elapsed_ms":79.834746,"timing_error":""}
+  ok   dynamic dry-run date posture true
+# lua_timing {"schema":1,"driver":"linux","id":101,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run fields posture false","status":"pass","elapsed_ms":101.593660,"timing_error":""}
+  ok   dynamic dry-run fields posture false
+# lua_timing {"schema":1,"driver":"linux","id":102,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run fields posture true","status":"pass","elapsed_ms":87.482070,"timing_error":""}
+  ok   dynamic dry-run fields posture true
+# lua_timing {"schema":1,"driver":"linux","id":103,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run user posture false","status":"pass","elapsed_ms":99.582480,"timing_error":""}
+  ok   dynamic dry-run user posture false
+# lua_timing {"schema":1,"driver":"linux","id":104,"kind":"case","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"dynamic dry-run user posture true","status":"pass","elapsed_ms":82.194435,"timing_error":""}
+  ok   dynamic dry-run user posture true
+# lua_timing {"schema":1,"driver":"linux","id":96,"kind":"module","module":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","name":"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch","status":"pass","elapsed_ms":689.847690,"timing_error":""}
+
+=== prefix expansions: what is built ===
+# lua_timing {"schema":1,"driver":"linux","id":106,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"completes a phone number from its first four digits","status":"pass","elapsed_ms":0.050626,"timing_error":""}
+  ok   completes a phone number from its first four digits
+# lua_timing {"schema":1,"driver":"linux","id":107,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"offers the international form too","status":"pass","elapsed_ms":0.051888,"timing_error":""}
+  ok   offers the international form too
+# lua_timing {"schema":1,"driver":"linux","id":108,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"gives back the form the user started typing","status":"pass","elapsed_ms":0.056936,"timing_error":""}
+  ok   gives back the form the user started typing
+# lua_timing {"schema":1,"driver":"linux","id":109,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"matches an IBAN whatever the casing","status":"pass","elapsed_ms":0.014462,"timing_error":""}
+  ok   matches an IBAN whatever the casing
+# lua_timing {"schema":1,"driver":"linux","id":110,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"builds as many mappings as the shared count promises","status":"pass","elapsed_ms":0.319200,"timing_error":""}
+  ok   builds as many mappings as the shared count promises
+# lua_timing {"schema":1,"driver":"linux","id":111,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"builds nothing at all from an empty personal_info","status":"pass","elapsed_ms":0.009024,"timing_error":""}
+  ok   builds nothing at all from an empty personal_info
+# lua_timing {"schema":1,"driver":"linux","id":112,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"builds nothing from a value too short to identify","status":"pass","elapsed_ms":0.011747,"timing_error":""}
+  ok   builds nothing from a value too short to identify
+
+=== prefix expansions: privacy ===
+# lua_timing {"schema":1,"driver":"linux","id":113,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"marks every mapping private, without exception","status":"pass","elapsed_ms":0.058338,"timing_error":""}
+  ok   marks every mapping private, without exception
+
+=== prefix expansions: the switches ===
+# lua_timing {"schema":1,"driver":"linux","id":114,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"drops a family that is switched off","status":"pass","elapsed_ms":0.034051,"timing_error":""}
+  ok   drops a family that is switched off
+# lua_timing {"schema":1,"driver":"linux","id":115,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"takes a switched-off family out of the category's count","status":"pass","elapsed_ms":11.187731,"timing_error":""}
+  ok   takes a switched-off family out of the category's count
+# lua_timing {"schema":1,"driver":"linux","id":116,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"is pure, so the rebuild is the only moving part","status":"pass","elapsed_ms":0.034222,"timing_error":""}
+  ok   is pure, so the rebuild is the only moving part
+
+=== prefix expansions: reaching the engine ===
+# lua_timing {"schema":1,"driver":"linux","id":117,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"hands the provider's mappings to the engine","status":"pass","elapsed_ms":176.594085,"timing_error":""}
+  ok   hands the provider's mappings to the engine
+# lua_timing {"schema":1,"driver":"linux","id":118,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"refuses replacement when the personal provider raises","status":"pass","elapsed_ms":81.508187,"timing_error":""}
+  ok   refuses replacement when the personal provider raises
+# lua_timing {"schema":1,"driver":"linux","id":119,"kind":"case","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"still registers them when the catalogue is empty","status":"pass","elapsed_ms":62.047365,"timing_error":""}
+  ok   still registers them when the catalogue is empty
+# lua_timing {"schema":1,"driver":"linux","id":105,"kind":"module","module":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","name":"tests.unit.modules.hotstrings.engine.test_prefix_expansions","status":"pass","elapsed_ms":343.355961,"timing_error":""}
+
+=== preview masking: the cross-driver corpus ===
+# lua_timing {"schema":1,"driver":"linux","id":121,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"produces the expected string for every vector","status":"pass","elapsed_ms":0.995509,"timing_error":""}
+  ok   produces the expected string for every vector
+
+=== preview masking: what happens when it cannot decide ===
+# lua_timing {"schema":1,"driver":"linux","id":122,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"masks everything when the policy is unusable","status":"pass","elapsed_ms":0.004537,"timing_error":""}
+  ok   masks everything when the policy is unusable
+# lua_timing {"schema":1,"driver":"linux","id":123,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"fails closed for every malformed shared policy","status":"pass","elapsed_ms":0.387524,"timing_error":""}
+  ok   fails closed for every malformed shared policy
+# lua_timing {"schema":1,"driver":"linux","id":124,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"masks a field nobody classified","status":"pass","elapsed_ms":0.249997,"timing_error":""}
+  ok   masks a field nobody classified
+# lua_timing {"schema":1,"driver":"linux","id":125,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"leaves a declared-public field alone","status":"pass","elapsed_ms":0.098067,"timing_error":""}
+  ok   leaves a declared-public field alone
+
+=== preview masking: display only ===
+# lua_timing {"schema":1,"driver":"linux","id":126,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"tags every prefix mapping with the field it came from","status":"pass","elapsed_ms":0.415366,"timing_error":""}
+  ok   tags every prefix mapping with the field it came from
+# lua_timing {"schema":1,"driver":"linux","id":127,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"keeps the replacement itself in clear","status":"pass","elapsed_ms":0.120001,"timing_error":""}
+  ok   keeps the replacement itself in clear
+# lua_timing {"schema":1,"driver":"linux","id":128,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"carries the field through the engine to the preview","status":"pass","elapsed_ms":0.830170,"timing_error":""}
+  ok   carries the field through the engine to the preview
+
+=== preview masking: the shared cross-driver vectors ===
+# lua_timing {"schema":1,"driver":"linux","id":129,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"renders every shared vector exactly","status":"pass","elapsed_ms":0.801407,"timing_error":""}
+  ok   renders every shared vector exactly
+# lua_timing {"schema":1,"driver":"linux","id":130,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"covers both masked and public fields, and the missing-field case","status":"pass","elapsed_ms":0.255264,"timing_error":""}
+  ok   covers both masked and public fields, and the missing-field case
+
+=== preview: a multi-field @-combo row ===
+# lua_timing {"schema":1,"driver":"linux","id":131,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"hides the secret part and shows the public one, in the same row","status":"pass","elapsed_ms":0.075373,"timing_error":""}
+  ok   hides the secret part and shows the public one, in the same row
+# lua_timing {"schema":1,"driver":"linux","id":132,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"keeps the two parts separated by the tab glyph","status":"pass","elapsed_ms":0.028383,"timing_error":""}
+  ok   keeps the two parts separated by the tab glyph
+# lua_timing {"schema":1,"driver":"linux","id":133,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"still masks an ordinary single-field row","status":"pass","elapsed_ms":0.031838,"timing_error":""}
+  ok   still masks an ordinary single-field row
+# lua_timing {"schema":1,"driver":"linux","id":134,"kind":"case","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"leaves a row that declares no field at all untouched","status":"pass","elapsed_ms":0.004347,"timing_error":""}
+  ok   leaves a row that declares no field at all untouched
+# lua_timing {"schema":1,"driver":"linux","id":120,"kind":"module","module":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","name":"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets","status":"pass","elapsed_ms":5.694597,"timing_error":""}
+
+=== personal info field classification (linux-personal-fields) ===
+# lua_timing {"schema":1,"driver":"linux","id":136,"kind":"case","module":"tests.unit.infra.test_personal_info_fields","name":"masks a declared secret and shows a declared open field","status":"pass","elapsed_ms":1.036711,"timing_error":""}
+  ok   masks a declared secret and shows a declared open field
+# lua_timing {"schema":1,"driver":"linux","id":137,"kind":"case","module":"tests.unit.infra.test_personal_info_fields","name":"masks a field nobody classified and a missing field name","status":"pass","elapsed_ms":0.046240,"timing_error":""}
+  ok   masks a field nobody classified and a missing field name
+# lua_timing {"schema":1,"driver":"linux","id":138,"kind":"case","module":"tests.unit.infra.test_personal_info_fields","name":"keeps the length of a value in a log line but not its content","status":"pass","elapsed_ms":0.028713,"timing_error":""}
+  ok   keeps the length of a value in a log line but not its content
+# lua_timing {"schema":1,"driver":"linux","id":139,"kind":"case","module":"tests.unit.infra.test_personal_info_fields","name":"fails closed when the shared declaration cannot be located","status":"pass","elapsed_ms":0.023866,"timing_error":""}
+  ok   fails closed when the shared declaration cannot be located
+# lua_timing {"schema":1,"driver":"linux","id":135,"kind":"module","module":"tests.unit.infra.test_personal_info_fields","name":"tests.unit.infra.test_personal_info_fields","status":"pass","elapsed_ms":1.244494,"timing_error":""}
+
+=== personal-info-policy-read ===
+# lua_timing {"schema":1,"driver":"linux","id":141,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-read) refuses a native FIFO before waiting for a writer","status":"pass","elapsed_ms":8.998683,"timing_error":""}
+  ok   (personal-info-policy-read) refuses a native FIFO before waiting for a writer
+# lua_timing {"schema":1,"driver":"linux","id":142,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with boolean field","status":"pass","elapsed_ms":0.540174,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with boolean field
+# lua_timing {"schema":1,"driver":"linux","id":143,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with numeric field","status":"pass","elapsed_ms":0.473463,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with numeric field
+# lua_timing {"schema":1,"driver":"linux","id":144,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with scalar fields","status":"pass","elapsed_ms":0.340443,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with scalar fields
+# lua_timing {"schema":1,"driver":"linux","id":145,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with empty array fields","status":"pass","elapsed_ms":0.341444,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with empty array fields
+# lua_timing {"schema":1,"driver":"linux","id":146,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with empty array field","status":"pass","elapsed_ms":3.552400,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with empty array field
+# lua_timing {"schema":1,"driver":"linux","id":147,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with array fields","status":"pass","elapsed_ms":0.370178,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with array fields
+# lua_timing {"schema":1,"driver":"linux","id":148,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with string mask flag","status":"pass","elapsed_ms":0.490880,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with string mask flag
+# lua_timing {"schema":1,"driver":"linux","id":149,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) rejects native TOML with table mask flag","status":"pass","elapsed_ms":0.365360,"timing_error":""}
+  ok   (personal-info-policy-shape) rejects native TOML with table mask flag
+# lua_timing {"schema":1,"driver":"linux","id":150,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) preserves an explicitly public field in native TOML","status":"pass","elapsed_ms":1.817147,"timing_error":""}
+  ok   (personal-info-policy-shape) preserves an explicitly public field in native TOML
+# lua_timing {"schema":1,"driver":"linux","id":151,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-shape) keeps a missing mask flag private","status":"pass","elapsed_ms":0.330948,"timing_error":""}
+  ok   (personal-info-policy-shape) keeps a missing mask flag private
+# lua_timing {"schema":1,"driver":"linux","id":152,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-read) accepts a complete public declaration","status":"pass","elapsed_ms":0.285279,"timing_error":""}
+  ok   (personal-info-policy-read) accepts a complete public declaration
+# lua_timing {"schema":1,"driver":"linux","id":153,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-read) masks everything after an unacknowledged close","status":"pass","elapsed_ms":0.107592,"timing_error":""}
+  ok   (personal-info-policy-read) masks everything after an unacknowledged close
+# lua_timing {"schema":1,"driver":"linux","id":154,"kind":"case","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"(personal-info-policy-read) closes an unreadable stream and caches its refusal","status":"pass","elapsed_ms":0.082274,"timing_error":""}
+  ok   (personal-info-policy-read) closes an unreadable stream and caches its refusal
+# lua_timing {"schema":1,"driver":"linux","id":140,"kind":"module","module":"tests.unit.infra.config.test_personal_info_policy_read","name":"tests.unit.infra.config.test_personal_info_policy_read","status":"pass","elapsed_ms":18.704623,"timing_error":""}
+
+=== personal info editor opening payload (linux-personal-payload) ===
+# lua_timing {"schema":1,"driver":"linux","id":156,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"lists the fields sorted by key with the trigger hint of aliased ones only","status":"pass","elapsed_ms":0.498681,"timing_error":""}
+  ok   lists the fields sorted by key with the trigger hint of aliased ones only
+# lua_timing {"schema":1,"driver":"linux","id":157,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"translates the three window strings through the i18n owner","status":"pass","elapsed_ms":0.194553,"timing_error":""}
+  ok   translates the three window strings through the i18n owner
+# lua_timing {"schema":1,"driver":"linux","id":158,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"reports a page that could not receive the data","status":"pass","elapsed_ms":0.197377,"timing_error":""}
+  ok   reports a page that could not receive the data
+
+=== personal info editor save outcomes (linux-personal-save) ===
+# lua_timing {"schema":1,"driver":"linux","id":159,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"a committed save reloads, announces the change and closes the page","status":"pass","elapsed_ms":0.134984,"timing_error":""}
+  ok   a committed save reloads, announces the change and closes the page
+# lua_timing {"schema":1,"driver":"linux","id":160,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"a refused save keeps the editor open and notifies once","status":"pass","elapsed_ms":0.148764,"timing_error":""}
+  ok   a refused save keeps the editor open and notifies once
+# lua_timing {"schema":1,"driver":"linux","id":161,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"a raising persistence layer is a refused save, not a crash","status":"pass","elapsed_ms":0.129575,"timing_error":""}
+  ok   a raising persistence layer is a refused save, not a crash
+# lua_timing {"schema":1,"driver":"linux","id":162,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"a save without a values table never reaches persistence","status":"pass","elapsed_ms":0.109955,"timing_error":""}
+  ok   a save without a values table never reaches persistence
+# lua_timing {"schema":1,"driver":"linux","id":163,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"a catalogue that does not reload leaves the page open and says so","status":"pass","elapsed_ms":0.119340,"timing_error":""}
+  ok   a catalogue that does not reload leaves the page open and says so
+# lua_timing {"schema":1,"driver":"linux","id":164,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"ignores an unknown action and a payload that is not a table","status":"pass","elapsed_ms":0.238930,"timing_error":""}
+  ok   ignores an unknown action and a payload that is not a table
+# lua_timing {"schema":1,"driver":"linux","id":155,"kind":"module","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","name":"tests.unit.ui.personal_info_editor.test_personal_info_editor_payload","status":"pass","elapsed_ms":2.060454,"timing_error":""}
+
+=== personal info editor close ownership (linux-personal-close) ===
+# lua_timing {"schema":1,"driver":"linux","id":166,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","name":"a foreign epoch close keeps the open page's retained source","status":"pass","elapsed_ms":0.213071,"timing_error":""}
+  ok   a foreign epoch close keeps the open page's retained source
+# lua_timing {"schema":1,"driver":"linux","id":167,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","name":"the exact epoch close revokes the source before any persistence","status":"pass","elapsed_ms":0.156216,"timing_error":""}
+  ok   the exact epoch close revokes the source before any persistence
+# lua_timing {"schema":1,"driver":"linux","id":168,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","name":"a fresh opening after close captures and saves with its own source","status":"pass","elapsed_ms":0.187492,"timing_error":""}
+  ok   a fresh opening after close captures and saves with its own source
+# lua_timing {"schema":1,"driver":"linux","id":169,"kind":"case","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","name":"cancel closes the exact page without persistence","status":"pass","elapsed_ms":0.147683,"timing_error":""}
+  ok   cancel closes the exact page without persistence
+# lua_timing {"schema":1,"driver":"linux","id":165,"kind":"module","module":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","name":"tests.unit.ui.personal_info_editor.test_personal_info_editor_close","status":"pass","elapsed_ms":0.854838,"timing_error":""}
+
+=== personal editor fixture process ABI ===
+# lua_timing {"schema":1,"driver":"linux","id":171,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"requires physical mkdir, exact data readback and cleanup through the existing status owner","status":"pass","elapsed_ms":5.524692,"timing_error":""}
+  ok   requires physical mkdir, exact data readback and cleanup through the existing status owner
+# lua_timing {"schema":1,"driver":"linux","id":172,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a non-success process receipt false","status":"pass","elapsed_ms":0.364569,"timing_error":""}
+  ok   refuses a non-success process receipt false
+# lua_timing {"schema":1,"driver":"linux","id":173,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a non-success process receipt nil","status":"pass","elapsed_ms":0.241784,"timing_error":""}
+  ok   refuses a non-success process receipt nil
+# lua_timing {"schema":1,"driver":"linux","id":174,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a non-success process receipt number","status":"pass","elapsed_ms":0.413142,"timing_error":""}
+  ok   refuses a non-success process receipt number
+# lua_timing {"schema":1,"driver":"linux","id":175,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a non-success process receipt text","status":"pass","elapsed_ms":0.298259,"timing_error":""}
+  ok   refuses a non-success process receipt text
+# lua_timing {"schema":1,"driver":"linux","id":176,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a non-success process receipt throw","status":"pass","elapsed_ms":0.233602,"timing_error":""}
+  ok   refuses a non-success process receipt throw
+
+=== personal editor opening-source admission ===
+# lua_timing {"schema":1,"driver":"linux","id":177,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a foreign section added after the actual displayed model","status":"pass","elapsed_ms":5.572007,"timing_error":""}
+  ok   refuses a foreign section added after the actual displayed model
+# lua_timing {"schema":1,"driver":"linux","id":178,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"advances only our committed payload for a second actual save","status":"pass","elapsed_ms":7.634559,"timing_error":""}
+  ok   advances only our committed payload for a second actual save
+# lua_timing {"schema":1,"driver":"linux","id":179,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"fresh reopening admits the new source while the old held view refuses","status":"pass","elapsed_ms":6.246754,"timing_error":""}
+  ok   fresh reopening admits the new source while the old held view refuses
+# lua_timing {"schema":1,"driver":"linux","id":180,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a retired opening owner: epoch","status":"pass","elapsed_ms":6.612108,"timing_error":""}
+  ok   refuses a retired opening owner: epoch
+# lua_timing {"schema":1,"driver":"linux","id":181,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a retired opening owner: route","status":"pass","elapsed_ms":5.939736,"timing_error":""}
+  ok   refuses a retired opening owner: route
+# lua_timing {"schema":1,"driver":"linux","id":182,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a retired opening owner: context","status":"pass","elapsed_ms":5.746416,"timing_error":""}
+  ok   refuses a retired opening owner: context
+# lua_timing {"schema":1,"driver":"linux","id":183,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refuses a retired opening owner: missing","status":"pass","elapsed_ms":5.306958,"timing_error":""}
+  ok   refuses a retired opening owner: missing
+# lua_timing {"schema":1,"driver":"linux","id":184,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"failed initData cannot lend editable authority: false","status":"pass","elapsed_ms":4.773630,"timing_error":""}
+  ok   failed initData cannot lend editable authority: false
+# lua_timing {"schema":1,"driver":"linux","id":185,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"failed initData cannot lend editable authority: nil","status":"pass","elapsed_ms":4.169405,"timing_error":""}
+  ok   failed initData cannot lend editable authority: nil
+# lua_timing {"schema":1,"driver":"linux","id":186,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"failed initData cannot lend editable authority: number","status":"pass","elapsed_ms":4.972410,"timing_error":""}
+  ok   failed initData cannot lend editable authority: number
+# lua_timing {"schema":1,"driver":"linux","id":187,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"failed initData cannot lend editable authority: throw","status":"pass","elapsed_ms":4.462150,"timing_error":""}
+  ok   failed initData cannot lend editable authority: throw
+# lua_timing {"schema":1,"driver":"linux","id":188,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"classifies the opening source before displaying it: malformed","status":"pass","elapsed_ms":3.849758,"timing_error":""}
+  ok   classifies the opening source before displaying it: malformed
+# lua_timing {"schema":1,"driver":"linux","id":189,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"classifies the opening source before displaying it: read_refusal","status":"pass","elapsed_ms":3.682441,"timing_error":""}
+  ok   classifies the opening source before displaying it: read_refusal
+# lua_timing {"schema":1,"driver":"linux","id":190,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"classifies the opening source before displaying it: absent","status":"pass","elapsed_ms":6.733592,"timing_error":""}
+  ok   classifies the opening source before displaying it: absent
+# lua_timing {"schema":1,"driver":"linux","id":191,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refused publication preserves opening authority and supports owned retry: false","status":"pass","elapsed_ms":6.286414,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: false
+# lua_timing {"schema":1,"driver":"linux","id":192,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refused publication preserves opening authority and supports owned retry: nil","status":"pass","elapsed_ms":5.856231,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: nil
+# lua_timing {"schema":1,"driver":"linux","id":193,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refused publication preserves opening authority and supports owned retry: number","status":"pass","elapsed_ms":5.200573,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: number
+# lua_timing {"schema":1,"driver":"linux","id":194,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refused publication preserves opening authority and supports owned retry: text","status":"pass","elapsed_ms":5.710391,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: text
+# lua_timing {"schema":1,"driver":"linux","id":195,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"refused publication preserves opening authority and supports owned retry: throw","status":"pass","elapsed_ms":5.239382,"timing_error":""}
+  ok   refused publication preserves opening authority and supports owned retry: throw
+# lua_timing {"schema":1,"driver":"linux","id":196,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"passes the retained source into the actual stage-time CAS owner","status":"pass","elapsed_ms":4.165103,"timing_error":""}
+  ok   passes the retained source into the actual stage-time CAS owner
+# lua_timing {"schema":1,"driver":"linux","id":197,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"post-ACK foreign bytes cannot become our next-save authority","status":"pass","elapsed_ms":5.033331,"timing_error":""}
+  ok   post-ACK foreign bytes cannot become our next-save authority
+# lua_timing {"schema":1,"driver":"linux","id":198,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"keeps the existing saved-but-reload-refused policy","status":"pass","elapsed_ms":6.187850,"timing_error":""}
+  ok   keeps the existing saved-but-reload-refused policy
+
+=== personal editor opening-source admission ===
+# lua_timing {"schema":1,"driver":"linux","id":199,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"uses the actual manager route and rejects retired page epochs","status":"pass","elapsed_ms":7.899068,"timing_error":""}
+  ok   uses the actual manager route and rejects retired page epochs
+# lua_timing {"schema":1,"driver":"linux","id":200,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"missing committed-payload receipt does not invent a next-save source","status":"pass","elapsed_ms":6.724443,"timing_error":""}
+  ok   missing committed-payload receipt does not invent a next-save source
+# lua_timing {"schema":1,"driver":"linux","id":201,"kind":"case","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"a failed reentrant opening cannot be revived by an older write ACK","status":"pass","elapsed_ms":5.567851,"timing_error":""}
+  ok   a failed reentrant opening cannot be revived by an older write ACK
+# lua_timing {"schema":1,"driver":"linux","id":170,"kind":"module","module":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","name":"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture","status":"pass","elapsed_ms":148.110101,"timing_error":""}
+
+=== the personal information editor source admission ===
+# lua_timing {"schema":1,"driver":"linux","id":203,"kind":"case","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"admits the registered plain renderer and returns its own template owner","status":"pass","elapsed_ms":0.014021,"timing_error":""}
+  ok   admits the registered plain renderer and returns its own template owner
+# lua_timing {"schema":1,"driver":"linux","id":204,"kind":"case","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"refuses a renderer that is not the registered infra.manifest_menu","status":"pass","elapsed_ms":0.001682,"timing_error":""}
+  ok   refuses a renderer that is not the registered infra.manifest_menu
+# lua_timing {"schema":1,"driver":"linux","id":205,"kind":"case","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"refuses a renderer with a metatable or a missing owner","status":"pass","elapsed_ms":0.003395,"timing_error":""}
+  ok   refuses a renderer with a metatable or a missing owner
+# lua_timing {"schema":1,"driver":"linux","id":206,"kind":"case","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"refuses a declaration that is not the single plain editor command","status":"pass","elapsed_ms":0.095874,"timing_error":""}
+  ok   refuses a declaration that is not the single plain editor command
+# lua_timing {"schema":1,"driver":"linux","id":207,"kind":"case","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"reports false once the retained declaration or the facade changed","status":"pass","elapsed_ms":0.437439,"timing_error":""}
+  ok   reports false once the retained declaration or the facade changed
+# lua_timing {"schema":1,"driver":"linux","id":202,"kind":"module","module":"tests.unit.ui.menu.structure.test_menu_personal_info_source","name":"tests.unit.ui.menu.structure.test_menu_personal_info_source","status":"pass","elapsed_ms":0.782278,"timing_error":""}
+TARGETED passed=191 failed=0

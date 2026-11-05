@@ -1,0 +1,31 @@
+default alias p -> first_name full-value/private=true
+default alias m -> email_address full-value/private=true
+default alias n -> last_name full-value/private=true
+default alias i -> iban full-value/private=true
+default alias t -> phone_number full-value/private=true
+default alias w -> work_email_address full-value/private=true
+default alias s -> social_security_number full-value/private=true
+default alias e -> email_address full-value/private=true
+default alias f -> phone_number_clean full-value/private=true
+default alias c -> credit_card full-value/private=true
+default alias d -> date_of_birth full-value/private=true
+default alias a -> street_address full-value/private=true
+default alias b -> bic full-value/private=true
+field bic remap p: full-value/private=true preview=masked
+field city remap p: full-value/private=true preview=unmasked
+field country remap p: full-value/private=true preview=unmasked
+field credit_card remap p: full-value/private=true preview=masked
+field date_of_birth remap p: full-value/private=true preview=unmasked
+field email_address remap p: full-value/private=true preview=unmasked
+field first_name remap p: full-value/private=true preview=unmasked
+field iban remap p: full-value/private=true preview=masked
+field last_name remap p: full-value/private=true preview=unmasked
+field phone_number remap p: full-value/private=true preview=unmasked
+field phone_number_clean remap p: full-value/private=true preview=unmasked
+field postal_code remap p: full-value/private=true preview=unmasked
+field social_security_number remap p: full-value/private=true preview=masked
+newline preview normalization="Line1Line2"
+field street_address remap p: full-value/private=true preview=unmasked
+field work_email_address remap p: full-value/private=true preview=unmasked
+MATRIX PASS: 13 default aliases;15 known fields;4 masked fields;known MH001 literal-provider preview delta retained once
+classification-unavailable and unknown-field controls: fail closed; no raw value shown

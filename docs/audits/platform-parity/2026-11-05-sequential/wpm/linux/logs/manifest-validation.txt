@@ -1,0 +1,2 @@
+PASS task schema1 required fields, severities/guarantees, SHA, report/evidence existence, final sweep logs.
+Repository workflow validator refused scratch report: report must be inside repository; its schema additionally restricts ahk/hammerspoon dated paths and does not support this task-specific Linux scratch scope. No repository artifact created to bypass contract.

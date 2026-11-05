@@ -1,0 +1,69 @@
+{
+	"schema_version": 1,
+	"scope": "macOS wrap symbols",
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"created_at": "2026-11-05",
+	"report_path": "report.md",
+	"findings": [
+		{
+			"id": "WSM-001",
+			"title": "Checked guillemet pair does not match native layout trigger strings",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["truthful menu state"],
+			"reproduction": "Enable physical selection wrapping, keep the guillemet row checked, and type bare or shipped Ergopti NBSP guillemets over a readable selection. Actual native callback returns passthrough with zero AX reads/writes/pastes. ASCII-space full-trigger positive control consumes and wraps successfully.",
+			"root_cause": "Text flattens full delimiter strings as event lookup keys; shared catalogue guillemets use ASCII spaces, while shipped Ergopti layout outputs NBSP and other layouts bare guillemets. System uses exact e:getCharacters lookup and never normalizes trigger identity separately from output delimiters.",
+			"silent_failure": "Unmatched lookup is ordinary passthrough, producing no diagnostics. Actual menu keeps the pair checked; parameterized copied wrap is a separate working backstop.",
+			"regression_test": "Exercise actual menu/live getter/eventtap with bare, NBSP and actual supported layout output strings; require wrapping and intended output spacing, preserving no-selection/raw-key controls.",
+			"evidence": [
+				"report.md",
+				"probes/menu.lua",
+				"probes/menu.log",
+				"probes/trigger.lua",
+				"probes/trigger.log",
+				"probes/layout-guillemet-source.json",
+				"probes/native-event-contract.txt"
+			]
+		},
+		{
+			"id": "WSM-002",
+			"title": "Wrap clipboard restoration discards later pasteboard items",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["clipboard integrity"],
+			"reproduction": "Run actual Text/SyntheticInput/Timer owners and exact upstream Hammerspoon1.1.1 pasteboard wrappers over two-item board: text+HTML first item, PNG only in second. Wrap accepts and pastes, then cleanup loses the PNG and second item with zero errors; single-item control restores both first-item types. Copy-based wrap with no selection likewise loses later item data without pasting.",
+			"root_cause": "capture_text_clipboard assumes readAllData is complete, but pinned upstream implementation enumerates only contentTypes of first NSPasteboardItem. writeAllData clears the entire board before restoring only saved representations. No allContentTypes item-shape admission check occurs.",
+			"silent_failure": "Stable changeCount and true native setter acknowledgments cannot detect an incomplete snapshot. Exact owner settles and logs normal completion with no error. No other borrower, foreign writer or focus transition is involved; prior MCP001–003 are separate.",
+			"regression_test": "Use actual upstream Lua read/write wrappers with item-aware native primitives; require exact preservation of every item/representation or loud refusal before mutation. Include empty/no-selection, single-item, native refusal, foreign generation and actual Darwin multi-object qualification.",
+			"evidence": [
+				"report.md",
+				"probes/multi-item.lua",
+				"probes/multi-item.log",
+				"probes/upstream-pasteboard-1.1.1.lua",
+				"probes/upstream-pasteboard-provenance.txt",
+				"probes/native-pasteboard-contract.txt"
+			]
+		},
+		{
+			"id": "WSM-003",
+			"title": "Disabling lower curly quotes removes a still-enabled opener",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"additional_properties": ["truthful menu state"],
+			"reproduction": "Through actual menu, disable only „ … “, leaving “ … ” checked. Active getter no longer contains “ and actual eventtap passes it without AX/paste; closing ” control still wraps with “ … ”. Refused-save control preserves prior state/input view.",
+			"root_cause": "At load Text preflattens endpoints, so later pair „→“ overwrites earlier opener “→”. Runtime per-left filtering removes the overwritten key when „ is disabled, without reconsidering earlier still-enabled pairs.",
+			"silent_failure": "The menu tracks each opening state independently and continues checking “ … ”; no native or persistence error occurs. Typing its closing endpoint and explicit parameterized wrap remain limited backstops. Ambiguous both-enabled default precedence is not counted as a defect.",
+			"regression_test": "Filter enabled catalogue pairs before collision policy; define overlap priority and test each colliding pair disabled independently through actual menu→getter→eventtap. Assert effects and checked state, not table existence.",
+			"evidence": [
+				"report.md",
+				"probes/menu.lua",
+				"probes/menu.log",
+				"probes/trigger.lua",
+				"probes/trigger.log"
+			]
+		}
+	]
+}

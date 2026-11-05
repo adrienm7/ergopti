@@ -1,0 +1,58 @@
+PROBE trigger exit=0 sha256=aa3d44c7e7497e6648b2f960a594ca6a4cd3fb40ed7e7ce59fa49de951080dbb
+input="(" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="(é雪\
+line)" restores=1 all-types=restored
+paused admission control: no additional write or paste
+retired tap control: no additional clipboard mutation
+input="«" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="»" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="« " decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input=" »" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="« " decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="« é雪\
+line »" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=false AXreads=1 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=false AXreads=1 writes=1 pastes=0 pasted="" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="(" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="(é雪\
+line)" restores=2 all-types=restored
+retired tap control: no additional clipboard mutation
+input="⟦" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="⟦é雪\
+line⟧" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="“" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="„é雪\
+line“" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+input="“" decision=passthrough consumed=false AXreads=0 writes=0 pastes=0 pasted="" restores=0 all-types=restored
+retired tap control: no additional clipboard mutation
+input="”" decision=wrap consumed=true AXreads=1 writes=1 pastes=1 pasted="“é雪\
+line”" restores=1 all-types=restored
+retired tap control: no additional clipboard mutation
+
+PROBE menu exit=0 sha256=40f0887722dad7d7afa3db19604942363c5b6d944ddc72abf6670f56fe7dc258
+refused preference ACK control: prior “ native lookup remains and state unchanged
+WSM-003 actual menu: disabled „ … “; refreshed “ … ” stays checked; live input getter[“]=nil; saves=2
+WSM-001 actual menu: spaced « … » stays checked; bare and shipped NBSP guillemet triggers absent; ASCII-space key present
+
+PROBE multi-item exit=0 sha256=88070bd237ead639eff8a8f775af3ee39d543761d5a5aede5b186ef983c899b3
+native wrapper/control diagnostic errors=0
+CONTROL original-items=1 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="(selected)" copied-empty=false
+native wrapper/control diagnostic errors=0
+WSM-002 REPRO original-items=2 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="(selected)" copied-empty=false
+native wrapper/control diagnostic errors=0
+CONTROL original-items=1 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="" copied-empty=true
+native wrapper/control diagnostic errors=0
+WSM-002 REPRO original-items=2 final-items=1 first-text+html=restored later-PNG=nil item-count-probes=0 paste="" copied-empty=true
+
+PROBE copied exit=0 sha256=b6224d93651136a7f90642aa2df38648e1023eb78f9f767d2c73dcf10a29af8c
+healthy copied selection: actual custom parameter parser **|** -> actual copy/wrap/native CmdV; pasted **SELECTED WORDS**; full text+HTML restored
+healthy action parser: bare guillemet resolves spaced delimiters; newline parameter refused; copied route is distinct from exact physical-symbol lookup
+

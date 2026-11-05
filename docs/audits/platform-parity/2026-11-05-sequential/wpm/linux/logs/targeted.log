@@ -1,0 +1,610 @@
+
+=== wpm readouts: the shared canon ===
+# lua_timing {"schema":1,"driver":"linux","id":2,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"loads, with every key the readouts draw with","status":"pass","elapsed_ms":0.930310,"timing_error":""}
+  ok   loads, with every key the readouts draw with
+# lua_timing {"schema":1,"driver":"linux","id":3,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"refuses a canon missing a key rather than drawing with a guess","status":"pass","elapsed_ms":0.532992,"timing_error":""}
+  ok   refuses a canon missing a key rather than drawing with a guess
+# lua_timing {"schema":1,"driver":"linux","id":4,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"refuses a colour that is not #RRGGBB","status":"pass","elapsed_ms":0.434394,"timing_error":""}
+  ok   refuses a colour that is not #RRGGBB
+# lua_timing {"schema":1,"driver":"linux","id":5,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"names the Storage keys of the saved place, the same on every driver","status":"pass","elapsed_ms":1.142189,"timing_error":""}
+  ok   names the Storage keys of the saved place, the same on every driver
+
+=== wpm readouts: colours ===
+# lua_timing {"schema":1,"driver":"linux","id":6,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"darkens the strip to 40 % of each channel, as macOS and Windows do","status":"pass","elapsed_ms":0.252490,"timing_error":""}
+  ok   darkens the strip to 40 % of each channel, as macOS and Windows do
+# lua_timing {"schema":1,"driver":"linux","id":7,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"paints the AI's text in the AI colour","status":"pass","elapsed_ms":0.267383,"timing_error":""}
+  ok   paints the AI's text in the AI colour
+# lua_timing {"schema":1,"driver":"linux","id":8,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"paints a hotstring in its group's own colour","status":"pass","elapsed_ms":0.262565,"timing_error":""}
+  ok   paints a hotstring in its group's own colour
+# lua_timing {"schema":1,"driver":"linux","id":9,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"falls back to the canon's accent when a group has no usable colour","status":"pass","elapsed_ms":0.249956,"timing_error":""}
+  ok   falls back to the canon's accent when a group has no usable colour
+# lua_timing {"schema":1,"driver":"linux","id":10,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps neutral sources in the manual colour","status":"pass","elapsed_ms":0.424408,"timing_error":""}
+  ok   keeps neutral sources in the manual colour
+# lua_timing {"schema":1,"driver":"linux","id":11,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"returns to the manual colour once the source is older than the hold","status":"pass","elapsed_ms":0.429757,"timing_error":""}
+  ok   returns to the manual colour once the source is older than the hold
+# lua_timing {"schema":1,"driver":"linux","id":12,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"with colours off, draws the manual pill — never the idle one","status":"pass","elapsed_ms":0.483968,"timing_error":""}
+  ok   with colours off, draws the manual pill — never the idle one
+# lua_timing {"schema":1,"driver":"linux","id":13,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"shows the number and the translated unit apart","status":"pass","elapsed_ms":0.262646,"timing_error":""}
+  ok   shows the number and the translated unit apart
+
+=== wpm readouts: the graph ===
+# lua_timing {"schema":1,"driver":"linux","id":14,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps the canon's number of samples","status":"pass","elapsed_ms":0.374965,"timing_error":""}
+  ok   keeps the canon's number of samples
+# lua_timing {"schema":1,"driver":"linux","id":15,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"draws the curve inside the panel, clamped at the fixed scale","status":"pass","elapsed_ms":0.345630,"timing_error":""}
+  ok   draws the curve inside the panel, clamped at the fixed scale
+# lua_timing {"schema":1,"driver":"linux","id":16,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"shares the pill's bottom-right corner, so switching mode does not move it","status":"pass","elapsed_ms":0.819833,"timing_error":""}
+  ok   shares the pill's bottom-right corner, so switching mode does not move it
+
+=== wpm readouts: when they show ===
+# lua_timing {"schema":1,"driver":"linux","id":17,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"shows while text is appearing","status":"pass","elapsed_ms":0.020631,"timing_error":""}
+  ok   shows while text is appearing
+# lua_timing {"schema":1,"driver":"linux","id":18,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"stays up briefly after typing stops, then hides","status":"pass","elapsed_ms":0.001362,"timing_error":""}
+  ok   stays up briefly after typing stops, then hides
+# lua_timing {"schema":1,"driver":"linux","id":19,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"hides as soon as the mouse moves after the last keystroke","status":"pass","elapsed_ms":0.000721,"timing_error":""}
+  ok   hides as soon as the mouse moves after the last keystroke
+# lua_timing {"schema":1,"driver":"linux","id":20,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"stays up while a preview is on screen","status":"pass","elapsed_ms":0.000621,"timing_error":""}
+  ok   stays up while a preview is on screen
+# lua_timing {"schema":1,"driver":"linux","id":21,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"shows the menu bar readout while typing or while a source colours it","status":"pass","elapsed_ms":0.001091,"timing_error":""}
+  ok   shows the menu bar readout while typing or while a source colours it
+# lua_timing {"schema":1,"driver":"linux","id":22,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"sits by default in the screen's bottom-right corner, inset","status":"pass","elapsed_ms":0.717770,"timing_error":""}
+  ok   sits by default in the screen's bottom-right corner, inset
+
+=== wpm readouts: the live speed ===
+# lua_timing {"schema":1,"driver":"linux","id":23,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"counts typed characters as words per minute","status":"pass","elapsed_ms":0.024587,"timing_error":""}
+  ok   counts typed characters as words per minute
+# lua_timing {"schema":1,"driver":"linux","id":24,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"reads 0 after a pause, not the last burst's speed","status":"pass","elapsed_ms":0.059940,"timing_error":""}
+  ok   reads 0 after a pause, not the last burst's speed
+# lua_timing {"schema":1,"driver":"linux","id":25,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"names the last source and its group","status":"pass","elapsed_ms":0.001883,"timing_error":""}
+  ok   names the last source and its group
+# lua_timing {"schema":1,"driver":"linux","id":26,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"is fed by the Linux keystats's typing, expansions and completions","status":"pass","elapsed_ms":47.107023,"timing_error":""}
+  ok   is fed by the Linux keystats's typing, expansions and completions
+
+=== wpm readouts: the floating widget ===
+# lua_timing {"schema":1,"driver":"linux","id":27,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"refuses native hide before changing the persisted visibility","status":"pass","elapsed_ms":15.701486,"timing_error":""}
+  ok   refuses native hide before changing the persisted visibility
+# lua_timing {"schema":1,"driver":"linux","id":28,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"captures and reapplies its exact frame without preference writes","status":"pass","elapsed_ms":0.907376,"timing_error":""}
+  ok   captures and reapplies its exact frame without preference writes
+# lua_timing {"schema":1,"driver":"linux","id":29,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"draws the pill in the bottom-right corner while the user types","status":"pass","elapsed_ms":1.859929,"timing_error":""}
+  ok   draws the pill in the bottom-right corner while the user types
+# lua_timing {"schema":1,"driver":"linux","id":30,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"redraws at the shared rate, however often it is ticked","status":"pass","elapsed_ms":0.674485,"timing_error":""}
+  ok   redraws at the shared rate, however often it is ticked
+# lua_timing {"schema":1,"driver":"linux","id":31,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"hides once the user stops typing and goes back to the mouse","status":"pass","elapsed_ms":0.447003,"timing_error":""}
+  ok   hides once the user stops typing and goes back to the mouse
+# lua_timing {"schema":1,"driver":"linux","id":32,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps the place the user drags it to, across a restart","status":"pass","elapsed_ms":0.986885,"timing_error":""}
+  ok   keeps the place the user drags it to, across a restart
+# lua_timing {"schema":1,"driver":"linux","id":33,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps the complete WPM position when the second scalar drag publication refuses","status":"pass","elapsed_ms":1.061487,"timing_error":""}
+  ok   keeps the complete WPM position when the second scalar drag publication refuses
+# lua_timing {"schema":1,"driver":"linux","id":34,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps the complete WPM position when the second scalar reset publication refuses","status":"pass","elapsed_ms":1.676823,"timing_error":""}
+  ok   keeps the complete WPM position when the second scalar reset publication refuses
+# lua_timing {"schema":1,"driver":"linux","id":35,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps both saved WPM coordinates after a false batch refusal","status":"pass","elapsed_ms":1.407969,"timing_error":""}
+  ok   keeps both saved WPM coordinates after a false batch refusal
+# lua_timing {"schema":1,"driver":"linux","id":36,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps both saved WPM coordinates after a throw batch refusal","status":"pass","elapsed_ms":1.496702,"timing_error":""}
+  ok   keeps both saved WPM coordinates after a throw batch refusal
+# lua_timing {"schema":1,"driver":"linux","id":37,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"keeps both saved WPM coordinates after a missing batch refusal","status":"pass","elapsed_ms":1.541690,"timing_error":""}
+  ok   keeps both saved WPM coordinates after a missing batch refusal
+# lua_timing {"schema":1,"driver":"linux","id":38,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"draws the graph in graph mode, and keeps that choice","status":"pass","elapsed_ms":1.972989,"timing_error":""}
+  ok   draws the graph in graph mode, and keeps that choice
+# lua_timing {"schema":1,"driver":"linux","id":39,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"hides its own window on stop, never the preview bubble","status":"pass","elapsed_ms":1.555351,"timing_error":""}
+  ok   hides its own window on stop, never the preview bubble
+
+=== wpm readouts: the tray readout ===
+# lua_timing {"schema":1,"driver":"linux","id":40,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"refuses native retirement without losing the live item or preference","status":"pass","elapsed_ms":4.258848,"timing_error":""}
+  ok   refuses native retirement without losing the live item or preference
+# lua_timing {"schema":1,"driver":"linux","id":41,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"recreates the exact retired readout without preference writes","status":"pass","elapsed_ms":3.465440,"timing_error":""}
+  ok   recreates the exact retired readout without preference writes
+# lua_timing {"schema":1,"driver":"linux","id":42,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"appears with the speed while typing, and leaves the panel after","status":"pass","elapsed_ms":3.233271,"timing_error":""}
+  ok   appears with the speed while typing, and leaves the panel after
+# lua_timing {"schema":1,"driver":"linux","id":43,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"paints a new icon file when the number changes, so a panel's cache cannot hold the old one","status":"pass","elapsed_ms":5.636611,"timing_error":""}
+  ok   paints a new icon file when the number changes, so a panel's cache cannot hold the old one
+# lua_timing {"schema":1,"driver":"linux","id":44,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"is coloured by the source, as on macOS, unless colours are off","status":"pass","elapsed_ms":7.174906,"timing_error":""}
+  ok   is coloured by the source, as on macOS, unless colours are off
+# lua_timing {"schema":1,"driver":"linux","id":45,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"removes its item on stop, and keeps that choice","status":"pass","elapsed_ms":7.017655,"timing_error":""}
+  ok   removes its item on stop, and keeps that choice
+# lua_timing {"schema":1,"driver":"linux","id":1,"kind":"module","module":"tests.unit.ui.metrics.test_wpm_readouts","name":"tests.unit.ui.metrics.test_wpm_readouts","status":"pass","elapsed_ms":120.888840,"timing_error":""}
+
+=== wpm widget: what gets written ===
+# lua_timing {"schema":1,"driver":"linux","id":47,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"stores nothing while both switches are at their shipped default","status":"pass","elapsed_ms":4.599276,"timing_error":""}
+  ok   stores nothing while both switches are at their shipped default
+# lua_timing {"schema":1,"driver":"linux","id":48,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"remembers that the user turned it on","status":"pass","elapsed_ms":1.521329,"timing_error":""}
+  ok   remembers that the user turned it on
+# lua_timing {"schema":1,"driver":"linux","id":49,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"clears the entry when it is turned off again","status":"pass","elapsed_ms":0.924261,"timing_error":""}
+  ok   clears the entry when it is turned off again
+# lua_timing {"schema":1,"driver":"linux","id":50,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"remembers the colour mode","status":"pass","elapsed_ms":0.286862,"timing_error":""}
+  ok   remembers the colour mode
+# lua_timing {"schema":1,"driver":"linux","id":51,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"keeps the durable visibility and colour state when writes fail","status":"pass","elapsed_ms":0.256756,"timing_error":""}
+  ok   keeps the durable visibility and colour state when writes fail
+
+=== wpm widget: what gets read ===
+# lua_timing {"schema":1,"driver":"linux","id":52,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"comes up showing when the user left it showing","status":"pass","elapsed_ms":0.281254,"timing_error":""}
+  ok   comes up showing when the user left it showing
+# lua_timing {"schema":1,"driver":"linux","id":53,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"comes up with the colour mode the user chose","status":"pass","elapsed_ms":2.516897,"timing_error":""}
+  ok   comes up with the colour mode the user chose
+# lua_timing {"schema":1,"driver":"linux","id":54,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"falls back to the shipped default when nothing is stored","status":"pass","elapsed_ms":0.244638,"timing_error":""}
+  ok   falls back to the shipped default when nothing is stored
+# lua_timing {"schema":1,"driver":"linux","id":55,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"refuses a malformed canonical boolean before changing the runtime","status":"pass","elapsed_ms":0.522015,"timing_error":""}
+  ok   refuses a malformed canonical boolean before changing the runtime
+
+=== wpm widget: it is ticked ===
+# lua_timing {"schema":1,"driver":"linux","id":56,"kind":"case","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"has a caller for tick in the daemon","status":"pass","elapsed_ms":1.601841,"timing_error":""}
+  ok   has a caller for tick in the daemon
+# lua_timing {"schema":1,"driver":"linux","id":46,"kind":"module","module":"tests.unit.ui.metrics.test_wpm_widget_persistence","name":"tests.unit.ui.metrics.test_wpm_widget_persistence","status":"pass","elapsed_ms":13.248420,"timing_error":""}
+
+=== WPM surface terminal hide ===
+# lua_timing {"schema":1,"driver":"linux","id":58,"kind":"case","module":"tests.unit.adapters.system.test_wpm_surface_lifecycle","name":"rejects refused or unobserved native show before releasing restoration","status":"pass","elapsed_ms":0.672782,"timing_error":""}
+  ok   rejects refused or unobserved native show before releasing restoration
+# lua_timing {"schema":1,"driver":"linux","id":59,"kind":"case","module":"tests.unit.adapters.system.test_wpm_surface_lifecycle","name":"acknowledges an absent window and a verified native hide","status":"pass","elapsed_ms":0.150486,"timing_error":""}
+  ok   acknowledges an absent window and a verified native hide
+# lua_timing {"schema":1,"driver":"linux","id":60,"kind":"case","module":"tests.unit.adapters.system.test_wpm_surface_lifecycle","name":"rejects thrown and unobserved hides while retaining the window for retry","status":"pass","elapsed_ms":0.259340,"timing_error":""}
+  ok   rejects thrown and unobserved hides while retaining the window for retry
+# lua_timing {"schema":1,"driver":"linux","id":57,"kind":"module","module":"tests.unit.adapters.system.test_wpm_surface_lifecycle","name":"tests.unit.adapters.system.test_wpm_surface_lifecycle","status":"pass","elapsed_ms":1.332656,"timing_error":""}
+
+=== Metrics widget menu parity ===
+# lua_timing {"schema":1,"driver":"linux","id":62,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity declared checks","status":"pass","elapsed_ms":0.072569,"timing_error":""}
+  ok   metrics-widget-parity declared checks
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":63,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0000","status":"pass","elapsed_ms":115.066414,"timing_error":""}
+  ok   metrics-widget-parity 0000
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":64,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0001","status":"pass","elapsed_ms":50.115461,"timing_error":""}
+  ok   metrics-widget-parity 0001
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":65,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0010","status":"pass","elapsed_ms":56.032919,"timing_error":""}
+  ok   metrics-widget-parity 0010
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":66,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0011","status":"pass","elapsed_ms":46.045021,"timing_error":""}
+  ok   metrics-widget-parity 0011
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":67,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0100","status":"pass","elapsed_ms":52.540870,"timing_error":""}
+  ok   metrics-widget-parity 0100
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":68,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0101","status":"pass","elapsed_ms":62.557576,"timing_error":""}
+  ok   metrics-widget-parity 0101
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":69,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0110","status":"pass","elapsed_ms":52.493203,"timing_error":""}
+  ok   metrics-widget-parity 0110
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":70,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 0111","status":"pass","elapsed_ms":53.045734,"timing_error":""}
+  ok   metrics-widget-parity 0111
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":71,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1000","status":"pass","elapsed_ms":61.631424,"timing_error":""}
+  ok   metrics-widget-parity 1000
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":72,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1001","status":"pass","elapsed_ms":43.571514,"timing_error":""}
+  ok   metrics-widget-parity 1001
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":73,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1010","status":"pass","elapsed_ms":56.400623,"timing_error":""}
+  ok   metrics-widget-parity 1010
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":74,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1011","status":"pass","elapsed_ms":41.582876,"timing_error":""}
+  ok   metrics-widget-parity 1011
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":75,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1100","status":"pass","elapsed_ms":44.414887,"timing_error":""}
+  ok   metrics-widget-parity 1100
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":76,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1101","status":"pass","elapsed_ms":47.976893,"timing_error":""}
+  ok   metrics-widget-parity 1101
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":77,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1110","status":"pass","elapsed_ms":60.407686,"timing_error":""}
+  ok   metrics-widget-parity 1110
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":78,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-parity 1111","status":"pass","elapsed_ms":48.128636,"timing_error":""}
+  ok   metrics-widget-parity 1111
+
+=== Metrics widget commands ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":79,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command wpm_widget false","status":"pass","elapsed_ms":50.195806,"timing_error":""}
+  ok   metrics-widget-command wpm_widget false
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":80,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command wpm_widget true","status":"pass","elapsed_ms":53.466302,"timing_error":""}
+  ok   metrics-widget-command wpm_widget true
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":81,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command widget_colors false","status":"pass","elapsed_ms":58.255779,"timing_error":""}
+  ok   metrics-widget-command widget_colors false
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":82,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command widget_colors true","status":"pass","elapsed_ms":76.992308,"timing_error":""}
+  ok   metrics-widget-command widget_colors true
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":83,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command include_realtime false","status":"pass","elapsed_ms":51.886575,"timing_error":""}
+  ok   metrics-widget-command include_realtime false
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":84,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-widget-command include_realtime true","status":"pass","elapsed_ms":51.017273,"timing_error":""}
+  ok   metrics-widget-command include_realtime true
+
+=== declared inert Metrics migration statuses ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":85,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"keeps actual unavailable status inert (metrics-migration-label)","status":"pass","elapsed_ms":52.172556,"timing_error":""}
+  ok   keeps actual unavailable status inert (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":86,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"reads actual unavailable shared caption mutations (metrics-migration-label)","status":"pass","elapsed_ms":52.568756,"timing_error":""}
+  ok   reads actual unavailable shared caption mutations (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":87,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"keeps actual idle status inert (metrics-migration-label)","status":"pass","elapsed_ms":58.996659,"timing_error":""}
+  ok   keeps actual idle status inert (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":88,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"reads actual idle shared caption mutations (metrics-migration-label)","status":"pass","elapsed_ms":41.798271,"timing_error":""}
+  ok   reads actual idle shared caption mutations (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":89,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"honors actual unavailable platform hiding (metrics-migration-label)","status":"pass","elapsed_ms":41.220195,"timing_error":""}
+  ok   honors actual unavailable platform hiding (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":90,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"honors actual idle platform hiding (metrics-migration-label)","status":"pass","elapsed_ms":44.073609,"timing_error":""}
+  ok   honors actual idle platform hiding (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":91,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"preserves running progress and native false cancellation policy (metrics-migration-label)","status":"pass","elapsed_ms":62.751925,"timing_error":""}
+  ok   preserves running progress and native false cancellation policy (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":92,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"preserves running progress and native nil cancellation policy (metrics-migration-label)","status":"pass","elapsed_ms":50.485897,"timing_error":""}
+  ok   preserves running progress and native nil cancellation policy (metrics-migration-label)
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":93,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"preserves running progress and native truthy cancellation policy (metrics-migration-label)","status":"pass","elapsed_ms":43.282188,"timing_error":""}
+  ok   preserves running progress and native truthy cancellation policy (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":94,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"replays inert labels and platform hiding in all 21 locales (metrics-migration-label)","status":"pass","elapsed_ms":716.798870,"timing_error":""}
+  ok   replays inert labels and platform hiding in all 21 locales (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":95,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label missing identity (metrics-migration-label)","status":"pass","elapsed_ms":0.115754,"timing_error":""}
+  ok   refuses inert label missing identity (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":96,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label empty caption (metrics-migration-label)","status":"pass","elapsed_ms":0.086881,"timing_error":""}
+  ok   refuses inert label empty caption (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":97,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label command metadata (metrics-migration-label)","status":"pass","elapsed_ms":0.042003,"timing_error":""}
+  ok   refuses inert label command metadata (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":98,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label caption getter (metrics-migration-label)","status":"pass","elapsed_ms":0.133220,"timing_error":""}
+  ok   refuses inert label caption getter (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":99,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label checked predicate (metrics-migration-label)","status":"pass","elapsed_ms":0.179370,"timing_error":""}
+  ok   refuses inert label checked predicate (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":100,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label private disabled flag (metrics-migration-label)","status":"pass","elapsed_ms":0.079119,"timing_error":""}
+  ok   refuses inert label private disabled flag (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":101,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label foreign field (metrics-migration-label)","status":"pass","elapsed_ms":0.085158,"timing_error":""}
+  ok   refuses inert label foreign field (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":102,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label uppercase caption field (metrics-migration-label)","status":"pass","elapsed_ms":0.081983,"timing_error":""}
+  ok   refuses inert label uppercase caption field (metrics-migration-label)
+# lua_timing {"schema":1,"driver":"linux","id":103,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses inert label empty unavailable policy (metrics-migration-label)","status":"pass","elapsed_ms":0.066119,"timing_error":""}
+  ok   refuses inert label empty unavailable policy (metrics-migration-label)
+
+=== shared checked and section-header templates ===
+# lua_timing {"schema":1,"driver":"linux","id":104,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"decorates inert id-less and named headers on hs (template-header)","status":"pass","elapsed_ms":9.018406,"timing_error":""}
+  ok   decorates inert id-less and named headers on hs (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":105,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains grey header stand-ins on hs (template-header)","status":"pass","elapsed_ms":5.859715,"timing_error":""}
+  ok   retains grey header stand-ins on hs (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":106,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"keeps check delivery and current readiness on hs (template-check)","status":"pass","elapsed_ms":5.080422,"timing_error":""}
+  ok   keeps check delivery and current readiness on hs (template-check)
+# lua_timing {"schema":1,"driver":"linux","id":107,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"decorates inert id-less and named headers on linux (template-header)","status":"pass","elapsed_ms":4.491075,"timing_error":""}
+  ok   decorates inert id-less and named headers on linux (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":108,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains grey header stand-ins on linux (template-header)","status":"pass","elapsed_ms":4.152797,"timing_error":""}
+  ok   retains grey header stand-ins on linux (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":109,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"keeps check delivery and current readiness on linux (template-check)","status":"pass","elapsed_ms":4.055821,"timing_error":""}
+  ok   keeps check delivery and current readiness on linux (template-check)
+# lua_timing {"schema":1,"driver":"linux","id":110,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"decorates inert id-less and named headers on ahk (template-header)","status":"pass","elapsed_ms":4.231165,"timing_error":""}
+  ok   decorates inert id-less and named headers on ahk (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":111,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains grey header stand-ins on ahk (template-header)","status":"pass","elapsed_ms":4.094850,"timing_error":""}
+  ok   retains grey header stand-ins on ahk (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":112,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"keeps check delivery and current readiness on ahk (template-check)","status":"pass","elapsed_ms":4.624396,"timing_error":""}
+  ok   keeps check delivery and current readiness on ahk (template-check)
+# lua_timing {"schema":1,"driver":"linux","id":113,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains all sixteen existing id-less header declarations (template-header)","status":"pass","elapsed_ms":306.471131,"timing_error":""}
+  ok   retains all sixteen existing id-less header declarations (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":114,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata id 1 (template-header)","status":"pass","elapsed_ms":29.116460,"timing_error":""}
+  ok   refuses header metadata id 1 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":115,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata id 2 (template-header)","status":"pass","elapsed_ms":15.603212,"timing_error":""}
+  ok   refuses header metadata id 2 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":116,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata i18n 3 (template-header)","status":"pass","elapsed_ms":13.479576,"timing_error":""}
+  ok   refuses header metadata i18n 3 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":117,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata i18n 4 (template-header)","status":"pass","elapsed_ms":24.542980,"timing_error":""}
+  ok   refuses header metadata i18n 4 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":118,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata unavailable 5 (template-header)","status":"pass","elapsed_ms":26.754827,"timing_error":""}
+  ok   refuses header metadata unavailable 5 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":119,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata unavailable 6 (template-header)","status":"pass","elapsed_ms":13.218254,"timing_error":""}
+  ok   refuses header metadata unavailable 6 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":120,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata reason_key 7 (template-header)","status":"pass","elapsed_ms":14.281573,"timing_error":""}
+  ok   refuses header metadata reason_key 7 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":121,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata reason_key 8 (template-header)","status":"pass","elapsed_ms":26.985003,"timing_error":""}
+  ok   refuses header metadata reason_key 8 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":122,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata command 9 (template-header)","status":"pass","elapsed_ms":14.217407,"timing_error":""}
+  ok   refuses header metadata command 9 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":123,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata caption_getter 10 (template-header)","status":"pass","elapsed_ms":13.630284,"timing_error":""}
+  ok   refuses header metadata caption_getter 10 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":124,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata checked_when 11 (template-header)","status":"pass","elapsed_ms":17.373885,"timing_error":""}
+  ok   refuses header metadata checked_when 11 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":125,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata disabled_when 12 (template-header)","status":"pass","elapsed_ms":30.223204,"timing_error":""}
+  ok   refuses header metadata disabled_when 12 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":126,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata disabled 13 (template-header)","status":"pass","elapsed_ms":15.387838,"timing_error":""}
+  ok   refuses header metadata disabled 13 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":127,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata action 14 (template-header)","status":"pass","elapsed_ms":12.229076,"timing_error":""}
+  ok   refuses header metadata action 14 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":128,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata items 15 (template-header)","status":"pass","elapsed_ms":22.073435,"timing_error":""}
+  ok   refuses header metadata items 15 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":129,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata foreign_field 16 (template-header)","status":"pass","elapsed_ms":20.875733,"timing_error":""}
+  ok   refuses header metadata foreign_field 16 (template-header)
+# lua_timing {"schema":1,"driver":"linux","id":130,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses header metadata I18N 17 (template-header)","status":"pass","elapsed_ms":12.625612,"timing_error":""}
+  ok   refuses header metadata I18N 17 (template-header)
+
+=== Template groups: existing readiness and reason policy (template-group-policy) ===
+# lua_timing {"schema":1,"driver":"linux","id":131,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains exact absent-policy group data and child refusal on hs","status":"pass","elapsed_ms":0.148083,"timing_error":""}
+  ok   retains exact absent-policy group data and child refusal on hs
+# lua_timing {"schema":1,"driver":"linux","id":132,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates positive group readiness and literal caption to existing owners on hs","status":"pass","elapsed_ms":0.118438,"timing_error":""}
+  ok   delegates positive group readiness and literal caption to existing owners on hs
+# lua_timing {"schema":1,"driver":"linux","id":133,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates false group readiness and exact reason receipt on hs","status":"pass","elapsed_ms":0.180652,"timing_error":""}
+  ok   delegates false group readiness and exact reason receipt on hs
+# lua_timing {"schema":1,"driver":"linux","id":134,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates nil group readiness and exact reason receipt on hs","status":"pass","elapsed_ms":0.064427,"timing_error":""}
+  ok   delegates nil group readiness and exact reason receipt on hs
+# lua_timing {"schema":1,"driver":"linux","id":135,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains disabled group shape without inventing a reason on hs","status":"pass","elapsed_ms":0.059309,"timing_error":""}
+  ok   retains disabled group shape without inventing a reason on hs
+# lua_timing {"schema":1,"driver":"linux","id":136,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a missing group getter fails closed and names the missing owner on hs","status":"pass","elapsed_ms":0.128854,"timing_error":""}
+  ok   a missing group getter fails closed and names the missing owner on hs
+# lua_timing {"schema":1,"driver":"linux","id":137,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a throwing group getter retains its actual error receipt on hs","status":"pass","elapsed_ms":0.048613,"timing_error":""}
+  ok   a throwing group getter retains its actual error receipt on hs
+# lua_timing {"schema":1,"driver":"linux","id":138,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"uses every declared group predicate and preserves truthy resolver semantics on hs","status":"pass","elapsed_ms":0.072790,"timing_error":""}
+  ok   uses every declared group predicate and preserves truthy resolver semantics on hs
+# lua_timing {"schema":1,"driver":"linux","id":139,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"honors group platform hiding before invoking a native getter on hs","status":"pass","elapsed_ms":0.139369,"timing_error":""}
+  ok   honors group platform hiding before invoking a native getter on hs
+# lua_timing {"schema":1,"driver":"linux","id":140,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses missing group child data on hs","status":"pass","elapsed_ms":0.062914,"timing_error":""}
+  ok   refuses missing group child data on hs
+# lua_timing {"schema":1,"driver":"linux","id":141,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains exact absent-policy group data and child refusal on linux","status":"pass","elapsed_ms":0.099510,"timing_error":""}
+  ok   retains exact absent-policy group data and child refusal on linux
+# lua_timing {"schema":1,"driver":"linux","id":142,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates positive group readiness and literal caption to existing owners on linux","status":"pass","elapsed_ms":0.064487,"timing_error":""}
+  ok   delegates positive group readiness and literal caption to existing owners on linux
+# lua_timing {"schema":1,"driver":"linux","id":143,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates false group readiness and exact reason receipt on linux","status":"pass","elapsed_ms":0.056315,"timing_error":""}
+  ok   delegates false group readiness and exact reason receipt on linux
+# lua_timing {"schema":1,"driver":"linux","id":144,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates nil group readiness and exact reason receipt on linux","status":"pass","elapsed_ms":0.063606,"timing_error":""}
+  ok   delegates nil group readiness and exact reason receipt on linux
+# lua_timing {"schema":1,"driver":"linux","id":145,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains disabled group shape without inventing a reason on linux","status":"pass","elapsed_ms":0.039630,"timing_error":""}
+  ok   retains disabled group shape without inventing a reason on linux
+# lua_timing {"schema":1,"driver":"linux","id":146,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a missing group getter fails closed and names the missing owner on linux","status":"pass","elapsed_ms":0.029014,"timing_error":""}
+  ok   a missing group getter fails closed and names the missing owner on linux
+# lua_timing {"schema":1,"driver":"linux","id":147,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a throwing group getter retains its actual error receipt on linux","status":"pass","elapsed_ms":0.027351,"timing_error":""}
+  ok   a throwing group getter retains its actual error receipt on linux
+# lua_timing {"schema":1,"driver":"linux","id":148,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"uses every declared group predicate and preserves truthy resolver semantics on linux","status":"pass","elapsed_ms":0.094322,"timing_error":""}
+  ok   uses every declared group predicate and preserves truthy resolver semantics on linux
+# lua_timing {"schema":1,"driver":"linux","id":149,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"honors group platform hiding before invoking a native getter on linux","status":"pass","elapsed_ms":0.030636,"timing_error":""}
+  ok   honors group platform hiding before invoking a native getter on linux
+# lua_timing {"schema":1,"driver":"linux","id":150,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses missing group child data on linux","status":"pass","elapsed_ms":0.027161,"timing_error":""}
+  ok   refuses missing group child data on linux
+# lua_timing {"schema":1,"driver":"linux","id":151,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains exact absent-policy group data and child refusal on ahk","status":"pass","elapsed_ms":0.035163,"timing_error":""}
+  ok   retains exact absent-policy group data and child refusal on ahk
+# lua_timing {"schema":1,"driver":"linux","id":152,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates positive group readiness and literal caption to existing owners on ahk","status":"pass","elapsed_ms":0.070266,"timing_error":""}
+  ok   delegates positive group readiness and literal caption to existing owners on ahk
+# lua_timing {"schema":1,"driver":"linux","id":153,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates false group readiness and exact reason receipt on ahk","status":"pass","elapsed_ms":0.059780,"timing_error":""}
+  ok   delegates false group readiness and exact reason receipt on ahk
+# lua_timing {"schema":1,"driver":"linux","id":154,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"delegates nil group readiness and exact reason receipt on ahk","status":"pass","elapsed_ms":0.138368,"timing_error":""}
+  ok   delegates nil group readiness and exact reason receipt on ahk
+# lua_timing {"schema":1,"driver":"linux","id":155,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"retains disabled group shape without inventing a reason on ahk","status":"pass","elapsed_ms":0.092379,"timing_error":""}
+  ok   retains disabled group shape without inventing a reason on ahk
+# lua_timing {"schema":1,"driver":"linux","id":156,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a missing group getter fails closed and names the missing owner on ahk","status":"pass","elapsed_ms":0.071308,"timing_error":""}
+  ok   a missing group getter fails closed and names the missing owner on ahk
+# lua_timing {"schema":1,"driver":"linux","id":157,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"a throwing group getter retains its actual error receipt on ahk","status":"pass","elapsed_ms":0.069915,"timing_error":""}
+  ok   a throwing group getter retains its actual error receipt on ahk
+# lua_timing {"schema":1,"driver":"linux","id":158,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"uses every declared group predicate and preserves truthy resolver semantics on ahk","status":"pass","elapsed_ms":0.039850,"timing_error":""}
+  ok   uses every declared group predicate and preserves truthy resolver semantics on ahk
+# lua_timing {"schema":1,"driver":"linux","id":159,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"honors group platform hiding before invoking a native getter on ahk","status":"pass","elapsed_ms":0.028613,"timing_error":""}
+  ok   honors group platform hiding before invoking a native getter on ahk
+# lua_timing {"schema":1,"driver":"linux","id":160,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses missing group child data on ahk","status":"pass","elapsed_ms":0.032279,"timing_error":""}
+  ok   refuses missing group child data on ahk
+
+=== Metrics structural completed-parent ownership (linux) ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":161,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent reads genuine en parent caption and completed child identity","status":"pass","elapsed_ms":66.548042,"timing_error":""}
+  ok   metrics-parent reads genuine en parent caption and completed child identity
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":162,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent reads genuine fr parent caption and completed child identity","status":"pass","elapsed_ms":57.387197,"timing_error":""}
+  ok   metrics-parent reads genuine fr parent caption and completed child identity
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":163,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent uses a changed actual declared caption and preserves raw false","status":"pass","elapsed_ms":67.976026,"timing_error":""}
+  ok   metrics-parent uses a changed actual declared caption and preserves raw false
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":164,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for missing source","status":"pass","elapsed_ms":71.485566,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for missing source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":165,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for wrong_kind source","status":"pass","elapsed_ms":72.659040,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for wrong_kind source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":166,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for sparse source","status":"pass","elapsed_ms":55.406963,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for sparse source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":167,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for metatable source","status":"pass","elapsed_ms":53.869461,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for metatable source
+# lua_timing {"schema":1,"driver":"linux","id":168,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for duplicate source","status":"pass","elapsed_ms":18.870887,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for duplicate source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":169,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for parent_type source","status":"pass","elapsed_ms":59.836657,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for parent_type source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":170,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for parent_rows source","status":"pass","elapsed_ms":76.455387,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for parent_rows source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":171,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds parent getter and projection for wrong_platform source","status":"pass","elapsed_ms":64.178317,"timing_error":""}
+  ok   metrics-parent withholds parent getter and projection for wrong_platform source
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":172,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds projection after completed child changes withdraw authority","status":"pass","elapsed_ms":61.321956,"timing_error":""}
+  ok   metrics-parent withholds projection after completed child changes withdraw authority
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":173,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds projection after completed child changes replace authority","status":"pass","elapsed_ms":55.388655,"timing_error":""}
+  ok   metrics-parent withholds projection after completed child changes replace authority
+# lua_timing {"schema":1,"driver":"linux","id":174,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent withholds projection after completed child changes caption authority","status":"pass","elapsed_ms":25.300579,"timing_error":""}
+  ok   metrics-parent withholds projection after completed child changes caption authority
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":175,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent preserves genuine native nil child refusal","status":"pass","elapsed_ms":61.334565,"timing_error":""}
+  ok   metrics-parent preserves genuine native nil child refusal
+# lua_timing {"schema":1,"driver":"linux","id":176,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent preserves genuine native throw child refusal","status":"pass","elapsed_ms":42.434013,"timing_error":""}
+  ok   metrics-parent preserves genuine native throw child refusal
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":177,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent preserves genuine native sparse child refusal","status":"pass","elapsed_ms":103.562322,"timing_error":""}
+  ok   metrics-parent preserves genuine native sparse child refusal
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":178,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent preserves genuine native metatable child refusal","status":"pass","elapsed_ms":69.616549,"timing_error":""}
+  ok   metrics-parent preserves genuine native metatable child refusal
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":179,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent accepts genuine authored empty Metrics source and repairs after withdrawal","status":"pass","elapsed_ms":151.641627,"timing_error":""}
+  ok   metrics-parent accepts genuine authored empty Metrics source and repairs after withdrawal
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":180,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent retains authentic empty and completed deep callback trees by identity","status":"pass","elapsed_ms":107.820579,"timing_error":""}
+  ok   metrics-parent retains authentic empty and completed deep callback trees by identity
+INDEPENDENT_FINAL_METRICS	linux	caption_calls	1	returned	false	called	true
+# lua_timing {"schema":1,"driver":"linux","id":181,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"independent final physical Metrics caption callback cannot withdraw parent authority","status":"pass","elapsed_ms":25.474752,"timing_error":""}
+  ok   independent final physical Metrics caption callback cannot withdraw parent authority
+# lua_timing {"schema":1,"driver":"linux","id":182,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"metrics-parent refuses direct source field drift during the final physical caption","status":"pass","elapsed_ms":44.011265,"timing_error":""}
+  ok   metrics-parent refuses direct source field drift during the final physical caption
+
+=== Metrics absent native module keeps genuine shared status children ===
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":183,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"materializes absent status once without inventing a checked flag","status":"pass","elapsed_ms":47.012996,"timing_error":""}
+  ok   materializes absent status once without inventing a checked flag
+
+=== Metrics absent parent final source fence ===
+# lua_timing {"schema":1,"driver":"linux","id":184,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"refuses after the genuine final caption withdraws an absent-module parent","status":"pass","elapsed_ms":14.803002,"timing_error":""}
+  ok   refuses after the genuine final caption withdraws an absent-module parent
+
+=== Metrics absent native failure receipt ===
+# lua_timing {"schema":1,"driver":"linux","id":185,"kind":"case","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"preserves the exact producer error identity through the protected full build","status":"pass","elapsed_ms":10.254171,"timing_error":""}
+  ok   preserves the exact producer error identity through the protected full build
+# lua_timing {"schema":1,"driver":"linux","id":61,"kind":"module","module":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","name":"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity","status":"pass","elapsed_ms":4576.083957,"timing_error":""}
+
+=== canonical metrics preferences ===
+# lua_timing {"schema":1,"driver":"linux","id":187,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"cleanup retains canonical metric choices and offers only unknown neighbors","status":"pass","elapsed_ms":71.756552,"timing_error":""}
+  ok   cleanup retains canonical metric choices and offers only unknown neighbors
+# lua_timing {"schema":1,"driver":"linux","id":188,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"both WPM surfaces read canonical choices and persist their own leaves","status":"pass","elapsed_ms":3.306334,"timing_error":""}
+  ok   both WPM surfaces read canonical choices and persist their own leaves
+# lua_timing {"schema":1,"driver":"linux","id":189,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"collector reads canonical consent and never imports the legacy store","status":"pass","elapsed_ms":4.276733,"timing_error":""}
+  ok   collector reads canonical consent and never imports the legacy store
+# lua_timing {"schema":1,"driver":"linux","id":190,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"reads exact canonical choices and manifest defaults without rewriting","status":"pass","elapsed_ms":0.790159,"timing_error":""}
+  ok   reads exact canonical choices and manifest defaults without rewriting
+# lua_timing {"schema":1,"driver":"linux","id":191,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"writes sparse choices through the real TOML owner and preserves neighbors","status":"pass","elapsed_ms":2.269064,"timing_error":""}
+  ok   writes sparse choices through the real TOML owner and preserves neighbors
+# lua_timing {"schema":1,"driver":"linux","id":192,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"refuses a malformed source without overwriting it","status":"pass","elapsed_ms":0.293521,"timing_error":""}
+  ok   refuses a malformed source without overwriting it
+# lua_timing {"schema":1,"driver":"linux","id":193,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"reads an old-shape boolean as neutral and offers it for cleanup (config-outdated-metrics)","status":"pass","elapsed_ms":1.742301,"timing_error":""}
+  ok   reads an old-shape boolean as neutral and offers it for cleanup (config-outdated-metrics)
+# lua_timing {"schema":1,"driver":"linux","id":194,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"refuses unknown ownership and nonboolean values","status":"pass","elapsed_ms":0.258889,"timing_error":""}
+  ok   refuses unknown ownership and nonboolean values
+# lua_timing {"schema":1,"driver":"linux","id":195,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"the excluded applications are a sparse list that survives a restart","status":"pass","elapsed_ms":2.006619,"timing_error":""}
+  ok   the excluded applications are a sparse list that survives a restart
+# lua_timing {"schema":1,"driver":"linux","id":196,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"a list of the wrong shape is neutral and refused as a write","status":"pass","elapsed_ms":0.358630,"timing_error":""}
+  ok   a list of the wrong shape is neutral and refused as a write
+# lua_timing {"schema":1,"driver":"linux","id":197,"kind":"case","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"an excluded application is kept out of the metrics and nothing else","status":"pass","elapsed_ms":3.117810,"timing_error":""}
+  ok   an excluded application is kept out of the metrics and nothing else
+# lua_timing {"schema":1,"driver":"linux","id":186,"kind":"module","module":"tests.unit.infra.preferences.test_metrics_preferences","name":"tests.unit.infra.preferences.test_metrics_preferences","status":"pass","elapsed_ms":93.667523,"timing_error":""}
+
+=== Linux metrics scope transaction ===
+# lua_timing {"schema":1,"driver":"linux","id":199,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"restores an adjusted setting: it leaves the file and the runtime takes the default again","status":"pass","elapsed_ms":7.906905,"timing_error":""}
+  ok   restores an adjusted setting: it leaves the file and the runtime takes the default again
+# lua_timing {"schema":1,"driver":"linux","id":200,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"clears an outdated owned value instead of refusing (config-outdated-metrics)","status":"pass","elapsed_ms":6.027297,"timing_error":""}
+  ok   clears an outdated owned value instead of refusing (config-outdated-metrics)
+# lua_timing {"schema":1,"driver":"linux","id":201,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"preserves a preexisting backup and refuses before changing runtime","status":"pass","elapsed_ms":4.781412,"timing_error":""}
+  ok   preserves a preexisting backup and refuses before changing runtime
+# lua_timing {"schema":1,"driver":"linux","id":202,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"preserves concurrent external edits and restores exact native state","status":"pass","elapsed_ms":4.982926,"timing_error":""}
+  ok   preserves concurrent external edits and restores exact native state
+# lua_timing {"schema":1,"driver":"linux","id":203,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"clears all owned preferences with an exact backup and preserves unknown neighbors","status":"pass","elapsed_ms":4.596684,"timing_error":""}
+  ok   clears all owned preferences with an exact backup and preserves unknown neighbors
+# lua_timing {"schema":1,"driver":"linux","id":204,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"restores recommendations without granting collector consent","status":"pass","elapsed_ms":5.150879,"timing_error":""}
+  ok   restores recommendations without granting collector consent
+# lua_timing {"schema":1,"driver":"linux","id":205,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"restores actual runtime after a refused publication without changing source","status":"pass","elapsed_ms":4.838268,"timing_error":""}
+  ok   restores actual runtime after a refused publication without changing source
+# lua_timing {"schema":1,"driver":"linux","id":206,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"retains refused compensation and fences sibling mutations until recovery","status":"pass","elapsed_ms":5.502958,"timing_error":""}
+  ok   retains refused compensation and fences sibling mutations until recovery
+# lua_timing {"schema":1,"driver":"linux","id":207,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"refuses an active historical conversion before creating the backup","status":"pass","elapsed_ms":4.496765,"timing_error":""}
+  ok   refuses an active historical conversion before creating the backup
+
+=== Linux metrics scope rendered commands ===
+# lua_timing {"schema":1,"driver":"linux","id":208,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"keeps the daemon menu pause provider live after context construction","status":"pass","elapsed_ms":1.045633,"timing_error":""}
+  ok   keeps the daemon menu pause provider live after context construction
+Automatic startup requires an installed application.
+Automatic startup requires an installed application.
+# lua_timing {"schema":1,"driver":"linux","id":209,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"the real Metrics submenu opens with its switch and restore, and offers no clear","status":"pass","elapsed_ms":57.745801,"timing_error":""}
+  ok   the real Metrics submenu opens with its switch and restore, and offers no clear
+# lua_timing {"schema":1,"driver":"linux","id":210,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"routes recommended through the actual terminal owner","status":"pass","elapsed_ms":17.846145,"timing_error":""}
+  ok   routes recommended through the actual terminal owner
+# lua_timing {"schema":1,"driver":"linux","id":211,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"routes publication refusal through the actual terminal owner","status":"pass","elapsed_ms":16.839221,"timing_error":""}
+  ok   routes publication refusal through the actual terminal owner
+# lua_timing {"schema":1,"driver":"linux","id":212,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"routes pause before the click through the actual terminal owner","status":"pass","elapsed_ms":23.834393,"timing_error":""}
+  ok   routes pause before the click through the actual terminal owner
+
+=== Linux metrics scope revert ===
+# lua_timing {"schema":1,"driver":"linux","id":213,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"reverts a committed clear to the exact file and the running collector","status":"pass","elapsed_ms":22.849712,"timing_error":""}
+  ok   reverts a committed clear to the exact file and the running collector
+
+=== metrics private native claim ===
+# lua_timing {"schema":1,"driver":"linux","id":214,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"releases the actual preference primitive without hiding public pending","status":"pass","elapsed_ms":5.572493,"timing_error":""}
+  ok   releases the actual preference primitive without hiding public pending
+
+=== metrics retained native release debt ===
+# lua_timing {"schema":1,"driver":"linux","id":215,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates clear native runtime and source on nil release","status":"pass","elapsed_ms":6.703584,"timing_error":""}
+  ok   compensates clear native runtime and source on nil release
+# lua_timing {"schema":1,"driver":"linux","id":216,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates clear native runtime and source on false release","status":"pass","elapsed_ms":6.862263,"timing_error":""}
+  ok   compensates clear native runtime and source on false release
+# lua_timing {"schema":1,"driver":"linux","id":217,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates clear native runtime and source on truthy string release","status":"pass","elapsed_ms":7.068894,"timing_error":""}
+  ok   compensates clear native runtime and source on truthy string release
+# lua_timing {"schema":1,"driver":"linux","id":218,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates clear native runtime and source on wrong object release","status":"pass","elapsed_ms":5.629548,"timing_error":""}
+  ok   compensates clear native runtime and source on wrong object release
+# lua_timing {"schema":1,"driver":"linux","id":219,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates clear native runtime and source on exception release","status":"pass","elapsed_ms":4.930046,"timing_error":""}
+  ok   compensates clear native runtime and source on exception release
+# lua_timing {"schema":1,"driver":"linux","id":220,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates recommended native runtime and source on nil release","status":"pass","elapsed_ms":5.447945,"timing_error":""}
+  ok   compensates recommended native runtime and source on nil release
+# lua_timing {"schema":1,"driver":"linux","id":221,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates recommended native runtime and source on false release","status":"pass","elapsed_ms":5.632603,"timing_error":""}
+  ok   compensates recommended native runtime and source on false release
+# lua_timing {"schema":1,"driver":"linux","id":222,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates recommended native runtime and source on truthy string release","status":"pass","elapsed_ms":5.869289,"timing_error":""}
+  ok   compensates recommended native runtime and source on truthy string release
+# lua_timing {"schema":1,"driver":"linux","id":223,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates recommended native runtime and source on wrong object release","status":"pass","elapsed_ms":5.412923,"timing_error":""}
+  ok   compensates recommended native runtime and source on wrong object release
+# lua_timing {"schema":1,"driver":"linux","id":224,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"compensates recommended native runtime and source on exception release","status":"pass","elapsed_ms":8.019983,"timing_error":""}
+  ok   compensates recommended native runtime and source on exception release
+# lua_timing {"schema":1,"driver":"linux","id":225,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"preserves an external successor under the exact retained native inverse","status":"pass","elapsed_ms":6.647229,"timing_error":""}
+  ok   preserves an external successor under the exact retained native inverse
+# lua_timing {"schema":1,"driver":"linux","id":226,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"settles release-only debt after an acknowledged explicit inverse","status":"pass","elapsed_ms":7.582126,"timing_error":""}
+  ok   settles release-only debt after an acknowledged explicit inverse
+# lua_timing {"schema":1,"driver":"linux","id":227,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"halts the actual global composition before a later participant on native debt","status":"pass","elapsed_ms":5.032881,"timing_error":""}
+  ok   halts the actual global composition before a later participant on native debt
+# lua_timing {"schema":1,"driver":"linux","id":228,"kind":"case","module":"tests.unit.infra.scope.test_metrics_scope","name":"logs a privacy-filter click refused by a held metrics transaction (menu-click-during-scoped-transition)","status":"pass","elapsed_ms":3.739926,"timing_error":""}
+  ok   logs a privacy-filter click refused by a held metrics transaction (menu-click-during-scoped-transition)
+# lua_timing {"schema":1,"driver":"linux","id":198,"kind":"module","module":"tests.unit.infra.scope.test_metrics_scope","name":"tests.unit.infra.scope.test_metrics_scope","status":"pass","elapsed_ms":280.252145,"timing_error":""}
+TARGETED passed=222 failed=0

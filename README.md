@@ -547,3 +547,5 @@ The [generated configuration inventory and parity review](docs/feature-inventory
 The [deep review by OS and module](docs/audits/platform-parity/2026-11-04-deep/report.md) includes 18 scoped reports and an [intentional-difference register](docs/audits/platform-parity/2026-11-04-deep/intentional-differences.md) with rationale and user-visible effects.
 
 The [end-to-end continuation](docs/audits/platform-parity/2026-11-04-flows/report.md) examines clipboard custody, credentials, configuration publication and native action receipts, with [intentional behavior and constraints](docs/audits/platform-parity/2026-11-04-flows/intentional-differences.md) recorded alongside its qualified follow-ups.
+
+The [sequential module review](docs/audits/platform-parity/2026-11-05-sequential/report.md) compares WPM, wrap symbols and personal information with four reviewers focused on one module at a time. Its [generated behavior and intentional-difference table](docs/audits/platform-parity/2026-11-05-sequential/capabilities.md) distinguishes actual-owner evidence, source projections and unmeasured native behavior.

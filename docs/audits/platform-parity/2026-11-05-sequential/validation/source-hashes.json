@@ -1,0 +1,3702 @@
+{
+	"schema_version": 1,
+	"audited_sha": "7aecd9a25b35efdcff68898919506dc2f6fd02d0",
+	"scope_count": 12,
+	"claim_count": 496,
+	"unique_path_count": 167,
+	"scopes": [
+		{
+			"scope": "wpm/windows",
+			"claim_count": 7
+		},
+		{
+			"scope": "wpm/macos",
+			"claim_count": 24
+		},
+		{
+			"scope": "wpm/linux",
+			"claim_count": 0
+		},
+		{
+			"scope": "wpm/shared",
+			"claim_count": 104
+		},
+		{
+			"scope": "wrap-symbols/windows",
+			"claim_count": 19
+		},
+		{
+			"scope": "wrap-symbols/macos",
+			"claim_count": 38
+		},
+		{
+			"scope": "wrap-symbols/linux",
+			"claim_count": 0
+		},
+		{
+			"scope": "wrap-symbols/shared",
+			"claim_count": 106
+		},
+		{
+			"scope": "personal-info/windows",
+			"claim_count": 21
+		},
+		{
+			"scope": "personal-info/macos",
+			"claim_count": 40
+		},
+		{
+			"scope": "personal-info/linux",
+			"claim_count": 13
+		},
+		{
+			"scope": "personal-info/shared",
+			"claim_count": 124
+		}
+	],
+	"paths": [
+		{
+			"path": "TODO.md",
+			"kind": "documentation",
+			"pinned_sha256": "4d5e1fad2785ee48e84608c81c5a893baa1f4ae5011734e59efcc23515c73849",
+			"current_sha256": "00dc2d7574adc787179b0ef39597ec50f69741a5ea3721e68dd699857bada76b",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": false,
+			"status": "expected_documentation_drift"
+		},
+		{
+			"path": "docs/audits/platform-parity/2026-11-04-flows/intentional-differences.json",
+			"kind": "documentation",
+			"pinned_sha256": "f02d909a39715d7ebf7935678f6aac5a55579c78a6707afedaa1fce1678f0541",
+			"current_sha256": "f02d909a39715d7ebf7935678f6aac5a55579c78a6707afedaa1fce1678f0541",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "docs/audits/platform-parity/2026-11-04/hotstrings.md",
+			"kind": "documentation",
+			"pinned_sha256": "28c9343af50dff1fc284fd7762389d4437d16cccbdd3172099d0bdd911b006f7",
+			"current_sha256": "28c9343af50dff1fc284fd7762389d4437d16cccbdd3172099d0bdd911b006f7",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/config_schema/config.schema.json",
+			"kind": "production",
+			"pinned_sha256": "108be15b7d9f9f5c86025b699f1b2cbd1623f1f6552adf5b9811cd1593a4dcc0",
+			"current_sha256": "108be15b7d9f9f5c86025b699f1b2cbd1623f1f6552adf5b9811cd1593a4dcc0",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/core/config_schema/examples/personal_info.example.toml",
+			"kind": "production",
+			"pinned_sha256": "ca12b48bab377d26c3b51abc6da4b518dca43735980fa798b82a3850dfd153bf",
+			"current_sha256": "ca12b48bab377d26c3b51abc6da4b518dca43735980fa798b82a3850dfd153bf",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"kind": "production",
+			"pinned_sha256": "ecdc4fb4b994ece990a1328a935d356c2eefd913b0bb88449c569b38e4b4d076",
+			"current_sha256": "ecdc4fb4b994ece990a1328a935d356c2eefd913b0bb88449c569b38e4b4d076",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"kind": "production",
+			"pinned_sha256": "587277a527c35ad859ee394b69489efee6f6467c10784c3167c2353182f9f8d4",
+			"current_sha256": "587277a527c35ad859ee394b69489efee6f6467c10784c3167c2353182f9f8d4",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"kind": "production",
+			"pinned_sha256": "136a7277e5de4726c4f688dd22659c3c883fed91cce5e0f04ca78321cc5d4795",
+			"current_sha256": "136a7277e5de4726c4f688dd22659c3c883fed91cce5e0f04ca78321cc5d4795",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"kind": "production",
+			"pinned_sha256": "923b760e51d77658b3784db4e6802b0f9c3eee316859265810f6c7a189b0cb53",
+			"current_sha256": "923b760e51d77658b3784db4e6802b0f9c3eee316859265810f6c7a189b0cb53",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"kind": "production",
+			"pinned_sha256": "5dbc069c890d121fdf85d54599c345d74b13c559f42856cac932e36d0645dcd9",
+			"current_sha256": "5dbc069c890d121fdf85d54599c345d74b13c559f42856cac932e36d0645dcd9",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"kind": "production",
+			"pinned_sha256": "ae67260161ef9b8b3059dd1acf77cadfd967749ccdb94dbd54d2d1b9b05a46a5",
+			"current_sha256": "ae67260161ef9b8b3059dd1acf77cadfd967749ccdb94dbd54d2d1b9b05a46a5",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"kind": "production",
+			"pinned_sha256": "3ee358a53542d113393ae872dc154f569b23ad66c9725a9a1a4725dbd612e1c0",
+			"current_sha256": "3ee358a53542d113393ae872dc154f569b23ad66c9725a9a1a4725dbd612e1c0",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"kind": "production",
+			"pinned_sha256": "a72a9b9c63cca850cc8a191f2f2719ee5f770be4326cf5943e4cfba60a7552df",
+			"current_sha256": "a72a9b9c63cca850cc8a191f2f2719ee5f770be4326cf5943e4cfba60a7552df",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"kind": "production",
+			"pinned_sha256": "140c7dc06a3a858d279167a1ef8a9bc9cb548256c01cbd5fc9ff26e28ba5665f",
+			"current_sha256": "140c7dc06a3a858d279167a1ef8a9bc9cb548256c01cbd5fc9ff26e28ba5665f",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"kind": "production",
+			"pinned_sha256": "ef2637388212a228cb1197dd1594b8a1a459ee4cbc17d6bc812d465c380d771f",
+			"current_sha256": "ef2637388212a228cb1197dd1594b8a1a459ee4cbc17d6bc812d465c380d771f",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"kind": "production",
+			"pinned_sha256": "1969c5c7ee5f6956396a5d039284ad2f2d38c57db2f1a2c715441b27c38b923c",
+			"current_sha256": "1969c5c7ee5f6956396a5d039284ad2f2d38c57db2f1a2c715441b27c38b923c",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"kind": "production",
+			"pinned_sha256": "bebfc6359b242a47397c72fc45e0ed0f1f3ca3358ae1879a8b3d9af835e47db2",
+			"current_sha256": "bebfc6359b242a47397c72fc45e0ed0f1f3ca3358ae1879a8b3d9af835e47db2",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"kind": "production",
+			"pinned_sha256": "515a19882ee7938b472df9a7b42909d6e8792a0e029d0cf20db0c77dc4ddfebe",
+			"current_sha256": "515a19882ee7938b472df9a7b42909d6e8792a0e029d0cf20db0c77dc4ddfebe",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"kind": "production",
+			"pinned_sha256": "74273dc98ded4e8a5298b76819e5ca08bc6de1f3aaed9a9d47be90baa84cec1a",
+			"current_sha256": "74273dc98ded4e8a5298b76819e5ca08bc6de1f3aaed9a9d47be90baa84cec1a",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"kind": "production",
+			"pinned_sha256": "ce4a7239e0fba189df8719a9bf1b0837de8daac8cac87680b3f56c7fd84886eb",
+			"current_sha256": "ce4a7239e0fba189df8719a9bf1b0837de8daac8cac87680b3f56c7fd84886eb",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"kind": "production",
+			"pinned_sha256": "232088333b6288c799c9ef4f051ed9a54069ad8221b1d8b85d55138a739ac211",
+			"current_sha256": "232088333b6288c799c9ef4f051ed9a54069ad8221b1d8b85d55138a739ac211",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"kind": "production",
+			"pinned_sha256": "c0a53b8e8ef9862776936c4805258278cf29b43a7c48bc279641bd1a3d20cc54",
+			"current_sha256": "c0a53b8e8ef9862776936c4805258278cf29b43a7c48bc279641bd1a3d20cc54",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"kind": "production",
+			"pinned_sha256": "f0999fe25b0b030ad757d3b037d9a8b3c2d1defea9b58804db936e8da450a723",
+			"current_sha256": "f0999fe25b0b030ad757d3b037d9a8b3c2d1defea9b58804db936e8da450a723",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"kind": "production",
+			"pinned_sha256": "e13068a9472d5dcc64680c5140ee3ba6124a74830f6a607fff77c5f9aec4327f",
+			"current_sha256": "e13068a9472d5dcc64680c5140ee3ba6124a74830f6a607fff77c5f9aec4327f",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"kind": "production",
+			"pinned_sha256": "9ec228a6f748d59d66d2968af61662fc8a6daf53e511f62badb060a403d22227",
+			"current_sha256": "9ec228a6f748d59d66d2968af61662fc8a6daf53e511f62badb060a403d22227",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"kind": "production",
+			"pinned_sha256": "94331f3bfe76e8db99084d11d8f3748d6d22a2a145fbf423773fff13e70535da",
+			"current_sha256": "94331f3bfe76e8db99084d11d8f3748d6d22a2a145fbf423773fff13e70535da",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/adapter_errors.lua",
+			"kind": "production",
+			"pinned_sha256": "1a33ea7625c96d4a596b769c3c51df546a72ea0203de74d4c70688dcc7870569",
+			"current_sha256": "1a33ea7625c96d4a596b769c3c51df546a72ea0203de74d4c70688dcc7870569",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/compat/utf8.lua",
+			"kind": "production",
+			"pinned_sha256": "d62fc294924d345f7ffd8636a0808bcbee98ea4bb5280c3790ca3927d3013a9c",
+			"current_sha256": "d62fc294924d345f7ffd8636a0808bcbee98ea4bb5280c3790ca3927d3013a9c",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/config_keys.lua",
+			"kind": "production",
+			"pinned_sha256": "c2105ae1c67b02154ccc9a00c0d621a4e03a4e6ef32c65f813f7df6b438956d1",
+			"current_sha256": "c2105ae1c67b02154ccc9a00c0d621a4e03a4e6ef32c65f813f7df6b438956d1",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/dynamic_hotstrings/init.lua",
+			"kind": "production",
+			"pinned_sha256": "cba2a2ba484c10d00a81913697e3625cb89e65b7ae11d7321e2e3ea69b76d6f3",
+			"current_sha256": "cba2a2ba484c10d00a81913697e3625cb89e65b7ae11d7321e2e3ea69b76d6f3",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/live_wpm.lua",
+			"kind": "production",
+			"pinned_sha256": "7e2353387b34d4fdbd1cfe20924ab30bedf354f8312837d1ad927287b86db13d",
+			"current_sha256": "7e2353387b34d4fdbd1cfe20924ab30bedf354f8312837d1ad927287b86db13d",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/keystats/metrics.lua",
+			"kind": "production",
+			"pinned_sha256": "195fecde2292b54731add5c4ac12dff5615d3b5dd8207bbee98a775269740df1",
+			"current_sha256": "195fecde2292b54731add5c4ac12dff5615d3b5dd8207bbee98a775269740df1",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/frames/personal_info_source.lua",
+			"kind": "production",
+			"pinned_sha256": "2cb20ecb5fd961addb66c6266beaeaa6e282873c727c279f286d89573d1d28e8",
+			"current_sha256": "2cb20ecb5fd961addb66c6266beaeaa6e282873c727c279f286d89573d1d28e8",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/renderer.lua",
+			"kind": "production",
+			"pinned_sha256": "dd335a82fb1df6762d82c6191fe08720b3b9734fef9d585a3f835fa964643e15",
+			"current_sha256": "dd335a82fb1df6762d82c6191fe08720b3b9734fef9d585a3f835fa964643e15",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/wrap_mutation.lua",
+			"kind": "production",
+			"pinned_sha256": "faa5a9d9f781be1e48b60c7f781c0d2b8f2c5de793af5faaaf971b768d6b2193",
+			"current_sha256": "faa5a9d9f781be1e48b60c7f781c0d2b8f2c5de793af5faaaf971b768d6b2193",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/17"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/17"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/menu/wrap_preferences.lua",
+			"kind": "production",
+			"pinned_sha256": "ef9b42f0dbed435becf2a78e814e955e5f2ae89a22af2f55ef3c20d01a0ebdad",
+			"current_sha256": "ef9b42f0dbed435becf2a78e814e955e5f2ae89a22af2f55ef3c20d01a0ebdad",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/16"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/16"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/personal_info/mask.lua",
+			"kind": "production",
+			"pinned_sha256": "e0a0f3ad2447d2fbb086288ef01ff5b4940708849599b5a5545d798a461a0edd",
+			"current_sha256": "e0a0f3ad2447d2fbb086288ef01ff5b4940708849599b5a5545d798a461a0edd",
+			"claim_count": 5,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/19"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/19"
+				},
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/text_utils/init.lua",
+			"kind": "production",
+			"pinned_sha256": "91fa72430bf0375aa1d464804a0c19e55ddde9e934344834953c0f257dff6592",
+			"current_sha256": "91fa72430bf0375aa1d464804a0c19e55ddde9e934344834953c0f257dff6592",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/codec.lua",
+			"kind": "production",
+			"pinned_sha256": "a154aaebadd1bc6994a2ad842f3279d7e850789b1f461be29fa17f52f7b0b9ef",
+			"current_sha256": "a154aaebadd1bc6994a2ad842f3279d7e850789b1f461be29fa17f52f7b0b9ef",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/init.lua",
+			"kind": "production",
+			"pinned_sha256": "97ed0ffa484a2e54d51e426306bef6f565758af56e78ee9af1e8ba7664cc8262",
+			"current_sha256": "97ed0ffa484a2e54d51e426306bef6f565758af56e78ee9af1e8ba7664cc8262",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/toml_codec/leaf_rows.lua",
+			"kind": "production",
+			"pinned_sha256": "a13c30916b01124c54b86e94fac997920cc9629cfcda68ff2509903e49c5018c",
+			"current_sha256": "a13c30916b01124c54b86e94fac997920cc9629cfcda68ff2509903e49c5018c",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/wpm_widget/model.lua",
+			"kind": "production",
+			"pinned_sha256": "539d08be5ae002e70650ebd0f8b48160942bd1c10f7f9901a21995918d5f4f76",
+			"current_sha256": "539d08be5ae002e70650ebd0f8b48160942bd1c10f7f9901a21995918d5f4f76",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/11"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/11"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/lua/wrap_pair/init.lua",
+			"kind": "production",
+			"pinned_sha256": "91429eb62227a9da696c6c3b75e1d6eb249a97550b014238f67ec944582333a4",
+			"current_sha256": "91429eb62227a9da696c6c3b75e1d6eb249a97550b014238f67ec944582333a4",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/18"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/18"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/actions/actions.toml",
+			"kind": "production",
+			"pinned_sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"current_sha256": "ab8d3f941660cabcaf8854af017cc628c75db601b6d85f2dd2309c64fb3f91a0",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/diagnostics/redaction.json",
+			"kind": "production",
+			"pinned_sha256": "6fe1f02324889dae8b67097c89f855dd3f63c94b4c086687871d93cddbd17f2b",
+			"current_sha256": "6fe1f02324889dae8b67097c89f855dd3f63c94b4c086687871d93cddbd17f2b",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"kind": "production",
+			"pinned_sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"current_sha256": "7bddba3b2b6b487cb5e899760b78ef87f0a776074b21acf28ebc2fb122f8eb92",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/menu/menu.toml",
+			"kind": "production",
+			"pinned_sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197",
+			"current_sha256": "2650137e463b4d56da5f2bbd7bb777ca4f5e2916bccb6ae2571174e4f981b197",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/personal_info/README.md",
+			"kind": "production",
+			"pinned_sha256": "03d002d6843053c1ade5f632db2eaceb42a77d66542f585b33400a60d4f06855",
+			"current_sha256": "03d002d6843053c1ade5f632db2eaceb42a77d66542f585b33400a60d4f06855",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/personal_info/fields.toml",
+			"kind": "production",
+			"pinned_sha256": "cd4d630eda6de88dde70c4074094060b597b9284c5c9647a4494388f0e01e17c",
+			"current_sha256": "cd4d630eda6de88dde70c4074094060b597b9284c5c9647a4494388f0e01e17c",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/personal_info/preview_vectors.toml",
+			"kind": "production",
+			"pinned_sha256": "51dd3b9f2422fece60f3c58e3f2b8ac5735cf435dec0883259a2e42b0a0c4a8a",
+			"current_sha256": "51dd3b9f2422fece60f3c58e3f2b8ac5735cf435dec0883259a2e42b0a0c4a8a",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/timings/constants.toml",
+			"kind": "production",
+			"pinned_sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"current_sha256": "0d28466a2306acc79dec7c8bcc39b49c07ba742f488aaea1bfc00727b498cf91",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/wpm_widget/README.md",
+			"kind": "production",
+			"pinned_sha256": "f9c77dd9c29a0c9238531c0af9b3f6f9a1707d103617635458713a88dba7cb5b",
+			"current_sha256": "f9c77dd9c29a0c9238531c0af9b3f6f9a1707d103617635458713a88dba7cb5b",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/wpm_widget/constants.toml",
+			"kind": "production",
+			"pinned_sha256": "5958af1049d9a196c6bb256985ba6c824355a9bfd62e97520094cbae30aa78db",
+			"current_sha256": "5958af1049d9a196c6bb256985ba6c824355a9bfd62e97520094cbae30aa78db",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/wrap_symbols/README.md",
+			"kind": "production",
+			"pinned_sha256": "c8669bd26f5b65f88436bd5f9e04e1122a2e1fd0a6650314bd40cce12b84527d",
+			"current_sha256": "c8669bd26f5b65f88436bd5f9e04e1122a2e1fd0a6650314bd40cce12b84527d",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/modules/wrap_symbols/wrap_symbols.json",
+			"kind": "production",
+			"pinned_sha256": "8b43b818f379f3e53f91a917d04b4b539888edc46a2cd9bd96e6b703c2e54ce0",
+			"current_sha256": "8b43b818f379f3e53f91a917d04b4b539888edc46a2cd9bd96e6b703c2e54ce0",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/action_parameters/wrap_pair_vectors.json",
+			"kind": "production",
+			"pinned_sha256": "516c3803287221138a11d44232ce927825c575b0b2f8679cc5854ea03bf2528f",
+			"current_sha256": "516c3803287221138a11d44232ce927825c575b0b2f8679cc5854ea03bf2528f",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/menus/wrap_symbol_controls.json",
+			"kind": "production",
+			"pinned_sha256": "3bbdac1308427ccec2e4c7ecfe99a27c85adec08fcada21f0395ef340fd46b52",
+			"current_sha256": "3bbdac1308427ccec2e4c7ecfe99a27c85adec08fcada21f0395ef340fd46b52",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/tests/corpus/personal_info/mask_vectors.json",
+			"kind": "production",
+			"pinned_sha256": "180c6378fd8c4506eba5a6726b1b93fc123733f78ff6bf47f45a2635341bf3e6",
+			"current_sha256": "180c6378fd8c4506eba5a6726b1b93fc123733f78ff6bf47f45a2635341bf3e6",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/ui/personal_info_editor/index.html",
+			"kind": "production",
+			"pinned_sha256": "59b8d35ef63d9c40f4d90b525d971638b5d98e40f003845b0d78dccc93811ec0",
+			"current_sha256": "59b8d35ef63d9c40f4d90b525d971638b5d98e40f003845b0d78dccc93811ec0",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/ui/personal_info_editor/script.js",
+			"kind": "production",
+			"pinned_sha256": "0f8d78ab19a293fba1bff3c00a5c1a859d8c9d1990017240ed7e35c536646779",
+			"current_sha256": "0f8d78ab19a293fba1bff3c00a5c1a859d8c9d1990017240ed7e35c536646779",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/adapters/wpm_surface.lua",
+			"kind": "production",
+			"pinned_sha256": "6194a8e17446da2d653248773b862bdbcaa0d704433aa0c7880178bce43e8439",
+			"current_sha256": "6194a8e17446da2d653248773b862bdbcaa0d704433aa0c7880178bce43e8439",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
+			"kind": "production",
+			"pinned_sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"current_sha256": "f29ed22988b17bb2a409792fc295bc12eb21f6c486af053ebd5d466be24ba4d9",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/config_paths.lua",
+			"kind": "production",
+			"pinned_sha256": "2363e9b8cf88dd7a7d55bdcb47f0fcb1e4226d94987961839eb8f76b30deddcc",
+			"current_sha256": "2363e9b8cf88dd7a7d55bdcb47f0fcb1e4226d94987961839eb8f76b30deddcc",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/infra/personal_info_fields.lua",
+			"kind": "production",
+			"pinned_sha256": "e8ae78cf6dd50d16e14878be7f957bcb7f2746848e17a65e313507b17b63442c",
+			"current_sha256": "e8ae78cf6dd50d16e14878be7f957bcb7f2746848e17a65e313507b17b63442c",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+			"kind": "production",
+			"pinned_sha256": "61bcf37b7a5e26145f8b9c0ac40b51ce13899f1c6ebf75ef496329daafafbad6",
+			"current_sha256": "61bcf37b7a5e26145f8b9c0ac40b51ce13899f1c6ebf75ef496329daafafbad6",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/dynamic_hotstrings/prefix_rules.lua",
+			"kind": "production",
+			"pinned_sha256": "68349d9cc3ee05b9f23d54e748023060922a0605fe5283611105e881b9fa66f4",
+			"current_sha256": "68349d9cc3ee05b9f23d54e748023060922a0605fe5283611105e881b9fa66f4",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/gestures/manager.lua",
+			"kind": "production",
+			"pinned_sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08",
+			"current_sha256": "f57b749763cdf55368f9af38e6a60bea2679adbc14070518279f62307b3dcb08",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/hotstrings/injector.lua",
+			"kind": "production",
+			"pinned_sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"current_sha256": "0e7fd57730f818ac710c41d60079ef023453e181c0dfac9ca8a8c17edba07445",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/keystats/keystats.lua",
+			"kind": "production",
+			"pinned_sha256": "bdbd5a1878833c3adec1f15bb4dd9ed3759d572f0cdf19dc57c1edbde0d0f64b",
+			"current_sha256": "bdbd5a1878833c3adec1f15bb4dd9ed3759d572f0cdf19dc57c1edbde0d0f64b",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+			"kind": "production",
+			"pinned_sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"current_sha256": "069112cb304c5c522c69c3a51768319993ab051fc9e1f391c7830e832f5d8dbb",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua",
+			"kind": "production",
+			"pinned_sha256": "d4b039d0d2fe6591d68e8f7e123d9fdd24926dd4935c77d509b18e35613e9459",
+			"current_sha256": "d4b039d0d2fe6591d68e8f7e123d9fdd24926dd4935c77d509b18e35613e9459",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_hotstrings.lua",
+			"kind": "production",
+			"pinned_sha256": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f",
+			"current_sha256": "a5ba41898949763cea999e18c7494c952de3db78f58d9df5d0b6ea75f53fe13f",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_metrics.lua",
+			"kind": "production",
+			"pinned_sha256": "c47519671baf2a530d52175b411aab22d7e101d28a85dcc37ca53e0173494ff1",
+			"current_sha256": "c47519671baf2a530d52175b411aab22d7e101d28a85dcc37ca53e0173494ff1",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/menu/menu_shortcuts.lua",
+			"kind": "production",
+			"pinned_sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"current_sha256": "645352b9ab68db6262eae3797c6a1ca9cabb4bc0223981438d6109254344920a",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/personal_info_editor/bridge.lua",
+			"kind": "production",
+			"pinned_sha256": "844140e63f6b500201d1a5307b07e3f3c389d9f8b2b5e2cc5827f4d0ab2742b8",
+			"current_sha256": "844140e63f6b500201d1a5307b07e3f3c389d9f8b2b5e2cc5827f4d0ab2742b8",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/tooltip/preview.lua",
+			"kind": "production",
+			"pinned_sha256": "49d45bf4e78fd377c35f3437485f4f09b0939f83707592fb6a6f33af2d5b1697",
+			"current_sha256": "49d45bf4e78fd377c35f3437485f4f09b0939f83707592fb6a6f33af2d5b1697",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/linux/source-hashes.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/wpm/tray_readout.lua",
+			"kind": "production",
+			"pinned_sha256": "51732330611d56277dec0a101f10dc119d5ae075f43e9527de325c01c580d248",
+			"current_sha256": "51732330611d56277dec0a101f10dc119d5ae075f43e9527de325c01c580d248",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/linux/ui/wpm/widget.lua",
+			"kind": "production",
+			"pinned_sha256": "c3ad6d6f9c530efa5535f2af22c64a8a7db5c1a547f88c17e50d3df0714776e4",
+			"current_sha256": "c3ad6d6f9c530efa5535f2af22c64a8a7db5c1a547f88c17e50d3df0714776e4",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/clipboard.lua",
+			"kind": "production",
+			"pinned_sha256": "da4534dbe7b0414dda8efc069ee3b55c0ddc4c45b8c04c2fe002ea9311cf67be",
+			"current_sha256": "da4534dbe7b0414dda8efc069ee3b55c0ddc4c45b8c04c2fe002ea9311cf67be",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/15"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/15"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/event_provenance.lua",
+			"kind": "production",
+			"pinned_sha256": "60e2003632b7243e918c32d6fd9f421ef4bc3a75feea9002cf4f00363c232400",
+			"current_sha256": "60e2003632b7243e918c32d6fd9f421ef4bc3a75feea9002cf4f00363c232400",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/13"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/13"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/file_system.lua",
+			"kind": "production",
+			"pinned_sha256": "b0b67258ea3bd02fdb8ea68c5ce323b334aedb17d1ad7332775508d23d9c2cef",
+			"current_sha256": "b0b67258ea3bd02fdb8ea68c5ce323b334aedb17d1ad7332775508d23d9c2cef",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/11"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/11"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/graphics_renderer.lua",
+			"kind": "production",
+			"pinned_sha256": "132c71acbf12b1e7707e1ab977251803d865d310ec4d200858d99db8440c532e",
+			"current_sha256": "132c71acbf12b1e7707e1ab977251803d865d310ec4d200858d99db8440c532e",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/10"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/10"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/secure_field_detector.lua",
+			"kind": "production",
+			"pinned_sha256": "1b79ce5c1786a4e132891f65946945db346b7754613d980b2b26ccbe7780f700",
+			"current_sha256": "1b79ce5c1786a4e132891f65946945db346b7754613d980b2b26ccbe7780f700",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/18"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/18"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/storage.lua",
+			"kind": "production",
+			"pinned_sha256": "05640713281cb0fceaa6fee75288e6105503dd0d267af3ff1434948a88a1b66b",
+			"current_sha256": "05640713281cb0fceaa6fee75288e6105503dd0d267af3ff1434948a88a1b66b",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/8"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/8"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+			"kind": "production",
+			"pinned_sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"current_sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/12"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/12"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/12"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/12"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/adapters/timer_scheduler.lua",
+			"kind": "production",
+			"pinned_sha256": "1a2e8ff2aed93652eb656903163a9b431a2015981d10a55178ceeb32710ff3dc",
+			"current_sha256": "1a2e8ff2aed93652eb656903163a9b431a2015981d10a55178ceeb32710ff3dc",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/9"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/9"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/14"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/14"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/file_watchers.lua",
+			"kind": "production",
+			"pinned_sha256": "e18a72271f194a265b306757c36c4487b1b1bbac91787681432d3aecc00c6bdd",
+			"current_sha256": "e18a72271f194a265b306757c36c4487b1b1bbac91787681432d3aecc00c6bdd",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/10"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/10"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/personal_info_fields.lua",
+			"kind": "production",
+			"pinned_sha256": "f7e2959266e4ee2f2cba3da06f9b362ddb89ca2a865df3467125f818ccbeb24d",
+			"current_sha256": "f7e2959266e4ee2f2cba3da06f9b362ddb89ca2a865df3467125f818ccbeb24d",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/3"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/3"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/infra/preferences.lua",
+			"kind": "production",
+			"pinned_sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"current_sha256": "8047bca3664aabd36d5d72a07d0fa3d80289c3c73559864bb21eca872b3c90af",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/11"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/11"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/init.lua",
+			"kind": "production",
+			"pinned_sha256": "9fdc916ab6b25fcb661826d6108c2ee5ab9e7bb9a3a58aad296560ef5e7f1d7d",
+			"current_sha256": "9fdc916ab6b25fcb661826d6108c2ee5ab9e7bb9a3a58aad296560ef5e7f1d7d",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/2"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/2"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua",
+			"kind": "production",
+			"pinned_sha256": "6d33555bdb978b3d9604a5c41c70cf99ab58bee098c0f14026f5b7d3d26e7a60",
+			"current_sha256": "6d33555bdb978b3d9604a5c41c70cf99ab58bee098c0f14026f5b7d3d26e7a60",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/0"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/0"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/dynamic_hotstrings/rules_engine.lua",
+			"kind": "production",
+			"pinned_sha256": "28523d822adc3f2529cc6cb91a8b792d7356cb0838e3a3fab13afac10f31271a",
+			"current_sha256": "28523d822adc3f2529cc6cb91a8b792d7356cb0838e3a3fab13afac10f31271a",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/1"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/1"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+			"kind": "production",
+			"pinned_sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"current_sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/8"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/8"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/expander.lua",
+			"kind": "production",
+			"pinned_sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"current_sha256": "d8dd0723d8027df63f6ca712c692fb4cd731f6b5f3994924a7d2998e5399a887",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/15"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/15"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+			"kind": "production",
+			"pinned_sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"current_sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/13"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/13"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/llm_bridge.lua",
+			"kind": "production",
+			"pinned_sha256": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff",
+			"current_sha256": "1cb966c2341686ff8394de5d21ad5dfb7388d3a7a38457f53ec859b72f95b4ff",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/16"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/16"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/registry.lua",
+			"kind": "production",
+			"pinned_sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"current_sha256": "1fdc94fb8b7001627ae314b42a6c04eefdab98d1a38b51c3c88cac5a138f6eb1",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/14"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/14"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keymap/utils.lua",
+			"kind": "production",
+			"pinned_sha256": "46c0b4e7a1926e4b056090da6df95352845153f54a3b947ff89e60ca1cb1f6f3",
+			"current_sha256": "46c0b4e7a1926e4b056090da6df95352845153f54a3b947ff89e60ca1cb1f6f3",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/17"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/17"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/keystats/init.lua",
+			"kind": "production",
+			"pinned_sha256": "04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6",
+			"current_sha256": "04668df840bfefd7d6bb8aac0d18665b500d622a024d84f72eed88b1ab0d36d6",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/7"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/7"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/system.lua",
+			"kind": "production",
+			"pinned_sha256": "92d871db51d5b86cdfb105e9a55dafb31734536f2f523975fb264f382ebea64a",
+			"current_sha256": "92d871db51d5b86cdfb105e9a55dafb31734536f2f523975fb264f382ebea64a",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/1"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/1"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text.lua",
+			"kind": "production",
+			"pinned_sha256": "4c3b1eebf359d6eb0cae14941b60f472c2a3425ea1a94d9260893e1748f61120",
+			"current_sha256": "4c3b1eebf359d6eb0cae14941b60f472c2a3425ea1a94d9260893e1748f61120",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/0"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/0"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_continuation.lua",
+			"kind": "production",
+			"pinned_sha256": "bffd32654c2fcdb9706a57e76f4b5e16e523d5283dd3ddeecdbbea8cd26bb539",
+			"current_sha256": "bffd32654c2fcdb9706a57e76f4b5e16e523d5283dd3ddeecdbbea8cd26bb539",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/3"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/3"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_dispatch.lua",
+			"kind": "production",
+			"pinned_sha256": "e1e3fdb65cc1c29d2de96517a533669577fe39512e34936edf3b9537ff40ea7e",
+			"current_sha256": "e1e3fdb65cc1c29d2de96517a533669577fe39512e34936edf3b9537ff40ea7e",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/2"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/2"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/actions/text_transform_grace.lua",
+			"kind": "production",
+			"pinned_sha256": "3ee174015866921fac4874d385a444f56c96ec043f6dabc61c1ce8784ca7843a",
+			"current_sha256": "3ee174015866921fac4874d385a444f56c96ec043f6dabc61c1ce8784ca7843a",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/4"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/4"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/bindings.lua",
+			"kind": "production",
+			"pinned_sha256": "ee1ec1a912baa6ac561dc76837ebe764a9d3df702bbab70069ac9283ae8131e1",
+			"current_sha256": "ee1ec1a912baa6ac561dc76837ebe764a9d3df702bbab70069ac9283ae8131e1",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/5"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/5"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/init.lua",
+			"kind": "production",
+			"pinned_sha256": "05d533dfb0dd01344eb58a373127d265b151f74a008b6baaddf4794a55b8c20c",
+			"current_sha256": "05d533dfb0dd01344eb58a373127d265b151f74a008b6baaddf4794a55b8c20c",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/6"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/6"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/modules/shortcuts/script_control.lua",
+			"kind": "production",
+			"pinned_sha256": "77b175b0dd166a7c8f46e2dc5fb89a7fdbd070a82c2130d02bbf56cc25790803",
+			"current_sha256": "77b175b0dd166a7c8f46e2dc5fb89a7fdbd070a82c2130d02bbf56cc25790803",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/6"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/6"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/7"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/7"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/init.lua",
+			"kind": "production",
+			"pinned_sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"current_sha256": "a9b865def35d734f71f28241def18ff39f665398f93f0bf139e54f68cf7272a1",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/5"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/5"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/10"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/10"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/9"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/9"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_hotstrings.lua",
+			"kind": "production",
+			"pinned_sha256": "de5ae6e4ea7004f6be9d4307f373fefb47a3d311ab517589399b186e11007cfd",
+			"current_sha256": "de5ae6e4ea7004f6be9d4307f373fefb47a3d311ab517589399b186e11007cfd",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/7"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/7"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_metrics.lua",
+			"kind": "production",
+			"pinned_sha256": "aeee97b4de6ad25e2492f6d289311633bcf1ea01c00c833a9e77fcf6bedd82b3",
+			"current_sha256": "aeee97b4de6ad25e2492f6d289311633bcf1ea01c00c833a9e77fcf6bedd82b3",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/3"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/3"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+			"kind": "production",
+			"pinned_sha256": "83fda17f8f9b7b7d20a4756ea79e09e1f72bb40f24e7832686cc68508bc8d027",
+			"current_sha256": "83fda17f8f9b7b7d20a4756ea79e09e1f72bb40f24e7832686cc68508bc8d027",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-A.json",
+					"pointer": "/sources/9"
+				},
+				{
+					"artifact": "wrap-symbols/macos/probes/dry-B.json",
+					"pointer": "/sources/9"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/menu_state.lua",
+			"kind": "production",
+			"pinned_sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"current_sha256": "e6c629104558eb578eb31bf103725aa60e41545de4116d4845ed56e53cfebd75",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/8"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/8"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/menu/metrics_scope.lua",
+			"kind": "production",
+			"pinned_sha256": "3d00a674e21904afeb3d1258779e05c4f9185394265d687e9535f3c511988943",
+			"current_sha256": "3d00a674e21904afeb3d1258779e05c4f9185394265d687e9535f3c511988943",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/4"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/4"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/personal_info_editor/init.lua",
+			"kind": "production",
+			"pinned_sha256": "0635ba68bf24f14053081c1526544690e4a4c29c2f2c1940de07373f7ce9efb0",
+			"current_sha256": "0635ba68bf24f14053081c1526544690e4a4c29c2f2c1940de07373f7ce9efb0",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/4"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/4"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/ui_builder.lua",
+			"kind": "production",
+			"pinned_sha256": "ea66ae4a00070b0ee4facef220b7ab991f41e531af7385ff497f30c6a3fe932b",
+			"current_sha256": "ea66ae4a00070b0ee4facef220b7ab991f41e531af7385ff497f30c6a3fe932b",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/5"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/5"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/webview_close_owner.lua",
+			"kind": "production",
+			"pinned_sha256": "075a34c6791884ff8187a6d8dd688f6b51226f4e2f4e0e989663afcff86b5323",
+			"current_sha256": "075a34c6791884ff8187a6d8dd688f6b51226f4e2f4e0e989663afcff86b5323",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/macos/probes/dry-A.json",
+					"pointer": "/source_inventory/6"
+				},
+				{
+					"artifact": "personal-info/macos/probes/dry-B.json",
+					"pointer": "/source_inventory/6"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/README.md",
+			"kind": "production",
+			"pinned_sha256": "6f2657bab13c6d00ea192bd889a1bca23b99eb517564ef8eb0aed2bc8d24f7d4",
+			"current_sha256": "6f2657bab13c6d00ea192bd889a1bca23b99eb517564ef8eb0aed2bc8d24f7d4",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/shared.lua",
+			"kind": "production",
+			"pinned_sha256": "8da3ce9145eae40348c82bb64cbc9b90104ed9d6288f8cb1c54f484326c8b676",
+			"current_sha256": "8da3ce9145eae40348c82bb64cbc9b90104ed9d6288f8cb1c54f484326c8b676",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/0"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/0"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/wpm_menubar.lua",
+			"kind": "production",
+			"pinned_sha256": "515af136eb1367343127b41ecedd5e9cf0068705067c7341396dabe049dd1b2a",
+			"current_sha256": "515af136eb1367343127b41ecedd5e9cf0068705067c7341396dabe049dd1b2a",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/2"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/2"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/macos/ui/wpm/wpm_widget.lua",
+			"kind": "production",
+			"pinned_sha256": "a5835760055c6f2948bee963cf9268de08e01f5da8d8c922c313f442da9985a5",
+			"current_sha256": "a5835760055c6f2948bee963cf9268de08e01f5da8d8c922c313f442da9985a5",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wpm/macos/probes/dry-A.json",
+					"pointer": "/sources/1"
+				},
+				{
+					"artifact": "wpm/macos/probes/dry-B.json",
+					"pointer": "/sources/1"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ErgoptiPlus.ahk",
+			"kind": "production",
+			"pinned_sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"current_sha256": "520ed68623d143edd1ea55c5f3727cf636a8162287cdf65d517671bece545161",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/0"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/adapters/uia_worker.ahk",
+			"kind": "production",
+			"pinned_sha256": "e4bb55e3489f831c6e7d1e5ac45089f3b72733c86c134e79541269c4878ebe33",
+			"current_sha256": "e4bb55e3489f831c6e7d1e5ac45089f3b72733c86c134e79541269c4878ebe33",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/12"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/config_io.ahk",
+			"kind": "production",
+			"pinned_sha256": "c756a12e4d17066f86070742948577e9ca923cb4f5b38873b3383dce8fe8062e",
+			"current_sha256": "c756a12e4d17066f86070742948577e9ca923cb4f5b38873b3383dce8fe8062e",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/14"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_builder.ahk",
+			"kind": "production",
+			"pinned_sha256": "d33df4df2fef9e7009cd51698b35463c5bbb6cf9b2e0b2fffc893075b272fd5f",
+			"current_sha256": "d33df4df2fef9e7009cd51698b35463c5bbb6cf9b2e0b2fffc893075b272fd5f",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/8"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_dispatch.ahk",
+			"kind": "production",
+			"pinned_sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"current_sha256": "b1f46fb50f3ca84f6a17a9bd10a180dc42845486049afdbe9c7920c7f64e2832",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/7"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_engine_main.ahk",
+			"kind": "production",
+			"pinned_sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"current_sha256": "57401bae23d1a2355e778883343d3823578eea34cd8e4271364412b4391d6f70",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/6"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
+			"kind": "production",
+			"pinned_sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"current_sha256": "aaf6a20afbecb674c8ce4cb95611e2ff9ea5dcea0a5f43f6f3d13e38f871b503",
+			"claim_count": 4,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/5"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/9"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/hotstring_send.ahk",
+			"kind": "production",
+			"pinned_sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"current_sha256": "dcc3b043ac6fdd16099edda1d3f225335daf2b4f797e1feb568cbeead047915e",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/6"
+				},
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/10"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/hotstrings/personal_toml_io.ahk",
+			"kind": "production",
+			"pinned_sha256": "09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9",
+			"current_sha256": "09ea72e8310ee0fd752316716092e096b2f79d68691a6db025ac83800004fbe9",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/5"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/lifecycle.ahk",
+			"kind": "production",
+			"pinned_sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"current_sha256": "82f831243cc220a81da56ad61fe5ee97d2eb84d1790ce2d9f35bd30c44bf1b8f",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/17"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/menu_helpers.ahk",
+			"kind": "production",
+			"pinned_sha256": "e55e9ac75b9a024544314d2a0c304903effe57682f2ad55f9d6b4f2811fc2c42",
+			"current_sha256": "e55e9ac75b9a024544314d2a0c304903effe57682f2ad55f9d6b4f2811fc2c42",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/18"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/personal_info_mask.ahk",
+			"kind": "production",
+			"pinned_sha256": "6f1ea8c2e9952065a6620542e341a4b018c691784056a731daa6e770a18a954a",
+			"current_sha256": "6f1ea8c2e9952065a6620542e341a4b018c691784056a731daa6e770a18a954a",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/3"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/personal_info_preview.ahk",
+			"kind": "production",
+			"pinned_sha256": "c580be723f9431ce71d6a0e318885ba54cdd2180ec420e7582b7375311097893",
+			"current_sha256": "c580be723f9431ce71d6a0e318885ba54cdd2180ec420e7582b7375311097893",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/4"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/tap_keys.ahk",
+			"kind": "production",
+			"pinned_sha256": "0f208ff7c16926ef11dba8ba3b01bbc29eb32383d6f32377cfe769b51bf4546c",
+			"current_sha256": "0f208ff7c16926ef11dba8ba3b01bbc29eb32383d6f32377cfe769b51bf4546c",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/15"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/text_utils.ahk",
+			"kind": "production",
+			"pinned_sha256": "7fde3e32975575bfc60068a7f4662a16077fd3c1f7c85c3834f5d6e4a42fba26",
+			"current_sha256": "7fde3e32975575bfc60068a7f4662a16077fd3c1f7c85c3834f5d6e4a42fba26",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/11"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/toml/toml_helpers.ahk",
+			"kind": "production",
+			"pinned_sha256": "d8b8c28875206529bb7f5ec4558ddc3824b97c110759951dfb8cf25c8b4fb6af",
+			"current_sha256": "d8b8c28875206529bb7f5ec4558ddc3824b97c110759951dfb8cf25c8b4fb6af",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/12"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/toml/toml_loader.ahk",
+			"kind": "production",
+			"pinned_sha256": "8c50e6cd75a8ee7980fb88aa4f19f1a4097df6a823a7ca820c30264a5917ead9",
+			"current_sha256": "8c50e6cd75a8ee7980fb88aa4f19f1a4097df6a823a7ca820c30264a5917ead9",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/13"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/wrap_pair.ahk",
+			"kind": "production",
+			"pinned_sha256": "162a3e5dd04411b05fb122b655ae7f644aea2f40e50b5203705008d1e460cc26",
+			"current_sha256": "162a3e5dd04411b05fb122b655ae7f644aea2f40e50b5203705008d1e460cc26",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/0"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/infra/wrap_symbols_config.ahk",
+			"kind": "production",
+			"pinned_sha256": "f5424293976ab7443b87297be1719567b4bf07a6500fd27462d79e03b6fd02ec",
+			"current_sha256": "f5424293976ab7443b87297be1719567b4bf07a6500fd27462d79e03b6fd02ec",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/1"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
+			"kind": "production",
+			"pinned_sha256": "c2473eac43ac80812cc14dcff0d2e436143f9f6ceac082e64a9d573588f1454a",
+			"current_sha256": "c2473eac43ac80812cc14dcff0d2e436143f9f6ceac082e64a9d573588f1454a",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/2"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/actions.ahk",
+			"kind": "production",
+			"pinned_sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"current_sha256": "38ac49e062182b7e57a4b50642f2fc817fa933a7c04d12c8ccbf744f10070224",
+			"claim_count": 6,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/7"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/19"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/config.ahk",
+			"kind": "production",
+			"pinned_sha256": "a9cd769afffd8b50a2f63910aef32fc8267be371beaa08e083e357f423f1338e",
+			"current_sha256": "a9cd769afffd8b50a2f63910aef32fc8267be371beaa08e083e357f423f1338e",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/8"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/gestures/init.ahk",
+			"kind": "production",
+			"pinned_sha256": "4f9e0f965448e32d0e70a96a787b4ae750e5cf0294d60a10cd175ab8a358a677",
+			"current_sha256": "4f9e0f965448e32d0e70a96a787b4ae750e5cf0294d60a10cd175ab8a358a677",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/9"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/hotstrings/hotstrings_text_expansion.ahk",
+			"kind": "production",
+			"pinned_sha256": "45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474",
+			"current_sha256": "45a67b3854bb6362e499a9032ef73357f3c50fca1cb9a269353d022eb833d474",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/1"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout.ahk",
+			"kind": "production",
+			"pinned_sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"current_sha256": "edfbf6d0f4633915217cf03bd0490092613d3c9cf474914ee423f535ca0e0661",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/3"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/layout/layout_ergopti.ahk",
+			"kind": "production",
+			"pinned_sha256": "1bd24324386564c89a2656cfc7e7a4a06f09eae8722e49c673aadcf5948dccf0",
+			"current_sha256": "1bd24324386564c89a2656cfc7e7a4a06f09eae8722e49c673aadcf5948dccf0",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/4"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/llm_bridge.ahk",
+			"kind": "production",
+			"pinned_sha256": "ac1ce7abd174bc6686530df1a030d5f13c465a0b049e16e3731951f7075eda83",
+			"current_sha256": "ac1ce7abd174bc6686530df1a030d5f13c465a0b049e16e3731951f7075eda83",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/uia_selection_worker.ahk",
+			"kind": "production",
+			"pinned_sha256": "4134c136e4c19b68fea77e8f27ebe5756af068110a7a3d707be98525e66eb8b7",
+			"current_sha256": "4134c136e4c19b68fea77e8f27ebe5756af068110a7a3d707be98525e66eb8b7",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/10"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keymap/uia_selection_worker_entry.ahk",
+			"kind": "production",
+			"pinned_sha256": "c0c38fa5bcbfd6cfa1ad315fa8e3996ca64cda9f45ea8ca6631608b71382b9e1",
+			"current_sha256": "c0c38fa5bcbfd6cfa1ad315fa8e3996ca64cda9f45ea8ca6631608b71382b9e1",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/11"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/modules/keystats/keystats_hotstring_log.ahk",
+			"kind": "production",
+			"pinned_sha256": "ad7f97ae3fc93acc4331a8fc836fcfef8998c0afd51534adb2728c4aeffdba45",
+			"current_sha256": "ad7f97ae3fc93acc4331a8fc836fcfef8998c0afd51534adb2728c4aeffdba45",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				},
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/20"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/platform/remap/constants.ahk",
+			"kind": "production",
+			"pinned_sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"current_sha256": "3c094b62641fa76bbdd53782e0d243a6697492c025a99476b036d6622b52835c",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/16"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/action_picker_webview.ahk",
+			"kind": "production",
+			"pinned_sha256": "a9d16bdbaa4e2e77203b408250b0e6ec6d0dde10f0ec185ff99bc280771ec455",
+			"current_sha256": "a9d16bdbaa4e2e77203b408250b0e6ec6d0dde10f0ec185ff99bc280771ec455",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/13"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/editors.ahk",
+			"kind": "production",
+			"pinned_sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6",
+			"current_sha256": "003f73f84ad8cfc92c98c5dfea4e4f163441950f22ff31ba62efc92f2d2a58e6",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/16"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_metrics.ahk",
+			"kind": "production",
+			"pinned_sha256": "d2a0d4e8fb50696bcf4b69b41c8b28641922e762fe55676934079408491bbf56",
+			"current_sha256": "d2a0d4e8fb50696bcf4b69b41c8b28641922e762fe55676934079408491bbf56",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_metrics_actions.ahk",
+			"kind": "production",
+			"pinned_sha256": "7e38096d767693fbfaf4a805c5175590d3411e99c6550f7955254830c2111dbe",
+			"current_sha256": "7e38096d767693fbfaf4a805c5175590d3411e99c6550f7955254830c2111dbe",
+			"claim_count": 2,
+			"claim_origins": [
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk",
+			"kind": "production",
+			"pinned_sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"current_sha256": "d0adc3d14e14ef0d33b6e6b83b176bdbbd318505c989229230b98d2e040b59e8",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/2"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wrap-symbols/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/menu/menu_submenus.ahk",
+			"kind": "production",
+			"pinned_sha256": "7103a527175ed11eac5423a1c543e75a1e55286a937d9575973b494b7cb7679d",
+			"current_sha256": "7103a527175ed11eac5423a1c543e75a1e55286a937d9575973b494b7cb7679d",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/17"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/personal_info_editor/README.md",
+			"kind": "production",
+			"pinned_sha256": "334f928aef794434e441ccd5bf1ddf0476cabf79b8c24f7672031d1b82c19fa2",
+			"current_sha256": "334f928aef794434e441ccd5bf1ddf0476cabf79b8c24f7672031d1b82c19fa2",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/15"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/personal_info_editor/init.ahk",
+			"kind": "production",
+			"pinned_sha256": "eea7c487931b4da5cdefbb0fa7be6c5ab8a70b2f1988819532d3a4215fb4e70d",
+			"current_sha256": "eea7c487931b4da5cdefbb0fa7be6c5ab8a70b2f1988819532d3a4215fb4e70d",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "personal-info/windows/coverage.json",
+					"pointer": "/source_owners/14"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "personal-info/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/README.md",
+			"kind": "production",
+			"pinned_sha256": "bc608b2ef9c9742a2bd23aa17513b359ed71be046ebfd8cc89c8ca401ccee611",
+			"current_sha256": "bc608b2ef9c9742a2bd23aa17513b359ed71be046ebfd8cc89c8ca401ccee611",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/0"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/init.ahk",
+			"kind": "production",
+			"pinned_sha256": "80298a82d4c45873009b9517429f3acfb03b9c0db29476cbce16b29f3947616b",
+			"current_sha256": "80298a82d4c45873009b9517429f3acfb03b9c0db29476cbce16b29f3947616b",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/1"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_category_color.ahk",
+			"kind": "production",
+			"pinned_sha256": "2104b470e401825737f87a3bae65151dae464374877c62ac83c15f8b9313a2f8",
+			"current_sha256": "2104b470e401825737f87a3bae65151dae464374877c62ac83c15f8b9313a2f8",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/2"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_config.ahk",
+			"kind": "production",
+			"pinned_sha256": "210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446",
+			"current_sha256": "210947274712ee82e21b5378cc71a29db29e1c42650b7b79afd502e941fe5446",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/3"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_display.ahk",
+			"kind": "production",
+			"pinned_sha256": "203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055",
+			"current_sha256": "203b47646a5784b00a6c2598eee71ef68b2cab34c7ec73b4158a5137f6504055",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/4"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_gdiplus_ownership.ahk",
+			"kind": "production",
+			"pinned_sha256": "fefad49304a0b997cf748fd81878ab274d66e7e31faf2b3ed22161ec980e4561",
+			"current_sha256": "fefad49304a0b997cf748fd81878ab274d66e7e31faf2b3ed22161ec980e4561",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/5"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/ui/wpm/wpm_widget.ahk",
+			"kind": "production",
+			"pinned_sha256": "84c17eb40cbcacdc93c652179ae5f8a9619cc7d561addf1bd6de2102b53ffe77",
+			"current_sha256": "84c17eb40cbcacdc93c652179ae5f8a9619cc7d561addf1bd6de2102b53ffe77",
+			"claim_count": 3,
+			"claim_origins": [
+				{
+					"artifact": "wpm/windows/coverage.json",
+					"pointer": "/allfiles/6"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-a.json"
+				},
+				{
+					"artifact": "wpm/shared/logs/source-inventory-b.json"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		},
+		{
+			"path": "static/ergopti_plus/windows/vendor/UIA.ahk",
+			"kind": "production",
+			"pinned_sha256": "e2460a50cc5c8590c080c14ce270e5e44431c41abfc9d7c26ed86b6b6410339d",
+			"current_sha256": "e2460a50cc5c8590c080c14ce270e5e44431c41abfc9d7c26ed86b6b6410339d",
+			"claim_count": 1,
+			"claim_origins": [
+				{
+					"artifact": "wrap-symbols/windows/coverage.json",
+					"pointer": "/source_owners/18"
+				}
+			],
+			"claims_match_pinned": true,
+			"current_matches_pinned": true,
+			"status": "match"
+		}
+	],
+	"failures": [],
+	"boundary": "Exact retained repository-file hash claims only; no production behavior, native receiving or exhaustive source-coverage certification. Documentation drift is reported without changing audit snapshots."
+}

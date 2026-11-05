@@ -1,0 +1,21 @@
+Condensed original successful full-runner filtered output; passing case lines and overall totals retained.
+Filtering to test cases matching: "WPM"
+  ok   both WPM surfaces read canonical choices and persist their own leaves
+  ok   reports a WPM restore failure
+=== on_reload errors ===
+  ok   'onboarding' has _shared/ui/onboarding/index.html
+  ok   'personal_info_editor' has _shared/ui/personal_info_editor/index.html
+  ok   'hotstring_editor' has _shared/ui/hotstring_editor/index.html
+  ok   'model_browser' has _shared/ui/model_browser/index.html
+  ok   'layer_editor' has _shared/ui/layer_editor/index.html
+  ok   'paths_editor' has _shared/ui/paths_editor/index.html
+  ok   'changelog' has _shared/ui/changelog/index.html
+  ok   21 registered bridge(s), each keyed by a real page
+  ok   keeps the complete WPM position when the second scalar drag publication refuses
+  ok   keeps the complete WPM position when the second scalar reset publication refuses
+  ok   keeps both saved WPM coordinates after a false batch refusal
+  ok   keeps both saved WPM coordinates after a throw batch refusal
+  ok   keeps both saved WPM coordinates after a missing batch refusal
+Total modules: 857
+Passed tests:  7
+Failed tests:  0

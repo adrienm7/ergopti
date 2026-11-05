@@ -1,0 +1,134 @@
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/canvas/libcanvas.m
+SHA256 full artifact: 07281122f7a7ef11aa3f967afef6dc2fc7e6c77fca2b9b1dc62ada7062d34c92
+
+2350: /// Returns:
+2351: ///  * a new, empty, canvas object, or nil if the canvas cannot be created with the specified coordinates
+2352: ///
+2353: /// Notes:
+2354: ///  * The size of the canvas defines the visible area of the canvas -- any portion of a canvas element which extends past the canvas's edges will be clipped.
+2355: ///  * a rect-table is a table with key-value pairs specifying the top-left coordinate on the screen for the canvas (keys `x`  and `y`) and the size (keys `h` and `w`) of the canvas. The table may be crafted by any method which includes these keys, including the use of an `hs.geometry` object.
+2356: static int canvas_new(lua_State *L) {
+2357:     LuaSkin *skin = [LuaSkin sharedWithState:L] ;
+2358:     [skin checkArgs:LS_TTABLE, LS_TBREAK] ;
+2359: 
+2360:     HSCanvasWindow *canvasWindow = [[HSCanvasWindow alloc] initWithContentRect:[skin tableToRectAtIndex:1]
+2361:                                                                      styleMask:NSWindowStyleMaskBorderless
+2362:                                                                          backing:NSBackingStoreBuffered
+2363:                                                                            defer:YES] ;
+2364:     if (canvasWindow) {
+2365:         HSCanvasView *canvasView = [[HSCanvasView alloc] initWithFrame:canvasWindow.contentView.bounds];
+2366:         canvasView.wrapperWindow = canvasWindow ;
+2367:         canvasWindow.contentView = canvasView ;
+2368: 
+2369:         [skin pushNSObject:canvasView] ;
+2370:     } else {
+2371:         lua_pushnil(L) ;
+2372:     }
+
+2830: /// hs.canvas:topLeft([point]) -> canvasObject | currentValue
+2831: /// Method
+2832: /// Get or set the top-left coordinate of the canvas object
+2833: ///
+2834: /// Parameters:
+2835: ///  * `point` - An optional point-table specifying the new coordinate the top-left of the canvas object should be moved to
+2836: ///
+2837: /// Returns:
+2838: ///  * If an argument is provided, the canvas object; otherwise the current value.
+2839: ///
+2840: /// Notes:
+2841: ///  * a point-table is a table with key-value pairs specifying the new top-left coordinate on the screen of the canvas (keys `x`  and `y`). The table may be crafted by any method which includes these keys, including the use of an `hs.geometry` object.
+2842: static int canvas_topLeft(lua_State *L) {
+2843:     LuaSkin *skin = [LuaSkin sharedWithState:L];
+2844:     [skin checkArgs:LS_TUSERDATA, USERDATA_TAG,
+2845:                     LS_TTABLE | LS_TOPTIONAL,
+2846:                     LS_TBREAK] ;
+2847: 
+2848:     HSCanvasView   *canvasView   = [skin luaObjectAtIndex:1 toClass:"HSCanvasView"] ;
+2849:     if (parentIsWindow(canvasView)) {
+2850:         HSCanvasWindow *canvasWindow = (HSCanvasWindow *)canvasView.window ;
+2851:         NSRect oldFrame = RectWithFlippedYCoordinate(canvasWindow.frame);
+2852: 
+2853:         if (lua_gettop(L) == 1) {
+2854:             [skin pushNSPoint:oldFrame.origin] ;
+2855:         } else {
+2856:             NSPoint newCoord = [skin tableToPointAtIndex:2] ;
+2857:             NSRect  newFrame = RectWithFlippedYCoordinate(NSMakeRect(newCoord.x, newCoord.y, oldFrame.size.width, oldFrame.size.height)) ;
+2858:             [canvasWindow setFrame:newFrame display:YES animate:NO];
+2859:             lua_pushvalue(L, 1);
+2860:         }
+2861:     } else {
+2862:         return luaL_argerror(L, 1, "method unavailable for canvas as a subview") ;
+2863:     }
+2864:     return 1;
+2865: }
+2866: 
+2867: /// hs.canvas:imageFromCanvas() -> hs.image object
+
+3214: /// hs.canvas:isShowing() -> boolean
+3215: /// Method
+3216: /// Returns whether or not the canvas is currently being shown.
+3217: ///
+3218: /// Parameters:
+3219: ///  * None
+3220: ///
+3221: /// Returns:
+3222: ///  * a boolean indicating whether or not the canvas is currently being shown (true) or is currently hidden (false).
+3223: ///
+3224: /// Notes:
+3225: ///  * This method only determines whether or not the canvas is being shown or is hidden -- it does not indicate whether or not the canvas is currently off screen or is occluded by other objects.
+3226: ///  * See also [hs.canvas:isOccluded](#isOccluded).
+3227: static int canvas_isShowing(lua_State *L) {
+https://raw.githubusercontent.com/Hammerspoon/hammerspoon/1.1.1/extensions/canvas/canvas.lua
+SHA256 full artifact: 5ab969bc5c09dbedc6690571ede2304095023c5ef80e524ff6a5dd51fd83220a
+
+247: --- hs.canvas:frame([rect]) -> canvasObject | currentValue
+248: --- Method
+249: --- Get or set the frame of the canvasObject.
+250: ---
+251: --- Parameters:
+252: ---  * rect - An optional rect-table containing the co-ordinates and size the canvas object should be moved and set to
+253: ---
+254: --- Returns:
+255: ---  * If an argument is provided, the canvas object; otherwise the current value.
+256: ---
+257: --- Notes:
+258: ---  * a rect-table is a table with key-value pairs specifying the new top-left coordinate on the screen of the canvas (keys `x`  and `y`) and the new size (keys `h` and `w`).  The table may be crafted by any method which includes these keys, including the use of an `hs.geometry` object.
+259: ---
+260: ---  * elements in the canvas that have the `absolutePosition` attribute set to false will be moved so that their relative position within the canvas remains the same with respect to the new size.
+261: ---  * elements in the canvas that have the `absoluteSize` attribute set to false will be resized so that their relative size with respect to the canvas remains the same with respect to the new size.
+262: canvasMT.frame = function(obj, ...)
+263:     local args = table.pack(...)
+264: 
+265:     if args.n == 0 then
+266:         local topLeft = obj:topLeft()
+267:         local size    = obj:size()
+268:         return {
+269:             __luaSkinType = "NSRect",
+270:             x = topLeft.x,
+271:             y = topLeft.y,
+272:             h = size.h,
+273:             w = size.w,
+274:         }
+275:     elseif args.n == 1 and type(args[1]) == "table" then
+276:         obj:size(args[1])
+277:         obj:topLeft(args[1])
+278:         return obj
+279:     elseif args.n > 1 then
+280:         error("frame method expects 0 or 1 arguments", 2)
+281:     else
+282:         error("frame method argument must be a table", 2)
+283:     end
+284: end
+285: 
+
+https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/constrainframerect(_:to:).json
+SHA256 full artifact: 8ca2efacaae762d6bf0b765c4170061f515487405df7838433ba79e3cc10cce3
+[{"declarations": [{"languages": ["swift"], "platforms": ["macOS"], "tokens": [{"kind": "keyword", "text": "func"}, {"kind": "text", "text": " "}, {"kind": "identifier", "text": "constrainFrameRect"}, {"kind": "text", "text": "("}, {"kind": "externalParam", "text": "_"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "frameRect"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Foundation/NSRect", "kind": "typeIdentifier", "preciseIdentifier": "c:@T@NSRect", "text": "NSRect"}, {"kind": "text", "text": ", "}, {"kind": "externalParam", "text": "to"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "screen"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.appkit/documentation/AppKit/NSScreen", "kind": "typeIdentifier", "preciseIdentifier": "c:objc(cs)NSScreen", "text": "NSScreen"}, {"kind": "text", "text": "?) -> "}, {"identifier": "doc://com.apple.documentation/documentation/Foundation/NSRect", "kind": "typeIdentifier", "preciseIdentifier": "c:@T@NSRect", "text": "NSRect"}]}], "kind": "declarations"}, {"kind": "parameters", "parameters": [{"content": [{"inlineContent": [{"text": "The proposed frame rectangle to adjust.", "type": "text"}], "type": "paragraph"}], "name": "frameRect"}, {"content": [{"inlineContent": [{"text": "The screen on which the top edge of the window’s frame is to lie.", "type": "text"}], "type": "paragraph"}], "name": "screen"}]}, {"content": [{"anchor": "return-value", "level": 2, "text": "Return Value", "type": "heading"}, {"inlineContent": [{"text": "The adjusted frame rectangle.", "type": "text"}], "type": "paragraph"}], "kind": "content"}, {"content": [{"anchor": "Discussion", "level": 2, "text": "Discussion", "type": "heading"}, {"inlineContent": [{"text": "If the window is resizable and the window’s height is greater than the screen height, the rectangle’s height is adjusted to fit within the screen as well. The rectangle’s width and horizontal location are unaffected. You shouldn’t need to invoke this method yourself; it’s invoked automatically (and the modified frame is used to locate and set the size of the window) whenever a titled ", "type": "text"}, {"code": "NSWindow", "type": "codeVoice"}, {"text": " object is placed onscreen and whenever its size is changed.", "type": "text"}], "type": "paragraph"}, {"inlineContent": [{"text": "Subclasses can override this method to prevent their instances from being constrained or to constrain them differently.", "type": "text"}], "type": "paragraph"}], "kind": "content"}]
+
+https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/setframe(_:display:).json
+SHA256 full artifact: 294645856d5730c6425bb4185cc90ac9680d9ce80682a80f01d9239118941ac6
+[{"declarations": [{"languages": ["swift"], "platforms": ["macOS"], "tokens": [{"kind": "keyword", "text": "func"}, {"kind": "text", "text": " "}, {"kind": "identifier", "text": "setFrame"}, {"kind": "text", "text": "("}, {"kind": "externalParam", "text": "_"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "frameRect"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Foundation/NSRect", "kind": "typeIdentifier", "preciseIdentifier": "c:@T@NSRect", "text": "NSRect"}, {"kind": "text", "text": ", "}, {"kind": "externalParam", "text": "display"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "flag"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Swift/Bool", "kind": "typeIdentifier", "preciseIdentifier": "s:Sb", "text": "Bool"}, {"kind": "text", "text": ")"}]}], "kind": "declarations"}, {"kind": "parameters", "parameters": [{"content": [{"inlineContent": [{"text": "The frame rectangle for the window, including the title bar.", "type": "text"}], "type": "paragraph"}], "name": "frameRect"}, {"content": [{"inlineContent": [{"text": "Specifies whether the window redraws the views that need to be displayed. When ", "type": "text"}, {"identifier": "doc://com.apple.documentation/documentation/Swift/true", "isActive": true, "type": "reference"}, {"text": " the window sends a ", "type": "text"}, {"identifier": "doc://com.apple.appkit/documentation/AppKit/NSWindow/displayIfNeeded()", "isActive": true, "type": "reference"}, {"text": " message down its view hierarchy, thus redrawing all views.", "type": "text"}], "type": "paragraph"}], "name": "flag"}]}, {"content": [{"anchor": "Discussion", "level": 2, "text": "Discussion", "type": "heading"}, {"inlineContent": [{"text": "Note that the window server limits window position coordinates to ±16,000 and sizes to 10,000.", "type": "text"}], "type": "paragraph"}], "kind": "content"}]
+
+https://developer.apple.com/tutorials/data/documentation/appkit/nswindow/setframe(_:display:animate:).json
+SHA256 full artifact: 462ac755bd58b7cfc9cb58cfa1a65d9fb45b865b95a8da21bd4cb12daf7b8409
+[{"declarations": [{"languages": ["swift"], "platforms": ["macOS"], "tokens": [{"kind": "keyword", "text": "func"}, {"kind": "text", "text": " "}, {"kind": "identifier", "text": "setFrame"}, {"kind": "text", "text": "("}, {"kind": "externalParam", "text": "_"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "frameRect"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Foundation/NSRect", "kind": "typeIdentifier", "preciseIdentifier": "c:@T@NSRect", "text": "NSRect"}, {"kind": "text", "text": ", "}, {"kind": "externalParam", "text": "display"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "displayFlag"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Swift/Bool", "kind": "typeIdentifier", "preciseIdentifier": "s:Sb", "text": "Bool"}, {"kind": "text", "text": ", "}, {"kind": "externalParam", "text": "animate"}, {"kind": "text", "text": " "}, {"kind": "internalParam", "text": "animateFlag"}, {"kind": "text", "text": ": "}, {"identifier": "doc://com.apple.documentation/documentation/Swift/Bool", "kind": "typeIdentifier", "preciseIdentifier": "s:Sb", "text": "Bool"}, {"kind": "text", "text": ")"}]}], "kind": "declarations"}, {"kind": "parameters", "parameters": [{"content": [{"inlineContent": [{"text": "The frame rectangle for the window, including the title bar.", "type": "text"}], "type": "paragraph"}], "name": "frameRect"}, {"content": [{"inlineContent": [{"text": "Specifies whether the window redraws the views that need to be displayed. When ", "type": "text"}, {"identifier": "doc://com.apple.documentation/documentation/Swift/true", "isActive": true, "type": "reference"}, {"text": " the window sends a ", "type": "text"}, {"identifier": "doc://com.apple.appkit/documentation/AppKit/NSWindow/displayIfNeeded()", "isActive": true, "type": "reference"}, {"text": " message down its view hierarchy, thus redrawing all views.", "type": "text"}], "type": "paragraph"}], "name": "displayFlag"}, {"content": [{"inlineContent": [{"text": "Specifies whether the window performs a smooth resize. ", "type": "text"}, {"identifier": "doc://com.apple.documentation/documentation/Swift/true", "isActive": true, "type": "reference"}, {"text": " to perform the animation, whose duration is specified by ", "type": "text"}, {"identifier": "doc://com.apple.appkit/documentation/AppKit/NSWindow/animationResizeTime(_:)", "isActive": true, "type": "reference"}, {"text": ".", "type": "text"}], "type": "paragraph"}], "name": "animateFlag"}]}]
