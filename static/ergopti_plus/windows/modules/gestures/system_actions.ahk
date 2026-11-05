@@ -284,11 +284,13 @@ GestureSysMonitorCenter(X, Y, Monitors) {
 
 ; Moves the pointer to the centre of the monitor it is on.
 GestureSysCenterMouse(Sys := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	Position := Sys.MousePosition()
 	Center := GestureSysMonitorCenter(Position.X, Position.Y, Sys.Monitors())
-	if A_IsSuspended {
-		LoggerInfo("gestures", "center_mouse was cancelled before moving the pointer: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "center_mouse was cancelled before moving the pointer: suspended or original lifecycle transition retired.")
 		return false
 	}
 	if !IsObject(Center) {
@@ -492,7 +494,12 @@ GestureSysEjectAllDisks(Sys := 0) {
 	}
 	if (Letters = "") {
 		LoggerInfo("gestures", "eject_all_disks: no removable drive.")
-		Sys.Notify(t("system_actions.no_disk_to_eject"))
+		Notice := t("system_actions.no_disk_to_eject")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "eject_all_disks was cancelled before its notice: suspended or original lifecycle transition retired.")
+			return
+		}
+		Sys.Notify(Notice)
 		return
 	}
 	Computer := Sys.ShellApplication().Namespace(GESTURE_SYS_CSIDL_DRIVES)
@@ -646,20 +653,27 @@ GestureSysUnblockFileSelection(Sys := 0, ConfirmedTarget := 0) {
 ; Opens a terminal in the current Explorer folder: Windows Terminal when it is
 ; installed, the command prompt otherwise.
 GestureSysOpenTerminalHere(Sys := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
-	if A_IsSuspended {
-		LoggerInfo("gestures", "open_terminal_here was cancelled after its folder query: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "open_terminal_here was cancelled after its folder query: suspended or original lifecycle transition retired.")
 		return false
 	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "open_terminal_here: no Explorer folder is active.")
-		Sys.Notify(t("system_actions.no_folder"))
+		Notice := t("system_actions.no_folder")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "open_terminal_here was cancelled before its notice: suspended or original lifecycle transition retired.")
+			return
+		}
+		Sys.Notify(Notice)
 		return
 	}
 	Terminal := Sys.WindowsTerminalPath()
-	if A_IsSuspended {
-		LoggerInfo("gestures", "open_terminal_here was cancelled before launching the terminal: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "open_terminal_here was cancelled before launching the terminal: suspended or original lifecycle transition retired.")
 		return false
 	}
 	try {
@@ -674,12 +688,14 @@ GestureSysOpenTerminalHere(Sys := 0) {
 
 ; Creates an empty text file with a free name in a folder.
 ; @returns {String} The created path, or "" when none could be created.
-GestureSysCreateTextFile(Folder, BaseName, Sys) {
-	global GESTURE_SYS_NEW_FILE_ATTEMPTS
+GestureSysCreateTextFile(Folder, BaseName, Sys, Transition := unset) {
+	global GESTURE_SYS_NEW_FILE_ATTEMPTS, _LifecycleLatestTransition
+	if !IsSet(Transition)
+		Transition := _LifecycleLatestTransition
 	Loop GESTURE_SYS_NEW_FILE_ATTEMPTS {
 		Path := RTrim(Folder, "\") . "\" . BaseName . (A_Index = 1 ? "" : " (" . A_Index . ")") . ".txt"
-		if A_IsSuspended {
-			LoggerInfo("gestures", "new_text_file_here was cancelled before creating its file: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before creating its file: suspended or original lifecycle transition retired.")
 			return ""
 		}
 		Status := Sys.CreateNewFile(Path)
@@ -697,19 +713,25 @@ GestureSysCreateTextFile(Folder, BaseName, Sys) {
 ; Creates an empty text file in the current Explorer folder and selects it
 ; with its name ready to be typed.
 GestureSysNewTextFileHere(Sys := 0) {
-	global GESTURE_SYS_SVSI_RENAME
+	global GESTURE_SYS_SVSI_RENAME, _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	Here := _GestureSysActiveFolder(Sys)
-	if A_IsSuspended {
-		LoggerInfo("gestures", "new_text_file_here was cancelled after its folder query: the script is suspended.")
+	if A_IsSuspended || Transition != _LifecycleLatestTransition {
+		LoggerInfo("gestures", "new_text_file_here was cancelled after its folder query: suspended or original lifecycle transition retired.")
 		return false
 	}
 	if (Here.Folder = "") {
 		LoggerInfo("gestures", "new_text_file_here: no Explorer folder is active.")
-		Sys.Notify(t("system_actions.no_folder"))
+		Notice := t("system_actions.no_folder")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before its notice: suspended or original lifecycle transition retired.")
+			return
+		}
+		Sys.Notify(Notice)
 		return
 	}
-	Path := GestureSysCreateTextFile(Here.Folder, t("system_actions.new_text_file_name"), Sys)
+	Path := GestureSysCreateTextFile(Here.Folder, t("system_actions.new_text_file_name"), Sys, Transition)
 	if (Path = "")
 		return
 	LoggerInfo("gestures", "Created the text file '{1}'.", Path)
@@ -717,8 +739,8 @@ GestureSysNewTextFileHere(Sys := 0) {
 		return
 	SplitPath(Path, &Name)
 	try {
-		if A_IsSuspended {
-			LoggerInfo("gestures", "new_text_file_here was cancelled before preparing its rename: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before preparing its rename: suspended or original lifecycle transition retired.")
 			return false
 		}
 		Document := Here.Window.Document
@@ -734,8 +756,8 @@ GestureSysNewTextFileHere(Sys := 0) {
 			LoggerWarn("gestures", "The created text file could not be identified exactly for Explorer rename preparation.")
 			return
 		}
-		if A_IsSuspended {
-			LoggerInfo("gestures", "new_text_file_here was cancelled before selecting its created file: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "new_text_file_here was cancelled before selecting its created file: suspended or original lifecycle transition retired.")
 			return false
 		}
 		Document.SelectItem(Item, GESTURE_SYS_SVSI_RENAME)
