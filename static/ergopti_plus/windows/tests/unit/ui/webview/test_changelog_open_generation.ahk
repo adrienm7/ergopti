@@ -112,3 +112,11 @@ for _CWOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reope
 
 for _CWOC_ShowMode in ["show-current", "show-close"]
 	Test("Changelog initial native Show: " . _CWOC_ShowMode . " respects actual Close (changelog-show-native-close)", _CWOC_Case.Bind(_CWOC_ShowMode))
+
+for _CWNS_Mode in ["native-destroy-current", "native-destroy-reopen"]
+	Test("Changelog native Close: " . _CWNS_Mode . " preserves exact successor ownership (changelog-native-destroy-successor)",
+		_CWOC_Case.Bind(_CWNS_Mode))
+
+for _CWSF_Mode in ["native-fault-current", "native-fault-successor"]
+	Test("Changelog explicit Show fault: " . _CWSF_Mode . " retires only its exact native owner (changelog-native-show-fault)",
+		_CWOC_Case.Bind(_CWSF_Mode))
