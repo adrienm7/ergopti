@@ -136,6 +136,12 @@ passed++;
 		'/lib64/ld-linux-x86-64.so.2 bad',
 		'the complete interpreter is compared, including spaces'
 	);
+	assert.equal(
+		Ceiling.parseInterpreter('  [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]bad]'),
+		'/lib64/ld-linux-x86-64.so.2]bad'
+	);
+	assert.throws(() => Ceiling.parseInterpreter('  [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2\nbad]'),
+		/unreadable program interpreter/);
 	for (const name of [
 		'libc.so.6',
 		'libm.so.6',
