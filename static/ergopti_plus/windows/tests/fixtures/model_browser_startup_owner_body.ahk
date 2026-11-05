@@ -11,7 +11,9 @@
 #Requires AutoHotkey v2.0
 
 global _MBSW := {Mode: A_Args[1], Windows: [], Created: 0, CloseEvents: 0, NativeClose: 0, PublicReturned: false, EpochAfter: 0, Environments: 0, Fired: false, Closed: 0, Subscriptions: 0, Navigated: 0, Filled: 0, CloseWhileSubscribed: false, EarlyClose: false, ClosePosted: false, TeardownReopened: false, NativeAliveAtSubscriptionReturn: false, NativeAliveAtControllerClose: false, SdkFailure: Error("Controlled model SDK add-event refusal"),
-	SdkCalls: 0, SdkPublicLogs: 0, SdkRetiredLogs: 0, SdkCaught: 0, SdkAliveAtThrow: false}
+	SdkCalls: 0, SdkPublicLogs: 0, SdkRetiredLogs: 0, SdkCaught: 0, SdkAliveAtThrow: false,
+	ResetHookInstalled: false, ResetHadCall: false, ResetCallDescriptor: 0,
+	UnwindStarted: false, UnwindCloseAcknowledged: false, ForwardedResetRefused: false}
 global _VendorDir := A_Args[2]
 global _SharedDir := A_Args[3]
 global _I18nLocale := "fr"
@@ -197,7 +199,8 @@ _MBSW_CheckSdkFailure(PublicResult) {
 		. " native_ready=" . NativeReady . " native_global=" . IsSet(_LLM_ModelBrowser_Gui) . " successor_ready=" . AliveB . " windows=" . _MBSW.Windows.Length
 		. " controllers=" . _MBSW.Created . " closed=" . _MBSW.Closed . " subscriptions=" . _MBSW.Subscriptions
 		. " public_logs=" . _MBSW.SdkPublicLogs . " retired_logs=" . _MBSW.SdkRetiredLogs
-		. " caught_same=" . (_MBSW.SdkCaught == _MBSW.SdkFailure) . "`n", "*", "UTF-8")
+		. " caught_same=" . (_MBSW.SdkCaught == _MBSW.SdkFailure)
+		. " unwind_close_ack=" . _MBSW.UnwindCloseAcknowledged . " reset_refused=" . _MBSW.ForwardedResetRefused . "`n", "*", "UTF-8")
 	if _MBSW.SdkCalls != 1 || !_MBSW.SdkAliveAtThrow || !_MBSW.NativeAliveAtControllerClose
 		|| _MBSW.Closed != 1 || DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int") || _MBSW.CloseWhileSubscribed
 		throw Error("The genuine failed SDK call must retire its exact original native/controller owner")
@@ -210,6 +213,12 @@ _MBSW_CheckSdkFailure(PublicResult) {
 			|| IsSet(_LLM_ModelBrowser_Gui) || _MBSW.SdkPublicLogs != 1 || _MBSW.SdkRetiredLogs != 0
 			|| _MBSW.Subscriptions != 1 || _MBSW.Navigated != 1 || _MBSW.Filled != 1
 			throw Error("A public successor admitted during cleanup must prevent the old native fallback")
+	} else if _MBSW.Mode == "subscription-throw-unwind-close" {
+		if !_MBSW.UnwindCloseAcknowledged || !_MBSW.ForwardedResetRefused || PublicResult != 0
+			|| _MBSW.NativeClose != 1 || _MBSW.CloseEvents != 1 || _MBSW.Windows.Length != 1
+			|| _MBSW.Created != 1 || IsSet(_LLM_ModelBrowser_Gui) || IsSet(_LLM_MBW_Gui)
+			|| _MBSW.SdkPublicLogs != 1 || _MBSW.SdkRetiredLogs != 0 || _MBSW.Subscriptions != 0
+			throw Error("A real Close which already consumed Reset must remain terminal during SDK-error unwinding")
 	} else if _MBSW.Mode == "subscription-throw-direct" {
 		if _MBSW.SdkCaught != _MBSW.SdkFailure || _MBSW.Windows.Length != 1 || _MBSW.Created != 1
 			|| IsSet(_LLM_ModelBrowser_Gui) || IsSet(_LLM_MBW_Gui) || _MBSW.Subscriptions != 0
@@ -221,9 +230,42 @@ _MBSW_CheckSdkFailure(PublicResult) {
 		throw Error("An SDK failure returned after real native Close cannot reopen a canceled model browser")
 }
 
+
+_MBSW_InstallUnwindClose() {
+	global _MBSW
+	_MBSW.ResetHadCall := _LLM_MBW_Reset.HasOwnProp("Call")
+	if _MBSW.ResetHadCall
+		_MBSW.ResetCallDescriptor := _LLM_MBW_Reset.GetOwnPropDesc("Call")
+	_LLM_MBW_Reset.DefineProp("Call", {Call: _MBSW_ResetDuringSdkUnwind})
+	_MBSW.ResetHookInstalled := true
+}
+
+; The exact function still executes and returns its real receipt. The observer
+; only delivers a genuine native Close before the old cleanup frame can claim it.
+_MBSW_ResetDuringSdkUnwind(This, Params*) {
+	global _MBSW, _LLM_MBW_SessionEpoch, _LLM_MBW_Gui
+	Mine := !_MBSW.UnwindStarted && _MBSW.SdkCalls == 1
+	if Mine {
+		_MBSW.UnwindStarted := true
+		Epoch := _LLM_MBW_SessionEpoch
+		_MBSW_Withdraw("subscription-throw-unwind-close")
+		_MBSW.UnwindCloseAcknowledged := _MBSW.NativeClose == 1 && _MBSW.CloseEvents == 1
+			&& _LLM_MBW_SessionEpoch == Epoch + 1 && !IsSet(_LLM_MBW_Gui)
+			&& !DllCall("IsWindow", "Ptr", _MBSW.Hwnd, "Int")
+		if !_MBSW.UnwindCloseAcknowledged
+			throw Error("Unqualified: the actual user Close must consume the old epoch before cleanup Reset")
+	}
+	Result := Func.Prototype.Call.Call(This, Params*)
+	if Mine
+		_MBSW.ForwardedResetRefused := (Result is Integer) && Result == 0
+	return Result
+}
+
 OnMessage(0x18, _MBSW_ShowMessage)
 OnMessage(0x10, _MBSW_CloseMessage)
 try {
+	if _MBSW.Mode == "subscription-throw-unwind-close"
+		_MBSW_InstallUnwindClose()
 	if _MBSW.Mode == "subscription-throw-direct" {
 		PublicResult := 0
 		try PublicResult := _LLM_ModelBrowser_ShowWeb()
@@ -297,6 +339,13 @@ try {
 	FileAppend(Type(Failure) . ": " . Failure.Message . "`n", "*", "UTF-8")
 	ExitCode := 1
 } finally {
+	if _MBSW.ResetHookInstalled {
+		if _MBSW.ResetHadCall
+			_LLM_MBW_Reset.DefineProp("Call", _MBSW.ResetCallDescriptor)
+		else
+			_LLM_MBW_Reset.DeleteProp("Call")
+		_MBSW.ResetHookInstalled := false
+	}
 	if InStr(_MBSW.Mode, "subscription-throw-") == 1 {
 		if IsSet(_LLM_MBW_Gui)
 			try _LLM_MBW_OnClose(_LLM_MBW_Gui)
