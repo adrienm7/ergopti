@@ -854,9 +854,30 @@ _HSCI_EnsureWriteCallout(Mode) {
 	HadWarnings := IsSet(_HealthCheckWarnCount)
 	SavedWarnings := HadWarnings ? _HealthCheckWarnCount : 0
 	Root := A_Temp . "\ergopti_initial_cache_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
-	FSCreateDirectoryExclusiveStrict(Root)
+	Created := false, RegistryScope := 0
 	Lock := 0, Failure := 0, PreviousCritical := A_IsCritical
-	Facts := {logs: 0, critical: false, changed: false, failure: 0}
+	Facts := {logs: 0, critical: false, changed: false, failure: 0, ownedCalls: 0, ownedReturns: 0, collisions: []}
+	OwnedWriter := FSWriteReplaceOwned, HadOwnedCall := OwnedWriter.HasOwnProp("Call"), InstalledOwned := false
+	if HadOwnedCall
+		SavedOwnedCall := OwnedWriter.GetOwnPropDesc("Call")
+	ObserveOwned(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Tsv, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			ForeignPath := Tsv . Suffix
+			AssertEqual(1, FSWriteCreateDurable(ForeignPath, "Independent cache collision"))
+			Facts.collisions.Push(ForeignPath)
+			return StageFn.Call(Folder, Name, Attributes)
+		}
+		if Mine
+			Facts.ownedCalls += 1
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, BeforePublishFn, AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			Facts.ownedReturns += 1
+		return Result
+	}
 	OnLog(Line) {
 		if !InStr(Line, "Could not write hotstring cache", true)
 			return
@@ -878,6 +899,10 @@ _HSCI_EnsureWriteCallout(Mode) {
 	}
 	try {
 		Critical("Off")
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		RegistryScope := _PECASE_RegistryScope()
 		DirCreate(Root . "\modules\hotstrings")
 		Index := Root . "\modules\hotstrings\_index.toml"
 		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
@@ -899,8 +924,8 @@ _HSCI_EnsureWriteCallout(Mode) {
 		Source := _HotstringsCacheTomlPath("autocorrection")
 		Tsv := _HotstringsCacheTsvPath()
 		AssertFalse(FileExist(Tsv), "this must exercise the first production build, not a disk cache hit")
-		Lock := FileOpen(Tsv . ".tmp", "w-rwd", "UTF-8-RAW")
-		AssertTrue(IsObject(Lock), "the real cache stage must be physically exclusive")
+		OwnedWriter.DefineProp("Call", {Call: ObserveOwned})
+		InstalledOwned := true
 		_ResetLogger()
 		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_PATH_DATE := ""
@@ -913,6 +938,13 @@ _HSCI_EnsureWriteCallout(Mode) {
 		LoggerClearTestSink()
 		if Facts.failure is Error
 			throw Facts.failure
+		_TestPrint("# initial-cache-owned-diagnostic mode=" . Mode . " owned_calls=" . Facts.ownedCalls
+			. " owned_returns=" . Facts.ownedReturns . " collisions=" . Facts.collisions.Length . " logs=" . Facts.logs)
+		AssertTrue(Facts.ownedCalls >= 1)
+		AssertEqual(Facts.ownedCalls, Facts.ownedReturns)
+		AssertEqual(Facts.ownedCalls, Facts.collisions.Length)
+		for ForeignPath in Facts.collisions
+			AssertEqual("Independent cache collision", FSReadUtf8Exact(ForeignPath), "the real refused cache owner cannot retire the foreign stage")
 		AssertTrue(Facts.logs >= 1, "the actual writer must really reach its post-build diagnostic")
 		AssertFalse(Facts.critical, "the genuine yielding diagnostic must stay interruptible")
 		AssertTrue(Facts.changed is Integer && Facts.changed == 1, "the observer must physically change its authoritative input")
@@ -934,6 +966,12 @@ _HSCI_EnsureWriteCallout(Mode) {
 		}
 		AssertTrue(Facts.logs <= 2, "source movement must settle or refuse within the bounded producer attempts")
 	} finally {
+		if InstalledOwned {
+			if HadOwnedCall
+				OwnedWriter.DefineProp("Call", SavedOwnedCall)
+			else
+				OwnedWriter.DeleteProp("Call")
+		}
 		LoggerClearTestSink()
 		_LOGGER_REPEAT_ENABLED := SavedRepeat, _LOGGER_PATH_DATE := SavedDate
 		_TLOG_RestoreLoggerState(LoggerState)
@@ -944,7 +982,10 @@ _HSCI_EnsureWriteCallout(Mode) {
 				Lock.Close()
 		} catch as Err
 			CloseFailure := Err
-		HSE_TestReset()
+		if IsObject(RegistryScope) {
+			HSE_TestReset()
+			_PECASE_RegistryScope(RegistryScope)
+		}
 		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
 		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
 		_HotstringBoundSources := Saved[7], _TomlFileCache := Saved[8]
@@ -954,20 +995,58 @@ _HSCI_EnsureWriteCallout(Mode) {
 		try {
 			if CloseFailure is Error
 				throw CloseFailure
-			DirDelete(Root, true)
+			if Created
+				DirDelete(Root, true)
 		} finally Critical(PreviousCritical)
 	}
 }
 Test("hotstrings cache initial publication: real writer diagnostic edits category", _HSCI_EnsureWriteCallout.Bind("category"))
 Test("hotstrings cache initial publication: canonical memo A cannot bless actual index B", _HSCI_EnsureWriteCallout.Bind("index"))
 
-_HCOW_PublicEnsure(Collision) {
+_HCOW_PublicEnsure(Collision, TruncateStage := false) {
 	global _SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS
 	global _TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources
 	Saved := [_SharedDir, _HS_CACHE_ROWS, _HS_CACHE_LOADED, _GENERATED_HOTSTRINGS,
 		_TomlFileCache, _TomlFileSectionCounts, _TomlCountCache, HS_BUNDLED_CATEGORIES, _HotstringBoundSources]
 	Root := A_Temp . "\ergopti_cache_stage_owner_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	Created := false
+	OwnedWriter := FSWriteReplaceOwned, HadOwnedCall := OwnedWriter.HasOwnProp("Call"), InstalledOwned := false
+	if HadOwnedCall
+		SavedOwnedCall := OwnedWriter.GetOwnPropDesc("Call")
+	Fault := {calls: 0, handle: -1, truncated: 0, observedBytes: -1, nativeAck: -1, stagePath: ""}
+	ObserveOwned(This, Target, Content, Suffix, &Detail := "", StageFn := 0,
+			BeforePublishFn := 0, AdmissionFn := 0, ReplaceExisting := true,
+			&Publication := 0, FlushFn := 0) {
+		Mine := (Target is String) && StrCompare(Target, Tsv, true) == 0
+		CreateOriginal(Folder, Name, Attributes) {
+			Fault.handle := StageFn.Call(Folder, Name, Attributes)
+			Fault.stagePath := Tsv . Suffix
+			return Fault.handle
+		}
+		TruncateThenVerify() {
+			_FSRewind(Fault.handle)
+			Prefix := Buffer(1, 0x23)
+			if !_FSNativeWrite(Fault.handle, Prefix.Ptr, 1, &Written := 0) || Written != 1
+				throw Error("the genuine private stage prefix could not be written")
+			if !DllCall("kernel32\SetEndOfFile", "Ptr", Fault.handle, "Int")
+				throw OSError(A_LastError, "private held cache stage truncation")
+			if !DllCall("kernel32\FlushFileBuffers", "Ptr", Fault.handle, "Int")
+				throw OSError(A_LastError, "private truncated cache flush")
+			if !DllCall("kernel32\GetFileSizeEx", "Ptr", Fault.handle, "Int64*", &Bytes := 0, "Int")
+				throw OSError(A_LastError, "private truncated cache size")
+			Fault.observedBytes := Bytes
+			Fault.truncated += 1
+			return BeforePublishFn.Call()
+		}
+		if Mine
+			Fault.calls += 1
+		Result := Func.Prototype.Call.Call(This, Target, Content, Suffix, &Detail,
+			Mine ? CreateOriginal : StageFn, Mine ? TruncateThenVerify : BeforePublishFn,
+			AdmissionFn, ReplaceExisting, &Publication, FlushFn)
+		if Mine
+			Fault.nativeAck := Result
+		return Result
+	}
 	try {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
@@ -993,12 +1072,17 @@ _HCOW_PublicEnsure(Collision) {
 			Before := FSReadBytesStrict(Foreign)
 		}
 		_HS_CACHE_ROWS := Map(), _GENERATED_HOTSTRINGS := Map(), _HS_CACHE_LOADED := false
+		if TruncateStage {
+			OwnedWriter.DefineProp("Call", {Call: ObserveOwned})
+			InstalledOwned := true
+		}
 		HotstringsCacheEnsure()
 		Present := FSStrictExists(Foreign), CachePresent := FSStrictExists(Tsv)
 		After := Present ? FSReadBytesStrict(Foreign) : Buffer(0)
 		_TestPrint("# hotstrings-cache-stage collision=" . Collision . " foreign_present=" . Present
 			. " cache_present=" . CachePresent . " loaded=" . _HS_CACHE_LOADED
-			. " has_rows=" . _HS_CACHE_ROWS.Has("autocorrection.names") . " foreign_bytes=" . After.Size)
+			. " has_rows=" . _HS_CACHE_ROWS.Has("autocorrection.names") . " foreign_bytes=" . After.Size
+			. " truncated=" . Fault.truncated . " observed_stage_bytes=" . Fault.observedBytes . " native_ack=" . Fault.nativeAck)
 		AssertTrue(_HS_CACHE_LOADED, "valid TOML remains loadable even if the best-effort cache cannot publish")
 		AssertEqual("cacheownerprobe", _HS_CACHE_ROWS["autocorrection.names"][1][2])
 		AssertEqual("Owned output", _HS_CACHE_ROWS["autocorrection.names"][1][3])
@@ -1007,6 +1091,13 @@ _HCOW_PublicEnsure(Collision) {
 			AssertEqual(Before.Size, After.Size)
 			AssertEqual(Before.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Before,
 				"Ptr", After, "UPtr", Before.Size, "UPtr"), "foreign cache bytes remain exact")
+		} else if TruncateStage {
+			AssertEqual(1, Fault.calls)
+			AssertEqual(1, Fault.truncated, "the actual owned native stage must be physically truncated after its first flush")
+			AssertEqual(1, Fault.observedBytes)
+			AssertEqual(0, Fault.nativeAck, "the genuine helper must refuse the corrupt held stage")
+			AssertFalse(CachePresent, "a complete-looking prefix cannot receive a reusable cache publication")
+			AssertFalse(FSStrictExists(Fault.stagePath), "only the owned rejected stage is retired")
 		} else {
 			AssertTrue(CachePresent, "the default native writer still produces a reusable verified cache")
 			Disk := _HotstringsCacheReadTsv(FSReadUtf8Exact(Tsv))
@@ -1014,6 +1105,12 @@ _HCOW_PublicEnsure(Collision) {
 			AssertEqual("cacheownerprobe", Disk["autocorrection.names"][1][2])
 		}
 	} finally {
+		if InstalledOwned {
+			if HadOwnedCall
+				OwnedWriter.DefineProp("Call", SavedOwnedCall)
+			else
+				OwnedWriter.DeleteProp("Call")
+		}
 		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
 		_GENERATED_HOTSTRINGS := Saved[4], _TomlFileCache := Saved[5]
 		_TomlFileSectionCounts := Saved[6], _TomlCountCache := Saved[7]
