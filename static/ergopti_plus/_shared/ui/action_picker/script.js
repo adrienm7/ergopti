@@ -238,7 +238,7 @@ function render() {
 	list.innerHTML = '';
 	visible = [];
 
-	const q = el('search').value.trim().toLowerCase();
+	const q = el('search').value.trim().toLowerCase().normalize('NFC');
 	const searching = q !== '';
 
 	// When searching, mark headings that have at least one matching descendant.
@@ -298,7 +298,7 @@ function render() {
 }
 
 function matches(actionEntry, q) {
-	return (actionEntry.label || '').toLowerCase().indexOf(q) !== -1;
+	return (actionEntry.label || '').toLowerCase().normalize('NFC').indexOf(q) !== -1;
 }
 
 // The action entry an id names, or null.
