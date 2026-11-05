@@ -1019,6 +1019,7 @@ _MBPO_VisibilityTrace(State, Phase) {
 _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 	global _LLM_ModelBrowser_Gui
 	State.Active += 1
+	ReopenFrame := false
 	try {
 		if State.Armed && Hwnd == State.Hwnd && Message == 0x18
 			_MBPO_VisibilityTrace(State, "callback.enter." . WParam)
@@ -1029,17 +1030,26 @@ _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 			return Result
 		_MBPO_Require(_MBPO_NativeWindowPid(Hwnd) == ProcessExist(), "Only the exact owned native visibility callback may drive another action")
 		if State.Mode == "native-hide-reopen-close" && !WParam && !State.Reopened {
-			State.Reopened := true
+			State.Reopened := true, State.ReopenCallbackActive := true, ReopenFrame := true
 			_MBPO_VisibilityTrace(State, "public-show.before")
 			State.ShowReturned := LLM_ModelBrowser_Show()
 			_MBPO_VisibilityTrace(State, "public-show.after")
 			State.VisibleAfterFirstShow := !!DllCall("IsWindowVisible", "Ptr", State.Hwnd, "Int")
 			State.SameAfterReopen := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
+			State.FirstShowReturned := true
 		} else if WParam {
 			State.ShowSeen := true, State.ShowCount += 1
 			State.CriticalAtShow := A_IsCritical
-			if (State.Mode == "native-show-close" && State.ShowCount == 1)
-					|| (State.Mode == "native-hide-reopen-close" && State.ShowCount == 2) {
+			; A Show on an already-visible HWND need not send WM_SHOWWINDOW.
+			; Identify the actual repair after the first public Show and its
+			; containing Hide callback returned, rather than counting messages.
+			RepairShow := State.Mode == "native-hide-reopen-close" && State.FirstShowReturned
+				&& !State.ReopenCallbackActive && !State.CloseCalls
+			if (State.Mode == "native-show-close" && State.ShowCount == 1) || RepairShow {
+				if RepairShow {
+					State.RepairShowSeen := true
+					_MBPO_VisibilityTrace(State, "repair-show.seen")
+				}
 				State.CloseCalls += 1
 				_MBPO_VisibilityTrace(State, "nested-close.before")
 				_LLM_ModelBrowser_OnClose()
@@ -1052,7 +1062,11 @@ _MBPO_VisibilityProc(State, Hwnd, Message, WParam, LParam, Id, Data) {
 		State.Failed := true, State.Failure := Failure
 		_MBPO_VisibilityTrace(State, "callback.failed." . Type(Failure))
 		return 0
-	} finally State.Active -= 1
+	} finally {
+		if ReopenFrame
+			State.ReopenCallbackActive := false
+		State.Active -= 1
+	}
 }
 _MBPO_VisibilityReentry() {
 	global _MBPO, _LLM_ModelBrowser_Gui, _VendorDir, _DriverDir, ConfigurationFile
@@ -1064,6 +1078,7 @@ _MBPO_VisibilityReentry() {
 	PreviousCritical := Critical("Off")
 	State := {Window: 0, Hwnd: 0, Proc: 0, Installed: false, Armed: false, Active: 0,
 		Mode: _MBPO.Mode, Reopened: false, ShowSeen: false, ShowCount: 0, VisibleAfterFirstShow: false, CloseCalls: 0, HiddenDuringClose: false,
+		ReopenCallbackActive: false, FirstShowReturned: false, RepairShowSeen: false,
 		SameAfterReopen: false, CriticalAtShow: -1, Failed: false, Failure: 0, Debt: false, TraceFailures: 0}
 	if State.Mode == "native-hide-reopen-close" {
 		State.PhasePath := A_Args[2] . "\visibility-phases.txt"
@@ -1099,13 +1114,17 @@ _MBPO_VisibilityReentry() {
 		SameOwner := IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == State.Window
 		FileAppend("OBSERVATION native-model-visibility-reentry mode=" . State.Mode . " show_seen=" . State.ShowSeen
 			. " close_calls=" . State.CloseCalls . " hidden_during_close=" . State.HiddenDuringClose
-			. " reopened=" . State.Reopened . " show_count=" . State.ShowCount . " first_show_visible=" . State.VisibleAfterFirstShow . " same_owner=" . SameOwner . " visible_after=" . VisibleAfter
+			. " reopened=" . State.Reopened . " first_show_returned=" . State.FirstShowReturned
+			. " repair_show_seen=" . State.RepairShowSeen . " show_count=" . State.ShowCount . " first_show_visible=" . State.VisibleAfterFirstShow . " same_owner=" . SameOwner . " visible_after=" . VisibleAfter
 			. " trace_failures=" . State.TraceFailures . " critical_at_show=" . State.CriticalAtShow . "`n", "*", "UTF-8-RAW")
 		if State.Failed
 			FileAppend("DIAGNOSTIC native-model-visibility-reentry callback_type=" . JsonStringLiteral(Type(State.Failure))
 				. " callback_message=" . JsonStringLiteral(State.Failure is Error ? State.Failure.Message : "non-Error callback value") . "`n", "*", "UTF-8-RAW")
 		_MBPO_Require(!State.Failed && State.ShowSeen && SameOwner,
 			"The native Show callback must execute on the actual unchanged GUI owner")
+		if State.Mode == "native-hide-reopen-close"
+			_MBPO_Require(State.FirstShowReturned && !State.ReopenCallbackActive && State.RepairShowSeen,
+				"The actual post-reopen native Show must admit the third Close before product visibility is judged")
 		_MBPO_Require(_MBPO.Errors.Length == 0 && _MBPO.WriterEntries == 0
 			&& CryptoSha256Bytes(FSReadBytesStrict(ConfigurationFile)) == _MBPO.OriginalHash,
 			"Visibility ordering must preserve configuration bytes without technical errors")
@@ -1116,7 +1135,7 @@ _MBPO_VisibilityReentry() {
 			_MBPO_Require(State.CloseCalls == 1 && State.HiddenDuringClose && !VisibleAfter,
 				"A newer actual Close accepted inside Show must remain hidden during Close and after the older Show returns")
 			if State.Mode == "native-hide-reopen-close"
-				_MBPO_Require(State.Reopened && State.SameAfterReopen && State.ShowCount == 2 && State.VisibleAfterFirstShow,
+				_MBPO_Require(State.Reopened && State.SameAfterReopen && State.RepairShowSeen && State.VisibleAfterFirstShow,
 					"The third action must follow the successful visible public reopen and occur inside its actual repair Show")
 		}
 	} finally {
