@@ -1,0 +1,141 @@
+{
+	"head": "d892168eeaadf5fec2d883ffbf4d6daa728da65a",
+	"base": "19587d92dcafb63c0b20d74531c0656f9ac54652",
+	"qualification": "Targeted contracts and actual portable Lua gesture suites cover the nine upstream paths integrated after the successful572-check run. macOS AppKit/Swift/native gesture receiving not executed on Linux. Unchanged one-shot owners are checked separately.",
+	"checks": [
+		{
+			"command": ["node", "tools/test/test-macos-field-run-contract.cjs"],
+			"exit_code": 1,
+			"program_sha256": "bbfbcad1581ebe09eed2b85d382d7527d5e2e2e06288f76853dd2eaa9a962665",
+			"streams": {
+				"stdout": {
+					"path": "test-macos-field-run-contract.stdout.txt",
+					"sha256": "d78f2b3664523e51220ec683ee5ec391bd9954afc149ff02401ff2fcbb90210a"
+				},
+				"stderr": {
+					"path": "field-fixture-original-error.json",
+					"sha256": "030a302a1bf95e15ab52ae2847c42f6aa922cd0406f3d721b022da91fdab3f83",
+					"encoding": "json-string",
+					"field": "stderr",
+					"archive_sha256": "15dd87df64532ddb908a5b3f8d848efc7c831b5e3c78cb300489b9fce37d5898"
+				}
+			}
+		},
+		{
+			"command": ["node", "tools/test/test-macos-swift-launcher-ci.cjs"],
+			"exit_code": 0,
+			"program_sha256": "ee2a8231b39b0f442fcb216c9caa962d478a5136b0fe903f549873323cf0361f",
+			"streams": {
+				"stdout": {
+					"path": "test-macos-swift-launcher-ci.stdout.txt",
+					"sha256": "ca722a40d4eb555780e3056f4065df47de41d84febd153282ce5a2204be31e5d"
+				},
+				"stderr": {
+					"path": "test-macos-swift-launcher-ci.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": ["node", "tools/test/test-launcher-single-instance.cjs"],
+			"exit_code": 0,
+			"program_sha256": "143916e3f25dcec1d908d028b3d4ddbfa1abb875ae0275ee6f49e75842df8ac2",
+			"streams": {
+				"stdout": {
+					"path": "test-launcher-single-instance.stdout.txt",
+					"sha256": "ca2a0b53db2d5a5e9f824f8e13e7c6fa9622491ae38334ed7675ebe4506f56a8"
+				},
+				"stderr": {
+					"path": "test-launcher-single-instance.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": ["node", "tools/test/test-macos-bundle-layout.cjs"],
+			"exit_code": 0,
+			"program_sha256": "1ea250f4c5a4138363a2bffd5368fd7154dcb9b7acd7f94960875a22b5a1ff5b",
+			"streams": {
+				"stdout": {
+					"path": "test-macos-bundle-layout.stdout.txt",
+					"sha256": "23ff5c528beca6200b2fd49292d100b2b3dd0dc9d5201ece42f2b70c2972fe26"
+				},
+				"stderr": {
+					"path": "test-macos-bundle-layout.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": ["node", "tools/test/test-windows-updater-original-source.cjs"],
+			"exit_code": 0,
+			"program_sha256": "5650dd261daebf3d45ee476cae2ff9ef2060960721399703ad1847056132f91f",
+			"streams": {
+				"stdout": {
+					"path": "test-windows-updater-original-source.stdout.txt",
+					"sha256": "7107f979412e77fefa2b597564babaebf286c1910aee586f018acc066ebeff50"
+				},
+				"stderr": {
+					"path": "test-windows-updater-original-source.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": ["node", "tools/test/test-recommended-defaults-rule.cjs"],
+			"exit_code": 0,
+			"program_sha256": "901b1e8f92db69d5f0650024bb2e56d6c3c3ffda880285deccb06f859bad65bb",
+			"streams": {
+				"stdout": {
+					"path": "test-recommended-defaults-rule.stdout.txt",
+					"sha256": "b97224d3e296314ea11eb32828df788907df6733131e7a5e6a0beef60278f419"
+				},
+				"stderr": {
+					"path": "test-recommended-defaults-rule.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": [
+				"lua",
+				"static/ergopti_plus/macos/tests/run.lua",
+				"--only",
+				"tests/unit/modules/gestures/config/test_conflicts.lua"
+			],
+			"exit_code": 0,
+			"program_sha256": "a2767ffc7e86d1a722e0422d0952bd198dbcc26c06c123ab6d50cd8be6d5e23e",
+			"streams": {
+				"stdout": {
+					"path": "test_conflicts.stdout.txt",
+					"sha256": "62e626800adb98117b627c5961b62efba7e6bfddc9bec027cc69a4dc4a97b55f"
+				},
+				"stderr": {
+					"path": "test_conflicts.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		},
+		{
+			"command": [
+				"lua",
+				"static/ergopti_plus/macos/tests/run.lua",
+				"--only",
+				"tests/unit/modules/gestures/config/test_system_gesture_conflicts.lua"
+			],
+			"exit_code": 0,
+			"program_sha256": "a2767ffc7e86d1a722e0422d0952bd198dbcc26c06c123ab6d50cd8be6d5e23e",
+			"streams": {
+				"stdout": {
+					"path": "test_system_gesture_conflicts.stdout.txt",
+					"sha256": "fe1c2945a8ef530eaa35f8cabaf5c181e3cb2bd96603f2bbbb7b01889f389577"
+				},
+				"stderr": {
+					"path": "test_system_gesture_conflicts.stderr.txt",
+					"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+				}
+			}
+		}
+	],
+	"failed": 1
+}

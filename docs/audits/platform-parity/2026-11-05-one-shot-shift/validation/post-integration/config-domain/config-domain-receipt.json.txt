@@ -1,0 +1,185 @@
+{
+  "source_commit": "9c565c88c9a1366a2e9b18c1b9d2868509510975",
+  "sources": [
+    {
+      "path": "static/ergopti_plus/macos/platform/remap/init.lua",
+      "sha256": "18082e82568983bbd93847843a0f309719d51da7909f4145541275edd197923b",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/platform/remap/config.lua",
+      "sha256": "05f383dff5598cb296bbdb3fdfc89594bb4731845a4350b5d1131c19c175bbc8",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/infra/logger.lua",
+      "sha256": "d6af6e7bfab9e4f97c67f5bf60a93415e4e79811ede656dfbfcb7e6403470e53",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/logger/init.lua",
+      "sha256": "aa1d13396cbcc84ee9e1bebcab7d7b1ca6f364e23167c447d92205c8728493e0",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/keymap/init.lua",
+      "sha256": "b19f4d2315819cef1d3a1faed0f63fb3613ad1f9d3dbd22ee804c9c1c89bfd56",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/keymap/one_shot_shift.lua",
+      "sha256": "645f3a237074fc49e3294579e09cd65aa45e4840664f59ffdc0b72152c992213",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/adapters/one_shot_shift.lua",
+      "sha256": "1b772c8608804b5962bcd038fcd621fdd095bb4803f930383b1660ffc3339aa0",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/support/remap_transaction_fixture.lua",
+      "sha256": "388f8976e15d9a4d2a0ccb09d143b93311b5a91d2788d5eb99414d5e4e41be91",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "f31390b134692f273ab7256b2aece7743428996731b597a0a2cd147c163bcf64",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": ".agents/skills/adversarial-audit/SKILL.md",
+      "sha256": "f0c4baeb48d9fcc2221ab7c074223eaefe129bfb695c68374fa0ddde8fad7640",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": ".agents/skills/hammerspoon-driver/SKILL.md",
+      "sha256": "ac670e7e9f56c8c1dfb58e5c07e1bbf7962ee364f85bbe5942f23e6c5fc0162e",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": ".agents/skills/false-green-tests/SKILL.md",
+      "sha256": "8f7bc899fa67f34e382501669baa4fd8e64e88500e35d6016427fe889a6f8b0c",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/modules/gestures/actions.lua",
+      "sha256": "3e9fa4e342016389ab8ba639e8f84e4a37e39c794f61a5b91aeb865e89124a9c",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/ui/menu/menu_tap_holds.lua",
+      "sha256": "ac391baa4071af3b97e81313201d05bca1eb102a444a1a2b224b76e7dfa1765d",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/adapters/synthetic_input.lua",
+      "sha256": "3a72301204dd545ca4773ad114f719e0d6b171799874dbe96b047899d102259e",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/platform/remap/watchers.lua",
+      "sha256": "9a5cec016f0ac91d0f57e360f97d3b40291be473c83caca33951f8cfb75f4763",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/infra/capsword_output.lua",
+      "sha256": "eaff5c5baa507b2190cbd550aa4fc2201ff2a499130b2f21fbd16193054a6f22",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/tap_hold/one_shot_shift.lua",
+      "sha256": "9ff4f097e014ada2c6755d774c5570b91239f611b4699bdbb317c5af84071b13",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/tap_hold/one_shot_shift.json",
+      "sha256": "6c605b612374f4e21a3ad5edfea6c0c676c37c23cff32db78d867aef4e28d182",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/_shared/lua/layouts/keylayout.lua",
+      "sha256": "095fc49ce776a89aa395ebf3d1c7dc9fa34d542fc166fd83ac6b0263e119fc13",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+      "sha256": "23dac99d4bc366e3baaab1ce2895d087868ccd01330c188aa32df3e28f92a059",
+      "pinned_matches": true,
+      "current_matches": true
+    },
+    {
+      "path": "static/ergopti_plus/macos/tests/unit/modules/keymap/lifecycle/test_start_commit_transaction.lua",
+      "sha256": "62f2b90a69af35e7741d64002c4d6ff17414f98fbf48e0555c8e6bd6e145ec18",
+      "pinned_matches": true,
+      "current_matches": true
+    }
+  ],
+  "supplement_handoff_sha256": "b7bd54fea998412a490218aa955c9f5585e436657cc465db3f8357f8bed17d75",
+  "frozen_supplement_authenticated": true,
+  "frozen_public_fixture_authenticated": true,
+  "runs": [
+    {
+      "command": [
+        "lua",
+        "/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/validation/config-domain-boundaries.lua",
+        "/workspace/ergopti"
+      ],
+      "runtime_version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+      "exit": 0,
+      "log": "config-domain-boundaries-current.log",
+      "sha256": "04861fd7e0866d529c251523458e48a2ccfd7d110ed49b756282d5885c3aabfc",
+      "program_sha256": "897787d02b1301551774a2b297fa46c57e8b0570dc9915a39683dcaef2e85659",
+      "fresh_private_tmpdir": true
+    },
+    {
+      "command": [
+        "lua",
+        "/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/validation/public-arm-domain-boundaries.lua",
+        "/workspace/ergopti"
+      ],
+      "runtime_version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+      "exit": 0,
+      "log": "public-arm-domain-boundaries-current.log",
+      "sha256": "3a2b2faf28152bf76f40c55a4ddf78e7882fb80170188a534f82b2771ad1239e",
+      "program_sha256": "e0e5d0c8349a6363ab2d2bdbb125d2fb5af6857315771e7d9df877b5ee50232c",
+      "fresh_private_tmpdir": true
+    },
+    {
+      "command": [
+        "lua",
+        "/workspace/ergopti/docs/audits/platform-parity/2026-11-05-one-shot-shift/macos/validation/logger-domain-boundaries.lua",
+        "/workspace/ergopti"
+      ],
+      "runtime_version": "Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio",
+      "exit": 0,
+      "log": "logger-domain-boundaries-current.log",
+      "sha256": "576b7afd9c314ff3ef03ff5c5ad07d3ecddec88d90434813fe7c1791c0ec442c",
+      "program_sha256": "6d5d232ecaee2bde095091c14a0392da051182d8cf4678987fa764aefdb5c37b",
+      "fresh_private_tmpdir": true
+    }
+  ],
+  "setter_rows_asserted": 14,
+  "public_arm_rows_asserted": 5,
+  "shared_formatter_rows_asserted": 2,
+  "qualification": "Original owners over declared ports; setter initially disabled and save acknowledged only; public arming and formatter execute independently; no real disk, menu, native receiving or full native logger transport claim. Same OSM-002 numeric-domain root."
+}
