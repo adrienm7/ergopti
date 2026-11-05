@@ -587,6 +587,20 @@ for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three", "cost-three", "i
 ; Actual native fallback InputHook -> Bridge -> OnKeystroke -> native timer ->
 ; FirePrediction -> genuine managed HTTP. No provider service or fake subject.
 global _LDP_Debt := []
+_LDP_PrivacyTraceState() {
+    global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration, _LLM_Bridge_BufferSource
+    global _LLM_Bridge_ReadLiveFocus, _LLM_Engine, SFD_FIELD_CACHE, _PrefixDeferredGeneration
+    Source := _LLM_Bridge_BufferSource
+    return Map("buffer_units", StrLen(_LLM_Bridge_Buffer), "engine_units", StrLen(_LLM_Engine.Get("last_buffer", "")),
+        "content_generation", _LLM_Bridge_ContentGeneration, "lifecycle", _PrefixDeferredGeneration,
+        "source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
+        "source_control", Source is Map ? Source.Get("control", 0) : 0,
+        "source_focus_generation", Source is Map ? Source.Get("input_focus_generation", -1) : -1,
+        "source_element_matches", Source is Map ? Source.Get("input_element_id", "") == SFD_FIELD_CACHE["current_element_id"] : -1,
+        "cache_hwnd", SFD_FIELD_CACHE["hwnd"], "cache_generation", SFD_FIELD_CACHE["focus_generation"],
+        "cache_secure", SFD_FIELD_CACHE["secure"], "cache_tracking", SFD_FIELD_CACHE["focus_tracking_active"],
+        "cache_at", SFD_FIELD_CACHE["at"], "focus_reader", ObjPtr(_LLM_Bridge_ReadLiveFocus))
+}
 _LDP_Char(State, IH, Char) {
     if !State.InputActive
         return
@@ -595,7 +609,14 @@ _LDP_Char(State, IH, Char) {
         State.InputCallbacks += 1
         AssertEqual(State.TypedHwnd, WIGetForegroundHwnd())
         AssertEqual(State.TypedControl, WIGetFocusedControlToken())
+        EntryOrder := State.InputCallbacks, EntryUnits := StrLen(State.InputChars)
+        Before := _LDP_PrivacyTraceState()
         _LLM_Bridge_OnDispatcherChar(IH, Char)
+        After := _LDP_PrivacyTraceState()
+        State.InputCompleted += 1
+        State.PrivacyTrace.Push(Map("entry", EntryOrder, "completion", State.InputCompleted,
+            "entry_units", EntryUnits, "completed_at_units", StrLen(State.InputChars), "chunk_units", StrLen(Char),
+            "before", Before, "after", After))
     } catch Any as Err {
         State.Failure := Err
     }
@@ -750,7 +771,7 @@ _LDP_Native(Mode, Calls, Lines) {
     State := {Directory: "", DirectoryOwned: false, Peer: 0, PeerStop: "", App: 0, AppStop: "",
         GuiA: 0, Hook: 0, InputActive: false, InputChars: "", InputCallbacks: 0, InputDowns: 0,
         TypedHwnd: 0, TypedControl: 0, Failure: 0, Id: 0, Entry: 0, Engine: _LLM_Engine,
-        Endpoint: "", OwnEntries: Map(), SfdOwned: false, SfdPrevious: 0, SfdCache: 0, SecureSource: -1, SecureFocus: -1}
+        Endpoint: "", OwnEntries: Map(), PrivacyTrace: [], InputCompleted: 0, SfdOwned: false, SfdPrevious: 0, SfdCache: 0, SecureSource: -1, SecureFocus: -1}
     Primary := 0
     try {
         AssertFalse(SFD_FIELD_CACHE.Get("focus_tracking_active", false), "do not borrow a live native secure-field observer")
@@ -919,6 +940,7 @@ _LDP_Native(Mode, Calls, Lines) {
             AssertEqual(Canary . AllowedCanary, State.InputChars, "both actual I1 input bursts must be observed in order")
             AssertEqual(AllowedCanary, ControlGetText(BControl), "the fresh allowed context is genuinely present in native B")
             AssertEqual(PriorCallbacks + StrLen(AllowedCanary), State.InputCallbacks)
+            FreshBCompletedAtSnapshot := State.InputCompleted
             FreshBBufferExact := _LLM_Bridge_Buffer == AllowedCanary
             FreshBEngineExact := _LLM_Engine["last_buffer"] == AllowedCanary
             AssertTrue(_LLM_Engine["timer_active"] && IsObject(_LLM_Engine_Plan().Pending))
@@ -969,6 +991,7 @@ _LDP_Native(Mode, Calls, Lines) {
             "origin_hwnd", OriginHwnd, "origin_control", OriginControl, "fresh_b_input", Retyped,
             "private_source_purged", PrivatePurged,
             "fresh_b_buffer_exact", Retyped ? FreshBBufferExact : -1,
+            "fresh_b_completed_at_snapshot", Retyped ? FreshBCompletedAtSnapshot : -1,
             "fresh_b_engine_exact", Retyped ? FreshBEngineExact : -1,
             "typed_hwnd", State.TypedHwnd, "typed_control", State.TypedControl,
             "captured_source_hwnd", Source is Map ? Source.Get("hwnd", 0) : 0,
@@ -976,6 +999,8 @@ _LDP_Native(Mode, Calls, Lines) {
             "focus_hwnd", WIGetForegroundHwnd(),
             "native_request_delta", NativeDelta, "http_posts", Posts, "source_a_received", SourceA,
             "source_b_received", SourceB, "remaining_requests", _LLM_Remote_Async.Count)))
+        if Retyped && (!FreshBBufferExact || !FreshBEngineExact)
+            _TestPrint("# LLM_DEBOUNCE_PRIVACY_TRACE " . KL_JsonEncode(State.PrivacyTrace))
         if Retyped {
             AssertTrue(FreshBBufferExact, "the rolling context must contain exactly B, never retained private A")
             AssertTrue(FreshBEngineExact, "the armed engine must contain exactly B")
