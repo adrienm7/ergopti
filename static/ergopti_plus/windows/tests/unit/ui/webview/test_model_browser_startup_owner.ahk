@@ -123,3 +123,7 @@ for _MBSTO_Mode in ["current", "reuse", "close", "reopen", "teardown-reopen", "e
 for _MBSTO_SubscriptionMode in ["subscription-owner-current", "subscription-owner-close"]
 	Test("Model web add-event retirement: " . _MBSTO_SubscriptionMode . " owns the actual HWND (model-web-native-subscription-retirement-owner)",
 		_MBSTO_Case.Bind(_MBSTO_SubscriptionMode))
+
+for _MBSTO_SdkMode in ["subscription-throw-current", "subscription-throw-retired", "subscription-throw-cleanup-reopen", "subscription-throw-direct"]
+	Test("Model browser SDK refusal: " . _MBSTO_SdkMode . " preserves fallback ownership (model-subscription-sdk-failure-owner)",
+		_MBSTO_Case.Bind(_MBSTO_SdkMode))

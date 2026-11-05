@@ -194,6 +194,10 @@ _PRSO_Check() {
 	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EditId, ConfigurationFile
 	if IsObject(_PRSO.Failure)
 		throw _PRSO.Failure
+	if InStr(_PRSO.Mode, "subscription-throw-") == 1 {
+		_PRSO_CheckSdkFailure()
+		return
+	}
 	_PRSO_Require(_PRSO.Errors.Length == 0 && _PRSO.FallbackInputs == 0 && _PRSO.Environments == 1,
 		"No admission or runtime diagnostic may qualify as prompt cancellation.")
 	_PRSO_Require(FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
@@ -253,7 +257,8 @@ _PRSO_Main() {
 		OldEpoch: 0, SuccessorEpoch: 0, FallbackInputs: 0, Environments: 0,
 		ActiveSubscriptions: 0, CreatedSubscriptions: 0, ReleasedSubscriptions: 0, SubscriptionCalls: 0,
 		SubscriptionCloseCalls: 0, NativeAliveAtReturn: false, NativeAliveAtClose: false, SubscriptionsAtClose: -1,
-		SubscriptionInFlight: false, ReleasedInFlight: false, NativeCloseObserved: false }
+		SubscriptionInFlight: false, ReleasedInFlight: false, NativeCloseObserved: false,
+		SdkFailure: Error("Controlled prompt SDK add-event refusal"), SdkCaught: 0 }
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_PRSO_OnError)
 	LoggerSetTestSink(_PRSO_Log)
@@ -282,7 +287,12 @@ _PRSO_Main() {
 			_ConfigPrepareTypedUpdates(_LLM_Menu_ProfileProjectionUpdates(Features, _LLM_Menu))),
 			"The actual native writer must align the complete private LLM source before opening.")
 		_PRSO.Source := FSConfigReadUtf8Exact(ConfigurationFile)
-		_PRSO_Open(_PRSO.Profiles[1])
+		if InStr(_PRSO.Mode, "subscription-throw-") == 1 {
+			try _PRSO_Open(_PRSO.Profiles[1])
+			catch Any as SdkFailure
+				_PRSO.SdkCaught := SdkFailure
+		} else
+			_PRSO_Open(_PRSO.Profiles[1])
 		_PRSO_Observe(), Observed := true
 		_PRSO_Check()
 	} catch as Failure {
@@ -345,7 +355,7 @@ _PRSO_Subscribe(View, Callback) {
 	_PRSO.SubscriptionCalls += 1
 	_PRSO.SubscriptionInFlight := true
 	try {
-		if _PRSO.Mode == "subscription-close" {
+		if _PRSO.Mode == "subscription-close" || _PRSO.Mode == "subscription-throw-retired" {
 			Hwnd := _PRSO.Hwnds[1], Epoch := _PromptEdWeb_ContextEpoch
 			_PRSO_Require(_PRSO.SubscriptionCalls == 1 && Epoch > 0
 				&& WinGetPID("ahk_id " . Hwnd) == ProcessExist()
@@ -361,6 +371,8 @@ _PRSO_Subscribe(View, Callback) {
 			_PRSO_Require(_PRSO.NativeCloseObserved, "The genuine handler must revoke context and source before the add-event call returns")
 		}
 		_PRSO.NativeAliveAtReturn := !!DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int")
+		if InStr(_PRSO.Mode, "subscription-throw-") == 1
+			throw _PRSO.SdkFailure
 		return _PRSO_Subscription(Callback)
 	} finally _PRSO.SubscriptionInFlight := false
 }
@@ -399,6 +411,36 @@ _PRSO_CheckSubscription() {
 		&& !IsSet(_PromptEdWeb_Controller) && !IsSet(_PromptEdWeb_WebView)
 		&& !IsSet(_PromptEdWeb_MsgSub) && !IsSet(_PromptEdWeb_NavSub),
 		"Physical retirement must finish after the ordered subscription/controller cleanup")
+}
+
+
+_PRSO_CheckSdkFailure() {
+	global _PRSO, _PromptEdWeb_Gui, _PromptEdWeb_Controller, _PromptEdWeb_WebView
+	global _PromptEdWeb_MsgSub, _PromptEdWeb_NavSub, _PromptEdWeb_ContextEpoch, ConfigurationFile
+	Current := _PRSO.Mode == "subscription-throw-current"
+	FileAppend("OBSERVATION prompt-sdk-failure mode=" . _PRSO.Mode . " caught_same=" . (_PRSO.SdkCaught == _PRSO.SdkFailure)
+		. " caught_any=" . IsObject(_PRSO.SdkCaught) . " calls=" . _PRSO.SubscriptionCalls
+		. " close_observed=" . _PRSO.NativeCloseObserved . " hwnd_at_throw=" . _PRSO.NativeAliveAtReturn
+		. " hwnd_at_close=" . _PRSO.NativeAliveAtClose . " controller_closes=" . _PRSO.Controllers[1].Closed
+		. " errors=" . _PRSO.Errors.Length . " fallback_inputs=" . _PRSO.FallbackInputs . "`n", "*", "UTF-8")
+	_PRSO_Require(_PRSO.Controllers.Length == 1 && _PRSO.Windows.Length == 1 && _PRSO.Environments == 1
+		&& _PRSO.SubscriptionCalls == 1 && _PRSO.NativeAliveAtReturn && _PRSO.NativeAliveAtClose
+		&& _PRSO.Controllers[1].Closed == 1 && _PRSO.SubscriptionCloseCalls == 1
+		&& _PRSO.ActiveSubscriptions == 0 && _PRSO.CreatedSubscriptions == 0 && _PRSO.FallbackInputs == 0,
+		"The genuine failed SDK call must retire its exact native/controller owner without inventing a wizard fallback")
+	if Current
+		_PRSO_Require(_PRSO.SdkCaught == _PRSO.SdkFailure && _PRSO.Errors.Length == 0 && _PRSO.CloseSent == 0,
+			"A current SDK failure must reach the public prompt caller as the exact original Error")
+	else
+		_PRSO_Require(!IsObject(_PRSO.SdkCaught) && _PRSO.CloseSent == 1 && _PRSO.NativeCloseObserved
+			&& _PRSO.Errors.Length == 1 && InStr(_PRSO.Errors[1], "[PromptEditor] Browser subscription failed (error_type=Error)."),
+			"An SDK failure returned after actual native Close is consumed without reopening its canceled editor")
+	_PRSO_Require(_PromptEdWeb_ContextEpoch == 0 && !IsObject(_PromptEdWeb_Gui)
+		&& !IsSet(_PromptEdWeb_Controller) && !IsSet(_PromptEdWeb_WebView)
+		&& !IsSet(_PromptEdWeb_MsgSub) && !IsSet(_PromptEdWeb_NavSub)
+		&& !DllCall("IsWindow", "Ptr", _PRSO.Hwnds[1], "Int")
+		&& FSConfigReadUtf8Exact(ConfigurationFile) == _PRSO.Source,
+		"Failed startup cleanup must finish without changing the real profile source")
 }
 
 _PRSO_Main()
