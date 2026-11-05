@@ -183,7 +183,7 @@ fi
 hidden=false
 if [ "$ACTION" = disable ]; then hidden=true; fi
 write_desktop_choice() {
-	local line normalized group= inserted=false newline= last_newline=true
+	local line normalized carriage group= inserted=false newline= last_newline=true
 	while :; do
 		line= newline=
 		if IFS= read -r line; then newline=$'\n'; else [ -n "$line" ] || break; fi
@@ -199,6 +199,13 @@ write_desktop_choice() {
 				normalized="${normalized%"${normalized##*[![:space:]]}"}"
 				if [ "$normalized" = '[Desktop Entry]' ]; then group=main; else group=other; fi ;;
 			*)
+				if [ "$group" = main ] && [[ "$normalized" =~ ^Exec[[:space:]]*= ]]; then
+					carriage=
+					if [ -n "$newline" ] && [[ "$line" = *$'\r' ]]; then carriage=$'\r'; fi
+					printf '%s%s%s' "$desktop_exec" "$carriage" "$newline" || return 1
+					if [ -n "$newline" ]; then last_newline=true; else last_newline=false; fi
+					continue
+				fi
 				if [ "$group" = main ] && [[ "$normalized" =~ ^(Hidden|X-GNOME-Autostart-enabled|X-Ergopti-Startup)[[:space:]]*= ]]; then
 					continue
 				fi ;;

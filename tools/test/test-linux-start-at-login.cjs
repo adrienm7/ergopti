@@ -245,6 +245,20 @@ try {
 	);
 	assert.equal(run('disable', { SHOW_REFUSE: '1', SYSTEMD_COLORS: '1' }).status, 0);
 	const ownedDesktop = fs.readFileSync(desktop, 'utf8');
+	// Legacy unquoted paths with spaces must be repaired when startup is changed.
+	fs.writeFileSync(
+		desktop,
+		`[Desktop Entry]\r\nExec=${posix(selectedLauncher)} --tray\r\nHidden=true\r\n# personal\r\n[Desktop Action Extra]\r\nExec=personal-command\r\n`
+	);
+	assert.equal(run('enable').status, 0);
+	assert.match(fs.readFileSync(desktop, 'utf8'), /^Exec=\/bin\/bash ".*" --session-start --tray$/m);
+	assert.match(fs.readFileSync(desktop, 'utf8'), /^# personal\r$/m);
+	assert.match(fs.readFileSync(desktop, 'utf8'), /--session-start --tray\r\n/);
+	assert.match(
+		fs.readFileSync(desktop, 'utf8'),
+		/\[Desktop Action Extra\]\r\nExec=personal-command\r\n/
+	);
+	assert.equal(run('disable').status, 0);
 	const binaryCustomization = Buffer.concat([
 		Buffer.from(ownedDesktop),
 		Buffer.from('# personal\0data\n')
