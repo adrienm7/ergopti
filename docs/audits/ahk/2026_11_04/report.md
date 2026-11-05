@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **110 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **112 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1795,3 +1795,19 @@ Severity: medium. Confidence: high. Evidence: native Windows fail-before.
 Stop invalidates capture and its privacy tracker, then flushes existing rows without closing the active app/title clocks. Runs41967942121 and41971226185 observe terminal `rows=0 elapsed=46-47 errors=0` and cold SQL app time0. The corrected positive control emits two switch rows and47ms of canonical app time in the latter run. Both results repeat in inverse order.
 
 The pending correction must close accepted origins through independent acknowledgements, preserve privacy refusals and retain transition ownership across native Stop reentrancy. Four extra accepted-row/Stop cutpoint controls are integrated for the next native run. Implementation and postfix qualification remain pending.
+
+## AHK-111: A selected existing application path can launch its executable prefix
+
+Severity: high. Confidence: high. Evidence: native Windows fail-before.
+
+The chooser stores an unquoted file path, while open_app passes that value as a raw Run command line. Windows can therefore select an existing executable prefix before the first space. Run41974178449 at26b1ecd81954794d09806e746265724e60332bc1 launches the private `witness.exe` instead of `witness.exe folder/target.exe`; the quoted control succeeds. Both exact processes are authenticated by retained handle, PID, creation FILETIME and image, and joined before cleanup. The failure repeats in inverse order. No privilege elevation or execution of external applications is claimed.
+
+The correction quotes a complete value recognized as an existing file, preserves legacy shell URI/argument strings and leaves generic Launch unchanged. The original lifecycle owner remains required after the filesystem probe, including actual suspend/resume. Native receiver, shortcut and compatibility controls await postfix qualification. A missing or unobservable path string remains indistinguishable from a legacy command without additional stored provenance; that separate domain is outside this correction's claim.
+
+## AHK-112: Malformed locator bytes silently select a different configuration profile
+
+Severity: medium. Confidence: high. Evidence: native Windows fail-before.
+
+ReadPathsToml replaces malformed UTF-8 before routing. The native run independently proves invalid original bytes and native replacement decoding, then reaches `refused=0 selected-target=1 actual-profile=redirected` in an actually existing private U+FFFD profile. The valid Unicode control selects its intended profile. Both results repeat in inverse order; no user profile is modified by these fixtures.
+
+The correction reads one raw Buffer and decodes it strictly through a pure early-boot codec extracted from the qualified068 algorithm. Personal helper signatures remain intact. Four actual routing cases preserve malformed-byte refusal and the valid Unicode, UTF-8 BOM and UTF-16LE BOM protocols. Native postfix qualification is pending.

@@ -49,6 +49,7 @@ class _SysActionsFake {
 		this.Shell := ""
 		this.ActiveTab := 0
 		this.Directories := Map()
+		this.ExistingAppPaths := Map()
 		this.Terminal := ""
 		this.CreateStatuses := []
 		this.Pointer := { X: 0, Y: 0 }
@@ -106,6 +107,7 @@ class _SysActionsFake {
 		return this.CreateStatuses.Length ? this.CreateStatuses.RemoveAt(1) : "created"
 	}
 	IsDirectory(Path) => this.Directories.Has(Path)
+	IsExistingFile(Path) => this.ExistingAppPaths.Has(Path)
 	FilesUnder(Dir) => this.Directories[Dir]
 	EnumerateUnblockFiles(Dir) => { Files: this.FilesUnder(Dir), Failed: 0 }
 	WindowsTerminalPath() => this.Terminal
@@ -678,6 +680,18 @@ _SysActions_OpenApp() {
 		Launches := _SysActions_CallsNamed(Fake, "Launch")
 		AssertEqual(1, Launches.Length)
 		AssertEqual(Target, Launches[1][2], "the binding's own application, as the shell runs it")
+		for FilePath in ["C:\Program Files\Demo\demo.exe", "C:\Start Menu\Demo.lnk"] {
+			GestureActionParameters := Map(GestureActionParameterKey("keyboard__primary_k", "open_app"), FilePath)
+			Fake := _SysActionsFake(), Fake.ExistingAppPaths[FilePath] := true
+			GestureSysOpenApp("keyboard__primary_k", Fake)
+			AssertEqual('"' . FilePath . '"', _SysActions_CallsNamed(Fake, "Launch")[1][2],
+				"an existing whole file is passed as one argument")
+		}
+		Command := '"C:\Program Files\Demo\demo.exe" --option'
+		GestureActionParameters := Map(GestureActionParameterKey("keyboard__primary_k", "open_app"), Command)
+		Fake := _SysActionsFake()
+		GestureSysOpenApp("keyboard__primary_k", Fake)
+		AssertEqual(Command, _SysActions_CallsNamed(Fake, "Launch")[1][2], "a command line stays intact")
 		Fake := _SysActionsFake()
 		GestureSysOpenApp("tap_3", Fake)
 		AssertEqual(0, Fake.Calls.Length, "a binding with no application opens nothing")
@@ -1034,6 +1048,7 @@ class _OAP_NativeControl extends _SysActionsFake {
 		super.__New()
 		this.Native := SystemControl(), this.ProcessHandle := 0, this.UnownedPid := 0, this.Admitted := false
 	}
+	IsExistingFile(Path) => this.Native.IsExistingFile(Path)
 	Launch(Target, WorkingDir := "", Options := "") {
 		Pid := this.Native.Launch(Target, WorkingDir, "Hide")
 		if !(Pid is Integer) || Pid <= 0
@@ -1224,3 +1239,88 @@ _OAP_ChosenPathDoesNotLaunchPrefix() {
 	}
 }
 Test("system actions: chosen executable path with spaces does not launch its prefix (open-app-native-quoted-path)", _OAP_ChosenPathDoesNotLaunchPrefix)
+
+
+; A real shortcut is classified as one file, while shell expressions and
+; wildcard patterns remain untouched by the path-specific quoting policy.
+class _OAP_RecordingControl extends _SysActionsFake {
+	__New() {
+		super.__New()
+		this.Native := SystemControl()
+	}
+	IsExistingFile(Path) => this.Native.IsExistingFile(Path)
+}
+_OAP_NativeShortcutControl() {
+	Root := A_Temp . "\ergopti-shortcut-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	Created := FSCreateDirectoryExclusiveStrict(Root)
+	if !(Created is Integer) || Created != 1
+		throw Error("Exclusive fixture ownership was not confirmed.")
+	try {
+		Link := Root . "\chosen shortcut.lnk"
+		FileCreateShortcut(A_AhkPath, Link)
+		Control := _OAP_RecordingControl()
+		AssertTrue(Control.IsExistingFile(Link), "the OS recognizes the real shortcut")
+		AssertFalse(Control.IsExistingFile(Root . "\*.lnk"), "wildcards are never treated as one path")
+		_OAP_RunAction(Control, Link)
+		Launches := _SysActions_CallsNamed(Control, "Launch")
+		AssertEqual(1, Launches.Length)
+		AssertEqual('"' . Link . '"', Launches[1][2], "the selected shortcut is one shell target")
+	} finally DirDelete(Root, true)
+}
+Test("system actions: existing shortcut path stays one shell target (open-app-native-shortcut)", _OAP_NativeShortcutControl)
+
+
+class _OAP_PauseOnFileProbe extends _SysActionsFake {
+	IsExistingFile(Path) {
+		Suspend(true)
+		return true
+	}
+}
+_OAP_PauseAfterPathProbe() {
+	PriorPause := A_IsSuspended, Control := _OAP_PauseOnFileProbe()
+	try {
+		Suspend(false)
+		_OAP_RunAction(Control, "C:\Program Files\Example\app.exe")
+		AssertEqual(0, _SysActions_CallsNamed(Control, "Launch").Length,
+			"a suspension during the new file query cancels the launch")
+	} finally Suspend(PriorPause)
+}
+Test("system actions: pause during open_app path probe prevents launch (open-app-probe-pause)", _OAP_PauseAfterPathProbe)
+
+
+class _OAP_ResumeOnFileProbe extends _SysActionsFake {
+	__New(DoResume) {
+		super.__New()
+		this.DoResume := DoResume
+	}
+	IsExistingFile(Path) {
+		if this.DoResume {
+			Suspend(true)
+			try AssertTrue(TapHoldReleaseSyntheticKeys(), "native lifecycle drain acknowledged")
+			finally Suspend(false)
+		}
+		return true
+	}
+}
+_OAP_ResumeAfterPathProbe() {
+	global _TapCopyPending
+	AssertFalse(IsObject(_TapCopyPending), "a foreign pending copy cannot be retired by this fixture")
+	_TSUH_Begin(Map(), Map())
+	PriorPause := A_IsSuspended
+	try {
+		Suspend(false)
+		Control := _OAP_ResumeOnFileProbe(false)
+		_OAP_RunAction(Control, "C:\Program Files\Example\app.exe")
+		AssertEqual(1, _SysActions_CallsNamed(Control, "Launch").Length,
+			"an unchanged invocation may launch")
+		Control := _OAP_ResumeOnFileProbe(true)
+		_OAP_RunAction(Control, "C:\Program Files\Example\app.exe")
+		AssertFalse(A_IsSuspended, "the native driver resumed before the probe returned")
+		AssertEqual(0, _SysActions_CallsNamed(Control, "Launch").Length,
+			"the original lifecycle owner cannot launch after pause and resume")
+	} finally {
+		Suspend(PriorPause)
+		_TSUH_End()
+	}
+}
+Test("system actions: pause and resume during open_app probe retires launch (open-app-probe-resume)", _OAP_ResumeAfterPathProbe)

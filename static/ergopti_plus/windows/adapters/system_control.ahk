@@ -415,6 +415,15 @@ class SystemControl {
 		return InStr(FileExist(Path), "D") > 0
 	}
 
+	; True only when the whole value names an existing file. Wildcards and
+	; command-line quoting cannot be literal Windows file-name characters.
+	IsExistingFile(Path) {
+		if !(Path is String) || Path == "" || RegExMatch(Path, '[*?"<>|]')
+			return false
+		Attributes := FileExist(Path)
+		return Attributes != "" && !InStr(Attributes, "D")
+	}
+
 	; @returns {Array} Every file below a directory, recursively.
 	FilesUnder(Dir) {
 		Files := []
