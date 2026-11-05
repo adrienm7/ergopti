@@ -409,23 +409,36 @@ LLM_RemoteBackboardChat_Async(Resolved, System, Text, on_success, on_fail, Kind 
  * @param {Func}       on_fail    - Called with _LLMRemote_FailInfo's Map.
  * @param {String}     Kind       - Reservation kind.
  * @param {Integer}    TimeoutMs  - Override (0 keeps the shared one).
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
  * @returns {Integer} Request id.
  */
-LLM_RemoteDecisions_Async(Resolved, State, Questions, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+LLM_RemoteDecisions_Async(Resolved, State, Questions, on_success, on_fail, Kind := "", TimeoutMs := 0, CurrentFn := 0) {
     if !(Resolved is Map) || Resolved["Format"] != "decisions"
         throw ValueError("LLM_RemoteDecisions_Async needs a resolved decisions entry.")
+    if !_LLMRemote_RequesterCurrent(CurrentFn)
+        return 0
     Body := LLM_RemoteFormats_Encode(LLM_RemoteFormats_DecisionsBody(Resolved["Model"], State, Questions))
     Url := _LLMRemoteBuildUrl(Resolved["BaseUrl"], Resolved["Format"], Resolved["Token"], Resolved["Model"])
     return _LLMRemote_PostBody(Resolved, Url, Body,
         _LLMRemote_OnJsonObject.Bind(_LLMRemote_OnDecisions.Bind(on_success, on_fail), on_fail),
-        on_fail, TimeoutMs, Kind)
+        on_fail, TimeoutMs, Kind, CurrentFn)
 }
 
-; The transport of the Backboard and decisions requests, or the test seam.
-_LLMRemote_PostBody(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind) {
+; The original requester reaches the genuine managed reservation. The legacy
+; observation port keeps its seven-argument ABI and guarded callback delivery.
+_LLMRemote_PostBody(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind, CurrentFn := 0) {
     global _LLM_Remote_PostBodyFn
-    Post := HasMethod(_LLM_Remote_PostBodyFn, "Call") ? _LLM_Remote_PostBodyFn : LLM_RemotePostBody_Async
-    return Post.Call(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind)
+    if !_LLMRemote_RequesterCurrent(CurrentFn)
+        return 0
+    if HasMethod(_LLM_Remote_PostBodyFn, "Call") {
+        if HasMethod(CurrentFn, "Call") {
+            on_success := _LLMRemote_InvokeRequesterCurrent.Bind(CurrentFn, on_success, "on_success")
+            on_fail := _LLMRemote_InvokeRequesterCurrent.Bind(CurrentFn, on_fail, "on_fail")
+        }
+        return _LLM_Remote_PostBodyFn.Call(Resolved, Url, Payload, on_success, on_fail, TimeoutMs, Kind)
+    }
+    return LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail,
+        TimeoutMs, Kind, 0, CurrentFn)
 }
 
 ; The assistant cache key: one assistant per address and key.

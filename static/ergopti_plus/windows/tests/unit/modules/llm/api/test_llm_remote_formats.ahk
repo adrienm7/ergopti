@@ -517,3 +517,51 @@ _NUAT_Run(ProbeCase) {
 for _NUAT_ProbeCase in ["ordinary", "diversity", "configured_maximum"]
     Test("Remote Anthropic sampling: " . _NUAT_ProbeCase . " fits Messages protocol (anthropic-temperature-domain)",
         _NUAT_Run.Bind(_NUAT_ProbeCase))
+
+; The genuine Decisions API retains source admission while preserving the
+; existing seven-argument observation-port ABI. Native HTTP proof is separate.
+_JRC_PortContract(Mode) {
+    _LRF_Run(_Body)
+    _Body(Fx, Lines) {
+        Owner := {Current: Mode != "already-retired"}
+        Current := () => Owner.Current ? true : false
+        Resolved := _LLMRemoteResolveEntry(Map("Provider", "typesafe", "Model", "jev-latest",
+            "BaseUrl", "https://jev-requester-contract.invalid/systemone", "Token", "owned-fixture-key"))
+        AssertTrue(Resolved is Map && Resolved["Format"] == "decisions")
+        Questions := Map("intent", Map("type", "choice", "instructions", "Choose none.", "criteria", ["none"]))
+        Id := LLM_RemoteDecisions_Async(Resolved, "synthetic state", Questions,
+            (Answers, Usage := "") => Fx.Texts.Push(Map("answers", Answers, "usage", Usage)),
+            (Info := "") => Fx.Fails.Push(Info), "requester_contract", 20000, Current)
+        if Mode == "already-retired" {
+            AssertEqual(0, Id, "an already retired original caller acquires no request")
+            AssertEqual(0, Fx.Posts.Length)
+            AssertEqual(0, Fx.Texts.Length + Fx.Fails.Length)
+            return
+        }
+        AssertEqual(1, Id)
+        AssertEqual(1, Fx.Posts.Length, "the unchanged seven-argument port is called once")
+        Post := Fx.Posts[1]
+        AssertEqual("requester_contract", Post["kind"])
+        AssertEqual("synthetic state", Post["body"]["state"])
+        AssertEqual("jev-latest", Post["body"]["model"])
+        Usage := Map("prompt_tokens", 2, "completion_tokens", 1, "total_tokens", 3)
+        if Mode == "retired-after-post"
+            Owner.Current := false
+        Post["on_success"].Call('{"answers":{"intent":{"type":"choice","choice":"none"}}}', Usage)
+        if Mode == "retired-after-post" {
+            Post["on_fail"].Call(Map("reason", "transport", "status", 0))
+            AssertEqual(0, Fx.Texts.Length + Fx.Fails.Length,
+                "neither terminal callback can revive the withdrawn original owner")
+        } else {
+            AssertEqual("live", Mode)
+            AssertEqual(1, Fx.Texts.Length)
+            AssertEqual(0, Fx.Fails.Length)
+            AssertEqual("none", Fx.Texts[1]["answers"]["intent"]["choice"],
+                "the real JSON/decisions projection reaches the live caller")
+            AssertTrue(Fx.Texts[1]["usage"] == Usage, "callback metadata is forwarded without replacement")
+        }
+    }
+}
+for _JRC_Mode in ["live", "already-retired", "retired-after-post"]
+    Test("Decisions requester contract: " . _JRC_Mode . " preserves the legacy port (decisions-requester-contract)",
+        _JRC_PortContract.Bind(_JRC_Mode))

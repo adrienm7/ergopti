@@ -892,7 +892,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage, Current) {
 	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
-			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
+			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail, "", 0, Current)
 		return true
 	}
 	LLM_RemoteBackboard_Async(Target["resolved"],
