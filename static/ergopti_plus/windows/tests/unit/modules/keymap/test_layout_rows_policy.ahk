@@ -420,3 +420,96 @@ for _LRNF_Mode in ["plain", "held", "released"]
 	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)",
 		_LRPS_LevelCustody.Bind(0, false, _LRNF_ChildSource,
 			[_LRNF_Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags"))
+
+_LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
+	if Hwnd != Record["edit"].Hwnd || WParam != Record["vk"]
+		return
+	Record["received"] += 1
+	if Record["received"] == 1 {
+		Shift := !!(DllCall("GetKeyState", "Int", 0x10, "Short") & 0x8000)
+		Extra := DllCall("GetMessageExtraInfo", "UPtr")
+		Payload := Shift . "|" . Extra . "|" . WParam . "|" . Hwnd . "|" . DllCall("GetCurrentProcessId", "UInt")
+		try {
+			if !FSWriteCreateDurable(Record["receipt"], Payload)
+				throw Error("the owned external receiver receipt could not be created")
+		} catch as Err
+			Record["failure"] := Err
+	}
+	return 0
+}
+
+_LRNX_Case(Mode) {
+	global _DriverDir, _SharedDir
+	static RetirementDebt := 0
+	if IsObject(RetirementDebt)
+		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
+	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "failure", 0)
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	Created := false, Handle := 0, Primary := 0, Receiver := _LRNX_Receiver.Bind(Record)
+	PreviousCritical := Critical("Off")
+	try {
+		Created := FSCreateDirectoryExclusiveStrict(Root)
+		AssertTrue(Created)
+		Script := Root . "\sender.ahk"
+		Code := _LRPS_ChildSource("layout_row_external_flags_body.ahk")
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . Code) != 0)
+		Record["window"] := Gui(, "Ergopti external native row receiver")
+		Record["edit"] := Record["window"].AddEdit("w320 r3")
+		Record["window"].Show()
+		WinActivate("ahk_id " . Record["window"].Hwnd)
+		AssertTrue(WinWaitActive("ahk_id " . Record["window"].Hwnd, , 2), "the parent-owned external receiver must acquire focus")
+		Record["edit"].Focus()
+		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
+			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
+		Record["vk"] := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
+		OnMessage(0x100, Receiver)
+		Args := ["/ErrorStdOut=UTF-8", Script, "--allow-explicit-family-edit-row-flags", Mode,
+			String(Record["window"].Hwnd), String(Record["edit"].Hwnd), String(DllCall("GetCurrentProcessId", "UInt")),
+			String(Record["vk"]), Record["receipt"], _SharedDir]
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args, _LRPS_Completion.Bind(State))
+		AssertTrue(Handle.start(), "the exact owned sender process must start separately from its receiving parent")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		FileAppend("# external-row-flags " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText . "`n", "*")
+		AssertEqual(1, State.Calls, "the external sender must settle exactly once")
+		AssertEqual(1, Record["received"], "the parent-owned receiver must actually observe exactly one keydown")
+		if IsObject(Record["failure"])
+			throw Record["failure"]
+		AssertEqual(0, State.Code, "the native external row sender refused: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertTrue(InStr(State.Output, "PASS layout-row-external-native-flags") > 0)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try {
+			OnMessage(0x100, Receiver, 0)
+			if IsObject(Record["window"])
+				Record["window"].Destroy()
+			if Created
+				DirDelete(Root, true)
+		} catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	} else
+		RetirementDebt := {Handle: Handle, Record: Record, Receiver: Receiver, Root: Root}
+	Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "the owned sender must retire before its external receiver is destroyed")
+}
+
+for _LRNX_Mode in ["plain", "held", "released"]
+	Test("layout row external native modifier flags: " . _LRNX_Mode . " (layout-row-external-native-flags)", _LRNX_Case.Bind(_LRNX_Mode))
