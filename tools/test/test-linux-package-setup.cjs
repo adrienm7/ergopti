@@ -25,6 +25,26 @@ assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permissi
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
+	// A checkout name is data, even when it contains JavaScript quotes.
+	{
+		const checkout = path.join(sandbox, "checkout's directory\n");
+		const driver = path.join(checkout, 'static/ergopti_plus/linux');
+		fs.mkdirSync(driver, { recursive: true });
+		fs.writeFileSync(path.join(checkout, 'package.json'), '{"version":"7.8.9"}');
+		const installer = fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/linux/install.sh'),
+			'utf8'
+		);
+		const assignment = installer.match(/ERGOPTI_VERSION="\$\([\s\S]*?\n\)"/);
+		assert.ok(assignment, 'actual installer version assignment');
+		const result = spawnSync(
+			bashExecutable(),
+			['-c', `SCRIPT_DIR="$1"\n${assignment[0]}\nprintf '%s' "$ERGOPTI_VERSION"`, 'version-test', bashPath(driver)],
+			{ encoding: 'utf8', timeout: 10000 }
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, '7.8.9');
+	}
 	// A release archive's install.sh sits directly at the extraction root,
 	// whose name may end in a newline. Its help path must find the bundle.
 	{

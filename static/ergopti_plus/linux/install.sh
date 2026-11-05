@@ -97,7 +97,7 @@ _help_option() {
 }
 
 ERGOPTI_VERSION="$(
-	node -p "require('$(cd "${SCRIPT_DIR}/../../.." && pwd -P)/package.json').version" 2>/dev/null \
+	node -p 'require(process.argv[1]).version' "${SCRIPT_DIR}/../../../package.json" 2>/dev/null \
 	|| echo "dev"
 )"
 
