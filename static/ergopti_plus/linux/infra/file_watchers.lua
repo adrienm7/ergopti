@@ -995,6 +995,13 @@ function M.start(opts)
 		-- object under that name is refused loudly instead of silently unwatched.
 		local selected = not is_directory and _is_toml(clean_dir)
 		local is_file = false
+		local wait_for_directory = false
+		if not is_directory and not selected then
+			local attributes = _personal_metadata(clean_dir)
+			-- A missing or temporarily uninspectable root can appear later.
+			-- A known non-directory never grants directory traversal authority.
+			wait_for_directory = attributes == nil
+		end
 		if selected then
 			_personal_file, _personal_root = true, clean_dir
 			local attributes, detail, code = _personal_metadata(clean_dir)
@@ -1012,7 +1019,7 @@ function M.start(opts)
 				Logger.warn(LOG, "Selected TOML path '%s' is not a regular file; it is not watched.", clean_dir)
 			end
 		end
-		if is_directory or is_file then
+		if is_directory or is_file or wait_for_directory then
 			_personal_epoch = _personal_epoch + 1
 			_personal_root, _personal_dirty = clean_dir, true
 			_personal_file = is_file == true

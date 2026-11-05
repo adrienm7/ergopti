@@ -448,7 +448,13 @@ function M.find_toml_files(dir, max_directory_depth, require_complete, allow_abs
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
 	local result, complete = {}, true
-	NativeDirectory.walk(dir, max_directory_depth, function(path, kind)
+	NativeDirectory.walk(dir, max_directory_depth, function(path, kind, depth)
+		-- A no-follow walk also visits regular files and symlinks at the root;
+		-- neither proves that the requested directory was enumerated.
+		if depth == 0 and kind ~= "directory" then
+			complete = false
+			if require_complete then error("hotstring source enumeration refused: root is not a directory", 0) end
+		end
 		if kind == "file" and path:sub(-5) == ".toml" and M.is_pack_file(path) then result[#result + 1] = path end
 	end, function(path, message, code)
 		report_unlistable(path, message, code)

@@ -288,7 +288,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
       else chunk = assert(load(code, "daemon config resolution", "t", env)) end
       local resolve = chunk()
       status["/default"], status["/shared"] = "ENOENT", { type = "directory" }
-      helpers.assert_eq(resolve(nil), "/shared")
+      helpers.assert_eq(resolve(nil), "/default")
       status["/default"] = { type = "directory" }
       helpers.assert_eq(resolve(nil), "/default")
       for _, invalid in ipairs({ "EACCES", "ENOTDIR", { type = "fifo" } }) do
