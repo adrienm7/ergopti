@@ -181,8 +181,8 @@ _CPC_ProfilePublisherRetainsOpeningImage() {
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the actual native receipt must be consumed")
 		for Replacement in ["", "Ignored := "] {
 			Mutant := Lines.Clone()
-			Mutant[Index] := StrReplace(Line, "return ", Replacement)
-			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual return")
+			Mutant[Index] := StrReplace(Line, "Committed := ", Replacement)
+			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual native assignment")
 			AssertFalse(_CPC_LineConsumesResult(Mutant, Index), "discarding or ignoring the actual ACK must fail")
 		}
 	}
