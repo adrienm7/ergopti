@@ -1,71 +1,59 @@
 {
-	"expected_count": 40,
+	"expected_count": 37,
 	"native_http_client_e2e": false,
-	"native_hotstring_e2e": true,
+	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "one-shot-native-failed-down",
-			"expected_count": 1
-		},
-		{
-			"contains": "one-shot-native-kana-balancing",
-			"expected_count": 4
-		},
-		{
-			"contains": "one-shot-native-kana-flags",
-			"expected_count": 2
-		},
-		{
-			"contains": "synthetic-down-effect-refusal",
-			"expected_count": 9
-		},
-		{
-			"contains": "synthetic-lifted-down-refusal",
+			"contains": "layout-early-show",
 			"expected_count": 3
 		},
 		{
-			"contains": "taphold-synthetic-refcount",
-			"expected_count": 4
+			"contains": "layout-settings-close-owner",
+			"expected_count": 2
 		},
 		{
-			"contains": "synthetic-user-held-2026-09-25",
-			"expected_count": 5
-		},
-		{
-			"contains": "tap-holds AHK-03: synthetic ownership uses short transactional Critical spans",
+			"contains": "layout-settings-successor-owner",
 			"expected_count": 1
 		},
 		{
-			"contains": "tap-holds AHK-03: every synthetic Down caller consumes the ownership verdict",
-			"expected_count": 1
+			"contains": "layout-subscription-close-owner",
+			"expected_count": 2
 		},
 		{
-			"contains": "tap-holds AHK-03: synthetic key-Up is not injected while the driver is suspended",
-			"expected_count": 1
+			"contains": "layout-subscription-retirement-retry",
+			"expected_count": 2
 		},
 		{
-			"contains": "managed-bootstrap-lifetime",
-			"expected_count": 1
+			"contains": "model-browser-native-backend",
+			"expected_count": 2
 		},
 		{
-			"contains": "managed-bootstrap-timer-control",
-			"expected_count": 1
+			"contains": "secure-field-native-style-change",
+			"expected_count": 3
 		},
 		{
-			"contains": "managed-bootstrap-graph-lifetime",
-			"expected_count": 4
+			"contains": "secure-field-native-style-cache",
+			"expected_count": 2
 		},
 		{
-			"contains": "managed bootstrap: cancellation keeps private cleanup debt",
-			"expected_count": 1
+			"contains": "llm-prefix-native-style-privacy",
+			"expected_count": 2
 		},
 		{
-			"contains": "managed bootstrap: READY keeps source withdrawal retirement",
-			"expected_count": 1
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
 		},
 		{
-			"contains": "managed bootstrap: exact committed enable hands off READY source",
-			"expected_count": 1
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-typing-source-privacy",
+			"expected_count": 10
 		}
 	]
 }
