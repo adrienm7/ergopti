@@ -169,7 +169,9 @@ KL_Sensors_Tick(PowerFn := 0) {
 		batt_pct := NumGet(pwr, 2, "UChar")   ; 255 = unknown
 		if (batt_pct != 255) {
 			meta["battery_pct"] := batt_pct
-			meta["on_ac"]       := (ac_line = 1)
+			; Unknown AC status must not become an offline/battery reading.
+			if ac_line == 0 || ac_line == 1
+				meta["on_ac"] := (ac_line == 1)
 		}
 	}
 
