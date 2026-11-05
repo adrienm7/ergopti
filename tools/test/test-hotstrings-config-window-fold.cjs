@@ -185,6 +185,7 @@ function hostState() {
 			name,
 			title: name,
 			group: 'common',
+			delay_ms: 0,
 			sections: [{ ...section }]
 		}))
 	};
@@ -208,6 +209,16 @@ assert.match(
 // 2/ Categories open unfolded, and the caret folds only its own category.
 sandbox.setData(hostState());
 assert.equal(cards().length, 2, 'both categories of the active group are drawn');
+assert.equal(
+	cards()[0].querySelector('.field-delay').querySelector('input').value,
+	0,
+	'a saved zero file delay remains visible instead of the global hint'
+);
+assert.equal(
+	cards()[0].querySelector('.sections').querySelector('.field-delay').querySelector('input').value,
+	0,
+	'a saved zero section delay remains visible instead of the global hint'
+);
 for (const card of cards()) {
 	assert.equal(card.querySelector('.sections').hidden, false, 'a category opens unfolded');
 	assert.equal(card.querySelector('.sections').children.length, 1, 'its sections are drawn');
