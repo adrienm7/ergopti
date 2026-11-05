@@ -687,7 +687,14 @@ helpers.describe("Configured prediction shortcut collision reservations", functi
 		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, navigation)
 			local frame = assert(engine.capture_collision_inventory())
 			navigation.get()[1] = "alt"
-			helpers.assert_eq(frame.sealed(), false); helpers.assert_eq(engine.capture_collision_inventory(), nil)
+			helpers.assert_true(frame.sealed(), "the detached view cannot mutate the retained chord")
+			local current, found = assert(engine.capture_collision_inventory()), false
+			for _, claim in ipairs(current.claims) do
+				if claim.binding == "prediction__digit_2" then
+					found = true; helpers.assert_eq(claim.mods, { shift = true })
+				end
+			end
+			helpers.assert_true(found, "the original configured claim remains available")
 		end)
 	end)
 

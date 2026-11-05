@@ -111,8 +111,14 @@ local function chord_matches(chord, held)
 		and held.altgr ~= true
 end
 
+local function copy_chord(chord)
+	local copy = {}
+	for index, modifier in ipairs(chord) do copy[index] = modifier end
+	return copy
+end
+
 --- @return table The validation chord's modifiers ({} = bare digits).
-function M.get() return read(KEY) end
+function M.get() return copy_chord(read(KEY)) end
 
 --- Persists the validation chord, then publishes it.
 --- @param value table Modifier names.
@@ -125,7 +131,7 @@ function M.set(value) return write(KEY, value) end
 function M.matches(held) return chord_matches(read(KEY), held) end
 
 --- @return table The navigation chord's modifiers ({} = bare Up and Down).
-function M.get_navigation() return read(NAVIGATION_KEY) end
+function M.get_navigation() return copy_chord(read(NAVIGATION_KEY)) end
 
 --- Persists the navigation chord, then publishes it.
 --- @param value table Modifier names.

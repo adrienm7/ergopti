@@ -44,6 +44,23 @@ helpers.describe("LLM navigation settings", function()
 		package.loaded["infra.llm_preferences"] = previous
 	end)
 
+	helpers.it("returns detached validation and navigation chords", function()
+		local previous = package.loaded["infra.llm_preferences"]
+		package.loaded["infra.llm_preferences"] = PreferencesFixture.new()
+		local settings = helpers.load_module("modules.llm.navigation_settings")
+		local ok, err = pcall(function()
+			settings._reset()
+			helpers.assert_true(settings.set({ "alt" }))
+			helpers.assert_true(settings.set_navigation({ "ctrl" }))
+			local validation, navigation = settings.get(), settings.get_navigation()
+			validation[1], navigation[1] = "shift", "cmd"
+			helpers.assert_true(settings.matches({ alt = true }))
+			helpers.assert_true(settings.matches_navigation({ ctrl = true }))
+		end)
+		package.loaded["infra.llm_preferences"] = previous
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("keeps a navigation chord of its own, bare by default (llm-tooltip-chords-consumed)", function()
 		local previous = package.loaded["infra.llm_preferences"]
 		local storage = PreferencesFixture.new()
