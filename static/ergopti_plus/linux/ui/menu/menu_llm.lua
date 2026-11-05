@@ -736,9 +736,11 @@ local function _build_llm(ctx)
 	-- The dialogs the model selector page's transactions open: the menu owns
 	-- them, so they never fight the keyboard grab (ui/modal.lua).
 	local page_dialogs = {
-		prompt = prompt_text,
-		error = show_error,
-		info = show_info,
+		prompt = function(title, text, initial, hidden, choices)
+			return prompt_text(title, plain_markup(text), initial, hidden, choices)
+		end,
+		error = function(message, title) return show_error(plain_markup(message), title) end,
+		info = function(title, message) return show_info(title, plain_markup(message)) end,
 		confirm = function(title, text)
 			return ask_yes_no(title, plain_markup(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 		end,
