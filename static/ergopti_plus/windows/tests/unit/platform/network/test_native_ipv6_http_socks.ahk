@@ -25,6 +25,14 @@ _NativeIpv6HttpSocks_Controls() {
 			_SR_TreePoll()
 			Sleep(10)
 		}
+		; Persist the private child's bounded streams before a missing receipt
+		; assertion can hide the actual setup or production failure.
+		_TestAppendProgress("# native-ipv6-http-socks1 callbacks=" . Observed.Length)
+		if Observed.Length == 1 {
+			_TestAppendProgress("# native-ipv6-http-socks1 exit=" . Observed[1]["exit"])
+			_TestAppendProgress("# native-ipv6-http-socks1 stdout=" . JsonStringLiteral(Observed[1]["stdout"]))
+			_TestAppendProgress("# native-ipv6-http-socks1 stderr=" . JsonStringLiteral(Observed[1]["stderr"]))
+		}
 		AssertEqual(1, Observed.Length, "The exact IPv6 fixture Job must settle once within its bound")
 		if Observed.Length != 1
 			return
