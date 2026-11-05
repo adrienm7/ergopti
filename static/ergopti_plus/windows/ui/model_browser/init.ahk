@@ -337,21 +337,38 @@ _LLM_ModelBrowser_PickRow(LV, RowNumber) {
 	Applied := LLM_Menu_SetModel(name)
 	if !(Applied is Integer) || Applied != 1 || !_LLM_ModelBrowser_NativeCurrent(Owner)
 		return false
+	Owner.model := name
+	if !_LLM_ModelBrowser_NativeCurrent(Owner)
+		return false
 	; This is the only model-selector entry left in the native tray. Like its
 	; Web counterpart, selecting an Ollama row also activates that backend.
 	if _LLM_Menu.Get("backend", "") != "ollama" {
-		Applied := LLM_Menu_SetBackend("ollama")
+		; The original UI receipt is checked by the candidate mutator after
+		; terminal bundle acquisition, not adopted anew by a second setter.
+		Applied := LLM_Menu_CommitMutation("the LLM backend selection",
+			(Candidate) => _LLM_ModelBrowser_BackendCandidate(Candidate, Owner),
+			_LLM_Menu_ApplyBackendCommitted)
 		if !(Applied is Integer) || Applied != 1
 			return false
 	}
+	Owner.backend := "ollama"
 	if !_LLM_ModelBrowser_NativeCurrent(Owner)
 		return false
 	return _LLM_ModelBrowser_OnClose(Owner)
 }
 
+_LLM_ModelBrowser_BackendCandidate(Candidate, Owner) {
+	return _LLM_ModelBrowser_NativeCurrent(Owner)
+		&& _LLM_Menu_SetCandidateValue(Candidate, "backend", "ollama")
+}
+
 ; Independent of the model lifecycle epoch, which this selection itself bumps.
 _LLM_ModelBrowser_NativeCurrent(Owner) {
-	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition
+	global _LLM_ModelBrowser_Gui, _LLM_ModelBrowser_Epoch, _LifecycleLatestTransition, _LLM_Menu
+	if Owner.HasOwnProp("model") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("model", "") == Owner.model))
+		return false
+	if Owner.HasOwnProp("backend") && (!IsSet(_LLM_Menu) || !(_LLM_Menu is Map) || !(_LLM_Menu.Get("backend", "") == Owner.backend))
+		return false
 	return !A_IsSuspended && IsSet(_LLM_ModelBrowser_Gui) && _LLM_ModelBrowser_Gui == Owner.window
 		&& _LLM_ModelBrowser_Epoch == Owner.epoch && _LifecycleLatestTransition == Owner.lifecycle
 		&& (!(Owner.lifecycle is Object) || Owner.lifecycle.finished)
