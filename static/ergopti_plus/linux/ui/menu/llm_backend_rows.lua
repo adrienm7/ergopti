@@ -402,7 +402,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 		return ok and current == true
 	end
 	local function changed() if type(on_changed) == "function" then on_changed() end end
-	local function removal_failed()
+	local function report_save_failure()
 		if page_owned() then
 			SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
 		end
@@ -454,9 +454,9 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
 				if not page_owned() or not active_commands_ready() then return false end
-				if llm.set_backend("api") ~= true then return removal_failed() end
+				if llm.set_backend("api") ~= true then return report_save_failure() end
 				if not page_owned() or not active_commands_ready() then return false end
-				if entries.remove(active.id) ~= true then return removal_failed() end
+				if entries.remove(active.id) ~= true then return report_save_failure() end
 				changed()
 				return true
 			end }
@@ -469,7 +469,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
 				if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
 				if not page_owned() or not entry_retained(entries, entry) then return false end
-				if entries.remove(entry.id) ~= true then return removal_failed() end
+				if entries.remove(entry.id) ~= true then return report_save_failure() end
 				changed()
 				return true
 			end }
@@ -495,7 +495,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				-- backend: it retires the running request of the previous entry.
 				run = chat and function()
 					if not page_owned() or not entry_retained(entries, entry) then return false end
-					if llm.set_backend("api") ~= true then return false end
+					if llm.set_backend("api") ~= true then return report_save_failure() end
 					if not page_owned() or not entry_retained(entries, entry) then return false end
 					local saved
 					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
@@ -519,10 +519,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
 					if typed == "" or not page_owned() or not entry_retained(entries, entry) then return false end
-					if llm.set_backend("api") ~= true then
-						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
-						return false
-					end
+					if llm.set_backend("api") ~= true then return report_save_failure() end
 					if not page_owned() or not entry_retained(entries, entry) then return false end
 					if entries.set_model(entry.id, typed) ~= true then
 						save_failed(dialogs, entries, tr("common.error_title"))
