@@ -65,10 +65,18 @@ _KRCB_ContextProjectionReadsCanonicalMemoryOnly() {
 		Assert(InStr(Body, Forbidden) = 0,
 			"the resident keystats projection must be memory-only; found " . Forbidden)
 	}
+	CapturePos := InStr(Body, "Generation := KLHook.capture_generation")
+	AcquirePos := InStr(Body, "SnapshotFn.Call()")
+	Assert(CapturePos > 0 && AcquirePos > CapturePos,
+		"The original capture generation must be retained before any potentially yielding snapshot acquisition")
 	ValidPos := InStr(Body, "Snapshot.valid")
-	SessionPos := InStr(Body, "Keystats.session_title := NewTitle")
-	Assert(ValidPos > 0 && SessionPos > ValidPos,
-		"an invalid canonical snapshot must be rejected before keystats session context mutates")
+	ProjectPos := InStr(Body, "_KL_ContextProject(Snapshot, A_TickCount, Generation)")
+	Prepare := _DriverFuncBody("_KL_ContextPrepare")
+	Assert(ValidPos > 0 && ProjectPos > ValidPos
+		&& InStr(Prepare, "Keystats.session_title := Frame.NewTitle") > 0,
+		"An invalid canonical snapshot must be rejected before its exact frame can publish the destination session context")
+	Assert(InStr(Body, "_KL_ContextDrain(Pending, Generation)") > 0,
+		"A previously retained exact transition must drain under the captured generation before a new acquisition")
 }
 
 Test("keystats focus: resident context timer reads canonical memory only (focus-refresh-bounded-resident)",
@@ -92,8 +100,10 @@ _KRCB_ProjectionTimerLifecycleIsPaired() {
 	Assert(InStr(StartBody, "KL_Hook_RefreshContext.Bind()") > 0
 		&& InStr(StartBody, "SetTimer(KLHook.context_timer") > 0,
 		"KL_Hook_Start must arm the memory-only context projection timer")
-	Assert(InStr(StopBody, "SetTimer(KLHook.context_timer, 0)") > 0,
-		"KL_Hook_Stop must cancel the resident projection timer")
+	Assert(InStr(StopBody, '["flush_timer", "context_timer", "live_push_timer"]') > 0
+		&& InStr(StopBody, "Resources.%Field% := KLHook.HasOwnProp(Field) ? KLHook.%Field% : false") > 0
+		&& InStr(StopBody, "SetTimer(Resources.%Field%, 0)") > 0,
+		"KL_Hook_Stop must cancel the exact captured projection timer, without touching a reentrant successor")
 	Assert(InStr(StartBody, "WICaptureBoundedFocusSnapshot") = 0,
 		"the keystats lifecycle must not create a second focus acquisition owner")
 

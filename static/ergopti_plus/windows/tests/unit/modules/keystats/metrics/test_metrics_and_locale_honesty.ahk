@@ -52,7 +52,11 @@
 _MLH_WatermarkNeverOvershoots() {
 	SavedApp := KLHook.app_entered_at
 	SavedTitle := KLHook.title_entered_at
+	SavedTransition := KLHook.context_transition
+	SavedStop := KLHook.context_stop
 	try {
+		KLHook.context_transition := false
+		KLHook.context_stop := false
 		Past := A_TickCount - 10000
 		KLHook.app_entered_at := Past
 		KLHook.title_entered_at := Past - 1000
@@ -74,6 +78,8 @@ _MLH_WatermarkNeverOvershoots() {
 	} finally {
 		KLHook.app_entered_at := SavedApp
 		KLHook.title_entered_at := SavedTitle
+		KLHook.context_transition := SavedTransition
+		KLHook.context_stop := SavedStop
 	}
 }
 
@@ -225,3 +231,27 @@ Test("metrics-locale-honesty: the miss warning is throttled per key",
 	_MLH_MissWarningIsThrottled)
 Test("metrics-locale-honesty: a resolved key does not warn",
 	_MLH_ResolvedKeyDoesNotWarn)
+
+
+; Deterministic native-domain contract: these are pure scalar observations,
+; not a claim of hardware uptime or an injected InputHook capture timestamp.
+_MLH_ContextOriginsRetainNative64Domain() {
+	SavedApp := KLHook.app_entered_at, SavedTitle := KLHook.title_entered_at
+	SavedTransition := KLHook.context_transition, SavedStop := KLHook.context_stop
+	try {
+		Origin := 0x100000000 + 17
+		KLHook.context_transition := false, KLHook.context_stop := false
+		KLHook.app_entered_at := Origin, KLHook.title_entered_at := Origin + 3
+		KL_Hook_AdvanceContextWatermarks(11, Origin + 1000)
+		AssertEqual(Origin + 11, KLHook.app_entered_at, "A native app origin above one DWORD era must retain its exact compensation")
+		AssertEqual(Origin + 14, KLHook.title_entered_at, "The independent native title origin must retain its exact compensation")
+		AssertEqual(Origin + 23, _KL_ContextClockOrigin(Origin, 23),
+			"An acknowledged native endpoint plus pause shift cannot be truncated into a DWORD origin")
+		AssertEqual(0, _KL_ContextClockOrigin(0, 0), "Zero remains a legitimate native monotonic origin")
+	} finally {
+		KLHook.app_entered_at := SavedApp, KLHook.title_entered_at := SavedTitle
+		KLHook.context_transition := SavedTransition, KLHook.context_stop := SavedStop
+	}
+}
+Test("Keystats native64 context: watermark and acknowledged endpoint retain full native origins (context-native64-origin-contract)",
+	_MLH_ContextOriginsRetainNative64Domain)

@@ -241,6 +241,7 @@ for Mode in ["key", "timer", "stop", "timeout", "private", "native32-boundary"]
 ; the actual production append and teardown bodies, preserving their include
 ; isolation while exercising the privacy refusal that the recording stub hides.
 _KLSCR_ShutdownCloseNativeChain() {
+	global _DriverDir
 	_KLRDC_Reset()
 	Script := _KLRDC_Root() . "shutdown_close_chain.ahk"
 	Handle := 0
@@ -270,6 +271,9 @@ _KLSCR_ShutdownCloseNativeChain() {
 			AssertTrue(Body != "", "each actual native-chain function must be present")
 			Source .= Body . "`n"
 		}
+		ContextOwner := _DriverProductionFileForSymbol("_KL_ContextProject", _DriverDir)
+		AssertTrue(ContextOwner != "", "The actual inactive context close still needs its genuine owner")
+		Source .= "#Include " . ContextOwner . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\..\modules\keystats\keystats_session_events.ahk' . "`n"
 		Source .= '#Include ' . A_ScriptDir . '\fixtures\keystats_shutdown_close_fixture.ahk' . "`n"
 		AssertTrue(FSWriteCreateDurable(Script, Source) != 0)

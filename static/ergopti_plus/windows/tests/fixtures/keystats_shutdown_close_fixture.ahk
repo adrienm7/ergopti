@@ -22,6 +22,14 @@ class KLHook {
 	static capture_generation := 1
 	static capture_stopping := false
 	static control_char_echo := false
+	static prev_app := ""
+	static prev_title := ""
+	static app_entered_at := 0
+	static title_entered_at := 0
+	static context_at := 0
+	static suspend_tick := 0
+	static context_transition := false
+	static context_stop := false
 }
 
 ; No physical hook is installed by the fixture. Any unexpected removal or
@@ -35,6 +43,7 @@ class HookDispatcher {
 class HookDispatcherConst {
 	static EVT_KB_CHAR := "fixture-character"
 	static EVT_KB_DOWN := "fixture-keydown"
+	static EVT_KB_UP := "fixture-keyup"
 }
 
 KL_Hook_AdvanceContextWatermarks(*) {

@@ -138,6 +138,8 @@ class KLHook {
 		; Active-window context cache. Avoids hammering Win32 on every
 		; keystroke; refreshed at most every CONTEXT_TTL_MS.
 		static context_at := 0
+		static context_transition := false
+		static context_stop := false
 
 		; Previous (app, title) values + their entry tick — used to emit
 		; ``app_switch`` / ``window_switch`` events when the focused app or
@@ -180,42 +182,68 @@ class KLHook {
 ;
 ; Clamping here rather than at the consumer keeps the watermark itself honest:
 ; it can never claim the app was entered in the future.
-KL_Hook_AdvanceContextWatermarks(Elapsed) {
-		Now := A_TickCount
-		KLHook.app_entered_at   := Min(KLHook.app_entered_at + Elapsed, Now)
-		KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
+KL_Hook_AdvanceContextWatermarks(Elapsed, NowTick := unset) {
+		; Gap compensation and both exact clock receipts share one RAM claim.
+		PreviousCritical := Critical("On")
+		try {
+			Now := IsSet(NowTick) ? NowTick : A_TickCount
+			Pending := KLHook.context_transition
+			if IsObject(KLHook.context_stop)
+				return ; the first stop endpoint also freezes an unfinished normal transition
+			if IsObject(Pending) && Pending.App.Required && !Pending.App.Done
+					&& KLHook.app_entered_at = Pending.App.Origin
+				Pending.App.Shift := Min(Pending.App.Shift + Elapsed, TickElapsed64(Pending.EndTick, Now))
+			else
+				KLHook.app_entered_at := Min(KLHook.app_entered_at + Elapsed, Now)
+			if IsObject(Pending) && Pending.Title.Required && !Pending.Title.Done
+					&& KLHook.title_entered_at = Pending.Title.Origin
+				Pending.Title.Shift := Min(Pending.Title.Shift + Elapsed, TickElapsed64(Pending.EndTick, Now))
+			else
+				KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
+		} finally Critical(PreviousCritical)
 }
 
 KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
-		; Driven by SetTimer, which bypasses native Suspend — stay silent while
-		; the driver is paused so no app/title switch is observed or flushed.
-		;
-		; A bare return is not enough: the watermarks would freeze while wall-clock
-		; keeps running, so the first refresh after resume emits an app_switch whose
-		; duration spans the whole pause. KLW_WalkAppSwitch adds that value verbatim
-		; to app_time with no upper clamp, so an overnight pause credited hours of
-		; screen time to whichever app happened to be focused — landing on the RESUME
-		; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
-		; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
-		; fires first whenever the focused app changed during the pause.
-		if KL_CaptureHeld() {
-				PausedNow := A_TickCount
-				if (KLHook.suspend_tick != 0) {
-						Elapsed := (PausedNow - KLHook.suspend_tick) & 0xFFFFFFFF
-						KL_Hook_AdvanceContextWatermarks(Elapsed)
-				}
-				KLHook.suspend_tick := PausedNow
-				return
-		}
-		KLHook.suspend_tick := 0
-		; Guard against the timer firing before KL_Init() has completed — the
-		; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
-		; keystats instance; without this guard a fast startup race could crash
-		; or write a corrupted switch event (H-16 fix).
-		if !Keystats.initialized
-				return
-		if !force and (A_TickCount - (KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
-				return
+		EntryCritical := Critical("On")
+		try {
+			if KLHook.capture_stopping
+				return false
+			Generation := KLHook.capture_generation
+			; Driven by SetTimer, which bypasses native Suspend — stay silent while
+			; the driver is paused so no app/title switch is observed or flushed.
+			;
+			; A bare return is not enough: the watermarks would freeze while wall-clock
+			; keeps running, so the first refresh after resume emits an app_switch whose
+			; duration spans the whole pause. KLW_WalkAppSwitch adds that value verbatim
+			; to app_time with no upper clamp, so an overnight pause credited hours of
+			; screen time to whichever app happened to be focused — landing on the RESUME
+			; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
+			; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
+			; fires first whenever the focused app changed during the pause.
+			if KL_CaptureHeld() {
+					PausedNow := A_TickCount
+					if (KLHook.suspend_tick != 0) {
+							Elapsed := TickElapsed64(KLHook.suspend_tick, PausedNow)
+							KL_Hook_AdvanceContextWatermarks(Elapsed)
+					}
+					KLHook.suspend_tick := PausedNow
+					return
+			}
+			KLHook.suspend_tick := 0
+			; Guard against the timer firing before KL_Init() has completed — the
+			; KL_LogAppSwitch / KL_LogWindowSwitch calls below require an initialized
+			; keystats instance; without this guard a fast startup race could crash
+			; or write a corrupted switch event (H-16 fix).
+			if !Keystats.initialized
+					return
+			Pending := KLHook.context_transition
+		} finally Critical(EntryCritical)
+		if IsObject(Pending) && !_KL_ContextDrain(Pending, Generation)
+			return false
+		if !_KL_ContextEpochCurrent(Generation)
+			return false
+		if !force && TickElapsed64(KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
+			return false
 		; The 50 ms metrics poll is the sole OS acquisition owner. This resident
 		; timer reads that already-published object and refuses an invalid snapshot;
 		; MF_ShouldFilter independently sees the same invalid marker and drops every
@@ -227,80 +255,19 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 						"Canonical focus snapshot read failed: {1}.", Err.Message)
 				return false
 		}
-		if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
-			if IsSet(KL_Roi_DiscardWord)
-				KL_Roi_DiscardWord()
-			return false
-		}
-		if IsSet(KL_Roi_AdmitWordContext)
-			KL_Roi_AdmitWordContext(Snapshot)
-		NewTitle := Snapshot.title
-		NewApp := Snapshot.process_name
-		Now := A_TickCount
-
-		; Snapshot the outgoing app BEFORE any mutation below. The app-switch
-		; block updates KLHook.prev_app in place the instant the app itself
-		; changes, so by the time the title-change block runs (same refresh
-		; tick, e.g. Alt-Tab to a different app with a different title)
-		; KLHook.prev_app would already read the NEW app. KL_LogWindowSwitch
-		; must be attributed to the app that actually owned prev_title, not
-		; the one the user switched into (F9 fix).
-		outgoing_app := KLHook.prev_app
-		outgoing_title := KLHook.prev_title
-		AppChanged := NewApp != "" && NewApp != outgoing_app
-
-		; Emit app_switch / window_switch the first time we observe a change.
-		; HS tracks app and title separately because a window-title-only change
-		; (e.g. switching tabs in a browser) is interesting on its own — it
-		; surfaces in the metrics dashboard as a per-app context shift without
-		; double-counting as an app switch.
-		if AppChanged {
-				if (KLHook.prev_app != "") {
-		duration := TickElapsed(KLHook.app_entered_at, Now)
-						; Flush before logging so the typing buffer is attributed to the
-						; previous app, not the new one. Mirrors HS log_manager flush_buffer
-						; calls on app_switch.
-						try KL_FlushBuffer()
-						; The retained destination may differ from the later live focus.
-						; Refuse only its row; context projection must still advance.
-						DestinationFiltered := true
-						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
-						catch {
-								try LoggerWarn("keystats_hook", "Captured app-switch destination could not be classified; its row was refused.")
-						}
-						if !DestinationFiltered
-								try KL_LogAppSwitch(outgoing_app, NewApp, duration, outgoing_title)
-				}
-				KLHook.prev_app := NewApp
-				KLHook.app_entered_at := Now
-		}
-		; A caption belongs to its application. Equal text in a new process
-		; still closes the old title interval and starts a fresh native origin.
-		if (NewTitle !== outgoing_title || AppChanged) {
-				if (outgoing_title != "" and outgoing_app != "") {
-		duration := TickElapsed(KLHook.title_entered_at, Now)
-						; Flush before logging so the typing buffer is attributed to
-						; the previous window context, not the new one. Mirrors the
-						; flush that already precedes KL_LogAppSwitch above (M-01 fix).
-						try KL_FlushBuffer()
-						; The retained destination may differ from the later live focus.
-						; Refuse only its row; context projection must still advance.
-						DestinationFiltered := true
-						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
-						catch {
-								try LoggerWarn("keystats_hook", "Captured window-switch destination could not be classified; its row was refused.")
-						}
-						if !DestinationFiltered
-								try KL_LogWindowSwitch(outgoing_app, outgoing_title, NewTitle, duration)
-				}
-				KLHook.prev_title := NewTitle
-				KLHook.title_entered_at := Now
-		}
-
-		Keystats.session_title := NewTitle
-		Keystats.session_app := NewApp
-		KLHook.context_at := Now
-		return true
+		ProjectionCritical := Critical("On")
+		try {
+			if !_KL_ContextEpochCurrent(Generation)
+				return false
+			if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid {
+				if IsSet(KL_Roi_DiscardWord)
+					KL_Roi_DiscardWord()
+				return false
+			}
+			if IsSet(KL_Roi_AdmitWordContext)
+				KL_Roi_AdmitWordContext(Snapshot)
+		} finally Critical(ProjectionCritical)
+		return _KL_ContextProject(Snapshot, A_TickCount, Generation)
 }
 
 
@@ -808,6 +775,8 @@ KL_Hook_LivePush() {
 ; ============================
 
 KL_Hook_Start() {
+		if IsObject(KLHook.context_stop)
+			return false
 		; Idempotent — multiple Start calls are no-ops once subscribed.
 		if KLHook.HasOwnProp("registered") && KLHook.registered
 				return
@@ -847,30 +816,75 @@ KL_Hook_Start() {
 		; Project the canonical focus snapshot from memory on a resident timer. The
 		; metrics owner seeds its bounded snapshot before KL_Hook_Start, so the first
 		; keystroke has context without any target-window call on this path.
-		KL_Hook_RefreshContext()
+		KL_Hook_RefreshContext(true)
 		KLHook.context_timer := KL_Hook_RefreshContext.Bind()
 		SetTimer(KLHook.context_timer, KLHookConst.CONTEXT_REFRESH_MS)
 }
 
-KL_Hook_Stop() {
+KL_Hook_Stop(AppendFn := unset) {
 		KL_Hook_InvalidateCapture(true)
-		KL_PasswordFocusTrackingStop()
-		if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
-				try SetTimer(KLHook.flush_timer, 0)
+		Generation := KLHook.capture_generation
+		Closed := false
+		try Closed := _KL_ContextCloseTail(AppendFn?)
+		catch as Failure
+			try LoggerError("Keystats", "Context tail close remains pending: {1}.", Failure.Message)
+		PreviousCritical := Critical("On")
+		try {
+			Stop := KLHook.context_stop
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			Resources := {}
+			for Field in ["flush_timer", "context_timer", "live_push_timer", "cb_char", "cb_down", "cb_up"]
+				Resources.%Field% := KLHook.HasOwnProp(Field) ? KLHook.%Field% : false
+		} finally Critical(PreviousCritical)
+		; Only cancel the exact resources captured by this stop attempt. A nested
+		; stop may finish and a successor may start while native teardown returns.
+		ResourcesStopped := true
+		for Field in ["flush_timer", "context_timer", "live_push_timer"] {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if IsObject(Resources.%Field%) {
+				try SetTimer(Resources.%Field%, 0)
+				catch
+					ResourcesStopped := false
+			}
 		}
-		if KLHook.HasOwnProp("context_timer") && IsObject(KLHook.context_timer) {
-				try SetTimer(KLHook.context_timer, 0)
+		for Binding in [["cb_char", HookDispatcherConst.EVT_KB_CHAR], ["cb_down", HookDispatcherConst.EVT_KB_DOWN],
+			["cb_up", HookDispatcherConst.EVT_KB_UP]] {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if IsObject(Resources.%Binding[1]%) {
+				try HookDispatcher.Unregister(Binding[2], Resources.%Binding[1]%)
+				catch
+					ResourcesStopped := false
+			}
 		}
-		if KLHook.HasOwnProp("live_push_timer") && IsObject(KLHook.live_push_timer) {
-				try SetTimer(KLHook.live_push_timer, 0)
-		}
-		if KLHook.HasOwnProp("cb_char") {
-				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, KLHook.cb_char)
-				try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, KLHook.cb_down)
-		}
-		if KLHook.HasOwnProp("cb_up")
-			try HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_UP, KLHook.cb_up)
-		KLHook.registered := false
-		; Final flush so the in-RAM buffer hits today.log before we leave.
-		try KL_FlushBuffer()
+		PreviousCritical := Critical("On")
+		try {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if ResourcesStopped
+				KLHook.registered := false
+		} finally Critical(PreviousCritical)
+		; Preserve both the close receipt and its classifier through final flush.
+		; The gate also protects a detached typing snapshot against a nested stop.
+		Flushed := false, PasswordStopped := false
+		try Flushed := !Keystats.initialized || KL_FlushBuffer(_KL_ContextStopCurrent.Bind(Stop, Generation))
+		if !_KL_ContextStopCurrent(Stop, Generation)
+			return false
+		if Closed && Flushed && ResourcesStopped
+			try PasswordStopped := KL_PasswordFocusTrackingStop()
+		PreviousCritical := Critical("On")
+		try {
+			if !_KL_ContextStopCurrent(Stop, Generation)
+				return false
+			if Closed && Flushed && ResourcesStopped && PasswordStopped {
+				KLHook.context_stop := false
+				return true
+			}
+			return false
+		} finally Critical(PreviousCritical)
 }
+
+
+#Include keystats_context_owner.ahk

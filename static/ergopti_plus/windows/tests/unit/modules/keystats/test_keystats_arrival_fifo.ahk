@@ -22,7 +22,7 @@ _KLF_WithState(Body) {
 	Owners := [Keystats, KLHook, KLWatch, KLPasswordCache, MetricsFocusCache, MetricsFilters]
 	Fields := [["initialized", "_shutting_down", "lifecycle_generation", "buffer_events", "buffer_text",
 		"synth_active", "synth_type", "synth_private", "health_privacy_hits"],
-		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping", "control_char_echo"],
+		["last_tick", "last_vk", "last_sc", "last_hint_lifecycle", "capture_queue", "capture_owner", "capture_generation", "capture_stopping", "control_char_echo", "context_transition", "context_stop"],
 		["is_session_active", "session_started_at", "session_generation", "last_authorized_tick", "is_idle", "idle_started_at", "idle_generation",
 		"privacy_interrupted", "privacy_started_at", "session_close", "session_close_draining", "idle_close", "system_events", "system_failure_reported"],
 		["generation", "focus_generation"], ["generation", "state"],
@@ -53,6 +53,8 @@ _KLF_WithState(Body) {
 		KLHook.last_vk := 0x41
 		KLHook.last_sc := 0x1E
 		KLHook.control_char_echo := false
+		KLHook.context_transition := false
+		KLHook.context_stop := false
 		KLHook.last_hint_lifecycle := Keystats.lifecycle_generation
 		if KLHook.HasOwnProp("capture_queue") {
 			KLHook.capture_queue := []

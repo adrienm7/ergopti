@@ -13,7 +13,7 @@
 _KCPO_ChildSource() {
 	global _DriverDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["MF_ShouldFilter", "CB_ConsumeOwnedChange", "KL_Clip_OnChange", "WallClockTimestamp", "TickElapsed64"] {
+	for Symbol in ["_KL_ContextProject", "MF_ShouldFilter", "CB_ConsumeOwnedChange", "KL_Clip_OnChange", "WallClockTimestamp", "TickElapsed64"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child requires the unique real owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"

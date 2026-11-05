@@ -473,7 +473,7 @@ KL_EnsureGitignore() {
 ; ========================================
 
 KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
-	PublishCommit := unset, FrozenClose := unset) {
+	PublishCommit := unset, FrozenClose := unset, PublishRefuse := unset) {
 	RejectedBySuspend := false
     ; Hot path. Optimisations applied (see Section 2 latency caches):
     ;  - persistent FileObject handle: avoids open/close ≈ 0.5-2 ms each
@@ -524,7 +524,12 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
         try LoggerWarn("Keystats", "MF_ShouldFilter unavailable — defaulting to filtered.")
     }
     if filtered {
-		KL_RecordPrivacyHit()
+		RefusalCritical := Critical("On")
+		try {
+			KL_RecordPrivacyHit()
+			if IsSet(PublishRefuse)
+				PublishRefuse.Call()
+		} finally Critical(RefusalCritical)
 		if Keystats._shutting_down
 			try LoggerWarn("Keystats", Format("Shutdown event '{1}' refused by the current privacy predicate.", entry["type"]))
         return false
@@ -565,7 +570,12 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
             try LoggerWarn("Keystats", "MF_ShouldFilterFor unavailable — defaulting to filtered.")
         }
         if outgoing_filtered {
-			KL_RecordPrivacyHit()
+			RefusalCritical := Critical("On")
+			try {
+				KL_RecordPrivacyHit()
+				if IsSet(PublishRefuse)
+					PublishRefuse.Call()
+			} finally Critical(RefusalCritical)
             return false
 		}
     }
@@ -796,7 +806,9 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 ; ===================================================
 ; ===================================================
 
-KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "") {
+KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "",
+	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset) {
+	RejectedBySuspend := false
     ; The outgoing title classifies private browsing without persisting that
     ; title in an app-switch record. Live focus already names the destination.
     Filtered := true
@@ -804,25 +816,34 @@ KL_LogAppSwitch(prev_app, next_app, duration_ms := 0, prev_title := "") {
     catch as Err
         try LoggerWarn("Keystats", "Outgoing app-switch privacy could not be classified: {1}.", Err.Message)
     if Filtered {
-        KL_RecordPrivacyHit()
+		RefusalCritical := Critical("On")
+		try {
+			KL_RecordPrivacyHit()
+			if IsSet(PublishRefuse)
+				PublishRefuse.Call()
+		} finally Critical(RefusalCritical)
         return false
     }
-    KL_AppendLog(Map(
+    Writer := IsSet(AppendFn) ? AppendFn : KL_AppendLog
+    return Writer.Call(Map(
         "type",        "app_switch",
         "prev_app",    prev_app,
         "next_app",    next_app,
         "duration_ms", duration_ms
-    ))
+    ), &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
 }
 
-KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0) {
-    KL_AppendLog(Map(
+KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0,
+	PublishGuard := unset, PublishCommit := unset, PublishRefuse := unset, &RejectedBySuspend := false, AppendFn := unset) {
+	RejectedBySuspend := false
+    Writer := IsSet(AppendFn) ? AppendFn : KL_AppendLog
+    return Writer.Call(Map(
         "type",        "window_switch",
         "app",         app_name,
         "prev_title",  prev_title,
         "next_title",  next_title,
         "duration_ms", duration_ms
-    ))
+    ), &RejectedBySuspend, PublishGuard?, PublishCommit?, , PublishRefuse?)
 }
 
 
@@ -1199,7 +1220,8 @@ KL_Stop(Token := 0) {
 		_KL_StopTimingMark("prepare", Timing)
 	    ; Release the keystroke hook FIRST so no late event lands in a
 	    ; buffer we are about to flush + serialise.
-	    try KL_Hook_Stop()
+		HookStopped := false
+	    try HookStopped := KL_Hook_Stop()
 		catch as Err
 			try LoggerError("Keystats", "Shutdown hook teardown failed: {1}.", Err.Message)
 		_KL_StopTimingMark("hook", Timing)
@@ -1265,14 +1287,14 @@ KL_Stop(Token := 0) {
 		_KL_StopTimingMark("ingest_and_state", Timing)
 		HandleClosed := KL_CloseTodayFh(Scope.Token)
 		_KL_StopTimingMark("handle", Timing)
-		if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
+		if !HookStopped or !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
 			or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
 			or !IngestComplete or !StateSaved or !HandleClosed {
 			try LoggerError("Keystats",
-				"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}).",
+				"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}, hook={12}).",
 				TimersStopped, SensorsStopped, TopologyStopped, AvStateStopped,
 				NetworkStopped, RoiStopped, PrefetchStopped, WatchersStopped,
-				IngestComplete, StateSaved, HandleClosed)
+				IngestComplete, StateSaved, HandleClosed, HookStopped)
 			return false
 		}
 	    Keystats.initialized := false

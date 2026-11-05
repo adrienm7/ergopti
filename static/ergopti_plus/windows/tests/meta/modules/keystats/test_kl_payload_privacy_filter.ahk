@@ -93,8 +93,10 @@ _KPPF_PayloadStillCarriesTheLaggingContext() {
 
 	Hook := _DriverFuncBody("KL_Hook_RefreshContext")
 	Assert(Hook != "", "KL_Hook_RefreshContext must exist")
-	Assert(InStr(Hook, "Keystats.session_app") > 0 && InStr(Hook, "Keystats.session_title") > 0,
-		"prerequisite: KL_Hook_RefreshContext is still the sole writer of that pair")
+	Prepare := _DriverFuncBody("_KL_ContextPrepare")
+	Assert(InStr(Hook, "_KL_ContextProject(") > 0 && InStr(Prepare, "Keystats.session_app") > 0
+		&& InStr(Prepare, "Keystats.session_title") > 0,
+		"prerequisite: the real hook projector still publishes the lagging session pair through its frame owner")
 	Assert(InStr(Hook, "CONTEXT_TTL_MS") > 0,
 		"prerequisite: it still self-gates on its own TTL, which is what makes the payload "
 		. "lag the focus cache MF_ShouldFilter reads")
