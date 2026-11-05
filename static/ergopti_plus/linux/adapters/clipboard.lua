@@ -199,10 +199,11 @@ end
 --- clipboard proves no such copy, so the restore stays owed.
 --- @param selected_backend table
 --- @param text string The text written for the paste.
---- @return boolean restorable
+--- @return boolean|nil restorable nil when ownership could not be read.
 local function holds_pasted_text(selected_backend, text)
 	local ok, contents = read_backend_checked(selected_backend)
-	if not ok or contents == text then return true end
+	if not ok then return nil end
+	if contents == text then return true end
 	Logger.info(LOG, "Another application copied during the paste; its content is kept, not restored over.")
 	return false
 end
@@ -387,7 +388,11 @@ function M.new_paste_stage(text, sleep_ms, key_v, admission)
 			-- Only a completed write proves the clipboard held our text. After a
 			-- failed write or a failed restore, a differing clipboard may be our
 			-- own damage, which the restore must still repair.
-			if written and not restore_attempted and not holds_pasted_text(b, text) then return true end
+			if written and not restore_attempted then
+				local held = holds_pasted_text(b, text)
+				if held == nil then return false end
+				if not held then return true end
+			end
 			restore_attempted = true
 			return write_backend_checked(b, saved)
 		end)
@@ -503,7 +508,8 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 	-- Restored even when it was empty: writing "" back is what leaves the
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
-	if holds_pasted_text(b, text) and not write_backend_checked(b, saved) then
+	local held = holds_pasted_text(b, text)
+	if held == nil or (held and not write_backend_checked(b, saved)) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
 		return false, "clipboard restoration failed"
 	end

@@ -83,6 +83,22 @@ local function with_stage(body, options)
 end
 
 helpers.describe("prepared clipboard exact lifetime", function()
+	helpers.it("retains restoration when the ownership read is unavailable", function()
+		local options = {}
+		with_stage(function(s)
+			helpers.assert_true(s.stage.prepare())
+			s.value = "external copy"
+			options.read_refused = true
+			helpers.assert_eq(s.stage.close(), false)
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+			options.read_refused = false
+			helpers.assert_true(s.stage.close())
+			helpers.assert_eq(s.value, "external copy")
+			helpers.assert_eq(#s.writes, 1)
+		end, options)
+	end)
+
 	helpers.it("constructs and closes an unused stage without desktop IO or admission", function()
 		with_stage(function(s)
 			helpers.assert_eq({ s.backend_calls, s.reads, #s.writes, #s.rows, #s.waits, s.admissions }, { 0, 0, 0, 0, 0, 0 })
