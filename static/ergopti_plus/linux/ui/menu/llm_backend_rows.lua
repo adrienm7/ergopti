@@ -485,13 +485,15 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				name = base .. suffix, runtime_name = configured, provider = entry.provider, installed = true,
 				available = false, typed = true, hint_key = plan.typed.hint_key,
 				actions = { { id = "other_model", text = tr("model_browser.api_other_model"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
 					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
-					if typed == "" then return false end
+					if typed == "" or not page_owned() or not entry_retained(entries, entry) then return false end
 					if llm.set_backend("api") ~= true then
 						SaveFailure.present(tr, function(message) dialogs.error(message, tr("common.error_title")) end)
 						return false
 					end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					if entries.set_model(entry.id, typed) ~= true then
 						save_failed(dialogs, entries, tr("common.error_title"))
 						return false
