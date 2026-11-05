@@ -309,6 +309,15 @@ KL_Clip_OnPaste() {
 	if _KL_Clip_ShouldFilter()
 		return
 
+	; The captured hook context can lag current focus; classify its source too.
+	SourceFiltered := true
+	try SourceFiltered := MF_ShouldFilterFor(Context.app, Context.title)
+	catch {
+		try LoggerWarn("Keystats", "Clipboard paste source privacy classification failed closed.")
+	}
+	if SourceFiltered
+		return
+
 	Now := A_TickCount
 	CopyLag := (CopyTick > 0) ? TickElapsed64(CopyTick, Now) : -1
 	Fresh := []
