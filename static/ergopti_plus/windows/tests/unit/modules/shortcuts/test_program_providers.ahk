@@ -563,3 +563,32 @@ for ProviderId in ["autohotkey", "python", "powershell"]
 		_RPA_WithFixture.Bind(_RPA_WithCapturedProgramLogs.Bind(_RPP_NativeVariants.Bind(ProviderId))))
 
 #Include test_program_picker_modal_owner.ahk
+
+
+; Exercise the real route for each independent corpus entry; no SMB is opened.
+_RPP_UncRouteCase(Input, Expected, Accepted) {
+	global _ConfigDir
+	AssertTrue(IsSet(_ConfigDir), "SETUP: the runner owns the normal configuration directory")
+	Saved := _ConfigDir
+	try {
+		_ConfigDir := Input
+		Actual := ProgramProviders_ConfigRoute()
+		_TestPrint("# program-provider-config-route input=" . Input . " result=" . Actual)
+		AssertEqual(Expected, Actual, "the actual route owner must preserve the qualified root")
+		AssertEqual(Accepted, !!ProgramProviderAbsolute(Input), "the provider policy must agree")
+	} finally _ConfigDir := Saved
+}
+for Row in [
+	["drive-root", "C:\", "C:\scripts", true],
+	["unc-root-no-slash", "\\server\share", "\\server\share\scripts", true],
+	["unc-root-slash", "\\server\share\", "\\server\share\scripts", true],
+	["unc-descendant", "\\server\share\folder\", "\\server\share\folder\scripts", true],
+	["missing-share", "\\server", false, false],
+	["empty-share", "\\server\", false, false],
+	["double-empty-share", "\\server\\", false, false],
+	["device-question", "\\?\C:\folder", false, false],
+	["device-dot", "\\.\C:\folder", false, false]
+] {
+	Test("program providers: " . Row[1] . " configuration route (program-provider-unc-root)",
+		_RPP_UncRouteCase.Bind(Row[2], Row[3], Row[4]))
+}
