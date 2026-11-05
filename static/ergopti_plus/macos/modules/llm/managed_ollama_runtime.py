@@ -681,11 +681,18 @@ def describe_refusal(error, owner_file):
     """
     owner = os.path.basename(owner_file)
     frames = traceback.extract_tb(error.__traceback__)
-    inner = frames[-1]
-    facts = [
-        "%s at %s:%d %s"
-        % (type(error).__name__, os.path.basename(inner.filename), inner.lineno, inner.name)
-    ]
+    if not frames:
+        # A failure recorded but never raised has no frame: its type and named
+        # facts still name it (the serve owner's cleanup debt of 2026-11-05
+        # raised IndexError here and the refusal line was lost).
+        facts = [type(error).__name__]
+        inner = None
+    else:
+        inner = frames[-1]
+        facts = [
+            "%s at %s:%d %s"
+            % (type(error).__name__, os.path.basename(inner.filename), inner.lineno, inner.name)
+        ]
     phases = [
         frame
         for frame in frames

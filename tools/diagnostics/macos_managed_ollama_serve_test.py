@@ -584,6 +584,23 @@ class ProductionServeControls(unittest.TestCase):
         self.assertEqual(
             self.subject.serve_refusal_facts(self.subject.ServeRefusal("state")), "state"
         )
+        # Field run 2026-11-05: the cleanup debt is recorded, never raised, so it
+        # has no traceback; naming it raised IndexError and lost the whole line.
+        debt = self.subject.ServeRefusal(
+            "cleanup",
+            primary=RuntimeError("admission"),
+            facts={"guardian_refused": 70, "guardian_status": 0},
+        )
+        nested = self.subject.serve_refusal_facts(
+            self.subject.ServeRefusal(
+                "operation", primary=raised(RuntimeError("bind")), cleanup=debt
+            )
+        )
+        self.assertRegex(
+            nested,
+            r"^operation, primary=RuntimeError at \S+:\d+ raised, cleanup=cleanup, "
+            r"cleanup_guardian_refused=70, cleanup_guardian_status=0, cleanup_primary=RuntimeError$",
+        )
 
     def test_legacy_serve_without_binding_emits_no_new_protocol_bytes(self):
         stream = io.StringIO()
@@ -1179,8 +1196,7 @@ class CallerInputControls(unittest.TestCase):
         # then the retained failures' path-free facts (serve_refusal_facts).
         self.assertRegex(
             diagnostic.getvalue(),
-            r"\AManaged Ollama daemon admission refused: [a-z_]+"
-            r"(, (primary|cleanup)=\w+ at [\w.]+:\d+ \w+( from [\w.]+:\d+ \w+)?(, \w+=[\w.:-]+)*)*\.\n\Z",
+            r"\AManaged Ollama daemon admission refused: [a-z_]+(, [a-z_]+=[\w.: -]+)*\.\n\Z",
         )
         self.assertNotIn("/", diagnostic.getvalue())
         return result
