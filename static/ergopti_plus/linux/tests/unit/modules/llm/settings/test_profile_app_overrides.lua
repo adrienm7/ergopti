@@ -119,6 +119,37 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 		restore()
 	end)
 
+	helpers.it("app-profile: refuses a stale cached map after an external edit", function()
+		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		local first = Overrides.encode({ firefox = "basic" })
+		local external = Overrides.encode({ firefox = "advanced", kate = "basic" })
+		local source = '[llm]\napp_profile_overrides = "' .. first .. '"\n'
+		local successor = '[llm]\napp_profile_overrides = "' .. external .. '"\n'
+		Sandbox.with_config(source, function(path)
+			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local ok, err = pcall(function()
+				package.loaded["infra.config_paths"] = { config = function() return path end }
+				local settings = require("modules.llm.profile_settings")
+				helpers.assert_eq(settings.app_overrides().firefox, "basic")
+				local snapshot = settings.configuration_snapshot()
+				settings._reset()
+				helpers.assert_true(settings.restore_configuration(snapshot))
+				local file = assert(io.open(path, "wb")); assert(file:write(successor)); assert(file:close())
+				helpers.assert_eq(settings.set_app_override("terminal", "advanced"), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), successor)
+				helpers.assert_true(settings.set_app_override("terminal", "advanced"))
+				local actual = settings.app_overrides()
+				helpers.assert_eq(actual.firefox, "advanced")
+				helpers.assert_eq(actual.kate, "basic")
+				helpers.assert_eq(actual.terminal, "advanced")
+			end)
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("app-profile: deleting a profile drops its overrides in the same write", function()
 		local settings, storage = load_settings()
 		helpers.assert_true(settings.save_user_profile(USER, false, false))

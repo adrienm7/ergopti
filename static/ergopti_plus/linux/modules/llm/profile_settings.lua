@@ -60,12 +60,13 @@ local _profile_serial = 0
 -- stored text this build cannot read leaves the map empty and refuses every
 -- write, so a newer or damaged value is never replaced by an empty one.
 local _app_overrides = nil
+local _app_overrides_source = nil
 local _app_overrides_refused = false
 -- The mapped profiles already reported missing
 local _missing_override_profiles = {}
 
 local function forget_registry(refresh_values)
-	_app_overrides, _app_overrides_refused = nil, false
+	_app_overrides, _app_overrides_refused, _app_overrides_source = nil, false, nil
 	_user_profiles = nil
 	_registry_source = nil
 	_unreadable_profiles = {}
@@ -248,7 +249,10 @@ end
 local function load_app_overrides()
 	if _app_overrides then return _app_overrides end
 	local Storage = require("infra.llm_preferences")
-	local overrides, reason = AppOverrides.decode(Storage.get(APP_OVERRIDES_KEY, ""))
+	local values, source = Storage.get_many({ APP_OVERRIDES_KEY })
+	assert(type(source) == "table", "application overrides require an exact source snapshot")
+	local overrides, reason = AppOverrides.decode(values[APP_OVERRIDES_KEY] or "")
+	_app_overrides_source = source
 	if not overrides then
 		ConfigOutdated.report(APP_OVERRIDES_KEY, ConfigOutdated.REFUSED, Logger)
 		Logger.error(LOG, "Stored application profile overrides are unreadable (%s); none apply and none is written.",
@@ -621,6 +625,13 @@ function M.delete_user_profile(profile_id, admission)
 		if mapped == profile_id then dropped = true else kept[app] = mapped end
 	end
 	if dropped and not _app_overrides_refused then
+		if not _app_overrides_source or not _registry_source
+				or _app_overrides_source.status ~= _registry_source.status
+				or _app_overrides_source.content ~= _registry_source.content then
+			forget_registry(true)
+			Logger.error(LOG, "Application profile overrides changed before profile deletion; retry required.")
+			return false
+		end
 		local payload = AppOverrides.encode(kept)
 		if payload == nil then return false end
 		writes[APP_OVERRIDES_KEY] = payload
@@ -689,11 +700,13 @@ local function store_app_overrides(overrides, admission)
 		return false
 	end
 	local Storage = require("infra.llm_preferences")
-	if Storage.set_many({ [APP_OVERRIDES_KEY] = payload }, nil, admission) ~= true then
-		Logger.error(LOG, "Application profile overrides could not be persisted; the map in force is unchanged.")
+	if Storage.set_many({ [APP_OVERRIDES_KEY] = payload }, _app_overrides_source, admission) ~= true then
+		_app_overrides, _app_overrides_source = nil, nil
+		Logger.error(LOG, "Application profile overrides could not be persisted; reload required.")
 		return false
 	end
-	_app_overrides = overrides
+	-- Re-read the published source before deriving another candidate.
+	_app_overrides, _app_overrides_source = nil, nil
 	return true
 end
 
@@ -740,7 +753,7 @@ function M._reset()
 	_registry_outdated = false
 	_reported_profiles = {}
 	_profile_serial = 0
-	_app_overrides, _app_overrides_refused = nil, false
+	_app_overrides, _app_overrides_refused, _app_overrides_source = nil, false, nil
 	_missing_override_profiles = {}
 	ModelProfile._reset()
 end
@@ -765,7 +778,8 @@ end
 function M.configuration_snapshot()
 	return { values = _values, users = _user_profiles, source = _registry_source,
 		unreadable = _unreadable_profiles, outdated = _registry_outdated,
-		overrides = _app_overrides, overrides_refused = _app_overrides_refused }
+		overrides = _app_overrides, overrides_refused = _app_overrides_refused,
+		overrides_source = _app_overrides_source }
 end
 
 --- Restores an owner-issued registry/cache snapshot without serialization.
@@ -775,7 +789,7 @@ function M.restore_configuration(snapshot)
 	_values, _user_profiles = snapshot.values, snapshot.users
 	_registry_source, _unreadable_profiles = snapshot.source, snapshot.unreadable
 	_registry_outdated = snapshot.outdated == true
-	_app_overrides, _app_overrides_refused = snapshot.overrides, snapshot.overrides_refused == true
+	_app_overrides, _app_overrides_refused, _app_overrides_source = snapshot.overrides, snapshot.overrides_refused == true, snapshot.overrides_source
 	return true
 end
 
