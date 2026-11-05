@@ -191,6 +191,21 @@ function validateExecution(tap, expected) {
 	);
 	return manifest;
 }
+
+// Explicit numeric receipts stay useful when successful TAP artifacts cannot be downloaded.
+function numericObservations(tap) {
+	const records = [];
+	let omitted = 0;
+	const pattern =
+		/^# OBSERVATION ([a-z][a-z0-9-]{0,63}(?: [a-z][a-z0-9_]{0,63}=[0-9]{1,20}){1,16})\r?$/gm;
+	for (const match of tap.matchAll(pattern)) {
+		if (match[1].length > 1024) continue;
+		if (records.length < 16) records.push(match[1]);
+		else omitted += 1;
+	}
+	return { records, omitted };
+}
+
 async function nativeChild(command, args, context) {
 	const descriptors = [];
 	try {
@@ -296,6 +311,9 @@ async function replay(options) {
 				result.entry.manifest = validateAhkSuiteManifest(result.tap);
 				validateExecution(result.tap, expected);
 				result.entry.status = 'passed';
+				const observations = numericObservations(result.tap);
+				if (observations.records.length)
+					console.log(`Native observations: ${JSON.stringify({ label, ...observations })}`);
 			} catch (error) {
 				result.entry.status = 'failed';
 				result.entry.error = error.message;
@@ -416,6 +434,27 @@ async function selfTest() {
 	);
 	validateExecution(tap(['Alpha', 'Beta']), ['Alpha', 'Beta']);
 	validateExecution(tap(['Beta', 'Alpha']), ['Beta', 'Alpha']);
+	const observed = 'sample input_bytes=65536 encoded_units=2147562052';
+	assert.deepEqual(numericObservations(`# OBSERVATION ${observed}\r\n`), {
+		records: [observed],
+		omitted: 0
+	});
+	assert.deepEqual(
+		numericObservations(
+			[
+				'# unrelated comment',
+				'# OBSERVATION sample units=secret',
+				'# OBSERVATION sample units=-1',
+				'# OBSERVATION sample units=1\u001b[31m',
+				`# OBSERVATION sample units=${'1'.repeat(21)}`,
+				`# OBSERVATION sample${(' ' + 'k'.repeat(64) + '=1').repeat(16)}`
+			].join('\n')
+		),
+		{ records: [], omitted: 0 }
+	);
+	const crowdedObservations = numericObservations(`# OBSERVATION ${observed}\n`.repeat(20));
+	assert.equal(crowdedObservations.records.length, 16);
+	assert.equal(crowdedObservations.omitted, 4);
 	const lines = tap(['Alpha', 'Beta']).split('\n');
 	const reordered = [lines[0], ...lines.slice(4, 7), ...lines.slice(1, 4), ...lines.slice(7)].join(
 		'\n'
