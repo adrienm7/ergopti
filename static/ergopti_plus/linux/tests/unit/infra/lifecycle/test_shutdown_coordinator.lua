@@ -480,6 +480,17 @@ local function coordinator_fixture(opts)
 end
 
 helpers.describe("shutdown coordinator: pre-wait ownership", function()
+	helpers.it("stops a hook that is waiting to reacquire its last source", function()
+		local calls = {}
+		local coordinator = ShutdownCoordinator.new({ pre_wait = {},
+			keyboard_hook = { isRunning = function() return false end, isRecovering = function() return true end,
+				stop = function() calls[#calls + 1] = "hook.stop" end,
+				emergency_stop = function() error("unexpected emergency") end },
+			event_loop = { stop = function() calls[#calls + 1] = "loop.stop" end } })
+		coordinator.request("quit")
+		helpers.assert_eq(calls, { "hook.stop", "loop.stop" })
+	end)
+
 	helpers.it("stops every external owner before the hook and loop", function()
 		local coordinator, calls = coordinator_fixture()
 		helpers.assert_true(coordinator.request("tray quit"))
