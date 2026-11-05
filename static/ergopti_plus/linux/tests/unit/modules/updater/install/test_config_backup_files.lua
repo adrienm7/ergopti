@@ -45,6 +45,30 @@ local function scratch()
 end
 
 helpers.describe("config_backup (Linux): real files", function()
+	helpers.it("refuses a null backup file list instead of reporting an empty restore", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+		local ok, err = pcall(function()
+			local owner = assert(Backup.owner())
+			local record = assert(owner.create("pre_install"))
+			local Json = require("json")
+			local manifest = assert(Json.decode_lossless(assert(read(record.path .. "/backup.json"))))
+			manifest.files = Json.decode_lossless("null")
+			write(record.path .. "/backup.json", assert(Json.encode(manifest)))
+			write(dir .. "/cfg/config.toml", "kept after refusal")
+			local restored = owner.restore(record.id)
+			helpers.assert_eq(restored, false)
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "kept after refusal")
+			manifest.files = {}
+			write(record.path .. "/backup.json", assert(Json.encode(manifest)))
+			helpers.assert_true(owner.restore(record.id), "legacy empty objects remain readable")
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "kept after refusal")
+		end)
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
 	helpers.it("uses the same instant for the backup folder and manifest", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")
