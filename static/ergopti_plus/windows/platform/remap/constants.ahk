@@ -410,7 +410,7 @@ _TH_TakePressTakenByCombination(KeyId, GuardMs, TickNow := unset) {
 		return false
 	TakenAt := _TH_PressesTakenByCombination[KeyId]
 	_TH_PressesTakenByCombination.Delete(KeyId)
-	return TickElapsed(TakenAt, IsSet(TickNow) ? TickNow : A_TickCount) <= GuardMs
+	return TickElapsed64(TakenAt, IsSet(TickNow) ? TickNow : A_TickCount) <= GuardMs
 }
 
 ; Return the cancellation reason for this tap dispatch, or "" when dispatch is allowed.

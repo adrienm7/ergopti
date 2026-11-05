@@ -14,10 +14,10 @@ _US64_ChildSource() {
 	Code .= "global UIA_SELECTION_MAX_AGE_MS := " . Integer(Age[1]) . "`n"
 	for Name in ["_UIA_OnSelectionWorkerTerminal", "_UIA_CurrentSelectionContext", "_UIA_CurrentInputEpoch",
 		"KS_GetPhysicalInputEpoch", "GetUIASelection", "UIASW_ContextMatches",
-		"UIASW_ConsumeSelectionSnapshot", "WIGetForegroundHwnd", "WIGetFocusedControlToken", "TickElapsed"] {
+		"UIASW_ConsumeSelectionSnapshot", "WIGetForegroundHwnd", "WIGetFocusedControlToken", "TickElapsed64"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The native age subject must include its actual production owner: " . Name)
-		if Name == "TickElapsed" {
+		if Name == "TickElapsed64" {
 			Count := 0
 			Definition := StrReplace(Definition, "NowTick := A_TickCount", "NowTick := _US64_Clock()", true, &Count)
 			AssertEqual(1, Count, "Only the genuine default elapsed-clock read may be rebound.")

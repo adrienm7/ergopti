@@ -2,7 +2,7 @@
 
 ; The provider terminal reply is explicit fixture input, not real UIA success.
 ; Native foreground/control and the genuine publisher/getter/validator are used.
-; Only TickElapsed's default current-clock read is observed and rebound; neither
+; Only TickElapsed64's default current-clock read is observed and rebound; neither
 ; the producer's CapturedAt nor the consumed flag is assigned by this fixture.
 if A_Args.Length != 2 || A_Args[1] != "--allow-owned-uia-native64"
 	throw Error("Explicit owned receiver opt-in is required.")

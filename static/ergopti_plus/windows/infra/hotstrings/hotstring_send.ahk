@@ -1293,7 +1293,7 @@ AppState_TouchLastSentKey(Character, NowTick := unset) {
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
-						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
+						if TickExpired64(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
 								LastSentCharacterKeyTime.Delete(k)
 								if LastSentCharacterKeyComplex.Has(k)
 										LastSentCharacterKeyComplex.Delete(k)

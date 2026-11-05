@@ -400,7 +400,7 @@ UIASW_Start() {
 		if UIASWState.starting_generation
 			return false
 		if UIASWState.start_failure_tick {
-			if !TickExpired(UIASWState.start_failure_tick, UIASW_START_BACKOFF_MS)
+			if !TickExpired64(UIASWState.start_failure_tick, UIASW_START_BACKOFF_MS)
 				return false
 			UIASWState.start_failure_tick := 0
 		}
