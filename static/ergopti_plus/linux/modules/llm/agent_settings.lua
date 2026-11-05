@@ -306,8 +306,10 @@ function M.get_disabled_apps()
 		report_invalid(DISABLED_APPS_PATH)
 		return list
 	end
+	local seen = {}
 	for _, app in ipairs(value) do
-		if type(app) == "string" and app ~= "" then list[#list + 1] = app end
+		local key = AppIdentity.normalize(app)
+		if key and not seen[key] then seen[key] = true; list[#list + 1] = app end
 	end
 	return list
 end
@@ -325,12 +327,13 @@ function M.set_disabled_apps(apps)
 	if count ~= length then return false end
 	local list, seen = {}, {}
 	for _, app in ipairs(apps) do
-		if type(app) ~= "string" or app == "" then
-			Logger.error(LOG, "set_disabled_apps(): '%s' is not an application — refused.", tostring(app))
+		local key = AppIdentity.normalize(app)
+		if not key then
+			Logger.error(LOG, "set_disabled_apps(): an application identifier was refused.")
 			return false
 		end
-		if not seen[app] then
-			seen[app] = true
+		if not seen[key] then
+			seen[key] = true
 			list[#list + 1] = app
 		end
 	end
