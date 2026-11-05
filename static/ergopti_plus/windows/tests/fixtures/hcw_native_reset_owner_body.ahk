@@ -268,7 +268,43 @@ _HNRC_NumericAfter(Control, *) {
 	global _HNRC
 	if Control.Hwnd == _HNRC.NumericHwnd && Control.Text == _HNRC.NumericText
 		_HNRC.NumericAfter += 1
+	if _HNRC.Mode == "numeric-pending-empty" && Control.Hwnd == _HNRC.NumericHwnd
+		&& Control.Text == "3" && !_HNRC.PrefixObserved {
+		_HNRC.PrefixObserved := true
+		SetTimer(_HNRC_NumericErasePending, -1)
+	}
 }
+
+; The pending prefix comes from the preceding genuine Change callback. Its
+; source bytes and still-unexpired timer are prerequisites, never fabricated.
+_HNRC_NumericErasePending() {
+	global _HNRC, _HCW_PendingNumericWrites, _HCW_NUMERIC_DEBOUNCE_MS
+	try {
+		_HNRC.EraseCalls += 1
+		Hash := CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath))
+		Queued := false
+		for Pending in _HCW_PendingNumericWrites {
+			if Pending.Entry.Key == _HNRC.NumericEntryKey && Pending.Sec == _HNRC.NumericSection
+				&& Pending.Field == "delay" && Abs(Pending.Value - 0.003) < 0.000000001
+				Queued := true
+		}
+		_HNRC.PrefixAge := TickElapsed(_HNRC.PrefixStarted)
+		_HNRC.PrefixPending := Queued
+		_HNRC.PrefixSourceUnchanged := Hash == _HNRC.NumericBeforeHash
+		FileAppend("OBSERVATION hcw-pending-prefix queued=" . Queued
+			. " source_unchanged=" . _HNRC.PrefixSourceUnchanged . " age=" . _HNRC.PrefixAge
+			. " debounce=" . _HCW_NUMERIC_DEBOUNCE_MS . "`n", "*", "UTF-8-RAW")
+		_HNRC_Require(_HNRC.EraseCalls == 1 && Queued && _HNRC.PrefixSourceUnchanged
+			&& _HNRC.PrefixAge < _HCW_NUMERIC_DEBOUNCE_MS
+			&& DllCall("User32\GetFocus", "Ptr") == _HNRC.NumericHwnd,
+			"Unqualified: the exact valid prefix must still be pending, unwritten and unexpired before deleting it")
+		DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0xB1, "Ptr", 0, "Ptr", -1, "Ptr")
+		DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0x102, "UPtr", 0x08, "Ptr", 1, "Ptr")
+		_HNRC.RawNumericText := _HNRC.NumericEdit.Text
+	} catch Any as Failure
+		_HNRC_Fail(Failure)
+}
+
 _HNRC_NumericInput() {
 	global _HNRC, _HCW_PendingNumericWrites, _HCW_NumericDrainActive, _HCW_NUMERIC_DEBOUNCE_MS
 	try {
@@ -282,7 +318,10 @@ _HNRC_NumericInput() {
 		_HNRC_Require(DllCall("User32\GetFocus", "Ptr") == _HNRC.NumericHwnd,
 			"The actual numeric Edit must own native focus before editing")
 		DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0xB1, "Ptr", 0, "Ptr", -1, "Ptr")
-		if _HNRC.NumericEmpty
+		if _HNRC.Mode == "numeric-pending-empty" {
+			_HNRC.PrefixStarted := A_TickCount
+			DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0x102, "UPtr", Ord("3"), "Ptr", 1, "Ptr")
+		} else if _HNRC.NumericEmpty
 			DllCall("User32\SendMessageW", "Ptr", _HNRC.NumericHwnd, "UInt", 0x102, "UPtr", 0x08, "Ptr", 1, "Ptr")
 		else {
 			for Character in StrSplit(_HNRC.NumericText)
@@ -331,15 +370,25 @@ _HNRC_NumericRun() {
 	_HCW_LoadCurrent()
 	_HNRC_Require(_HCW_PendingNumericWrites.Length == 0 && !_HCW_NumericDrainActive,
 		"Refreshing actual controls must leave no pre-existing numeric candidate")
-	_HNRC.NumericEmpty := _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority"
+	_HNRC.NumericEmpty := _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority" || _HNRC.Mode == "numeric-pending-empty"
 	_HNRC.NumericField := _HNRC.Mode == "numeric-empty-priority" ? "priority" : "delay"
+	if _HNRC.Mode == "numeric-priority-clamp"
+		_HNRC.NumericField := "priority"
 	_HNRC.NumericEdit := _HNRC.NumericField == "priority" ? _HCWWidgets.PriorityEdit : _HCWWidgets.DelayEdit
 	_HNRC.NumericHwnd := _HNRC.NumericEdit.Hwnd
 	_HNRC.NumericText := _HNRC.NumericEmpty ? "" : (_HNRC.Mode == "numeric-current" ? "3" : "18446744073709551619")
+	if _HNRC.Mode == "numeric-padded"
+		_HNRC.NumericText := "0003"
+	else if _HNRC.Mode == "numeric-zero"
+		_HNRC.NumericText := "0"
+	else if _HNRC.Mode == "numeric-priority-clamp"
+		_HNRC.NumericText := "999"
 	_HNRC_Require(_HNRC.NumericEdit.Text != ""
 		&& (DllCall("User32\GetWindowLongW", "Ptr", _HNRC.NumericHwnd, "Int", -16, "Int") & 0x2000),
 		"The actual nonempty native Edit must expose the shipped ES_NUMBER style")
 	Before := FSReadBytesStrict(_HNRC.OverridePath), BeforeHash := CryptoSha256Bytes(Before)
+	_HNRC.NumericBeforeHash := BeforeHash
+	_HNRC.NumericEntryKey := Entry.Key, _HNRC.NumericSection := Section
 	BeforeResolved := HotstringsResolve(Entry.Key, Section)
 	_HNRC_Require(Abs(BeforeResolved.Delay - 0.321) < 0.000000001 && BeforeResolved.Priority == 47,
 		"The initial live projection must match both genuine seeded durable values")
@@ -375,10 +424,25 @@ _HNRC_NumericRun() {
 	if IsObject(_HNRC.Failure)
 		throw _HNRC.Failure
 	_HNRC_Require(_HNRC.NumericAfter > 0, "The production Change handler must return to its passive following subscriber")
+	if _HNRC.Mode == "numeric-pending-empty"
+		_HNRC_Require(_HNRC.PrefixObserved && _HNRC.EraseCalls == 1 && _HNRC.PrefixPending && _HNRC.PrefixSourceUnchanged,
+			"The empty edit must supersede an actual uncommitted valid prefix rather than undoing an acknowledged write")
 	if _HNRC.Mode == "numeric-current"
 		_HNRC_Require(_HNRC.Errors.Length == 0 && WrappedDurable && Abs(FinalResolved.Delay - 0.003) < 0.000000001
 			&& FinalResolved.Priority == 47 && BeforeHash != FinalHash,
 			"Ordinary 3ms input must still reach the real durable override writer without changing another field")
+	else if _HNRC.Mode == "numeric-padded"
+		_HNRC_Require(_HNRC.Errors.Length == 0 && WrappedDurable && Abs(FinalResolved.Delay - 0.003) < 0.000000001
+			&& FinalResolved.Priority == 47 && BeforeHash != FinalHash,
+			"Zero-padded ordinary input must preserve the same durable/live 3ms intention")
+	else if _HNRC.Mode == "numeric-zero"
+		_HNRC_Require(_HNRC.Errors.Length == 0 && Node.Get("delay_unlimited", false) == true
+			&& !Node.Has("delay_offset") && FinalResolved.Delay == 0 && FinalResolved.Priority == 47 && BeforeHash != FinalHash,
+			"Actual numeric zero must still persist the supported unlimited delay without changing priority")
+	else if _HNRC.Mode == "numeric-priority-clamp"
+		_HNRC_Require(_HNRC.Errors.Length == 0 && Node.Get("priority", -1) == 100 && FinalResolved.Priority == 100
+			&& FinalResolved.Delay == BeforeResolved.Delay && BeforeHash != FinalHash,
+			"The existing native upper priority clamp must preserve its durable/live100 behavior")
 	else if _HNRC.NumericEmpty
 		_HNRC_Require(_HNRC.Errors.Length == 0 && BeforeHash == FinalHash
 			&& FinalResolved.Delay == BeforeResolved.Delay && FinalResolved.Priority == BeforeResolved.Priority,
@@ -397,8 +461,10 @@ _HNRC_Main() {
 		DestroyDescriptor: 0, DestroyPortInstalled: false, DestroyCalls: 0, NativeDestroyReturns: 0,
 		FaultInjected: false, FaultWarnings: 0, Fault: Error("Controlled native reset Destroy observer refusal"), LastThrown: 0,
 		NumericEdit: 0, NumericHwnd: 0, NumericText: "", RawNumericText: "", NumericBefore: 0, NumericAfter: 0,
-		NumericInputs: 0, NumericDone: false, NumericDrained: false, NumericEmpty: false, NumericField: ""}
-	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode() || _HNRC.Mode == "numeric-current" || _HNRC.Mode == "numeric-overflow" || _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority"), "The private mode and root must be explicit")
+		NumericInputs: 0, NumericDone: false, NumericDrained: false, NumericEmpty: false, NumericField: "",
+		NumericBeforeHash: "", NumericEntryKey: "", NumericSection: "", PrefixStarted: 0, PrefixObserved: false,
+		PrefixAge: 0, PrefixPending: false, PrefixSourceUnchanged: false, EraseCalls: 0}
+	_HNRC_Require(A_Args.Length == 2 && (_HNRC.Mode == "current" || _HNRC.Mode == "reopen" || _HNRC.Mode == "destroy-current" || _HNRC.Mode == "destroy-reopen" || _HNRC_FaultMode() || _HNRC.Mode == "numeric-current" || _HNRC.Mode == "numeric-overflow" || _HNRC.Mode == "numeric-empty-delay" || _HNRC.Mode == "numeric-empty-priority" || _HNRC.Mode == "numeric-padded" || _HNRC.Mode == "numeric-zero" || _HNRC.Mode == "numeric-priority-clamp" || _HNRC.Mode == "numeric-pending-empty"), "The private mode and root must be explicit")
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_HNRC_OnError)
 	LoggerSetTestSink(_HNRC_Log)
@@ -430,7 +496,7 @@ _HNRC_Main() {
 			_HNRC.DestroyProc := 0
 		} else if !IsObject(Cleanup)
 			Cleanup := Error("The exact native destruction callback must quiesce before callback memory is released")
-		for Callback in [_HNRC_Click, _HNRC_Actor, _HNRC_NumericInput] {
+		for Callback in [_HNRC_Click, _HNRC_Actor, _HNRC_NumericInput, _HNRC_NumericErasePending] {
 			try SetTimer(Callback, 0)
 			catch Any as Failure {
 				if !IsObject(Cleanup)
