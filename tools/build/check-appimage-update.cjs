@@ -181,15 +181,29 @@ function verify(image, zsync) {
 			`zsync Length ${header.get('Length')} differs from the AppImage size ${image.length}`
 		);
 	}
-	const blocksize = header.get('Blocksize') ?? '';
-	if (!/^[0-9]+$/.test(blocksize) || !Number.isSafeInteger(Number(blocksize)) || Number(blocksize) <= 0)
-		problems.push('zsync Blocksize is missing or invalid');
+	// zsync2 accepts powers of two and defaults missing Hash-Lengths to 1,4,16.
+	// It then reads one weak and one strong checksum for each target block.
+	const blocksizeText = header.get('Blocksize') ?? '';
+	const blocksize = Number(blocksizeText);
+	const validBlocksize = /^[0-9]+$/.test(blocksizeText) && Number.isSafeInteger(blocksize) &&
+		blocksize > 0 && (BigInt(blocksize) & (BigInt(blocksize) - 1n)) === 0n;
+	if (!validBlocksize) problems.push('zsync Blocksize is missing or invalid');
+	const lengthsText = header.get('Hash-Lengths') ?? '1,4,16';
+	const lengthsMatch = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$/.exec(lengthsText);
+	const lengths = lengthsMatch?.slice(1).map(Number);
+	const validLengths = lengths && lengths.every(Number.isSafeInteger) &&
+		lengths[0] >= 1 && lengths[0] <= 2 && lengths[1] >= 1 && lengths[1] <= 4 &&
+		lengths[2] >= 3 && lengths[2] <= 16;
+	if (!validLengths) problems.push('zsync Hash-Lengths is malformed or out of range');
 	const sha1 = header.get('SHA-1') ?? '';
 	if (!/^[0-9a-f]{40}$/.test(sha1)) problems.push('zsync SHA-1 is missing or malformed');
 	else if (sha1 !== createHash('sha1').update(image).digest('hex'))
 		problems.push('zsync SHA-1 does not match the AppImage');
-	if (Number(header.get('__blocks')) <= 0)
-		problems.push('the .zsync file carries no block checksums');
+	const checksumBytes = Number(header.get('__blocks'));
+	if (checksumBytes <= 0) problems.push('the .zsync file carries no block checksums');
+	else if (validBlocksize && validLengths &&
+		checksumBytes < Math.ceil(image.length / blocksize) * (lengths[1] + lengths[2]))
+		problems.push('the .zsync file has truncated block checksums');
 	if (!globMatches(parseUpdateInformation(UPDATE_INFORMATION).pattern, ZSYNC_ASSET)) {
 		problems.push(`the update pattern does not match the published asset ${ZSYNC_ASSET}`);
 	}

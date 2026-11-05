@@ -725,7 +725,11 @@ function zsyncFor(length, overrides = {}) {
 		.filter(([, value]) => value !== null)
 		.map(([key, value]) => `${key}: ${value}`)
 		.join('\n');
-	return Buffer.concat([Buffer.from(`${text}\n\n`, 'latin1'), Buffer.from([1, 2, 3, 4])]);
+	const sizes = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*$/.exec(fields['Hash-Lengths'] ?? '1,4,16');
+	const [weak, strong] = sizes ? [Number(sizes[2]), Number(sizes[3])] : [2, 4];
+	const blocksize = Number(fields.Blocksize) > 0 ? Number(fields.Blocksize) : 2048;
+	const count = Math.ceil(length / blocksize) * (weak + strong);
+	return Buffer.concat([Buffer.from(`${text}\n\n`, 'latin1'), Buffer.alloc(count, 1)]);
 }
 
 assert.equal(
@@ -757,6 +761,12 @@ const wrongArch = Buffer.from(image);
 wrongArch.writeUInt16LE(183, 0x12); // EM_AARCH64
 const wrongArchHash = require('node:crypto').createHash('sha1').update(wrongArch).digest('hex');
 assert.ok(Update.verify(wrongArch, zsyncFor(wrongArch.length, { 'SHA-1': wrongArchHash })).some((problem) => /architecture/i.test(problem)));
+for (const lengths of [null, '1,1,3', '2,4,16', '1, 4, 16'])
+	assert.deepEqual(Update.verify(image, zsyncFor(image.length, { 'Hash-Lengths': lengths })), []);
+const multipleBlocks = zsyncFor(image.length, { Blocksize: '512' });
+assert.deepEqual(Update.verify(image, multipleBlocks), []);
+assert.ok(Update.verify(image, multipleBlocks.subarray(0, -1)).some((problem) => /truncated block checksums/.test(problem)));
+
 
 for (const [what, badImage, badZsync, expected] of [
 	['an AppImage built without -u', elfWith(''), zsyncFor(image.length), /differs from/],
@@ -787,12 +797,17 @@ for (const [what, badImage, badZsync, expected] of [
 	['a zsync of another size', image, zsyncFor(image.length + 1), /Length/],
 	['a zsync without a hash', image, zsyncFor(image.length, { 'SHA-1': null }), /SHA-1/],
 	['a zsync with zero block size', image, zsyncFor(image.length, { Blocksize: '0' }), /Blocksize/],
+	['a zsync with non-power-of-two blocks', image, zsyncFor(image.length, { Blocksize: '3' }), /Blocksize/],
+	...['0,2,4', '3,2,4', '1,0,4', '1,5,4', '1,2,2', '1,2,17', 'bad'].map((lengths) =>
+		[`invalid hash lengths ${lengths}`, image, zsyncFor(image.length, { 'Hash-Lengths': lengths }), /Hash-Lengths/]),
+	['truncated checksum records', image, zsyncFor(image.length).subarray(0, -1), /block checksums/],
+
 	['a zsync with malformed block size', image, zsyncFor(image.length, { Blocksize: 'NaN' }), /Blocksize/],
 	['a zsync for different bytes', image, zsyncFor(image.length, { 'SHA-1': '0'.repeat(40) }), /SHA-1.*match/],
 	[
 		'a zsync with no blocks',
 		image,
-		Buffer.from(zsyncFor(image.length).subarray(0, -4)),
+		Buffer.from(zsyncFor(image.length).subarray(0, -6)),
 		/no block checksums/
 	],
 	['a zsync with no header end', image, Buffer.from('zsync: 0.6.2\n'), /terminating blank line/],
