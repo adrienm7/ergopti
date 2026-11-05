@@ -244,6 +244,30 @@ helpers.describe("api_token_store: the secret-tool calls", function()
 		assert(ok, err)
 	end)
 
+	helpers.it("linux-secret-tool-input-limit: an oversized token cannot publish a truncated key", function()
+		local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'"))
+		local tool = dir .. "/secret-tool"
+		local script = assert(io.open(tool, "w"))
+		script:write("#!/bin/sh\ndd bs=8192 count=1 of='" .. dir .. "/stored' 2>/dev/null\nexit 0\n")
+		script:close(); os.execute("chmod +x '" .. tool .. "'")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local ok, err = pcall(function()
+			local reference = Store.store("provider", string.rep("x", 8193))
+			helpers.assert_nil(reference, "secret-tool cannot acknowledge a key longer than its input capacity")
+			helpers.assert_nil(io.open(dir .. "/stored", "rb"), "refusal must happen before the service is changed")
+			assert(Store.store("provider", string.rep("x", 8192)), "the full supported buffer must remain usable")
+			local stored = assert(io.open(dir .. "/stored", "rb"))
+			local bytes = stored:read("*a"); stored:close()
+			helpers.assert_eq(#bytes, 8192)
+		end)
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
+	end)
+
 	--- A stand-in secret-tool: records its arguments and stdin, answers as told.
 	--- @param body string Shell lines run after recording.
 	--- @return string tool, string dir

@@ -40,6 +40,9 @@ local TOOL = "secret-tool"
 local _tool_override = nil
 local APPLICATION_ATTRIBUTE = "application"
 local KEY_ATTRIBUTE = "api_key"
+-- secret-tool's stdin reader has an 8192-byte buffer and may exit successfully
+-- after storing only that prefix. Never publish a reference to truncated data.
+local SECRET_TOOL_INPUT_BYTES = 8192
 
 -- The backend a test installed, or nil for secret-tool.
 local _backend = nil
@@ -157,6 +160,7 @@ end
 --- @param token string
 --- @return boolean ok, string|nil reason
 function SECRET_TOOL.store(name, token)
+	if #token > SECRET_TOOL_INPUT_BYTES then return false, "API key exceeds secret-tool input capacity" end
 	local status, _, stderr = run_tool({
 		"store", "--label=" .. Identifiers.app.name .. " API key " .. name,
 		APPLICATION_ATTRIBUTE, Identifiers.app.name, KEY_ATTRIBUTE, name,
