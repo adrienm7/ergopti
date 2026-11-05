@@ -67,8 +67,19 @@ with tempfile.TemporaryDirectory(prefix="ergopti-native-lifecycle-") as temporar
     display = function(
         "copy_display_path", ctypes.c_int, owner_type, ctypes.c_char_p, ctypes.c_size_t
     )
-    owner = owner_type()
     deadline = clock() + 10000
+    real_parent = parent / "real-parent"
+    real_parent.mkdir()
+    alias = parent / "linked-parent"
+    alias.symlink_to(real_parent, target_is_directory=True)
+    rejected = owner_type()
+    assert create(os.fsencode(alias), deadline, ctypes.byref(rejected)) == -1
+    assert rejected.value is not None
+    assert cleanup(rejected) == 0, ctypes.get_errno()
+    assert closed(rejected) == 1
+    assert dispose(rejected) == 0, ctypes.get_errno()
+    assert alias.is_symlink() and list(real_parent.iterdir()) == []
+    owner = owner_type()
     assert create(os.fsencode(parent), deadline, ctypes.byref(owner)) == 0, ctypes.get_errno()
     early_reader = ctypes.c_int(123)
     assert reader(owner, deadline, ctypes.byref(early_reader)) == -1
