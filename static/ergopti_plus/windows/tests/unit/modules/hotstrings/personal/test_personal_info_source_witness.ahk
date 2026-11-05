@@ -191,3 +191,83 @@ Test("personal info source: uninterrupted native save publishes and reloads (per
 	_PISW_Case.Bind("live"))
 Test("personal info source: admitted UTF-16 BOM identity still saves and reloads (personal-info-source-witness)",
 	_PISW_Case.Bind("utf16"))
+
+_PISYN_Display(Value) => JsonStringLiteral(Value is String ? Value : "<" . Type(Value) . ">")
+
+_PISYN_PublicRoundTrip(Mode) {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	global ScriptInformation, _TomlUnreadableFiles, HSE_RuntimeDecisionGeneration
+	HadInfo := IsSet(PersonalInformation), OldInfo := HadInfo ? PersonalInformation : 0
+	HadLetters := IsSet(PersonalInformationLetters), OldLetters := HadLetters ? PersonalInformationLetters : 0
+	OldCache := _ReadPersonalInfoTomlCache, OldGeneration := HSE_RuntimeDecisionGeneration
+	HadPath := ScriptInformation.Has("PersonalInfoTomlPath"), OldPath := ScriptInformation.Get("PersonalInfoTomlPath", "")
+	Root := A_Temp . "\ergopti_personal_info_projection_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
+	Path := Root . "\personal_info.toml", Created := false
+	try {
+		AssertFalse(A_IsSuspended)
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := (Creation is Integer) && Creation == 1
+		AssertTrue(Created)
+		; These are actual declared field/alias identities, detached from user data.
+		PersonalInformation := Map("first_name", "PlaceholderFirst", "last_name", "PlaceholderLast")
+		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
+		_ReadPersonalInfoTomlCache := false
+		ScriptInformation["PersonalInfoTomlPath"] := Path
+		First := Mode == "unsupported-info-type" ? 42 : Mode == "quoted-hash-control" ? "Ada#Place" : "Ada"
+		RawFirst := Mode == "unsupported-info-type" ? "42" : Mode == "literal-info" ? "'Ada'" : Mode == "multiline-info" ? '"""Ada"""' : TOML_RenderString(First)
+		InfoHeader := Mode == "header-comment" ? "[info] # valid annotation" : "[info]"
+		RawLetter := Mode == "literal-letter" ? "'first_name'" : TOML_RenderString("first_name")
+		Source := InfoHeader . "`nfirst_name = " . RawFirst . '`nlast_name = "Initial"`n'
+			. "[letters]`np = " . RawLetter . '`nn = "last_name"`n'
+		AssertTrue(FSWriteCreateDurable(Path, Source))
+		Independent := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(First, Independent["info"]["first_name"], "the actual canonical decoder accepts this genuine TOML source")
+		AssertEqual("first_name", Independent["letters"]["p"])
+		ReadPersonalInfoToml(Path)
+		ReadFirst := PersonalInformation["first_name"]
+		ReadLetter := PersonalInformationLetters.Get("p", "_missing_")
+		Opening := _PersonalInfoCaptureEditorSource(Path)
+		Result := PersonalInfoCommitValues(Path, Map("last_name", "Edited"), 0, 0, 0, 0, Opening)
+		After := FSReadUtf8Exact(Path)
+		Disk := TOML_ParseDocument(After)
+		_TestPrint("# personal-info-projection mode=" . Mode . " ack=" . Result
+			. " read_first=" . _PISYN_Display(ReadFirst) . " read_alias=" . _PISYN_Display(ReadLetter)
+			. " disk_first=" . _PISYN_Display(Disk["info"].Get("first_name", "_missing_"))
+			. " disk_alias=" . _PISYN_Display(Disk.Get("letters", Map()).Get("p", "_missing_")))
+		if Mode == "unsupported-info-type" {
+			AssertFalse(Result, "a non-String owned field must refuse the public save; preserving its number is not a valid admission")
+			AssertEqual(Source, After, "a refused unsupported owned type must preserve every original source byte")
+			return
+		}
+		if InStr(Mode, "control") > 0
+			AssertTrue(Result, "an ordinary representable source must retain the true public persistence route")
+		if !Result {
+			AssertEqual(Source, After, "a projection that cannot represent its owned source must refuse without rewriting any byte")
+			return
+		}
+		AssertEqual(First, Disk["info"].Get("first_name", "_missing_"), "editing last_name cannot erase a correctly authored first_name omitted by the loader")
+		AssertEqual("first_name", Disk.Get("letters", Map()).Get("p", "_missing_"), "an unrelated info edit cannot erase a correctly authored letter alias")
+		AssertEqual("Edited", Disk["info"]["last_name"])
+		AssertEqual(First, PersonalInformation["first_name"])
+		AssertEqual("first_name", PersonalInformationLetters["p"])
+		ReadPersonalInfoToml(Path)
+		AssertEqual(First, PersonalInformation["first_name"], "the genuine reloaded owner retains the original source field")
+		AssertEqual("Edited", PersonalInformation["last_name"])
+		AssertEqual("first_name", PersonalInformationLetters["p"])
+	} finally {
+		PersonalInformation := HadInfo ? OldInfo : unset
+		PersonalInformationLetters := HadLetters ? OldLetters : unset
+		_ReadPersonalInfoTomlCache := OldCache
+		HSE_RuntimeDecisionGeneration := OldGeneration
+		if HadPath
+			ScriptInformation["PersonalInfoTomlPath"] := OldPath
+		else
+			ScriptInformation.Delete("PersonalInfoTomlPath")
+		if _TomlUnreadableFiles.Has(Path)
+			_TomlUnreadableFiles.Delete(Path)
+		if Created
+			DirDelete(Root, true)
+	}
+}
+for _PISYN_Mode in ["literal-info", "multiline-info", "header-comment", "literal-letter", "unsupported-info-type", "basic-control", "quoted-hash-control"]
+	Test("personal info source projection: " . _PISYN_Mode, _PISYN_PublicRoundTrip.Bind(_PISYN_Mode))
