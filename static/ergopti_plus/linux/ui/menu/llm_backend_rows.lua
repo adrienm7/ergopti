@@ -466,7 +466,9 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				-- Selecting goes through set_backend("api") even under the API
 				-- backend: it retires the running request of the previous entry.
 				run = chat and function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					if llm.set_backend("api") ~= true then return false end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
 					local saved
 					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
 					if saved ~= true then
