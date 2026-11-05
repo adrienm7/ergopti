@@ -6,8 +6,6 @@
 // Active mode for the hour×weekday heatmap; flipped by setHourWeekdayMode().
 let _hourWeekdayMode = 'chars'; // "chars" | "time"
 
-const WEEKDAY_LABELS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-
 /**
  * Renders a 24×7 heatmap of activity by hour-of-day × day-of-week. Reads
  * aggData.rich.hour_weekday and renders SVG cells coloured by intensity
@@ -16,6 +14,7 @@ const WEEKDAY_LABELS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
  * @param {Object} aggData - Result of getAggregatedData()
  */
 function renderHourWeekdayHeatmap(aggData) {
+	const weekdayLabels = metricWeekdayLabels();
 	const container = document.getElementById('hour_weekday_heatmap_container');
 	if (!container) return;
 	const grid = (aggData && aggData.rich && aggData.rich.hour_weekday) || {};
@@ -65,7 +64,7 @@ function renderHourWeekdayHeatmap(aggData) {
 	let labels_x = '';
 	for (let wd = 0; wd < W; wd++) {
 		const cx = LABEL_LEFT + wd * (CELL + GAP) + CELL / 2;
-		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${WEEKDAY_LABELS_FR[wd]}</text>`;
+		labels_x += `<text x="${cx}" y="14" text-anchor="middle" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${escapeHtml(weekdayLabels[wd])}</text>`;
 	}
 	let labels_y = '';
 	HOURS.forEach((hh, h_idx) => {
@@ -77,9 +76,16 @@ function renderHourWeekdayHeatmap(aggData) {
 			const cell = grid[`${hh}|${wd}`];
 			const v = !cell ? 0 : mode === 'time' ? cell.time_ms || 0 : cell.chars || 0;
 			const fill = heat(v);
-			const tip_v = mode === 'time' ? (v > 0 ? formatDuration(v) : '0') : v > 0 ? `${v} car.` : '0';
-			const tip = `${WEEKDAY_LABELS_FR[wd]} ${hh}h — ${tip_v}`;
-			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${tip}</title></rect>`;
+			const tip_v =
+				mode === 'time'
+					? v > 0
+						? formatDuration(v)
+						: '0'
+					: v > 0
+						? `${v} ${_t('ui_apps.col_chars')}`
+						: '0';
+			const tip = `${weekdayLabels[wd]} ${hh}h — ${tip_v}`;
+			cells += `<rect x="${cx}" y="${cy2}" width="${CELL}" height="${CELL}" rx="3" fill="${fill}"><title>${escapeHtml(tip)}</title></rect>`;
 		}
 	});
 
@@ -101,6 +107,7 @@ function renderRibbon(aggData) {
 	const legend = document.getElementById('ribbon_legend');
 	if (!container) return;
 
+	const weekdayLabels = metricWeekdayLabels();
 	const ribbon = (aggData && aggData.rich && aggData.rich.ribbon) || {};
 	const days = Object.keys(ribbon).sort(); // ascending date
 	if (days.length === 0) {
@@ -137,8 +144,8 @@ function renderRibbon(aggData) {
 		const dow = (new Date(ts).getUTCDay() + 6) % 7;
 		const dd = String(new Date(ts).getUTCDate()).padStart(2, '0');
 		const mm = String(new Date(ts).getUTCMonth() + 1).padStart(2, '0');
-		const label = `${WEEKDAY_LABELS_FR[dow]} ${dd}/${mm}`;
-		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${label}</text>`;
+		const label = `${weekdayLabels[dow]} ${dd}/${mm}`;
+		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="${ThemeTokens.color('grey-aaa')}" font-size="11" font-family="system-ui">${escapeHtml(label)}</text>`;
 
 		HOURS.forEach((hh, hi) => {
 			const x = LABEL_LEFT + hi * CELL_W;
@@ -159,7 +166,7 @@ function renderRibbon(aggData) {
 			const opacity = Math.min(1, totalMs / (60 * 60 * 1000)) || 0.05;
 			const tip = topCat
 				? `${label} · ${hh}h — ${topCat} (${formatDuration(totalMs)})`
-				: `${label} · ${hh}h — inactif`;
+				: `${label} · ${hh}h — 0`;
 			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${escapeHtml(tip)}</title></rect>`;
 		});
 	});
@@ -330,7 +337,7 @@ function renderDayTimeline(aggData) {
 	}
 
 	container.innerHTML =
-		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Jour : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
+		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${escapeHtml(_t('ui_apps.col_day'))} : ${escapeHtml(formatDisplayDate(targetDay))}</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
 }
 
@@ -1008,21 +1015,6 @@ window.setHourWeekdayMode = function (mode) {
 
 let _calendarMode = 'chars';
 
-const MONTHS_FR_SHORT = [
-	'Jan',
-	'Fév',
-	'Mar',
-	'Avr',
-	'Mai',
-	'Juin',
-	'Juil',
-	'Août',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Déc'
-];
-
 /**
  * Renders a GitHub-style 53-week × 7-day calendar covering the last 365
  * days. Intensity per cell scales with either characters typed (default)
@@ -1105,15 +1097,15 @@ function renderActivityCalendar() {
 		if (c.date.getUTCDate() <= 7 && c.date.getUTCMonth() !== last_label_month) {
 			last_label_month = c.date.getUTCMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getUTCMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="${ThemeTokens.color('grey-888')}" font-size="10" font-family="system-ui">${escapeHtml(_t(`ui_typing.calendar_month_${c.date.getUTCMonth()}`))}</text>`;
 		}
 	});
 
-	const wd_labels_short = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+	const wd_labels_short = metricWeekdayLabels();
 	let wd_labels = '';
 	[1, 3, 5].forEach((wd_i) => {
 		const cy = HEAD_H + wd_i * (CELL + GAP) + 9;
-		wd_labels += `<text x="0" y="${cy}" fill="${ThemeTokens.color('grey-666')}" font-size="9" font-family="system-ui">${wd_labels_short[wd_i]}</text>`;
+		wd_labels += `<text x="0" y="${cy}" fill="${ThemeTokens.color('grey-666')}" font-size="9" font-family="system-ui">${escapeHtml(wd_labels_short[wd_i])}</text>`;
 	});
 
 	let rects = '';
@@ -1134,9 +1126,9 @@ function renderActivityCalendar() {
 					? formatDuration(c.value)
 					: '0'
 				: c.value > 0
-					? `${c.value} car.`
+					? `${c.value} ${_t('ui_apps.col_chars')}`
 					: '0';
-		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${dt} — ${v_txt}</title></rect>`;
+		rects += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${escapeHtml(`${dt} — ${v_txt}`)}</title></rect>`;
 	});
 
 	container.innerHTML =

@@ -19,6 +19,16 @@ function _t(key) {
 	return (window._i18n_strings && window._i18n_strings[key]) || key;
 }
 
+/**
+ * Resolves labels on each render so a language change reaches the charts.
+ * @returns {string[]} Weekday labels, starting with Monday.
+ */
+function metricWeekdayLabels() {
+	return ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) =>
+		_t(`ui_typing.heatmap_day_${day}`)
+	);
+}
+
 let manifestData = window.ManifestData || {};
 let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
