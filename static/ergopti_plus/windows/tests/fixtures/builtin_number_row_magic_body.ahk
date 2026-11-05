@@ -19,16 +19,17 @@ HotIf(Args*) {
 }
 Hotkey(Name, Callback, Options) {
 	global _LRPN_Current, _LRPN_Entries, _LRPN_Registrations
+	Identity := StrReplace(Name, "~")
 	_LRPN_Registrations += 1
-	if !_LRPN_Entries.Has(Name)
-		_LRPN_Entries[Name] := []
-	for Entry in _LRPN_Entries[Name] {
+	if !_LRPN_Entries.Has(Identity)
+		_LRPN_Entries[Identity] := []
+	for Entry in _LRPN_Entries[Identity] {
 		if Entry["criterion"] == _LRPN_Current {
 			Entry["callback"] := Callback, Entry["options"] := Options
 			return
 		}
 	}
-	_LRPN_Entries[Name].Push(Map("name", Name, "callback", Callback, "criterion", _LRPN_Current, "options", Options))
+	_LRPN_Entries[Identity].Push(Map("name", Name, "callback", Callback, "criterion", _LRPN_Current, "options", Options))
 }
 GetKeyState(Key, *) {
 	global _LRPN_Caps
@@ -140,6 +141,11 @@ _LRPN_Output(Name, Kind, Text) {
 	_LRPN_Require(Entry is Map, "the real cohort must retain an admitted owner of " . Name)
 	_LRPN_Emits := []
 	Entry["callback"].Call(Entry["name"])
+	if Kind == "native" {
+		_LRPN_Require(SubStr(Entry["name"], 1, 1) == "~" && StrReplace(Entry["name"], "~") == Name
+			&& _LRPN_Emits.Length == 0, "the admitted native identity must pass its original event without a replay")
+		return Entry
+	}
 	_LRPN_Require(_LRPN_Emits.Length == 1 && _LRPN_Emits[1]["kind"] == Kind && _LRPN_Emits[1]["text"] == Text,
 		"the actually selected callback must emit exactly the independent expected result for " . Name)
 	return Entry
@@ -172,7 +178,7 @@ _LRPN_Check() {
 	}
 	; The sibling digit keeps its real paired Down/Up only while that owner wins.
 	if !_LRPN_Row
-		_LRPN_Output("SC003", "event", "{Blind}{SC003}")
+		_LRPN_Output("SC003", "native", "SC003")
 	else if _LRPN_Caps
 		_LRPN_Output("SC003", "new", "2")
 	else {
@@ -185,13 +191,13 @@ _LRPN_Check() {
 	if _LRPN_Row
 		_LRPN_Output("+" . _LRPN_Scan, "new", Golden["levels"]["shift"][_LRPN_Scan]["text"])
 	else
-		_LRPN_Output("+" . _LRPN_Scan, "event", "{Blind}{" . _LRPN_Scan . "}")
+		_LRPN_Output("+" . _LRPN_Scan, "native", _LRPN_Scan)
 	Features["layout"]["ergopti_base"] := false
 	_LRPN_Output(_LRPN_Scan, MagicKind, MagicText)
 	Features["layout"]["ergopti_base"] := true
 	Features["hotstrings"]["magic_key"]["replace"]["enabled"] := false
 	if !_LRPN_Row
-		_LRPN_Output(_LRPN_Scan, "event", "{Blind}{" . _LRPN_Scan . "}")
+		_LRPN_Output(_LRPN_Scan, "native", _LRPN_Scan)
 	else if _LRPN_Caps
 		_LRPN_Output(_LRPN_Scan, "new", Golden["levels"]["caps"][_LRPN_Scan]["text"])
 	else if _LRPN_Scan == "SC002" {

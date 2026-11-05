@@ -48,6 +48,7 @@ _LRCZ_Choose(Name) {
 _LRCZ_Emit(Name, Kind, Text, NativeScan := "") {
 	global _LRCZ_Emits
 	_LRCZ_Emits := []
+	NativeAdmitted := false
 	Chosen := _LRCZ_Choose(Name)
 	WasCritical := Critical("Off")
 	try {
@@ -56,8 +57,14 @@ _LRCZ_Emit(Name, Kind, Text, NativeScan := "") {
 		else if NativeScan != "" {
 			_LRCZ_Require(_LayoutRowPassthroughCriterion(NativeScan, Name), "the genuine native-row owner must remain eligible")
 			_LayoutRowPassthrough(NativeScan)
+			NativeAdmitted := true
 		}
 	} finally Critical(WasCritical)
+	if Kind == "native" {
+		_LRCZ_Require(NativeAdmitted && _LRCZ_Emits.Length == 0,
+			"a disabled row must admit its original host event without replaying zoom or a key")
+		return
+	}
 	if Kind == "" {
 		_LRCZ_Require(_LRCZ_Emits.Length == 0, "a disabled layout must emit no zoom or paste")
 		return
@@ -87,7 +94,7 @@ _LRCZ_Check() {
 	_LRCZ_Emit(Name, "final", OtherZoom)
 	_LRCZ_Mode := OriginalMode
 	Features["layout"]["emulate_number_row"] := false
-	_LRCZ_Emit(Name, "event", "{Blind}{" . _LRCZ_Sc . "}", _LRCZ_Sc)
+	_LRCZ_Emit(Name, "native", _LRCZ_Sc, _LRCZ_Sc)
 	Features["layout"]["emulate_number_row"] := true
 	_LRCZ_Emit(Name, "final", Zoom)
 	Features["layout"]["ergopti_base"] := false
