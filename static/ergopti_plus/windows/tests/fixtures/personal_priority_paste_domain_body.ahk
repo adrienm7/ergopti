@@ -1,0 +1,133 @@
+﻿; tests/fixtures/personal_priority_paste_domain_body.ahk
+
+; Native paste and the complete public handlers are real. Only the final draft
+; publication and its deferred success callback are passive private destinations.
+#Requires AutoHotkey v2.0
+
+global _PPNC_State := {Publications: [], PasteCalls: 0}
+global _PersonalEditorEntryBusy := false
+global _PersonalEditorData := 0
+global _PersonalEditorSection := "private"
+global _PersonalEditorPrioCtrl := 0
+LoggerWarn(*) => 0
+LoggerError(*) => 0
+LoggerDebug(*) => 0
+LoggerInfo(*) => 0
+t(Key) => Key
+_PersonalEditorCompleteAddedEntry(*) => 0
+_PersonalEditorSaveEntryCandidate(Window, List, Status, Candidate, *) {
+ global _PPNC_State
+ _PPNC_State.Publications.Push(Candidate)
+ Status.Value := "published"
+ return 1
+}
+_PPNC_Require(Condition, Message) {
+ if !Condition
+  throw Error(Message)
+}
+_PPNC_Paste(Edit, Text) {
+ global _PPNC_State
+ Edit.Value := ""
+ if Text == ""
+  return
+ Token := CB_TryBeginPasteTransaction("personal_priority_paste_fixture")
+ _PPNC_Require(Token > 0, "A private paste must own its exact process-wide transaction")
+ Saved := CB_SaveAll(), Sequence := 0
+ try {
+  _PPNC_Require(!(Saved is String && Saved == "__CB_SAVE_ERROR__"), "The complete original clipboard must be retained before publication")
+  _PPNC_Require(CB_WriteTextWithReceipt(Text, &Sequence) && Sequence > 0, "Only an acknowledged native text publication may authorize paste")
+  PreviousCritical := Critical("On")
+  try {
+   _PPNC_Require(CB_GetSequenceNumber() == Sequence, "A foreign later copy cannot supply the private paste")
+   DllCall("User32\SendMessageW", "Ptr", Edit.Hwnd, "UInt", 0x0302, "Ptr", 0, "Ptr", 0, "Ptr")
+   _PPNC_State.PasteCalls += 1
+   _PPNC_Require(Edit.Value == Text, "The genuine ES_NUMBER control must admit this exact native pasted text")
+  } finally Critical(PreviousCritical)
+ } finally {
+  if Sequence > 0 {
+   Settled := CB_RestoreOwnedAllEventually(Saved, Sequence, Token, "personal_priority_paste_fixture")
+   Started := A_TickCount
+   while CB_HasRestoreDebtForOwner(Token) && TickElapsed64(Started) < 2000 {
+    CB_RetryRestoreDebt()
+    Sleep(10)
+   }
+   _PPNC_Require(!CB_HasRestoreDebtForOwner(Token), "The exact opaque clipboard restore must settle before testing a handler")
+  } else if !CB_HasRestoreDebtForOwner(Token)
+   CB_EndOwnedTransaction(Token)
+ }
+}
+_PPNC_Run(Mode) {
+ global _PPNC_State, _PersonalEditorData, _PersonalEditorPrioCtrl, _PersonalEditorSection
+ Fields := StrSplit(Mode, "-")
+ _PPNC_Require(Fields.Length == 2 && (Fields[1] == "add" || Fields[1] == "save") && (Fields[2] == "invalid" || Fields[2] == "current"), "Explicit public handler and input mode are required")
+ Adding := Fields[1] == "add", Invalid := Fields[2] == "invalid"
+ Window := Gui("", "Private personal priority paste")
+ try {
+  Trigger := Window.AddEdit("w180", "abcd")
+  Output := Window.AddEdit("w180", "replacement")
+  Checks := []
+  loop 5
+   Checks.Push(Window.AddCheckbox("", "private"))
+  Checks[2].Value := 1
+  Priority := Window.Add("Edit", "w64 h22 +Number +Limit3")
+  Window.Add("UpDown", "Range0-100")
+  Button := Window.AddButton("", "Private focus target")
+  List := Window.AddListView("w240 r1", ["Trigger", "Output"])
+  List.Add("", "abcd", "original")
+  List.Modify(1, "Select Focus")
+  Status := Window.AddText("w240", "initial")
+  Window.Show("NA")
+  _PersonalEditorPrioCtrl := Priority
+  _PPNC_Require(WinGetClass("ahk_id " . Priority.Hwnd) == "Edit" && WinGetPID("ahk_id " . Priority.Hwnd) == ProcessExist(), "Only the child-owned native Edit can receive paste")
+  _PPNC_Require((WinGetStyle("ahk_id " . Priority.Hwnd) & 0x2000) != 0, "The shipped ES_NUMBER style must be genuine")
+  _PPNC_Require(DllCall("User32\SendMessageW", "Ptr", Priority.Hwnd, "UInt", 0x00D5, "Ptr", 0, "Ptr", 0, "Ptr") == 3, "The shipped native three-character limit must remain active")
+  Vectors := Invalid ? [["abc", "invalid"]] : [["47", 47], ["", ""], ["999", 100], ["-3", 0], ["1.5", 1.5]]
+  for Vector in Vectors {
+   Existing := Map("trigger", "abcd", "output", "original", "line_index", 17, "priority", 47)
+   _PersonalEditorData := Map("sections", Map("private", Map("entries", Adding ? [] : [Existing])))
+   Before := _PersonalEditorData, BeforeCount := _PPNC_State.Publications.Length
+   Status.Value := "initial"
+   _PPNC_Paste(Priority, Vector[1])
+   Button.Focus()
+   _PPNC_Require(Priority.Value == Vector[1], "The pasted value must survive leaving the UpDown buddy before the public action")
+   Failure := 0
+   try {
+    if Adding
+     Result := _AddEntry(Window, List, Trigger, Output, Checks[1], Checks[2], Checks[3], Checks[4], Checks[5], Status)
+    else
+     Result := _SaveEntry(Window, List, Trigger, Output, Checks[1], Checks[2], Checks[3], Checks[4], Status)
+   } catch Any as ErrorValue
+    Failure := ErrorValue
+   FileAppend("OBSERVATION personal-priority mode=" . Mode . " text=" . Vector[1] . " pastes=" . _PPNC_State.PasteCalls
+    . " publications=" . (_PPNC_State.Publications.Length - BeforeCount) . " exception=" . (IsObject(Failure) ? Type(Failure) . ":" . Failure.Message : "none") . " status=" . Status.Value . "`n", "*", "UTF-8-RAW")
+   _PPNC_Require(!IsObject(Failure), "Pasted nonnumeric priority must be a friendly form refusal, never an unhandled numeric conversion")
+   _PPNC_Require(_PersonalEditorData == Before, "The displayed model cannot change before the explicit private publication acknowledgement")
+   _PPNC_Require(Before["sections"]["private"]["entries"].Length == (Adding ? 0 : 1), "Building a candidate cannot mutate the original collection")
+   if !Adding
+    _PPNC_Require(Existing["priority"] == 47 && Existing["output"] == "original" && Existing["line_index"] == 17, "The actual selected source entry cannot be changed before publication")
+   if Invalid {
+    _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount, "Invalid priority cannot reach the publication destination")
+    _PPNC_Require(Status.Value == "numeric_prompt.not_a_number", "The actual public handler must explain numeric refusal through the existing translated status key")
+    _PPNC_Require(Priority.Value == "abc", "The user's rejected draft must remain editable")
+   } else {
+    _PPNC_Require(_PPNC_State.Publications.Length == BeforeCount + 1, "Every ordinary and inherited priority must still reach publication exactly once")
+    Candidate := _PPNC_State.Publications[-1]
+    Entry := Candidate["sections"]["private"]["entries"][1]
+    _PPNC_Require(Type(Entry["priority"]) == Type(Vector[2]) && Entry["priority"] == Vector[2], "Accepted blank, integer, clamped and fractional priorities retain their original semantics")
+    if !Adding
+     _PPNC_Require(Entry["line_index"] == 17, "Saving preserves the exact selected source record")
+   }
+  }
+ } finally {
+  _PersonalEditorPrioCtrl := 0
+  Window.Destroy()
+ }
+}
+try {
+ _PPNC_Run(A_Args[1])
+ FileAppend("PASS personal-priority-paste-domain " . A_Args[1] . "`n", "*", "UTF-8-RAW")
+ ExitApp(0)
+} catch Any as Failure {
+ FileAppend("FAIL personal-priority-paste-domain " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8-RAW")
+ ExitApp(1)
+}

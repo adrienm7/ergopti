@@ -925,3 +925,80 @@ for Mode in ["web-resolve", "web-reject"]
 
 
 #Include test_personal_editor_window_retirement.ahk
+
+
+_PPNT_Source() {
+ global _DriverDir
+ Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+ Included := Map()
+ for Symbol in ["CB_Write", "TickElapsed64", "NumberTryParseInputInteger"] {
+  Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+  AssertTrue(Owner != "", "Every clipboard and clock port must have its complete genuine owner")
+  if !Included.Has(Owner) {
+   Source .= "#Include " . Owner . "`n"
+   Included[Owner] := true
+  }
+ }
+ for Symbol in ["_BuildEntry", "_AddEntry", "_SaveEntry", "NormaliseOutput", "_PersonalTomlCloneDetached"] {
+  Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+  AssertTrue(Owner != "", "Every public handler and helper must have its genuine owner")
+  Text := FSReadStrict(Owner)
+  if Symbol == "_BuildEntry" {
+   AssertTrue(RegExMatch(Text, 'PrioEdit\s*:=\s*W\.Add\("Edit",[^\n]*\+Number \+Limit3') > 0,
+    "The private native Edit must retain the actual shipped numeric style and limit")
+   AssertContains(Text, 'W.Add("UpDown", "Range0-100")', "The actual numeric buddy must remain in the fixture")
+  }
+  Body := _DriverExtractFunctionBody(&Text, Symbol)
+  AssertTrue(Body != "", "The complete current production handler body must be preserved")
+  Source .= Body . "`n"
+ }
+ return Source . "#Include " . _DriverDir . "\tests\fixtures\personal_priority_paste_domain_body.ahk`n"
+}
+_PPNT_Done(State, Code, Output, ErrorText) {
+ State.Calls += 1, State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+}
+_PPNT_Case(Mode) {
+ global _DriverDir
+ static Debt := 0
+ AssertFalse(IsObject(Debt), "A retained child prevents another timer case")
+ Root := A_Temp . "\ergopti_personal_priority_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+ FSCreateDirectoryExclusiveStrict(Root)
+ State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+ PreviousCritical := Critical("Off")
+ try {
+  Script := Root . "\subject.ahk"
+  AssertEqual(1, FSWriteCreateDurable(Script, Chr(0xFEFF) . _PPNT_Source()))
+  _TestPrint("# personal-priority-paste-domain source=" . CryptoSha256Bytes(FSReadBytesStrict(Script)))
+  Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Script, Mode, Root, _DriverDir . "\..\_shared"], _PPNT_Done.Bind(State))
+  AssertTrue(Handle.start(), "The exact private timer child must really start")
+  Started := A_TickCount
+  while !State.Calls && TickElapsed64(Started) < 20000 {
+   _SR_TreePoll()
+   Sleep(10)
+  }
+  _TestPrint("# personal-priority-paste-domain mode=" . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+  AssertEqual(1, State.Calls)
+  AssertEqual("", State.ErrorText)
+  AssertEqual(0, State.Code, State.Output)
+  AssertContains(State.Output, "PASS personal-priority-paste-domain " . Mode)
+ } catch Any as Failure
+  Primary := Failure
+ try {
+  Receipt := IsObject(Handle) ? Handle.terminate() : 1
+  Retired := Receipt is Integer && Receipt == 1
+ } catch Any as Failure {
+  if !IsObject(Primary)
+   Primary := Failure
+ }
+ try {
+  if !Retired
+   Debt := {Root: Root, Handle: Handle}
+  else if !IsObject(Primary)
+   DirDelete(Root, true)
+ } finally Critical(PreviousCritical)
+ if IsObject(Primary)
+  throw Primary
+ AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
+}
+for _PPNT_Mode in ["add-invalid", "save-invalid", "add-current", "save-current"]
+ Test("Personal native priority: " . _PPNT_Mode . " handles actual pasted text (personal-native-priority-paste-domain)", _PPNT_Case.Bind(_PPNT_Mode))
