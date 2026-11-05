@@ -371,8 +371,11 @@ function buildAggregatedData() {
 				(appOut.session_total_active_ms || 0) + (Number(appData.session_total_active_ms) || 0);
 			if ((Number(appData.session_longest_ms) || 0) > (appOut.session_longest_ms || 0)) {
 				appOut.session_longest_ms = Number(appData.session_longest_ms) || 0;
-				appOut.session_longest_chars = Number(appData.session_longest_chars) || 0;
 			}
+			appOut.session_longest_chars = Math.max(
+				appOut.session_longest_chars || 0,
+				Number(appData.session_longest_chars) || 0
+			);
 			if ((Number(appData.burst_max_cpm) || 0) > (appOut.burst_max_cpm || 0)) {
 				appOut.burst_max_cpm = Number(appData.burst_max_cpm) || 0;
 			}
@@ -444,9 +447,12 @@ function buildAggregatedData() {
 			r.sessions.total_active_ms += Number(appData.session_total_active_ms) || 0;
 			if ((Number(appData.session_longest_ms) || 0) > r.sessions.longest_ms) {
 				r.sessions.longest_ms = Number(appData.session_longest_ms);
-				r.sessions.longest_chars = Number(appData.session_longest_chars) || 0;
 				r.sessions.longest_app = appName;
 			}
+			r.sessions.longest_chars = Math.max(
+				r.sessions.longest_chars,
+				Number(appData.session_longest_chars) || 0
+			);
 			if ((Number(appData.session_longest_ms) || 0) >= LONG_SESSION_THRESHOLD_MS) {
 				r.long_sessions += 1;
 			}

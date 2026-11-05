@@ -4144,4 +4144,43 @@ for (const host of ['windows', 'macos', 'linux']) {
 		});
 }
 
+for (const host of ['windows', 'macos', 'linux']) {
+	test(`${host} session duration and character records stay independent`, () => {
+		const page = loadMetricsAppsPage(host);
+		for (const id of [
+			'app_drilldown_modal',
+			'app_modal_title',
+			'app_modal_tiles',
+			'app_modal_hourly',
+			'app_modal_dests',
+			'app_modal_layouts',
+			'app_modal_records',
+			'app_modal_assist',
+			'top_sessions_tbody'
+		])
+			page.elements.set(id, page.context.document.createElement('div'));
+		page.context.Chart = class {
+			destroy() {}
+		};
+		page.elements.get('app_modal_hourly').getContext = () => ({});
+		vm.runInContext("currentPeriod = 'all';", page.context);
+		publishLoadedAppsData(page, host, {
+			'2026-10-01': { Editor: { session_longest_ms: 120000, session_longest_chars: 10 } },
+			'2026-10-02': { Editor: { session_longest_ms: 60000, session_longest_chars: 200 } }
+		});
+		const agg = page.context.getAggregatedData();
+		assert.equal(agg.apps.Editor.session_longest_ms, 120000);
+		assert.equal(agg.apps.Editor.session_longest_chars, 200);
+		assert.equal(agg.rich.sessions.longest_chars, 200);
+		page.context.openAppDrilldown('Editor');
+		const records = page.elements.get('app_modal_records').innerHTML;
+		assert.ok(records.includes(page.context._t('ui_typing.lbl_longest_chars')));
+		assert.match(records, /200/);
+		assert.doesNotMatch(records, /200 car\./);
+		assert.match(read('metrics_apps/index.html'), /data-i18n="ui_typing\.lbl_longest_chars"/);
+		page.context.renderTopSessionsTable();
+		assert.match(page.elements.get('top_sessions_tbody').innerHTML, /200/);
+	});
+}
+
 console.log(`${passed} passed, 0 failed.`);
