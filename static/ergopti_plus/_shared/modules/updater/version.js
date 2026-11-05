@@ -51,6 +51,7 @@ function comparePrereleaseId(a, b) {
 		if (ai < bi) return -1;
 		return 0;
 	}
+	if (aNum !== bNum) return aNum ? -1 : 1;
 	if (a > b) return 1;
 	if (a < b) return -1;
 	return 0;

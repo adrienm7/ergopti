@@ -28,7 +28,9 @@ end
 --- @return table|nil  {major=int, minor=int, patch=int, prerelease=string[]|nil}
 local function parse_version(tag)
 	local norm = M.normalize_tag(tag)
-	local maj, min, pat, pre = norm:match("^(%d+)%.(%d+)%.(%d+)%-?(.*)$")
+	local maj, min, pat = norm:match("^(%d+)%.(%d+)%.(%d+)$")
+	local pre
+	if not maj then maj, min, pat, pre = norm:match("^(%d+)%.(%d+)%.(%d+)%-(.+)$") end
 	if not maj then return nil end
 	if pre == "" then pre = nil end
 	return {
@@ -56,6 +58,7 @@ local function compare_prerelease_id(a, b)
 		if ai < bi then return -1 end
 		return 0
 	end
+	if a_num ~= b_num then return a_num and -1 or 1 end
 	if a > b then return 1 end
 	if a < b then return -1 end
 	return 0
