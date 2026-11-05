@@ -1,92 +1,28 @@
 {
-	"expected_count": 124,
-	"native_http_client_e2e": false,
-	"native_proxy_relay_owner_e2e": false,
-	"native_hotstring_e2e": true,
+	"expected_count": 5,
+	"native_http_client_e2e": true,
+	"native_hotstring_e2e": false,
+	"native_proxy_relay_owner_e2e": true,
 	"filters": [
 		{
-			"contains": "keystats arrival FIFO:",
-			"expected_count": 16
-		},
-		{
-			"contains": "keystats input: Backspace preserves complete Unicode scalars",
+			"contains": "native-ipv6-relay-upstream1",
 			"expected_count": 1
 		},
 		{
-			"contains": "keystats session: synthetic clock retirement",
-			"expected_count": 3
-		},
-		{
-			"contains": "keystats session: tick zero remains",
+			"contains": "native-relay-hop-branches1",
 			"expected_count": 1
 		},
 		{
-			"contains": "keystats-native-key-char-owner",
-			"expected_count": 4
+			"contains": "native-winhttp-ipv6-host1",
+			"expected_count": 1
 		},
 		{
-			"contains": "keystats-native-unicode-packet",
-			"expected_count": 2
+			"contains": "native-ipv6-http-socks1",
+			"expected_count": 1
 		},
 		{
-			"contains": "keystats-control-char-echo",
-			"expected_count": 9
-		},
-		{
-			"contains": "keystats-native-utf16-packet-roundtrip",
-			"expected_count": 9
-		},
-		{
-			"contains": "keystats-native-high-backspace",
-			"expected_count": 2
-		},
-		{
-			"contains": "keystats-native-revoked-high-backspace",
-			"expected_count": 3
-		},
-		{
-			"contains": "keystats-scalar-",
-			"expected_count": 12
-		},
-		{
-			"contains": "keystats correction erased corpus:",
-			"expected_count": 12
-		},
-		{
-			"contains": "keystats collection:",
-			"expected_count": 11
-		},
-		{
-			"contains": "personal-info-typing-row-leak",
-			"expected_count": 12
-		},
-		{
-			"contains": "boolean-suppression-released-early-on-overlapping-fires",
-			"expected_count": 4
-		},
-		{
-			"contains": "(AHK-080)",
-			"expected_count": 2
-		},
-		{
-			"contains": "wrap-native-fresh-selection",
-			"expected_count": 4
-		},
-		{
-			"contains": "gesture-transform-native-render-focus",
-			"expected_count": 2
-		},
-		{
-			"contains": "switch-destination-privacy-owner",
-			"expected_count": 7
-		},
-		{
-			"contains": "context-tail-retry-owner",
-			"expected_count": 4
-		},
-		{
-			"contains": "hcw-native-numeric-domain-owner",
-			"expected_count": 4
+			"contains": "native-ipv6-http-socks-port1",
+			"expected_count": 1
 		}
 	]
 }
