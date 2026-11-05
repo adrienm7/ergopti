@@ -426,3 +426,159 @@ _LSP_Case(Mode) {
 for _LSP_Mode in ["stale-entry", "parse-gap"]
     Test("LLM slot display: " . _LSP_Mode . " preserves the current cached projection (llm-slot-display-stale-parser)",
         _LSP_Case.Bind(_LSP_Mode))
+
+
+; Append to test_llm_failed_prediction_owner.ahk. Family066 downstream variant coverage.
+_RUAG_Exercise(State) {
+    global LLM_REMOTE_MODEL_PRICES, _Stub_LlmLogCalls, _Stub_LlmPresentedRecord, _LLM_Engine
+    Count := State.Mode == "integer-three" ? 3 : 2
+    Price := State.Mode == "cost-two" ? 1e308 : (State.Mode == "ordinary-two" ? 2.0 : 0.0)
+    LLM_REMOTE_MODEL_PRICES := _LLMRemoteAdmitPrices(Map("model-a", Map("in", Price, "out", 0.0)))
+    AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("model-a"), "the genuine price boundary admits this finite nonnegative price")
+    PerPrompt := State.Mode == "integer-three" ? 0x7FFFFFFFFFFFFFFF : (State.Mode == "cost-two" ? 1000000 : 2)
+    PerCompletion := State.Mode == "ordinary-two" ? 1 : 0
+    PerTotal := PerPrompt + PerCompletion
+    PerResponse := [], Contents := ["premiere variante correcte", "deuxieme variante correcte", "troisieme variante correcte"]
+    LLM_Engine_FirePrediction("Le message du controle")
+    AssertEqual(1, State.Calls.Length, "the actual public request must dispatch its first sequential variant")
+    RequestId := State.Calls[1]["request_id"]
+    loop Count {
+        Index := A_Index
+        AssertEqual(Index, State.Calls.Length, "every later dispatch must be produced by the real preceding engine success")
+        Call := State.Calls[Index]
+        AssertEqual(RequestId, Call["request_id"], "all sequential responses belong to one real prediction request")
+        Body := '{"choices":[{"message":{"role":"assistant","content":' . JsonStringLiteral(Contents[Index])
+            . '}}],"usage":{"prompt_tokens":' . PerPrompt . ',"completion_tokens":' . PerCompletion . ',"total_tokens":' . PerTotal . '}}'
+        Classified := _LLMRemoteClassifyResponse("openai", Body, "model-a")
+        AssertTrue(Classified["ok"])
+        Usage := Classified["usage"]
+        AssertTrue(Usage["prompt_tokens"] is Integer && Usage["prompt_tokens"] >= 0)
+        AssertTrue(Usage["completion_tokens"] is Integer && Usage["completion_tokens"] >= 0)
+        AssertTrue(Usage["total_tokens"] is Integer && Usage["total_tokens"] >= 0)
+        AssertTrue(_LLMRemote_CatalogPriceIsValid(Usage["est_cost_usd"]), "every response independently obeys the already fixed native usage/cost domain")
+        PerResponse.Push(Map("prompt", String(Usage["prompt_tokens"]), "completion", String(Usage["completion_tokens"]),
+            "total", String(Usage["total_tokens"]), "cost", String(Usage["est_cost_usd"])))
+        Call["on_success"].Call(Classified["text"], Usage)
+    }
+    AssertEqual(Count, State.Calls.Length, "distinct valid predictions must finalize without an invented extra attempt")
+    Events := []
+    for Log in _Stub_LlmLogCalls {
+        if Log.event_type == "generation"
+            Events.Push(Log.evt)
+    }
+    AssertEqual(1, Events.Length, "the final public keystats consumer must receive one aggregate generation event")
+    Event := Events[1]
+    Prompt := Event.Get("prompt_tokens", 0), Completion := Event.Get("completion_tokens", 0)
+    Total := Event.Get("total_tokens", 0), Cost := Event.Get("est_cost_usd", 0.0)
+    _TestPrint("# REQUEST_USAGE_AGGREGATE " . KL_JsonEncode(Map("mode", State.Mode, "request_id", RequestId,
+        "responses", PerResponse, "dispatches", State.Calls.Length, "generation_events", Events.Length,
+        "aggregate_prompt", String(Prompt), "aggregate_completion", String(Completion), "aggregate_total", String(Total),
+        "aggregate_cost", String(Cost), "aggregate_cost_finite", _LLMRemote_CatalogPriceIsValid(Cost),
+        "prediction_count", Event["predictions"].Length, "presentation_final", IsObject(_Stub_LlmPresentedRecord) && _Stub_LlmPresentedRecord.IsFinal)))
+    AssertEqual(Count, Event["predictions"].Length, "billing refusal must not lose the actual successful predictions")
+    AssertTrue(IsObject(_Stub_LlmPresentedRecord) && _Stub_LlmPresentedRecord.IsFinal
+        && _Stub_LlmPresentedRecord.Lifecycle.OfferId == RequestId)
+    if State.Mode == "ordinary-two" {
+        AssertEqual(4, Prompt), AssertEqual(2, Completion), AssertEqual(6, Total)
+        AssertTrue(Abs(Cost - 0.000008) < 1e-12, "ordinary per-response costs must accumulate unchanged")
+    } else if State.Mode == "integer-three" {
+        AssertEqual(0, Prompt, "an unrepresentable full-request count stays unknown, not a positive wrapped partial total")
+        AssertEqual(0, Total)
+        AssertEqual(0, Completion)
+    } else {
+        AssertEqual("cost-two", State.Mode)
+        AssertEqual(2000000, Prompt), AssertEqual(2000000, Total)
+        AssertTrue(_LLMRemote_CatalogPriceIsValid(Cost), "the final consumer cannot receive infinity from individually admitted prices and usages")
+        AssertEqual(0.0, Cost, "the existing unrepresentable cost policy is unknown zero, never infinity or a fabricated finite ceiling")
+    }
+}
+_RUAG_Case(Mode) {
+	global _LLM_Engine, _LLM_Menu, _LLM_Engine_RemoteTransport, _LLM_Live, LLM_REMOTE_MODEL_PRICES
+	global _LLM_Remote_Async, _LLM_Remote_BackboardExchanges, _LLM_Ollama_Async
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Pending, _LLM_Bridge_PrefixObserver
+	global _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord, _Stub_LlmLogCalls
+	global _Stub_LlmLogFailedCalls, _Stub_LlmSuggestedCalls
+	global _LLM_ProfilesCache, _LLM_COMMON_INFERENCE, _LLM_COMMON_INFERENCE_RAW
+	global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, _LOGGER_CLOCK_FN, _LOGGER_STAMP_FN, _LOGGER_PATH_DATE
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy
+	Names := ["LLM_REMOTE_MODEL_PRICES", "_LLM_Engine", "_LLM_Menu", "_LLM_Engine_RemoteTransport", "_LLM_Live",
+		"_LLM_Remote_Async", "_LLM_Remote_BackboardExchanges", "_LLM_Ollama_Async",
+		"_LLM_Ollama_ActiveStreams", "_LLM_Ollama_Pending", "_LLM_Bridge_PrefixObserver",
+		"_Stub_LlmTooltipCalls", "_Stub_LlmTooltipVisible", "_Stub_LlmTooltipLoading",
+		"_Stub_LlmTooltipText", "_Stub_LlmPresentedRecord", "_Stub_LlmLogCalls",
+		"_Stub_LlmLogFailedCalls", "_Stub_LlmSuggestedCalls", "_LLM_ProfilesCache",
+		"_LLM_COMMON_INFERENCE", "_LLM_COMMON_INFERENCE_RAW", "_LOGGER_TEST_SINK",
+		"_LOGGER_REPEAT_ENABLED", "_LOGGER_CLOCK_FN", "_LOGGER_STAMP_FN", "_LOGGER_PATH_DATE",
+		"_LOGGER_DEBUG_ENABLED", "_LOGGER_INFO_ENABLED", "_LOGGER_WARN_ENABLED", "_LOGGER_ERROR_ENABLED",
+		"_HealthCheckWarnCount", "_HealthCheckLastError", "_HealthCheckErrCount", "_ED_Policy"]
+	PreviousCritical := Critical("On")
+	Saved := Map(), SavedLogger := _TLOG_CaptureLoggerState()
+	for Name in Names
+		Saved[Name] := {Present: IsSet(%Name%), Value: IsSet(%Name%) ? %Name% : 0}
+	Store := _LLM_Engine_SlotDisplayStore()
+	SavedCtx := Store.Ctx, SavedDisplays := Store.ByText
+	State := {Mode: Mode, Calls: [], AId: 0, BId: 0, Timer: 0, TimerCalls: 0,
+		Done: false, Failure: 0, FailedLines: 0, Armed: false, FloorMs: 0, BRecord: 0, BText: ""}
+	Primary := 0, PrivateEngineOwned := false
+	try {
+		AssertFalse(SavedLogger.FlushActive, "A foreign logger flush cannot be detached by this fixture.")
+		_ResetLogger()
+		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
+		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0, _LOGGER_PATH_DATE := ""
+		_LOGGER_INFO_ENABLED := true, _LOGGER_WARN_ENABLED := true
+		_HealthCheckWarnCount := 0, _HealthCheckLastError := "", _HealthCheckErrCount := 0, _ED_Policy := 0
+		_LLM_Remote_Async := Map(), _LLM_Remote_BackboardExchanges := Map(), _LLM_Ollama_Async := Map()
+		_LLM_Ollama_ActiveStreams := [], _LLM_Ollama_Pending := "", _LLM_Bridge_PrefixObserver := 0
+		_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
+		_LLM_Engine := _LPP_Engine(Saved["_LLM_Engine"].Value)
+		PrivateEngineOwned := true
+		_LLM_Engine["pending_timer"] := "", _LLM_Engine["timer_active"] := false
+		_LLM_Menu := _LPP_Menu()
+		_Stub_LlmTooltipCalls := [], _Stub_LlmTooltipVisible := false, _Stub_LlmTooltipLoading := false
+		_Stub_LlmTooltipText := "", _Stub_LlmPresentedRecord := 0
+		_Stub_LlmLogCalls := [], _Stub_LlmLogFailedCalls := [], _Stub_LlmSuggestedCalls := []
+		_LLM_ProfilesCache := unset, _LLM_COMMON_INFERENCE := unset, _LLM_COMMON_INFERENCE_RAW := unset
+		Store.Ctx := "", Store.ByText := Map()
+		_LLM_Engine_RemoteTransport := _LFO_Transport.Bind(State)
+		_LOGGER_TEST_SINK := 0
+		Critical("Off")
+		LLM_Engine_Init(Map("profile_id", "basic", "n_predictions", Mode == "integer-three" ? 3 : 2, "show_info_bar", false))
+		_RUAG_Exercise(State)
+	} catch Any as Failure {
+		Primary := Failure
+	}
+	try {
+		State.Armed := false
+		if IsObject(State.Timer)
+			SetTimer(State.Timer, 0)
+		if PrivateEngineOwned {
+			LLM_Engine_StopGeneration()
+			AssertFalse(_LLM_Engine["timer_active"])
+			AssertEqual(0, _LLM_Remote_Async.Count)
+			AssertEqual(0, _LLM_Ollama_Async.Count)
+		}
+	} catch Any as Failure {
+		if !IsObject(Primary)
+			Primary := Failure
+	} finally {
+		Critical("On")
+		try {
+			State.Timer := 0
+			State.Calls := []
+			State.BRecord := 0
+			Store.Ctx := SavedCtx, Store.ByText := SavedDisplays
+			_TLOG_RestoreLoggerState(SavedLogger)
+			for Name, Item in Saved
+				%Name% := Item.Present ? Item.Value : unset
+		} finally Critical(PreviousCritical)
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+for _RUAG_Mode in ["ordinary-two", "cost-two", "integer-three"]
+    Test("Request usage aggregate: " . _RUAG_Mode . " preserves the final consumer domain (request-usage-aggregate-domain)",
+        _RUAG_Case.Bind(_RUAG_Mode))

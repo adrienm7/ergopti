@@ -608,3 +608,91 @@ _PFI_UnknownApiSelection(State) {
 
 Test("LLM profile opening source: explicit unknown API selection is preserved (llm-profile-projection-unknown-api)",
 	_PFI_Run.Bind("edit-preopen-api-unknown"))
+
+; Keep the default full-state collector: an LLM-only callback would hide the
+; actual non-LLM rows the public profile transaction writes in production.
+_PFNL_Input(State, Prompt, Title, Options, Default := "") {
+	State.Inputs += 1
+	AssertTrue(Prompt != "" && Title != "")
+	return {Result: "OK", Value: State.Inputs == 1 ? "Edited A" : "edited-a"}
+}
+
+_PFNL_Case(External) {
+	global Features, _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner, _VendorDir
+	PreviousContext := _PEC_InstallFixture()
+	World := 0
+	WasSuspended := A_IsSuspended
+	PreviousCritical := Critical("Off")
+	SavedHotkeys := _LLM_Menu_ProfileHotkeyOwner
+	SavedVendor := _VendorDir
+	State := {Inputs: 0, Notices: [], NoticeLevels: []}
+	try {
+		Suspend(false)
+		World := _LSP_World()
+		_LLM_Menu_ProfileHotkeyOwner := 0
+		_VendorDir := World.ConfigPath . "-no-webview-loader"
+		Profiles := [_PFI_Profile("user_profile_a", "original-a"), _PFI_Profile("user_profile_b", "original-b")]
+		_LLM_Menu["user_profiles"] := Profiles
+		_LLM_Menu["profile_id"] := "user_profile_a"
+		_LLM_Menu["enabled"] := false
+		Initial := _ConfigCollectFullSaveUpdates(Features, _LLM_Menu)
+		AssertTrue(Initial is Array && Initial.Length > 0,
+			"The genuine full-state collector must build all production rows before the public action")
+		AssertTrue(TOML_ConfigBatchWrite(World.ConfigPath, _ConfigPrepareTypedUpdates(Initial)),
+			"The actual native writer must admit the unchanged current full-state fixture")
+		InitialImage := FSConfigReadUtf8Exact(World.ConfigPath)
+		InitialMenu := _LLM_Menu
+		CurrentLocale := I18nGetLocale()
+		ExpectedLocale := External ? (CurrentLocale == "en" ? "fr" : "en") : CurrentLocale
+		ExternalImage := InitialImage
+		if External {
+			Built := TOML_BuildConfigUpdatedContent(World.ConfigPath,
+				[{Section: "script", Key: "locale", Value: ExpectedLocale}])
+			AssertTrue(Built is Map && Built.Get("status", "") == "ok")
+			ExternalImage := Built["content"]
+			AssertTrue(StrCompare(ExternalImage, InitialImage, true) != 0)
+			AssertTrue(FSWriteDurable(World.ConfigPath, ExternalImage))
+		}
+		AssertTrue(ConfigFullStateCanPersist(), "The real current schema must admit this valid pre-opening external locale")
+		Port := Map("input", _PFNL_Input.Bind(State), "notify", _PFI_Notify.Bind(State),
+			"apply", ObjBindMethod(World, "ApplyCommitted"), "acquire", _LMT_Acquire, "settle", _LMT_Settle)
+		AssertFalse(Port.Has("collect"), "Only the genuine default full-save collector may serialize this public profile action")
+		Result := LLM_Menu_PromptEditProfile(Profiles[1], Port)
+		Observed := TOML_ParseFreshFileTyped(World.ConfigPath)
+		LocaleRead := _TOML_DocumentLookup(Observed, ["script", "locale"])
+		ActualLocale := LocaleRead["found"] ? LocaleRead["value"] : ManifestDefaultFor("script.locale")
+		Preserved := ActualLocale == ExpectedLocale
+		_TestPrint("# profile-nonllm-source external=" . External . " apply_calls=" . World.ApplyCalls
+			. " input_calls=" . State.Inputs . " physical_locale_preserved=" . Preserved)
+		AssertTrue(Preserved, "A public LLM profile edit cannot overwrite another persisted preference changed before opening")
+		AssertTrue(World.ApplyCalls <= 1)
+		if World.ApplyCalls == 1 {
+			AssertTrue(Result)
+			AssertEqual(2, State.Inputs)
+			Rows := _LLM_Menu_DeserializeUserProfiles(Observed["llm"]["user_profiles"])
+			AssertEqual("edited-a", Rows[1]["system_single"])
+			AssertEqual("original-b", Rows[2]["system_single"])
+		} else {
+			AssertTrue(External, "The unmodified current full-state source must actually save the profile")
+			AssertFalse(Result)
+			AssertEqual(ExternalImage, FSConfigReadUtf8Exact(World.ConfigPath))
+			AssertTrue(_LLM_Menu == InitialMenu && ManifestValuesEqual(Profiles, _LLM_Menu["user_profiles"]))
+			AssertTrue(State.Notices.Length > 0)
+		}
+	} finally {
+		try {
+			if World is _LSP_World
+				World.Restore()
+		} finally {
+			_PEC_RestoreFixture(PreviousContext)
+			_LLM_Menu_ProfileHotkeyOwner := SavedHotkeys
+			_VendorDir := SavedVendor
+			Suspend(WasSuspended)
+			Critical(PreviousCritical)
+		}
+	}
+}
+
+for _PFNL_External in [false, true]
+	Test("LLM full-state opening: " . (_PFNL_External ? "external locale" : "current control")
+		. " preserves non-LLM preferences (llm-profile-nonllm-source)", _PFNL_Case.Bind(_PFNL_External))

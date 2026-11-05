@@ -407,3 +407,71 @@ _SCCF_Case(Mode) {
 
 for _SCCF_Mode in ["current", "redirect"]
 	Test("selection capture native same-window focus: " . _SCCF_Mode . " (selection-capture-native-control-focus)", _SCCF_Case.Bind(_SCCF_Mode))
+
+_GTTL_ChildSource() {
+	global _DriverDir
+	Code := _GTRF_ChildSource()
+	Suffix := FSReadStrict(_DriverDir . "\tests\fixtures\gesture_transform_render_focus_body.ahk")
+	AssertEqual(Suffix, SubStr(Code, -StrLen(Suffix)), "Only the isolated fixture changes; actual capture/send/clipboard owners remain intact")
+	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
+	Code := StrReplace(Code, "KL_MarkSynthetic(source, is_private := false) {",
+		"_GTTL_ActualMarkSynthetic(source, is_private := false) {", true, &Owners)
+	AssertEqual(1, Owners, "The complete genuine synthetic-owner publication may only receive a passive scheduling observer")
+	Title := _DriverFuncBody("TextCaseTitle")
+	Title := StrReplace(Title, "TextCaseTitle(Text) {", "_GTTL_ActualTextCaseTitle(Text) {", true, &Transforms)
+	AssertEqual(1, Transforms, "The actual title-case implementation must remain unchanged behind a passive running-phase observer")
+	return Code . Title . "`n" . FSReadStrict(_DriverDir . "\tests\fixtures\gesture_title_transform_target_body.ahk")
+}
+_GTTL_Case(Mode) {
+	global SEND_INSTANT_PASTE_DELAY_MS
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unretired owned clipboard probe prevents another native publisher.")
+	Root := A_Temp . "\ergopti_gesture_title_transform_target_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Created := false, Handle := 0, Primary := 0, Retired := false
+	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	PreviousCritical := Critical("Off")
+	try {
+		Creation := FSCreateDirectoryExclusiveStrict(Root)
+		Created := Creation is Integer && Creation == 1
+		AssertTrue(Created, "The fixture must exclusively own its script and evidence directory.")
+		Script := Root . "\subject.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _GTTL_ChildSource()))
+		OwnerSource := FSReadStrict(_DriverProductionFileForSymbol("GetUIASelection"))
+		AssertTrue(RegExMatch(OwnerSource, "m)^global UIA_SELECTION_MAX_AGE_MS := ([0-9]+)[ `t]*$", &Age),
+			"The isolated child must receive the actual production snapshot age literal, not an unavailable harness global.")
+		MaxAge := Integer(Age[1])
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-owned-clipboard-render-focus", Mode,
+				String(SEND_INSTANT_PASTE_DELAY_MS), String(MaxAge)], _WRCF_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The exact native clipboard/render subject must start.")
+		Started := A_TickCount
+		while !State.Calls && TickElapsed(Started) < 12000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		_TestPrint("# gesture-title-transform-target " . Mode . " stdout=" . State.Output . " stderr=" . State.ErrorText)
+		AssertEqual(1, State.Calls, "The actual clipboard and native paste owner must settle exactly once.")
+		AssertEqual(0, State.Code, "The native wrap render focus probe failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText)
+		AssertContains(State.Output, "PASS gesture-title-transform-target " . Mode)
+	} catch as Err {
+		Primary := Err
+	}
+	try Retired := !IsObject(Handle) || ((Receipt := Handle.terminate()) is Integer && Receipt == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if !Retired && Created
+			RetirementDebt := {Handle: Handle, Root: Root}
+		else if Retired && Created && !IsObject(Primary)
+			DirDelete(Root, true)
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "The exact clipboard subject must retire before its script directory is removed.")
+}
+
+for _GTTL_Mode in ["current", "redirect"]
+	Test("gesture title transform native target: " . _GTTL_Mode . " (gesture-title-native-transform-target)", _GTTL_Case.Bind(_GTTL_Mode))

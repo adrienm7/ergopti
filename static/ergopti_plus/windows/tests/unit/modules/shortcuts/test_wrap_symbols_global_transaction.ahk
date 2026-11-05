@@ -1063,3 +1063,52 @@ _WSSA_PostAck(Mode, Root, Path, Source) {
 }
 for _WSSA_AckMode in ["pause-after-ack", "live-after-ack-control"]
 	Test("wrap acknowledged publication: " . _WSSA_AckMode, _WSSA_WithOwnedSource.Bind(_WSSA_PostAck.Bind(_WSSA_AckMode)))
+
+; A prior real successful save reveals only the implementation-owned stage name.
+; The tested save itself uses all default stage/native/cleanup adapters.
+_WSST_StageCollision(Mode, Root, Path, Source) {
+	global _WS_Custom
+	Observed := {path: "", calls: 0}
+	Observe(Stage, Content) {
+		Observed.calls += 1
+		Observed.path := Stage
+		return FSWriteDurable(Stage, Content)
+	}
+	AssertTrue(WrapSymbols_AddCustom("c", "d", Observe), "the observation delegates the actual durable stage writer")
+	AssertEqual(1, Observed.calls)
+	AssertFalse(FSStrictExists(Observed.path), "the real first native rename must consume its stage")
+	AssertTrue(RegExMatch(Observed.path, "^(.*-)([0-9]+)(\.tmp)$", &Parts) > 0,
+		"the fixture observes the production stage namespace rather than controlling its allocator")
+	NextStage := Parts[1] . (Integer(Parts[2]) + 1) . Parts[3]
+	Before := FSReadUtf8Exact(Path)
+	Foreign := "foreign-stage-owned-by-another-writer`n"
+	if Mode == "collision"
+		AssertTrue(FSWriteCreateDurable(NextStage, Foreign), "the independent stage already exists before the tested public transaction")
+	else
+		AssertFalse(FSStrictExists(NextStage))
+	Result := WrapSymbols_AddCustom("e", "f")
+	Present := FSStrictExists(NextStage)
+	AfterStage := Present ? FSReadUtf8Exact(NextStage) : "<missing>"
+	After := FSReadUtf8Exact(Path)
+	Disk := _WSIC_Document(After)
+	FileAppend("# wrap-stage-collision mode=" . Mode . " ack=" . Result . " foreign-present=" . Present
+		. " foreign-preserved=" . ((AfterStage == Foreign) ? 1 : 0) . "`n", "*")
+	if Mode == "collision" {
+		AssertTrue(Present, "a pre-existing unowned stage must never be consumed by this save")
+		AssertEqual(Foreign, AfterStage, "a pre-existing unowned stage must never be overwritten or cleaned")
+		if !Result {
+			AssertEqual(Before, After, "a refused stage admission leaves the live source unchanged")
+			AssertFalse(_WSIC_HasPair(_WS_Custom, "e", "f"))
+		}
+	} else
+		AssertTrue(Result, "the ordinary default writer must still perform a real successful save")
+	if Result {
+		AssertTrue(_WSIC_HasPair(Disk["custom"], "e", "f"))
+		AssertTrue(_WSIC_HasPair(_WS_Custom, "e", "f"))
+	}
+	AssertTrue(_WSIC_HasPair(Disk["custom"], "a", "b"))
+	AssertTrue(_WSIC_HasPair(Disk["custom"], "c", "d"))
+}
+for _WSST_Mode in ["collision", "ordinary-control"]
+	Test("wrap symbols native stage ownership: " . _WSST_Mode . " (wrap-stage-ownership)",
+		_WSSA_WithOwnedSource.Bind(_WSST_StageCollision.Bind(_WSST_Mode)))
