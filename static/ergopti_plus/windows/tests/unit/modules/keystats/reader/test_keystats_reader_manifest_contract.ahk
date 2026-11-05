@@ -1556,3 +1556,97 @@ for _KLRTP_Spec in [
 ]
 	Test("KLR thinking pauses numeric domain: " . _KLRTP_Spec[1] . " retains finite projection semantics (klr-thinking-pause-numeric-domain)",
 		_SQLRD_WithDatabase.Bind(_KLRTP_NumericBoundary.Bind(_KLRTP_Spec)))
+
+_KLDL_Frontend(Root, Kind) {
+	global _DriverDir
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved frontend child must retain its exact owned input directory")
+	Repo := FSResolveDirectoryPath(_DriverDir . "\..\..\..")
+	Script := Repo . "\tools\test\support\typing-live-inventory.cjs"
+	AssertTrue(FSStrictExists(Script), "The actual frontend fixture must exist")
+	Directory := A_Temp . "\ergopti_live_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	AssertEqual(1, FSCreateDirectoryExclusiveStrict(Directory), "The frontend inputs require an exclusively acquired directory")
+	State := {Calls: 0, Code: -1, Output: ""}, Handle := 0
+	Complete(Code, Out, Err) {
+		State.Calls += 1, State.Code := Code, State.Output := Out . Err
+	}
+	try {
+		for Name in ["full.json", "live.json", "range.json"]
+			FileCopy(Root . Name, Directory . "\" . Name, false)
+		Handle := ShellRunner_SpawnTreeOwned("node.exe", [Script, Directory, Kind], Complete)
+		AssertTrue(Handle.start(), "The real Node frontend process must start")
+		Started := A_TickCount
+		while State.Calls = 0 && TickElapsed64(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		for Line in StrSplit(StrReplace(State.Output, "`r`n", "`n"), "`n")
+			if Trim(Line) != ""
+				_TestPrint("# live-frontend " . Line)
+		AssertEqual(1, State.Calls, "The exact frontend process must settle")
+		AssertEqual(0, State.Code, "The actual typing frontend must retain and refresh its visible inventory")
+		AssertContains(State.Output, "PASS live-inventory-composed " . Kind)
+	} finally {
+		Retired := !IsObject(Handle) || Handle.terminate()
+		if Retired
+			DirDelete(Directory, true)
+		else
+			RetirementDebt := {Handle: Handle, Directory: Directory}
+		AssertTrue(Retired, "The exact Node process tree must retire before its separate input directory is deleted")
+	}
+}
+_KLDL_Count(Data, Kind, Token) {
+	return Data.Has(Kind) && Data[Kind] is Map && Data[Kind].Has(Token) ? Data[Kind][Token].Get("c", 0) : 0
+}
+_KLDL_Case(Kind) {
+	global _TimingsCache
+	SavedRegistry := _TimingsCache, SavedTimings := KLW_TimingValues()
+	PreviousCritical := Critical("Off")
+	Fields := ["MAX_KEYSTROKE_DELAY_MS", "THINK_PAUSE_MS", "BURST_GAP_MS", "SESSION_GAP_MS", "AUTO_REPEAT_MAX_DELAY_MS", "HOLD_THRESHOLD_MS"]
+	try {
+		TimingsLoadShared()
+		KeystatsWalkerLoadTimings()
+		_KLRDC_EnsureSharedDir()
+		_KLRDC_Reset()
+		Today := FormatTime(A_Now, "yyyy-MM-dd")
+		Characters := ["a", "b", "c", "d", "e", "f", "g"]
+		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(1,
+			Today . " 10:00:00.000", Today, "fixture.exe", Characters))
+		Db := _KLRDC_BuildAsWorker()
+		Full := KLPF_BuildTyping(Db, "full", true, Today, true)
+		FullToday := JsonParse(Full["__klpf_prefetch_json"])["today"]["fixture.exe"]
+		Seed := KLPF_CaptureHistorySeed(_KLRDC_Root(), Today)
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2,
+			Today . " 10:00:01.000", Today, "fixture.exe", Characters))
+		Db := _KLRDC_BuildAsWorker()
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Seed, KLPF_CaptureHistorySeed(_KLRDC_Root(), Today)),
+			"The actual durable same-day append must be admitted to the production live mode")
+		Live := KLPF_BuildTyping(Db, "live", false, Today, true)
+		for Spec in [["pg", "ngram_pentagrams", "abcde"], ["hx", "ngram_hexagrams", "abcdef"], ["hp", "ngram_heptagrams", "abcdefg"]] {
+			Raw := SQLite_Query(Db, "SELECT SUM(c) AS c FROM " . Spec[2]
+				. " WHERE app='fixture.exe' AND token=" . SQLite_Q(Spec[3]) . ";")[1]["c"]
+			_TestPrint("# LIVE_DEPTH kind=" . Spec[1] . " initial_full=" . _KLDL_Count(FullToday, Spec[1], Spec[3])
+				. " rebuilt_raw=" . Raw . " live=" . _KLDL_Count(JsonParse(Live["__klpf_today_json"])["fixture.exe"], Spec[1], Spec[3]))
+			AssertEqual(1, _KLDL_Count(FullToday, Spec[1], Spec[3]))
+			AssertEqual(2, Raw, "The genuine source contains both occurrences before frontend delivery")
+		}
+		Root := _KLRDC_Root()
+		AssertTrue(FSWriteCreateDurable(Root . "full.json", KLPF_SerializeBlob(Full)))
+		AssertTrue(FSWriteCreateDurable(Root . "live.json", KLPF_SerializeBlob(Live)))
+		AssertTrue(FSWriteCreateDurable(Root . "range.json", KLR_BuildRangeSplitTodayJson(Db, Today, Today, ["fixture.exe"], Today)))
+		_KLDL_Frontend(Root, Kind)
+	} finally {
+		try _KLRDC_Cleanup()
+		finally {
+			Critical("On")
+			try {
+				_TimingsCache := SavedRegistry
+				for Index, Field in Fields
+					KLWConst.%Field% := SavedTimings[Index]
+			} finally Critical(PreviousCritical)
+		}
+	}
+}
+for _KLDL_Kind in ["chars", "deep"]
+	Test("Keystats live projection: " . _KLDL_Kind . " retains visible same-day typing inventory through the genuine frontend (klr-live-deep-inventory)",
+		_KLRDC_CheckTeardown.Bind(_KLDL_Case.Bind(_KLDL_Kind)))
