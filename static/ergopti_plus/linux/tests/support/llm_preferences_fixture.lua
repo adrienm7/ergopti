@@ -13,6 +13,10 @@ function M.new(options)
 	local port = Fakes.storage(options)
 	local write, remove = port.set, port.delete
 	local revision = 0
+	function port.get_with_status(path)
+		local value = port.get(path)
+		return value, value == nil and "absent" or "ok"
+	end
 	function port.generation() return revision end
 	function port.is_current_revision(expected) return expected == revision end
 	function port.admit() return true end
@@ -69,18 +73,21 @@ end
 function M.with(body, options)
 	local preferences = require("infra.llm_preferences")
 	local old_get, old_set, old_delete = preferences.get, preferences.set, preferences.delete
+	local old_get_with_status = preferences.get_with_status
 	local old_many = preferences.set_many
 	local old_get_many = preferences.get_many
 	local old_generation, old_admit = preferences.generation, preferences.admit
 	local old_current_revision = preferences.is_current_revision
 	local fake = M.new(options)
 	preferences.get, preferences.set, preferences.delete = fake.get, fake.set, fake.delete
+	preferences.get_with_status = fake.get_with_status
 	preferences.set_many = fake.set_many
 	preferences.get_many = fake.get_many
 	preferences.generation, preferences.admit = fake.generation, fake.admit
 	preferences.is_current_revision = fake.is_current_revision
 	local ok, err = pcall(body, fake)
 	preferences.get, preferences.set, preferences.delete = old_get, old_set, old_delete
+	preferences.get_with_status = old_get_with_status
 	preferences.set_many = old_many
 	preferences.get_many = old_get_many
 	preferences.generation, preferences.admit = old_generation, old_admit

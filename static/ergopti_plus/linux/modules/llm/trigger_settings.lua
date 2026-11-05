@@ -78,6 +78,9 @@ local MAX_APPS = 200
 
 local _defaults = {}
 local _values = {}
+-- An unreadable exclusion value cannot authorize typing-triggered requests. Keep this sentinel
+-- in the cache itself so transaction snapshots restore the exact admission.
+local EXCLUSIONS_REFUSED = {}
 
 local function detached(name, value)
 	if name ~= LEAF.DISABLED_APPS or type(value) ~= "table" then return value end
@@ -163,12 +166,42 @@ end
 --- @param name string
 --- @return number|boolean|nil
 function M.get(name)
+	if _values[name] == EXCLUSIONS_REFUSED then return detached(name, default_for(name)) end
 	if _values[name] ~= nil then return detached(name, _values[name]) end
 	local shipped = default_for(name)
 	if shipped == nil then return nil end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
+	if name == LEAF.DISABLED_APPS and (not ok or type(Storage) ~= "table") then
+		_values[name] = EXCLUSIONS_REFUSED
+		Logger.error(LOG, "Trigger exclusions are unavailable; automatic predictions are suppressed.")
+		return detached(name, shipped)
+	end
 	if ok and Storage then
-		local stored = Storage.get(PREF_PREFIX .. name, nil)
+		local stored, status
+		if name == LEAF.DISABLED_APPS then
+			if type(Storage.get_with_status) ~= "function" then
+				_values[name] = EXCLUSIONS_REFUSED
+				Logger.error(LOG, "Trigger exclusions could not be classified; automatic predictions are suppressed.")
+				return detached(name, shipped)
+			end
+			local read_ok
+			read_ok, stored, status = pcall(Storage.get_with_status, PREF_PREFIX .. name)
+			if not read_ok then
+				_values[name] = EXCLUSIONS_REFUSED
+				Logger.error(LOG, "Trigger exclusions are unreadable; automatic predictions are suppressed.")
+				return detached(name, shipped)
+			end
+		else
+			stored = Storage.get(PREF_PREFIX .. name, nil)
+		end
+		if name == LEAF.DISABLED_APPS and (status == "invalid" or
+				(status == "ok" and not valid(name, stored)) or
+				(status ~= "ok" and status ~= "absent")) then
+			_values[name] = EXCLUSIONS_REFUSED
+			ConfigOutdated.report(PREF_PREFIX .. name, ConfigOutdated.REFUSED, Logger)
+			Logger.warn(LOG, "Trigger exclusions are invalid; automatic predictions are suppressed until corrected.")
+			return detached(name, shipped)
+		end
 		if valid(name, stored) then
 			_values[name] = detached(name, stored)
 			return detached(name, _values[name])
@@ -191,12 +224,14 @@ end
 
 --- Whether the trigger is switched off in an application.
 --- @param app any The identifier the session reports for the focused application.
+--- @param automatic boolean|nil True for a typing-triggered request.
 --- @return boolean disabled
 local indexed_owner, disabled_index = setmetatable({}, { __mode = "v" }), nil
-function M.is_app_disabled(app)
+function M.is_app_disabled(app, automatic)
 	if _values[LEAF.DISABLED_APPS] == nil then M.get(LEAF.DISABLED_APPS) end
 	local apps = _values[LEAF.DISABLED_APPS]
-	if type(apps) ~= "table" then return false end
+	if apps == EXCLUSIONS_REFUSED then return automatic == true end
+	if type(apps) ~= "table" then return automatic == true end
 	if apps ~= indexed_owner[1] then
 		indexed_owner[1], disabled_index = apps, AppIdentity.exclusion_index(apps)
 	end
