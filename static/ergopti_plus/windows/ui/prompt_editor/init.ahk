@@ -524,8 +524,9 @@ _PromptEdWeb_PersistProfile(EditId, Epoch, Name, Batch, Prompt, Port := 0) {
 	return LLM_Menu_CommitMutation("the LLM prompt-editor profile save",
 		(Candidate) => _PromptEdWeb_ApplyProfileForContext(Candidate,
 			EditId, Epoch, Name, Batch, Prompt), Options.Get("apply", _PromptEdWeb_ApplyCommitted),
-		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
-		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
+		_LLM_Menu_WriteProfileSource.Bind(Source), _LLM_Menu_ProfileNotifyFailure.Bind(Source, Options.Get("notify", 0)),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0),
+		_LLM_Menu_ProfilePreparePublication.Bind(Source), _LLM_Menu_ProfilePublishCandidate.Bind(Source))
 }
 
 

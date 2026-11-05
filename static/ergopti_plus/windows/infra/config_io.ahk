@@ -1591,19 +1591,9 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; over the user's saved values. Skipping is safe: TOML_BatchWrite preserves keys
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
-				if !MenuState.Has(ConfigLeaf.ONBOARDING_SEEN)
-						|| !LLM_Option_TryNormalize(ConfigLeaf.ONBOARDING_SEEN,
-							MenuState[ConfigLeaf.ONBOARDING_SEEN], &OnboardingSeen)
-					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: ConfigLeaf.ONBOARDING_SEEN, Value: OnboardingSeen })
-				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
-						MenuState[ConfigLeaf.APP_PROFILE_OVERRIDES])
-				if !(_AppOverridesPayload is String)
-						throw Error("Could not serialize LLM app-profile overrides")
-				Updates.Push({ Section: "llm", Key: ConfigLeaf.APP_PROFILE_OVERRIDES, Value: _AppOverridesPayload })
-				if IsSet(_LLM_Menu_AppendPersistedUpdates)
-						&& !_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
-					throw Error("LLM menu persistence fields could not be serialized into the full-save candidate")
+				if !IsSet(_LLM_Menu_AppendOwnedPersistedUpdates)
+						throw Error("The LLM persistence collector is unavailable")
+				_LLM_Menu_AppendOwnedPersistedUpdates(Updates, MenuState)
 		}
 		if IsSet(CategoryEnabled) {
 				for _CatName, _CatBool in CategoryEnabled

@@ -1639,3 +1639,7 @@ Observation: Run41954012438 records wrong_control1 and transforms bravo in EditB
 Regression: Bind every real capture to a nonzero native control token, revalidate after callouts and before delivery, preserve manually built legacy jobs, and retain exact owner cleanup. The stable positive receiver case initially fails cleanup only.
 
 The production correction is integrated; post-fix native qualification is pending.
+
+## Profile publication follow-up for AHK-072
+
+The profile source guard now compares the complete persisted LLM projection through the shared feature and private-menu collectors, including navigation preferences. It admits canonical loader equivalences without accepting unknown API selections or lossy future profile fields. A detached persisted RAM snapshot and the existing API authority protect against in-place dependency failure during the actual native writer. If durability succeeds but RAM publication is withdrawn, the existing exact-path session refusal prevents later stale full saves from overwriting the acknowledged profile; feedback states that the saved configuration requires restart. Ten added controls cover canonical values, unknown selection and both sides of native acknowledgement. Native post-fix qualification remains pending. This extends072, without increasing the distinct finding count.
