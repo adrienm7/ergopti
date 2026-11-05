@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **101 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **102 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1701,3 +1701,17 @@ Automatic optional boot full saves retain their actual admitted boot source in t
 ## Personal-information projection follow-up for AHK-068
 
 The reader now decodes its single held byte buffer through the existing BOM-aware decoder and projects the canonical TOML document. Known identity fields and aliases require actual String-token intent; wrong types latch write refusal before cache or RAM publication. Literal, multiline, inline, dotted and UTF-16 BOM forms receive explicit coverage. The publication-race fixture uses a valid TOML invalid-length alias to reach the actual warning callout; duplicate exact TOML assignments are no longer used as a substitute for a valid document. The existing ownership, bytes and generation oracles remain. Native qualification of the canonical reader is pending.
+
+## AHK-102: Locale fast caches silently rename delimiter-bearing translation keys
+
+Severity: low. Confidence: high. Evidence: native Windows fail-before.
+
+The locale cache writer emits raw keys into tab/newline-delimited records. The reader then interprets a key's delimiter as structure while the entry-count sentinel still matches. An unknown source key can therefore become a different lookup key after a warm reload.
+
+Run41969593070 at320cd51a8171a8b8ed84f74c46acb7e198768865 reaches both real generated caches with `warm_ok=1 warm_fast=1 count=1`, but `exact_key=0` for tab and newline keys. Cold JSON decoding and the three carriage/backslash/value controls pass. Both failures repeat in inverse order.
+
+The correction escapes both fields with the same codec, decodes complete keys, distinguishes sentinel records from data and regenerates historical v2 caches. The five original native cases and an additional genuine v2 cache case cover the fix. This TSV format belongs to Windows; the Lua drivers do not consume it. Post-fix native qualification is pending.
+
+## Personal-information encoding follow-up for AHK-068
+
+The same10-case native run proves an additional source-fidelity failure in the existing068 family: an unrelated public edit acknowledges success over invalid UTF-8 (92 original bytes become98) and an odd UTF-16 BOM image (191 become101). Neither reader latches refusal. All three genuine UTF-8, UTF-8 BOM and UTF-16 BOM controls pass, and both failures repeat in inverse order. Strict decoding of the same captured Buffer is being implemented; no extra distinct count is assigned to these source-preservation siblings.

@@ -766,7 +766,7 @@ _I18nKeyCacheRoundTrip(Mode) {
 		Path := Root . "\fixture.json", Tsv := Root . "\fixture.tsv"
 		Key := "fixture.key", Value := "translation"
 		switch Mode {
-			case "tab-key":
+			case "tab-key", "legacy-v2-key":
 				Json := '{"before\tafter":"translation"}'
 				Key := "before`tafter"
 			case "newline-key":
@@ -796,6 +796,11 @@ _I18nKeyCacheRoundTrip(Mode) {
 		AssertTrue(Cold.Cache.Has(Key))
 		AssertEqual(Value, Cold.Cache[Key])
 		AssertTrue(FSExists(Tsv), "the actual cold-load writer must publish its cache")
+		if Mode == "legacy-v2-key" {
+			FileDelete(Tsv)
+			FileAppend(Key . "`t" . Value . "`n#!ergopti-i18n-cache-v2 count=1`n", Tsv, "UTF-8-RAW")
+			AssertEqual(Key . "`t" . Value . "`n#!ergopti-i18n-cache-v2 count=1`n", FSReadUtf8Exact(Tsv))
+		}
 		FileSetTime("20000101000000", Path, "M")
 		FileSetTime("20000101000002", Tsv, "M")
 		AssertTrue(_I18nTsvIsFresh(Tsv, Path), "the real filesystem timestamps must admit the generated cache")
@@ -803,6 +808,7 @@ _I18nKeyCacheRoundTrip(Mode) {
 		_TestPrint("# i18n-key-cache mode=" . Mode . " warm_ok=" . Warm.Ok . " warm_fast=" . Warm.Fast
 			. " expected_key_units=" . StrLen(Key) . " exact_key=" . Warm.Cache.Has(Key) . " count=" . Warm.Cache.Count)
 		AssertTrue(Warm.Ok)
+		AssertEqual(Mode != "legacy-v2-key", Warm.Fast, "historical delimiter-bearing keys require regeneration from authoritative JSON")
 		AssertEqual(1, Warm.Cache.Count)
 		AssertTrue(Warm.Cache.Has(Key), "a generated fast cache must preserve the complete canonical translation key")
 		AssertEqual(Value, Warm.Cache[Key], "the same translation must survive a real cold-to-warm native reload")
@@ -811,5 +817,5 @@ _I18nKeyCacheRoundTrip(Mode) {
 			DirDelete(Root, true)
 	}
 }
-for _I18nKeyCache_Mode in ["tab-key", "newline-key", "carriage-key", "backslash-key-control", "value-control"]
+for _I18nKeyCache_Mode in ["tab-key", "newline-key", "carriage-key", "backslash-key-control", "value-control", "legacy-v2-key"]
 	Test("i18n cache key fidelity: " . _I18nKeyCache_Mode . " (i18n-cache-key-fidelity)", _I18nKeyCacheRoundTrip.Bind(_I18nKeyCache_Mode))

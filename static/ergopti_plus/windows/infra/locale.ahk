@@ -56,9 +56,10 @@ global _I18nCacheFrLoaded := false
 global _I18nFallbacksWarmed := false
 
 ; Terminal record proving a complete, globally validated String catalogue.
-; Version 2 retires older caches which erased invalid JSON value types.
+; Version 3 also retires caches which serialized translation keys as delimiters.
+; Version 2 already retired caches which erased invalid JSON value types.
 ; The count also rejects a complete-looking file whose record prefix was lost.
-global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v2 count="
+global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v3 count="
 
 
 
@@ -93,6 +94,11 @@ _I18nUnescapeTSV(s) {
 				i += 2
 				continue
 			}
+			if (n == "t") {
+				out .= "`t"
+				i += 2
+				continue
+			}
 			if (n == "r") {
 				out .= "`r"
 				i += 2
@@ -124,16 +130,16 @@ _I18nParseTSV(Content, MagicKey, Status := unset) {
 		line := A_LoopField
 		if (line == "")
 			continue
-		if (InStr(line, _I18N_TSV_SENTINEL, true) == 1) {
+		p := InStr(line, "`t")
+		if (!p && InStr(line, _I18N_TSV_SENTINEL, true) == 1) {
 			RawCount := SubStr(line, StrLen(_I18N_TSV_SENTINEL) + 1)
 			if RegExMatch(RawCount, "^\d+$")
 				ExpectedCount := RawCount + 0
 			continue
 		}
-		p := InStr(line, "`t")
 		if (!p)
 			continue
-		k := SubStr(line, 1, p - 1)
+		k := _I18nUnescapeTSV(SubStr(line, 1, p - 1))
 		v := SubStr(line, p + 1)
 		if InStr(v, "\")
 			v := _I18nUnescapeTSV(v)
@@ -160,10 +166,18 @@ _I18nTsvIsFresh(TsvPath, JsonPath) {
 	}
 }
 
+; Encode either field without lending record delimiters to its contents.
+_I18nEscapeTSV(Text) {
+	Text := StrReplace(Text, "\", "\\")
+	Text := StrReplace(Text, "`t", "\t")
+	Text := StrReplace(Text, "`r", "\r")
+	return StrReplace(Text, "`n", "\n")
+}
+
 ; (Re)write the flat key<TAB>value .tsv cache from a parsed locale map. The .tsv
 ; is a gitignored, self-healing cache the driver owns end-to-end — the .json is
-; the single tracked source of truth, never duplicated in git. Values are escaped
-; \\ then \r then \n (backslash FIRST so it can never collide), ★ placeholders are
+; the single tracked source of truth, never duplicated in git. Both keys and values
+; escape backslash FIRST, then record/field delimiters. ★ placeholders are
 ; PRESERVED (the reader substitutes the MagicKey at parse time, keeping the cache
 ; MagicKey-independent), LF line endings, UTF-8 without BOM. Best-effort: a
 ; read-only install directory simply means every boot keeps parsing the JSON.
@@ -171,16 +185,8 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 	global _I18N_TSV_SENTINEL
 	try {
 		Content := ""
-		for Key, Val in Parsed {
-			Esc := Val
-			if InStr(Esc, "\")
-				Esc := StrReplace(Esc, "\", "\\")
-			if InStr(Esc, "`r")
-				Esc := StrReplace(Esc, "`r", "\r")
-			if InStr(Esc, "`n")
-				Esc := StrReplace(Esc, "`n", "\n")
-			Content .= Key . "`t" . Esc . "`n"
-		}
+		for Key, Val in Parsed
+			Content .= _I18nEscapeTSV(Key) . "`t" . _I18nEscapeTSV(Val) . "`n"
 		Content .= _I18N_TSV_SENTINEL . Parsed.Count . "`n"
 		; Stage then rename. FileDelete + FileAppend is a two-step publication that
 		; leaves the LIVE cache absent or half-written between the two calls, and a
