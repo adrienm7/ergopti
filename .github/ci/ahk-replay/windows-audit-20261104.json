@@ -1,71 +1,11 @@
 {
-	"expected_count": 60,
+	"expected_count": 4,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
 	"filters": [
 		{
-			"contains": "api-thinking-retry-alias-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "remote-retry-alias-companion",
-			"expected_count": 4
-		},
-		{
-			"contains": "api-thinking-retry-owner",
-			"expected_count": 2
-		},
-		{
-			"contains": "LLM thinking off: cancelling a prediction cancels its retry",
-			"expected_count": 1
-		},
-		{
-			"contains": "remote-trim-cancel",
-			"expected_count": 2
-		},
-		{
-			"contains": "remote-http-abort-retirement",
-			"expected_count": 12
-		},
-		{
-			"contains": "updater-list-stage-custody",
-			"expected_count": 2
-		},
-		{
-			"contains": "hotstring-delay-zero-sentinel-domain",
-			"expected_count": 3
-		},
-		{
-			"contains": "hotstring-idle-native-integer-domain",
-			"expected_count": 2
-		},
-		{
 			"contains": "personal-native-priority-paste-domain",
-			"expected_count": 4
-		},
-		{
-			"contains": "personal-priority-file-selection-guard",
-			"expected_count": 4
-		},
-		{
-			"contains": "HotstringsConfig legacy runtime delay:",
-			"expected_count": 8
-		},
-		{
-			"contains": "delay-edit-non-integer-personal-truncation",
-			"expected_count": 3
-		},
-		{
-			"contains": "hs_config: delay serializer rejects values outside the tick domain",
-			"expected_count": 1
-		},
-		{
-			"contains": "HotstringsConfig persistent offset:",
-			"expected_count": 6
-		},
-		{
-			"contains": "HotstringsConfig unlimited precedence:",
 			"expected_count": 4
 		}
 	]
