@@ -209,17 +209,29 @@ ProxyOverride_Unseal(Stored) {
  * @returns {Boolean} False when the value is refused.
  */
 ProxyOverride_Publish(Stored) {
-	global PROXY_OVERRIDE_REFUSED_TOKEN, _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed
-	global _ProxyOverrideBootSealSource
-	; Any later publication retires an earlier boot canonicalization receipt.
-	_ProxyOverrideBootSealSource := 0
-	_ProxyOverrideSealed := ProxyOverride_IsSealed(Stored)
+	return _ProxyOverride_ApplyPublication(_ProxyOverride_PreparePublication(Stored))
+}
+
+; Resolve DPAPI and normalize the route before entering a durable publisher.
+_ProxyOverride_PreparePublication(Stored) {
+	global PROXY_OVERRIDE_REFUSED_TOKEN
+	Sealed := ProxyOverride_IsSealed(Stored)
 	Value := ProxyOverride_Unseal(Stored)
-	_ProxyOverrideStored := Value is String ? Value : Stored is String ? Stored : String(Stored)
+	RuntimeStored := Value is String ? Value : Stored is String ? Stored : String(Stored)
 	Choice := ProxyOverride_Parse(Value)
 	Usable := Choice is Map
-	_ProxyOverridePublished := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
-	return Usable
+	Published := Usable ? ProxyOverride_Canonical(Choice) : PROXY_OVERRIDE_REFUSED_TOKEN
+	return {config: Stored, stored: RuntimeStored, published: Published, sealed: Sealed, usable: Usable}
+}
+
+; Primitive swaps only: durable publishers call this under the gateway Critical.
+_ProxyOverride_ApplyPublication(Publication) {
+	global _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideBootSealSource
+	_ProxyOverrideBootSealSource := 0
+	_ProxyOverrideSealed := Publication.sealed
+	_ProxyOverrideStored := Publication.stored
+	_ProxyOverridePublished := Publication.published
+	return Publication.usable
 }
 
 /**
