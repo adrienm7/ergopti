@@ -1,26 +1,106 @@
 {
-	"expected_count": 30,
+	"expected_count": 52,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"filters": [
 		{
-			"contains": "local-prediction-custody",
-			"expected_count": 6
-		},
-		{
-			"contains": "public-prediction-requester-admission",
-			"expected_count": 18
-		},
-		{
-			"contains": "llm-captured-source-app-privacy",
-			"expected_count": 1
-		},
-		{
-			"contains": "proxy-queued-full-save",
+			"contains": "toml-update-name-scalar",
 			"expected_count": 3
 		},
 		{
-			"contains": "override-stage-ownership",
+			"contains": "toml-config-update-name-scalar",
+			"expected_count": 3
+		},
+		{
+			"contains": "toml-name-scalar-owners",
+			"expected_count": 1
+		},
+		{
+			"contains": "toml-write-scalar",
+			"expected_count": 6
+		},
+		{
+			"contains": "TOML native decoded key admission: known-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "TOML native decoded key admission: known-escape-control",
+			"expected_count": 1
+		},
+		{
+			"contains": "paths-generation-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "paths-byte-admission",
+			"expected_count": 4
+		},
+		{
+			"contains": "registry-pending-source-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "registry-pending-deep-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "registry cache: exact typed values and case-sensitive maps survive decoding",
+			"expected_count": 1
+		},
+		{
+			"contains": "registry cache: hits validate, source/parser changes miss and missing source fails",
+			"expected_count": 1
+		},
+		{
+			"contains": "registry cache: shipped typed model and validated plan remain identical",
+			"expected_count": 1
+		},
+		{
+			"contains": "config-migration-stage-ownership",
+			"expected_count": 2
+		},
+		{
+			"contains": "config-migration-partial-publication",
+			"expected_count": 2
+		},
+		{
+			"contains": "config journal: default native older-source migration retains registry custody prepared",
+			"expected_count": 1
+		},
+		{
+			"contains": "config journal: default native older-source migration retains registry custody stage",
+			"expected_count": 1
+		},
+		{
+			"contains": "sticky-kana-native",
+			"expected_count": 2
+		},
+		{
+			"contains": "sticky-kana-capture-options",
+			"expected_count": 1
+		},
+		{
+			"contains": "sticky-native-nontext",
+			"expected_count": 3
+		},
+		{
+			"contains": "sticky-native-modifier-flags",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-debounce-password-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "llm-debounce-private-retyped-context",
+			"expected_count": 2
+		},
+		{
+			"contains": "llm-debounce-source-privacy",
+			"expected_count": 3
+		},
+		{
+			"contains": "hotstrings-cache-stage-ownership",
 			"expected_count": 2
 		}
 	]
