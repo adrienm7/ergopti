@@ -16,7 +16,11 @@ if [ "${1:-}" = --service ]; then SERVICE_MODE=true; shift; fi
 if [ "${1:-}" = --session-start ]; then
 	SESSION_START=true
 	shift
-	set -- --tray "$@"
+	# The native autostart entry already carries --tray. Avoid duplicating it
+	# while keeping every supplied daemon argument in its original order.
+	has_tray=false
+	for value in "$@"; do if [ "$value" = --tray ]; then has_tray=true; fi; done
+	if ! "$has_tray"; then set -- --tray "$@"; fi
 fi
 for arg in "$@"; do if [ "$arg" = --tray ]; then SESSION_START=true; fi; done
 

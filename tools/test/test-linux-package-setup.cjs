@@ -725,7 +725,29 @@ else echo "users input uinput"; fi`
 			/systemctl --user start ergopti-hotstrings.service/,
 			/luajit|pkexec|enable/
 		],
+		[
+			'autostart',
+			['--session-start', '--tray'],
+			0,
+			/systemctl --user start ergopti-hotstrings.service/,
+			/luajit|pkexec|enable/
+		],
 		...[
+			[
+				'session-tray-verbose',
+				['--session-start', '--tray', '--verbose'],
+				/luajit .* --tray --verbose$/m
+			],
+			[
+				'session-verbose-tray',
+				['--session-start', '--verbose', '--tray'],
+				/luajit .* --verbose --tray$/m
+			],
+			[
+				'session-config-missing',
+				['--session-start', '--config', '--tray'],
+				/luajit .* --config --tray$/m
+			],
 			['tray-version', ['--tray', '--version'], /luajit .* --tray --version$/m],
 			['tray-unknown', ['--tray', '--unknown'], /luajit .* --tray --unknown$/m],
 			[
@@ -827,6 +849,35 @@ else echo "users input uinput"; fi`
 				'credentials refresh precedes the single instance lock'
 			);
 		}
+	}
+	// Replay each native packager's actual autostart transformation and send
+	// the resulting desktop Exec arguments through the shipped launcher.
+	for (const kind of ['deb', 'rpm']) {
+		const builder = fs.readFileSync(path.join(ROOT, `tools/build/build-linux-${kind}.sh`), 'utf8');
+		const entry = builder.match(/\[Desktop Entry\][\s\S]*?\n(?=DESKTOP_EOF)/);
+		const transform = builder.match(/sed '(s\|\^Exec=.*?\|)'/);
+		assert.ok(entry && transform, `${kind}: actual desktop producer`);
+		const generated = spawnSync('sed', [transform[1]], { input: entry[0], encoding: 'utf8' });
+		assert.equal(generated.status, 0, generated.stderr);
+		const exec = generated.stdout.match(/^Exec=(.+)$/m);
+		assert.ok(exec, `${kind}: generated autostart Exec`);
+		const [program, ...args] = exec[1].trim().split(/\s+/);
+		assert.equal(program, 'ergopti');
+		fs.writeFileSync(callLog, '');
+		const launched = spawnSync(bashExecutable(), [bashPath(launcher), ...args], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: {
+				HOME: bashPath(sandbox),
+				TEST_PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+				CALL_LOG: bashPath(callLog),
+				TEST_CASE: 'desktop'
+			}
+		});
+		assert.equal(launched.status, 0, launched.stderr);
+		const invoked = fs.readFileSync(callLog, 'utf8');
+		assert.match(invoked, /systemctl --user start ergopti-hotstrings.service/);
+		assert.doesNotMatch(invoked, /luajit|pkexec/);
 	}
 	const stopScript = path.join(sandbox, 'install', 'stop-sessions.sh');
 	const runtimeRoot = path.join(sandbox, 'run/user');
