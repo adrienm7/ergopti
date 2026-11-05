@@ -4,7 +4,7 @@ Audited commit: `9154723b34ee0599433cbf749a4aca839bd54b53`. Scope: ErgoptiPlus W
 
 ## Goal and evidence standard
 
-The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **124 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
+The requested goal is 1,000 distinct new confirmed defects. The ongoing register currently records **125 distinct findings**. The initial snapshot contained eight findings. Earlier fixes on the branch precede this baseline and are not counted in this snapshot. Duplicate sites, policy disagreements and unconfirmed hypotheses do not increase the count. Implementation history and native qualification remain separate from source confirmation.
 
 ## Findings
 
@@ -1875,3 +1875,23 @@ The next corrections are integrated separately:2d3d2fe1 preserves complete NUL-b
 Further test-only probes are independent hypotheses: actual prefix-observer destructor lifetime, native custom flags in OneShot, an override reserved-root roundtrip, existing registry-key identity controls, retained agent-pause cancellation capability and TakeNote pause/reentrancy. The agent-pause probe manually recalls an older scheduler fixture callback; a failure would establish that protocol invariant, not prove that native SetTimer delivers after cancellation. They add no distinct count before assessment. The follow-up23-case replay has a separate immutable checkout and does not replace or resume the177-case run.
 
 The audit helper's verify-commit command requires its canonical fix-ahk-audit worktree and refuses this user-requested fix/windows checkout as missing. That refusal is not test evidence. The current branch is preserved as requested; finding trailers and source commits remain directly reviewable in Git, and native/behavioral qualification is reported separately.
+
+## Later native receipts and observer lifetime
+
+Replay42023834421 at4c5999f01d9c1f26c3feae061b83e737e7d0e626 executes177 selected cases:169 pass/8 fail individually,168 pass/9 fail reversed. Production compilation and90/90 hotstring E2E pass. The selected managed HTTP override step completes its explicit11-case guard. Storage quoted-scalar, counted-name refusal and personal-information close/Reset corrections pass their selected cases in both orders, including exact native successor survival. The Sticky preheld control passes. This is not a whole-suite qualification.
+
+Its four native menu suffix collisions are confirmed in both orders: personal sections retain only2 of3 native rows, and the profile frame retains31 of32. These extend preexisting named uniqueness contracts and add no family count. Commitd91f90f3 reserves actual outputs in both consumers; a separate actual Menu case-comparison receipt is still pending. Two TakeNote pause probes fail their resume prerequisite before any business oracle, so no TakeNote defect is confirmed. The private child lacked the unrelated KeyboardArbiterEnsureForLedger resume port;098b36af declares and authenticates that passive prerequisite and prints real debts before assertions. Production lifecycle is unchanged.
+
+The scalar-framing focus-change observer-count failure and live-expansion target-control failure require compatibility review. Privacy passes all8 real source cases and10 new units individually. Reversed password-switches-typed retains no A canary but loses fresh B context despite48 real characters and one POST: exactBbuffer0/engine0/Bcanary0. This is a loss/admission divergence, not evidence of A transmission. Its cause is being fixed before full privacy qualification.
+
+Replay42025538508 at3263811d executes23 selected cases:14 pass and9 fail with identical names reversed. Production compilation passes; neither E2E is selected. Original plain/standard OneShot controls pass while the custom released modifier reaches the actual replayed Backspace as absent; it extends067. Bare ext override ACK1/reload1 loses its record and blocks the next valid write, while ext.demo passes; it extends068 and is corrected bye4098414. Three existing registry-key controls pass, refuting the suspected predefined-HKEY pointer defect on the actual runtime. No registry-pointer patch is applied.
+
+TakeNote's four resumed modes remain unadmitted due to the same child prerequisite; same-epoch passes. The retained agent-pause fixture proves loss of the successor cancellation capability, but explicitly recalling that old callback does not prove native delivery after SetTimer cancellation. Commit360ec610 adds a short RAM generation claim before clearing that capability as protocol hardening; it adds no distinct finding.
+
+### AHK-125: Retired per-character prefix observers retain a callback cycle
+
+Severity: medium. Confidence: high. Evidence: actual AHK destructor and native-scheduler fail-before.
+
+Both cancellation and genuine one-shot completion reach global_retired1 with fake_callbacks0, then keep owner_deleted0 after exact native callback cancellation and release of local references. The independent acyclic control is destroyed once. The owner retains its BoundFunc, which retains that same owner; removing its global never breaks the cycle. The mechanism already exists at9154723b, so it is a new campaign finding rather than a regression introduced by the privacy correction. No RSS, byte-rate or latency claim is made.
+
+Commit06b42cec detaches the reverse edge before cancellation and in the old owner's own finally, even when a successor has been published. The original two lifetime tests remain unchanged. Ten privacy/reentry controls now retain actual callbacks before revocation and explicitly check that returning old frames preserve the successor. Postfix native qualification is pending.
