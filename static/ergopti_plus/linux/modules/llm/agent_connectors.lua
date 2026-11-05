@@ -333,7 +333,7 @@ local function start_desktop(executable, args, on_done)
 	if _stopping then return false end
 	local job = {}
 	_desktop_jobs[job] = true
-	local called, operation, reason = pcall(_deps.run, executable, args, { timeout_ms = OPEN_TIMEOUT_MS }, function(result)
+	local called, operation, reason, cleanup = pcall(_deps.run, executable, args, { timeout_ms = OPEN_TIMEOUT_MS }, function(result)
 		if not _desktop_jobs[job] then return end
 		_desktop_jobs[job] = nil
 		if _stopping then M.cleanup(); return end
@@ -344,7 +344,14 @@ local function start_desktop(executable, args, on_done)
 	end)
 	if not called then error(operation, 0) end
 	if operation == nil then
-		_desktop_jobs[job] = nil
+		if cleanup then
+			-- A refused output watcher can still leave the launcher alive with
+			-- its calendar input; keep it until the exact child has retired.
+			pcall(cleanup.on_settled, function()
+				_desktop_jobs[job] = nil
+				M.cleanup()
+			end)
+		else _desktop_jobs[job] = nil end
 		if not _stopping then on_done(false, string.format("%s could not start: %s", executable, tostring(reason))) end
 		return false
 	end
