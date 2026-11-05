@@ -211,13 +211,14 @@ function M.new(port)
 	local switcher = {}
 	local choices = {}
 	local listing_epoch = 0
+	local refreshing = 0
 	local busy, queued = false, nil
 	local listeners, delivering = {}, false
 
 	local function settle_listeners()
 		if delivering then return end
 		delivering = true
-		while not busy and queued == nil and #listeners > 0 do
+		while not busy and queued == nil and refreshing == 0 and #listeners > 0 do
 			local listener = table.remove(listeners, 1)
 			local ok, err = pcall(listener)
 			if not ok then Logger.error(LOG, "A switch settlement listener failed: %s.", tostring(err)) end
@@ -296,11 +297,11 @@ function M.new(port)
 	function switcher.refresh(on_done)
 		listing_epoch = listing_epoch + 1
 		local epoch = listing_epoch
+		refreshing = refreshing + 1
 		read_listing(function(listing, reason)
 			local changed = false
 			if epoch ~= listing_epoch then
-				if type(on_done) == "function" then on_done(false) end
-				return
+				listing = nil
 			elseif listing then
 				local fresh = choices_of(listing)
 				changed = #fresh ~= #choices
@@ -309,10 +310,15 @@ function M.new(port)
 					if not old or old.id ~= choice.id or old.label ~= choice.label then changed = true end
 				end
 				choices = fresh
-			else
+			elseif epoch == listing_epoch then
 				Logger.warn(LOG, "Keyboard layouts not listed: %s.", tostring(reason))
 			end
-			if type(on_done) == "function" then on_done(changed) end
+			if type(on_done) == "function" then
+				local called, err = pcall(on_done, changed)
+				if not called then Logger.error(LOG, "A layout refresh callback failed: %s.", tostring(err)) end
+			end
+			refreshing = refreshing - 1
+			settle_listeners()
 		end)
 	end
 
@@ -362,11 +368,11 @@ function M.new(port)
 		start(id, on_done)
 	end
 
-	--- Whether no switch is running or queued.
+	--- Whether no switch or layout-listing operation remains in flight.
 	--- @return boolean
-	function switcher.is_settled() return not busy and queued == nil end
+	function switcher.is_settled() return not busy and queued == nil and refreshing == 0 end
 
-	--- Calls listener once no switch is running or queued (at once if none is).
+	--- Calls listener once switches and layout listings have settled.
 	--- @param listener function
 	function switcher.when_settled(listener)
 		if type(listener) ~= "function" then error("a settlement listener is required", 2) end
@@ -407,7 +413,9 @@ function M.native_port()
 			local operation = OwnedProcess.start(program, args, {
 				owner = "input_source_switch:" .. sequence, timeout_ms = timeout_ms,
 			}, function(result) on_done(result) end)
-			return type(operation) == "table" and operation.started == true and operation.error == nil
+			-- Even refused dispatch can own pipes or timers until the operation's
+			-- completion callback acknowledges their physical retirement.
+			return type(operation) == "table"
 		end,
 	}
 end
