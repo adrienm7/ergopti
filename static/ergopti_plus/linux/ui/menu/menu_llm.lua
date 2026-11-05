@@ -60,10 +60,13 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	local called, values, source, revision = pcall(get_many, { path })
 	if not called or type(values) ~= "table" or type(values[path]) ~= "number" or type(source) ~= "table"
 		or type(revision) ~= "number" or revision < 0 or revision % 1 ~= 0 then return nil end
-	local function current()
+	local function owner_current()
 		if not ports_current() then return false end
 		local read, selected = pcall(config, "config.toml")
-		return read and selected == root and ports_current() and revision_current(revision) == true and ports_current()
+		return read and selected == root and ports_current()
+	end
+	local function current()
+		return owner_current() and revision_current(revision) == true and ports_current()
 	end
 	local function refused(page_current, invalid)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
@@ -83,7 +86,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 		if not checked or actual ~= revision or not current() then return refused(page_current) end
 		local noticed = false
 		local receipt = { admit = page_current, acknowledge = function() noticed = true end }
-		local saved, accepted, reason = pcall(classified or retained or set, name, value, source, current, receipt)
+		local saved, accepted, reason = pcall(classified or retained or set, name, value, source, current, receipt, owner_current)
 		if not saved then
 			Logger.error(LOG, "Numeric setting callback raised (error type: %s).", type(accepted))
 			return false
@@ -95,6 +98,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 				or observed.content ~= source.content then return false end
 			return refused(page_current, reason == "invalid")
 		end
+		if not owner_current() or (page_current and page_current() ~= true) then return false end
 		if type(refresh) == "function" then refresh() end
 		return true
 	end
@@ -107,30 +111,82 @@ end
 --- @param refresh function|nil Menu refresh callback.
 --- @param classified boolean|nil Whether the owner exposes a closed refusal reason.
 --- @return boolean committed
-local function commit_preset(owner, name, value, refresh, classified)
-	local setter = classified and owner.set_with_reason or owner.set_with_notice
+--- Captures the configuration owner at menu projection time.
+local function choice_origin()
+	local Paths = require("infra.config_paths")
+	local config = Paths.config
+	if type(config) ~= "function" then return nil end
+	local okay, path = pcall(config, "config.toml")
+	if not okay or type(path) ~= "string" or Paths.config ~= config then return nil end
+	return { paths = Paths, config = config, path = path }
+end
+
+--- Stores an admitted menu choice and reports only an unconfirmed write.
+--- @return boolean committed
+local function commit_choice(owner, name, value, source, prefix, expected, origin, classified)
+	local setter = classified and owner.set_with_reason or owner.set_with_reason_notice
 	if type(setter) ~= "function" then return false end
-	local noticed = false
-	local accepted, reason
-	if classified then accepted, reason = setter(name, value, nil, nil, function() noticed = true end)
-	else accepted, noticed = setter(name, value) end
-	if accepted ~= true then
-		if classified and reason == "invalid" then
-			local okay, notifier = pcall(require, "adapters.notifier")
-			if okay and type(notifier.send) == "function" then
-				pcall(notifier.send, i18n_safe("menu.llm.word_limits_incompatible"), { level = "error" })
-			end
-			return false
-		end
-		if classified and reason ~= "persistence" then return false end
-		Logger.error(LOG, "Preset setting '%s' could not be saved.", name)
-		if noticed == true then return false end
-		local okay, notifier = pcall(require, "adapters.notifier")
-		if okay and type(notifier.send) == "function" then
-			pcall(notifier.send, i18n_safe("dialog.personal_info.save_failed_title"), { level = "error" })
-		end
-		return false
+	local Prefs, Paths = require("infra.llm_preferences"), require("infra.config_paths")
+	local read, config, current_revision = Prefs.get_many, Paths.config, Prefs.is_current_revision
+	local publish = Prefs.set_many_with_notice
+	local module_names = { ["llm.trigger."] = "modules.llm.trigger_settings", ["llm.display."] = "modules.llm.display_settings", ["llm.generation."] = "modules.llm.settings", ["llm.profiles."] = "modules.llm.profile_settings" }
+	local module_name = module_names[prefix]
+	if not module_name then return false end
+	if type(origin) ~= "table" or origin.paths ~= Paths or origin.config ~= config
+		or type(read) ~= "function" or type(config) ~= "function" or type(current_revision) ~= "function"
+		or type(publish) ~= "function" then return false end
+	local root_ok, root = pcall(config, "config.toml")
+	local read_ok, values, observed, revision = pcall(read, { prefix .. name })
+	if not root_ok or type(root) ~= "string" or root ~= origin.path or not read_ok or type(values) ~= "table" or type(observed) ~= "table"
+		or (expected ~= nil and values[prefix .. name] ~= expected)
+		or type(revision) ~= "number" or (source and (source.status ~= observed.status or source.content ~= observed.content)) then return false end
+	local function owner_current()
+		if package.loaded["infra.llm_preferences"] ~= Prefs or package.loaded["infra.config_paths"] ~= Paths
+			or package.loaded[module_name] ~= owner or Prefs.set_many_with_notice ~= publish
+			or Prefs.get_many ~= read or Prefs.is_current_revision ~= current_revision or Paths.config ~= config
+			or (classified and owner.set_with_reason or owner.set_with_reason_notice) ~= setter then return false end
+		local okay, selected = pcall(config, "config.toml")
+		if not okay or selected ~= root then return false end
+		return true
 	end
+	local function current()
+		if not owner_current() then return false end
+		local checked, unchanged = pcall(current_revision, revision)
+		return checked and unchanged == true and package.loaded["infra.llm_preferences"] == Prefs
+			and package.loaded[module_name] == owner and Prefs.set_many_with_notice == publish
+			and package.loaded["infra.config_paths"] == Paths and Prefs.get_many == read
+			and Prefs.is_current_revision == current_revision and Paths.config == config
+			and (classified and owner.set_with_reason or owner.set_with_reason_notice) == setter
+	end
+	if not current() then return false end
+	local committed, reason, noticed
+	if classified then
+		local reported = false
+		committed, reason = setter(name, value, observed, current, { admit = current, acknowledge = function() reported = true end }, owner_current)
+		noticed = reported
+	else
+		committed, reason, noticed = setter(name, value, observed, current, owner_current)
+	end
+	if committed == true then return owner_current() end
+	if (reason == "unconfirmed" or reason == "persistence" or reason == "invalid") and noticed ~= true then
+		if not current() then return false end
+		local reread, _, after = pcall(read, { prefix .. name })
+		if not reread or type(after) ~= "table" or after.status ~= observed.status or after.content ~= observed.content
+			or not current() then return false end
+		local okay, notifier = pcall(require, "adapters.notifier")
+		if okay and type(notifier.send) == "function" and current() then
+			local send = notifier.send
+			local message = i18n_safe(reason == "invalid" and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
+			if current() and package.loaded["adapters.notifier"] == notifier and notifier.send == send then
+				pcall(send, message, { level = "error" })
+			end
+		end
+	end
+	return false
+end
+
+local function commit_preset(owner, name, value, refresh, classified, prefix, origin)
+	if not commit_choice(owner, name, value, nil, prefix, nil, origin, classified) then return false end
 	if type(refresh) == "function" then refresh() end
 	return true
 end
@@ -166,6 +222,7 @@ local function _build_llm(ctx)
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
 	-- declared group and this driver supplies only the runtime child contents.
 	group_builders["llm_trigger"] = function()
+		local origin = choice_origin()
 		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
@@ -183,7 +240,7 @@ local function _build_llm(ctx)
 			local delay_choices = {}
 			local function choose(value)
 				return function()
-					return commit_preset(TriggerSettings, name, value, ctx.on_menu_changed)
+					return commit_preset(TriggerSettings, name, value, ctx.on_menu_changed, false, "llm.trigger.", origin)
 				end
 			end
 			for _, value in ipairs(TriggerSettings.presets(name)) do
@@ -278,7 +335,7 @@ local function _build_llm(ctx)
 				or decision.admitted ~= true or type(expected.source) ~= "table" or type(current.source) ~= "table"
 				or expected.source.status ~= current.source.status
 				or expected.source.content ~= current.source.content then return false end
-			if TriggerSettings.set(name, decision.value, expected.source) ~= true then return false end
+			if not commit_choice(TriggerSettings, name, decision.value, expected.source, "llm.trigger.", nil, origin) then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
@@ -288,7 +345,8 @@ local function _build_llm(ctx)
 		end
 		local function toggle(name)
 			if not ready() then return false end
-			if TriggerSettings.toggle(name) ~= true then return false end
+			local current = TriggerSettings.get(name)
+			if type(current) ~= "boolean" or not commit_choice(TriggerSettings, name, not current, nil, "llm.trigger.", current, origin) then return false end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
@@ -300,8 +358,9 @@ local function _build_llm(ctx)
 				[require("config_keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("config_keys").LEAF.AFTER_HOTSTRING) end,
 				[require("config_keys").COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
 					local leaf = require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP
-					if not ready() or TriggerSettings.get(leaf) == value then return false end
-					if TriggerSettings.set(leaf, value) ~= true then return false end
+					local current = TriggerSettings.get(leaf)
+					if not ready() or current == value then return false end
+					if not commit_choice(TriggerSettings, leaf, value, nil, "llm.trigger.", current, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -592,6 +651,7 @@ local function _build_llm(ctx)
 	end
 
 	group_builders["llm_display"] = function()
+		local origin = choice_origin()
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
 		local DisplayPolicy = require("llm.display_policy")
@@ -662,13 +722,14 @@ local function _build_llm(ctx)
 					local current = indentation_snapshot()
 					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set(require("config_keys").LEAF.PRED_INDENT, decision.value, current.source) ~= true then return false end
+					if not commit_choice(DisplaySettings, require("config_keys").LEAF.PRED_INDENT, decision.value, current.source, "llm.display.", nil, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 				[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
 					if not show_all_ready() then return false end
-					if DisplaySettings.set(require("config_keys").LEAF.STREAMING_MULTI, not DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) ~= true then return false end
+					local current = DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)
+					if type(current) ~= "boolean" or not commit_choice(DisplaySettings, require("config_keys").LEAF.STREAMING_MULTI, not current, nil, "llm.display.", current, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -676,7 +737,7 @@ local function _build_llm(ctx)
 					local current = streaming_snapshot()
 					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set("streaming", decision.value, current.source) ~= true then return false end
+					if not commit_choice(DisplaySettings, "streaming", decision.value, current.source, "llm.display.", nil, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -684,7 +745,7 @@ local function _build_llm(ctx)
 					local current = info_bar_snapshot()
 					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set(require("config_keys").LEAF.SHOW_INFO_BAR, decision.value, current.source) ~= true then return false end
+					if not commit_choice(DisplaySettings, require("config_keys").LEAF.SHOW_INFO_BAR, decision.value, current.source, "llm.display.", nil, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -874,7 +935,7 @@ local function _build_llm(ctx)
 	--- The suggestion count row: a generation parameter, the first one on every
 	--- driver, with one choice per count from 1 to 10.
 	--- @return table|nil row Nil, with the failure logged, when the profile settings cannot load.
-	local function suggestion_count_row()
+	local function suggestion_count_row(generation_origin)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then
 			Logger.error(LOG, "LLM profile settings unavailable — the suggestion count row cannot be built: %s.",
@@ -891,7 +952,7 @@ local function _build_llm(ctx)
 				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
-					return commit_preset(ProfileSettings, require("config_keys").LEAF.NUM_PREDICTIONS, value, ctx.on_menu_changed)
+					return commit_preset(ProfileSettings, require("config_keys").LEAF.NUM_PREDICTIONS, value, ctx.on_menu_changed, false, "llm.profiles.", generation_origin)
 				end,
 			}
 		end
@@ -907,6 +968,7 @@ local function _build_llm(ctx)
 	-- driver read them from the canonical defaults with no way to change either —
 	-- constants wearing the shape of settings.
 	providers["llm_generation"] = function()
+		local generation_origin = choice_origin()
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then
 			Logger.error(LOG, "LLM profile settings unavailable — generation controls cannot read their current count: %s.",
@@ -929,7 +991,7 @@ local function _build_llm(ctx)
 					label = tostring(value),
 					checked = current == value,
 					action = function()
-						return commit_preset(Settings, setting.name, value, ctx.on_menu_changed, true)
+						return commit_preset(Settings, setting.name, value, ctx.on_menu_changed, true, "llm.generation.", generation_origin)
 					end,
 				}
 			end
@@ -969,7 +1031,7 @@ local function _build_llm(ctx)
 			}
 		end
 		local rows = {}
-		rows[#rows + 1] = suggestion_count_row()
+		rows[#rows + 1] = suggestion_count_row(generation_origin)
 		for _, setting in ipairs({
 			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
 			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },

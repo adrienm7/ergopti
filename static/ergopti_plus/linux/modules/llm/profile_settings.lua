@@ -311,14 +311,15 @@ function M.get(name)
 	return shipped
 end
 
-local function persist_one(name, value, admission, on_notice)
+local function persist_one(name, value, admission, on_notice, expected_source, publication_guard)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then return false end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then return false end
+	local values_owner, previous_value = _values, _values[name]
 	local persisted
 	if on_notice then
-		persisted = Storage.set_many_with_notice({ [DEFINITIONS[name].path] = value }, nil, admission, on_notice)
+		persisted = Storage.set_many_with_notice({ [DEFINITIONS[name].path] = value }, expected_source, admission, on_notice)
 	elseif admission ~= nil then
 		persisted = type(Storage.set_many) == "function"
 			and Storage.set_many({ [DEFINITIONS[name].path] = value }, nil, admission)
@@ -326,7 +327,11 @@ local function persist_one(name, value, admission, on_notice)
 		persisted = Storage.set(DEFINITIONS[name].path, value)
 	end
 	if persisted ~= true then return false end
-	_values[name] = value
+	local may_publish = not publication_guard or publication_guard()
+	if _values == values_owner and _values[name] == previous_value then
+		if may_publish then _values[name] = value
+		else _values[name] = nil end
+	end
 	return true
 end
 
@@ -338,7 +343,7 @@ end
 --- @param current_model string|nil
 --- @param admission function|nil Retained menu admission checked by the writer.
 --- @return boolean
-local function set(name, value, current_model, admission, on_notice)
+local function set(name, value, current_model, admission, on_notice, expected_source, publication_guard)
 	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
 	if not valid(name, value) or default_for(name) == nil then
 		Logger.error(LOG, "Refused invalid profile setting %s=%s.", tostring(name), tostring(value))
@@ -358,7 +363,7 @@ local function set(name, value, current_model, admission, on_notice)
 		_values.active = value
 		_values.auto_profile_for_model = false
 	else
-		if not persist_one(name, value, admission, on_notice) then
+		if not persist_one(name, value, admission, on_notice, expected_source, publication_guard) then
 			Logger.error(LOG, "Profile setting '%s' could not be persisted; live state is unchanged.", name)
 			return false
 		end
@@ -379,6 +384,19 @@ function M.set_with_notice(name, value)
 	local noticed = false
 	local committed = set(name, value, nil, nil, function() noticed = true end)
 	return committed, noticed
+end
+
+--- Stores an admitted preset with its exact source and notification receipt.
+--- @return boolean committed
+--- @return string|nil reason
+--- @return boolean noticed
+function M.set_with_reason_notice(name, value, expected_source, admission, publication_guard)
+	if name ~= LEAF.NUM_PREDICTIONS or not valid(name, value) then return false, "invalid", false end
+	local noticed = false
+	local receipt = { admit = admission, acknowledge = function() noticed = true end }
+	local committed = set(name, value, nil, admission, receipt, expected_source, publication_guard)
+	if committed then return true, nil, noticed end
+	return false, "unconfirmed", noticed
 end
 
 --- Returns the profile that should drive the next request.
