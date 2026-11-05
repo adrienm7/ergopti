@@ -271,7 +271,7 @@ local utf8_length = require("compat.utf8").len
 --- @param value any
 --- @return boolean
 local function is_email(value)
-	return type(value) == "string" and #value <= 254
+	return type(value) == "string" and #value <= 254 and utf8_length(value) ~= nil
 		and value:match("^[^@%s,;<>\"]+@[^@%s,;<>\"]+%.[^@%s,;<>\"]+$") ~= nil
 end
 
