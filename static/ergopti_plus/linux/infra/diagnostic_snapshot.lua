@@ -123,6 +123,7 @@ function M.system_facts(env)
 	local meminfo = env.read("/proc/meminfo")
 	local desktop = DisplayServer.desktop()
 	local locale = os.getenv("LC_ALL")
+	if not locale or locale == "" then locale = os.getenv("LC_MESSAGES") end
 	if not locale or locale == "" then locale = os.getenv("LANG") end
 	return {
 		os_name        = os_release_value(os_release, "PRETTY_NAME") or os_release_value(os_release, "NAME"),
