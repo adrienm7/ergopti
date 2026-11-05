@@ -45,6 +45,9 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
     public readonly TcpListener Listener = new TcpListener(IPAddress.Loopback, 0);
     public string Mode = "static";
     public string[] Responses = new string[0];
+    // Opt-in native ownership cutpoint; ordinary response modes remain immediate.
+    public int HoldResponseAt;
+    public volatile bool HeldResponseObserved, ReleaseHeldResponse;
     public string Package = "NTLM";
     public bool AdvertiseNegotiate;
     // True: the service plays an origin server (401 / Authorization) instead of a proxy.
@@ -223,7 +226,15 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
                     case "origin401":
                         {
                             string response;
-                            lock (gate) { response = Responses[cursor++ % Responses.Length]; }
+                            int ordinal;
+                            lock (gate) { ordinal = ++cursor; response = Responses[(ordinal - 1) % Responses.Length]; }
+                            if (HoldResponseAt == ordinal)
+                            {
+                                HeldResponseObserved = true;
+                                DateTime until = DateTime.UtcNow.AddSeconds(30);
+                                while (!stopping && !ReleaseHeldResponse && DateTime.UtcNow < until) Thread.Sleep(5);
+                                if (stopping || !ReleaseHeldResponse) return;
+                            }
                             Write(stream, response);
                             if (response.IndexOf("Connection: close") >= 0) return;
                             break;

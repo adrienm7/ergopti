@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Directory,
     [Parameter(Mandatory=$true)][string]$ServicesPath,
     [Parameter(Mandatory=$true)][string]$Nonce,
-    [Parameter(Mandatory=$true)][ValidateSet('positive','cancel','http400','http200')][string]$Case
+    [Parameter(Mandatory=$true)][ValidateSet('positive','cancel','http400','http200','alias-complete','alias-cancel')][string]$Case
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -45,6 +45,7 @@ try {
     $Server.Responses = if ($Case -ceq 'http200') { @($GoodResponse) }
         elseif ($Case -ceq 'http400') { @($BadResponse) }
         else { @($BadResponse, $GoodResponse) }
+    if ($Case -ceq 'alias-complete' -or $Case -ceq 'alias-cancel') { $Server.HoldResponseAt = 2 }
     # Reserve the native listener, but do not start its accept thread until
     # the genuine Menu handler has returned and published its original id.
     # TcpListener.Start is idempotent; Server.Start starts the acceptor later.
@@ -57,7 +58,13 @@ try {
     }
     if (-not $Stopped) {
         $Server.Start()
+        $WaitingPublished = $false
         while (-not ($Stopped = Test-Control 'stop')) {
+            if ($Server.HeldResponseObserved -and -not $WaitingPublished) {
+                Write-PrivateJson 'retry_waiting.json' @{nonce=$Nonce; case=$Case; pid=$PID}
+                $WaitingPublished = $true
+            }
+            if ($Case -ceq 'alias-complete' -and (Test-Control 'finish-retry')) { $Server.ReleaseHeldResponse = $true }
             if ([DateTime]::UtcNow -ge $Until) { throw 'Stop deadline exceeded.' }
             Start-Sleep -Milliseconds 10
         }
