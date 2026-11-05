@@ -56,8 +56,72 @@ install -m 644 "$BUILD_DIR/AppDir/usr/lib/ergopti/network-runtime-env.sh" "$STAG
 # rename avoids truncating a different user file hardlinked to that output.
 tar -czf "$STAGE/$ASSET" -C "$STAGE" linux _shared bin install.sh
 (cd "$STAGE" && sha256sum -- "$ASSET" > "$ASSET.sha256" && sha256sum --check -- "$ASSET.sha256")
-mv -T -- "$STAGE/$ASSET" "$BUILD_DIR/$ASSET"
-mv -T -- "$STAGE/$ASSET.sha256" "$BUILD_DIR/$ASSET.sha256"
+# Retain exact prior inodes so a failed second rename can restore both outputs
+# without changing their contents, permissions or other hard links.
+BACKUP="$(mktemp -d "$BUILD_DIR/.bundle-rollback.XXXXXX")"
+retain_backup=false
+cleanup_bundle() {
+	local status=$?
+	trap - EXIT
+	if "$retain_backup"; then
+		echo "[ERR] Bundle recovery files retained at $BACKUP" >&2
+	else
+		rm -rf -- "$BACKUP" || status=1
+	fi
+	rm -rf -- "$STAGE" || status=1
+	exit "$status"
+}
+trap cleanup_bundle EXIT
+for part in archive checksum; do
+	if [ "$part" = archive ]; then name="$ASSET"; else name="$ASSET.sha256"; fi
+	ln -- "$STAGE/$name" "$BACKUP/new-$part"
+	if [ -e "$BUILD_DIR/$name" ]; then ln -- "$BUILD_DIR/$name" "$BACKUP/old-$part"; fi
+done
+# Hash and stat observations are captured before publication: the retained
+# hard link alone shares writes with the published file and proves no bytes.
+# These observations do not serialize an unrelated concurrent writer.
+bundle_output_evidence() {
+	local file="$1" before after digest size
+	[ -f "$file" ] && [ ! -L "$file" ] || return 1
+	before="$(stat -c '%d:%i:%f:%u:%g:%s:%y' -- "$file")" || return 1
+	size="$(stat -c '%s' -- "$file")" || return 1
+	# Bound the read to the observed size plus one byte, and never wait for a
+	# substituted FIFO or follow a substituted final symlink during open.
+	[[ "$size" =~ ^[0-9]{1,18}$ ]] || return 1
+	digest="$(set -o pipefail; dd if="$file" bs=65536 count="$((10#$size + 1))" iflag=nonblock,nofollow,count_bytes status=none | sha256sum)" || return 1
+	after="$(stat -c '%d:%i:%f:%u:%g:%s:%y' -- "$file")" || return 1
+	[ "$before" = "$after" ] && [ -f "$file" ] && [ ! -L "$file" ] || return 1
+	printf '%s\n%s\n' "$after" "$digest"
+}
+new_archive_evidence="$(bundle_output_evidence "$BACKUP/new-archive")"
+new_checksum_evidence="$(bundle_output_evidence "$BACKUP/new-checksum")"
+rollback_bundle_part() {
+	local part="$1" target="$BUILD_DIR/$2" observed expected
+	if [ "$part" = archive ]; then expected="$new_archive_evidence"; else expected="$new_checksum_evidence"; fi
+	# Only undo our own rename. An intervening writer keeps its file and the
+	# retained backup is reported for manual recovery.
+	if [ ! -L "$target" ] && [ "$target" -ef "$BACKUP/new-$part" ]; then
+		observed="$(bundle_output_evidence "$target")" || return 1
+		[ "$observed" = "$expected" ] || return 1
+		if [ -e "$BACKUP/old-$part" ]; then
+			mv -T -- "$BACKUP/old-$part" "$target"
+		else
+			rm -f -- "$target"
+		fi
+	elif [ ! -L "$target" ] && [ -e "$BACKUP/old-$part" ] && [ "$target" -ef "$BACKUP/old-$part" ]; then
+		return 0
+	elif [ ! -e "$BACKUP/old-$part" ] && [ ! -e "$target" ] && [ ! -L "$target" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+if ! mv -T -- "$STAGE/$ASSET" "$BUILD_DIR/$ASSET" \
+	|| ! mv -T -- "$STAGE/$ASSET.sha256" "$BUILD_DIR/$ASSET.sha256"; then
+	rollback_bundle_part archive "$ASSET" || retain_backup=true
+	rollback_bundle_part checksum "$ASSET.sha256" || retain_backup=true
+	exit 1
+fi
 echo "Bundle contents:"
 tar -tzf "$BUILD_DIR/$ASSET" | sed -n '1,20p'
 echo "... $(tar -tzf "$BUILD_DIR/$ASSET" | wc -l) entries"
