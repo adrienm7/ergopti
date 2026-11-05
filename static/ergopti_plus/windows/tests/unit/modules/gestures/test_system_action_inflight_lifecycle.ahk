@@ -17,7 +17,7 @@ _SAIL_Source() {
  AssertTrue(InStr(Prefix, 'global GESTURE_SYS_SHELL_CLASSES := Map(') > 0,
   "The private quit action must use the authentic protected-class list")
  Source .= Prefix . "`n"
- for Symbol in ["GestureSysToggleDarkMode", "GestureSysMicMuteToggle", "GestureSysQuitRefusal", "GestureSysIsSharedHost", "GestureSysQuitFrontmostApp"] {
+ for Symbol in ["GestureSysToggleDarkMode", "GestureSysMicMuteToggle", "GestureSysQuitRefusal", "GestureSysIsSharedHost", "GestureSysQuitFrontmostApp", "GestureSysEjectAllDisks"] {
   Body := _DriverExtractFunctionBody(&Text, Symbol)
   AssertTrue(Body != "", "Every in-flight action must retain its actual production body: " . Symbol)
   Source .= Body . "`n"
@@ -68,7 +68,7 @@ _SAIL_Case(Mode) {
   throw Primary
  AssertTrue(Retired, "The precise native process tree must retire before private cleanup")
 }
-for _SAIL_Action in ["theme", "quit", "mic"] {
+for _SAIL_Action in ["theme", "quit", "mic", "eject"] {
  Test("System action in-flight lifecycle: " . _SAIL_Action . " retires its pre-pause read (system-action-inflight-lifecycle)", _SAIL_Case.Bind(_SAIL_Action . "-pulse"))
  Test("System action in-flight lifecycle: " . _SAIL_Action . " preserves its same-epoch effect (system-action-inflight-lifecycle)", _SAIL_Case.Bind(_SAIL_Action . "-same"))
 }

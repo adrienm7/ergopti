@@ -1,5 +1,5 @@
 {
-	"expected_count": 18,
+	"expected_count": 20,
 	"native_http_client_e2e": false,
 	"native_hotstring_e2e": false,
 	"native_proxy_relay_owner_e2e": false,
@@ -31,6 +31,10 @@
 		{
 			"contains": "hotstrings_config_window: refused numeric drafts remain retryable",
 			"expected_count": 1
+		},
+		{
+			"contains": "System action in-flight lifecycle: eject",
+			"expected_count": 2
 		}
 	]
 }
