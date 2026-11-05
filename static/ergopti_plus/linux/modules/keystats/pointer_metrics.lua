@@ -80,7 +80,16 @@ function M.new()
 		return copy
 	end
 
-	function tracker.commit_fractions(value) fractions = value end
+	--- Discard empty entries without losing a remainder for a delayed old day.
+	function tracker.commit_fractions(value)
+		for date, apps in pairs(value) do
+			for app, remainder in pairs(apps) do
+				if remainder == 0 then apps[app] = nil end
+			end
+			if next(apps) == nil then value[date] = nil end
+		end
+		fractions = value
+	end
 
 	--- Forgets uncommitted movement without admitting a dropped packet.
 	function tracker.discard_frames()
