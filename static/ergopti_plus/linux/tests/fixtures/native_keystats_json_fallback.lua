@@ -40,6 +40,11 @@ require("tests.support.metrics_preferences_fixture").with(function()
 	assert(Keystats.set_enabled(true)); Keystats.reset_session()
 	local app = "fixture.json.fallback"
 	Keystats.on_app_focus(app, 1000); Keystats.on_keydown("a", 1100, app)
+	local range = assert(Keystats.get_range_payload(nil, nil, nil))
+	local dashboard = assert(Keystats.get_dashboard_payload())
+	assert(range.incomplete == true and dashboard.metrics_manifest_incomplete == true
+		and dashboard._prefetch_data.incomplete == true, "an unavailable SQLite history must be marked incomplete")
+	assert(range.today[app].c.a.c == 1, "the live character must remain visible despite incomplete history")
 	assert(Keystats.flush() == false and Keystats._pending_buffer_count_for_test() == 1)
 	local path = logs .. "/keystrokes_" .. os.date("%Y-%m-%d") .. ".json"
 	local before = read(path)

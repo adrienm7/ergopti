@@ -1467,7 +1467,8 @@ end
 --- @return table manifest Persisted manifest, partial when a query failed.
 --- @return boolean complete Whether every native query was accepted.
 local function persisted_manifest()
-	if not (sqlite_available() and SqliteReader) then return {}, true end
+	-- An unavailable store cannot certify that no historical rows exist.
+	if not (sqlite_available() and SqliteReader) then return {}, false end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
 		return _manifest_cache.manifest, true
@@ -1628,7 +1629,8 @@ function M.get_range_payload(start_date, end_date, apps)
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local clock = observe_calendar()
 	local bounds = SqliteReader.split_bounds(start_date, end_date, clock.date)
-	local payload, complete = { historical = empty_ngrams(), today = {} }, true
+	-- RAM remains useful, but unavailable SQLite history is not a complete range.
+	local payload, complete = { historical = empty_ngrams(), today = {} }, false
 	if sqlite_available() then
 		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
