@@ -60,6 +60,7 @@ local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local _state = nil
 local _dispatch_parent = GESTURE_ACTION_PARENT
+local _binding_changes = {}
 local _action_scope_lifecycles = {}
 local _lookup_operations = {}
 
@@ -553,11 +554,11 @@ end
 -- registry below stays a pure name -> behaviour mapping. Re-export its public
 -- surface on M so existing callers (and the registry) keep their call sites.
 M.force_cleanup           = Click.force_cleanup
-M.toggle_right_click      = function()
-	return Click.toggle_right_click(current_action_parent())
+M.toggle_right_click      = function(binding)
+	return Click.toggle_right_click(current_action_parent(), binding)
 end
-M.toggle_left_click       = function()
-	return Click.toggle_left_click(current_action_parent())
+M.toggle_left_click       = function(binding)
+	return Click.toggle_left_click(current_action_parent(), binding)
 end
 M.is_right_click_held     = Click.is_right_click_held
 
@@ -3047,6 +3048,27 @@ local function dispatch_single(name, binding, s, parent, control_plane, acted_fr
 	return callback_ok == true and admission_committed == true
 end
 
+--- Reserves one gesture slot across a durable assignment change.
+--- @return table|nil receipt
+function M.begin_click_binding_change(binding, previous)
+	if type(binding) ~= "string" or _binding_changes[binding] then return nil end
+	local receipt = { binding = binding, click = Click.capture_binding(GESTURE_ACTION_PARENT, binding, previous) }
+	_binding_changes[binding] = receipt
+	return receipt
+end
+
+--- Opens the slot after publication and retires only its captured click.
+--- @return boolean settled
+function M.finish_click_binding_change(receipt, committed)
+	if type(receipt) ~= "table" or _binding_changes[receipt.binding] ~= receipt then return false end
+	if committed and receipt.click and Click.retire_binding(receipt.click) ~= true then
+		_binding_changes[receipt.binding] = nil
+		return false
+	end
+	_binding_changes[receipt.binding] = nil
+	return true
+end
+
 --- Dispatches a registered single-shot action. An action the catalogue
 --- declares `confirm = true` only asks here; it runs from the answer, and only
 --- while its parent is still admitted.
@@ -3056,6 +3078,7 @@ end
 --- confirmation asked for); false when the action is unknown here, so the
 --- caller can try its own fallback instead of assuming the action ran.
 function M.execute_single(name, binding)
+	if type(binding) == "string" and _binding_changes[binding] then return false end
 	local parent = parent_for_binding(binding)
 	local control_plane = is_script_control_plane_action(name, binding)
 	if not control_plane and not aux_admission_open(parent) then return false end
