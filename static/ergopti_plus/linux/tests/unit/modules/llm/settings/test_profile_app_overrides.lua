@@ -119,6 +119,31 @@ helpers.describe("LLM profile settings: per-application overrides", function()
 		restore()
 	end)
 
+	helpers.it("app-profile: preserves a wrong-typed saved override", function()
+		local Sandbox = require("test.config_unused_keys_contract").sandbox
+		for _, source in ipairs({
+			'[llm]\napp_profile_overrides = 42\n',
+			'[llm]\napp_profile_overrides = false\n',
+			'[llm]\napp_profile_overrides = []\n',
+			'llm = false\n',
+		}) do
+			Sandbox.with_config(source, function(path)
+				local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings" }
+				local saved = {}
+				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+				local ok, err = pcall(function()
+					package.loaded["infra.config_paths"] = { config = function() return path end }
+					local settings = require("modules.llm.profile_settings")
+					helpers.assert_nil(settings.resolve_for_app("firefox"))
+					helpers.assert_eq(settings.set_app_override("firefox", "advanced"), false)
+					helpers.assert_eq(Sandbox.read_bytes(path), source)
+				end)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(err, 0) end
+			end)
+		end
+	end)
+
 	helpers.it("app-profile: refuses a stale cached map after an external edit", function()
 		local Sandbox = require("test.config_unused_keys_contract").sandbox
 		local first = Overrides.encode({ firefox = "basic" })

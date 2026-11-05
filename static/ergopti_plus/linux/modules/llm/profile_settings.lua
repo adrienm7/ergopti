@@ -251,7 +251,21 @@ local function load_app_overrides()
 	local Storage = require("infra.llm_preferences")
 	local values, source = Storage.get_many({ APP_OVERRIDES_KEY })
 	assert(type(source) == "table", "application overrides require an exact source snapshot")
-	local overrides, reason = AppOverrides.decode(values[APP_OVERRIDES_KEY] or "")
+	-- get_many omits a leaf rejected by manifest validation. Inspect the same
+	-- captured document so a wrong-typed value is not mistaken for absence.
+	local document = Codec.decode(source.content or "")
+	local llm
+	if type(document) == "table" then llm = document.llm end
+	local invalid_parent = llm ~= nil and type(llm) ~= "table"
+	local raw
+	if type(llm) == "table" then raw = llm.app_profile_overrides end
+	local invalid_type = invalid_parent or (raw ~= nil and type(raw) ~= "string")
+	local overrides, reason
+	if invalid_type then
+		reason = "invalid stored type"
+	else
+		overrides, reason = AppOverrides.decode(values[APP_OVERRIDES_KEY] or "")
+	end
 	_app_overrides_source = source
 	if not overrides then
 		ConfigOutdated.report(APP_OVERRIDES_KEY, ConfigOutdated.REFUSED, Logger)
