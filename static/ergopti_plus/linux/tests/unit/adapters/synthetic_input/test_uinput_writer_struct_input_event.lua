@@ -727,6 +727,24 @@ helpers.describe("uinput_writer: exact output custody", function()
 		end)
 	end
 
+	helpers.it("blocks keys after a relative report loses its SYN", function()
+		local writer = helpers.load_module("adapters.uinput_writer")
+		local recorded = recorder()
+		local calls = 0
+		recorded.backend.write = function() calls = calls + 1; return calls == 1 end
+		recorded.backend.close = function() recorded.closed = recorded.closed + 1; return true end
+		writer._set_backend(recorded.backend)
+		helpers.assert_eq(writer.open(), true)
+		local capability = writer.capture_output()
+		helpers.assert_eq(writer.emit_relative(0, 4), false)
+		helpers.assert_eq(calls, 2, "the relative event was written before the refused SYN")
+		helpers.assert_eq(writer.has_output_debt(), true)
+		helpers.assert_eq(writer.emit_owned(capability, 30, 1), false)
+		helpers.assert_eq(calls, 2, "a later key must not publish the uncertain relative event")
+		helpers.assert_eq(writer.close_owned(capability), true)
+		helpers.assert_eq(writer.has_output_debt(), false)
+	end)
+
 	helpers.it("retains SYN debt and does not pretend that KEY alone reached the application", function()
 		local writer = helpers.load_module("adapters.uinput_writer")
 		local recorded = recorder()
