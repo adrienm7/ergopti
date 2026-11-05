@@ -215,6 +215,21 @@ helpers.describe("agent actions stay inside the closed schema", function()
 		helpers.assert_eq(Agent.mailto(action), "mailto:?body=first%0D%0Asecond")
 	end)
 
+	helpers.it("rejects a recipient object instead of silently dropping its address", function()
+		local config = read_json("modules/llm/agent.json")
+		local action = Agent.validate_action(config, { type = "mail", body = "Hello",
+			to = { address = "paul@example.com" } }, { tools = {} })
+		helpers.assert_nil(action, "recipients must be a list, not an object that becomes empty")
+		local sparse = Agent.validate_action(config, { type = "mail", body = "Hello",
+			to = { [1] = "paul@example.com", [3] = "anne@example.com" } }, { tools = {} })
+		helpers.assert_nil(sparse, "a recipient after a hole must not disappear")
+		local parsed, rejected = Agent.parse_actions(config,
+			'ACTIONS: [{"type":"mail","body":"Hello","to":{"address":"paul@example.com"}}]',
+			json.decode, { tools = {}, is_null = json.is_null })
+		helpers.assert_eq(#parsed, 0)
+		helpers.assert_eq(#rejected, 1)
+	end)
+
 	helpers.it("refuses a type, a field or a shortcut the schema does not name", function()
 		local config = read_json("modules/llm/agent.json")
 		local opts = { tools = { "Mode focus" }, is_null = json.is_null }
