@@ -20,7 +20,7 @@ local function with_browser(body)
 		get_current_model = function() return "qwen3.5:0.8b" end,
 		refresh_models = function() seen.refreshes = seen.refreshes + 1; return {} end,
 		set_model = function(model) seen.selected[#seen.selected + 1] = model; return true end,
-		download_model = function(model, label) seen.downloads[#seen.downloads + 1] = { model, label }; return true end,
+		download_model = function(model, label) seen.downloads[#seen.downloads + 1] = { model, label }; return not seen.refuse_download end,
 	}
 	local fixture = Document.new("model_browser", bridge, { llm = llm })
 	local ok, failure = xpcall(function() body(fixture, bridge, seen) end, debug.traceback)
@@ -31,6 +31,30 @@ local function with_browser(body)
 end
 
 helpers.describe("model browser inventory document", function()
+	for _, refused in ipairs({ true, false }) do
+		helpers.it("(model-selector-download-receipt) reports request admission " .. tostring(not refused), function()
+			with_browser(function(f, _, seen)
+				f.handshake()
+				seen.refuse_download = refused
+				local logger, messages = require("logger.shim"), {}
+				local info, warn = logger.info, logger.warn
+				logger.info = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+				logger.warn = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
+				local ok, result = pcall(f.send, { action = "add_model", backend = "ollama", name = "example:7b" })
+				logger.info, logger.warn = info, warn
+				assert(ok, result)
+				helpers.assert_eq(result.downloading, not refused)
+				local expected = refused and "could not be started" or "download requested"
+				local found = false
+				for _, message in ipairs(messages) do
+					helpers.assert_true(not message:find("Model added", 1, true))
+					if message:find(expected, 1, true) then found = true end
+				end
+				helpers.assert_true(found)
+			end)
+		end)
+	end
+
 	helpers.it("(model-selector-api-owner) passes the actual page lifetime to API callbacks", function()
 		local previous, current = package.loaded["ui.menu.llm_backend_rows"], nil
 		package.loaded["ui.menu.llm_backend_rows"] = {

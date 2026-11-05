@@ -374,7 +374,11 @@ function M.on_message(payload, state, context)
 			and frame.llm_ports.download_model(payload.name, payload.name, function(succeeded)
 				if succeeded then changed() end
 			end) == true
-		Logger.info(LOG, "Model added via the selector page: %s.", payload.name)
+		if downloading then
+			Logger.info(LOG, "Model download requested via the selector page: %s.", payload.name)
+		else
+			Logger.warn(LOG, "Model download could not be started via the selector page: %s.", payload.name)
+		end
 		return { downloading = downloading }
 	end
 	if type(payload.name) ~= "string" then return nil end
