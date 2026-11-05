@@ -223,14 +223,15 @@ _GestureSysPowerOffDisplays(Sys, Transition) {
 ; Switches apps and the system between the light and the dark theme, then
 ; tells the open windows to re-read it.
 GestureSysToggleDarkMode(Sys := 0) {
-	global GESTURE_SYS_PERSONALIZE_KEY, GESTURE_SYS_COLOR_SETTING_AREA
+	global GESTURE_SYS_PERSONALIZE_KEY, GESTURE_SYS_COLOR_SETTING_AREA, _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	try {
 		Light := Sys.ReadDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme")
 		; Absent is Windows' own default, the light theme.
 		NewLight := (Light = "" || Light != 0) ? 0 : 1
-		if A_IsSuspended {
-			LoggerInfo("gestures", "toggle_dark_mode was cancelled before its theme change: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "toggle_dark_mode was cancelled before its theme change: suspended or original lifecycle transition retired.")
 			return false
 		}
 		Sys.WriteDword(GESTURE_SYS_PERSONALIZE_KEY, "AppsUseLightTheme", NewLight)
@@ -245,11 +246,13 @@ GestureSysToggleDarkMode(Sys := 0) {
 
 ; Mutes the default microphone, or unmutes it.
 GestureSysMicMuteToggle(Sys := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	try {
 		Muted := !Sys.CaptureMuted()
-		if A_IsSuspended {
-			LoggerInfo("gestures", "mic_mute_toggle was cancelled before its endpoint change: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "mic_mute_toggle was cancelled before its endpoint change: suspended or original lifecycle transition retired.")
 			return false
 		}
 		Sys.SetCaptureMuted(Muted)
@@ -365,6 +368,8 @@ GestureSysIsSharedHost(Active, ShellPid) {
 ; their close buttons do, so it can still ask to save. In a shared host
 ; process only the active window is the application's, so only it is closed.
 GestureSysQuitFrontmostApp(Sys := 0) {
+	global _LifecycleLatestTransition
+	Transition := _LifecycleLatestTransition
 	Sys := _GestureSys(Sys)
 	Active := Sys.ActiveWindow()
 	Refusal := GestureSysQuitRefusal(Active, Sys.OwnPid())
@@ -373,8 +378,8 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 		return
 	}
 	if GestureSysIsSharedHost(Active, Sys.ShellPid()) {
-		if A_IsSuspended {
-			LoggerInfo("gestures", "quit_frontmost_app was cancelled before its shared window close: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before its shared window close: suspended or original lifecycle transition retired.")
 			return false
 		}
 		if Sys.PostClose(Active.Hwnd)
@@ -385,8 +390,8 @@ GestureSysQuitFrontmostApp(Sys := 0) {
 	}
 	Closed := 0
 	for Hwnd in Sys.WindowsOfProcess(Active.Pid) {
-		if A_IsSuspended {
-			LoggerInfo("gestures", "quit_frontmost_app was cancelled before a process window close: the script is suspended.")
+		if A_IsSuspended || Transition != _LifecycleLatestTransition {
+			LoggerInfo("gestures", "quit_frontmost_app was cancelled before a process window close: suspended or original lifecycle transition retired.")
 			return false
 		}
 		Closed += Sys.PostClose(Hwnd) ? 1 : 0
